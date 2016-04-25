@@ -1,8 +1,32 @@
-# BashOnWindows
 This repo is for the reporting of issues found within and when using Bash on Ubuntu on Windows.
 
-Note: If you would like us to consider adding and/or changing features, behaviors, etc., please [post on our UserVoice forum](http://aka.ms/winbashuv). Be sure to search on UserVoice before adding a new ask in order to avoid unnecessarily duplicating the same ask multiple times.
+######Labels
+This and our User Voice page are your best ways to interact directly with the Bash on Ubuntu on Windows teams.  We will be monitoring and responding to issues as best we can.  In the spirit of openness we will be tagging issues with the following:
 
-Release notes for insider builds are available at: [https://msdn.microsoft.com/en-us/commandline/wsl/release_notes](https://msdn.microsoft.com/en-us/commandline/wsl/release_notes)
+- **Bug** – We consider this issue to be a bug internally.  This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change.  Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
+  - Example: No internet connectivity in Bash [(#5)](https://github.com/Microsoft/BashOnWindows/issues/5)
 
-We'll also be posting samples, etc. here so be sure to bookmark and come back regularly!
+- **Feature** – Denotes something that is not yet implemented.  The community should use our User Voice page for voting on which features everyone feels as the most important.  The team will take the User Voice page as input in deciding what to work on next.
+  - Example:  Docker is not working [(#85)](https://github.com/Microsoft/BashOnWindows/issues/85)
+
+- **Discussion** – Denotes a discussion on the board that does not relate to a specific feature.
+  - Example: Windows Subsystem for Linux is not open source [(#178)](https://github.com/Microsoft/BashOnWindows/issues/178)
+
+- **FixInbound** – When possible, we will mark bugs that have been fixed internally.  Unfortunately we cannot say specifically when the bug will hit the insider flights.
+
+- **ByDesign** – Denotes that an issue is raised that we consider is working as intended.  We will give some reasoning why this is by design.  After one week we will either close the issue or mark as Discussion depending on what comes up.
+
+Additional tags may be used to denote specific types of issues.  These include items such as network or symlink. 
+
+######Closing
+Issues may be closed the original poster at any time.  We will close issues if:
+- One week passes after the change goes out to the Insider Fast ring
+- An issue is clearly a dup of another.  The duplicate will be linked
+- Any discussion that has clearly run its course
+
+######Important Links
+- Documentation:  https://msdn.microsoft.com/en-us/commandline/wsl/about
+- Release Notes: https://msdn.microsoft.com/en-us/commandline/wsl/release_notes
+- User Voice: https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash
+- WSL Blog: https://blogs.msdn.microsoft.com/wsl
+- Console Blog: https://blogs.msdn.microsoft.com/commandline/
