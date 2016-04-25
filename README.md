@@ -1,9 +1,9 @@
 This repo is for the reporting of issues found within and when using Bash on Ubuntu on Windows.
 
 ######Labels
-This and our User Voice page are your best ways to interact directly with the Bash on Ubuntu on Windows teams.  We will be monitoring and responding to issues as best we can.  In the spirit of openness we will be tagging issues with the following:
+This and our User Voice page are your best ways to interact directly with the Bash on Ubuntu on Windows teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. In the spirit of openness we will be tagging issues with the following:
 
-- **Bug** – We consider this issue to be a bug internally.  This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change.  Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
+- **Bug** – We consider this issue to be a bug internally. This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change. Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
   - Example: No internet connectivity in Bash [(#5)](https://github.com/Microsoft/BashOnWindows/issues/5)
 
 - **Feature** – Denotes something that is not yet implemented.  The community should use our User Voice page for voting on which features everyone feels as the most important.  The team will take the User Voice page as input in deciding what to work on next.
