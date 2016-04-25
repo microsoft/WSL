@@ -3,18 +3,18 @@ This repo is for the reporting of issues found within and when using Bash on Ubu
 ######Labels
 This and our User Voice page are your best ways to interact directly with the Bash on Ubuntu on Windows teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. In the spirit of openness we will be tagging issues with the following:
 
-- **Bug** – We consider this issue to be a bug internally. This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change. Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
+- **bug** – We consider this issue to be a bug internally. This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change. Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
   - Example: No internet connectivity in Bash [(#5)](https://github.com/Microsoft/BashOnWindows/issues/5)
 
-- **Feature** – Denotes something that is not yet implemented.  The community should use our User Voice page for voting on which features everyone feels as the most important.  The team will take the User Voice page as input in deciding what to work on next.
+- **feature** – Denotes something that is not yet implemented.  The community should use our User Voice page for voting on which features everyone feels as the most important.  The team will take the User Voice page as input in deciding what to work on next.
   - Example:  Docker is not working [(#85)](https://github.com/Microsoft/BashOnWindows/issues/85)
 
-- **Discussion** – Denotes a discussion on the board that does not relate to a specific feature.
+- **discussion** – Denotes a discussion on the board that does not relate to a specific feature.
   - Example: Windows Subsystem for Linux is not open source [(#178)](https://github.com/Microsoft/BashOnWindows/issues/178)
 
-- **FixInbound** – When possible, we will mark bugs that have been fixed internally.  Unfortunately we cannot say specifically when the bug will hit the insider flights.
+- **fixinbound** – When possible, we will mark bugs that have been fixed internally.  Unfortunately we cannot say specifically when the bug will hit the insider flights.
 
-- **ByDesign** – Denotes that an issue is raised that we consider is working as intended.  We will give some reasoning why this is by design.  After one week we will either close the issue or mark as Discussion depending on what comes up.
+- **bydesign** – Denotes that an issue is raised that we consider is working as intended.  We will give some reasoning why this is by design.  After one week we will either close the issue or mark as Discussion depending on what comes up.
 
 Additional tags may be used to denote specific types of issues.  These include items such as network or symlink. 
 
