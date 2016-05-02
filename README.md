@@ -30,4 +30,4 @@ Issues may be closed the original poster at any time.  We will close issues if:
 - User Voice: https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash
 - WSL Blog: https://blogs.msdn.microsoft.com/wsl
 - Console Blog: https://blogs.msdn.microsoft.com/commandline/
-- A community powered list of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
+- Community powered list of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
