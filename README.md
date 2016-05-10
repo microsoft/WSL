@@ -19,7 +19,7 @@ This and our User Voice page are your best ways to interact directly with the Ba
 Additional tags may be used to denote specific types of issues.  These include items such as network or symlink. 
 
 ######Closing
-Issues may be closed the original poster at any time.  We will close issues if:
+Issues may be closed by the original poster at any time.  We will close issues if:
 - One week passes after the change goes out to the Insider Fast ring
 - An issue is clearly a dup of another.  The duplicate will be linked
 - Any discussion that has clearly run its course
