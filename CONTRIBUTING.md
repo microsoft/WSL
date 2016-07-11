@@ -74,7 +74,8 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 ...
 ```
 
-7) Additional information
+###7) Additional information
+
 Some bugs require additional information such as scripts to reproduce.  Please add to this section.
 
 If there are files required, email the files to InsiderSupport@microsoft.com with:
@@ -87,4 +88,38 @@ Additional strace logs if the error occurs within a fork.  The following command
 
 ``` 
 $ strace -ff -o <outputfile> <command> 
+```
+
+###8) Detailed Logs
+Some bugs will require more detailed logs to help determine the cause.  There is a CMD command to start detailed logging and another to stop.  The logs are generated locally into the working directory.
+
+####Start
+
+``` 
+>logman.exe create trace lxcore_kernel -p {0CD1C309-0878-4515-83DB-749843B3F5C9} -mode 0x00000008 -ft 10:00 -o .\lxcore_kernel.etl -ets 
+>logman create trace lxcore_adss -p {754E4536-6735-4194-BE81-1374BD2E9B0D} -ft 1:00 -rt -o .\lxcore_adss.etl -ets 
+>logman create trace lxcore_user -p {D90B9468-67F0-5B3B-42CC-82AC81FFD960} -ft 1:00 -rt -o .\lxcore_user.etl -ets 
+>logman create trace lxcore_service -p {B99CDB5A-039C-5046-E672-1A0DE0A40211} -ft 1:00 -rt -o .\lxcore_service.etl -ets 
+``` 
+
+####Stop 
+
+(example runs in the C:\temp directory)
+
+``` 
+>logman stop lxcore_kernel -ets
+>logman stop lxcore_adss -ets
+>logman stop lxcore_user -ets
+>logman stop lxcore_service -ets
+``` 
+
+####Output
+
+Files generated are in the directory where the commands above ran:
+
+```          
+lxcore_adss.etl
+lxcore_kernel.etl
+lxcore_service.etl
+lxcore_user.etl
 ```
