@@ -1,4 +1,4 @@
-####Please include:
+Please include:
 
 * A brief description
 
@@ -10,4 +10,4 @@
 
 * Required packages and commands to install
 
-##### See [contributing.md](contributing.md) for assistance.
+See contributing.md for assistance.
