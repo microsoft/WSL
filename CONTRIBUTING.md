@@ -5,7 +5,7 @@ A well written bug will follow the template:
 
 A title succinctly describing the issue. 
 
-####Example
+####Example:
 
 `Traceroute not working.`
 
@@ -14,7 +14,7 @@ A title succinctly describing the issue.
 
 A brief description of what you are attemping to run.
 
-####Example
+####Example:
 
 `IP_MTU_DISCOVER error when running traceroute.`
 
@@ -27,7 +27,7 @@ C:\>ver
 Microsoft Windows [Version 10.0.14385] 
 ``` 
 
-####Example
+####Example:
 
 `Microsoft Windows [Version 10.0.14385]`
 
@@ -35,14 +35,14 @@ Microsoft Windows [Version 10.0.14385]
 
 Should include all packages and environmental variables as well as other required configuration.
 
-####Example
+####Example:
 
 `$ sudo apt-get install traceroute`
 `$ traceroute www.microsoft.com`
 
 ###5) Copy of the terminal output
 
-####Example
+####Example:
 
 ```
 russ@RUSSALEX-BOOK:/mnt/c$ traceroute www.microsoft.com
@@ -60,7 +60,7 @@ $ strace <command>
 
 Strace can produce a very long output.  If this is more than about 20 lines please paste this into [Gist](https://gist.github.com/) or another paste service and link in the bug.
 
-####Example
+####Example:
 
 ```
 russ@RUSSALEX-BOOK:/mnt/c$ strace traceroute www.microsoft.com
