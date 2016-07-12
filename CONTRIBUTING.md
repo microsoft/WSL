@@ -31,7 +31,7 @@ Microsoft Windows [Version 10.0.14385]
 
 `Microsoft Windows [Version 10.0.14385]`
 
-###4) All commands required to reproduce the error
+###4) Steps required to reproduce
 
 Should include all packages and environmental variables as well as other required configuration.
 
@@ -50,7 +50,11 @@ traceroute to www.microsoft.com (23.75.239.28), 30 hops max, 60 byte packets
 setsockopt IP_MTU_DISCOVER: Invalid argument
 ```
 
-###6) Strace of the failing command
+###6) Expected Behavior
+
+What was the expected result of the command?  Include examples / documentation if possible.
+
+###7) Strace of the failing command
 
 Run the failing command under [strace] (http://manpages.ubuntu.com/manpages/wily/man1/strace.1.html).  Normal command structure is:
 
@@ -74,7 +78,7 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 ...
 ```
 
-###7) Additional information
+###8) Additional information
 
 Some bugs require additional information such as scripts to reproduce.  Please add to this section.
 
@@ -90,7 +94,7 @@ Additional strace logs if the error occurs within a fork.  The following command
 $ strace -ff -o <outputfile> <command> 
 ```
 
-###8) Detailed Logs
+###9) Detailed Logs
 Some bugs will require more detailed logs to help determine the cause.  There is a CMD command to start detailed logging and another to stop.  The logs are generated locally into the working directory.
 
 ####Start
@@ -103,8 +107,6 @@ Some bugs will require more detailed logs to help determine the cause.  There is
 ``` 
 
 ####Stop 
-
-(example runs in the C:\temp directory)
 
 ``` 
 >logman stop lxcore_kernel -ets
