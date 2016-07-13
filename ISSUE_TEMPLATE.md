@@ -1,13 +1,17 @@
-Please include:
+Please use the following bug reporting template to help produce actionable and reproduceable issues:
 
 * A brief description
 
+* Expected results
+
+* Actual results (with terminal output if applicable)
+
 * Your Windows build number
 
-* Commands required to reproduce the error
+* Steps / commands required to reproduce the error
 
 * Strace of the failing command
 
 * Required packages and commands to install
 
-See contributing.md for assistance.
+See [our contributing instructions](/CONTRIBUTING.md) for assistance.
