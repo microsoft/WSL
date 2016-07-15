@@ -1,4 +1,4 @@
-Please use the following bug reporting template to help produce actionable and reproduceable issues:
+Please use the following bug reporting template to help produce actionable and reproducible issues:
 
 * A brief description
 
