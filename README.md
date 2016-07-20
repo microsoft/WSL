@@ -31,3 +31,4 @@ Issues may be closed by the original poster at any time.  We will close issues i
 - WSL Blog: https://blogs.msdn.microsoft.com/wsl
 - Console Blog: https://blogs.msdn.microsoft.com/commandline/
 - Community powered list of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
+- Community powered discussion forum: http://wsl-forum.qztc.io/
