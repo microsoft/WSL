@@ -33,3 +33,4 @@ Issues may be closed by the original poster at any time.  We will close issues i
 - Stack Overflow: https://stackoverflow.com/questions/tagged/wsl
 - Community powered list of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
 - Community powered discussion forum: http://wsl-forum.qztc.io/
+- Community powered tips and guides for users: [Crowdsourced tips for Ubuntu on Windows](https://github.com/abergs/ubuntuonwindows)
