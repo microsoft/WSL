@@ -24,13 +24,15 @@ Issues may be closed by the original poster at any time.  We will close issues i
 - An issue is clearly a dup of another.  The duplicate will be linked
 - Any discussion that has clearly run its course
 
-###Important Links
+###Microsoft Links
 - Documentation:  https://msdn.microsoft.com/en-us/commandline/wsl/about
 - Release Notes: https://msdn.microsoft.com/en-us/commandline/wsl/release_notes
 - User Voice: https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash
 - WSL Blog: https://blogs.msdn.microsoft.com/wsl
 - Console Blog: https://blogs.msdn.microsoft.com/commandline/
+
+###Community Links
 - Stack Overflow: https://stackoverflow.com/questions/tagged/wsl
-- Community powered list of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
-- Community powered discussion forum: http://wsl-forum.qztc.io/
-- Community powered tips and guides for users: [Crowdsourced tips for Ubuntu on Windows](https://github.com/abergs/ubuntuonwindows)
+- List of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
+- Discussion forum: http://wsl-forum.qztc.io
+- Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
