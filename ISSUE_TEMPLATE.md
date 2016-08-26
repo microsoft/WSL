@@ -1,4 +1,4 @@
-Please use the following bug reporting template to help produce actionable and reproducible issues:
+Please use the following bug reporting template to help produce actionable and reproducible issues. Please try to ensure that the reproduction is minimal so that the team can go through more bugs!
 
 * A brief description
 
