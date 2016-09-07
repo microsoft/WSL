@@ -1,6 +1,6 @@
 Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux.
 
-Please do not open Github issues for Windows crashes (BSODs) or security issues.  Please direct all Windows crashes and security issues to secure@microsoft.com.
+Do not open Github issues for Windows crashes (BSODs) or security issues.  Please direct all Windows crashes and security issues to secure@microsoft.com.  Issues with security vulerabilities may be edited to hide the vulnerability details.
 
 A well written bug will follow the template:
 
