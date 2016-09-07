@@ -1,4 +1,7 @@
 Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux.
+
+Please do not open Github issues for Windows crashes (BSODs) or security issues.  Please direct all Windows crashes and security issues to secure@microsoft.com.
+
 A well written bug will follow the template:
 
 ###1) Issue Title
