@@ -8,7 +8,7 @@ Please use the following bug reporting template to help produce actionable and r
 
 * Your Windows build number
 
-* Steps / commands required to reproduce the error
+* Steps / All commands required to reproduce the error from a brand new installation 
 
 * Strace of the failing command
 
