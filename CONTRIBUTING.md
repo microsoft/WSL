@@ -30,6 +30,8 @@ C:\>ver
 Microsoft Windows [Version 10.0.14385] 
 ``` 
 
+Note: The Windows Insider builds contain many updates and fixes. If you are running on the Anniversary Update (10.0.14393) please check to see if your issue has been resolved in a later build.
+
 ####Example:
 
 `Microsoft Windows [Version 10.0.14385]`
