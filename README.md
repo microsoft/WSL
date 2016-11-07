@@ -1,4 +1,5 @@
 This repo is for the reporting of issues found within and when using Bash on Ubuntu on Windows.
+- Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulerabilities may be edited to hide the vulnerability details.
 
 ###Labels
 This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) are your best ways to interact directly with the Bash on Ubuntu on Windows teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. In the spirit of openness we will be tagging issues with the following:
