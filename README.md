@@ -37,3 +37,6 @@ Issues may be closed by the original poster at any time.  We will close issues i
 - List of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
 - Discussion forum: http://wsl-forum.qztc.io
 - Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
+
+###Troubleshooting
+Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting).
