@@ -15,7 +15,7 @@ A title succinctly describing the issue.
 
 ###2) Brief description
 
-A brief description of what you are attemping to run.
+A brief description of what you are attempting to run.
 
 ####Example:
 
