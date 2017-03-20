@@ -1,7 +1,8 @@
 This repo is for the reporting of issues found within and when using Bash on Ubuntu on Windows.
 - Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulnerabilities may be edited to hide the vulnerability details.
 
-###Labels
+### Labels:
+
 This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) are your best ways to interact directly with the Bash on Ubuntu on Windows teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. In the spirit of openness we will be tagging issues with the following:
 
 - **bug** – We consider this issue to be a bug internally. This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change. Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
@@ -19,24 +20,28 @@ This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command
 
 Additional tags may be used to denote specific types of issues.  These include items such as network or symlink.
 
-###Closing
+### Closing:
+
 Issues may be closed by the original poster at any time.  We will close issues if:
 - One week passes after the change goes out to the Insider Fast ring
 - An issue is clearly a dup of another.  The duplicate will be linked
 - Any discussion that has clearly run its course
 
-###Microsoft Links
+### Microsoft Links:
+
 - Documentation:  https://msdn.microsoft.com/en-us/commandline/wsl/about
 - Release Notes: https://msdn.microsoft.com/en-us/commandline/wsl/release_notes
 - User Voice: https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash
 - WSL Blog: https://blogs.msdn.microsoft.com/wsl
 - Console Blog: https://blogs.msdn.microsoft.com/commandline/
 
-###Community Links
+### Community Links:
+
 - Stack Overflow: https://stackoverflow.com/questions/tagged/wsl
 - List of programs that work and don't work: https://github.com/ethanhs/WSL-Programs
 - Discussion forum: http://wsl-forum.qztc.io
 - Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
 
-###Troubleshooting
+### Troubleshooting:
+
 Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting).
