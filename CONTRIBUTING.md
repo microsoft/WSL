@@ -4,16 +4,16 @@ Do not open Github issues for Windows crashes (BSODs) or security issues.  Pleas
 
 A well written bug will follow the template:
 
-###1) Issue Title
+### 1) Issue Title
 
 A title succinctly describing the issue. 
 
-####Example:
+#### Example:
 
 `Traceroute not working.`
 
 
-###2) Brief description
+### 2) Brief description
 
 A brief description of what you are attempting to run.
 
@@ -21,7 +21,7 @@ A brief description of what you are attempting to run.
 
 `IP_MTU_DISCOVER error when running traceroute.`
 
-###3) Windows version / build number
+### 3) Windows version / build number
 
 Your Windows build number.  This can be gathered from the CMD prompt using the `ver` command.
 
@@ -32,22 +32,22 @@ Microsoft Windows [Version 10.0.14385]
 
 Note: The Windows Insider builds contain many updates and fixes. If you are running on the Anniversary Update (10.0.14393) please check to see if your issue has been resolved in a later build.
 
-####Example:
+#### Example:
 
 `Microsoft Windows [Version 10.0.14385]`
 
-###4) Steps required to reproduce
+### 4) Steps required to reproduce
 
 Should include all packages and environmental variables as well as other required configuration.
 
-####Example:
+#### Example:
 
 `$ sudo apt-get install traceroute`
 `$ traceroute www.microsoft.com`
 
-###5) Copy of the terminal output
+### 5) Copy of the terminal output
 
-####Example:
+#### Example:
 
 ```
 russ@RUSSALEX-BOOK:/mnt/c$ traceroute www.microsoft.com
@@ -55,11 +55,11 @@ traceroute to www.microsoft.com (23.75.239.28), 30 hops max, 60 byte packets
 setsockopt IP_MTU_DISCOVER: Invalid argument
 ```
 
-###6) Expected Behavior
+### 6) Expected Behavior
 
 What was the expected result of the command?  Include examples / documentation if possible.
 
-###7) Strace of the failing command
+### 7) Strace of the failing command
 
 Run the failing command under [strace] (http://manpages.ubuntu.com/manpages/wily/man1/strace.1.html).  Normal command structure is:
 
@@ -69,7 +69,7 @@ $ strace <command>
 
 Strace can produce a very long output.  If this is more than about 20 lines please paste this into [Gist](https://gist.github.com/) or another paste service and link in the bug.
 
-####Example:
+#### Example:
 
 ```
 russ@RUSSALEX-BOOK:/mnt/c$ strace traceroute www.microsoft.com
@@ -83,7 +83,7 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 ...
 ```
 
-###8) Additional information
+### 8) Additional information
 
 Some bugs require additional information such as scripts to reproduce.  Please add to this section.
 
@@ -99,10 +99,10 @@ Additional strace logs if the error occurs within a fork.  The following command
 $ strace -ff -o <outputfile> <command> 
 ```
 
-###9) Detailed Logs
+### 9) Detailed Logs
 Some bugs will require more detailed logs to help determine the cause.  There is a CMD command to start detailed logging and another to stop.  The logs are generated locally into the working directory.
 
-####Start
+#### Start
 
 ``` 
 >logman.exe create trace lxcore_kernel -p {0CD1C309-0878-4515-83DB-749843B3F5C9} -mode 0x00000008 -ft 10:00 -o .\lxcore_kernel.etl -ets 
@@ -111,7 +111,7 @@ Some bugs will require more detailed logs to help determine the cause.  There is
 >logman create trace lxcore_service -p {B99CDB5A-039C-5046-E672-1A0DE0A40211} -ft 1:00 -rt -o .\lxcore_service.etl -ets 
 ``` 
 
-####Stop 
+#### Stop 
 
 ``` 
 >logman stop lxcore_kernel -ets
@@ -120,7 +120,7 @@ Some bugs will require more detailed logs to help determine the cause.  There is
 >logman stop lxcore_service -ets
 ``` 
 
-####Output
+#### Output
 
 Files generated are in the directory where the commands above ran:
 
