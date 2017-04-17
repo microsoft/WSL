@@ -1,17 +1,15 @@
-Please use the following bug reporting template to help produce actionable and reproducible issues. Please try to ensure that the reproduction is minimal so that the team can go through more bugs!
+This bug-tracker is monitored by developers and other technical types.  We like detail!  So please use this form and tell us, concisely but precisely, what's up.  Please fill out ALL THE FIELDS!
 
-* A brief description
+If you have a feature request, please post to [the UserVoice](https://wpdev.uservoice.com/forums/266908).  If you're reporting a BSOD, don't post here!  Instead, e-mail "secure@microsoft.com", and if possible attach the minidump from "C:\Windows\minidump\".
 
-* Expected results
 
-* Actual results (with terminal output if applicable)
+* Your Windows build number:  (Type `ver` at a Windows Command Prompt)
 
-* Your Windows build number
+* What you're doing and what's happening:  (Copy&paste specific commands and their output, or include screen shots)
 
-* Steps / All commands required to reproduce the error from a brand new installation 
+* What's wrong / what should be happening instead:
 
-* Strace of the failing command
+* Strace of the failing command, if applicable:  (If `<cmd>` is failing, then run `strace -o strace.txt -ff <cmd>`, and post the strace.txt output here)
 
-* Required packages and commands to install
 
 See [our contributing instructions](/CONTRIBUTING.md) for assistance.

@@ -1,5 +1,7 @@
 Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux.
 
+This Github issues page is a bugtracker.  It's intended for technical discussion and for debugging specific issues.  If you have a feature request, you should instead post it to the [UserVoice](https://wpdev.uservoice.com/forums/266908).  The UserVoice is better for tracking feature requests; it has a voting mechanism so the WSL team can put a higher priority behind issues that affect more people.
+
 Do not open Github issues for Windows crashes (BSODs) or security issues.  Please direct all Windows crashes and security issues to secure@microsoft.com.  Issues with security vulnerabilities may be edited to hide the vulnerability details.
 
 A well written bug will follow the template:
@@ -13,15 +15,7 @@ A title succinctly describing the issue.
 `Traceroute not working.`
 
 
-### 2) Brief description
-
-A brief description of what you are attempting to run.
-
-####Example:
-
-`IP_MTU_DISCOVER error when running traceroute.`
-
-### 3) Windows version / build number
+### 2) Windows version / build number
 
 Your Windows build number.  This can be gathered from the CMD prompt using the `ver` command.
 
@@ -30,13 +24,13 @@ C:\>ver
 Microsoft Windows [Version 10.0.14385] 
 ``` 
 
-Note: The Windows Insider builds contain many updates and fixes. If you are running on the Anniversary Update (10.0.14393) please check to see if your issue has been resolved in a later build.
+Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on the Anniversary Update (10.0.14393), please try updating to the Creators Update.
 
 #### Example:
 
-`Microsoft Windows [Version 10.0.14385]`
+`Microsoft Windows [Version 10.0.16170]`
 
-### 4) Steps required to reproduce
+### 3) Steps required to reproduce
 
 Should include all packages and environmental variables as well as other required configuration.
 
@@ -45,7 +39,7 @@ Should include all packages and environmental variables as well as other require
 `$ sudo apt-get install traceroute`
 `$ traceroute www.microsoft.com`
 
-### 5) Copy of the terminal output
+### 4) Copy of the terminal output
 
 #### Example:
 
@@ -55,16 +49,16 @@ traceroute to www.microsoft.com (23.75.239.28), 30 hops max, 60 byte packets
 setsockopt IP_MTU_DISCOVER: Invalid argument
 ```
 
-### 6) Expected Behavior
+### 5) Expected Behavior
 
 What was the expected result of the command?  Include examples / documentation if possible.
 
-### 7) Strace of the failing command
+### 6) Strace of the failing command
 
 Run the failing command under [strace] (http://manpages.ubuntu.com/manpages/wily/man1/strace.1.html).  Normal command structure is:
 
 ```                           
-$ strace <command> 
+$ strace -ff <command> 
 ```          
 
 Strace can produce a very long output.  If this is more than about 20 lines please paste this into [Gist](https://gist.github.com/) or another paste service and link in the bug.
@@ -83,7 +77,7 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 ...
 ```
 
-### 8) Additional information
+### 7) Additional information
 
 Some bugs require additional information such as scripts to reproduce.  Please add to this section.
 
@@ -99,7 +93,7 @@ Additional strace logs if the error occurs within a fork.  The following command
 $ strace -ff -o <outputfile> <command> 
 ```
 
-### 9) Detailed Logs
+### 8) Detailed Logs
 Some bugs will require more detailed logs to help determine the cause.  There is a CMD command to start detailed logging and another to stop.  The logs are generated locally into the working directory.
 
 #### Start
