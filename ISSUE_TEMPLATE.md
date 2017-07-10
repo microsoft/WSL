@@ -12,4 +12,4 @@ If you have a feature request, please post to [the UserVoice](https://wpdev.user
 * Strace of the failing command, if applicable:  (If `<cmd>` is failing, then run `strace -o strace.txt -ff <cmd>`, and post the strace.txt output here)
 
 
-See [our contributing instructions](/CONTRIBUTING.md) for assistance.
+See [our contributing instructions](https://github.com/Microsoft/BashOnWindows/blob/master/CONTRIBUTING.md) for assistance.
