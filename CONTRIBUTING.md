@@ -55,7 +55,7 @@ What was the expected result of the command?  Include examples / documentation i
 
 ### 6) Strace of the failing command
 
-Run the failing command under [strace] (http://manpages.ubuntu.com/manpages/wily/man1/strace.1.html).  Normal command structure is:
+Run the failing command under [strace](http://manpages.ubuntu.com/manpages/wily/man1/strace.1.html).  Normal command structure is:
 
 ```                           
 $ strace -ff <command> 
