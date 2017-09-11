@@ -2,6 +2,7 @@ This bug-tracker is monitored by developers and other technical types.  We like 
 
 If you have a feature request, please post to [the UserVoice](https://wpdev.uservoice.com/forums/266908).  If you're reporting a BSOD, don't post here!  Instead, e-mail "secure@microsoft.com", and if possible attach the minidump from "C:\Windows\minidump\".
 
+**Important: When reporting BSODs or security issues, DO NOT attach memory dumps, logs, or traces to Github issues**. Instead, send dumps/traces to secure@microsoft.com, referencing the GitHub bug number.
 
 * Your Windows build number:  (Type `ver` at a Windows Command Prompt)
 
