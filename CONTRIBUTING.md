@@ -2,21 +2,29 @@ Please provide as much information as possible when reporting a bug or filing an
 
 This Github issues page is a bugtracker.  It's intended for technical discussion and for debugging specific issues.  If you have a feature request, you should instead post it to the [UserVoice](https://wpdev.uservoice.com/forums/266908).  The UserVoice is better for tracking feature requests; it has a voting mechanism so the WSL team can put a higher priority behind issues that affect more people.
 
-Do not open Github issues for Windows crashes (BSODs) or security issues.  Please direct all Windows crashes and security issues to secure@microsoft.com.  Issues with security vulnerabilities may be edited to hide the vulnerability details.
+## Important: Reporting BSODs and Security issues
+Please pay special attention if you want to report BSOD or security issues:
 
-A well written bug will follow the template:
+### BSODs
+When reporting BSODs, **DO NOT attach memory dumps or traces to Github issues**. Instead, send Windows crashes to secure@microsoft.com, referencing the GitHub bug number. 
+
+### Security Issues
+Special care should be taken when reporting security issues to avoid exposing sensitive information.
+
+Only send traces or logs when specifically asked to by a WSL team member, to secure@microsoft.com, referencing the GitHub bug number.
+
+> Note: Issues with security vulnerabilities may be edited to hide the vulnerability details.
+
+## Reporting issues in WSL
+A well written bug will follow the following template:
 
 ### 1) Issue Title
-
 A title succinctly describing the issue. 
 
 #### Example:
-
 `Traceroute not working.`
 
-
 ### 2) Windows version / build number
-
 Your Windows build number.  This can be gathered from the CMD prompt using the `ver` command.
 
 ```
@@ -60,7 +68,7 @@ Run the failing command under [strace](http://manpages.ubuntu.com/manpages/wily/
 $ strace -ff <command> 
 ```          
 
-Strace can produce a very long output.  If this is more than about 20 lines please paste this into [Gist](https://gist.github.com/) or another paste service and link in the bug.
+> Note: `strace` can produce lengthy output. If the generated trace is more than about 20 lines please paste this into a [Gist](https://gist.github.com/) or another paste service and link in the bug.
 
 #### Example:
 
