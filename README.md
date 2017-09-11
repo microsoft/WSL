@@ -8,7 +8,7 @@ This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command
 - **bug** – We consider this issue to be a bug internally. This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change. Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
   - Example: No internet connectivity in Bash [(#5)](https://github.com/Microsoft/BashOnWindows/issues/5)
 
-- **feature** – Denotes something that is not yet implemented.  The community should use our User Voice page for voting on which features everyone feels as the most important.  The team will take the User Voice page as input in deciding what to work on next.
+- **feature** – Denotes something that is not yet implemented.  The community should use our [User Voice](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) page for voting on which features everyone feels as the most important.  The team will take the User Voice page as input in deciding what to work on next.
   - Example:  Docker is not working [(#85)](https://github.com/Microsoft/BashOnWindows/issues/85)
 
 - **discussion** – Denotes a discussion on the board that does not relate to a specific feature.
