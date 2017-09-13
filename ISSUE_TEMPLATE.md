@@ -1,8 +1,8 @@
 This bug-tracker is monitored by developers and other technical types.  We like detail!  So please use this form and tell us, concisely but precisely, what's up.  Please fill out ALL THE FIELDS!
 
-If you have a feature request, please post to [the UserVoice](https://wpdev.uservoice.com/forums/266908).  If you're reporting a BSOD, don't post here!  Instead, e-mail "secure@microsoft.com", and if possible attach the minidump from "C:\Windows\minidump\".
+If you have a feature request, please post to [the UserVoice](https://wpdev.uservoice.com/forums/266908).
 
-**Important: When reporting BSODs or security issues, DO NOT attach memory dumps, logs, or traces to Github issues**. Instead, send dumps/traces to secure@microsoft.com, referencing the GitHub bug number.
+**Important: When reporting BSODs or security issues, DO NOT attach memory dumps, logs, or traces to Github issues**. Instead, send dumps/traces to secure@microsoft.com, referencing the GitHub bug number. Ideally, please [configure your machine to capture minidumps](https://support.microsoft.com/en-us/help/315263/how-to-read-the-small-memory-dump-file-that-is-created-by-windows-if-a), repro the issue, and send the minidump from "C:\Windows\minidump\".
 
 * Your Windows build number:  (Type `ver` at a Windows Command Prompt)
 
