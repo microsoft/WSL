@@ -10,7 +10,7 @@ If you have a feature request, please post to [the UserVoice](https://wpdev.user
 
 * What's wrong / what should be happening instead:
 
-* Strace of the failing command, if applicable:  (If `<cmd>` is failing, then run `strace -o strace.txt -ff <cmd>`, and post the strace.txt output here)
+* Strace of the failing command, if applicable:  (If `some_command` is failing, then run `strace -o some_command.strace -f some_command some_args`, and link the contents of `some_command.strace` in a [gist](https://gist.github.com/) here)
 
 
 See [our contributing instructions](https://github.com/Microsoft/BashOnWindows/blob/master/CONTRIBUTING.md) for assistance.
