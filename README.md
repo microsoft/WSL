@@ -1,9 +1,9 @@
-This repo is for the reporting of issues found within and when using Bash on Ubuntu on Windows.
+This repo is for the reporting of issues found within and when using Windows Subsystem for Linux.
 - Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulnerabilities may be edited to hide the vulnerability details.
 
 ### Labels:
 
-This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) are your best ways to interact directly with the Bash on Ubuntu on Windows teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. In the spirit of openness we will be tagging issues with the following:
+This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) are your best ways to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. In the spirit of openness we will be tagging issues with the following:
 
 - **bug** – We consider this issue to be a bug internally. This tag is generally for bugs in implemented features, or something we consider to be a “bug level” change. Things marked with Bug have a corresponding bug in on Microsoft’s internal bug tracking system.
   - Example: No internet connectivity in Bash [(#5)](https://github.com/Microsoft/BashOnWindows/issues/5)
