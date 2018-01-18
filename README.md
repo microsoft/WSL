@@ -1,6 +1,12 @@
 This repo is for the reporting of issues found within and when using Windows Subsystem for Linux.
 - Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulnerabilities may be edited to hide the vulnerability details.
 
+## Reporting issues in Windows Console or WSL text rendering/user experience
+Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
+
+![All consoles are Windows Console!](assets/WindowsConsole.jpg)
+
+
 ### Labels:
 
 This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) are your best ways to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. In the spirit of openness we will be tagging issues with the following:

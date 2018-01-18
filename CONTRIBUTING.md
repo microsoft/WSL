@@ -15,6 +15,11 @@ Only send traces or logs when specifically asked to by a WSL team member, to sec
 
 > Note: Issues with security vulnerabilities may be edited to hide the vulnerability details.
 
+## Reporting issues in Windows Console or WSL text rendering/user experience
+Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
+
+![All consoles are Windows Console!](assets/WindowsConsole.jpg)
+
 ## Reporting issues in WSL
 A well written bug will follow the following template:
 
