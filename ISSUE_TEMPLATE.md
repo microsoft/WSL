@@ -16,4 +16,4 @@ If this is a console issue (a problem with layout, rendering, colors, etc.), ple
 * Strace of the failing command, if applicable:  (If `some_command` is failing, then run `strace -o some_command.strace -f some_command some_args`, and link the contents of `some_command.strace` in a [gist](https://gist.github.com/) here)
 
 
-See [our contributing instructions](https://github.com/Microsoft/BashOnWindows/blob/master/CONTRIBUTING.md) for assistance.
+See [our contributing instructions](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) for assistance.
