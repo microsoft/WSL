@@ -46,6 +46,7 @@ Issues may be closed by the original poster at any time.  We will close issues i
 - List of programs that work and don't work
     - https://github.com/ethanhs/WSL-Programs
     - https://github.com/davatron5000/can-i-subsystem-it
+- Awesome WSL: https://github.com/sirredbeard/Awesome-WSL
 - Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
 
 ### Troubleshooting:
