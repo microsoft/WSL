@@ -4,7 +4,7 @@ If you have a feature request, please post to [the UserVoice](https://wpdev.user
 
 If this is a console issue (a problem with layout, rendering, colors, etc.), please post to the [console issue tracker](https://github.com/microsoft/console/issues).
 
-**Important: Do not open GitHub issues for Windows crashes (BSODs) or security issues.**  Please direct all Windows crashes and security issues to secure@microsoft.com, and reference the GitHub bug number.  Ideally, please [configure your machine to capture minidumps](https://support.microsoft.com/en-us/help/315263/how-to-read-the-small-memory-dump-file-that-is-created-by-windows-if-a), repro the issue, and send the minidump from "C:\Windows\minidump\".
+**Important: Do not open GitHub issues for Windows crashes (BSODs) or security issues.**  Please direct all Windows crashes and security issues to secure@microsoft.com.  Ideally, please [configure your machine to capture minidumps](https://support.microsoft.com/en-us/help/315263/how-to-read-the-small-memory-dump-file-that-is-created-by-windows-if-a), repro the issue, and send the minidump from "C:\Windows\minidump\".
 
 
 **Please fill out the below information:**
