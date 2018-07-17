@@ -3,17 +3,7 @@ Please provide as much information as possible when reporting a bug or filing an
 This Github issues page is a bugtracker.  It's intended for technical discussion and for debugging specific issues.  If you have a feature request, you should instead post it to the [UserVoice](https://wpdev.uservoice.com/forums/266908).  The UserVoice is better for tracking feature requests; it has a voting mechanism so the WSL team can put a higher priority behind issues that affect more people.
 
 ## Important: Reporting BSODs and Security issues
-Please pay special attention if you want to report BSOD or security issues:
-
-### BSODs
-When reporting BSODs, **DO NOT attach memory dumps or traces to Github issues**. Instead, send Windows crashes to secure@microsoft.com, referencing the GitHub bug number. 
-
-### Security Issues
-Special care should be taken when reporting security issues to avoid exposing sensitive information.
-
-Only send traces or logs when specifically asked to by a WSL team member, to secure@microsoft.com, referencing the GitHub bug number.
-
-> Note: Issues with security vulnerabilities may be edited to hide the vulnerability details.
+**Do not open Github issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com. 
 
 ## Reporting issues in Windows Console or WSL text rendering/user experience
 Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
