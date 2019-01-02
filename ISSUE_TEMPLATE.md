@@ -1,4 +1,4 @@
-This bug-tracker is monitored by developers and other technical types.  We like detail!  So please use this form and tell us, concisely but precisely, what's up.  Please fill out ALL THE FIELDS!  Issues with missing or incomplete issue templates will be closed.
+Please use the following bug reporting template to help produce issues which are actionable and reproducible, including **all** command-line steps necessary to induce the failure condition. Please fill out **all** the fields! Issues with missing or incomplete issue templates will be closed.
 
 If you have a feature request, please post to [the UserVoice](https://wpdev.uservoice.com/forums/266908).
 
@@ -10,7 +10,7 @@ If this is a console issue (a problem with layout, rendering, colors, etc.), ple
 **Please fill out the below information:**
 * Your Windows build number:  (Type `ver` at a Windows Command Prompt)
 
-* What you're doing and what's happening:  (Copy&paste specific commands and their output, or include screen shots)
+* What you're doing and what's happening:  (Copy&paste the full set of _specific_ command-line steps necessary to reproduce the behavior, and their output. Include screen shots if that helps demonstrate the problem.)
 
 * What's wrong / what should be happening instead:
 
