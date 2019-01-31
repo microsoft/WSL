@@ -97,14 +97,14 @@ $ strace -ff -o <outputfile> <command>
 ```
 
 ### 8) Detailed Logs
-Some bugs will require more detailed logs to help determine the cause.  There is a CMD command to start detailed logging and another to stop.  The logs are generated locally into the working directory.
+Some bugs will require more detailed logs to help determine the cause.  There is a command to start detailed logging and another to stop.  The logs are generated locally into the working directory.
 
 #### Start collecting logs
 
 ```
-logman.exe create trace lxcore_kernel -p {0CD1C309-0878-4515-83DB-749843B3F5C9} -mode 0x00000008 -ft 10:00 -o .\lxcore_kernel.etl -ets
-logman.exe create trace lxcore_user -p {D90B9468-67F0-5B3B-42CC-82AC81FFD960} -ft 1:00 -rt -o .\lxcore_user.etl -ets
-logman.exe create trace lxcore_service -p {B99CDB5A-039C-5046-E672-1A0DE0A40211} -ft 1:00 -rt -o .\lxcore_service.etl -ets
+logman.exe create trace lxcore_kernel -p "{0CD1C309-0878-4515-83DB-749843B3F5C9}" -mode 0x00000008 -ft 10:00 -o .\lxcore_kernel.etl -ets
+logman.exe create trace lxcore_user -p "{D90B9468-67F0-5B3B-42CC-82AC81FFD960}" -ft 1:00 -rt -o .\lxcore_user.etl -ets
+logman.exe create trace lxcore_service -p "{B99CDB5A-039C-5046-E672-1A0DE0A40211}" -ft 1:00 -rt -o .\lxcore_service.etl -ets
 ```
 
 #### Stop collecting logs
