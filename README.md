@@ -43,8 +43,8 @@ Issues may be closed by the original poster at any time.  We will close issues i
 - [Microsoft Docs](https://docs.microsoft.com/en-us/windows/wsl/about)
 - [Release Notes](https://docs.microsoft.com/en-us/windows/wsl/release-notes)
 - [User Voice](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash)
-- [WSL Blog](https://blogs.msdn.microsoft.com/wsl)
-- [Console Blog](https://blogs.msdn.microsoft.com/commandline/)
+- [WSL Blog](https://blogs.msdn.microsoft.com/wsl) (Historical)
+- [Command Line Blog](https://blogs.msdn.microsoft.com/commandline/) (Active)
 
 ### Community Links:
 
