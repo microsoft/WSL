@@ -28,6 +28,10 @@ This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command
 
 - **console** – The submission should be directed to the [console issue tracker](https://github.com/microsoft/console/issues)
 
+- **wsl2** - The issue relates specifically to WSL 2.
+
+- **fixed-in-wsl2** - The issue could be resolved by switching the distro to use the WSL 2 architecture.
+
 Additional tags may be used to denote specific types of issues.
 
 ## Closing:
