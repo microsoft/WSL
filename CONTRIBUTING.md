@@ -128,3 +128,41 @@ lxcore_user.etl
 #### Submitting logs
 
 To submit the details logs, attach them to your GitHub issue.
+
+### 9) Networking Logs
+For bugs that are related to networking, you can provide networking logs using the Feedback hub with the following steps.
+
+#### Open Feedback Hub and enter the title and description of your issue
+
+- Open Feedback hub and create a new issue by pressing `Windows Key + F` on your keyboard. 
+- Enter in the details of your issue:
+   - In `Summarize your feedback` copy and paste in the title of your Github Issue
+   - In `Explain in more detail` copy and paste a link to your Github Issue
+
+![GIF Of networking instructions](img/networkinglog1.gif)
+
+#### Choose the WSL category 
+
+- Select that your issue is a `Problem`
+- Choose the `Developer Platform` category and the `Windows Subsystem for Linux` subcategory
+
+![GIF Of networking instructions](img/networkinglog2.gif)
+
+#### Recreate your problem in the 'Additional Details' section
+
+- Select 'Other' under 'Which of the following best describes your problem'
+- Click 'Recreate My Problem' under 'Attachments
+- Ensure that `Include Data About:` is checked to 'Windows Subsystem for Linux' 
+- 'Click Start Recording' to start collecting logs
+- Recreate your problem
+- Click 'Stop Recording'
+
+![GIF Of networking instructions](img/networkinglog3.gif)
+
+#### Check your attachments and submit
+
+- Verify your recording is attached and whether you would like to send the screenshot that is automatically attached
+- Hit Submit
+- Reply on the Github Thread to let the WSL team know you submitted feedback
+
+![GIF Of networking instructions](img/networkinglog4.gif)
