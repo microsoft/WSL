@@ -163,6 +163,6 @@ For bugs that are related to networking, you can provide networking logs using t
 
 - Verify your recording is attached and whether you would like to send the screenshot that is automatically attached
 - Hit Submit
-- Reply on the Github Thread to let the WSL team know you submitted feedback
+- Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
