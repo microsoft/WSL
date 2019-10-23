@@ -7,13 +7,12 @@ Note that WSL distro's launch in the Windows Console (unless you have taken step
 
 ## Labels:
 
-This and our [User Voice page](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) are your best ways to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
+This is your best ways to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
 
 - **bug** – The issue considered to be a bug internally by the dev team. This tag is generally for gaps in implemented (read: intended to be working) WSL behavior. Things marked with **bug** have a corresponding bug in on Microsoft’s internal bug tracking system.
   - Example: No internet connectivity in Bash [(#5)](https://github.com/Microsoft/WSL/issues/5)
 
-- **feature** – Denotes something understood as not working and is not yet implemented. The community should use our [User Voice](https://wpdev.uservoice.com/forums/266908-command-prompt-console-bash-on-ubuntu-on-windo/category/161892-bash) page for voting on which features everyone feels as the most important.  The team will take the User Voice page as input in deciding what to work on next.
-  - Example:  Docker is not working [(#85)](https://github.com/Microsoft/WSL/issues/85)
+- **feature** – Denotes something understood as not working and is not yet implemented.
 
 - **fixinbound** / **fixedinNNNN** – The bug or feature request originally submitted has been addressed in whole or in part. Related or ongoing bug or feature gaps should be opened as a new issue submission if one does not already exist.
 
