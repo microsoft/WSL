@@ -1,7 +1,5 @@
 Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux.
 
-This Github issues page is a bugtracker.  It's intended for technical discussion and for debugging specific issues.  If you have a feature request, you should instead post it to the [UserVoice](https://wpdev.uservoice.com/forums/266908).  The UserVoice is better for tracking feature requests; it has a voting mechanism so the WSL team can put a higher priority behind issues that affect more people.
-
 ## Important: Reporting BSODs and Security issues
 **Do not open Github issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
 
