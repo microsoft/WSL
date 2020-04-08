@@ -33,6 +33,8 @@ This is your best ways to interact directly with the Windows Subsystem for Linux
 
 Additional tags may be used to denote specific types of issues.
 
+- **9p-file-server** - The issue is related to the 9P file server that serves Linux files to be accessed by Windows applications.
+
 ## Closing:
 
 Issues may be closed by the original poster at any time.  We will close issues if:
