@@ -1,5 +1,5 @@
 # Trouble Shooting
-Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting). Below includes some tips contribued by the community but may not covered by MSDN document yet.
+Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting). Below includes some tips contributed by the community but may not covered by MSDN document yet.
 
 ## Missing Kernel or kernel related
 The common error message is `WSL 2 requires an update to its kernel component. For information please visit https://aka.ms/wsl2kernel`.
