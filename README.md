@@ -64,5 +64,3 @@ Issues may be closed by the original poster at any time.  We will close issues i
 ### Troubleshooting:
 
 Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting).
-
-This repo also includes [troubleshooting](docs/TroubleShooting.md) page which inlcudes topics but is not covered by MSDN document yet.
