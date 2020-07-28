@@ -132,14 +132,16 @@ For bugs that are related to networking, you can provide networking logs using t
 
 #### Open Feedback Hub and enter the title and description of your issue
 
-- Open Feedback hub and create a new issue by pressing `Windows Key + F` on your keyboard. 
+- Open Feedback hub and create a new issue by link [Feedback Hub](Feedback-Hub:?referrer=WSL&tabID=2&newFeedback=true&CategoryId=25&ContextId=677&feedbackType=2&form=1) or pressing `Windows Key + F` on your keyboard. 
 - Enter in the details of your issue:
    - In `Summarize your feedback` copy and paste in the title of your Github Issue
    - In `Explain in more detail` copy and paste a link to your Github Issue
 
 ![GIF Of networking instructions](img/networkinglog1.gif)
 
-#### Choose the WSL category 
+#### Choose the WSL category
+
+This step can be skipped if Feedback Hub is opened by Link. 
 
 - Select that your issue is a `Problem`
 - Choose the `Developer Platform` category and the `Windows Subsystem for Linux` subcategory
