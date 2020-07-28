@@ -94,8 +94,8 @@ Common files are:
 $ strace -ff -o <outputfile> <command>
 ```
 <!-- Preserving anchors -->
-<div id="detailed-logs"></div>
-<div id="networking-logs"></div>
+<div id="8-detailed-logs"></div>
+<div id="9-networking-logs"></div>
 
 ### 8) Collect WSL logs
 To collect WSL logs follow these steps: 
