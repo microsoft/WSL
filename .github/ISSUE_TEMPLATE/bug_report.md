@@ -15,7 +15,7 @@ I ACKNOWLEDGE THE FOLLOWING BEFORE PROCEEDING:
 3. If I write an issue that has many duplicates, the core team may close my issue without further explanation or engagement (and without necessarily spending time to find the exact duplicate ID number).
 4. If I leave the title incomplete when filing the issue, the core team may close my issue without further explanation or engagement.
 5. If I file something completely blank in the body, the core team may close my issue without further explanation or engagement.
-6. If I file an issue without collecting logs, the WSL team can close my issue without further explanation or engagement. 
+6. If I file an issue without collecting logs, the WSL team may close my issue without further explanation or engagement. 
 
 All good? Then proceed!
 -->
