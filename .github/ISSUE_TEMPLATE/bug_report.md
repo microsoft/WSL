@@ -15,6 +15,7 @@ I ACKNOWLEDGE THE FOLLOWING BEFORE PROCEEDING:
 3. If I write an issue that has many duplicates, the core team may close my issue without further explanation or engagement (and without necessarily spending time to find the exact duplicate ID number).
 4. If I leave the title incomplete when filing the issue, the core team may close my issue without further explanation or engagement.
 5. If I file something completely blank in the body, the core team may close my issue without further explanation or engagement.
+6. If I file an issue without collecting logs, the WSL team may close my issue without further explanation or engagement. 
 
 All good? Then proceed!
 -->
@@ -49,9 +50,12 @@ Whether the issue is on WSL 2 and/or WSL 1: [run `cat /proc/version` in WSL]
 If you'd like to provide logs you can provide an `strace(1)`  log of the failing command (if `some_command` is failing, then run `strace -o some_command.strace -f some_command some_args`, and link the contents of `some_command.strace` in a gist. 
 More info on `strace` can be found here: https://www.man7.org/linux/man-pages/man1/strace.1.html
 You can use Github gists to share the output: https://gist.github.com/
-
-Additionally, For WSL launch issues, please collect detailed logs, instructions here: https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md#8-detailed-logs 
 -->
+
+<!--
+Collect WSL logs by following these instructions: https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md#8-detailed-logs  
+-->
+**WSL logs**: 
 
 #  Expected behavior
 

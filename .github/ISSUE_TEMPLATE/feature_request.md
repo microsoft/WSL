@@ -2,7 +2,7 @@
 name: Feature request
 about: Suggest a feature for Windows Subsystem for Linux
 title: ''
-labels: ''
+labels: 'feature'
 assignees: ''
 
 ---
