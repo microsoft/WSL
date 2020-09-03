@@ -1,8 +1,14 @@
-This repo is for the reporting of issues found within and when using Windows Subsystem for Linux. Please read [CONTRIBUTING.md](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) before making an issue submission. 
+This repo is for:
 
-- Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulnerabilities may be edited to hide the vulnerability details.
+- Reporting of issues found within and when using Windows Subsystem for Linux.
+  Please read [CONTRIBUTING.md](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) before making an issue submission
+
+  > Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulnerabilities may be edited to hide the vulnerability details.
+
+- Surrounding discussions about the Windows Subsystem for Linux.
 
 ## Reporting issues in Windows Console or WSL text rendering/user experience
+
 Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*. 
 
 ## Labels:
