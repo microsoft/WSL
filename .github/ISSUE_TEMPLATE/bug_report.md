@@ -37,7 +37,7 @@ Please fill out the items below.
 # Environment
 
 ```none
-Windows build number: [run `[Environment]::OSVersion` for powershell, or `ver` for cmd]
+Windows build number: [run `cmd.exe /c ver`]
 Your Distribution version: [On Debian or Ubuntu run `lsb_release -r` in WSL]
 Whether the issue is on WSL 2 and/or WSL 1: [run `cat /proc/version` in WSL]
 ```
