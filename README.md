@@ -23,7 +23,7 @@ This is your best ways to interact directly with the Windows Subsystem for Linux
 
 - **duplicate** – The submission is substantially duplicative of an existing issue, and/or has the same underlying cause.
 
-- **need-repro** – The issue submission is missing fields from the issue [template](https://github.com/Microsoft/WSL/blob/master/ISSUE_TEMPLATE.md), cannot be reproduced with the information provided, or is not actionable.
+- **need-repro** – The issue submission is missing fields from the issue [template](https://github.com/microsoft/WSL/tree/master/.github/ISSUE_TEMPLATE), cannot be reproduced with the information provided, or is not actionable.
 
 - **discussion** / **question** – Submissions which are not a bug report or feature request. Example: Windows Subsystem for Linux is not open source [(#178)](https://github.com/Microsoft/WSL/issues/178)
 
