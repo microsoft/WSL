@@ -108,6 +108,16 @@ Availability  Capabilities  CapabilityDescriptions                              
               {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
 ```
 
+#### Networking issues
+
+If the issue is about networking, download [networking.sh](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.sh), and execute it inside WSL by running:
+
+```
+$ bash ./networking.sh
+```
+
+Once the script execution is completed, include its output on the issue.
+
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
 <div id="9-networking-logs"></div>
