@@ -159,3 +159,21 @@ To collect WSL logs follow these steps:
 - Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
+
+#### Record WSL logs manually
+
+If creating a Feedback Hub entry isn't possible, then WSL logs need to be captured manually.
+
+To do so, first download [wsl.wprp](https://github.com/microsoft/WSL/blob/master/diagnostics/wsl.wprp), then run in an administrative command prompt:
+
+```
+$ wpr -start wsl.wprp -filemode
+```
+
+Once the log collection is started, reproduce the problem, and run:
+
+```
+$ wpr -stop wsl.etl
+```
+
+This will stop the log collection and create a file named `wsl.etl` that will capture diagnostics information.
