@@ -110,13 +110,15 @@ Availability  Capabilities  CapabilityDescriptions                              
 
 #### Networking issues
 
-If the issue is about networking, download [networking.sh](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.sh), and execute it inside WSL by running:
+If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
 
 ```
-$ bash ./networking.sh
+$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
+$ cd %tmp%\WSL\diagnostics
+$ networking.bat
 ```
 
-Once the script execution is completed, include its output on the issue.
+Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
 
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>

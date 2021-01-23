@@ -1,0 +1,294 @@
+<?xml version="1.0"?>
+<WindowsPerformanceRecorder Version="1">
+  <Profiles>
+    <EventCollector Id="Collector" Name="Collector">
+      <BufferSize Value="256"/>
+      <Buffers Value="4096"/>
+    </EventCollector>
+
+    <EventProvider Id="lxcore_kernel" Name="0CD1C309-0878-4515-83DB-749843B3F5C9"/>
+    <EventProvider Id="lxcore_user" Name="D90B9468-67F0-5B3B-42CC-82AC81FFD960"/>
+    <EventProvider Id="lxcore_service" Name="B99CDB5A-039C-5046-E672-1A0DE0A40211"/>
+    <EventProvider Id="vm_chipset" Name="de9ba731-7f33-4f44-98c9-6cac856b9f83"/>
+    <EventProvider Id="vmcompute_dll" Name="AF7FD3A7-B248-460C-A9F5-FEC39EF8468C"/>
+    <EventProvider Id="vmcompute" Name="17103E3F-3C6E-4677-BB17-3B267EB5BE57"/>
+    <EventProvider Id="vmmm" Name="6066F867-7CA1-4418-85FD-36E3F9C0600C"/>
+    <EventProvider Id="vmwp" Name="51DDFA29-D5C8-4803-BE4B-2ECB715570FE"/>
+    <EventProvider Id="9p" Name="e13c8d52-b153-571f-78c5-1d4098af2a1e"/>
+    <EventProvider Id="p9rdr" Name="bb1d36f0-e0e0-48cc-9493-fef0e3d0b28c" />
+    <EventProvider Id="mup" Name="20c46239-d059-4214-a11e-7d6769cbe020" />
+    <EventProvider Id="rfsmon" Name="51734B23-5B7E-4892-BA8E-45BC110B735C" />
+    <EventProvider Id="hyperv_storage" Name="c7ad62c6-5c99-5a1b-bbc4-0821ae5b765e" />
+    <EventProvider Id="hns" Name="0c885e0d-6eb6-476c-a048-2457eed3a5c1" />
+    <EventProvider Id="LsaAudit_WPP" Name="DAA76F6A-2D11-4399-A646-1D62B7380F15" />
+    <EventProvider Id="Microsoft_Windows_ResourceManager_WPP" Name="4180C4F7-E238-5519-338F-EC214F0B49AA" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_KeyCredMgr_WPP" Name="34646397-1635-5D14-4D2C-2FEBDCCCF5E9" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_NgcIsoCtnr_WPP" Name="CDC6BEB9-6D78-5138-D232-D951916AB98F" />
+    <EventProvider Id="Microsoft_OneCore_NetworkingTriage_OnDemand" Name="ABB1FC61-49BA-4CC3-809F-7ABE1F8BA315" />
+    <EventProvider Id="wlidsvc_WPP" Name="3F8B9EF5-BBD2-4C81-B6C9-DA3CDB72D3C5" />
+    <EventProvider Id="Microsoft_Windows_WebIO" Name="50b3e73c-9370-461d-bb9f-26f32d68887d" />
+    <EventProvider Id="msxml_WPP" Name="927821F8-D9E6-42E2-84F2-949E18256F3A" />
+    <EventProvider Id="Microsoft_Windows_HttpService" Name="dd5ef90a-6398-47a4-ad34-4dcecdef795f" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_Trustlet_WPP" Name="C0B2937D-E634-56A2-1451-7D678AA3BC53" />
+    <EventProvider Id="Microsoft_Web_Platform_WPP" Name="FF32ADA1-5A4B-583C-889E-A3C027B201F5" />
+    <EventProvider Id="Microsoft_Windows_Shell_CloudDomainJoin_Client_WPP" Name="AA02D1A4-72D8-5F50-D425-7402EA09253A" />
+    <EventProvider Id="HTTP_sys_WPP" Name="20F61733-57F1-4127-9F48-4AB7A9308AE2" />
+    <EventProvider Id="CHAT_WPP" Name="9B52E09F-0C58-4EAF-877F-70F9B54A7946" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_NgcCtnrSvc_WPP" Name="9DF6A82D-5174-5EBF-842A-39947C48BF2A" />
+    <EventProvider Id="BFE_WPP" Name="106B464A-8043-46B1-8CB8-E92A0CD7A560" />
+    <EventProvider Id="kerb_WPP" Name="6B510852-3583-4E2D-AFFE-A67F9F223438" />
+    <EventProvider Id="Microsoft_Windows_Runtime_Web_Http" Name="41877cb4-11fc-4188-b590-712c143c881d" />
+    <EventProvider Id="Microsoft_Windows_Shell_CloudExperienceHost_WPP" Name="D0034F5E-3686-5A74-DC48-5A22DD4F3D5B" />
+    <EventProvider Id="NCRYPT_WPP" Name="A74EFE00-14BE-4EF9-9DA9-1484D5473301" />
+    <EventProvider Id="pku2u_WPP" Name="2A6FAF47-5449-4805-89A3-A504F3E221A6" />
+    <EventProvider Id="Microsoft_Windows_Security_Biometrics_Service_WPP" Name="39A5AA08-031D-4777-A32D-ED386BF03470" />
+    <EventProvider Id="CAPI1_WPP" Name="A74EFE00-14BE-4EF9-9DA9-1484D5473305" />
+    <EventProvider Id="Microsoft_Windows_Security_DevCredTask_WPP" Name="86D5FE65-0564-4618-B90B-E146049DEBF4" />
+    <EventProvider Id="MsQuic_WPP" Name="620FD025-BE51-42EF-A5C0-50F13F183AD9" />
+    <EventProvider Id="Microsoft_Windows_Security_DevCredClient_WPP" Name="78983C7D-917F-58DA-E8D4-F393DECF4EC0" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_Local_WPP" Name="3B9DBF69-E9F0-5389-D054-A94BC30E33F7" />
+    <EventProvider Id="Microsoft_Windows_DM_Enrollment_Provider_WPP" Name="9FBF7B95-0697-4935-ADA2-887BE9DF12BC" />
+    <EventProvider Id="TokenBinding_WPP" Name="AEF66A73-A765-4421-B348-B7E0FC8C9898" />
+    <EventProvider Id="KerbClientShared_WPP" Name="FACB33C4-4513-4C38-AD1E-57C1F6828FC0" />
+    <EventProvider Id="Microsoft_OneCore_NetworkingTriage_RoutePolicyManagement" Name="923C0FFD-7933-4B52-8A49-121ABF2DC357" />
+    <EventProvider Id="ntlm_WPP" Name="5BBB6C18-AA45-49B1-A15F-085F7ED0AA90" />
+    <EventProvider Id="NCRYPTSSLP_WPP" Name="A74EFE00-14BE-4EF9-9DA9-1484D5473304" />
+    <EventProvider Id="Microsoft_Windows_CAPI2_WPP" Name="5BBCA4A8-B209-48DC-A8C7-B23D3E5216FB" />
+    <EventProvider Id="DNS_WPP" Name="609151DD-04F5-4DA7-974C-FC6947EAA323" />
+    <EventProvider Id="Microsoft_Windows_CertificateServicesClient_CertEnroll_WPP" Name="54164045-7C50-4905-963F-E5BC1EEF0CCA" />
+    <EventProvider Id="Webio_WPP" Name="08F93B14-1608-4A72-9CFA-457EECEDBBA7" />
+    <EventProvider Id="TPM_WPP" Name="3A8D6942-B034-48E2-B314-F69C2B4655A3" />
+    <EventProvider Id="Microsoft_Windows_CertificateServicesClient_Lifecycle_User_WPP" Name="BEA18B89-126F-4155-9EE4-D36038B02680" />
+    <EventProvider Id="Microsoft_Windows_MicrosoftAccount_TBProvider_WPP" Name="5836994D-A677-53E7-1389-588AD1420CC5" />
+    <EventProvider Id="vault_WPP" Name="7FDD167C-79E5-4403-8C84-B7C0BB9923A1" />
+    <EventProvider Id="Microsoft_Windows_Security_Biometrics_Client_WPP" Name="1B5106B1-7622-4740-AD81-D9C6EE74F124" />
+    <EventProvider Id="Microsoft_Windows_BranchCacheClientEventProvider" Name="e837619c-a2a8-4689-833f-47b48ebd2442" />
+    <EventProvider Id="CRYPTOWINRT_WPP" Name="786396CD-2FF3-53D3-D1CA-43E41D9FB73B" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_CryptNgc_WPP" Name="6D7051A0-9C83-5E52-CF8F-0ECAF5D5F6FD" />
+    <EventProvider Id="Microsoft_Windows_CertificateServicesClient_AutoEnrollment_WPP" Name="F0DB7EF8-B6F3-4005-9937-FEB77B9E1B43" />
+    <EventProvider Id="Microsoft_Windows_CertPolEng_WPP" Name="AF9CC194-E9A8-42BD-B0D1-834E9CFAB799" />
+    <EventProvider Id="dpapis_WPP" Name="EA3F84FC-03BB-540E-B6AA-9664F81A31FB" />
+    <EventProvider Id="Microsoft_Windows_CertificationAuthorityClient_CertCli_WPP" Name="98BF1CD3-583E-4926-95EE-A61BF3F46470" />
+    <EventProvider Id="KerbComm_WPP" Name="60A7AB7A-BC57-43E9-B78A-A1D516577AE3" />
+    <EventProvider Id="Microsoft_Windows_Security_LsaSrv_WPP" Name="4D9DFB91-4337-465A-A8B5-05A27D930D48" />
+    <EventProvider Id="Microsoft_Windows_Security_AADAuthHelper_WPP" Name="9EBB3B15-B094-41B1-A3B8-0F141B06BADD" />
+    <EventProvider Id="TLS_WPP" Name="37D2C3CD-C5D4-4587-8531-4696C44244C8" />
+    <EventProvider Id="webauth_WPP" Name="EF98103D-8D3A-4BEF-9DF2-2156563E64FA" />
+    <EventProvider Id="idlisten_WPP" Name="D93FE84A-795E-4608-80EC-CE29A96C8658" />
+    <EventProvider Id="Winsock_WPP" Name="1D44957B-7181-4835-B70A-D0B16112A4DE" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_KspSvc_WPP" Name="B66B577F-AE49-5CCF-D2D7-8EB96BFD440C" />
+    <EventProvider Id="aad_WPP" Name="4DE9BC9C-B27A-43C9-8994-0915F1A5E24F" />
+    <EventProvider Id="LsaIso_WPP" Name="366B218A-A5AA-4096-8131-0BDAFCC90E93" />
+    <EventProvider Id="Microsoft_Windows_Security_TokenBroker_WPP" Name="077B8C4A-E425-578D-F1AC-6FDF1220FF68" />
+    <EventProvider Id="CNG_WPP" Name="A74EFE00-14BE-4EF9-9DA9-1484D5473303" />
+    <EventProvider Id="NtlmShared_WPP" Name="AC69AE5B-5B21-405F-8266-4424944A43E9" />
+    <EventProvider Id="Microsoft_Windows_CertificateServicesClient_Lifecycle_System_WPP" Name="BC0669E1-A10D-4A78-834E-1CA3C806C93B" />
+    <EventProvider Id="Microsoft_Windows_DeviceManagement_SCEP_WPP" Name="D5A5B540-C580-4DEE-8BB4-185E34AA00C5" />
+    <EventProvider Id="Microsoft_Windows_Security_Biometrics_CredentialProvider_Face_WPP" Name="1D480C11-3870-4B19-9144-47A53CD973BD" />
+    <EventProvider Id="credssp_WPP" Name="6165F3E2-AE38-45D4-9B23-6B4818758BD9" />
+    <EventProvider Id="basecsp_WPP" Name="133A980D-035D-4E2D-B250-94577AD8FCED" />
+    <EventProvider Id="gMSAClient_WPP" Name="2D45EC97-EF01-4D4F-B9ED-EE3F4D3C11F3" />
+    <EventProvider Id="Microsoft_Windows_Security_DeviceLock_WPP" Name="2056054C-97A6-5AE4-B181-38BC6B58007E" />
+    <EventProvider Id="Microsoft_Windows_Security_Biometrics_FingerprintCredential_WPP" Name="225B3FED-0356-59D1-1F82-EED163299FA8" />
+    <EventProvider Id="BCRYPT_WPP" Name="A74EFE00-14BE-4EF9-9DA9-1484D5473302" />
+    <EventProvider Id="idstore_WPP" Name="82C7D3DF-434D-44FC-A7CC-453A8075144E" />
+    <EventProvider Id="Wininet_WPP" Name="4E749B6A-667D-4C72-80EF-373EE3246B08" />
+    <EventProvider Id="idcommon_WPP" Name="B1108F75-3252-4B66-9239-80FD47E06494" />
+    <EventProvider Id="Microsoft_Windows_DNS_Client" Name="1c95126e-7eea-49a9-a3fe-a378b03ddb4d" />
+    <EventProvider Id="Microsoft_Windows_DNS_Client_Configuration_PowerShell" Name="563a50d8-3536-4c8a-a361-b37af04094ec" />
+    <EventProvider Id="Microsoft_Windows_AppModel_Exec_WPP" Name="EB65A492-86C0-406A-BACE-9912D595BD69" />
+    <EventProvider Id="Microsoft_Windows_Security_DevCredSvc_WPP" Name="C3FEB5BF-1A8D-53F3-AAA8-44496392BF69" />
+    <EventProvider Id="Microsoft_Quic_ETW" Name="ff15e657-4f26-570e-88ab-0796b258d11c" />
+    <EventProvider Id="LsaDs_WPP" Name="169EC169-5B77-4A3E-9DB6-441799D5CACB" />
+    <EventProvider Id="Microsoft_Windows_WBioSrvc_WPP" Name="34BEC984-F11F-4F1F-BB9B-3BA33C8D0132" />
+    <EventProvider Id="Microsoft_Windows_Security_AADCloudAPPlugin_WPP" Name="556045FD-58C5-4A97-9881-B121F68B79C5" />
+    <EventProvider Id="Microsoft_Windows_CertificateServices_Deployment_WPP" Name="B2D1F576-2E85-4489-B504-1861C40544B3" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_CSP_WPP" Name="89F392FF-EE7C-56A3-3F61-2D5B31A36935" />
+    <EventProvider Id="kps_WPP" Name="97A38277-13C0-4394-A0B2-2A70B465D64F" />
+    <EventProvider Id="WinHttp_WPP" Name="B3A7698A-0C45-44DA-B73D-E181C9B5C8E6" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_NgcCtnr_WPP" Name="0ABA6892-455B-551D-7DA8-3A8F85225E1A" />
+    <EventProvider Id="Microsoft_Windows_Security_DevCredWinRt_WPP" Name="36FF4C84-82A2-4B23-8BA5-A25CBDFF3410" />
+    <EventProvider Id="Microsoft_Windows_BranchCacheEventProvider" Name="dd85457f-4e2d-44a5-a7a7-6253362e34dc" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_KeyStaging_WPP" Name="9B223F67-67A1-5B53-9126-4593FE81DF25" />
+    <EventProvider Id="dclocator_WPP" Name="CA030134-54CD-4130-9177-DAE76A3C5791" />
+    <EventProvider Id="webplatform_WPP" Name="2A3C6602-411E-4DC6-B138-EA19D64F5BBA" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_CredProv_WPP" Name="CAC8D861-7B16-5B6B-5FC0-85014776BDAC" />
+    <EventProvider Id="Microsoft_Windows_ProcessStateManager_WPP" Name="D49918CF-9489-4BF1-9D7B-014D864CF71F" />
+    <EventProvider Id="Microsoft_Windows_CertificateServicesClient_CredentialRoaming_WPP" Name="89A2278B-C662-4AFF-A06C-46AD3F220BCA" />
+    <EventProvider Id="Microsoft_Windows_LiveId_WPP" Name="05F02597-FE85-4E67-8542-69567AB8FD4F" />
+    <EventProvider Id="Microsoft_Windows_Security_Fido_WPP" Name="08B15CE7-C9FF-5E64-0D16-66589573C50F" />
+    <EventProvider Id="Microsoft_Windows_Security_DevCredProv_WPP" Name="7955D36A-450B-5E2A-A079-95876BCA450A" />
+    <EventProvider Id="kdc_WPP" Name="1BBA8B19-7F31-43C0-9643-6E911F79A06B" />
+    <EventProvider Id="Microsoft_Windows_Security_Credentials_UserConsentVerifier_WPP" Name="507C53AE-AF42-5938-AEDE-4A9D908640ED" />
+    <EventProvider Id="Microsoft_OSG_OSS_CredProvFramework_ReportResultStop_WPP" Name="8DB3086D-116F-5BED-CFD5-9AFDA80D28EA" />
+    <EventProvider Id="livessp_WPP" Name="C10B942D-AE1B-4786-BC66-052E5B4BE40E" />
+    <EventProvider Id="WFP_WPP" Name="EB004A05-9B1A-11D4-9123-0050047759BC" />
+    <EventProvider Id="Microsoft_Windows_DNS_Client_WinRNR" Name="b923f87a-b069-42b5-bd32-35623aba1c48" />
+    <EventProvider Id="digest_WPP" Name="FB6A424F-B5D6-4329-B9B5-A975B3A93EAD" />
+    <EventProvider Id="Microsoft_Windows_CertificateServicesClient_WPP" Name="73370BD6-85E5-430B-B60A-FEA1285808A7" />
+    <EventProvider Id="negoexts_WPP" Name="5AF52B0D-E633-4EAD-828A-4B85B8DAAC2B" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_LocalAccountMigPlugin_WPP" Name="CDD94AC7-CD2F-5189-E126-2DEB1B2FACBF" />
+    <EventProvider Id="LsaTrace_WPP" Name="D0B639E0-E650-4D1D-8F39-1580ADE72784" />
+    <EventProvider Id="Microsoft_Windows_DeviceManagement_Enterprise_Diagnostics_Provider_WPP" Name="3DA494E4-0FE2-415C-B895-FB5265C5C83B" />
+    <EventProvider Id="Microsoft_OSG_Wininet_WPP" Name="1A211EE8-52DB-4AF0-BB66-FB8C9F20B0E2" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_PopKeySrv_WPP" Name="1D6540CE-A81B-4E74-AD35-EEF8463F97F5" />
+    <EventProvider Id="UrlMon_WPP" Name="3FAB3162-24CE-4ED5-B23D-63501544E11D" />
+    <EventProvider Id="Microsoft_Windows_WinINet" Name="43d1a55c-76d6-4f7e-995c-64c711e5cafe" />
+    <EventProvider Id="Microsoft_Windows_Security_Biometrics_BioCredProv_WPP" Name="9DADD79B-D556-53F2-67C4-129FA62B7512" />
+    <EventProvider Id="Microsoft_OneCore_NetworkingTriage_GetConnected" Name="60523747-6516-48B7-84B1-3264FA2CB359" />
+    <EventProvider Id="Microsoft_Windows_Security_NGC_Recovery_WPP" Name="9D4CA978-8A14-545E-C047-A45991F0E92F" />
+    <EventProvider Id="Microsoft_Windows_Winsock_NameResolution" Name="55404E71-4DB9-4DEB-A5F5-8F86E46DDE56" />
+    <EventProvider Id="Microsoft_Windows_WinHttp" Name="7d44233d-3055-4b9c-ba64-0d47ca40a232" />
+    <EventProvider Id="Microsoft_Windows_Security_Biometrics_Trustlet_WPP" Name="9DF19CFA-E122-5343-284B-F3945CCD65B2" />
+    <EventProvider Id="cloudap_WPP" Name="EC3CA551-21E9-47D0-9742-1195429831BB" />
+    <EventProvider Id="Microsoft_Windows_BrokerInfrastructure_WPP" Name="63B6C2D2-0440-44DE-A674-AA51A251B123" />
+    <EventProvider Id="IPNat" Name="AE3F6C6D-BF2A-4291-9D07-59E661274EE3" />
+    <EventProvider Id="IpNatHlp" Name="9B322459-4AD9-4F81-8EEA-DC77CDD18CA6" />
+    <EventProvider Id="WinNatSys" Name="aa7387cf-3639-496a-b3bf-dc1e79a6fc5a" />
+    <EventProvider Id="Microsoft-Windows-TCPIP" Name="2f07e2ee-15db-40f1-90ef-9d7ba282188a" NonPagedMemory="true" EventKey="true" Strict="true"/>
+    <EventProvider Id="WinNat" Name="66C07ECD-6667-43FC-93F8-05CF07F446EC" />
+    <EventProvider Id="VmSwitch" Name="67DC0D66-3695-47C0-9642-33F76F7BD7AD" />
+    <Profile
+      Id="WSL.Verbose.File"
+      Name="WSL"
+      Description="Traces for all WSL components"
+      LoggingMode="File"
+      DetailLevel="Verbose"
+      >
+      <Collectors>
+        <EventCollectorId Value="Collector">
+          <EventProviders>
+            <EventProviderId Value="LsaAudit_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_ResourceManager_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_KeyCredMgr_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_NgcIsoCtnr_WPP"/>
+            <EventProviderId Value="Microsoft_OneCore_NetworkingTriage_OnDemand"/>
+            <EventProviderId Value="wlidsvc_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_WebIO"/>
+            <EventProviderId Value="msxml_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_HttpService"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_Trustlet_WPP"/>
+            <EventProviderId Value="Microsoft_Web_Platform_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Shell_CloudDomainJoin_Client_WPP"/>
+            <EventProviderId Value="HTTP_sys_WPP"/>
+            <EventProviderId Value="CHAT_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_NgcCtnrSvc_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_BranchCacheEventProvider"/>
+            <EventProviderId Value="BFE_WPP"/>
+            <EventProviderId Value="kerb_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Runtime_Web_Http"/>
+            <EventProviderId Value="Microsoft_Windows_Shell_CloudExperienceHost_WPP"/>
+            <EventProviderId Value="NCRYPT_WPP"/>
+            <EventProviderId Value="pku2u_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Biometrics_Service_WPP"/>
+            <EventProviderId Value="CAPI1_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_DevCredTask_WPP"/>
+            <EventProviderId Value="MsQuic_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_DevCredClient_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_Local_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_DM_Enrollment_Provider_WPP"/>
+            <EventProviderId Value="TokenBinding_WPP"/>
+            <EventProviderId Value="KerbClientShared_WPP"/>
+            <EventProviderId Value="Microsoft_OneCore_NetworkingTriage_RoutePolicyManagement"/>
+            <EventProviderId Value="ntlm_WPP"/>
+            <EventProviderId Value="NCRYPTSSLP_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CAPI2_WPP"/>
+            <EventProviderId Value="DNS_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificateServicesClient_CertEnroll_WPP"/>
+            <EventProviderId Value="Webio_WPP"/>
+            <EventProviderId Value="TPM_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificateServicesClient_Lifecycle_User_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_MicrosoftAccount_TBProvider_WPP"/>
+            <EventProviderId Value="vault_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Biometrics_Client_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_BranchCacheClientEventProvider"/>
+            <EventProviderId Value="CRYPTOWINRT_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_CryptNgc_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificateServicesClient_AutoEnrollment_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertPolEng_WPP"/>
+            <EventProviderId Value="dpapis_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificationAuthorityClient_CertCli_WPP"/>
+            <EventProviderId Value="KerbComm_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_LsaSrv_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_AADAuthHelper_WPP"/>
+            <EventProviderId Value="TLS_WPP"/>
+            <EventProviderId Value="webauth_WPP"/>
+            <EventProviderId Value="idlisten_WPP"/>
+            <EventProviderId Value="Winsock_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_KspSvc_WPP"/>
+            <EventProviderId Value="aad_WPP"/>
+            <EventProviderId Value="LsaIso_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_TokenBroker_WPP"/>
+            <EventProviderId Value="CNG_WPP"/>
+            <EventProviderId Value="NtlmShared_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificateServicesClient_Lifecycle_System_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_DeviceManagement_SCEP_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Biometrics_CredentialProvider_Face_WPP"/>
+            <EventProviderId Value="credssp_WPP"/>
+            <EventProviderId Value="basecsp_WPP"/>
+            <EventProviderId Value="gMSAClient_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_DeviceLock_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Biometrics_FingerprintCredential_WPP"/>
+            <EventProviderId Value="BCRYPT_WPP"/>
+            <EventProviderId Value="idstore_WPP"/>
+            <EventProviderId Value="Wininet_WPP"/>
+            <EventProviderId Value="idcommon_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_DNS_Client"/>
+            <EventProviderId Value="Microsoft_Windows_DNS_Client_Configuration_PowerShell"/>
+            <EventProviderId Value="Microsoft_Windows_AppModel_Exec_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_DevCredSvc_WPP"/>
+            <EventProviderId Value="Microsoft_Quic_ETW"/>
+            <EventProviderId Value="LsaDs_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_WBioSrvc_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_AADCloudAPPlugin_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificateServices_Deployment_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_CSP_WPP"/>
+            <EventProviderId Value="kps_WPP"/>
+            <EventProviderId Value="WinHttp_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_NgcCtnr_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_DevCredWinRt_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_KeyStaging_WPP"/>
+            <EventProviderId Value="dclocator_WPP"/>
+            <EventProviderId Value="webplatform_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_CredProv_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_ProcessStateManager_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificateServicesClient_CredentialRoaming_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_LiveId_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Fido_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_DevCredProv_WPP"/>
+            <EventProviderId Value="kdc_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Credentials_UserConsentVerifier_WPP"/>
+            <EventProviderId Value="Microsoft_OSG_OSS_CredProvFramework_ReportResultStop_WPP"/>
+            <EventProviderId Value="livessp_WPP"/>
+            <EventProviderId Value="WFP_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_DNS_Client_WinRNR"/>
+            <EventProviderId Value="digest_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_CertificateServicesClient_WPP"/>
+            <EventProviderId Value="negoexts_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_LocalAccountMigPlugin_WPP"/>
+            <EventProviderId Value="LsaTrace_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_DeviceManagement_Enterprise_Diagnostics_Provider_WPP"/>
+            <EventProviderId Value="Microsoft_OSG_Wininet_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_PopKeySrv_WPP"/>
+            <EventProviderId Value="UrlMon_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_WinINet"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Biometrics_BioCredProv_WPP"/>
+            <EventProviderId Value="Microsoft_OneCore_NetworkingTriage_GetConnected"/>
+            <EventProviderId Value="Microsoft_Windows_Security_NGC_Recovery_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_Winsock_NameResolution"/>
+            <EventProviderId Value="Microsoft_Windows_WinHttp"/>
+            <EventProviderId Value="Microsoft_Windows_Security_Biometrics_Trustlet_WPP"/>
+            <EventProviderId Value="cloudap_WPP"/>
+            <EventProviderId Value="Microsoft_Windows_BrokerInfrastructure_WPP"/>
+            <EventProviderId Value="IPNat"/>
+            <EventProviderId Value="IpNatHlp"/>
+            <EventProviderId Value="WinNat"/>
+            <EventProviderId Value="WinNatSys"/>
+            <EventProviderId Value="Microsoft-Windows-TCPIP"/>
+            <EventProviderId Value="VmSwitch"/>
+          </EventProviders>
+        </EventCollectorId>
+      </Collectors>
+    </Profile>
+  </Profiles>
+</WindowsPerformanceRecorder>
