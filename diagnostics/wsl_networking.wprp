@@ -158,6 +158,20 @@
       <Collectors>
         <EventCollectorId Value="Collector">
           <EventProviders>
+            <EventProviderId Value="lxcore_kernel"/>
+            <EventProviderId Value="lxcore_user"/>
+            <EventProviderId Value="lxcore_service"/>
+            <EventProviderId Value="vm_chipset"/>
+            <EventProviderId Value="vmcompute_dll"/>
+            <EventProviderId Value="vmcompute"/>
+            <EventProviderId Value="vmmm"/>
+            <EventProviderId Value="vmwp"/>
+            <EventProviderId Value="9p"/>
+            <EventProviderId Value="p9rdr"/>
+            <EventProviderId Value="mup"/>
+            <EventProviderId Value="rfsmon"/>
+            <EventProviderId Value="hyperv_storage"/>
+            <EventProviderId Value="hns"/>
             <EventProviderId Value="LsaAudit_WPP"/>
             <EventProviderId Value="Microsoft_Windows_ResourceManager_WPP"/>
             <EventProviderId Value="Microsoft_Windows_Security_NGC_KeyCredMgr_WPP"/>
