@@ -147,7 +147,16 @@
     <EventProvider Id="WinNatSys" Name="aa7387cf-3639-496a-b3bf-dc1e79a6fc5a" />
     <EventProvider Id="Microsoft-Windows-TCPIP" Name="2f07e2ee-15db-40f1-90ef-9d7ba282188a" NonPagedMemory="true" EventKey="true" Strict="true"/>
     <EventProvider Id="WinNat" Name="66C07ECD-6667-43FC-93F8-05CF07F446EC" />
-    <EventProvider Id="VmSwitch" Name="67DC0D66-3695-47C0-9642-33F76F7BD7AD" />
+    <EventProvider Id="Microsoft-Windows-Overlay-HNSPlugin" Name="564368D6-577B-4af5-AD84-1C54464848E6" />
+    <EventProvider Id="Microsoft.Windows.HyperV.Compute" Name="80CE50DE-D264-4581-950D-ABADEEE0D340" />
+    <EventProvider Id="Microsoft.Windows.HostNetworkingService.PrivateCloudPlugin" Name="D0E4BC17-34C7-43fc-9A72-D89A59D6979A" />
+    <EventProvider Id="Microsoft-Windows-Host-Network-Management" Name="93f693dc-9163-4dee-af64-d855218af242" />
+    <EventProvider Id="Microsoft-Windows-SharedAccess_NAT" Name="A6F32731-9A38-4159-A220-3D9B7FC5FE5D" />
+    <EventProvider Id="Microsoft.Windows.Hyper.V.VmsIf" Name="6C28C7E5-331B-4437-9C69-5352A2F7F296" />
+    <EventProvider Id="VmSwitch_wpp" Name="1F387CBC-6818-4530-9DB6-5F1058CD7E86"/>
+    <EventProvider Id="Microsoft-Windows-Hyper-V-VmSwitch" Name="67DC0D66-3695-47C0-9642-33F76F7BD7AD"/>
+    <EventProvider Id="Microsoft.Windows.Hyper.V.NetSetupHelper" Name="94DEB9D1-0A52-449B-B368-41E4426B4F36"/>
+    <EventProvider Id="Microsoft-Windows-Hyper-V-VfpExt" Name="9F2660EA-CFE7-428F-9850-AECA612619B0"/>
     <Profile
       Id="WSL.Verbose.File"
       Name="WSL"
@@ -299,7 +308,16 @@
             <EventProviderId Value="WinNat"/>
             <EventProviderId Value="WinNatSys"/>
             <EventProviderId Value="Microsoft-Windows-TCPIP"/>
-            <EventProviderId Value="VmSwitch"/>
+            <EventProviderId Value="Microsoft-Windows-Overlay-HNSPlugin"/>
+            <EventProviderId Value="Microsoft.Windows.HyperV.Compute"/>
+            <EventProviderId Value="Microsoft.Windows.HostNetworkingService.PrivateCloudPlugin"/>
+            <EventProviderId Value="Microsoft-Windows-Host-Network-Management"/>
+            <EventProviderId Value="Microsoft-Windows-SharedAccess_NAT"/>
+            <EventProviderId Value="Microsoft.Windows.Hyper.V.VmsIf"/>
+            <EventProviderId Value="VmSwitch_wpp"/>
+            <EventProviderId Value="Microsoft-Windows-Hyper-V-VmSwitch"/>
+            <EventProviderId Value="Microsoft.Windows.Hyper.V.NetSetupHelper"/>
+            <EventProviderId Value="Microsoft-Windows-Hyper-V-VfpExt"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>
