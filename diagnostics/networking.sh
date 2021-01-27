@@ -27,5 +27,8 @@ traceroute 1.1.1.1
 cat /etc/resolv.conf
 
 # Validate that everything is functionning correctly
-curl -m 5 -v https://microsoft.com
-
+if which curl > /dev/null; then
+    curl -m 5 -v https://microsoft.com
+else
+    wget -T 5 -v https://microsoft.com
+fi
