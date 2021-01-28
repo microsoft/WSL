@@ -12,6 +12,10 @@ if not exist networking.sh (echo networking.sh not found && exit /b 1)
 echo HNS objects: 
 hnsdiag list all -df
 
+:: Print the Windows routing table
+echo Routing table:
+netstat.exe -rn
+
 :: The WSL HNS network is created once per boot. Resetting it to collect network creation logs
 echo Deleting HNS network
 powershell.exe -NoProfile "Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL'} | Remove-HnsNetwork"
