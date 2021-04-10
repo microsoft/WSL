@@ -27,8 +27,8 @@ body:
     description: |
       Tell us whether the issue is on WSL 2 and/or WSL 1. You can tell your WSL version by running `wsl -l -v`. 
     options:
-      - label: WSL 2
-      - label: WSL 1
+      - label: "WSL 2"
+      - label: "WSL 1"
 
 - type: input
   attributes:
