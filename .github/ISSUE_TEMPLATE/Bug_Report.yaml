@@ -21,12 +21,14 @@ body:
   validations:
     required: true
 
-- type: input
+- type: checkboxes
   attributes:
     label: WSL Version
     description: |
       Tell us whether the issue is on WSL 2 and/or WSL 1. You can tell your WSL version by running `wsl -l -v`. 
-    placeholder: "WSL 2"
+    options:
+      - label: WSL 2
+      - label: WSL 1
   validations:
     required: true
 
