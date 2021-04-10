@@ -29,8 +29,6 @@ body:
     options:
       - label: WSL 2
       - label: WSL 1
-  validations:
-    required: true
 
 - type: input
   attributes:
