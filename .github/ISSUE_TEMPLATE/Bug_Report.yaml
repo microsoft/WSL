@@ -1,5 +1,5 @@
 ---
-name: "Bug Report"
+name: "WSL Bug Report"
 description: Report a bug on Windows Subsystem for Linux
 title: ''
 labels: ''
@@ -29,6 +29,8 @@ body:
     options:
       - label: "WSL 2"
       - label: "WSL 1"
+  validations:
+    required: true
 
 - type: input
   attributes:
