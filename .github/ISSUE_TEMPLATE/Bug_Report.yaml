@@ -1,5 +1,5 @@
 ---
-name: "Bug Report"
+name: "WSL Bug Report"
 description: Report a bug on Windows Subsystem for Linux
 title: ''
 labels: ''
@@ -21,14 +21,24 @@ body:
   validations:
     required: true
 
-- type: input
+- type: checkboxes
   attributes:
     label: WSL Version
     description: |
       Tell us whether the issue is on WSL 2 and/or WSL 1. You can tell your WSL version by running `wsl -l -v`. 
-    placeholder: "WSL 2"
+    options:
+      - label: "WSL 2"
+      - label: "WSL 1"
+
+- type: input
+  attributes:
+    label: Kernel Version
+    description: |
+      Please tell us what version of the Linux kernel you are using, or if you are using a custom kernel. 
+      You can run `wsl.exe --status` if that command is available to you, or by running `cat /proc/version` in your distro.
+    placeholder: "5.4.72"
   validations:
-    required: true
+    required: false
 
 - type: input
   attributes:
