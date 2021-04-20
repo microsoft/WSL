@@ -1,10 +1,6 @@
 ---
-name: "WSL Bug Report"
+name: "WSL - Bug Report"
 description: Report a bug on Windows Subsystem for Linux
-title: ''
-labels: ''
-assignees: ''
-issue_body: true
 body:
 - type: markdown
   attributes:
@@ -74,7 +70,7 @@ body:
   attributes:
     label: Expected Behavior
     description: What were you expecting to see? Include any relevant examples or documentation links.
-    placeholder: If you want to include screenshots, paste them into the markdown editor below the form or follow up with a separate comment. 
+    placeholder: If you want to include screenshots, paste them into the text area or follow up with a separate comment. 
   validations:
     required: true
 
