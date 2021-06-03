@@ -16,26 +16,34 @@ A title succinctly describing the issue.
 `Traceroute not working.`
 
 ### 2) Windows version / build number
-Your Windows build number.  This can be gathered from the CMD prompt using the `ver` command.
+Your Windows build number.  This can be gathered from the CMD prompt using the `cmd.exe --version` command.
 
-```
-C:\> ver
-Microsoft Windows [Version 10.0.14385]
+```cmd.exe
+C:\ cmd.exe --version
+Microsoft Windows [Version 10.0.21354.1]
 ```
 
-Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on the Anniversary Update (10.0.14393), please try updating to the Creators Update.
+Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on a Version below (10.0.14393), please try to update your Version.
 
 #### Example:
 
-`Microsoft Windows [Version 10.0.16170]`
+`Microsoft Windows [Version 10.0.21354.1]`
 
 ### 3) Steps required to reproduce
 
 Should include all packages and environmental variables as well as other required configuration.
 
-#### Example:
+#### Example: On linux 
 
 `$ sudo apt-get install traceroute && traceroute www.microsoft.com`
+
+#### Example: On Windows
+
+``
+`$ cmd.exe` 
+`CD C:\Windows\System32\`
+`tracert.exe`
+``
 
 ### 4) Copy of the terminal output
 
