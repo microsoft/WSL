@@ -8,6 +8,10 @@ net session >nul 2>&1 || goto :admin
 if not exist wsl_networking.wprp (echo wsl_networking.wprp not found && exit /b 1)
 if not exist networking.sh (echo networking.sh not found && exit /b 1)
 
+:: List installed Windows features
+echo Windows features:
+powershell.exe -NoProfile "Get-WindowsOptionalFeature -Online | ? State -eq Enabled | select FeatureName"
+
 :: List all HNS objects
 echo HNS objects: 
 hnsdiag list all -df
