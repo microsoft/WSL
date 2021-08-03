@@ -11,11 +11,10 @@ ip a
 ip route show
 
 # Validate that the gateway is responsive and can route ICMP correctly
-gateway=$(ip route show | awk '/default/ { print $3 }')
-if [ $? != '0' ]; then
-    echo 'No gateway found'
-else
+if gateway=$(ip route show | awk '/default/ { print $3 }'); then
     ping -c 4 "$gateway"
+else
+    echo 'No gateway found'
 fi
 
 ping -c 4 1.1.1.1
@@ -27,7 +26,7 @@ traceroute 1.1.1.1
 cat /etc/resolv.conf
 
 # Validate that everything is functionning correctly
-if which curl > /dev/null; then
+if type curl >/dev/null 2>&1; then
     curl -m 5 -v https://microsoft.com
 else
     wget -T 5 -v https://microsoft.com
