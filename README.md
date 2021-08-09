@@ -13,7 +13,7 @@ Note that WSL distro's launch in the Windows Console (unless you have taken step
 
 ## Labels:
 
-This is your best ways to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
+This is your best way to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
 
 - **bug** – The issue considered to be a bug internally by the dev team. This tag is generally for gaps in implemented (read: intended to be working) WSL behavior. Things marked with **bug** have a corresponding bug in on Microsoft’s internal bug tracking system. Example: "du -h reports wrong file size on DrvFs" [(#1894)](https://github.com/microsoft/WSL/issues/1894)
 
