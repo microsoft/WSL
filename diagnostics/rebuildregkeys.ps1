@@ -9,15 +9,40 @@ If WSL 2 distros are missing from registry but provided in Get-AppxPackage, this
 then user can import it to recover the regkeys
 
 Example:
-D:\repo\>powershell.exe .\rebuildregkeys.ps1
+D:\repo\WSL\diagnostics>powershell .\rebuildregkeys.ps1
 Below distros are detected in registry
 Below apps are installed
   Ubuntu
 Below apps are installed but not detected in registry which need to rebuild
   Ubuntu
 
-File D:\repo\wsl.reg is generated, please import it to Windows registry
+File D:\repo\WSL\diagnostics\wsl.reg is generated, please import it to Windows registry
+
+DefaultUid is set 0(root) in the script. After you imported the registry, you may reconfig the --default-user with the command the application provided.
+This an example for ubuntu:
+    ubuntu --help
+    ubuntu config --default-user demo
+
 #>
+
+$defaultUidMesasge = @"
+DefaultUid is set 0(root) in the script. After you imported the registry, you may reconfig the --default-user with the command the application provided.
+This an example for ubuntu:
+    ubuntu --help
+    ubuntu config --default-user demo
+"@
+
+$template = @"
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss]
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss\{UUID}]
+"State"=dword:00000001
+"DistributionName"="{DISTRONAME}"
+"Version"=dword:00000002
+"BasePath"="{BASEPATH}"
+"Flags"=dword:0000000f
+"DefaultUid"=dword:00000000
+"PackageFamilyName"="{PACKAGEFAMILY}"
+"@
 
 $activeDistros = Get-ChildItem -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss' | Where-Object {$_.Name -match '{*-*-*-*-*}'} |Select-Object -Property Name
 
@@ -81,19 +106,6 @@ foreach ($key in $basePaths.keys)
     }
 }
 
-
-$template = @"
-[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss]
-[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss\{UUID}]
-"State"=dword:00000001
-"DistributionName"="{DISTRONAME}"
-"Version"=dword:00000002
-"BasePath"="{BASEPATH}"
-"Flags"=dword:0000000f
-"DefaultUid"=dword:000003e8
-"PackageFamilyName"="{PACKAGEFAMILY}"
-"@
-
 $regConent = "Windows Registry Editor Version 5.00`r`n"
 function Rebuild-RegKeys()
 {
@@ -130,7 +142,8 @@ if ($rebuildPackages.Count -gt 0)
     }
     Set-Content $wslreg $regConent -Encoding UTF8
 
-    Write-Host "`r`nFile $wslreg is generated, please import it to Windows registry"
+    Write-Host "`r`nFile $wslreg is generated, please import it to Windows registry`r`n"
+    Write-Host $defaultUidMesasge
 }
 else
 {
