@@ -2,8 +2,11 @@
 # Licensed under the MIT License. See LICENSE in the project root for license information.
 
 <#
+Warning: This script used undocumented registery. Registry key state is subject to change and should not be used programatically in your code.
+
 Script to rebuild the WSL2 distros regkeys when they are missing from user's registry but provided in Get-AppxPackage
-distros information are stored in HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss
+
+distros information are stored in HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss. 
 Get-AppxPackage returns all installed packages
 If WSL 2 distros are missing from registry but provided in Get-AppxPackage, this script can rebuild the registy and saved as wsl.reg
 then user can import it to recover the regkeys
