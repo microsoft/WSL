@@ -1,4 +1,9 @@
 #! /bin/bash
+ if (($(id -u) != 0))
+ then
+     printf "If you see 'ping: socket: Operation not permitted' errors, "
+     printf "run this command as root.\n"
+fi
 
 set -xu
 
