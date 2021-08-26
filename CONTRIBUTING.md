@@ -94,52 +94,51 @@ Common files are:
 $ strace -ff -o <outputfile> <command>
 ```
 
-### 8) Detailed Logs
-Some bugs will require more detailed logs to help determine the cause.  There is a command to start detailed logging and another to stop.  The logs are generated locally into the working directory.
+#### wsl --mount
 
-#### Start collecting logs
+If the issue is about wsl --mount, please include the output of running `wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions` in an elevated command prompt.
 
-```
-logman.exe create trace lxcore_kernel -p "{0CD1C309-0878-4515-83DB-749843B3F5C9}" -mode 0x00000008 -ft 10:00 -o .\lxcore_kernel.etl -ets
-logman.exe create trace lxcore_user -p "{D90B9468-67F0-5B3B-42CC-82AC81FFD960}" -ft 1:00 -rt -o .\lxcore_user.etl -ets
-logman.exe create trace lxcore_service -p "{B99CDB5A-039C-5046-E672-1A0DE0A40211}" -ft 1:00 -rt -o .\lxcore_service.etl -ets
-```
-
-#### Stop collecting logs
+Example:
 
 ```
-logman.exe stop lxcore_kernel -ets
-logman.exe stop lxcore_user -ets
-logman.exe stop lxcore_service -ets
+C:\WINDOWS\system32>wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions
+Availability  Capabilities  CapabilityDescriptions                                       DeviceID            InterfaceType  MediaLoaded  MediaType              Model                       Name                Partitions
+              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE0  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB512HAJQ-000H2  \\.\PHYSICALDRIVE0  3
+              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE1  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB1T0HALR-000H2  \\.\PHYSICALDRIVE1  1
+              {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
 ```
 
-#### Generated log files
+#### Networking issues
 
-The files generated will be in the directory where the above commands ran.  The files will be named:
+If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
 
 ```
-lxcore_kernel.etl
-lxcore_service.etl
-lxcore_user.etl
+$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
+$ cd %tmp%\WSL\diagnostics
+$ networking.bat
 ```
 
-#### Submitting logs
+Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
 
-To submit the details logs, attach them to your GitHub issue.
+<!-- Preserving anchors -->
+<div id="8-detailed-logs"></div>
+<div id="9-networking-logs"></div>
 
-### 9) Networking Logs
-For bugs that are related to networking, you can provide networking logs using the Feedback hub with the following steps.
+### 8) Collect WSL logs
+To collect WSL logs follow these steps: 
 
 #### Open Feedback Hub and enter the title and description of your issue
 
-- Open Feedback hub and create a new issue by pressing `Windows Key + F` on your keyboard. 
+- Open Feedback hub and create a new issue by link [Feedback Hub](Feedback-Hub:?referrer=WSL&tabID=2&newFeedback=true&CategoryId=25&ContextId=677&feedbackType=2&form=1) or pressing `Windows Key + F` on your keyboard. 
 - Enter in the details of your issue:
    - In `Summarize your feedback` copy and paste in the title of your Github Issue
    - In `Explain in more detail` copy and paste a link to your Github Issue
 
 ![GIF Of networking instructions](img/networkinglog1.gif)
 
-#### Choose the WSL category 
+#### Choose the WSL category
+
+This step can be skipped if Feedback Hub is opened by Link. 
 
 - Select that your issue is a `Problem`
 - Choose the `Developer Platform` category and the `Windows Subsystem for Linux` subcategory
@@ -164,3 +163,21 @@ For bugs that are related to networking, you can provide networking logs using t
 - Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
+
+#### Record WSL logs manually
+
+If creating a Feedback Hub entry isn't possible, then WSL logs need to be captured manually.
+
+To do so, first download [wsl.wprp](https://github.com/microsoft/WSL/blob/master/diagnostics/wsl.wprp), then run in an administrative command prompt:
+
+```
+$ wpr -start wsl.wprp -filemode
+```
+
+Once the log collection is started, reproduce the problem, and run:
+
+```
+$ wpr -stop wsl.etl
+```
+
+This will stop the log collection and create a file named `wsl.etl` that will capture diagnostics information.
