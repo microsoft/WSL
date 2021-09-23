@@ -3,7 +3,7 @@
 set -xu
 
 # Gather distro & kernel info
-lsb_release -a || cat /etc/issue
+lsb_release -a || cat /etc/issue /etc/os-release
 uname -a
 
 # Output adapter & routing configuration
