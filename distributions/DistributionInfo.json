@@ -1,13 +1,13 @@
 {
     "Amd64Distributions": [
         {
-            "Name": "ubuntu",
+            "Name": "Ubuntu",
             "FriendlyName": "Ubuntu",
             "StoreAppId": "9NBLGGH4MSV6",
             "PackageFamilyName": "CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc"
         },
         {
-            "Name": "debian",
+            "Name": "Debian",
             "FriendlyName": "Debian GNU/Linux",
             "StoreAppId": "9MSVKQC78PK6",
             "PackageFamilyName": "DebianGNULinux_1-1-3-0_x64__76v4gfsz19hv4.Appx"
