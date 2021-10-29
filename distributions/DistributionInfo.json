@@ -1,0 +1,60 @@
+{
+    "Distributions": [
+        {
+            "Name": "Ubuntu",
+            "FriendlyName": "Ubuntu",
+            "StoreAppId": "9NBLGGH4MSV6",
+            "Amd64": true,
+            "Arm64": true
+        },
+        {
+            "Name": "Debian",
+            "FriendlyName": "Debian GNU/Linux",
+            "StoreAppId": "9MSVKQC78PK6",
+            "Amd64": true,
+            "Arm64": false
+        },
+        {
+            "Name": "kali-linux",
+            "FriendlyName": "Kali Linux Rolling",
+            "StoreAppId": "9PKR34TNCV07",
+            "Amd64": true,
+            "Arm64": false
+        },
+        {
+            "Name": "openSUSE-42",
+            "FriendlyName": "openSUSE Leap 42",
+            "StoreAppId": "9N6J06BMCGT3",
+            "Amd64": true,
+            "Arm64": false
+        },
+        {
+            "Name": "SLES-12",
+            "FriendlyName": "SUSE Linux Enterprise Server v12",
+            "StoreAppId": "9NVGTG6752JM",
+            "Amd64": true,
+            "Arm64": false
+        },
+        {
+            "Name": "SLES-15",
+            "FriendlyName": "SUSE Linux Enterprise Server v15",
+            "StoreAppId": "9NJFZK00FGKV",
+            "Amd64": true,
+            "Arm64": false
+        },
+        {
+            "Name": "Ubuntu-18.04",
+            "FriendlyName": "Ubuntu 18.04 LTS",
+            "StoreAppId": "9N9TNGVNDL3Q",
+            "Amd64": true,
+            "Arm64": true
+        },
+        {
+            "Name": "Ubuntu-20.04",
+            "FriendlyName": "Ubuntu 20.04 LTS",
+            "StoreAppId": "9N6SVWS3RX71",
+            "Amd64": true,
+            "Arm64": true
+        }
+    ]
+}
