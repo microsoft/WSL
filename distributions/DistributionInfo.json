@@ -36,6 +36,13 @@
             "Arm64": false
         },
         {
+            "Name": "SLES-15",
+            "FriendlyName": "SUSE Linux Enterprise Server v15",
+            "StoreAppId": "9NJFZK00FGKV",
+            "Amd64": true,
+            "Arm64": false
+        },
+        {
             "Name": "Ubuntu-18.04",
             "FriendlyName": "Ubuntu 18.04 LTS",
             "StoreAppId": "9N9TNGVNDL3Q",
