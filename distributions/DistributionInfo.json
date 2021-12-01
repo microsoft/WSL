@@ -5,56 +5,80 @@
             "FriendlyName": "Ubuntu",
             "StoreAppId": "9NBLGGH4MSV6",
             "Amd64": true,
-            "Arm64": true
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc"
         },
         {
             "Name": "Debian",
             "FriendlyName": "Debian GNU/Linux",
             "StoreAppId": "9MSVKQC78PK6",
             "Amd64": true,
-            "Arm64": false
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/DebianGNULinux_1-1-3-0_x64__76v4gfsz19hv4.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "TheDebianProject.DebianGNULinux_76v4gfsz19hv4"
         },
         {
             "Name": "kali-linux",
             "FriendlyName": "Kali Linux Rolling",
             "StoreAppId": "9PKR34TNCV07",
             "Amd64": true,
-            "Arm64": false
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/kali-linux-08-06-2019.appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
         {
             "Name": "openSUSE-42",
             "FriendlyName": "openSUSE Leap 42",
             "StoreAppId": "9N6J06BMCGT3",
             "Amd64": true,
-            "Arm64": false
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/openSUSE-42_v1.appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.openSUSELeap42.2_022rs5jcyhyac"
         },
         {
             "Name": "SLES-12",
             "FriendlyName": "SUSE Linux Enterprise Server v12",
-            "StoreAppId": "9NVGTG6752JM",
+            "StoreAppId": "9MZ3D1TRP8T1",
             "Amd64": true,
-            "Arm64": false
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/SLES-12_v1.appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer12SP2_022rs5jcyhyac"
         },
         {
             "Name": "SLES-15",
             "FriendlyName": "SUSE Linux Enterprise Server v15",
             "StoreAppId": "9NJFZK00FGKV",
             "Amd64": true,
-            "Arm64": false
+            "Arm64": false,
+            "Amd64PackageUrl": null,
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": null
         },
         {
             "Name": "Ubuntu-18.04",
             "FriendlyName": "Ubuntu 18.04 LTS",
             "StoreAppId": "9N9TNGVNDL3Q",
             "Amd64": true,
-            "Arm64": true
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04onWindows_79rhkp1fndgsc"
         },
         {
             "Name": "Ubuntu-20.04",
             "FriendlyName": "Ubuntu 20.04 LTS",
             "StoreAppId": "9N6SVWS3RX71",
             "Amd64": true,
-            "Arm64": true
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_ARM64.appx",
+            "PackageFamilyName": "46932SUSE.openSUSELeap42.2_022rs5jcyhyac"
         }
     ]
 }
