@@ -30,7 +30,7 @@ traceroute 1.1.1.1
 # Display the DNS configuration.
 cat /etc/resolv.conf
 
-# Validate that everything is functionning correctly.
+# Validate that everything is functioning correctly.
 if type curl >/dev/null 2>&1; then
     curl -m 5 -v https://microsoft.com
 else
