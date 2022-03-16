@@ -58,3 +58,5 @@ if __name__ == "__main__":
 
     for e in content['Distributions']:
         validate_distro(e)
+
+    print("All checks completed successfully")
