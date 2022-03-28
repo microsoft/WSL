@@ -8,6 +8,10 @@ net session >nul 2>&1 || goto :admin
 if not exist wsl_networking.wprp (echo wsl_networking.wprp not found && exit /b 1)
 if not exist networking.sh (echo networking.sh not found && exit /b 1)
 
+:: Capture the store WSL version
+echo "WSL version (Might be help text if store WSL is not installed):"
+wsl.exe --version
+
 :: List installed Windows features.
 echo Windows features:
 powershell.exe -NoProfile "Get-WindowsOptionalFeature -Online | ? State -eq Enabled | select FeatureName"
@@ -25,7 +29,7 @@ echo Deleting HNS network
 powershell.exe -NoProfile "Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL'} | Remove-HnsNetwork"
 
 :: Stop WSL.
-net.exe stop LxssManager
+net.exe stop WslService || net.exe stop LxssManager
 
 :: Start packet capture.
 powershell.exe -NoProfile "New-NetEventSession HnsPacketCapture -CaptureMode SaveToFile -LocalFilePath %cd%\\packets.etl" || goto :fail
