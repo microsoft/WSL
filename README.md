@@ -39,7 +39,7 @@ This is your best way to interact directly with the Windows Subsystem for Linux 
 
 Additional tags may be used to denote specific types of issues.
 
-- **9p-linux-file-access** - The issue is related to accesing Linux files from Windows.
+- **9p-linux-file-access** - The issue is related to accessing Linux files from Windows.
 
 ## Closing:
 
