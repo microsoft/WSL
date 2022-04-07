@@ -7,12 +7,13 @@ body:
     value: |
       Please [search for existing issues](https://github.com/microsoft/WSL/issues) before creating a new one.
       If you'd like to create a new bug report, please [read the guidance here](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) before getting started. This will save you time.
-      
+
 - type: input
   attributes:
-    label: Windows Build Number
+    label: Version
     description: |
       Please run `cmd.exe /c ver` to get the build of Windows you are on.
+      If you are running Windows Subsystem for Linux from the Microsoft Store, please run `wsl.exe --version`
     placeholder: "Microsoft Windows [Version 10.0.19042.867]"
   validations:
     required: true
