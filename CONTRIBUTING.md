@@ -93,33 +93,6 @@ Common files are:
 ```
 $ strace -ff -o <outputfile> <command>
 ```
-
-#### wsl --mount
-
-If the issue is about wsl --mount, please include the output of running `wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions` in an elevated command prompt.
-
-Example:
-
-```
-C:\WINDOWS\system32>wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions
-Availability  Capabilities  CapabilityDescriptions                                       DeviceID            InterfaceType  MediaLoaded  MediaType              Model                       Name                Partitions
-              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE0  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB512HAJQ-000H2  \\.\PHYSICALDRIVE0  3
-              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE1  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB1T0HALR-000H2  \\.\PHYSICALDRIVE1  1
-              {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
-```
-
-#### Networking issues
-
-If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
-
-```
-$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
-$ cd %tmp%\WSL\diagnostics
-$ networking.bat
-```
-
-Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
-
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
 <div id="9-networking-logs"></div>
@@ -129,16 +102,14 @@ To collect WSL logs follow these steps:
 
 #### Open Feedback Hub and enter the title and description of your issue
 
-- Open Feedback hub and create a new issue by link [Feedback Hub](Feedback-Hub:?referrer=WSL&tabID=2&newFeedback=true&CategoryId=25&ContextId=677&feedbackType=2&form=1) or pressing `Windows Key + F` on your keyboard. 
+- Open Feedback hub and create a new issue by pressing `Windows Key + F` on your keyboard. 
 - Enter in the details of your issue:
    - In `Summarize your feedback` copy and paste in the title of your Github Issue
    - In `Explain in more detail` copy and paste a link to your Github Issue
 
 ![GIF Of networking instructions](img/networkinglog1.gif)
 
-#### Choose the WSL category
-
-This step can be skipped if Feedback Hub is opened by Link. 
+#### Choose the WSL category 
 
 - Select that your issue is a `Problem`
 - Choose the `Developer Platform` category and the `Windows Subsystem for Linux` subcategory
@@ -163,21 +134,3 @@ This step can be skipped if Feedback Hub is opened by Link.
 - Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
-
-#### Record WSL logs manually
-
-If creating a Feedback Hub entry isn't possible, then WSL logs need to be captured manually.
-
-To do so, first download [wsl.wprp](https://github.com/microsoft/WSL/blob/master/diagnostics/wsl.wprp), then run in an administrative command prompt:
-
-```
-$ wpr -start wsl.wprp -filemode
-```
-
-Once the log collection is started, reproduce the problem, and run:
-
-```
-$ wpr -stop wsl.etl
-```
-
-This will stop the log collection and create a file named `wsl.etl` that will capture diagnostics information.
