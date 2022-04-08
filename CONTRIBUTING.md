@@ -16,34 +16,26 @@ A title succinctly describing the issue.
 `Traceroute not working.`
 
 ### 2) Windows version / build number
-Your Windows build number.  This can be gathered from the CMD prompt using the `cmd.exe --version` command.
+Your Windows build number.  This can be gathered from the CMD prompt using the `ver` command.
 
-```cmd.exe
-C:\ cmd.exe --version
-Microsoft Windows [Version 10.0.21354.1]
+```
+C:\> ver
+Microsoft Windows [Version 10.0.14385]
 ```
 
-Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on a Version below (10.0.14393), please try to update your Version.
+Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on the Anniversary Update (10.0.14393), please try updating to the Creators Update.
 
 #### Example:
 
-`Microsoft Windows [Version 10.0.21354.1]`
+`Microsoft Windows [Version 10.0.16170]`
 
 ### 3) Steps required to reproduce
 
 Should include all packages and environmental variables as well as other required configuration.
 
-#### Example: On linux 
+#### Example:
 
 `$ sudo apt-get install traceroute && traceroute www.microsoft.com`
-
-#### Example: On Windows
-
-``
-`$ cmd.exe` 
-`CD C:\Windows\System32\`
-`tracert.exe`
-``
 
 ### 4) Copy of the terminal output
 
@@ -101,33 +93,6 @@ Common files are:
 ```
 $ strace -ff -o <outputfile> <command>
 ```
-
-#### wsl --mount
-
-If the issue is about wsl --mount, please include the output of running `wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions` in an elevated command prompt.
-
-Example:
-
-```
-C:\WINDOWS\system32>wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions
-Availability  Capabilities  CapabilityDescriptions                                       DeviceID            InterfaceType  MediaLoaded  MediaType              Model                       Name                Partitions
-              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE0  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB512HAJQ-000H2  \\.\PHYSICALDRIVE0  3
-              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE1  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB1T0HALR-000H2  \\.\PHYSICALDRIVE1  1
-              {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
-```
-
-#### Networking issues
-
-If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
-
-```
-$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
-$ cd %tmp%\WSL\diagnostics
-$ networking.bat
-```
-
-Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
-
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
 <div id="9-networking-logs"></div>
@@ -169,21 +134,3 @@ To collect WSL logs follow these steps:
 - Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
-
-#### Record WSL logs manually
-
-If creating a Feedback Hub entry isn't possible, then WSL logs need to be captured manually.
-
-To do so, first download [wsl.wprp](https://github.com/microsoft/WSL/blob/master/diagnostics/wsl.wprp), then run in an administrative command prompt:
-
-```
-$ wpr -start wsl.wprp -filemode
-```
-
-Once the log collection is started, reproduce the problem, and run:
-
-```
-$ wpr -stop wsl.etl
-```
-
-This will stop the log collection and create a file named `wsl.etl` that will capture diagnostics information.

@@ -1,19 +1,22 @@
 ---
-name: "WSL - Bug Report"
+name: "WSL Bug Report"
 description: Report a bug on Windows Subsystem for Linux
+title: ''
+labels: ''
+assignees: ''
+issue_body: true
 body:
 - type: markdown
   attributes:
     value: |
       Please [search for existing issues](https://github.com/microsoft/WSL/issues) before creating a new one.
       If you'd like to create a new bug report, please [read the guidance here](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) before getting started. This will save you time.
-
+      
 - type: input
   attributes:
-    label: Version
+    label: Windows Build Number
     description: |
       Please run `cmd.exe /c ver` to get the build of Windows you are on.
-      If you are running Windows Subsystem for Linux from the Microsoft Store, please run `wsl.exe --version`
     placeholder: "Microsoft Windows [Version 10.0.19042.867]"
   validations:
     required: true
@@ -71,7 +74,7 @@ body:
   attributes:
     label: Expected Behavior
     description: What were you expecting to see? Include any relevant examples or documentation links.
-    placeholder: If you want to include screenshots, paste them into the text area or follow up with a separate comment. 
+    placeholder: If you want to include screenshots, paste them into the markdown editor below the form or follow up with a separate comment. 
   validations:
     required: true
 
