@@ -1,0 +1,23 @@
+name: Sync GitHub with ADO
+
+on: 
+  issues:
+    types: [closed, edited, deleted, reopened, assigned, unassigned, labeled, unlabeled]
+  issue_comment:
+
+jobs:
+  build:
+    name: Run gh-sync from GitHub action
+    if: ${{ github.event.label.name == 'tracking' || contains(github.event.issue.labels.*.name, 'tracking') }} # Filters out issues/events without the 'tracking' label
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Trigger gh-sync'
+        uses: microsoft/gh-sync@main
+        with:
+          ado-organization-url: ${{ secrets.AZURE_DEVOPS_URL }}
+          ado-project: ${{ secrets.AZURE_DEVOPS_PROJECT }}
+          ado-area-path: ${{ secrets.AZURE_DEVOPS_PATH }}
+          github-repo: 'microsoft/WSL'
+          issue-number: ${{github.event.issue.number}} # Auto-generated from GitHub action
+          ado-token: ${{ secrets.AZURE_DEVOPS_TOKEN }} # Your Personal Access Token (PAT)
+          github-token: ${{ secrets.GITHUB_TOKEN }}    # Auto-generated from GitHub action
