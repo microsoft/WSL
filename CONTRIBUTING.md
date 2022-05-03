@@ -174,7 +174,7 @@ To collect WSL logs follow these steps:
 
 If creating a Feedback Hub entry isn't possible, then WSL logs need to be captured manually.
 
-To do so, first download [wsl.wprp](https://github.com/microsoft/WSL/blob/master/diagnostics/wsl.wprp), then run in an administrative command prompt:
+To do so, first download [wsl.wprp](https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp), then run in an administrative command prompt:
 
 ```
 $ wpr -start wsl.wprp -filemode
