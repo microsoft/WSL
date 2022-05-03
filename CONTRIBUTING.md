@@ -132,7 +132,19 @@ Once the script execution is completed, include **both** its output and the gene
 <div id="8-detailed-logs"></div>
 <div id="9-networking-logs"></div>
 
-### 8) Collect WSL logs
+
+#### 8) Collect WSL logs (recommended method)
+
+To collect WSL logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an administrative powershell prompt:
+
+```
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\collect-wsl-logs.ps1
+```
+The scipt will output the path of the log file once done.
+
+### 9) Collect WSL logs with Feedback hub
 To collect WSL logs follow these steps: 
 
 #### Open Feedback Hub and enter the title and description of your issue
@@ -169,21 +181,3 @@ To collect WSL logs follow these steps:
 - Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
-
-#### Record WSL logs manually
-
-If creating a Feedback Hub entry isn't possible, then WSL logs need to be captured manually.
-
-To do so, first download [wsl.wprp](https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp), then run in an administrative command prompt:
-
-```
-$ wpr -start wsl.wprp -filemode
-```
-
-Once the log collection is started, reproduce the problem, and run:
-
-```
-$ wpr -stop wsl.etl
-```
-
-This will stop the log collection and create a file named `wsl.etl` that will capture diagnostics information.
