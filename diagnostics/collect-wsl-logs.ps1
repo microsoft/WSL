@@ -5,7 +5,6 @@ Param (
     $LogProfile = $null
     )
 
-$ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
@@ -14,7 +13,12 @@ mkdir -p $folder
 if ($LogProfile -eq $null)
 {
     $LogProfile = "$folder/wsl.wprp"
-    Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp" -OutFile $LogProfile 
+    try {
+        Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp" -OutFile $LogProfile
+    }
+    catch {
+        throw
+    }
 }
 
 reg.exe export HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKCU.reg
