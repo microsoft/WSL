@@ -31,16 +31,6 @@
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
         {
-            "Name": "openSUSE-42",
-            "FriendlyName": "openSUSE Leap 42",
-            "StoreAppId": "9N6J06BMCGT3",
-            "Amd64": true,
-            "Arm64": false,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/openSUSE-42_v1.appx",
-            "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.openSUSELeap42.2_022rs5jcyhyac"
-        },
-        {
             "Name": "SLES-12",
             "FriendlyName": "SUSE Linux Enterprise Server v12",
             "StoreAppId": "9MZ3D1TRP8T1",
