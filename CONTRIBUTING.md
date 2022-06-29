@@ -142,7 +142,7 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\collect-wsl-logs.ps1
 ```
-The scipt will output the path of the log file once done.
+The script will output the path of the log file once done.
 
 ### 9) Collect WSL logs with Feedback hub
 To collect WSL logs follow these steps: 
