@@ -26,7 +26,7 @@
             "StoreAppId": "9PKR34TNCV07",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/kali-linux-08-06-2019.appx",
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/KaliLinux_1.13.1.0.AppxBundle",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
