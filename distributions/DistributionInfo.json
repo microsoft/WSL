@@ -16,7 +16,7 @@
             "StoreAppId": "9MSVKQC78PK6",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/DebianGNULinux_1-1-3-0_x64__76v4gfsz19hv4.Appx",
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "TheDebianProject.DebianGNULinux_76v4gfsz19hv4"
         },
