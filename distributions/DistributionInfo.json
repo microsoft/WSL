@@ -15,9 +15,9 @@
             "FriendlyName": "Debian GNU/Linux",
             "StoreAppId": "9MSVKQC78PK6",
             "Amd64": true,
-            "Arm64": false,
+            "Arm64": true,
             "Amd64PackageUrl": "https://wsldownload.azureedge.net/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
-            "Arm64PackageUrl": null,
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
             "PackageFamilyName": "TheDebianProject.DebianGNULinux_76v4gfsz19hv4"
         },
         {
