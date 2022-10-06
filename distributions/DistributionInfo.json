@@ -3,12 +3,12 @@
         {
             "Name": "Ubuntu",
             "FriendlyName": "Ubuntu",
-            "StoreAppId": "9NBLGGH4MSV6",
+            "StoreAppId": "9PDXGNCFSCZV",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_x64.appx",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc"
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-221004.AppxBundle",
+            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-221004.AppxBundle",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu_79rhkp1fndgsc"
         },
         {
             "Name": "Debian",
