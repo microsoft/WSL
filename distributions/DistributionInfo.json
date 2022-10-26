@@ -3,12 +3,12 @@
         {
             "Name": "Ubuntu",
             "FriendlyName": "Ubuntu",
-            "StoreAppId": "9NBLGGH4MSV6",
+            "StoreAppId": "9PDXGNCFSCZV",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_x64.appx",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc"
+            "Amd64PackageUrl": "null",
+            "Arm64PackageUrl": "null",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu_79rhkp1fndgsc"
         },
         {
             "Name": "Debian",
@@ -69,6 +69,16 @@
             "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_x64.appx",
             "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_ARM64.appx",
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu20.04onWindows_79rhkp1fndgs"
+        },
+        {
+            "Name": "Ubuntu-20.04.4",
+            "FriendlyName": "Ubuntu 20.04.4 LTS",
+            "StoreAppId": "9NBLGGH4MSV6",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu.2020.424.0_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.UbuntuonWindows_79rhkp1fndgsc"
         },
         {
             "Name": "OracleLinux_8_5",
