@@ -2,6 +2,7 @@ Please provide as much information as possible when reporting a bug or filing an
 
 ## Important: Reporting BSODs and Security issues
 **Do not open GitHub issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
+See the `10) Reporting a Windows crash (BSOD)` section below for detailed instructions.
 
 ## Reporting issues in Windows Console or WSL text rendering/user experience
 Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
@@ -181,3 +182,22 @@ To collect WSL logs follow these steps:
 - Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
+
+
+### 10) Reporting a Windows crash (BSOD)
+
+To collect a kernel crash dump, first run the following command in an elevated command prompt:
+
+```
+reg.exe add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl /v AlwaysKeepMemoryDump  /t REG_DWORD /d 1 /f
+```
+
+Then reproduce the issue, and let the machine crash and reboot.
+
+After reboot, the kernel dump will be in `%SystemRoot%\MEMORY.DMP` (unless this path has been overriden in the advanced system settings).
+
+Please send this dump to: secure@microsoft.com .
+Make sure that the email body contains:
+
+- The Github issue number, if any
+- That this dump is destinated to the WSL team
