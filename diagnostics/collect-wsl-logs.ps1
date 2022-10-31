@@ -2,8 +2,9 @@
 
 [CmdletBinding()]
 Param (
-    $LogProfile = $null
-    )
+    $LogProfile = $null,
+    [switch]$Dump = $false
+   )
 
 Set-StrictMode -Version Latest
 
@@ -42,6 +43,39 @@ $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
 Write-Host "`nSaving logs..."
 
 wpr.exe -stop $folder/logs.etl
+
+if ($Dump)
+{
+    $Assembly = [PSObject].Assembly.GetType('System.Management.Automation.WindowsErrorReporting')
+    $DumpMethod = $Assembly.GetNestedType('NativeMethods', 'NonPublic').GetMethod('MiniDumpWriteDump', [Reflection.BindingFlags] 'NonPublic, Static')
+
+    $dumpFolder = Join-Path (Resolve-Path "$folder") dumps
+    New-Item -ItemType "directory" -Path "$dumpFolder"
+
+    $executables = "wsl", "wslservice", "wslhost", "msrdc"
+    foreach($process in Get-Process | Where-Object { $executables -contains $_.ProcessName})
+    {
+        $dumpFile =  "$dumpFolder/$($process.ProcessName).$($process.Id).dmp"
+        Write-Host "Writing $($dumpFile)"
+
+        $OutputFile = New-Object IO.FileStream($dumpFile, [IO.FileMode]::Create)
+
+        $Result = $DumpMethod.Invoke($null, @($process.Handle,
+                                              $process.id,
+                                              $OutputFile.SafeFileHandle,
+                                              [UInt32] 2
+                                              [IntPtr]::Zero,
+                                              [IntPtr]::Zero,
+                                              [IntPtr]::Zero))
+
+        $OutputFile.Close()
+        if (-not $Result)
+        {
+            Write-Host "Failed to write dump for: $($dumpFile)"
+        }
+    }
+}
+
 $logArchive = "$(Resolve-Path $folder).zip"
 Compress-Archive -Path $folder -DestinationPath $logArchive
 Remove-Item $folder -Recurse
