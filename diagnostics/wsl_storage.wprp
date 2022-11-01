@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<WindowsPerformanceRecorder Version="1">
+  <Profiles>
+    <EventCollector Id="Collector" Name="Collector">
+      <BufferSize Value="256"/>
+      <Buffers Value="1024"/>
+    </EventCollector>
+
+    <EventProvider Id="lxcore_kernel" Name="0CD1C309-0878-4515-83DB-749843B3F5C9"/>
+    <EventProvider Id="lxcore_user" Name="D90B9468-67F0-5B3B-42CC-82AC81FFD960"/>
+    <EventProvider Id="lxcore_service" Name="B99CDB5A-039C-5046-E672-1A0DE0A40211"/>
+    <EventProvider Id="vm_chipset" Name="de9ba731-7f33-4f44-98c9-6cac856b9f83"/>
+    <EventProvider Id="vmcompute_dll" Name="AF7FD3A7-B248-460C-A9F5-FEC39EF8468C"/>
+    <EventProvider Id="vmcompute" Name="17103E3F-3C6E-4677-BB17-3B267EB5BE57"/>
+    <EventProvider Id="vmmm" Name="6066F867-7CA1-4418-85FD-36E3F9C0600C"/>
+    <EventProvider Id="vmwp" Name="51DDFA29-D5C8-4803-BE4B-2ECB715570FE"/>
+    <EventProvider Id="9p" Name="e13c8d52-b153-571f-78c5-1d4098af2a1e"/>
+    <EventProvider Id="p9rdr" Name="bb1d36f0-e0e0-48cc-9493-fef0e3d0b28c" />
+    <EventProvider Id="mup" Name="20c46239-d059-4214-a11e-7d6769cbe020" />
+    <EventProvider Id="rfsmon" Name="51734B23-5B7E-4892-BA8E-45BC110B735C" />
+    <EventProvider Id="hyperv_storage" Name="c7ad62c6-5c99-5a1b-bbc4-0821ae5b765e" />
+    <EventProvider Id="hns" Name="0c885e0d-6eb6-476c-a048-2457eed3a5c1" />
+    <EventProvider Id="netmgmt" Name="93f693dc-9163-4dee-af64-d855218af242" />
+    <EventProvider Id="storvsp_io" Name="10b3d268-9782-49a4-aacc-a93c5482cb6f" NonPagedMemory="true">
+        <Keywords>
+            <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+        </Keywords>
+    </EventProvider>
+    <Profile
+      Id="WSL.Verbose.File"
+      Name="WSL"
+      Description="Traces for all WSL components"
+      LoggingMode="File"
+      DetailLevel="Verbose"
+      >
+      <Collectors>
+        <EventCollectorId Value="Collector">
+          <EventProviders>
+            <EventProviderId Value="lxcore_kernel"/>
+            <EventProviderId Value="lxcore_user"/>
+            <EventProviderId Value="lxcore_service"/>
+            <EventProviderId Value="vm_chipset"/>
+            <EventProviderId Value="vmcompute_dll"/>
+            <EventProviderId Value="vmcompute"/>
+            <EventProviderId Value="vmmm"/>
+            <EventProviderId Value="vmwp"/>
+            <EventProviderId Value="9p"/>
+            <EventProviderId Value="p9rdr"/>
+            <EventProviderId Value="mup"/>
+            <EventProviderId Value="rfsmon"/>
+            <EventProviderId Value="hyperv_storage"/>
+            <EventProviderId Value="hns"/>
+            <EventProviderId Value="netmgmt"/>
+            <EventProviderId Value="storvsp_io"/>
+          </EventProviders>
+        </EventCollectorId>
+      </Collectors>
+    </Profile>
+  </Profiles>
+</WindowsPerformanceRecorder>
