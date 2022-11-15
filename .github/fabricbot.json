@@ -770,6 +770,63 @@
           }
         ]
       }
+    },
+    {
+      "taskType": "trigger",
+      "capabilityId": "IssueResponder",
+      "subCapability": "IssueCommentResponder",
+      "version": "1.0",
+      "config": {
+        "conditions": {
+          "operator": "and",
+          "operands": [
+            {
+              "name": "commentContains",
+              "parameters": {
+                "commentPattern": "\\/dump?",
+                "isRegex": true
+              }
+            },
+            {
+              "operator": "or",
+              "operands": [
+                {
+                  "name": "activitySenderHasPermissions",
+                  "parameters": {
+                    "permissions": "admin"
+                  }
+                },
+                {
+                  "name": "activitySenderHasPermissions",
+                  "parameters": {
+                    "permissions": "write"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "eventType": "issue",
+        "eventNames": [
+          "issue_comment"
+        ],
+        "taskName": "Ask for dumps",
+        "actions": [
+          {
+            "name": "addReply",
+            "parameters": {
+              "comment": "Hello! Could you please provide logs and process dumps to help us better diagnose your issue? \n\nTo collect WSL logs and dumps, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an **administrative powershell prompt**:\n\n```\nInvoke-WebRequest -UseBasicParsing \"https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1\" -OutFile collect-wsl-logs.ps1\nSet-ExecutionPolicy Bypass -Scope Process -Force\n.\\collect-wsl-logs.ps1 -Dump\n```\nThe scipt will output the path of the log file once done. \n\nOnce completed please upload the output files to this Github issue.\n\n[Click here](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method) for more info on logging\n\nThank you!"
+            }
+          },
+          {
+            "name": "addLabel",
+            "parameters": {
+              "label": "needs-author-feedback"
+            }
+          }
+        ]
+      },
+      "disabled": false
     }
   ],
   "userGroups": []
