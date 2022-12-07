@@ -22,15 +22,19 @@ def download_and_get_manifest(url: str):
 def validate_package_url(url: str, family_name: str, platform: str):
     manifest = download_and_get_manifest(url)
     identity = manifest.find('.//{http://schemas.microsoft.com/appx/manifest/foundation/windows10}Identity')
-
+    dependencies = manifest.find('.//{http://schemas.microsoft.com/appx/manifest/foundation/windows10}PackageDependency')
     if identity is not None:
         # Check the architecture if the package isn't bundled
         assert platform == identity.attrib['ProcessorArchitecture']
     else:
         # Only check the package name for bundles
         identity =  manifest.find('.//{http://schemas.microsoft.com/appx/2013/bundle}Identity')
+        dependencies =  manifest.find('.//{http://schemas.microsoft.com/appx/2013/bundle}PackageDependency')
 
     assert identity.attrib['Name'] in family_name
+
+    # Packages uploaded to the CDN shouldn't have dependencies since they can't be installed automatically on Server SKU's.
+    assert dependencies is None
 
 def validate_distro(distro: dict):
     if distro['Amd64PackageUrl'] is not None:
