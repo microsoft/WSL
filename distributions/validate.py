@@ -1,6 +1,8 @@
 import requests
 import json
 import sys
+import hashlib
+import base64
 from urllib.request import urlretrieve
 from xml.etree import ElementTree
 import tempfile
@@ -31,10 +33,19 @@ def validate_package_url(url: str, family_name: str, platform: str):
         identity =  manifest.find('.//{http://schemas.microsoft.com/appx/2013/bundle}Identity')
         dependencies =  manifest.find('.//{http://schemas.microsoft.com/appx/2013/bundle}PackageDependency')
 
-    assert identity.attrib['Name'] in family_name
-
     # Packages uploaded to the CDN shouldn't have dependencies since they can't be installed automatically on Server SKU's.
     assert dependencies is None
+
+    # Validate the package family_name (the last part is based on a custom hash of the publisher)
+    publisher_hash = hashlib.sha256(identity.attrib['Publisher'].encode('utf-16le')).digest()[:8]
+    encoded_string = ''.join(['{0:b}'.format(e).rjust(8, '0') for e in publisher_hash] + ['0'])
+    encoded_hash = ''
+    charset = "0123456789abcdefghjkmnpqrstvwxyz"
+    for i in range(0, len(encoded_string), 5):
+        encoded_hash += charset[int(encoded_string[i:i + 5], 2)]
+
+    assert family_name.startswith(identity.attrib["Name"])
+    assert family_name.endswith('_' + encoded_hash)
 
 def validate_distro(distro: dict):
     if distro['Amd64PackageUrl'] is not None:
