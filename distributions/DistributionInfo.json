@@ -31,19 +31,29 @@
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
         {
-            "Name": "SLES-12",
-            "FriendlyName": "SUSE Linux Enterprise Server v12",
+            "Name": "SLES-12SP5",
+            "FriendlyName": "SUSE Linux Enterprise Server 12SP5",
             "StoreAppId": "9MZ3D1TRP8T1",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/SLES-12_v1.appx",
+            "Amd64PackageUrl": null,
             "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer12SP2_022rs5jcyhyac"
+            "PackageFamilyName": null
         },
         {
-            "Name": "SLES-15",
-            "FriendlyName": "SUSE Linux Enterprise Server v15",
-            "StoreAppId": "9NJFZK00FGKV",
+            "Name": "SLES-15SP4",
+            "FriendlyName": "SUSE Linux Enterprise Server 15SP4",
+            "StoreAppId": "9NMQXWVJJSZJ",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": null,
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": null
+        },
+        {
+            "Name": "Tumbleweed",
+            "FriendlyName": "openSUSE Tumbleweed Rolling",
+            "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": false,
             "Amd64PackageUrl": null,
