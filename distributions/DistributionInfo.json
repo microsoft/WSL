@@ -51,7 +51,7 @@
             "PackageFamilyName": null
         },
         {
-            "Name": "Tumbleweed",
+            "Name": "openSUSE-Tumbleweed",
             "FriendlyName": "openSUSE Tumbleweed Rolling",
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
