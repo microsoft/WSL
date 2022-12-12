@@ -201,3 +201,24 @@ Make sure that the email body contains:
 
 - The Github issue number, if any
 - That this dump is destinated to the WSL team
+
+### 11) Reporting a WSL process crash
+
+The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps).
+
+To enable automatic crash dumps, run the following commands in an elevated command prompt:
+
+```
+md C:\crashes
+reg.exe add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /f
+reg.exe add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /v DumpFolder /t REG_EXPAND_SZ /d C:\crashes /f
+reg.exe add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /v DumpType /t REG_DWORD /d 2 /f
+```
+
+Crash dumps will then automatically be written to C:\crashes.
+
+Once you're done, crash dump collection can be disabled by running the following command in an elevated command prompt:
+
+```
+reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /f
+```
