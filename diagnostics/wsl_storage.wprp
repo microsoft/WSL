@@ -22,10 +22,34 @@
     <EventProvider Id="hns" Name="0c885e0d-6eb6-476c-a048-2457eed3a5c1" />
     <EventProvider Id="netmgmt" Name="93f693dc-9163-4dee-af64-d855218af242" />
     <EventProvider Id="storvsp_io" Name="10b3d268-9782-49a4-aacc-a93c5482cb6f" NonPagedMemory="true">
-        <Keywords>
-            <Keyword Value="0xFFFFFFFFFFFFFFFF" />
-        </Keywords>
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
     </EventProvider>
+
+    <EventProvider Id="virtdisk_wpp" Name="e14dcdd9-d1ec-4dc3-8395-a606df8ef115" Level="4">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="virtdisk" Name="4D20DF22-E177-4514-A369-F1759FEEDEB3" Level="4">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+     <EventProvider Id="vhdmp" Name="E2816346-87F4-4F85-95C3-0C79409AA89D" NonPagedMemory="true" Level="5">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="vhdmp_wpp" Name="3c70c3b0-2fae-41d3-b68d-8f7fcaf79adb" NonPagedMemory="true" Level="5">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
     <Profile
       Id="WSL.Verbose.File"
       Name="WSL"
@@ -52,6 +76,10 @@
             <EventProviderId Value="hns"/>
             <EventProviderId Value="netmgmt"/>
             <EventProviderId Value="storvsp_io"/>
+            <EventProviderId Value="virtdisk"/>
+            <EventProviderId Value="virtdisk_wpp"/>
+            <EventProviderId Value="vhdmp"/>
+            <EventProviderId Value="vhdmp_wpp"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>
