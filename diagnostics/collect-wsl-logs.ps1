@@ -35,6 +35,7 @@ if (Test-Path $wslconfig)
 
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
+Get-WindowsOptionalFeature -Online > $folder/optional-components.txt
 
 wpr.exe -start $LogProfile -filemode 
 
