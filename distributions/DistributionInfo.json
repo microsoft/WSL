@@ -89,6 +89,16 @@
             "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux7.9_7.9.1.0.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.OracleLinux7.9_dm28ctvqnhe9g"
+        },
+	{
+            "Name": "openEuler-22.09",
+            "FriendlyName": "OpenEuler 22.09",
+            "StoreAppId": "9MWVQSNTMS7G",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OpenEuler2209-230123_x64.appx",
+            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OpenEuler2209-230123_ARM64.appx",
+            "PackageFamilyName": "30248openEuler.openEuler22.09_g7wd87adjxcy0"
         }
     ]
 }
