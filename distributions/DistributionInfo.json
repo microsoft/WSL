@@ -6,8 +6,8 @@
             "StoreAppId": "9PDXGNCFSCZV",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu_2204-221101_x64.appx",
-            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu_2204-221101_ARM64.appx",
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-220117.appx",
+            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-220117_ARM64.appx",
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu_79rhkp1fndgsc"
         },
         {
