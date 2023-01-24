@@ -15,6 +15,7 @@
     <EventProvider Id="vmmm" Name="6066F867-7CA1-4418-85FD-36E3F9C0600C"/>
     <EventProvider Id="vmwp" Name="51DDFA29-D5C8-4803-BE4B-2ECB715570FE"/>
     <EventProvider Id="9p" Name="e13c8d52-b153-571f-78c5-1d4098af2a1e"/>
+    <EventProvider Id="9p_errors" Name="06C601B3-6957-4F8C-A15F-74875B24429D" />
     <EventProvider Id="p9rdr" Name="bb1d36f0-e0e0-48cc-9493-fef0e3d0b28c" />
     <EventProvider Id="mup" Name="20c46239-d059-4214-a11e-7d6769cbe020" />
     <EventProvider Id="rfsmon" Name="51734B23-5B7E-4892-BA8E-45BC110B735C" />
@@ -64,6 +65,7 @@
             <EventProviderId Value="vmmm"/>
             <EventProviderId Value="vmwp"/>
             <EventProviderId Value="9p"/>
+            <EventProviderId Value="9p_errors"/>
             <EventProviderId Value="p9rdr"/>
             <EventProviderId Value="mup"/>
             <EventProviderId Value="rfsmon"/>
