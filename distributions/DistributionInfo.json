@@ -31,26 +31,6 @@
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
         {
-            "Name": "SLES-12",
-            "FriendlyName": "SUSE Linux Enterprise Server v12",
-            "StoreAppId": "9MZ3D1TRP8T1",
-            "Amd64": true,
-            "Arm64": false,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/SLES-12_v1.appx",
-            "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer12SP2_022rs5jcyhyac"
-        },
-        {
-            "Name": "SLES-15",
-            "FriendlyName": "SUSE Linux Enterprise Server v15",
-            "StoreAppId": "9NJFZK00FGKV",
-            "Amd64": true,
-            "Arm64": false,
-            "Amd64PackageUrl": null,
-            "Arm64PackageUrl": null,
-            "PackageFamilyName": null
-        },
-        {
             "Name": "Ubuntu-18.04",
             "FriendlyName": "Ubuntu 18.04 LTS",
             "StoreAppId": "9N9TNGVNDL3Q",
@@ -99,6 +79,36 @@
             "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux7.9_7.9.1.0.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.OracleLinux7.9_dm28ctvqnhe9g"
+        },
+        {
+            "Name": "SUSE-Linux-Enterprise-Server-15-SP4",
+            "FriendlyName": "SUSE Linux Enterprise Server 15 SP4",
+            "StoreAppId": "9NMQXWVJJSZJ",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterpriseServer15_SP4-230130_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer15SP4_022rs5jcyhyac"
+        },
+        {
+            "Name": "openSUSE-Leap-15.4",
+            "FriendlyName": "openSUSE Leap 15.4",
+            "StoreAppId": "9PJPFJHRM62V",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSELeap15_4-230130_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.openSUSELeap15.4_022rs5jcyhyac"
+        },
+        {
+            "Name": "openSUSE-Tumbleweed",
+            "FriendlyName": "openSUSE Tumbleweed",
+            "StoreAppId": "9MSSK2ZXXN11",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-230130_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]
 }
