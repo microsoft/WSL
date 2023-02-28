@@ -23,6 +23,24 @@
     <EventProvider Id="hyperv_storage" Name="c7ad62c6-5c99-5a1b-bbc4-0821ae5b765e" />
     <EventProvider Id="hns" Name="0c885e0d-6eb6-476c-a048-2457eed3a5c1" />
     <EventProvider Id="netmgmt" Name="93f693dc-9163-4dee-af64-d855218af242" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.AppDownload" Name="0BBE6221-EF09-4A3F-82EE-BE00DBB6A98A" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.Datastore" Name="42C60CEA-0FE7-4541-A86B-9E11F95BD9BF" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.PhoneProvisioner" Name="B876B1FC-C7F1-443E-9012-86677F7DE580" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.PPOEM" Name="7EDBED09-1FF7-4FEE-B8C3-5DB694420830" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.API" Name="82ADD491-01D7-4B85-9EAD-192C3CAACA23" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.CSP" Name="16E12400-A2D8-44B7-9479-004568EC7819" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Engine" Name="A6A847B7-4429-49AA-BBA6-2AD8C191AC8C" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Handlers" Name="0383D92C-2337-4F25-A0B5-A51767F04746" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Migration" Name="A0AF985E-83F9-4E1A-B658-338DCFE27893" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Operations" Name="7F99598F-B2C1-4371-9911-63DEE13B9EB1" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Platform" Name="B1F30020-8BC3-4888-BB1B-4DD681F24209" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Plugin.Engine" Name="55239D60-0EB6-495B-874E-15DE5D5F9A70" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Plugin.RemovableMedia" Name="B55883E6-6C45-45C2-AB9D-800BB7B66B13" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.ProvTool" Name="2BF4B6BA-556E-4D05-8534-CAFEDF19FED8" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.CommandCsp" Name="00BB69FC-60BC-4502-9438-25608F375CCB" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch" Name="08FACCFA-125D-4ED6-B0B7-B4A1A912E693" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.EMPS.Enrollment" Name="E74EFD1A-B62D-4B83-AB00-66F4A166A2D3" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment" Name="F9E3B648-9AF1-4DC3-9A8E-BF42C0FBCE9A" />
     <EventProvider Id="virtdisk_wpp" Name="e14dcdd9-d1ec-4dc3-8395-a606df8ef115" Level="4">
       <Keywords>
         <Keyword Value="0xFFFFFFFFFFFFFFFF" />
@@ -74,6 +92,23 @@
             <EventProviderId Value="hyperv_storage"/>
             <EventProviderId Value="hns"/>
             <EventProviderId Value="netmgmt"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.AppDownload"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.Datastore"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PhoneProvisioner"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PPOEM"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CSP"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Engine"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Migration"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Platform"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Operations"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.Engine"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.RemovableMedia"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvTool"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Operations"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CommandCsp"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.EMPS.Enrollment"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment"/>
             <EventProviderId Value="virtdisk"/>
             <EventProviderId Value="virtdisk_wpp"/>
             <EventProviderId Value="vhdmp"/>
