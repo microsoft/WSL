@@ -29,9 +29,9 @@ body:
 
 - type: checkboxes
   attributes:
-    label: WSL Generation
+    label: Are you using WSL 1 or WSL 2?
     description: |
-      Tell us whether the issue is on WSL 2 and/or WSL 1. You can tell your WSL version by running `wsl -l -v`. 
+      Tell us whether the issue is on WSL 2 and/or WSL 1. You can tell by running `wsl -l -v`. 
     options:
       - label: "WSL 2"
       - label: "WSL 1"
