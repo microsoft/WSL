@@ -37,48 +37,66 @@ get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux > $folder/appxpa
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
 Get-WindowsOptionalFeature -Online > $folder/optional-components.txt
 
-wpr.exe -start $LogProfile -filemode 
+$wprOutputLog = "$folder/wpr.txt"
 
-Write-Host -NoNewLine -ForegroundColor Green "Log collection is running. Please reproduce the problem and press any key to save the logs."
-
-$KeysToIgnore =
-      16,  # Shift (left or right)
-      17,  # Ctrl (left or right)
-      18,  # Alt (left or right)
-      20,  # Caps lock
-      91,  # Windows key (left)
-      92,  # Windows key (right)
-      93,  # Menu key
-      144, # Num lock
-      145, # Scroll lock
-      166, # Back
-      167, # Forward
-      168, # Refresh
-      169, # Stop
-      170, # Search
-      171, # Favorites
-      172, # Start/Home
-      173, # Mute
-      174, # Volume Down
-      175, # Volume Up
-      176, # Next Track
-      177, # Previous Track
-      178, # Stop Media
-      179, # Play
-      180, # Mail
-      181, # Select Media
-      182, # Application 1
-      183  # Application 2
-
-$Key = $null
-while ($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode)
+wpr.exe -start $LogProfile -filemode 2>&1 >> $wprOutputLog
+if ($LastExitCode -Ne 0)
 {
-    $Key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    Write-Host -ForegroundColor Yellow "Log collection failed to start (exit code: $LastExitCode), trying to reset it."
+    wpr.exe -cancel 2>&1 >> $wprOutputLog
+
+    wpr.exe -start $LogProfile -filemode 2>&1 >> $wprOutputLog
+    if ($LastExitCode -Ne 0)
+    {
+        Write-Host -ForegroundColor Red "Couldn't start log collection (exitCode: $LastExitCode)"
+    }
 }
 
-Write-Host "`nSaving logs..."
+try
+{
+    Write-Host -NoNewLine -ForegroundColor Green "Log collection is running. Please reproduce the problem and press any key to save the logs."
 
-wpr.exe -stop $folder/logs.etl
+    $KeysToIgnore =
+          16,  # Shift (left or right)
+          17,  # Ctrl (left or right)
+          18,  # Alt (left or right)
+          20,  # Caps lock
+          91,  # Windows key (left)
+          92,  # Windows key (right)
+          93,  # Menu key
+          144, # Num lock
+          145, # Scroll lock
+          166, # Back
+          167, # Forward
+          168, # Refresh
+          169, # Stop
+          170, # Search
+          171, # Favorites
+          172, # Start/Home
+          173, # Mute
+          174, # Volume Down
+          175, # Volume Up
+          176, # Next Track
+          177, # Previous Track
+          178, # Stop Media
+          179, # Play
+          180, # Mail
+          181, # Select Media
+          182, # Application 1
+          183  # Application 2
+
+    $Key = $null
+    while ($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode)
+    {
+        $Key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    }
+
+    Write-Host "`nSaving logs..."
+}
+finally
+{
+    wpr.exe -stop $folder/logs.etl 2>&1 >> $wprOutputLog
+}
 
 if ($Dump)
 {
