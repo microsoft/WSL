@@ -51,22 +51,21 @@ Issues may be closed by the original poster at any time.  We will close issues i
 
 ### Microsoft Links:
 
-- [Microsoft Docs](https://docs.microsoft.com/en-us/windows/wsl/about)
-- [Release Notes](https://docs.microsoft.com/en-us/windows/wsl/release-notes)
-- [WSL Blog](https://blogs.msdn.microsoft.com/wsl) (Historical)
+- [Microsoft Docs](https://learn.microsoft.com/windows/wsl/)
 - [Command Line Blog](https://blogs.msdn.microsoft.com/commandline/) (Active)
+- [WSL Store Release Notes](https://learn.microsoft.com/windows/wsl/store-release-notes)
+- [WSL Linux Kernel Release Notes](https://learn.microsoft.com/windows/wsl/kernel-release-notes)
+- [General Release Notes](https://learn.microsoft.com/windows/wsl/release-notes)
+- [Archived: WSL Historical Blog](https://blogs.msdn.microsoft.com/wsl)
+
 
 ### Community Links:
 
 - Stack Overflow: https://stackoverflow.com/questions/tagged/wsl
-- Ask Ubuntu: https://askubuntu.com/questions/tagged/wsl
 - reddit: https://www.reddit.com/r/bashonubuntuonwindows
-- List of programs that work and don't work
-    - https://github.com/ethanhs/WSL-Programs
-    - https://github.com/davatron5000/can-i-subsystem-it
-- Awesome WSL: https://github.com/sirredbeard/Awesome-WSL
-- Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
+- Ask Ubuntu: https://askubuntu.com/questions/tagged/wsl
+- Ubuntu Blogs featuring Microsoft/WSL: https://ubuntu.com/blog/tag/microsoft
 
 ### Troubleshooting:
 
-Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting).
+- [Common troubleshooting issues](https://learn.microsoft.com/windows/wsl/troubleshooting)
