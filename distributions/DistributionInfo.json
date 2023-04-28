@@ -61,24 +61,34 @@
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc"
         },
         {
-            "Name": "OracleLinux_8_5",
-            "FriendlyName": "Oracle Linux 8.5",
-            "StoreAppId": "9P06H18WXBVP",
-            "Amd64": true,
-            "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux8.5_8.5.1.0.Appx",
-            "Arm64PackageUrl": null,
-            "PackageFamilyName": "3810OracleAmericaInc.OracleLinux8.5_dm28ctvqnhe9g"
-        },
-        {
             "Name": "OracleLinux_7_9",
             "FriendlyName": "Oracle Linux 7.9",
             "StoreAppId": "9P7L0QWBSLTK",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux7.9_7.9.1.0.Appx",
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_7.9-230428.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.OracleLinux7.9_dm28ctvqnhe9g"
+        },
+        {
+            "Name": "OracleLinux_8_7",
+            "FriendlyName": "Oracle Linux 8.7",
+            "StoreAppId": "9NGGZVB0BKD9",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_8.7-230428.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "3810OracleAmericaInc.51946E772388_dm28ctvqnhe9g"
+        },
+        {
+            "Name": "OracleLinux_9_1",
+            "FriendlyName": "Oracle Linux 9.1",
+            "StoreAppId": "9N6CN5STZRX6",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_9.1-230428.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "3810OracleAmericaInc.62074632F71C9_dm28ctvqnhe9g"
         },
         {
             "Name": "SUSE-Linux-Enterprise-Server-15-SP4",
