@@ -1,0 +1,124 @@
+{
+    "Distributions": [
+        {
+            "Name": "Ubuntu",
+            "FriendlyName": "Ubuntu",
+            "StoreAppId": "9PDXGNCFSCZV",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-220117.appx",
+            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-220117_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu_79rhkp1fndgsc"
+        },
+        {
+            "Name": "Debian",
+            "FriendlyName": "Debian GNU/Linux",
+            "StoreAppId": "9MSVKQC78PK6",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
+            "PackageFamilyName": "TheDebianProject.DebianGNULinux_76v4gfsz19hv4"
+        },
+        {
+            "Name": "kali-linux",
+            "FriendlyName": "Kali Linux Rolling",
+            "StoreAppId": "9PKR34TNCV07",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/KaliLinux_1.13.1.0.AppxBundle",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
+        },
+        {
+            "Name": "Ubuntu-18.04",
+            "FriendlyName": "Ubuntu 18.04 LTS",
+            "StoreAppId": "9N9TNGVNDL3Q",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04onWindows_79rhkp1fndgsc"
+        },
+        {
+            "Name": "Ubuntu-20.04",
+            "FriendlyName": "Ubuntu 20.04 LTS",
+            "StoreAppId": "9N6SVWS3RX71",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu20.04onWindows_79rhkp1fndgsc"
+        },
+        {
+            "Name": "Ubuntu-22.04",
+            "FriendlyName": "Ubuntu 22.04 LTS",
+            "StoreAppId": "9PN20MSR04DW",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204LTS-230418_x64.appx",
+            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204LTS-230418_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc"
+        },
+        {
+            "Name": "OracleLinux_7_9",
+            "FriendlyName": "Oracle Linux 7.9",
+            "StoreAppId": "9P7L0QWBSLTK",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_7.9-230428.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "3810OracleAmericaInc.OracleLinux7.9_dm28ctvqnhe9g"
+        },
+        {
+            "Name": "OracleLinux_8_7",
+            "FriendlyName": "Oracle Linux 8.7",
+            "StoreAppId": "9NGGZVB0BKD9",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_8.7-230428.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "3810OracleAmericaInc.51946E772388_dm28ctvqnhe9g"
+        },
+        {
+            "Name": "OracleLinux_9_1",
+            "FriendlyName": "Oracle Linux 9.1",
+            "StoreAppId": "9N6CN5STZRX6",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_9.1-230428.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "3810OracleAmericaInc.62074632F71C9_dm28ctvqnhe9g"
+        },
+        {
+            "Name": "SUSE-Linux-Enterprise-Server-15-SP4",
+            "FriendlyName": "SUSE Linux Enterprise Server 15 SP4",
+            "StoreAppId": "9NMQXWVJJSZJ",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterpriseServer15_SP4-230130_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer15SP4_022rs5jcyhyac"
+        },
+        {
+            "Name": "openSUSE-Leap-15.4",
+            "FriendlyName": "openSUSE Leap 15.4",
+            "StoreAppId": "9PJPFJHRM62V",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSELeap15_4-230130_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.openSUSELeap15.4_022rs5jcyhyac"
+        },
+        {
+            "Name": "openSUSE-Tumbleweed",
+            "FriendlyName": "openSUSE Tumbleweed",
+            "StoreAppId": "9MSSK2ZXXN11",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-230130_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
+        }
+    ]
+}

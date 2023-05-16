@@ -13,17 +13,17 @@ Note that WSL distro's launch in the Windows Console (unless you have taken step
 
 ## Labels:
 
-This is your best ways to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
+This is your best way to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
 
 - **bug** – The issue considered to be a bug internally by the dev team. This tag is generally for gaps in implemented (read: intended to be working) WSL behavior. Things marked with **bug** have a corresponding bug in on Microsoft’s internal bug tracking system. Example: "du -h reports wrong file size on DrvFs" [(#1894)](https://github.com/microsoft/WSL/issues/1894)
 
-- **feature** – Denotes something understood as not working and is not yet implemented. Example: "Cuda can not be installed" [(#327)](https:/github.com/microsoft/WSL/issues/327)
+- **feature** – Denotes something understood as not working and is not yet implemented. Example: "Cuda can not be installed" [(#327)](https://github.com/microsoft/WSL/issues/327)
 
 - **fixinbound** / **fixedinNNNN** – The bug or feature request originally submitted has been addressed in whole or in part. Related or ongoing bug or feature gaps should be opened as a new issue submission if one does not already exist.
 
 - **duplicate** – The submission is substantially duplicative of an existing issue, and/or has the same underlying cause.
 
-- **need-repro** – The issue submission is missing fields from the issue [template](https://github.com/Microsoft/WSL/blob/master/ISSUE_TEMPLATE.md), cannot be reproduced with the information provided, or is not actionable.
+- **need-repro** – The issue submission is missing fields from the issue [template](https://github.com/microsoft/WSL/tree/master/.github/ISSUE_TEMPLATE), cannot be reproduced with the information provided, or is not actionable.
 
 - **discussion** / **question** – Submissions which are not a bug report or feature request. Example: Windows Subsystem for Linux is not open source [(#178)](https://github.com/Microsoft/WSL/issues/178)
 
@@ -39,7 +39,7 @@ This is your best ways to interact directly with the Windows Subsystem for Linux
 
 Additional tags may be used to denote specific types of issues.
 
-- **9p-linux-file-access** - The issue is related to accesing Linux files from Windows.
+- **9p-linux-file-access** - The issue is related to accessing Linux files from Windows.
 
 ## Closing:
 

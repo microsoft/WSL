@@ -1,7 +1,8 @@
 Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux.
 
 ## Important: Reporting BSODs and Security issues
-**Do not open Github issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
+**Do not open GitHub issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
+See the `10) Reporting a Windows crash (BSOD)` section below for detailed instructions.
 
 ## Reporting issues in Windows Console or WSL text rendering/user experience
 Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
@@ -16,26 +17,34 @@ A title succinctly describing the issue.
 `Traceroute not working.`
 
 ### 2) Windows version / build number
-Your Windows build number.  This can be gathered from the CMD prompt using the `ver` command.
+Your Windows build number.  This can be gathered from the CMD prompt using the `cmd.exe --version` command.
 
-```
-C:\> ver
-Microsoft Windows [Version 10.0.14385]
+```cmd.exe
+C:\ cmd.exe --version
+Microsoft Windows [Version 10.0.21354.1]
 ```
 
-Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on the Anniversary Update (10.0.14393), please try updating to the Creators Update.
+Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on a Version below (10.0.14393), please try to update your Version.
 
 #### Example:
 
-`Microsoft Windows [Version 10.0.16170]`
+`Microsoft Windows [Version 10.0.21354.1]`
 
 ### 3) Steps required to reproduce
 
 Should include all packages and environmental variables as well as other required configuration.
 
-#### Example:
+#### Example: On linux 
 
 `$ sudo apt-get install traceroute && traceroute www.microsoft.com`
+
+#### Example: On Windows
+
+``
+`$ cmd.exe` 
+`CD C:\Windows\System32\`
+`tracert.exe`
+``
 
 ### 4) Copy of the terminal output
 
@@ -93,11 +102,50 @@ Common files are:
 ```
 $ strace -ff -o <outputfile> <command>
 ```
+
+#### wsl --mount
+
+If the issue is about wsl --mount, please include the output of running `wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions` in an elevated command prompt.
+
+Example:
+
+```
+C:\WINDOWS\system32>wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions
+Availability  Capabilities  CapabilityDescriptions                                       DeviceID            InterfaceType  MediaLoaded  MediaType              Model                       Name                Partitions
+              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE0  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB512HAJQ-000H2  \\.\PHYSICALDRIVE0  3
+              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE1  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB1T0HALR-000H2  \\.\PHYSICALDRIVE1  1
+              {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
+```
+
+#### Networking issues
+
+If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
+
+```
+$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
+$ cd %tmp%\WSL\diagnostics
+$ networking.bat
+```
+
+Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
+
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
 <div id="9-networking-logs"></div>
 
-### 8) Collect WSL logs
+
+### 8) Collect WSL logs (recommended method)
+
+To collect WSL logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an administrative powershell prompt:
+
+```
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\collect-wsl-logs.ps1
+```
+The script will output the path of the log file once done.
+
+### 9) Collect WSL logs with Feedback hub
 To collect WSL logs follow these steps: 
 
 #### Open Feedback Hub and enter the title and description of your issue
@@ -134,3 +182,43 @@ To collect WSL logs follow these steps:
 - Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
 
 ![GIF Of networking instructions](img/networkinglog4.gif)
+
+
+### 10) Reporting a Windows crash (BSOD)
+
+To collect a kernel crash dump, first run the following command in an elevated command prompt:
+
+```
+reg.exe add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl /v AlwaysKeepMemoryDump  /t REG_DWORD /d 1 /f
+```
+
+Then reproduce the issue, and let the machine crash and reboot.
+
+After reboot, the kernel dump will be in `%SystemRoot%\MEMORY.DMP` (unless this path has been overriden in the advanced system settings).
+
+Please send this dump to: secure@microsoft.com .
+Make sure that the email body contains:
+
+- The Github issue number, if any
+- That this dump is destinated to the WSL team
+
+### 11) Reporting a WSL process crash
+
+The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps).
+
+To enable automatic crash dumps, run the following commands in an elevated command prompt:
+
+```
+md C:\crashes
+reg.exe add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /f
+reg.exe add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /v DumpFolder /t REG_EXPAND_SZ /d C:\crashes /f
+reg.exe add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /v DumpType /t REG_DWORD /d 2 /f
+```
+
+Crash dumps will then automatically be written to C:\crashes.
+
+Once you're done, crash dump collection can be disabled by running the following command in an elevated command prompt:
+
+```
+reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /f
+```

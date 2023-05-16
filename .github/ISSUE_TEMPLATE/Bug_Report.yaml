@@ -1,0 +1,103 @@
+---
+name: "WSL - Bug Report"
+description: Report a bug on Windows Subsystem for Linux
+body:
+- type: markdown
+  attributes:
+    value: |
+      Please [search for existing issues](https://github.com/microsoft/WSL/issues) before creating a new one.
+      If you'd like to create a new bug report, please [read the guidance here](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) before getting started. This will save you time.
+
+- type: input
+  attributes:
+    label: Windows Version
+    description: |
+      Please run `cmd.exe /c ver` to get the build of Windows you are on.
+    placeholder: "Microsoft Windows [Version 10.0.19042.867]"
+  validations:
+    required: true
+
+- type: input
+  attributes:
+    label: WSL Version
+    description: |
+      If you are running Windows Subsystem for Linux from the Microsoft Store, please run `wsl.exe --version`.
+      Else `0.0.0.0`
+    placeholder: "0.0.0.0"
+  validations:
+    required: true
+
+- type: checkboxes
+  attributes:
+    label: Are you using WSL 1 or WSL 2?
+    description: |
+      Tell us whether the issue is on WSL 2 and/or WSL 1. You can tell by running `wsl -l -v`. 
+    options:
+      - label: "WSL 2"
+      - label: "WSL 1"
+
+- type: input
+  attributes:
+    label: Kernel Version
+    description: |
+      Please tell us what version of the Linux kernel you are using, or if you are using a custom kernel. 
+      You can run `wsl.exe --status` if that command is available to you, or by running `cat /proc/version` in your distro.
+    placeholder: "5.4.72"
+  validations:
+    required: false
+
+- type: input
+  attributes:
+    label: Distro Version
+    description: |
+      Please tell us what distro you are using (if applicable). 
+      You can get additional information about the version where possible, e.g. on Debian / Ubuntu, run `lsb_release -r`
+    placeholder: "Ubuntu 16.04"
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Other Software
+    description: If you're reporting a bug involving WSL's interaction with other applications, please tell us. What applications? What versions?
+    placeholder: |
+      Docker Desktop (Windows), version 3.2.2
+      traceroute, Version: 1:2.0.21-1
+      Visual Studio Code 1.54.3 with Remote-WSL Extension 0.54.6
+      MyCustomApplication
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Repro Steps
+    description: Please list out the steps to reproduce your bug.  
+    placeholder: Your steps go here. Include relevant environmental variables or any other configuration.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Expected Behavior
+    description: What were you expecting to see? Include any relevant examples or documentation links.
+    placeholder: If you want to include screenshots, paste them into the text area or follow up with a separate comment. 
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Actual Behavior
+    description: What happened instead?
+    placeholder: Include the terminal output, straces of the failing command, etc. as necessary.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Diagnostic Logs
+    description: | 
+      Please provide additional diagnostics if needed.
+      See the [guidance](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) for info on how to gather Feedback Hub logs, networking logs, and more.
+    placeholder: Your links to logs or other information go here.
+  validations:
+    required: false
