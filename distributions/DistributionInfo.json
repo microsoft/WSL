@@ -33,12 +33,12 @@
         {
             "Name": "Ubuntu-18.04",
             "FriendlyName": "Ubuntu 18.04 LTS",
-            "StoreAppId": "9N9TNGVNDL3Q",
+            "StoreAppId": "9PNKSF5ZN4SW",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_x64.appx",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04onWindows_79rhkp1fndgsc"
+            "Amd64PackageUrl": "TODO",
+            "Arm64PackageUrl": "TODO",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04LTS_1804.6.4.0_x64__79rhkp1fndgsc"
         },
         {
             "Name": "Ubuntu-20.04",
