@@ -117,7 +117,7 @@ if ($Dump)
         $Result = $DumpMethod.Invoke($null, @($process.Handle,
                                               $process.id,
                                               $OutputFile.SafeFileHandle,
-                                              [UInt32] 2
+                                              [UInt32] 2,
                                               [IntPtr]::Zero,
                                               [IntPtr]::Zero,
                                               [IntPtr]::Zero))
