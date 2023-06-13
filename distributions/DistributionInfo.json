@@ -33,22 +33,22 @@
         {
             "Name": "Ubuntu-18.04",
             "FriendlyName": "Ubuntu 18.04 LTS",
-            "StoreAppId": "9N9TNGVNDL3Q",
+            "StoreAppId": "9PNKSF5ZN4SW",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_x64.appx",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_1804.2019.522.0_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04onWindows_79rhkp1fndgsc"
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu1804-230608_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu1804-230608_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04LTS_79rhkp1fndgsc"
         },
         {
             "Name": "Ubuntu-20.04",
             "FriendlyName": "Ubuntu 20.04 LTS",
-            "StoreAppId": "9N6SVWS3RX71",
+            "StoreAppId": "9MTTCL66CPXJ",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_x64.appx",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu_2004.2020.424.0_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu20.04onWindows_79rhkp1fndgsc"
+            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu2004-230608_x64.appx",
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu2004-230608_ARM64.appx",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu20.04LTS_79rhkp1fndgsc"
         },
         {
             "Name": "Ubuntu-22.04",
