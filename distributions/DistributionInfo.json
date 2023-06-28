@@ -91,6 +91,16 @@
             "PackageFamilyName": "3810OracleAmericaInc.62074632F71C9_dm28ctvqnhe9g"
         },
         {
+            "Name": "openSUSE-Leap-15.5",
+            "FriendlyName": "openSUSE Leap 15.5",
+            "StoreAppId": "9NJGLDP5G04B",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSuseLeap15-5-231506_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.openSUSELeap15.5_022rs5jcyhyac"
+        },
+        {
             "Name": "SUSE-Linux-Enterprise-Server-15-SP4",
             "FriendlyName": "SUSE Linux Enterprise Server 15 SP4",
             "StoreAppId": "9NMQXWVJJSZJ",
@@ -101,14 +111,14 @@
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer15SP4_022rs5jcyhyac"
         },
         {
-            "Name": "openSUSE-Leap-15.4",
-            "FriendlyName": "openSUSE Leap 15.4",
-            "StoreAppId": "9PJPFJHRM62V",
+            "Name": "SUSE-Linux-Enterprise-Server-15-SP5",
+            "FriendlyName": "SUSE Linux Enterprise Server 15 SP5",
+            "StoreAppId": "9N648JDGXK2D",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSELeap15_4-230130_x64.Appx",
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterpriseServer15_SP5-230628.Appx",
             "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.openSUSELeap15.4_022rs5jcyhyac"
+            "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
         },
         {
             "Name": "openSUSE-Tumbleweed",
