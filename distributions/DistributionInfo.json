@@ -111,12 +111,12 @@
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer15SP4_022rs5jcyhyac"
         },
         {
-            "Name": "SUSE-Linux-Enterprise-Server-15-SP5",
-            "FriendlyName": "SUSE Linux Enterprise Server 15 SP5",
+            "Name": "SUSE-Linux-Enterprise-15-SP5",
+            "FriendlyName": "SUSE Linux Enterprise 15 SP5",
             "StoreAppId": "9N648JDGXK2D",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterpriseServer15_SP5-230628.Appx",
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterprise15_SP5-230628.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
         },
