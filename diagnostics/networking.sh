@@ -13,7 +13,9 @@ uname -a
 
 # Output adapter & routing configuration.
 ip a
-ip route show
+ip route show table all
+ip neighbor
+ip link
 
 # Validate that the gateway is responsive and can route ICMP correctly.
 if gateway=$(ip route show | awk '/default/ { print $3 }'); then
