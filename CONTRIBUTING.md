@@ -7,6 +7,9 @@ See the `10) Reporting a Windows crash (BSOD)` section below for detailed instru
 ## Reporting issues in Windows Console or WSL text rendering/user experience
 Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
 
+## Privacy Statement
+Issues reported on this repository will be public, please consider that when uploading any logs to a GitHub issue. Please see Microsoft's privacy statement at aka.ms/privacy 
+
 ## Reporting issues in WSL
 A well written bug will follow the following template:
 
