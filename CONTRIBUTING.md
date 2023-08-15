@@ -222,3 +222,31 @@ Once you're done, crash dump collection can be disabled by running the following
 ```
 reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /f
 ```
+
+### 12) Collect wslservice time travel debugging traces
+
+To collect time travel debugging traces:
+
+1) [Install Windbg preview](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
+
+2) Open windbg preview as administrator by running `windbgx` in an elevated command prompt
+
+3) Navigate to `file` -> `Attach to process`
+
+4) Check `Record with Time Travel Debugging` (at the bottom right)
+
+4) Check `Show processes from all users` (at the bottom)
+
+5) Select `wslservice.exe`. Note, if wslservice.exe is not running, you make it start it with: `wsl.exe -l`
+
+6) Click `Configure and Record` (write down the folder you chose for the traces)
+
+7) Reproduce the issue
+
+8) Go back to windbg and click `Stop and Debug`
+
+9) Once the trace is done collecting, click `Stop Debugging` and close Windbg
+
+10) Go to the folder where the trace was colleced, and locate the .run file. It should look like: `wslservice*.run`
+
+11) Share that file on the issue
