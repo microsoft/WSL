@@ -35,6 +35,7 @@
     <EventProvider Id="HTTP_sys_WPP" Name="20F61733-57F1-4127-9F48-4AB7A9308AE2" />
     <EventProvider Id="CHAT_WPP" Name="9B52E09F-0C58-4EAF-877F-70F9B54A7946" />
     <EventProvider Id="Microsoft_Windows_Security_NGC_NgcCtnrSvc_WPP" Name="9DF6A82D-5174-5EBF-842A-39947C48BF2A" />
+    <EventProvider Id="Microsoft_Windows_BranchCacheEventProvider" Name="dd85457f-4e2d-44a5-a7a7-6253362e34dc" />
     <EventProvider Id="BFE_WPP" Name="106B464A-8043-46B1-8CB8-E92A0CD7A560" />
     <EventProvider Id="kerb_WPP" Name="6B510852-3583-4E2D-AFFE-A67F9F223438" />
     <EventProvider Id="Microsoft_Windows_Runtime_Web_Http" Name="41877cb4-11fc-4188-b590-712c143c881d" />
@@ -96,6 +97,8 @@
     <EventProvider Id="idcommon_WPP" Name="B1108F75-3252-4B66-9239-80FD47E06494" />
     <EventProvider Id="Microsoft_Windows_DNS_Client" Name="1c95126e-7eea-49a9-a3fe-a378b03ddb4d" />
     <EventProvider Id="Microsoft_Windows_DNS_Client_Configuration_PowerShell" Name="563a50d8-3536-4c8a-a361-b37af04094ec" />
+    <EventProvider Id="Microsoft-Windows-DHCP-Client" Name="15A7A4F8-0072-4EAB-ABAD-F98A4D666AED" />
+    <EventProvider Id="Microsoft-Windows-DHCPv6-Client" Name="6A1F2B00-6A90-4C38-95A5-5CAB3B056778" />
     <EventProvider Id="Microsoft_Windows_AppModel_Exec_WPP" Name="EB65A492-86C0-406A-BACE-9912D595BD69" />
     <EventProvider Id="Microsoft_Windows_Security_DevCredSvc_WPP" Name="C3FEB5BF-1A8D-53F3-AAA8-44496392BF69" />
     <EventProvider Id="Microsoft_Quic_ETW" Name="ff15e657-4f26-570e-88ab-0796b258d11c" />
@@ -108,7 +111,6 @@
     <EventProvider Id="WinHttp_WPP" Name="B3A7698A-0C45-44DA-B73D-E181C9B5C8E6" />
     <EventProvider Id="Microsoft_Windows_Security_NGC_NgcCtnr_WPP" Name="0ABA6892-455B-551D-7DA8-3A8F85225E1A" />
     <EventProvider Id="Microsoft_Windows_Security_DevCredWinRt_WPP" Name="36FF4C84-82A2-4B23-8BA5-A25CBDFF3410" />
-    <EventProvider Id="Microsoft_Windows_BranchCacheEventProvider" Name="dd85457f-4e2d-44a5-a7a7-6253362e34dc" />
     <EventProvider Id="Microsoft_Windows_Security_NGC_KeyStaging_WPP" Name="9B223F67-67A1-5B53-9126-4593FE81DF25" />
     <EventProvider Id="dclocator_WPP" Name="CA030134-54CD-4130-9177-DAE76A3C5791" />
     <EventProvider Id="webplatform_WPP" Name="2A3C6602-411E-4DC6-B138-EA19D64F5BBA" />
@@ -122,7 +124,9 @@
     <EventProvider Id="Microsoft_Windows_Security_Credentials_UserConsentVerifier_WPP" Name="507C53AE-AF42-5938-AEDE-4A9D908640ED" />
     <EventProvider Id="Microsoft_OSG_OSS_CredProvFramework_ReportResultStop_WPP" Name="8DB3086D-116F-5BED-CFD5-9AFDA80D28EA" />
     <EventProvider Id="livessp_WPP" Name="C10B942D-AE1B-4786-BC66-052E5B4BE40E" />
-    <EventProvider Id="WFP_WPP" Name="EB004A05-9B1A-11D4-9123-0050047759BC" />
+    <EventProvider Id="Netio_WPP" Name="EB004A05-9B1A-11D4-9123-0050047759BC" />
+    <EventProvider Id="PortTrackerServer_WPP" Name="090bf343-4490-42d3-b273-8af174d314fb" />
+    <EventProvider Id="mpssvcService" Name="5EEFEBDB-E90C-423a-8ABF-0241E7C5B87D" />
     <EventProvider Id="Microsoft_Windows_DNS_Client_WinRNR" Name="b923f87a-b069-42b5-bd32-35623aba1c48" />
     <EventProvider Id="digest_WPP" Name="FB6A424F-B5D6-4329-B9B5-A975B3A93EAD" />
     <EventProvider Id="Microsoft_Windows_CertificateServicesClient_WPP" Name="73370BD6-85E5-430B-B60A-FEA1285808A7" />
@@ -143,10 +147,10 @@
     <EventProvider Id="cloudap_WPP" Name="EC3CA551-21E9-47D0-9742-1195429831BB" />
     <EventProvider Id="Microsoft_Windows_BrokerInfrastructure_WPP" Name="63B6C2D2-0440-44DE-A674-AA51A251B123" />
     <EventProvider Id="IPNat" Name="AE3F6C6D-BF2A-4291-9D07-59E661274EE3" />
-    <EventProvider Id="IpNatHlp" Name="9B322459-4AD9-4F81-8EEA-DC77CDD18CA6" />
+    <EventProvider Id="SharedAccessWPP" Name="9B322459-4AD9-4F81-8EEA-DC77CDD18CA6" />
     <EventProvider Id="WinNatSys" Name="aa7387cf-3639-496a-b3bf-dc1e79a6fc5a" />
     <EventProvider Id="Microsoft-Windows-TCPIP" Name="2f07e2ee-15db-40f1-90ef-9d7ba282188a" NonPagedMemory="true" EventKey="true" Strict="true"/>
-    <EventProvider Id="WinNat" Name="66C07ECD-6667-43FC-93F8-05CF07F446EC" />
+    <EventProvider Id="Microsoft-Windows-WinNat" Name="66C07ECD-6667-43FC-93F8-05CF07F446EC" />
     <EventProvider Id="Microsoft-Windows-Overlay-HNSPlugin" Name="564368D6-577B-4af5-AD84-1C54464848E6" />
     <EventProvider Id="Microsoft.Windows.HyperV.Compute" Name="80CE50DE-D264-4581-950D-ABADEEE0D340" />
     <EventProvider Id="Microsoft.Windows.HostNetworkingService.PrivateCloudPlugin" Name="D0E4BC17-34C7-43fc-9A72-D89A59D6979A" />
@@ -157,6 +161,8 @@
     <EventProvider Id="Microsoft-Windows-Hyper-V-VmSwitch" Name="67DC0D66-3695-47C0-9642-33F76F7BD7AD"/>
     <EventProvider Id="Microsoft.Windows.Hyper.V.NetSetupHelper" Name="94DEB9D1-0A52-449B-B368-41E4426B4F36"/>
     <EventProvider Id="Microsoft-Windows-Hyper-V-VfpExt" Name="9F2660EA-CFE7-428F-9850-AECA612619B0"/>
+    <EventProvider Id="Microsoft.Windows.Networking.FlowSteering" Name="662abf07-6dda-5b25-c2c5-345236dbb2d2"/>
+    <EventProvider Id="Microsoft.Windows.HyperV.Socket" Name="b2ed3bdb-cd74-5b2c-f660-85079ca074b3"/>
     <Profile
       Id="WSL.Verbose.File"
       Name="WSL"
@@ -258,6 +264,8 @@
             <EventProviderId Value="idcommon_WPP"/>
             <EventProviderId Value="Microsoft_Windows_DNS_Client"/>
             <EventProviderId Value="Microsoft_Windows_DNS_Client_Configuration_PowerShell"/>
+            <EventProviderId Value="Microsoft-Windows-DHCP-Client"/>
+            <EventProviderId Value="Microsoft-Windows-DHCPv6-Client"/>
             <EventProviderId Value="Microsoft_Windows_AppModel_Exec_WPP"/>
             <EventProviderId Value="Microsoft_Windows_Security_DevCredSvc_WPP"/>
             <EventProviderId Value="Microsoft_Quic_ETW"/>
@@ -283,7 +291,9 @@
             <EventProviderId Value="Microsoft_Windows_Security_Credentials_UserConsentVerifier_WPP"/>
             <EventProviderId Value="Microsoft_OSG_OSS_CredProvFramework_ReportResultStop_WPP"/>
             <EventProviderId Value="livessp_WPP"/>
-            <EventProviderId Value="WFP_WPP"/>
+            <EventProviderId Value="Netio_WPP"/>
+            <EventProviderId Value="PortTrackerServer_WPP"/>
+            <EventProviderId Value="mpssvcService"/>
             <EventProviderId Value="Microsoft_Windows_DNS_Client_WinRNR"/>
             <EventProviderId Value="digest_WPP"/>
             <EventProviderId Value="Microsoft_Windows_CertificateServicesClient_WPP"/>
@@ -304,10 +314,10 @@
             <EventProviderId Value="cloudap_WPP"/>
             <EventProviderId Value="Microsoft_Windows_BrokerInfrastructure_WPP"/>
             <EventProviderId Value="IPNat"/>
-            <EventProviderId Value="IpNatHlp"/>
-            <EventProviderId Value="WinNat"/>
+            <EventProviderId Value="SharedAccessWPP"/>
             <EventProviderId Value="WinNatSys"/>
             <EventProviderId Value="Microsoft-Windows-TCPIP"/>
+            <EventProviderId Value="Microsoft-Windows-WinNat"/>
             <EventProviderId Value="Microsoft-Windows-Overlay-HNSPlugin"/>
             <EventProviderId Value="Microsoft.Windows.HyperV.Compute"/>
             <EventProviderId Value="Microsoft.Windows.HostNetworkingService.PrivateCloudPlugin"/>
@@ -318,6 +328,8 @@
             <EventProviderId Value="Microsoft-Windows-Hyper-V-VmSwitch"/>
             <EventProviderId Value="Microsoft.Windows.Hyper.V.NetSetupHelper"/>
             <EventProviderId Value="Microsoft-Windows-Hyper-V-VfpExt"/>
+            <EventProviderId Value="Microsoft.Windows.Networking.FlowSteering"/>
+            <EventProviderId Value="Microsoft.Windows.HyperV.Socket"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>
