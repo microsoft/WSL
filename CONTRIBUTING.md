@@ -119,7 +119,32 @@ Availability  Capabilities  CapabilityDescriptions                              
 
 #### Networking issues
 
-If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
+Install tcpdump in your WSL distribution using the following commands.
+Note: This might not work if WSL has Internet connectivity issues.
+
+```
+# sudo apt-get update
+# sudo apt-get -y install tcpdump
+```
+
+Run [networking_diagnostics.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking_diagnostics.bat) in an administrative command prompt:
+
+```
+$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
+$ cd %tmp%\WSL\diagnostics
+$ networking_diagnostics.bat
+```
+
+Note:
+If tcpdump is installed, the script will open 2 more shells, one of which will ask for your sudo password.
+If tcpdump is not installed, only 1 additional shell will be opened
+Wait for those shells to be opened before reproducing the issue
+
+After reproducing the issue, in the shell that asked for your sudo password, hit Ctrl + C. In the other shells, press any key.
+
+Collect `WslNetworkingLogs.zip`
+
+Run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
 
 ```
 $ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
