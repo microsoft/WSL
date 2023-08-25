@@ -127,32 +127,24 @@ Note: This might not work if WSL has Internet connectivity issues.
 # sudo apt-get -y install tcpdump
 ```
 
-Run [networking_diagnostics.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking_diagnostics.bat) in an administrative command prompt:
+Run networking_diagnostics.bat in an administrative Powershell window:
 
 ```
-$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
-$ cd %tmp%\WSL\diagnostics
-$ networking_diagnostics.bat
+$ Invoke-WebRequest 'https://github.com/microsoft/WSL/archive/refs/heads/master.zip' -OutFile .\wsl.zip
+$ Expand-Archive .\wsl.zip .\
+$ Remove-Item .\wsl.zip
+$ cd .\WSL-master\diagnostics
+$ .\networking_diagnostics.bat
 ```
 
 Note:
-If tcpdump is installed, the script will open 2 more shells, one of which will ask for your sudo password.
+If tcpdump is installed, the script will open 2 more shells.
 If tcpdump is not installed, only 1 additional shell will be opened
 Wait for those shells to be opened before reproducing the issue
 
-After reproducing the issue, in the shell that asked for your sudo password, hit Ctrl + C. In the other shells, press any key.
+After reproducing the issue, in the shell with tcpdump, hit Ctrl + C. In the other shells, press any key.
 
-Collect `WslNetworkingLogs.zip`
-
-Run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
-
-```
-$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
-$ cd %tmp%\WSL\diagnostics
-$ networking.bat
-```
-
-Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
+The script will output the path to a zip archive with the diagnostics when done. Collect the zip and attach it to the issue.
 
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
