@@ -27,7 +27,7 @@ powershell Get-NetRoute > get_netroute.log
 powershell invoke-expression 'cmd /c start powershell -Command { ..\collect-wsl-logs.ps1 }'
 powershell invoke-expression 'cmd /c start powershell -Command { "wsl.exe -u root sudo tcpdump -n -i any > tcpdump.log" }'
 
-wpr -start .\wsl_networking.wprp -filemode -instanceName wpr_networking
+wpr -start ..\wsl_networking.wprp -filemode -instanceName wpr_networking
 pktmon start -c --flags 0x1A
 netsh wfp capture start
 
