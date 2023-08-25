@@ -142,7 +142,8 @@ If tcpdump is installed, the script will open 2 more shells.
 If tcpdump is not installed, only 1 additional shell will be opened
 Wait for those shells to be opened before reproducing the issue
 
-After reproducing the issue, in the shell with tcpdump, hit Ctrl + C. In the other shells, press any key.
+After reproducing the issue, in the shell with tcpdump, hit Ctrl + C. In the other shell, press any key.
+After the new shells exit, press any key in the original Powershell window.
 
 The script will output the path to a zip archive with the diagnostics when done. Collect the zip and attach it to the issue.
 
