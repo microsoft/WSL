@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Run gh-sync from GitHub action
+    name: GH-Sync tracked issue
     if: ${{ github.event.label.name == 'tracking' || contains(github.event.issue.labels.*.name, 'tracking') }} # Filters out issues/events without the 'tracking' label
     runs-on: ubuntu-latest
     steps:
@@ -23,7 +23,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}    # Auto-generated from GitHub action
   
   network-sync:
-    name: Run gh-sync from GitHub action
+    name: GH-Sync networking issue
     if: ${{ github.event.label.name == 'network' || contains(github.event.issue.labels.*.name, 'network') }} # Filters out issues/events without the 'tracking' label
     runs-on: ubuntu-latest
     steps:
