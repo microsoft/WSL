@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Trigger gh-sync'
-        uses: craigloewen-msft/gh-sync/gh-sync@main
+        uses: craigloewen-msft/gh-sync@main
         with:
           ado-organization-url: ${{ secrets.AZURE_DEVOPS_URL }}
           ado-project: ${{ secrets.AZURE_DEVOPS_PROJECT }}
