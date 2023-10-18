@@ -117,35 +117,16 @@ Availability  Capabilities  CapabilityDescriptions                              
               {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
 ```
 
-#### Networking issues
+#### Collect WSL logs for networking issues
 
-Install tcpdump in your WSL distribution using the following commands.
-Note: This might not work if WSL has Internet connectivity issues.
-
-```
-# sudo apt-get update
-# sudo apt-get -y install tcpdump
-```
-
-Run networking_diagnostics.bat in an administrative Powershell window:
+To collect WSL networking logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-networking-logs.ps1) in an administrative powershell prompt:
 
 ```
-$ Invoke-WebRequest 'https://github.com/microsoft/WSL/archive/refs/heads/master.zip' -OutFile .\wsl.zip
-$ Expand-Archive .\wsl.zip .\
-$ Remove-Item .\wsl.zip
-$ cd .\WSL-master\diagnostics
-$ .\networking_diagnostics.bat
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-networking-logs.ps1" -OutFile collect-networking-logs.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\collect-networking-logs.ps1
 ```
-
-Note:
-If tcpdump is installed, the script will open 2 more shells.
-If tcpdump is not installed, only 1 additional shell will be opened
-Wait for those shells to be opened before reproducing the issue
-
-After reproducing the issue, in the shell with tcpdump, hit Ctrl + C. In the other shell, press any key.
-After the new shells exit, press any key in the original Powershell window.
-
-The script will output the path to a zip archive with the diagnostics when done. Collect the zip and attach it to the issue.
+The script will output the path of the log file once done.
 
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>

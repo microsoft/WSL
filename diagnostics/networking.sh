@@ -5,11 +5,15 @@ set -xu
 lsb_release -a || cat /etc/issue /etc/os-release
 uname -a
 
-# Output adapter & routing configuration.
+echo "Printing adapter & routing configuration"
 ip a
 ip route show table all
 ip neighbor
 ip link
 
-# Display the DNS configuration.
+# This will include the HTTP proxy env variables, if present
+echo "Printing all environment variables"
+printenv
+
+echo "Printing DNS configuration"
 cat /etc/resolv.conf
