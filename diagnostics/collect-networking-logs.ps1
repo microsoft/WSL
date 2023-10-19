@@ -2,13 +2,11 @@
 
 [CmdletBinding()]
 Param (
-    [switch]$DeleteHnsState = $false
+    [switch]$DeleteHnsNetwork = $false
    )
 
 $folder = "WslNetworkingLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
 mkdir -p $folder
-
-# TODO! tcpdump??
 
 # Retrieve WSL version and wslconfig file
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux > $folder/appxpackage.txt
@@ -19,17 +17,21 @@ if (Test-Path $wslconfig)
     Copy-Item $wslconfig $folder
 }
 
-if ($DeleteHnsState)
+# Collect Linux network state before the repro
+& wsl.exe -e ./networking.sh 2>&1 > $folder/linux_network_configuration_before.log
+
+if ($DeleteHnsNetwork)
 {
     # The WSL HNS network is created once per boot. Resetting it to collect network creation logs.
     Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL'} | Remove-HnsNetwork
 
     # Stop WSL.
-    net.exe stop WslService || net.exe stop LxssManager
+    net.exe stop WslService
+    if(-not $?)
+    {
+        net.exe stop LxssManager
+    }
 }
-
-# Collect Linux network state before the repro
-& wsl.exe -e ./networking.sh 2>&1 > $folder/linux_network_configuration_before.log
 
 # Start logging.
 $logProfile = ".\wsl_networking.wprp"
@@ -49,7 +51,7 @@ if ($LastExitCode -Ne 0)
 }
 
 # Start packet capture using pktmon
-pktmon start -c --flags 0x1A --file-name "$folder/pktmon.etl"
+pktmon start -c --flags 0x1A --file-name "$folder/pktmon.etl" | out-null
 
 # Start WFP capture
 netsh wfp capture start file="$folder/wfpdiag.cab"
@@ -98,7 +100,7 @@ try
 finally
 {
     netsh wfp capture stop
-    pktmon stop
+    pktmon stop | out-null
     wpr.exe -stop $folder/logs.etl 2>&1 >> $wprOutputLog
 }
 
@@ -184,7 +186,7 @@ try
 }
 catch {}
 
-logArchive = "$(Resolve-Path $folder).zip"
+$logArchive = "$(Resolve-Path $folder).zip"
 Compress-Archive -Path $folder -DestinationPath $logArchive
 Remove-Item $folder -Recurse
 
