@@ -119,12 +119,23 @@ Availability  Capabilities  CapabilityDescriptions                              
 
 #### Collect WSL logs for networking issues
 
-To collect WSL networking logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-networking-logs.ps1) in an administrative powershell prompt:
+Install tcpdump in your WSL distribution using the following commands.
+Note: This will not work if WSL has Internet connectivity issues.
 
 ```
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-networking-logs.ps1" -OutFile collect-networking-logs.ps1
-Set-ExecutionPolicy Bypass -Scope Process -Force
-.\collect-networking-logs.ps1
+# sudo apt-get update
+# sudo apt-get -y install tcpdump
+```
+
+To collect WSL networking logs, do the following steps in an administrative powershell prompt:
+
+```
+$ Invoke-WebRequest 'https://github.com/microsoft/WSL/archive/refs/heads/master.zip' -OutFile .\wsl.zip
+$ Expand-Archive .\wsl.zip .\
+$ Remove-Item .\wsl.zip
+$ cd .\WSL-master\diagnostics
+$ Set-ExecutionPolicy Bypass -Scope Process -Force
+$ .\collect-networking-logs.ps1
 ```
 The script will output the path of the log file once done.
 

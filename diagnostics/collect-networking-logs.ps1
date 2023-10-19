@@ -56,6 +56,14 @@ pktmon start -c --flags 0x1A --file-name "$folder/pktmon.etl" | out-null
 # Start WFP capture
 netsh wfp capture start file="$folder/wfpdiag.cab"
 
+# Start tcpdump. Using a try/catch as tcpdump might not be installed
+$tcpdumpProcess = $null
+try
+{
+    $tcpdumpProcess = Start-Process wsl.exe -ArgumentList "-u root /bin/bash -c 'tcpdump -n -i any > $folder/tcpdump.log'" -PassThru
+}
+catch {}
+
 try
 {
     Write-Host -NoNewLine -ForegroundColor Green "Log collection is running. Please reproduce the problem and press any key to save the logs."
@@ -99,6 +107,15 @@ try
 }
 finally
 {
+    try
+    {
+        if ($tcpdumpProcess -ne $null)
+        {
+            Stop-Process -InputObject $tcpdumpProcess
+        }
+    }
+    catch {}
+
     netsh wfp capture stop
     pktmon stop | out-null
     wpr.exe -stop $folder/logs.etl 2>&1 >> $wprOutputLog
