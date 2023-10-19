@@ -137,6 +137,7 @@ $ cd .\WSL-master\diagnostics
 $ Set-ExecutionPolicy Bypass -Scope Process -Force
 $ .\collect-networking-logs.ps1
 ```
+The script will output when log collection starts. Reproduce the problem, then press any key to stop the log collection.
 The script will output the path of the log file once done.
 
 <!-- Preserving anchors -->
