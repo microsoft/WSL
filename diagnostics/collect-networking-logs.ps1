@@ -60,7 +60,7 @@ netsh wfp capture start file="$folder/wfpdiag.cab"
 $tcpdumpProcess = $null
 try
 {
-    $tcpdumpProcess = Start-Process wsl.exe -ArgumentList "-u root /bin/bash -c 'tcpdump -n -i any > $folder/tcpdump.log'" -PassThru
+    $tcpdumpProcess = Start-Process wsl.exe -ArgumentList "-u root tcpdump -n -i any > $folder/tcpdump.log" -PassThru
 }
 catch {}
 
@@ -109,9 +109,10 @@ finally
 {
     try
     {
+        wsl.exe -u root killall tcpdump
         if ($tcpdumpProcess -ne $null)
         {
-            Stop-Process -InputObject $tcpdumpProcess
+            Wait-Process -InputObject $tcpdumpProcess
         }
     }
     catch {}
@@ -166,6 +167,12 @@ catch {}
 try
 {
     Get-NetFirewallHyperVRule -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallHyperVRule_ActiveStore.log" -Append
+}
+catch {}
+
+try
+{
+    Get-NetFirewallRule -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallRule_ActiveStore.log" -Append
 }
 catch {}
 
