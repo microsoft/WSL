@@ -36,6 +36,7 @@ if (Test-Path $wslconfig)
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
 Get-WindowsOptionalFeature -Online > $folder/optional-components.txt
+bcdedit.exe > $folder/bcdedit.txt
 
 $wprOutputLog = "$folder/wpr.txt"
 
