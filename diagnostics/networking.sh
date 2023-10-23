@@ -11,15 +11,14 @@ ip route show table all
 ip neighbor
 ip link
 
-set +u
-[[ ! -v http_proxy ]] && echo "http_proxy is not set" || echo "http_proxy is set"
-[[ ! -v HTTP_PROXY ]] && echo "HTTP_PROXY is not set" || echo "HTTP_PROXY is set"
-[[ ! -v https_proxy ]] && echo "https_proxy is not set" || echo "https_proxy is set"
-[[ ! -v HTTPS_PROXY ]] && echo "HTTPS_PROXY is not set" || echo "HTTPS_PROXY is set"
-[[ ! -v no_proxy ]] && echo "no_proxy is not set" || echo "no_proxy is set"
-[[ ! -v NO_PROXY ]] && echo "NO_PROXY is not set" || echo "NO_PROXY is set"
-[[ ! -v WSL_PAC_URL ]] && echo "WSL_PAC_URL is not set" || echo "WSL_PAC_URL is set"
-set -u
+# We only print whether the HTTP proxy variables are set or not, as their content might contain secrets such as usernames, passwords.
+if [ -z ${http_proxy+x} ]; then echo "http_proxy is unset"; else echo "http_proxy is set"; fi
+if [ -z ${HTTP_PROXY+x} ]; then echo "HTTP_PROXY is unset"; else echo "HTTP_PROXY is set"; fi
+if [ -z ${https_proxy+x} ]; then echo "https_proxy is unset"; else echo "https_proxy is set"; fi
+if [ -z ${HTTPS_PROXY+x} ]; then echo "HTTPS_PROXY is unset"; else echo "HTTPS_PROXY is set"; fi
+if [ -z ${no_proxy+x} ]; then echo "no_proxy is unset"; else echo "no_proxy is set"; fi
+if [ -z ${NO_PROXY+x} ]; then echo "NO_PROXY is unset"; else echo "NO_PROXY is set"; fi
+if [ -z ${WSL_PAC_URL+x} ]; then echo "WSL_PAC_URL is unset"; else echo "WSL_PAC_URL is set"; fi
 
 echo "Printing DNS configuration"
 cat /etc/resolv.conf
