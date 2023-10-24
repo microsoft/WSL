@@ -117,17 +117,30 @@ Availability  Capabilities  CapabilityDescriptions                              
               {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
 ```
 
-#### Networking issues
+#### Collect WSL logs for networking issues
 
-If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
+Install tcpdump in your WSL distribution using the following commands.
+Note: This will not work if WSL has Internet connectivity issues.
 
 ```
-$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
-$ cd %tmp%\WSL\diagnostics
-$ networking.bat
+# sudo apt-get update
+# sudo apt-get -y install tcpdump
 ```
 
-Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
+Install [WPR](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)
+
+To collect WSL networking logs, do the following steps in an administrative powershell prompt:
+
+```
+$ Invoke-WebRequest 'https://github.com/microsoft/WSL/archive/refs/heads/master.zip' -OutFile .\wsl.zip
+$ Expand-Archive .\wsl.zip .\
+$ Remove-Item .\wsl.zip
+$ cd .\WSL-master\diagnostics
+$ Set-ExecutionPolicy Bypass -Scope Process -Force
+$ .\collect-networking-logs.ps1
+```
+The script will output when log collection starts. Reproduce the problem, then press any key to stop the log collection.
+The script will output the path of the log file once done.
 
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>

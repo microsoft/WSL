@@ -1,40 +1,24 @@
 #! /bin/bash
-if (($(id -u) != 0))
-then
-    printf "If you see 'ping: socket: Operation not permitted' errors, "
-    printf "run this command as root.\n"
-fi
-
 set -xu
 
 # Gather distro & kernel info.
 lsb_release -a || cat /etc/issue /etc/os-release
 uname -a
 
-# Output adapter & routing configuration.
+echo "Printing adapter & routing configuration"
 ip a
 ip route show table all
 ip neighbor
 ip link
 
-# Validate that the gateway is responsive and can route ICMP correctly.
-if gateway=$(ip route show | awk '/default/ { print $3 }'); then
-    ping -c 4 "$gateway"
-else
-    echo 'No gateway found.'
-fi
+# We only print whether the HTTP proxy variables are set or not, as their content might contain secrets such as usernames, passwords.
+if [ -z ${http_proxy+x} ]; then echo "http_proxy is unset"; else echo "http_proxy is set"; fi
+if [ -z ${HTTP_PROXY+x} ]; then echo "HTTP_PROXY is unset"; else echo "HTTP_PROXY is set"; fi
+if [ -z ${https_proxy+x} ]; then echo "https_proxy is unset"; else echo "https_proxy is set"; fi
+if [ -z ${HTTPS_PROXY+x} ]; then echo "HTTPS_PROXY is unset"; else echo "HTTPS_PROXY is set"; fi
+if [ -z ${no_proxy+x} ]; then echo "no_proxy is unset"; else echo "no_proxy is set"; fi
+if [ -z ${NO_PROXY+x} ]; then echo "NO_PROXY is unset"; else echo "NO_PROXY is set"; fi
+if [ -z ${WSL_PAC_URL+x} ]; then echo "WSL_PAC_URL is unset"; else echo "WSL_PAC_URL is set"; fi
 
-ping -c 4 1.1.1.1
-
-# Validate that the default route is working (won't work if traceroute isn't installed).
-traceroute 1.1.1.1
-
-# Display the DNS configuration.
+echo "Printing DNS configuration"
 cat /etc/resolv.conf
-
-# Validate that everything is functioning correctly.
-if type curl >/dev/null 2>&1; then
-    curl -m 5 -v https://microsoft.com
-else
-    wget -T 5 -v https://microsoft.com
-fi
