@@ -219,7 +219,19 @@ Make sure that the email body contains:
 
 The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps).
 
-To enable automatic crash dumps, run the following commands in an elevated command prompt:
+To collect dumps of all running WSL processe, please open a PowerShell prompt with admin privileges, navigate to a folder where you'd like to put your log files and run these commands: 
+
+```
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\collect-wsl-logs.ps1 -Dump
+```
+
+The script will output the path to the log file when it is done.
+
+#### Enable automatic crash dump collection
+
+If your crash is sporadic or hard to reproduce, please enable automatic crash dumps to catch logs for this behavior: 
 
 ```
 md C:\crashes
