@@ -116,7 +116,7 @@
             "StoreAppId": "9N648JDGXK2D",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterprise15_SP5-230711.Appx",
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterprise15_SP5-231024.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
         },
@@ -126,8 +126,8 @@
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-230821_x64.Appx",
-            "Arm64PackageUrl": null,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-231024_x64.Appx",
+            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-231024_ARM64.Appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]
