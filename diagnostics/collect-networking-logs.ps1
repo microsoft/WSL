@@ -178,6 +178,12 @@ catch {}
 
 try
 {
+    Get-NetFirewallProfile -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallProfile_ActiveStore.log" -Append
+}
+catch {}
+
+try
+{
     Get-NetFirewallHyperVPort | Out-File -FilePath "$folder/Get-NetFirewallHyperVPort.log" -Append
 }
 catch {}
