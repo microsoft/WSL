@@ -122,6 +122,8 @@ Availability  Capabilities  CapabilityDescriptions                              
 Install tcpdump in your WSL distribution using the following commands.
 Note: This will not work if WSL has Internet connectivity issues.
 
+Install [WPR](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)
+
 ```
 # sudo apt-get update
 # sudo apt-get -y install tcpdump
