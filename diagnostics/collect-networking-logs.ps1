@@ -2,7 +2,7 @@
 
 [CmdletBinding()]
 Param (
-    [switch]$DeleteHnsNetwork = $false
+    [switch]$RestartWslReproMode = $false
    )
 
 $folder = "WslNetworkingLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
@@ -20,7 +20,7 @@ if (Test-Path $wslconfig)
 # Collect Linux network state before the repro
 & wsl.exe -e ./networking.sh 2>&1 > $folder/linux_network_configuration_before.log
 
-if ($DeleteHnsNetwork)
+if ($RestartWslReproMode)
 {
     # The WSL HNS network is created once per boot. Resetting it to collect network creation logs.
     Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL'} | Remove-HnsNetwork
