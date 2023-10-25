@@ -125,7 +125,7 @@
             "FriendlyName": "openSUSE Tumbleweed",
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
-            "Arm64": false,
+            "Arm64": true,
             "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-231024_x64.Appx",
             "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-231024_ARM64.Appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
