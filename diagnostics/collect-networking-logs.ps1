@@ -8,6 +8,13 @@ Param (
 $folder = "WslNetworkingLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
 mkdir -p $folder
 
+$logProfile = "$folder/wsl_networking.wprp"
+$networkingBashScript = "$folder/networking.sh"
+
+# Download supporting files
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_networking.wprp" -OutFile $logProfile
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/networking.sh" -OutFile $networkingBashScript
+
 # Retrieve WSL version and wslconfig file
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux > $folder/appxpackage.txt
 
@@ -18,7 +25,7 @@ if (Test-Path $wslconfig)
 }
 
 # Collect Linux network state before the repro
-& wsl.exe -e ./networking.sh 2>&1 > $folder/linux_network_configuration_before.log
+& wsl.exe -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_before.log
 
 if ($RestartWslReproMode)
 {
@@ -34,7 +41,6 @@ if ($RestartWslReproMode)
 }
 
 # Start logging.
-$logProfile = ".\wsl_networking.wprp"
 $wprOutputLog = "$folder/wpr.txt"
 
 wpr.exe -start $logProfile -filemode 2>&1 >> $wprOutputLog
@@ -123,7 +129,7 @@ finally
 }
 
 # Collect Linux network state after the repro
-& wsl.exe -e ./networking.sh 2>&1 > $folder/linux_network_configuration_after.log
+& wsl.exe -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_after.log
 
 # Collect host networking state relevant for WSL
 # Using a try/catch for commands below, as some of them do not exist on all OS versions
@@ -215,6 +221,9 @@ try
     & vfpctrl.exe /list-vmswitch-port 2>&1 > $folder/vfpctrl_list_vmswitch_port.log
 }
 catch {}
+
+Remove-Item $logProfile
+Remove-Item $networkingBashScript
 
 $logArchive = "$(Resolve-Path $folder).zip"
 Compress-Archive -Path $folder -DestinationPath $logArchive
