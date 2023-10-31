@@ -132,12 +132,9 @@ Install [WPR](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/window
 To collect WSL networking logs, do the following steps in an administrative powershell prompt:
 
 ```
-$ Invoke-WebRequest 'https://github.com/microsoft/WSL/archive/refs/heads/master.zip' -OutFile .\wsl.zip
-$ Expand-Archive .\wsl.zip .\
-$ Remove-Item .\wsl.zip
-$ cd .\WSL-master\diagnostics
-$ Set-ExecutionPolicy Bypass -Scope Process -Force
-$ .\collect-networking-logs.ps1
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-networking-logs.ps1" -OutFile collect-networking-logs.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\collect-networking-logs.ps1
 ```
 The script will output when log collection starts. Reproduce the problem, then press any key to stop the log collection.
 The script will output the path of the log file once done.
