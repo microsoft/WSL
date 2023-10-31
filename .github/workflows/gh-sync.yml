@@ -24,7 +24,7 @@ jobs:
   
   network-sync:
     name: GH-Sync networking issue
-    if: ${{ github.event.label.name == 'network' || contains(github.event.issue.labels.*.name, 'network') }} # Filters out issues/events without the 'tracking' label
+    if: ${{ github.event.label.name == 'network' || contains(github.event.issue.labels.*.name, 'network') }} 
     runs-on: ubuntu-latest
     steps:
       - name: 'Trigger gh-sync'
@@ -33,6 +33,22 @@ jobs:
           ado-organization-url: ${{ secrets.AZURE_DEVOPS_URL }}
           ado-project: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           ado-area-path: ${{ secrets.AZURE_DEVOPS_NETWORKING_PATH }}
+          github-repo: 'microsoft/WSL'
+          issue-number: ${{github.event.issue.number}} # Auto-generated from GitHub action
+          ado-token: ${{ secrets.AZURE_DEVOPS_TOKEN }} # Your Personal Access Token (PAT)
+          github-token: ${{ secrets.GITHUB_TOKEN }}    # Auto-generated from GitHub action
+
+  gpu-sync:
+    name: GH-Sync GPU issue
+    if: ${{ github.event.label.name == 'GPU' || contains(github.event.issue.labels.*.name, 'GPU') }} 
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Trigger gh-sync'
+        uses: craigloewen-msft/gh-sync@main
+        with:
+          ado-organization-url: ${{ secrets.AZURE_DEVOPS_URL }}
+          ado-project: ${{ secrets.AZURE_DEVOPS_PROJECT }}
+          ado-area-path: ${{ secrets.AZURE_DEVOPS_GPU_PATH }}
           github-repo: 'microsoft/WSL'
           issue-number: ${{github.event.issue.number}} # Auto-generated from GitHub action
           ado-token: ${{ secrets.AZURE_DEVOPS_TOKEN }} # Your Personal Access Token (PAT)
