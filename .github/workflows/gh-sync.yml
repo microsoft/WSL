@@ -53,4 +53,5 @@ jobs:
           issue-number: ${{github.event.issue.number}} # Auto-generated from GitHub action
           ado-token: ${{ secrets.AZURE_DEVOPS_TOKEN }} # Your Personal Access Token (PAT)
           github-token: ${{ secrets.GITHUB_TOKEN }}    # Auto-generated from GitHub action
+          ado-assigned-to: "Active"
           
