@@ -170,6 +170,9 @@ configuration:
             [Click here](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method) for more info on logging
 
 
+            If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue.
+
+
             Thank you!
       - addLabel:
           label: needs-author-feedback
