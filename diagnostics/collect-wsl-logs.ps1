@@ -9,7 +9,7 @@ Param (
 Set-StrictMode -Version Latest
 
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
-mkdir -p $folder
+mkdir -p $folder | Out-Null
 
 if ($LogProfile -eq $null)
 {
@@ -22,18 +22,18 @@ if ($LogProfile -eq $null)
     }
 }
 
-reg.exe export HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKCU.txt
-reg.exe export HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKLM.txt
-reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\P9NP $folder/P9NP.txt
-reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinSock2 $folder/Winsock2.txt
+reg.exe export HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKCU.txt | Out-Null
+reg.exe export HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Lxss $folder/HKLM.txt | Out-Null
+reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\P9NP $folder/P9NP.txt | Out-Null
+reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinSock2 $folder/Winsock2.txt | Out-Null
 
 $wslconfig = "$env:USERPROFILE/.wslconfig"
 if (Test-Path $wslconfig)
 {
-    Copy-Item $wslconfig $folder
+    Copy-Item $wslconfig $folder | Out-Null
 }
 
-get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux > $folder/appxpackage.txt
+get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
 Get-WindowsOptionalFeature -Online > $folder/optional-components.txt
 bcdedit.exe > $folder/bcdedit.txt
@@ -55,7 +55,9 @@ if ($LastExitCode -Ne 0)
 
 try
 {
-    Write-Host -NoNewLine -ForegroundColor Green "Log collection is running. Please reproduce the problem and press any key to save the logs."
+    Write-Host -NoNewLine "Log collection is running. Please "
+    Write-Host -NoNewLine -ForegroundColor Red "reproduce the problem "
+    Write-Host -NoNewLine "and once done press any key to save the logs."
 
     $KeysToIgnore =
           16,  # Shift (left or right)
