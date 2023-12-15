@@ -11,6 +11,7 @@
     <EventProvider Id="lxcore_service" Name="B99CDB5A-039C-5046-E672-1A0DE0A40211"/>
     <EventProvider Id="wsl_devicehost" Name="9d6c7b9e-2581-4d8a-b8c5-b90b4a17094a"/>
     <EventProvider Id="wslclient" Name="8cbb7724-7223-5d6f-8137-564dac45104d"/>
+    <EventProvider Id="wslapi" Name="beb94edf-1a7b-5058-0696-ff9e6b1798d1"/>
     <EventProvider Id="vm_chipset" Name="de9ba731-7f33-4f44-98c9-6cac856b9f83"/>
     <EventProvider Id="vmcompute_dll" Name="AF7FD3A7-B248-460C-A9F5-FEC39EF8468C"/>
     <EventProvider Id="vmcompute" Name="17103E3F-3C6E-4677-BB17-3B267EB5BE57"/>
@@ -111,6 +112,7 @@
             <EventProviderId Value="lxcore_service"/>
             <EventProviderId Value="wsl_devicehost"/>
             <EventProviderId Value="wslclient"/>
+            <EventProviderId Value="wslapi"/>
             <EventProviderId Value="vm_chipset"/>
             <EventProviderId Value="vmcompute_dll"/>
             <EventProviderId Value="vmcompute"/>
