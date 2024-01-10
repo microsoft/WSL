@@ -11,11 +11,25 @@ Set-StrictMode -Version Latest
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
 mkdir -p $folder | Out-Null
 
-if ($LogProfile -eq $null)
+if ($LogProfile -eq $null -Or ![System.IO.File]::Exists($LogProfile))
 {
+    if ($LogProfile -eq $null)
+    {
+        $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp"
+    }
+    elseif ($LogProfile -eq "storage")
+    {
+         $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_storage.wprp"
+    }
+    else
+    {
+        Write-Error "Unknown log profile: $LogProfile"
+        exit 1
+    }
+
     $LogProfile = "$folder/wsl.wprp"
     try {
-        Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp" -OutFile $LogProfile
+        Invoke-WebRequest -UseBasicParsing $url -OutFile $LogProfile
     }
     catch {
         throw
