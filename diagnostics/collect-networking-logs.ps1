@@ -30,7 +30,7 @@ if (Test-Path $wslconfig)
 if ($RestartWslReproMode)
 {
     # The WSL HNS network is created once per boot. Resetting it to collect network creation logs.
-    # Note: The below commands apply only for WSL in NAT mode
+    # Note: The below HNS commands apply only to WSL in NAT mode
     Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL'} | Remove-HnsNetwork
     Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL (Hyper-V firewall)'} | Remove-HnsNetwork
 
