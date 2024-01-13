@@ -30,7 +30,8 @@ if (Test-Path $wslconfig)
 if ($RestartWslReproMode)
 {
     # The WSL HNS network is created once per boot. Resetting it to collect network creation logs.
-    Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL'} | Remove-HnsNetwork
+    # Note: The below HNS command applies only to WSL in NAT mode
+    Get-HnsNetwork | Where-Object {$_.Name -eq 'WSL' -Or $_.Name -eq 'WSL (Hyper-V firewall)'} | Remove-HnsNetwork
 
     # Stop WSL.
     net.exe stop WslService
@@ -219,6 +220,14 @@ catch {}
 try
 {
     & vfpctrl.exe /list-vmswitch-port 2>&1 > $folder/vfpctrl_list_vmswitch_port.log
+}
+catch {}
+
+try
+{
+    # Collect HNS events from past 24 hours
+    $events = Get-WinEvent -ProviderName Microsoft-Windows-Host-Network-Service | Where-Object { $_.TimeCreated -ge ((Get-Date) - (New-TimeSpan -Day 1)) }
+    ($events | ForEach-Object { '{0},{1},{2},{3}' -f $_.TimeCreated, $_.Id, $_.LevelDisplayName, $_.Message }) -join [environment]::NewLine | Out-File -FilePath "$folder/hns_events.log" -Append
 }
 catch {}
 
