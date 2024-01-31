@@ -23,7 +23,27 @@ configuration:
       - closeIssue
       - addReply:
           reply: >-
-            This issue has been automatically closed since it has not had any author activity for the past **7 days**. If you're still experiencing this issue please re-open it. 
+            This issue has been automatically closed since it has not had any author activity for the past **7 days**. If you're still experiencing this issue please re-file it as a new issue. 
+
+
+            Thank you!
+    - description: Close year old issues
+      frequencies:
+      - weekday:
+          day: Thursday
+          time: 12:00
+      filters:
+      - isIssue
+      - isOpen
+      - isNotLabeledWith:
+          label: feature
+      - noActivitySince:
+          days: 365
+      actions:
+      - closeIssue
+      - addReply:
+          reply: >-
+            This issue has been automatically closed since it has not had any activity for the past **year**. If you're still experiencing this issue please re-file this as a new issue or feature request. 
 
 
             Thank you!
