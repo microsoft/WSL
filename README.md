@@ -66,6 +66,7 @@ Issues may be closed by the original poster at any time.  We will close issues i
     - https://github.com/davatron5000/can-i-subsystem-it
 - Awesome WSL: https://github.com/sirredbeard/Awesome-WSL
 - Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
+- WSL Utilities (WSLU): https://github.com/wslutilities/wslu
 
 ### Troubleshooting:
 
