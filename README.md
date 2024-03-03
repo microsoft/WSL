@@ -1,6 +1,6 @@
 This repo is for:
 
-- Reporting of issues found within and when using Windows Subsystem for Linux.
+- Reporting of issues found within and when using the Windows Subsystem for Linux.
   Please read [CONTRIBUTING.md](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) before making an issue submission
 
   > Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulnerabilities may be edited to hide the vulnerability details.
@@ -13,13 +13,13 @@ Note that WSL distro's launch in the Windows Console (unless you have taken step
 
 ## Labels:
 
-This is your best way to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
+This is your best way to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please try to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
 
 - **bug** – The issue considered to be a bug internally by the dev team. This tag is generally for gaps in implemented (read: intended to be working) WSL behavior. Things marked with **bug** have a corresponding bug in on Microsoft’s internal bug tracking system. Example: "du -h reports wrong file size on DrvFs" [(#1894)](https://github.com/microsoft/WSL/issues/1894)
 
 - **feature** – Denotes something understood as not working and is not yet implemented. Example: "Cuda can not be installed" [(#327)](https://github.com/microsoft/WSL/issues/327)
 
-- **fixinbound** / **fixedinNNNN** – The bug or feature request originally submitted has been addressed in whole or in part. Related or ongoing bug or feature gaps should be opened as a new issue submission if one does not already exist.
+- **fixinbound** / **fixedinNNNN** – The bug or feature request originally submitted has been addressed either wholly or partially. Related or ongoing bug or feature gaps should be opened as a new issue submission if one does not already exist.
 
 - **duplicate** – The submission is substantially duplicative of an existing issue, and/or has the same underlying cause.
 
@@ -27,13 +27,13 @@ This is your best way to interact directly with the Windows Subsystem for Linux 
 
 - **discussion** / **question** – Submissions which are not a bug report or feature request. Example: Windows Subsystem for Linux is not open source [(#178)](https://github.com/Microsoft/WSL/issues/178)
 
-- **bydesign** / **linux-behavior** – Denotes that an issue that is considered working as intended or would behave analogously on a native Linux kernel.
+- **bydesign** / **linux-behavior** – Denotes an issue considered to be working as intended or behaving analogously on a native Linux kernel.
 
 - **console** – The submission should be directed to the [console issue tracker](https://github.com/microsoft/console/issues).
 
 - **documentation** – The submission should be directed to the [WSL documentation issue tracker](https://github.com/MicrosoftDocs/WSL).
 
-- **wsl2** - The issue relates specifically to WSL 2.
+- **wsl2** - The issue specifically relates to WSL 2.
 
 - **fixed-in-wsl2** - The issue could be resolved by switching the distro to use the WSL 2 architecture.
 
