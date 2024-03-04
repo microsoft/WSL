@@ -11,9 +11,26 @@ mkdir -p $folder
 $logProfile = "$folder/wsl_networking.wprp"
 $networkingBashScript = "$folder/networking.sh"
 
-# Download supporting files
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_networking.wprp" -OutFile $logProfile
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/networking.sh" -OutFile $networkingBashScript
+# Copy/Download supporting files
+if (Test-Path "$PSScriptRoot/wsl_networking.wprp")
+{
+    Copy-Item "$PSScriptRoot/wsl_networking.wprp" $logProfile
+}
+else
+{
+    Write-Host -ForegroundColor Yellow "wsl_networking.wprp not found in the current directory. Downloading it from GitHub."
+    Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_networking.wprp" -OutFile $logProfile
+}
+
+if (Test-Path "$PSScriptRoot/networking.sh")
+{
+    Copy-Item "$PSScriptRoot/networking.sh" $networkingBashScript
+}
+else
+{
+    Write-Host -ForegroundColor Yellow "networking.sh not found in the current directory. Downloading it from GitHub."
+    Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/networking.sh" -OutFile $networkingBashScript
+}
 
 # Retrieve WSL version and wslconfig file
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux > $folder/appxpackage.txt
@@ -105,9 +122,16 @@ try
           183  # Application 2
 
     $Key = $null
-    while ($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode)
+    while (($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode) -and ($null -eq $tcpdumpProcess -or $tcpdumpProcess.HasExited -eq $false))
     {
-        $Key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        if ([console]::KeyAvailable)
+        {
+            $Key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        }
+        else
+        {
+            Start-Sleep -Seconds 1
+        }
     }
 
     Write-Host "`nSaving logs..."
