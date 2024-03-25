@@ -25,4 +25,5 @@ cat /etc/resolv.conf
 
 echo "Printing iptables and nftables rules"
 iptables -S
+ip6tables -S
 nft list ruleset
