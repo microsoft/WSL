@@ -1,0 +1,38 @@
+name: Process new issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  getSimilarIssues:
+    runs-on: ubuntu-latest
+    outputs:
+      message: ${{ steps.getBody.outputs.message }}
+    steps:
+      - uses: actions/checkout@v2
+      - id: getBody
+        uses: craigloewen-msft/GitGudSimilarIssues@main
+        with:
+          issueTitle: ${{ github.event.issue.title }}
+          issueBody: ${{ github.event.issue.body }}
+          repository: ${{ github.repository }}
+          similarityTolerance: "0.7"
+          commentBody: |
+            # View similar issues
+            Please view the issues below to see if they solve your problem, and if the issue describes your problem please consider closing this one and thumbs upping the other issue to help us prioritize it!
+  wti:
+    name: Run wti
+    needs: getSimilarIssues
+    runs-on: windows-2022
+    permissions:
+      issues: write
+    steps: 
+    - name: Checkout repo
+      uses: actions/checkout@v4
+    
+    - uses: ./.github/actions/triage
+      with: 
+        similar_issues_text: "${{ needs.getSimilarIssues.outputs.message }}"
+        issue: "${{ github.event.issue.number }}"
+        token: ${{ secrets.GITHUB_TOKEN }}

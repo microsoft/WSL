@@ -1,0 +1,193 @@
+wpa_profile: no-filter.wpaProfile
+
+logs_rules:
+    missing_logs_message: |
+        # Logs are required for review from WSL team
+        
+        If this a feature request, please reply with '/feature'. If this is a question, reply with '/question'.
+        **Otherwise please attach logs by following the instructions below**, your issue will not be reviewed unless they are added. These logs will help us understand what is going on in your machine.
+        
+        <details>
+        
+        <summary>How to collect WSL logs</summary>
+        
+        Download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an **administrative powershell prompt**:
+        
+        ```
+        Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        .\collect-wsl-logs.ps1
+        ```
+        
+        The scipt will output the path of the log file once done.
+        
+        Once completed please upload the output files to this Github issue.
+         
+        [Click here for more info on logging](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method)
+        If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue and reply with '/emailed-logs'.
+        </details>
+        
+    
+    missing_logs_add_tags: ['needs-author-feedback']
+    skip_tags: ['feature', 'question', 'emailed-logs', 'network']
+
+tags_rules:
+    - contains: '/question'
+      tag: 'question'
+    
+    - contains: '/feature'
+      tag: 'feature'
+      
+    - contains: '/emailed-logs'
+      tag: 'emailed-logs'
+
+rules:
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'brd: module loaded'
+      set: booting
+        
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'oom-kill'
+      set: 
+        name: oom
+        capture:
+            field1: oom-error
+        
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'Kernel panic'
+      set: 
+        name: kernel-panic
+        capture:
+            field1: kmsg
+    
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            regex: 'WSL (.*) ERROR'
+      set: init-error
+      
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: UserVisibleError
+      set: 
+        name: user-visible-error
+        capture:
+            field3: error
+
+    - logline:
+        provider: Microsoft-Windows-Hyper-V-Chipset
+        field1:
+            regex: '.*biosdevice.*80070057.*' # 80070057 = E_INVALIDARG
+      set: corrupted-initramfs
+        
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: FailedToStartVm
+      set: 
+        name: vm-failed-to-start
+        capture:
+          field4: error
+      
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+      set: service-running
+      oneshot: true
+      
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: LxssException
+        field7: 
+            regex: '.*0x80070422.*'
+      set: service-disabled-error
+      
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: UserVisibleError
+        field3: {regex: '.*/ConfigureNetworking/HNS/.*'}
+      set: 
+        name: hns-fatal-error
+        capture:
+          field3: error
+      
+      
+    - logline:
+        provider: Microsoft.Windows.Hyper.V.NetMgmt
+        task: NetMgmt::CreateVirtualSwitch
+        field4: '0x80041002'
+      set: 
+        name: vmswitch-known-issue
+        capture:
+            field4: error
+      
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1:
+            contains: 'EXT4-fs error'
+      set: 
+        name: ext4-error
+        capture:
+            field1: error
+actions:
+    - foreach:
+        var: user-visible-error
+        debug_message: 'Detected user visible error: $error'
+        
+    - when:
+        condition: 'kernel-panic'
+        debug_message: 'Found evidence of kernel panic: $kmsg'
+
+    - when: 
+        condition: 
+         and: ['oom', 'booting']
+        user_message: 'The logs show that WSL2 ran out of memory. Try increasing wsl2.memory in .wslconfig and see if that solves the issue.'
+        debug_message: 'Found evidence of OOM kill: $oom-error'
+        tag: needs-author-feedback
+        
+    - when: 
+        condition: 
+         and: ['vm-failed-to-start', 'hyperv-firmware-expired']
+        user_message: 'The logs show that your Hyper-V firmware is expired. Please update your Windows build and see if that solves the issue'
+        tag: needs-author-feedback
+        
+    - when:
+        condition:
+          and: ['vm-failed-to-start', 'corrupted-initramfs']
+        user_message: 'Your WSL installation seems corrupted. Please try to download and install the [latest WSL release](https://github.com/microsoft/WSL/releases/latest)'
+        tag: needs-author-feedback
+       
+    - when:
+        condition:
+          and: [{not: 'service-running'}, 'service-disabled-error']
+        user_message: 'The logs show that wslservice is disabled. Try to run (elevated command prompt): `sc.exe config wslservice start= demand` and see if that solves the issue'
+        tag: needs-author-feedback
+        
+    - when:
+        condition:
+          and: ['vm-failed-to-start', 'hns-fatal-error']
+        user_message: 'An HNS error seems to be causing WSL2 to fail to start. Adding network tag'
+        debug_message: 'Found HNS error: $error'
+        tag: 'network'
+        
+    - when:
+        condition:
+          and: ['vm-failed-to-start', 'vmswitch-known-issue']
+        user_message: 'Known vmswitch issue found (error: $error). Adding network tag'
+        debug_message: 'Found evidence of vmswitch error: $error'
+        tag: 'network'
+        
+    - when: 
+        condition: 'ext4-error'
+        user_message: 'The logs shows that a disk mount error occured. Try to [follow these repair instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error) and see if that solves the issue.'
+        debug_message: 'Found evidence of ext4 error: $error'
+        tag: 'needs-author-feedback'
