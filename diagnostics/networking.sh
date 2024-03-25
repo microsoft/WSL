@@ -22,3 +22,8 @@ if [ -z ${WSL_PAC_URL+x} ]; then echo "WSL_PAC_URL is unset"; else echo "WSL_PAC
 
 echo "Printing DNS configuration"
 cat /etc/resolv.conf
+
+echo "Printing iptables and nftables rules"
+iptables -S
+ip6tables -S
+nft list ruleset

@@ -42,7 +42,7 @@ if (Test-Path $wslconfig)
 }
 
 # Collect Linux network state before the repro
-& wsl.exe -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_before.log
+& wsl.exe -u root -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_before.log
 
 if ($RestartWslReproMode)
 {
@@ -154,7 +154,7 @@ finally
 }
 
 # Collect Linux network state after the repro
-& wsl.exe -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_after.log
+& wsl.exe -u root -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_after.log
 
 # Collect host networking state relevant for WSL
 # Using a try/catch for commands below, as some of them do not exist on all OS versions
