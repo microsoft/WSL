@@ -138,6 +138,17 @@ rules:
         name: ext4-error
         capture:
             field1: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+      set: wsl-service-logs
+      oneshot: true
+
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+      set: wsl-client-logs
+      oneshot: true
+
 actions:
     - foreach:
         var: user-visible-error
@@ -190,4 +201,12 @@ actions:
         condition: 'ext4-error'
         user_message: 'The logs shows that a disk mount error occured. Try to [follow these repair instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error) and see if that solves the issue.'
         debug_message: 'Found evidence of ext4 error: $error'
+        tag: 'needs-author-feedback'
+
+    - when:
+        condition:
+          not:
+            or: ['wsl-client-logs', 'wsl-service-logs']
+        user_message: "The log file doesn't contain any WSL traces. Please make sure **that you reproduced the issue while the log collection was running.**"
+        debug_message: 'Found no WSL traces in the logs'
         tag: 'needs-author-feedback'
