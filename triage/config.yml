@@ -153,10 +153,13 @@ actions:
     - foreach:
         var: user-visible-error
         debug_message: 'Detected user visible error: $error'
+        skip_similar_issues: false
+
         
     - when:
         condition: 'kernel-panic'
         debug_message: 'Found evidence of kernel panic: $kmsg'
+        skip_similar_issues: false
 
     - when: 
         condition: 
@@ -164,44 +167,53 @@ actions:
         user_message: 'The logs show that WSL2 ran out of memory. Try increasing wsl2.memory in .wslconfig and see if that solves the issue.'
         debug_message: 'Found evidence of OOM kill: $oom-error'
         tag: needs-author-feedback
+        skip_similar_issues: true
         
     - when: 
         condition: 
          and: ['vm-failed-to-start', 'hyperv-firmware-expired']
         user_message: 'The logs show that your Hyper-V firmware is expired. Please update your Windows build and see if that solves the issue'
         tag: needs-author-feedback
+        skip_similar_issues: true
+
         
     - when:
         condition:
           and: ['vm-failed-to-start', 'corrupted-initramfs']
         user_message: 'Your WSL installation seems corrupted. Please try to download and install the [latest WSL release](https://github.com/microsoft/WSL/releases/latest)'
         tag: needs-author-feedback
+        skip_similar_issues: true
        
     - when:
         condition:
           and: [{not: 'service-running'}, 'service-disabled-error']
         user_message: 'The logs show that wslservice is disabled. Try to run (elevated command prompt): `sc.exe config wslservice start= demand` and see if that solves the issue'
         tag: needs-author-feedback
-        
+        skip_similar_issues: true
+
     - when:
         condition:
           and: ['vm-failed-to-start', 'hns-fatal-error']
         user_message: 'An HNS error seems to be causing WSL2 to fail to start. Adding network tag'
         debug_message: 'Found HNS error: $error'
         tag: 'network'
-        
+
     - when:
         condition:
           and: ['vm-failed-to-start', 'vmswitch-known-issue']
         user_message: 'Known vmswitch issue found (error: $error). Adding network tag'
         debug_message: 'Found evidence of vmswitch error: $error'
         tag: 'network'
+        skip_similar_issues: true
+
         
     - when: 
         condition: 'ext4-error'
         user_message: 'The logs shows that a disk mount error occured. Try to [follow these repair instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error) and see if that solves the issue.'
         debug_message: 'Found evidence of ext4 error: $error'
         tag: 'needs-author-feedback'
+        skip_similar_issues: true
+
 
     - when:
         condition:
@@ -210,3 +222,4 @@ actions:
         user_message: "The log file doesn't contain any WSL traces. Please make sure **that you reproduced the issue while the log collection was running.**"
         debug_message: 'Found no WSL traces in the logs'
         tag: 'needs-author-feedback'
+        skip_similar_issues: false
