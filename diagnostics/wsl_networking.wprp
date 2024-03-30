@@ -203,6 +203,7 @@
     <EventProvider Id="Microsoft-Windows-SharedAccess_NAT" Name="A6F32731-9A38-4159-A220-3D9B7FC5FE5D" />
     <EventProvider Id="Microsoft.Windows.Hyper.V.VmsIf" Name="6C28C7E5-331B-4437-9C69-5352A2F7F296" />
     <EventProvider Id="VmSwitch_wpp" Name="1F387CBC-6818-4530-9DB6-5F1058CD7E86"/>
+    <EventProvider Id="ndis_wpp" Name="DD7A21E6-A651-46D4-B7C2-66543067B869"/>
     <EventProvider Id="Microsoft-Windows-Hyper-V-VmSwitch" Name="67DC0D66-3695-47C0-9642-33F76F7BD7AD"/>
     <EventProvider Id="Microsoft.Windows.Hyper.V.NetSetupHelper" Name="94DEB9D1-0A52-449B-B368-41E4426B4F36"/>
     <EventProvider Id="Microsoft-Windows-Hyper-V-VfpExt" Name="9F2660EA-CFE7-428F-9850-AECA612619B0"/>
@@ -395,6 +396,7 @@
             <EventProviderId Value="Microsoft-Windows-SharedAccess_NAT"/>
             <EventProviderId Value="Microsoft.Windows.Hyper.V.VmsIf"/>
             <EventProviderId Value="VmSwitch_wpp"/>
+            <EventProviderId Value="ndis_wpp"/>
             <EventProviderId Value="Microsoft-Windows-Hyper-V-VmSwitch"/>
             <EventProviderId Value="Microsoft.Windows.Hyper.V.NetSetupHelper"/>
             <EventProviderId Value="Microsoft-Windows-Hyper-V-VfpExt"/>
