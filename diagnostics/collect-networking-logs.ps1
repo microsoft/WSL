@@ -255,6 +255,19 @@ try
 }
 catch {}
 
+# Collect the setup and NetSetup log files
+$netSetupPath = "$env:WINDIR/logs/netsetup"
+if (Test-Path $netSetupPath)
+{
+    Copy-Item $netSetupPath $folder
+}
+
+$setupApiPath = "$env:WINDIR/inf/setupapi.dev.log"
+if (Test-Path $setupApiPath)
+{
+    Copy-Item $setupApiPath $folder
+}
+
 Remove-Item $logProfile
 Remove-Item $networkingBashScript
 
