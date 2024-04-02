@@ -259,7 +259,7 @@ catch {}
 $netSetupPath = "$env:WINDIR/logs/netsetup"
 if (Test-Path $netSetupPath)
 {
-    Copy-Item $netSetupPath $folder
+    Copy-Item $netSetupPath/* $folder
 }
 
 $setupApiPath = "$env:WINDIR/inf/setupapi.dev.log"
