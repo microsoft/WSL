@@ -141,6 +141,15 @@ rules:
 
     - logline:
         provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1: {regex: "EXT4-fs.*Can't find ext4 filesystem"}
+      set: 
+        name: ext4-mount-error
+        capture:
+            field1: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
       set: wsl-service-logs
       oneshot: true
 
@@ -208,7 +217,7 @@ actions:
 
         
     - when: 
-        condition: 'ext4-error'
+        condition: {or:  ['ext4-error', 'ext4-mount-error']}
         user_message: 'The logs shows that a disk mount error occured. Try to [follow these repair instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error) and see if that solves the issue.'
         debug_message: 'Found evidence of ext4 error: $error'
         tag: 'needs-author-feedback'
