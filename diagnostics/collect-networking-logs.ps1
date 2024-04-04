@@ -84,7 +84,7 @@ netsh wfp capture start file="$folder/wfpdiag.cab"
 $tcpdumpProcess = $null
 try
 {
-    $tcpdumpProcess = Start-Process wsl.exe -ArgumentList "-u root tcpdump -n -i any > $folder/tcpdump.log" -PassThru
+    $tcpdumpProcess = Start-Process wsl.exe -ArgumentList "-u root tcpdump -n -i any -e -vvv > $folder/tcpdump.log" -PassThru
 }
 catch {}
 
