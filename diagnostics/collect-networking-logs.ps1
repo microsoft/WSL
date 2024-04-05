@@ -5,6 +5,104 @@ Param (
     [switch]$RestartWslReproMode = $false
    )
 
+function Collect-WindowsNetworkState {
+
+    param (
+        $ReproStep
+    )
+
+    # Collect host networking state relevant for WSL
+    # Using a try/catch for commands below, as some of them do not exist on all OS versions
+
+    try
+    {
+        Get-NetAdapter -includeHidden | select Name,ifIndex,NetLuid,InterfaceGuid,Status,MacAddress,MtuSize,InterfaceType,Hidden,HardwareInterface,ConnectorPresent,MediaType,PhysicalMediaType | Out-File -FilePath "$folder/Get-NetAdapter_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetIPConfiguration -All -Detailed | Out-File -FilePath "$folder/Get-NetIPConfiguration_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetRoute | Out-File -FilePath "$folder/Get-NetRoute_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetFirewallHyperVVMCreator | Out-File -FilePath "$folder/Get-NetFirewallHyperVVMCreator_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetFirewallHyperVVMSetting -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallHyperVVMSetting_ActiveStore_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetFirewallHyperVProfile -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallHyperVProfile_ActiveStore_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetFirewallHyperVRule -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallHyperVRule_ActiveStore_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetFirewallRule -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallRule_ActiveStore_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetFirewallProfile -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallProfile_ActiveStore_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        Get-NetFirewallHyperVPort | Out-File -FilePath "$folder/Get-NetFirewallHyperVPort_$ReproStep.log" -Append
+    }
+    catch {}
+
+    try
+    {
+        & hnsdiag.exe list all 2>&1 > $folder/hnsdiag_list_all_"$ReproStep".log
+    }
+    catch {}
+
+    try
+    {
+        & hnsdiag.exe list endpoints -df 2>&1 > $folder/hnsdiag_list_endpoints_"$ReproStep".log
+    }
+    catch {}
+
+    try
+    {
+        foreach ($port in Get-NetFirewallHyperVPort)
+        {
+            & vfpctrl.exe /port $port.PortName /get-port-state 2>&1 > "$folder/vfp-port-$($port.PortName)-get-port-state_$ReproStep.log"
+            & vfpctrl.exe /port $port.PortName /list-rule 2>&1 > "$folder/vfp-port-$($port.PortName)-list-rule_$ReproStep.log"
+        }
+    }
+    catch {}
+
+    try
+    {
+        & vfpctrl.exe /list-vmswitch-port 2>&1 > $folder/vfpctrl_list_vmswitch_port_"$ReproStep".log
+    }
+    catch {}
+}
+
 $folder = "WslNetworkingLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
 mkdir -p $folder
 
@@ -41,8 +139,10 @@ if (Test-Path $wslconfig)
     Copy-Item $wslconfig $folder
 }
 
-# Collect Linux network state before the repro
+# Collect Linux & Windows network state before the repro
 & wsl.exe -u root -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_before.log
+
+Collect-WindowsNetworkState "before_repro"
 
 if ($RestartWslReproMode)
 {
@@ -153,99 +253,10 @@ finally
     wpr.exe -stop $folder/logs.etl 2>&1 >> $wprOutputLog
 }
 
-# Collect Linux network state after the repro
+# Collect Linux & Windows network state after the repro
 & wsl.exe -u root -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_after.log
 
-# Collect host networking state relevant for WSL
-# Using a try/catch for commands below, as some of them do not exist on all OS versions
-
-try
-{
-    Get-NetAdapter -includeHidden | select Name,ifIndex,NetLuid,InterfaceGuid,Status,MacAddress,MtuSize,InterfaceType,Hidden,HardwareInterface,ConnectorPresent,MediaType,PhysicalMediaType | Out-File -FilePath "$folder/Get-NetAdapter.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetIPConfiguration -All -Detailed | Out-File -FilePath "$folder/Get-NetIPConfiguration.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetRoute | Out-File -FilePath "$folder/Get-NetRoute.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetFirewallHyperVVMCreator | Out-File -FilePath "$folder/Get-NetFirewallHyperVVMCreator.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetFirewallHyperVVMSetting -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallHyperVVMSetting_ActiveStore.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetFirewallHyperVProfile -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallHyperVProfile_ActiveStore.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetFirewallHyperVRule -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallHyperVRule_ActiveStore.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetFirewallRule -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallRule_ActiveStore.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetFirewallProfile -PolicyStore ActiveStore | Out-File -FilePath "$folder/Get-NetFirewallProfile_ActiveStore.log" -Append
-}
-catch {}
-
-try
-{
-    Get-NetFirewallHyperVPort | Out-File -FilePath "$folder/Get-NetFirewallHyperVPort.log" -Append
-}
-catch {}
-
-try
-{
-    & hnsdiag.exe list all 2>&1 > $folder/hnsdiag_list_all.log
-}
-catch {}
-
-try
-{
-    & hnsdiag.exe list endpoints -df 2>&1 > $folder/hnsdiag_list_endpoints.log
-}
-catch {}
-
-try
-{
-    foreach ($port in Get-NetFirewallHyperVPort)
-    {
-		& vfpctrl.exe /port $port.PortName /get-port-state 2>&1 > "$folder/vfp-port-$($port.PortName)-get-port-state.log"
-	    & vfpctrl.exe /port $port.PortName /list-rule 2>&1 > "$folder/vfp-port-$($port.PortName)-list-rule.log"
-    }
-}
-catch {}
-
-try
-{
-    & vfpctrl.exe /list-vmswitch-port 2>&1 > $folder/vfpctrl_list_vmswitch_port.log
-}
-catch {}
+Collect-WindowsNetworkState "after_repro"
 
 try
 {
