@@ -266,6 +266,14 @@ try
 }
 catch {}
 
+# Collect the old Tcpip6 registry values - as they can break WSL if DisabledComponents is set to 0xff
+# see https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/configure-ipv6-in-windows
+try
+{
+    Get-Item HKLM:SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters | Out-File -FilePath "$folder/tcpip6_parameters.log" -Append
+}
+catch {}
+
 # Collect the setup and NetSetup log files
 $netSetupPath = "$env:WINDIR/logs/netsetup"
 if (Test-Path $netSetupPath)
