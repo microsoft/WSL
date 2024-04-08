@@ -10,6 +10,7 @@ ip a
 ip route show table all
 ip neighbor
 ip link
+ip rule show
 
 # We only print whether the HTTP proxy variables are set or not, as their content might contain secrets such as usernames, passwords.
 if [ -z ${http_proxy+x} ]; then echo "http_proxy is unset"; else echo "http_proxy is set"; fi
