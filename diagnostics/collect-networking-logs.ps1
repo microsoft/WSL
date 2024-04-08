@@ -22,6 +22,12 @@ function Collect-WindowsNetworkState {
 
     try
     {
+        & netsh nlm query all $folder/nlmquery_"$ReproStep".log
+    }
+    catch {}
+
+    try
+    {
         Get-NetIPConfiguration -All -Detailed | Out-File -FilePath "$folder/Get-NetIPConfiguration_$ReproStep.log" -Append
     }
     catch {}
