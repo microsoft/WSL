@@ -31,6 +31,13 @@ logs_rules:
     missing_logs_add_tags: ['needs-author-feedback']
     skip_tags: ['feature', 'question', 'emailed-logs', 'network']
 
+optional_component_rules:
+    - name: VirtualMachinePlatform
+      set: vmp-oc-enabled
+
+    - name: Microsoft-Windows-Subsystem-Linux
+      set: wsl-oc-enabled
+
 tags_rules:
     - contains: '/question'
       tag: 'question'
@@ -97,7 +104,16 @@ rules:
         name: vm-failed-to-start
         capture:
           field4: error
-      
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
+        task: Error
+        field8: '0x8004032D' # 0x8004032D = WSL_E_VIRTUAL_MACHINE_PLATFORM_REQUIRED
+      set: 
+        name: vmp-required
+        capture:
+          field8: error
+
     - logline:
         provider: Microsoft.Windows.Lxss.Manager
       set: service-running
@@ -232,3 +248,13 @@ actions:
         debug_message: 'Found no WSL traces in the logs'
         tag: 'needs-author-feedback'
         skip_similar_issues: false
+
+    - when:
+        condition:
+          and:
+            - vmp-required
+            - not: vmp-oc-enabled
+        debug_message: 'Found evidence of virtual machine platform component missing: $error'
+        user_message: 'It appears that the VirtualMachinePlatform optional component is not enabled. Please try running: `dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart`, then reboot and see if that solves the issue.'
+        skip_similar_issues: false
+        tag: 'needs-author-feedback'
