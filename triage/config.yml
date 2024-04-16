@@ -29,7 +29,7 @@ logs_rules:
         
     
     missing_logs_add_tags: ['needs-author-feedback']
-    skip_tags: ['feature', 'question', 'emailed-logs', 'network']
+    skip_tags: ['emailed-logs']
 
 optional_component_rules:
     - name: VirtualMachinePlatform
