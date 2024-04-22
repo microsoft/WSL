@@ -134,8 +134,7 @@ rules:
         name: hns-fatal-error
         capture:
           field3: error
-      
-      
+
     - logline:
         provider: Microsoft.Windows.Hyper.V.NetMgmt
         task: NetMgmt::CreateVirtualSwitch
@@ -172,6 +171,15 @@ rules:
     - logline:
         provider: Microsoft.Windows.Subsystem.Lxss
       set: wsl-client-logs
+      oneshot: true
+
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        field8: {regex: ".*InstallMsix\\(.*"}
+      set:
+        name: msix-install-error
+        capture:
+            field7: error
       oneshot: true
 
 actions:
@@ -258,3 +266,8 @@ actions:
         user_message: 'It appears that the VirtualMachinePlatform optional component is not enabled. Please try running: `dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart`, then reboot and see if that solves the issue.'
         skip_similar_issues: false
         tag: 'needs-author-feedback'
+
+    - when:
+        condition: msix-install-error
+        debug_message: 'Found evidence of MSIX install error: $error, adding msix tag'
+        tag: 'msix'
