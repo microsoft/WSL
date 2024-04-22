@@ -10,6 +10,8 @@
     <EventProvider Id="lxcore_user" Name="D90B9468-67F0-5B3B-42CC-82AC81FFD960"/>
     <EventProvider Id="lxcore_service" Name="B99CDB5A-039C-5046-E672-1A0DE0A40211"/>
     <EventProvider Id="wsl_devicehost" Name="9d6c7b9e-2581-4d8a-b8c5-b90b4a17094a"/>
+    <EventProvider Id="wslclient" Name="8cbb7724-7223-5d6f-8137-564dac45104d"/>
+    <EventProvider Id="wslapi" Name="beb94edf-1a7b-5058-0696-ff9e6b1798d1"/>
     <EventProvider Id="vm_chipset" Name="de9ba731-7f33-4f44-98c9-6cac856b9f83"/>
     <EventProvider Id="vmcompute_dll" Name="AF7FD3A7-B248-460C-A9F5-FEC39EF8468C"/>
     <EventProvider Id="vmcompute" Name="17103E3F-3C6E-4677-BB17-3B267EB5BE57"/>
@@ -65,6 +67,36 @@
       </Keywords>
     </EventProvider>
 
+    <EventProvider Id="storvsp" Name="10b3d268-9782-49a4-aacc-a93c5482cb6f" NonPagedMemory="true" Level="4">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="HyperV_SyntheticStorage" Name="EDACD782-2564-4497-ADE6-7199377850F2" Level="6">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="HyperV_EmulatedStorage" Name="86E15E01-EDF1-4AC7-89CF-B19563FD6894" Level="6">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="EventProvider_Telemetry_StorVSP" Name="544d0787-9f6d-432e-8414-e035a8b0541d">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="EventProvider_Trace_Vhdmp" Name="dc284fb3-1eab-4854-828a-b25417280280" Level="3">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
     <Profile
       Id="WSL.Verbose.File"
       Name="WSL"
@@ -79,6 +111,8 @@
             <EventProviderId Value="lxcore_user"/>
             <EventProviderId Value="lxcore_service"/>
             <EventProviderId Value="wsl_devicehost"/>
+            <EventProviderId Value="wslclient"/>
+            <EventProviderId Value="wslapi"/>
             <EventProviderId Value="vm_chipset"/>
             <EventProviderId Value="vmcompute_dll"/>
             <EventProviderId Value="vmcompute"/>
@@ -113,6 +147,11 @@
             <EventProviderId Value="virtdisk_wpp"/>
             <EventProviderId Value="vhdmp"/>
             <EventProviderId Value="vhdmp_wpp"/>
+            <EventProviderId Value="storvsp"/>
+            <EventProviderId Value="HyperV_SyntheticStorage"/>
+            <EventProviderId Value="HyperV_EmulatedStorage"/>
+            <EventProviderId Value="EventProvider_Telemetry_StorVSP"/>
+            <EventProviderId Value="EventProvider_Trace_Vhdmp"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>

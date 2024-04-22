@@ -8,7 +8,7 @@ See the `10) Reporting a Windows crash (BSOD)` section below for detailed instru
 Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
 
 ## Reporting issues in WSL
-A well written bug will follow the following template:
+A well written bug report will follow the following template:
 
 ### 1) Issue Title
 A title succinctly describing the issue.
@@ -117,17 +117,27 @@ Availability  Capabilities  CapabilityDescriptions                              
               {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
 ```
 
-#### Networking issues
+#### Collect WSL logs for networking issues
 
-If the issue is about networking, run [networking.bat](https://github.com/Microsoft/WSL/blob/master/diagnostics/networking.bat) in an administrative command prompt:
+Install tcpdump in your WSL distribution using the following commands.
+Note: This will not work if WSL has Internet connectivity issues.
 
 ```
-$ git clone https://github.com/microsoft/WSL --depth=1 %tmp%\WSL
-$ cd %tmp%\WSL\diagnostics
-$ networking.bat
+# sudo apt-get update
+# sudo apt-get -y install tcpdump
 ```
 
-Once the script execution is completed, include **both** its output and the generated log file, `wsl.etl` on the issue.
+Install [WPR](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)
+
+To collect WSL networking logs, do the following steps in an administrative powershell prompt:
+
+```
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-networking-logs.ps1" -OutFile collect-networking-logs.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\collect-networking-logs.ps1
+```
+The script will output when log collection starts. Reproduce the problem, then press any key to stop the log collection.
+The script will output the path of the log file once done.
 
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
@@ -135,6 +145,8 @@ Once the script execution is completed, include **both** its output and the gene
 
 
 ### 8) Collect WSL logs (recommended method)
+
+If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue.
 
 To collect WSL logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an administrative powershell prompt:
 
@@ -206,7 +218,19 @@ Make sure that the email body contains:
 
 The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps).
 
-To enable automatic crash dumps, run the following commands in an elevated command prompt:
+To collect dumps of all running WSL processe, please open a PowerShell prompt with admin privileges, navigate to a folder where you'd like to put your log files and run these commands: 
+
+```
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\collect-wsl-logs.ps1 -Dump
+```
+
+The script will output the path to the log file when it is done.
+
+#### Enable automatic crash dump collection
+
+If your crash is sporadic or hard to reproduce, please enable automatic crash dumps to catch logs for this behavior: 
 
 ```
 md C:\crashes
@@ -222,3 +246,31 @@ Once you're done, crash dump collection can be disabled by running the following
 ```
 reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /f
 ```
+
+### 12) Collect wslservice time travel debugging traces
+
+To collect time travel debugging traces:
+
+1) [Install Windbg preview](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
+
+2) Open windbg preview as administrator by running `windbgx` in an elevated command prompt
+
+3) Navigate to `file` -> `Attach to process`
+
+4) Check `Record with Time Travel Debugging` (at the bottom right)
+
+4) Check `Show processes from all users` (at the bottom)
+
+5) Select `wslservice.exe`. Note, if wslservice.exe is not running, you make it start it with: `wsl.exe -l`
+
+6) Click `Configure and Record` (write down the folder you chose for the traces)
+
+7) Reproduce the issue
+
+8) Go back to windbg and click `Stop and Debug`
+
+9) Once the trace is done collecting, click `Stop Debugging` and close Windbg
+
+10) Go to the folder where the trace was colleced, and locate the .run file. It should look like: `wslservice*.run`
+
+11) Share that file on the issue

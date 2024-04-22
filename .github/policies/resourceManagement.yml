@@ -1,0 +1,243 @@
+id: 
+name: GitOps.PullRequestIssueManagement
+description: GitOps.PullRequestIssueManagement primitive
+owner: 
+resource: repository
+disabled: false
+where: 
+configuration:
+  resourceManagementConfiguration:
+    scheduledSearches:
+    - description: 
+      frequencies:
+      - hourly:
+          hour: 3
+      filters:
+      - isIssue
+      - isOpen
+      - hasLabel:
+          label: needs-author-feedback
+      - noActivitySince:
+          days: 7
+      actions:
+      - closeIssue
+      - addReply:
+          reply: >-
+            This issue has been automatically closed since it has not had any author activity for the past **7 days**. If you're still experiencing this issue please re-file it as a new issue. 
+
+
+            Thank you!
+    - description: Close year old issues
+      frequencies:
+      - weekday:
+          day: Thursday
+          time: 12:00
+      filters:
+      - isIssue
+      - isOpen
+      - isNotLabeledWith:
+          label: feature
+      - noActivitySince:
+          days: 365
+      actions:
+      - closeIssue
+      - addReply:
+          reply: >-
+            This issue has been automatically closed since it has not had any activity for the past **year**. If you're still experiencing this issue please re-file this as a new issue or feature request. 
+
+
+            Thank you!
+    eventResponderTasks:
+    - if:
+      - payloadType: Issue_Comment
+      - isAction:
+          action: Created
+      - isActivitySender:
+          issueAuthor: True
+      - hasLabel:
+          label: needs-author-feedback
+      then:
+      - removeLabel:
+          label: needs-author-feedback
+      description: 
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/dup(licate|e)?(\s+of)?\s+\#[\d]+'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - addReply:
+          reply: >-
+            Hi! We've identified this issue as a duplicate of another one that already exists in this repository. This specific instance is being closed in favor of tracking the concern over on the referenced thread.
+
+
+            Thanks for your report!
+      - closeIssue
+      - addLabel:
+          label: duplicate
+      description: 
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/need-repro'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - addReply:
+          reply: >-
+            We’ve labelled your issue as ‘need-repro’ since we need more steps to help identify your problem. 
+
+
+            Could you please provide us with reproducible steps for the issue you’re experiencing, including things such as the specific command line steps necessary to reproduce the behavior and their output. 
+
+
+            Thank you!
+      - addLabel:
+          label: need-repro
+      description: 
+    - if:
+      - payloadType: Issue_Comment
+      then:
+      - cleanEmailReply
+      description: 
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/template'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - closeIssue
+      - addReply:
+          reply: >-
+            Hi! We've closed your issue since you haven't used the template, or it is incomplete. Could you please provide all the requested info in the bug template and resubmit? Having that information will help us be able to accurately diagnose and resolve your issue.
+
+
+            Thank you!
+      - lockIssue
+      description: 
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/fixed'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - closeIssue
+      - addLabel:
+          label: fixedininsiderbuilds
+      - addReply:
+          reply: >-
+            This bug or feature request originally submitted has been addressed in whole or in part. Related or ongoing bug or feature gaps should be opened as a new issue submission if one does not already exist. 
+
+
+            Thank you!
+      - removeLabel:
+          label: fixinbound
+      description: 
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/logs?'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - addReply:
+          reply: >-
+            Hello! Could you please provide more logs to help us better diagnose your issue? 
+
+
+            To collect WSL logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an **administrative powershell prompt**:
+
+
+            ```
+
+            Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+
+            .\collect-wsl-logs.ps1
+
+            ```
+
+            The scipt will output the path of the log file once done. 
+
+
+            Once completed please upload the output files to this Github issue.
+
+
+            [Click here](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method) for more info on logging
+
+
+            If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue.
+
+
+            Thank you!
+      - addLabel:
+          label: needs-author-feedback
+      description: 
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/dump?'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - addReply:
+          reply: >-
+            Hello! Could you please provide logs and process dumps to help us better diagnose your issue? 
+
+
+            To collect WSL logs and dumps, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an **administrative powershell prompt**:
+
+
+            ```
+
+            Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
+
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+
+            .\collect-wsl-logs.ps1 -Dump
+
+            ```
+
+            The scipt will output the path of the log file once done. 
+
+
+            Once completed please upload the output files to this Github issue.
+
+
+            [Click here](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method) for more info on logging
+
+
+            Thank you!
+      - addLabel:
+          label: needs-author-feedback
+      description: 
+onFailure: 
+onSuccess: 

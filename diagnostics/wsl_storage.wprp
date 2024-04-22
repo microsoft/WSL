@@ -50,6 +50,36 @@
       </Keywords>
     </EventProvider>
 
+    <EventProvider Id="HyperV_SyntheticStorage" Name="EDACD782-2564-4497-ADE6-7199377850F2" Level="6">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="HyperV_EmulatedStorage" Name="86E15E01-EDF1-4AC7-89CF-B19563FD6894" Level="6">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="EventProvider_Telemetry_StorVSP" Name="544d0787-9f6d-432e-8414-e035a8b0541d">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="EventProvider_Trace_Vhdmp" Name="dc284fb3-1eab-4854-828a-b25417280280" Level="3">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
+    <EventProvider Id="storvsp_wpp" Name="f96abc17-6a5e-4a49-a3f4-a2a86fa03846" NonPagedMemory="true" Level="4">
+      <Keywords>
+        <Keyword Value="0xFFFFFFFFFFFFFFFF" />
+      </Keywords>
+    </EventProvider>
+
     <Profile
       Id="WSL.Verbose.File"
       Name="WSL"
@@ -80,6 +110,11 @@
             <EventProviderId Value="virtdisk_wpp"/>
             <EventProviderId Value="vhdmp"/>
             <EventProviderId Value="vhdmp_wpp"/>
+            <EventProviderId Value="HyperV_SyntheticStorage"/>
+            <EventProviderId Value="HyperV_EmulatedStorage"/>
+            <EventProviderId Value="EventProvider_Telemetry_StorVSP"/>
+            <EventProviderId Value="EventProvider_Trace_Vhdmp"/>
+            <EventProviderId Value="storvsp_wpp"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>

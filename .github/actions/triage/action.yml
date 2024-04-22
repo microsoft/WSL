@@ -1,0 +1,44 @@
+name: Run automated triage
+
+
+inputs:
+    issue:
+      required: false
+      type: string
+    similar_issues_text:
+      required: false
+      type: string
+    comment:
+      required: false
+      type: string
+    token:
+      required: false
+      type: string
+
+runs:
+    using: "composite"
+    steps:
+      - name: 'Run WTI'
+        if: ${{ !contains(inputs.similar_issues_text, '''@') }} # Skip this step if the description contains a string that will break the here document
+        shell: pwsh
+        run: |
+            $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+            $message = @'
+            ${{ inputs.similar_issues_text }}
+            '@
+            
+            $maybe_message = @()
+            if (![string]::IsNullOrEmpty($message))
+            {
+                $maybe_message = @("--default-message-stdin")
+            }
+            
+            $maybe_comment = @()
+            if (![string]::IsNullOrEmpty("${{ inputs.comment }}"))
+            {
+                $maybe_comment = @("--comment", "${{ inputs.comment }}")
+            }
+            
+            curl.exe -L https://github.com/OneBlue/wti/releases/download/v0.1.6/wti.exe -o triage/wti.exe
+            
+            cd triage && echo -n $message | .\wti.exe --issue ${{ inputs.issue }} --config config.yml --github-token "${{ inputs.token }}" --ignore-tags @maybe_message @maybe_comment 

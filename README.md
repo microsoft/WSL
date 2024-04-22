@@ -65,6 +65,9 @@ Issues may be closed by the original poster at any time.  We will close issues i
 - reddit: https://www.reddit.com/r/bashonubuntuonwindows
 - Ask Ubuntu: https://askubuntu.com/questions/tagged/wsl
 - Ubuntu Blogs featuring Microsoft/WSL: https://ubuntu.com/blog/tag/microsoft
+- Awesome WSL: https://github.com/sirredbeard/Awesome-WSL
+- Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
+- WSL Utilities (WSLU): https://github.com/wslutilities/wslu
 
 ### Troubleshooting:
 
