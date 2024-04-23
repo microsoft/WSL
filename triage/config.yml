@@ -90,6 +90,12 @@ rules:
         name: user-visible-error
         capture:
             field3: error
+            
+    - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: UserVisibleError
+        field3: Wsl/CallMsi/REGDB_E_CLASSNOTREG
+      set: msix-bad-install-state
 
     - logline:
         provider: Microsoft-Windows-Hyper-V-Chipset
@@ -270,4 +276,18 @@ actions:
     - when:
         condition: msix-install-error
         debug_message: 'Found evidence of MSIX install error: $error, adding msix tag'
+        tag: 'msix'
+        
+    - when:
+        condition: msix-bad-install-state
+        user_message: | 
+            Your WSL installation appears to be in a bad state. Can you try running the following command to reinstall WSL (elevated powershell) and see if that solves the issue?
+            
+            ```
+            Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/triage/install-latest-wsl.ps1" -OutFile install-latest-wsl.ps1
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            .\install-latest-wsl.ps1
+             ```
+            
+            
         tag: 'msix'
