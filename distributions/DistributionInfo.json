@@ -61,6 +61,16 @@
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc"
         },
         {
+            "Name": "Ubuntu-24.04",
+            "FriendlyName": "Ubuntu 24.04 LTS",
+            "StoreAppId": "9NZ3KLHXDJP5",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2404-240425.AppxBundle",
+            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2404-240425.AppxBundle",
+            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu24.04LTS_79rhkp1fndgsc"
+        },
+        {
             "Name": "OracleLinux_7_9",
             "FriendlyName": "Oracle Linux 7.9",
             "StoreAppId": "9P7L0QWBSLTK",
