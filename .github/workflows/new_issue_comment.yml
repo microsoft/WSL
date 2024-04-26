@@ -1,6 +1,7 @@
 name: Process new comment on issue
 
 on: 
+  workflow_dispatch :
   issue_comment:
     types: [created]
 

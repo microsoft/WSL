@@ -1,6 +1,7 @@
 name: Process new issue
 
 on:
+  workflow_dispatch :
   issues:
     types: [opened]
 

@@ -39,14 +39,16 @@ optional_component_rules:
       set: wsl-oc-enabled
 
 tags_rules:
-    - contains: '/question'
-      tag: 'question'
-    
-    - contains: '/feature'
-      tag: 'feature'
-      
-    - contains: '/emailed-logs'
-      tag: 'emailed-logs'
+    ignore: ['/featurename']
+    tags:
+        - contains: '/question'
+          tag: 'question'
+        
+        - contains: '/feature'
+          tag: 'feature'
+          
+        - contains: '/emailed-logs'
+          tag: 'emailed-logs'
 
 rules:
     - logline:
