@@ -25,9 +25,9 @@
             "FriendlyName": "Kali Linux Rolling",
             "StoreAppId": "9PKR34TNCV07",
             "Amd64": true,
-            "Arm64": false,
+            "Arm64": true,
             "Amd64PackageUrl": "https://wsldownload.azureedge.net/KaliLinux_1.13.1.0.AppxBundle",
-            "Arm64PackageUrl": null,
+            "Arm64PackageUrl": "https://wsldownload.azureedge.net/KaliLinux_1.13.1.0.AppxBundle",
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
         {
