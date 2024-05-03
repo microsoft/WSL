@@ -173,6 +173,15 @@ rules:
 
     - logline:
         provider: Microsoft.Windows.Lxss.Manager
+        task: GuestLog
+        field1: {regex: ".*No space left on device"}
+      set: 
+        name: disk-out-of-space
+        capture:
+            field1: error
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
       set: wsl-service-logs
       oneshot: true
 
@@ -293,3 +302,16 @@ actions:
             
             
         tag: 'msix'
+
+    - when:
+       condition: disk-out-of-space
+       debug_message: 'Found evidence of disk being full: $error'
+       user_message: |
+        It looks like WSL is out of space. If you're importing a new distribution, try to add: 
+        
+        ```
+        [wsl2]
+        defaultVhdSize = <size> # (example: 1500GB)
+        ```
+        
+        Otherwise if you need to increase the size of an existing distribution, you can follow [these instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-expand-the-size-of-your-wsl-2-virtual-hard-disk).
