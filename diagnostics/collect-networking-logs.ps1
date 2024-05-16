@@ -107,6 +107,12 @@ function Collect-WindowsNetworkState {
         & vfpctrl.exe /list-vmswitch-port 2>&1 > $folder/vfpctrl_list_vmswitch_port_"$ReproStep".log
     }
     catch {}
+
+    try
+    {
+        Get-VMSwitch | select Name,Id,SwitchType | Out-File -FilePath "$folder/Get-VMSwitch_$ReproStep.log" -Append
+    }
+    catch {}
 }
 
 $folder = "WslNetworkingLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
