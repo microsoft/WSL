@@ -25,6 +25,31 @@ echo "Printing DNS configuration"
 cat /etc/resolv.conf
 
 echo "Printing iptables and nftables rules"
-iptables -S
-ip6tables -S
+# iptables can be configured using both "iptables" and the legacy version "iptables-legacy". It's possible they can be used together
+# (although not recommended). Collect both to make sure no rules are missed.
+# We list the contents of the most common tables (filter, nat, mangle, raw, security)
+iptables -vL -t filter
+iptables -vL -t nat
+iptables -vL -t mangle
+iptables -vL -t raw
+iptables -vL -t security
+
+ip6tables -vL -t filter
+ip6tables -vL -t nat
+ip6tables -vL -t mangle
+ip6tables -vL -t raw
+ip6tables -vL -t security
+
+iptables-legacy -vL -t filter
+iptables-legacy -vL -t nat
+iptables-legacy -vL -t mangle
+iptables-legacy -vL -t raw
+iptables-legacy -vL -t security
+
+ip6tables-legacy -vL -t filter
+ip6tables-legacy -vL -t nat
+ip6tables-legacy -vL -t mangle
+ip6tables-legacy -vL -t raw
+ip6tables-legacy -vL -t security
+
 nft list ruleset
