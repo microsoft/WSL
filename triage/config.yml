@@ -100,6 +100,13 @@ rules:
       set: msix-bad-install-state
 
     - logline:
+        provider: Microsoft.Windows.Subsystem.Lxss
+        task: LxssException
+        field1: 'onecore\vm\wsl\lxss\wslutil\liftedsupport.cpp'
+        field5: '0x80070002'
+      set: msix-bad-app-exec-alias-state
+
+    - logline:
         provider: Microsoft-Windows-Hyper-V-Chipset
         field1:
             regex: '.*biosdevice.*80070057.*' # 80070057 = E_INVALIDARG
@@ -288,9 +295,13 @@ actions:
         condition: msix-install-error
         debug_message: 'Found evidence of MSIX install error: $error, adding msix tag'
         tag: 'msix'
-        
+
+    - when: 
+        condition: msix-bad-app-exec-alias-state
+        debug_message: 'Found evidence of failed app execution alias execution in LiftedSupport'
+
     - when:
-        condition: msix-bad-install-state
+        condition: {or: [msix-bad-install-state, msix-bad-app-exec-alias-state]}
         user_message: | 
             Your WSL installation appears to be in a bad state. Can you try running the following command to reinstall WSL (elevated powershell) and see if that solves the issue?
             
