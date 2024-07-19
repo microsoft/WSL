@@ -19,7 +19,9 @@ logs_rules:
         .\collect-wsl-logs.ps1
         ```
         
-        The scipt will output the path of the log file once done.
+        The script will output the path of the log file once done.
+
+        If this is a networking issue, please use [collect-networking-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-networking-logs.ps1), following the instructions [here](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#collect-wsl-logs-for-networking-issues)
         
         Once completed please upload the output files to this Github issue.
          
