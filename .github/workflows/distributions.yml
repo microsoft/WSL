@@ -1,4 +1,4 @@
-name: Sync GitHub with ADO
+name: Validate distributions
 
 on: 
   pull_request: 
