@@ -116,7 +116,7 @@
             "StoreAppId": "9N648JDGXK2D",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15_SP5-231024.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15_SP5-240801.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
         },
