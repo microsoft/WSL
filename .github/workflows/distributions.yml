@@ -1,0 +1,17 @@
+name: Validate distributions
+
+on: 
+  pull_request: 
+    paths: ['distributions/**']
+
+jobs:
+  check:
+    name: Validate distributions
+    runs-on: ubuntu-latest
+    steps:
+        - name: Checkout repo
+          uses: actions/checkout@v4
+          
+        - name: Run validation
+          run: python distributions/validate.py distributions/DistributionInfo.json
+          shell: bash
