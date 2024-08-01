@@ -128,7 +128,7 @@
             "Arm64": false,
             "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15SP6-240801_x64.Appx",
             "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer15SP6_022rs5jcyhyac"
+            "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP6_022rs5jcyhyac"
         },
         {
             "Name": "openSUSE-Tumbleweed",
