@@ -101,24 +101,14 @@
             "PackageFamilyName": "3810OracleAmericaInc.62074632F71C9_dm28ctvqnhe9g"
         },
         {
-            "Name": "openSUSE-Leap-15.5",
-            "FriendlyName": "openSUSE Leap 15.5",
-            "StoreAppId": "9NJGLDP5G04B",
+            "Name": "openSUSE-Leap-15.6",
+            "FriendlyName": "openSUSE Leap 15.6",
+            "StoreAppId": "9PDTJHBQRQPF",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSuseLeap15-5-231506_x64.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELeap15p6-240801_x64.Appx",
             "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.openSUSELeap15.5_022rs5jcyhyac"
-        },
-        {
-            "Name": "SUSE-Linux-Enterprise-Server-15-SP4",
-            "FriendlyName": "SUSE Linux Enterprise Server 15 SP4",
-            "StoreAppId": "9NMQXWVJJSZJ",
-            "Amd64": true,
-            "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterpriseServer15_SP4-230130_x64.Appx",
-            "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer15SP4_022rs5jcyhyac"
+            "PackageFamilyName": "46932SUSE.openSUSELeap15.6_022rs5jcyhyac"
         },
         {
             "Name": "SUSE-Linux-Enterprise-15-SP5",
@@ -126,9 +116,19 @@
             "StoreAppId": "9N648JDGXK2D",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15_SP5-231024.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15_SP5-240801.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
+        },
+        {
+            "Name": "SUSE-Linux-Enterprise-Server-15-SP6",
+            "FriendlyName": "SUSE Linux Enterprise Server 15 SP6",
+            "StoreAppId": "9N738KZGNB91",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15SP6-240801_x64.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP6_022rs5jcyhyac"
         },
         {
             "Name": "openSUSE-Tumbleweed",
@@ -136,8 +136,8 @@
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-231024_x64.Appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-231024_ARM64.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-240801_x64.Appx",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-240801_ARM64.Appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]
