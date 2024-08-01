@@ -6,8 +6,8 @@
             "StoreAppId": "9PDXGNCFSCZV",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-220117.appx",
-            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204-220117_ARM64.appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204-220117.appx",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204-220117_ARM64.appx",
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu_79rhkp1fndgsc"
         },
         {
@@ -16,8 +16,8 @@
             "StoreAppId": "9MSVKQC78PK6",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/TheDebianProject.DebianGNULinux_1.12.2.0_neutral___76v4gfsz19hv4.AppxBundle",
             "PackageFamilyName": "TheDebianProject.DebianGNULinux_76v4gfsz19hv4"
         },
         {
@@ -26,8 +26,8 @@
             "StoreAppId": "9PKR34TNCV07",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/KaliLinux_1.13.1.0.AppxBundle",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/KaliLinux_1.13.1.0.AppxBundle",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/KaliLinux_1.13.1.0.AppxBundle",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/KaliLinux_1.13.1.0.AppxBundle",
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
         {
@@ -36,8 +36,8 @@
             "StoreAppId": "9PNKSF5ZN4SW",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu1804-230608_x64.appx",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu1804-230608_ARM64.appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu1804-230608_x64.appx",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu1804-230608_ARM64.appx",
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04LTS_79rhkp1fndgsc"
         },
         {
@@ -46,8 +46,8 @@
             "StoreAppId": "9MTTCL66CPXJ",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu2004-230608_x64.appx",
-            "Arm64PackageUrl": "https://wsldownload.azureedge.net/Ubuntu2004-230608_ARM64.appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2004-230608_x64.appx",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2004-230608_ARM64.appx",
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu20.04LTS_79rhkp1fndgsc"
         },
         {
@@ -56,8 +56,8 @@
             "StoreAppId": "9PN20MSR04DW",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204LTS-230518_x64.appx",
-            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2204LTS-230518_ARM64.appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204LTS-230518_x64.appx",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2204LTS-230518_ARM64.appx",
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc"
         },
         {
@@ -66,8 +66,8 @@
             "StoreAppId": "9NZ3KLHXDJP5",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2404-240425.AppxBundle",
-            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/Ubuntu2404-240425.AppxBundle",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-240425.AppxBundle",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-240425.AppxBundle",
             "PackageFamilyName": "CanonicalGroupLimited.Ubuntu24.04LTS_79rhkp1fndgsc"
         },
         {
@@ -76,7 +76,7 @@
             "StoreAppId": "9P7L0QWBSLTK",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_7.9-230428.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_7.9-230428.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.OracleLinux7.9_dm28ctvqnhe9g"
         },
@@ -86,7 +86,7 @@
             "StoreAppId": "9NGGZVB0BKD9",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_8.7-230428.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_8.7-230428.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.51946E772388_dm28ctvqnhe9g"
         },
@@ -96,7 +96,7 @@
             "StoreAppId": "9N6CN5STZRX6",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/OracleLinux_9.1-230428.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_9.1-230428.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "3810OracleAmericaInc.62074632F71C9_dm28ctvqnhe9g"
         },
@@ -106,7 +106,7 @@
             "StoreAppId": "9NJGLDP5G04B",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSuseLeap15-5-231506_x64.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSuseLeap15-5-231506_x64.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.openSUSELeap15.5_022rs5jcyhyac"
         },
@@ -116,7 +116,7 @@
             "StoreAppId": "9NMQXWVJJSZJ",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterpriseServer15_SP4-230130_x64.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterpriseServer15_SP4-230130_x64.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterpriseServer15SP4_022rs5jcyhyac"
         },
@@ -126,7 +126,7 @@
             "StoreAppId": "9N648JDGXK2D",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/SUSELinuxEnterprise15_SP5-231024.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15_SP5-231024.Appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
         },
@@ -136,8 +136,8 @@
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-231024_x64.Appx",
-            "Arm64PackageUrl": "https://wslstorestorage.blob.core.windows.net/wslblob/openSUSETumbleweed-231024_ARM64.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-231024_x64.Appx",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-231024_ARM64.Appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]
