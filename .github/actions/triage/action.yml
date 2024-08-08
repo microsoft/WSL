@@ -51,6 +51,6 @@ runs:
                 $maybe_previous_body = @("--previous-issue-body", "previous_body.txt")
             }
             
-            curl.exe -L https://github.com/OneBlue/wti/releases/download/v0.1.10/wti.exe -o triage/wti.exe
+            curl.exe -L https://github.com/OneBlue/wti/releases/download/v0.1.11/wti.exe -o triage/wti.exe
             
             cd triage && echo -n $message | .\wti.exe --issue ${{ inputs.issue }} --config config.yml --github-token "${{ inputs.token }}" --ignore-tags @maybe_message @maybe_comment @maybe_previous_body

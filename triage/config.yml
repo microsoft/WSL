@@ -228,11 +228,26 @@ rules:
             field7: error
       oneshot: true
 
+    - logline:
+        provider: Microsoft-Windows-VHDMP
+        task: VHD_VIRTUAL_DISK_HANDLE_CREATE_TASK
+        event: 'Microsoft-Windows-VHDMP/VHD_VIRTUAL_DISK_HANDLE_CREATE_TASK/win:Stop'
+        field1: {not: '0x00000000'}
+      set:
+          name: disk-attach-error
+          capture:
+            field1: error
+            field2: vhdpath
+
 actions:
     - foreach:
         var: user-visible-error
         debug_message: 'Detected user visible error: $error'
         skip_similar_issues: false
+
+    - foreach:
+        var: disk-attach-error
+        debug_message: 'Found evidence of disk failing to attach. Error: $error, Path: $vhdpath'
 
     - when:
         condition: 'init-crash'
