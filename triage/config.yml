@@ -31,6 +31,7 @@ logs_rules:
         
     
     missing_logs_add_tags: ['needs-author-feedback']
+    missing_logs_etl_message: 'No logs.etl found in the archive. Make sure that you ran `collect-wsl-logs.ps1` as administrator and that the `logs.etl` file is in the archive.'
     skip_tags: ['emailed-logs']
 
 optional_component_rules:
