@@ -121,8 +121,8 @@
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
         },
         {
-            "Name": "SUSE-Linux-Enterprise-Server-15-SP6",
-            "FriendlyName": "SUSE Linux Enterprise Server 15 SP6",
+            "Name": "SUSE-Linux-Enterprise-15-SP6",
+            "FriendlyName": "SUSE Linux Enterprise 15 SP6",
             "StoreAppId": "9N738KZGNB91",
             "Amd64": true,
             "Arm64": false,
