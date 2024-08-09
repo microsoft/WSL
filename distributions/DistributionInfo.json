@@ -139,6 +139,26 @@
             "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-240801_x64.Appx",
             "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-240801_ARM64.Appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
-        }
+        },
+        {
+            "Name": "AlmaLinuxOS-9",
+            "FriendlyName": "AlmaLinux-9",
+            "StoreAppId":"9P5RWLM70SN9",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/AlmaLinuxOSFoundation.AlmaLinux9_9.4.0.0_neutral_~_dx92scvka9p9g.AppxBundle",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/AlmaLinuxOSFoundation.AlmaLinux9_9.4.0.0_neutral_~_dx92scvka9p9g.AppxBundle",
+            "PackageFamilyName": "AlmaLinuxOSFoundation.AlmaLinux9_dx92scvka9p9g"
+        },
+        {
+            "Name": "AlmaLinux-8",
+            "FriendlyName": "AlmaLinux-8",
+            "StoreAppId":"9NMD96XJJ19F",
+            "Amd64": true,
+            "Arm64": true,
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/AlmaLinuxOSFoundation.AlmaLinux8WSL_8.10.0.0_neutral_~_dx92scvka9p9g.AppxBundle",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/AlmaLinuxOSFoundation.AlmaLinux8WSL_8.10.0.0_neutral_~_dx92scvka9p9g.AppxBundle",
+            "PackageFamilyName": "AlmaLinuxOSFoundation.AlmaLinux8WSL_dx92scvka9p9g"
+        }     
     ]
 }
