@@ -24,6 +24,10 @@ if [ -z ${WSL_PAC_URL+x} ]; then echo "WSL_PAC_URL is unset"; else echo "WSL_PAC
 echo "Printing DNS configuration"
 cat /etc/resolv.conf
 
+# This is only configured in mirrored mode. WSL configures only the v4 port range - Linux will use the same range for v6
+echo "Printing ephemeral port range"
+cat /proc/sys/net/ipv4/ip_local_port_range
+
 echo "Printing iptables and nftables rules"
 # iptables can be configured using both "iptables" and the legacy version "iptables-legacy". It's possible they can be used together
 # (although not recommended). Collect both to make sure no rules are missed.
