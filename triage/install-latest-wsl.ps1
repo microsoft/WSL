@@ -7,10 +7,10 @@ Set-StrictMode -Version Latest
 
 $release = Invoke-WebRequest 'https://api.github.com/repos/microsoft/WSL/releases/latest' | ConvertFrom-Json
 $systeminfo = & systeminfo | findstr /C:"System Type"
-if ($systeminfo.contains('x64'))
+if ($systeminfo -like '*x64*')
 {
     $target = '.x64.msi'
-} elseif ($systeminfo.contains('arm64'))
+} elseif ($systeminfo -like '*arm64*')
 {
     $target = '.arm64.msi'
 } else
