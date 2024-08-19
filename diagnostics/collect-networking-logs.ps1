@@ -113,6 +113,12 @@ function Collect-WindowsNetworkState {
         Get-VMSwitch | select Name,Id,SwitchType | Out-File -FilePath "$folder/Get-VMSwitch_$ReproStep.log" -Append
     }
     catch {}
+
+    try
+    {
+        Get-NetUdpEndpoint | Out-File -FilePath "$folder/Get-NetUdpEndpoint_$ReproStep.log" -Append
+    }
+    catch {}
 }
 
 $folder = "WslNetworkingLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
