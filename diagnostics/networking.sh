@@ -5,6 +5,9 @@ set -xu
 lsb_release -a || cat /etc/issue /etc/os-release
 uname -a
 
+echo "Printing per-distro configuration"
+cat /etc/wsl.conf
+
 echo "Printing adapter & routing configuration"
 ip a
 ip route show table all
@@ -23,10 +26,7 @@ if [ -z ${WSL_PAC_URL+x} ]; then echo "WSL_PAC_URL is unset"; else echo "WSL_PAC
 
 echo "Printing DNS configuration"
 cat /etc/resolv.conf
-
-# This is only configured in mirrored mode. WSL configures only the v4 port range - Linux will use the same range for v6
-echo "Printing ephemeral port range"
-cat /proc/sys/net/ipv4/ip_local_port_range
+cat /etc/nsswitch.conf
 
 echo "Printing iptables and nftables rules"
 # iptables can be configured using both "iptables" and the legacy version "iptables-legacy". It's possible they can be used together
@@ -57,3 +57,7 @@ ip6tables-legacy -vL -t raw
 ip6tables-legacy -vL -t security
 
 nft list ruleset
+
+# This will print configurations such as net.ipv4.conf.all.route_localnet or net.ipv4.ip_local_port_range
+echo "Printing networking configurations"
+sysctl -a | grep net

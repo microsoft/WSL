@@ -2,7 +2,7 @@
 
 [CmdletBinding()]
 Param (
-    [switch]$RestartWslReproMode = $false
+    $RestartWslReproMode = $false
    )
 
 function Collect-WindowsNetworkState {
