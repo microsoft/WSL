@@ -2,7 +2,7 @@ name: Publish to Winget
 
 on:
   release:
-    types: [created, edited]
+    types: [published]
 
 env:
   REGEX: 'wsl\.([\d.]+)\.x64\.msi$'
@@ -14,14 +14,15 @@ jobs:
       - name: Publish WSL
         run: |
           $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
-          $wingetRelevantAsset = $assets | Where-Object { $_.name -like '*.msi' } | Select-Object -First 1
+          $wingetRelevantAssetx64 = $assets | Where-Object { $_.name -like '*x64.msi' } | Select-Object -First 1
+          $wingetRelevantAssetARM64 = $assets | Where-Object { $_.name -like '*arm64.msi' } | Select-Object -First 1
           $regex = [Regex]::New($env:REGEX)
-          $version = $regex.Match($wingetRelevantAsset.name).Groups[1].Value
+          $version = $regex.Match($wingetRelevantAssetx64.name).Groups[1].Value
 
-          Write-Output "Asset info: $assets"
-          Write-Output "Relevant asset: $wingetRelevantAsset"
+          $wingetx64URL = $wingetRelevantAssetx64.browser_download_url
+          $wingetARM64URL = $wingetRelevantAssetARM64.browser_download_url
 
           $wingetPackage = "Microsoft.WSL"
 
           & curl.exe -JLO https://aka.ms/wingetcreate/latest
-          & .\wingetcreate.exe update $wingetPackage -s -v $version -u $wingetRelevantAsset.browser_download_url -t "${{ secrets.WINGET_TOKEN }}"
+          & .\wingetcreate.exe update $wingetPackage -s -v $version -u "$wingetx64URL|x64" "$wingetARM64URL|arm64" -t "${{ secrets.WINGET_TOKEN }}"
