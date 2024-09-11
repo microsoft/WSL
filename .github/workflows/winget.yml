@@ -5,7 +5,7 @@ on:
     types: [published]
 
 env:
-  REGEX: 'Microsoft\.WindowsTerminal(?:Preview)?_([\d.]+)_8wekyb3d8bbwe\.msixbundle$'
+  REGEX: 'wsl\.([\d.]+)\.x64\.msi$'
 
 jobs:
   publish:
@@ -14,7 +14,7 @@ jobs:
       - name: Publish WSL
         run: |
           $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
-          $wingetRelevantAsset = $assets | Where-Object { $_.name -like '*.msixbundle' } | Select-Object -First 1
+          $wingetRelevantAsset = $assets | Where-Object { $_.name -like '*.msi' } | Select-Object -First 1
           $regex = [Regex]::New($env:REGEX)
           $version = $regex.Match($wingetRelevantAsset.name).Groups[1].Value
 
