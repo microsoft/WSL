@@ -2,7 +2,7 @@ name: Publish to Winget
 
 on:
   release:
-    types: [created]
+    types: [created, edited]
 
 env:
   REGEX: 'wsl\.([\d.]+)\.x64\.msi$'
