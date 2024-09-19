@@ -127,7 +127,7 @@ if ($Dump)
     $dumpFolder = Join-Path (Resolve-Path "$folder") dumps
     New-Item -ItemType "directory" -Path "$dumpFolder"
 
-    $executables = "wsl", "wslservice", "wslhost", "msrdc"
+    $executables = "wsl", "wslservice", "wslhost", "msrdc", "dllhost"
     foreach($process in Get-Process | Where-Object { $executables -contains $_.ProcessName})
     {
         $dumpFile =  "$dumpFolder/$($process.ProcessName).$($process.Id).dmp"
