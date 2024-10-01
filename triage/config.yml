@@ -240,6 +240,15 @@ rules:
             field1: error
             field2: vhdpath
 
+    - logline:
+        provider: Microsoft.Windows.HyperV.Worker
+        task: FallbackError
+        field2: {regex: ".*vmchipset\\.dll.*80090006.*"} #0x80090006 = NTE_BAD_SIGNATURE 
+      set:
+        name: hyper-v-firmare-expired
+        capture:
+          field2: signature-error
+
 actions:
     - foreach:
         var: user-visible-error
@@ -378,3 +387,11 @@ actions:
         ```
         
         Otherwise if you need to increase the size of an existing distribution, you can follow [these instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-expand-the-size-of-your-wsl-2-virtual-hard-disk).
+
+    - when:
+        condition:
+          and: ['hyper-v-firmare-expired', 'vm-failed-to-start']
+        tag: 'needs-author-feedback'
+        debug_message: 'Found evidence of hyper-v firmware expiration: $signature-error'
+        user_message: |
+          It looks like the Hyper-V firmware on your Windows build has expired. Please try to update Windows to a more recent build and see if that solves the issue.
