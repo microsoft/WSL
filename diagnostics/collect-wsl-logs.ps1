@@ -42,7 +42,7 @@ reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\P9NP $folder
 reg.exe export HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinSock2 $folder/Winsock2.txt 2>&1 | Out-Null
 reg.exe export "HKEY_CLASSES_ROOT\CLSID\{e66b0f30-e7b4-4f8c-acfd-d100c46c6278}" $folder/wslsupport-proxy.txt 2>&1 | Out-Null
 reg.exe export "HKEY_CLASSES_ROOT\CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce7e}" $folder/wslsupport-impl.txt 2>&1 | Out-Null
-reg.exe export "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion" $folder/windows-version.txt 2>&1 | Out-Null
+Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion" > $folder/windows-version.txt
 
 Get-Service wslservice -ErrorAction Ignore | Format-list * -Force  > $folder/wslservice.txt
 
@@ -56,6 +56,12 @@ get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ign
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
 Get-WindowsOptionalFeature -Online > $folder/optional-components.txt
 bcdedit.exe > $folder/bcdedit.txt
+
+$uninstallLogs = "$env:TEMP/wsl-uninstall-logs.txt"
+if (Test-Path $uninstallLogs)
+{
+    Copy-Item $uninstallLogs $folder | Out-Null
+}
 
 $wprOutputLog = "$folder/wpr.txt"
 
