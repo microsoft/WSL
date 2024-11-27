@@ -1,5 +1,6 @@
 {
     "ModernDistributions": {},
+    "Default": "Ubuntu",
     "Distributions": [
         {
             "Name": "Ubuntu",
