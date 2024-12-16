@@ -155,7 +155,7 @@ def read_config_keys(config: configparser.ConfigParser) -> dict:
 
     for section in config.sections():
         for key in config[section].keys():
-            keys[f'{section}.{key}'] = config[section][key]
+            keys[f'{section}.{key.lower()}'] = config[section][key]
 
     return keys
 
@@ -233,8 +233,31 @@ def read_systemd_enabled_units(flavor: str, name: str, tar) -> dict:
 
     return units
 
+# Manually implemented because os.path.realpath tries to resolve local symlinks
+def linux_real_path(path: str):
+    components = path.split('/')
 
-def get_tar_file(tar, path: str, follow_symlink=False):
+    result = []
+    for e in components:
+        if e == '.' or not e:
+            continue
+        elif e == '..':
+            if result:
+                del result[-1]
+            continue
+
+        result.append(e)
+
+    real_path = '/'.join(result)
+    if path and path[0] == '/':
+        return '/' + real_path
+    else:
+        return real_path
+
+def get_tar_file(tar, path: str, follow_symlink=False, symlink_depth=10):
+    if symlink_depth < 0:
+        print(f'Warning: Exceeded maximum symlink depth when reading: {path}')
+        return None, None
 
     # Tar members can be formated as /{path}, {path}, or ./{path}
     if path.startswith('/'):
@@ -247,9 +270,9 @@ def get_tar_file(tar, path: str, follow_symlink=False):
     def follow_if_symlink(info, path: str):
         if follow_symlink and info.issym():
             if info.linkpath.startswith('/'):
-                return get_tar_file(tar, info.linkpath, follow_symlink=True)
+                return get_tar_file(tar, info.linkpath, follow_symlink=True, symlink_depth=symlink_depth - 1)
             else:
-                return get_tar_file(tar, f'{os.path.dirname(path)}/{info.linkpath}', follow_symlink=True)
+                return get_tar_file(tar, linux_real_path(os.path.dirname(path) + '/' + info.linkpath), follow_symlink=True, symlink_depth=symlink_depth -1)
         else:
             return info, path
 
@@ -268,9 +291,9 @@ def get_tar_file(tar, path: str, follow_symlink=False):
     parent_path = os.path.dirname(path)
     if parent_path != path:
         try:
-            parent_info, real_parent_path = get_tar_file(tar, parent_path, follow_symlink=True)
-            if real_parent_path != parent_path:
-                return get_tar_file(tar, f'{real_parent_path}/{os.path.basename(path)}', follow_symlink=True)
+            parent_info, real_parent_path = get_tar_file(tar, parent_path, follow_symlink=True, symlink_depth=symlink_depth - 1)
+            if real_parent_path is not None and real_parent_path != parent_path:
+                return get_tar_file(tar, f'{real_parent_path}/{os.path.basename(path)}', follow_symlink=True, symlink_depth=symlink_depth -1)
         except KeyError:
             pass
 
@@ -327,7 +350,7 @@ def read_tar(flavor: str, name: str, file, elf_magic: str):
 
             keys = read_config_keys(config)
 
-            unexpected_keys = [e for e in keys if e not in valid_keys]
+            unexpected_keys = [e for e in keys if e.lower() not in valid_keys]
             if unexpected_keys:
                 error(flavor, name, f'Found unexpected_keys in "{path}": {unexpected_keys}')
             else:
@@ -337,7 +360,7 @@ def read_tar(flavor: str, name: str, file, elf_magic: str):
 
         defaultUid = None
         if validate_mode('/etc/wsl-distribution.conf', [oct(0o664), oct(0o644)], 0, 0):
-            config = validate_config('/etc/wsl-distribution.conf', ['oobe.command', 'oobe.defaultuid', 'shortcut.icon', 'oobe.defaultname', 'windowsterminal.profileTemplate'])
+            config = validate_config('/etc/wsl-distribution.conf', ['oobe.command', 'oobe.defaultuid', 'shortcut.icon', 'oobe.defaultname', 'windowsterminal.profiletemplate'])
 
             if oobe_command := config.get('oobe.command', None):
                 validate_mode(oobe_command, [oct(0o775), oct(0o755)], 0, 0)
@@ -432,7 +455,7 @@ def warning(flavor: str, distribution: str, message: str):
     global warnings
 
     message = f'{flavor}/{distribution}: {message}'
-    click.secho(f'Warning: {message}', fg='red')
+    click.secho(f'Warning: {message}', fg='yellow')
 
     warnings.append(message)
 if __name__ == "__main__":
