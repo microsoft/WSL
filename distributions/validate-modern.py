@@ -261,7 +261,7 @@ def get_tar_file(tar, path: str, follow_symlink=False, symlink_depth=10):
         print(f'Warning: Exceeded maximum symlink depth when reading: {path}')
         return None, None
 
-    # Tar members can be formated as /{path}, {path}, or ./{path}
+    # Tar members can be formatted as /{path}, {path}, or ./{path}
     if path.startswith('/'):
         paths = [path, '.' + path, path[1:]]
     elif path.startswith('./'):
