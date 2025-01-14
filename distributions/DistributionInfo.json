@@ -1,7 +1,5 @@
 {
-    "ModernDistributions": {
-        "Dummy": {}
-    },
+    "ModernDistributions": {},
     "Default": "Ubuntu",
     "Distributions": [
         {
