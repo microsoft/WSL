@@ -1,7 +1,7 @@
 name: Validate tar based distributions
 
 on:
-  pull_request:
+  pull_request_target:
     paths: ['distributions/**']
 
 jobs:
@@ -13,9 +13,9 @@ jobs:
     steps:
         - name: Checkout repo
           uses: actions/checkout@v4
-          with:           
+          with:
+            ref: refs/pull/${{ github.event.pull_request.number }}/merge
             fetch-depth: 0
-
 
         - name: Install pip packages
           run: pip install -r distributions/requirements.txt
