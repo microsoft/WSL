@@ -403,6 +403,8 @@ def read_tar(flavor: str, name: str, file, elf_magic: str):
 
 def read_url(flavor: str, name: str, url: dict, elf_magic):
      hash = hashlib.sha256()
+     if not url['Url'].endswith('.wsl'):
+         warning(flavor, name, f'Url does not point to a .wsl file: {url["Url"]}')
 
      if url['Url'].startswith('file://'):
          with open(url['Url'].replace('file:///', '').replace('file://', ''), 'rb') as fd:
