@@ -4,7 +4,7 @@
             {
                 "Name": "openSUSE-Tumbleweed",
                 "FriendlyName": "openSUSE Tumbleweed",
-                "Default": false,
+                "Default": true,
                 "Amd64Url": {
                     "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250110.0/openSUSE-Tumbleweed-20250108.x86_64-7.31-Build7.31.tar.xz",
                     "Sha256": "0x8c89f858145e2ff778eb061817d91d31ee5bee3b2797af7e4000d236553872b0"
