@@ -18,6 +18,8 @@ MAGIC = magic.Magic()
 X64_ELF_MAGIC = re.compile('^ELF 64-bit.* x86-64, version 1')
 ARM64_ELF_MAGIC = re.compile('^ELF 64-bit.* ARM aarch64, version 1')
 
+KNOWN_TAR_FORMATS = {'^XZ compressed data.*': False, '^gzip compressed data.*': True}
+
 DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-networkd.service',
                             'systemd-tmpfiles-setup.service',
@@ -406,6 +408,7 @@ def read_url(flavor: str, name: str, url: dict, elf_magic):
      if not url['Url'].endswith('.wsl'):
          warning(flavor, name, f'Url does not point to a .wsl file: {url["Url"]}')
 
+     tar_format = None
      if url['Url'].startswith('file://'):
          with open(url['Url'].replace('file:///', '').replace('file://', ''), 'rb') as fd:
             while True:
@@ -414,6 +417,9 @@ def read_url(flavor: str, name: str, url: dict, elf_magic):
                     break
 
                 hash.update(e)
+
+                if tar_format is None:
+                    tar_format = MAGIC.from_buffer(e)
 
             fd.seek(0, 0)
             read_tar(flavor, name, fd, elf_magic)
@@ -425,6 +431,9 @@ def read_url(flavor: str, name: str, url: dict, elf_magic):
                 for e in response.iter_content(chunk_size=4096 * 4096):
                     file.write(e)
                     hash.update(e)
+
+                    if tar_format is None:
+                        tar_format = MAGIC.from_buffer(e)
 
                 file.seek(0, 0)
                 read_tar(flavor, name, file, elf_magic)
@@ -443,7 +452,11 @@ def read_url(flavor: str, name: str, url: dict, elf_magic):
          else:
              click.secho(f'Hash for {url["Url"]} matches ({expected_sha})', fg='green')
 
-
+     known_format = next((value for key, value in KNOWN_TAR_FORMATS.items() if re.match(key, tar_format)), None)
+     if known_format is None:
+        error(flavor, name, f'Unknown tar format: {tar_format}')
+     elif not known_format:
+        warning(flavor, name, f'Tar format not supported by WSL1: {tar_format}')
 
 def error(flavor: str, distribution: str, message: str):
     global errors
