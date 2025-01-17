@@ -4,6 +4,7 @@
         {
         "Name":"kali-linux",
         "FriendlyName":"Kali Linux Rolling",
+        "Default":true,
         "Amd64Url":{
             "Url":"https://image-wsl.kali.org/kali-2024.4/kali-linux-rolling-wsl-rootfs-amd64.wsl",
             "Sha256":"5478d3cf59515123c2138e41705eaf882e1b5dfc3e17713f6a7d677f9490f90d"
