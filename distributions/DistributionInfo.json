@@ -1,5 +1,20 @@
 {
-    "ModernDistributions": {},
+    "ModernDistributions": {
+    "kali":[
+        {
+        "Name":"kali-linux",
+        "FriendlyName":"Kali Linux Rolling",
+        "Amd64Url":{
+            "Url":"https://image-wsl.kali.org/kali-2024.4/kali-linux-rolling-wsl-rootfs-amd64.wsl",
+            "Sha256":"5478d3cf59515123c2138e41705eaf882e1b5dfc3e17713f6a7d677f9490f90d"
+            },
+        "Arm64Url":{
+            "Url":"https://image-wsl.kali.org/kali-2024.4/kali-linux-rolling-wsl-rootfs-arm64.wsl",
+            "Sha256":"6f88384c1c106aa49488e62b9b84fe00c01d52b0efb7668d70c25ceddc6542c1"
+            }
+        }
+    ]
+    },
     "Default": "Ubuntu",
     "Distributions": [
         {
