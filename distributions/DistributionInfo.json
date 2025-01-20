@@ -1,5 +1,17 @@
 {
-    "ModernDistributions": {},
+    "ModernDistributions": {
+        "Arch-Linux-Unofficial": [
+            {
+                "Name": "Arch-Linux-Unofficial",
+                "Default": true,
+                "FriendlyName": "Arch Linux Unofficial Rolling Release",
+                "Amd64Url": {
+                    "Url": "https://github.com/DevelopersCommunity/archlinux-wsl/releases/download/20250112.0.297543/archlinux.wsl",
+                    "Sha256": "2ed437c3813858976fc4bfcde245ca0ecf412c524abfc7d4c6a5a94d1972fdd0"
+                }
+            }
+        ]
+    },
     "Default": "Ubuntu",
     "Distributions": [
         {
