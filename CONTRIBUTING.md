@@ -206,7 +206,7 @@ reg.exe add HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl /v 
 
 Then reproduce the issue, and let the machine crash and reboot.
 
-After reboot, the kernel dump will be in `%SystemRoot%\MEMORY.DMP` (unless this path has been overriden in the advanced system settings).
+After reboot, the kernel dump will be in `%SystemRoot%\MEMORY.DMP` (unless this path has been overridden in the advanced system settings).
 
 Please send this dump to: secure@microsoft.com .
 Make sure that the email body contains:
@@ -271,6 +271,6 @@ To collect time travel debugging traces:
 
 9) Once the trace is done collecting, click `Stop Debugging` and close Windbg
 
-10) Go to the folder where the trace was colleced, and locate the .run file. It should look like: `wslservice*.run`
+10) Go to the folder where the trace was collected, and locate the .run file. It should look like: `wslservice*.run`
 
 11) Share that file on the issue
