@@ -19,6 +19,26 @@
                     "Sha256": "0x81d1abf44ab438e5333ff7da09baa101a7c9b64873bb37cfeaf5bf5f0cbed57a"
                 }
             }
+        ],
+        "SUSE": [
+            {
+                "Name": "SUSE-Linux-Enterprise-15-SP5",
+                "FriendlyName": "SUSE Linux Enterprise 15 SP5",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250123.0/SUSE-Linux-Enterprise-15-SP5-15.5.x86_64-11.1-Build11.1.wsl",
+                    "Sha256": "0x64ae138a1cdaff5fdc578d8ea92176d2939146932ca7ce2bff685d974ec34932"
+                }
+            },
+            {
+                "Name": "SUSE-Linux-Enterprise-15-SP6",
+                "FriendlyName": "SUSE Linux Enterprise 15 SP6",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250123.0/SUSE-Linux-Enterprise-15-SP6-15.6.x86_64-11.1-Build11.1.wsl",
+                    "Sha256": "0x8edc5a47003d06e72b17d35d169c5b8b0e7e4285d59110c4f3c73863fb578136"
+                }
+            }
         ]
     },
     "Default": "Ubuntu",
