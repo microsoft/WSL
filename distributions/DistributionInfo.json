@@ -6,8 +6,8 @@
                 "Default": true,
                 "FriendlyName": "Arch Linux Unofficial Rolling Release",
                 "Amd64Url": {
-                    "Url": "https://github.com/DevelopersCommunity/archlinux-wsl/releases/download/20250112.0.297543/archlinux.wsl",
-                    "Sha256": "2ed437c3813858976fc4bfcde245ca0ecf412c524abfc7d4c6a5a94d1972fdd0"
+                    "Url": "https://github.com/DevelopersCommunity/archlinux-wsl/releases/download/20250119.0.299327/archlinux-base-20250119.0.299327.wsl",
+                    "Sha256": "32015cfcb2539f2d4cfd9ed4ffff8143a8449d4c9bcfb9d40ba7150380a79e3c"
                 }
             }
         ]
