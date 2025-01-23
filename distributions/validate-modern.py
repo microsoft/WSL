@@ -209,7 +209,10 @@ def read_systemd_enabled_units(flavor: str, name: str, tar) -> dict:
         if not info.issym():
             return unit_path
         else:
-            return info.linkpath
+            if info.linkpath.startswith('/'):
+                return get_tar_file(tar, linux_real_path(info.linkpath), follow_symlink=True)[1]
+            else:
+                return get_tar_file(tar, linux_real_path(os.path.dirname(unit_path) + '/' + info.linkpath), follow_symlink=True)[1]
 
     def list_directory(path: str):
         files = []
@@ -221,6 +224,17 @@ def read_systemd_enabled_units(flavor: str, name: str, tar) -> dict:
 
         return files
 
+    def is_dev_null(path: str) -> bool:
+        return path == './dev/null' or path == '/dev/null'
+
+    def is_masked(unit: str):
+        try:
+            target = link_target(f'/etc/systemd/system/{unit}')
+        except KeyError:
+            return False # No symlink found, unit is not masked
+
+        return is_dev_null(target)
+
     units = {}
     for config_dir in config_dirs:
         targets = [e for e in list_directory(config_dir) if e.endswith('.target.wants')]
@@ -228,9 +242,10 @@ def read_systemd_enabled_units(flavor: str, name: str, tar) -> dict:
         for target in targets:
             for e in list_directory(f'{config_dir}/{target}'):
                 fullpath = f'{config_dir}/{target}/{e}'
+
                 unit_target = link_target(fullpath)
 
-                if unit_target != '/dev/null':
+                if is_dev_null(unit_target) and not is_masked(e):
                     units[e] = fullpath
 
     return units
