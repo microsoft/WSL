@@ -18,7 +18,7 @@ MAGIC = magic.Magic()
 X64_ELF_MAGIC = re.compile('^ELF 64-bit.* x86-64, version 1')
 ARM64_ELF_MAGIC = re.compile('^ELF 64-bit.* ARM aarch64, version 1')
 
-KNOWN_TAR_FORMATS = {'^XZ compressed data.*': False, '^gzip compressed data.*': True}
+KNOWN_TAR_FORMATS = {'^XZ compressed data.*': True, '^gzip compressed data.*': True}
 
 DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-networkd.service',
