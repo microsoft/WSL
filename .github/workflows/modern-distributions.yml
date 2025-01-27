@@ -1,22 +1,21 @@
 name: Validate tar based distributions
 
 on:
-  pull_request:
+  pull_request_target:
     paths: ['distributions/**']
-
-permissions:
-  pull-requests: write
 
 jobs:
   check:
     name: Validate tar based distributions changes
     runs-on: ubuntu-latest
+    permissions:
+        pull-requests: write
     steps:
         - name: Checkout repo
           uses: actions/checkout@v4
-          with:           
+          with:
+            ref: refs/pull/${{ github.event.pull_request.number }}/merge
             fetch-depth: 0
-
 
         - name: Install pip packages
           run: pip install -r distributions/requirements.txt

@@ -245,7 +245,7 @@ rules:
         task: FallbackError
         field2: {regex: ".*vmchipset\\.dll.*80090006.*"} #0x80090006 = NTE_BAD_SIGNATURE 
       set:
-        name: hyper-v-firmare-expired
+        name: hyper-v-firmware-expired
         capture:
           field2: signature-error
 
@@ -327,7 +327,7 @@ actions:
         
     - when: 
         condition: {or:  ['ext4-error', 'ext4-mount-error']}
-        user_message: 'The logs shows that a disk mount error occured. Try to [follow these repair instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error) and see if that solves the issue.'
+        user_message: 'The logs shows that a disk mount error occurred. Try to [follow these repair instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-repair-a-vhd-mounting-error) and see if that solves the issue.'
         debug_message: 'Found evidence of ext4 error: $error'
         tag: 'needs-author-feedback'
         skip_similar_issues: true
@@ -390,7 +390,7 @@ actions:
 
     - when:
         condition:
-          and: ['hyper-v-firmare-expired', 'vm-failed-to-start']
+          and: ['hyper-v-firmware-expired', 'vm-failed-to-start']
         tag: 'needs-author-feedback'
         debug_message: 'Found evidence of hyper-v firmware expiration: $signature-error'
         user_message: |

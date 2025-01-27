@@ -18,6 +18,8 @@ MAGIC = magic.Magic()
 X64_ELF_MAGIC = re.compile('^ELF 64-bit.* x86-64, version 1')
 ARM64_ELF_MAGIC = re.compile('^ELF 64-bit.* ARM aarch64, version 1')
 
+KNOWN_TAR_FORMATS = {'^XZ compressed data.*': True, '^gzip compressed data.*': True}
+
 DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-networkd.service',
                             'systemd-tmpfiles-setup.service',
@@ -207,7 +209,10 @@ def read_systemd_enabled_units(flavor: str, name: str, tar) -> dict:
         if not info.issym():
             return unit_path
         else:
-            return info.linkpath
+            if info.linkpath.startswith('/'):
+                return get_tar_file(tar, linux_real_path(info.linkpath), follow_symlink=True)[1]
+            else:
+                return get_tar_file(tar, linux_real_path(os.path.dirname(unit_path) + '/' + info.linkpath), follow_symlink=True)[1]
 
     def list_directory(path: str):
         files = []
@@ -219,6 +224,17 @@ def read_systemd_enabled_units(flavor: str, name: str, tar) -> dict:
 
         return files
 
+    def is_dev_null(path: str) -> bool:
+        return path == './dev/null' or path == '/dev/null'
+
+    def is_masked(unit: str):
+        try:
+            target = link_target(f'/etc/systemd/system/{unit}')
+        except KeyError:
+            return False # No symlink found, unit is not masked
+
+        return is_dev_null(target)
+
     units = {}
     for config_dir in config_dirs:
         targets = [e for e in list_directory(config_dir) if e.endswith('.target.wants')]
@@ -226,9 +242,10 @@ def read_systemd_enabled_units(flavor: str, name: str, tar) -> dict:
         for target in targets:
             for e in list_directory(f'{config_dir}/{target}'):
                 fullpath = f'{config_dir}/{target}/{e}'
+
                 unit_target = link_target(fullpath)
 
-                if unit_target != '/dev/null':
+                if is_dev_null(unit_target) and not is_masked(e):
                     units[e] = fullpath
 
     return units
@@ -259,7 +276,7 @@ def get_tar_file(tar, path: str, follow_symlink=False, symlink_depth=10):
         print(f'Warning: Exceeded maximum symlink depth when reading: {path}')
         return None, None
 
-    # Tar members can be formated as /{path}, {path}, or ./{path}
+    # Tar members can be formatted as /{path}, {path}, or ./{path}
     if path.startswith('/'):
         paths = [path, '.' + path, path[1:]]
     elif path.startswith('./'):
@@ -403,7 +420,10 @@ def read_tar(flavor: str, name: str, file, elf_magic: str):
 
 def read_url(flavor: str, name: str, url: dict, elf_magic):
      hash = hashlib.sha256()
+     if not url['Url'].endswith('.wsl'):
+         warning(flavor, name, f'Url does not point to a .wsl file: {url["Url"]}')
 
+     tar_format = None
      if url['Url'].startswith('file://'):
          with open(url['Url'].replace('file:///', '').replace('file://', ''), 'rb') as fd:
             while True:
@@ -412,6 +432,9 @@ def read_url(flavor: str, name: str, url: dict, elf_magic):
                     break
 
                 hash.update(e)
+
+                if tar_format is None:
+                    tar_format = MAGIC.from_buffer(e)
 
             fd.seek(0, 0)
             read_tar(flavor, name, fd, elf_magic)
@@ -423,6 +446,9 @@ def read_url(flavor: str, name: str, url: dict, elf_magic):
                 for e in response.iter_content(chunk_size=4096 * 4096):
                     file.write(e)
                     hash.update(e)
+
+                    if tar_format is None:
+                        tar_format = MAGIC.from_buffer(e)
 
                 file.seek(0, 0)
                 read_tar(flavor, name, file, elf_magic)
@@ -441,7 +467,11 @@ def read_url(flavor: str, name: str, url: dict, elf_magic):
          else:
              click.secho(f'Hash for {url["Url"]} matches ({expected_sha})', fg='green')
 
-
+     known_format = next((value for key, value in KNOWN_TAR_FORMATS.items() if re.match(key, tar_format)), None)
+     if known_format is None:
+        error(flavor, name, f'Unknown tar format: {tar_format}')
+     elif not known_format:
+        warning(flavor, name, f'Tar format not supported by WSL1: {tar_format}')
 
 def error(flavor: str, distribution: str, message: str):
     global errors
