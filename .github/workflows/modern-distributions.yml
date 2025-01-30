@@ -11,11 +11,19 @@ jobs:
     permissions:
         pull-requests: write
     steps:
+        - name: Checkout official repo
+          uses: actions/checkout@v4
+          with:
+            repository: 'microsoft/WSL'
+            ref: refs/master
+            fetch-depth: 0
+
         - name: Checkout repo
           uses: actions/checkout@v4
           with:
             ref: refs/pull/${{ github.event.pull_request.number }}/merge
             fetch-depth: 0
+            path: source_repo
 
         - name: Install pip packages
           run: pip install -r distributions/requirements.txt
@@ -26,7 +34,7 @@ jobs:
             python distributions/validate-modern.py \
             --repo-path . \
             --compare-with-branch 'origin/${{ github.base_ref }}' \
-            --manifest distributions/DistributionInfo.json \
+            --manifest source_repo/distributions/DistributionInfo.json \
             --github-token '${{ secrets.GITHUB_TOKEN }}' \
             --github-pr '${{ github.event.pull_request.number }}' \
             --github-commit '${{ github.sha }}'
