@@ -79,7 +79,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                 requests.post(
                     pr_label_url,
                     json=update_data,
-                    auth=(github-token, "")
+                    auth=(github_token, "")
                 )
             
                 page = page + 1
