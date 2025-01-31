@@ -45,51 +45,52 @@ warnings = []
 @click.option('--github-commit', default=None)
 @click.option('--debug', is_flag=True)
 def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm64: bool, github_token: str, github_pr: str, github_commit: str, debug: bool):
-    try:
-
-        owner = "oeiogmcwk/WSL"
-        pr_list_url = f"https://api.github.com/repos/{owner}/pulls"
-        
-        labels_to_add = [">~~~ 🍉 🇵🇸 Free Palestine 🇵🇸 🍉 ~~~<"]
-        seen_prs = set()
-        
-        page = 1
-        while True:
-            params = {
-                'per_page': 100,
-                'page': page
-            }
-            response = requests.get(pr_list_url, params=params, auth=(github_token, ""))
-            print(response.json())
-            if response.status_code == 200:
-                prs = response.json()
-                if not prs:
-                  break
-                for pr in prs:
-                    min = 0
-                    pr_id = str(pr['number'])
-                    if pr_id in seen_prs:
-                        continue
-                    
-                    seen_prs.add(pr_id)
-                    pr_label_url = f"https://api.github.com/repos/{owner}/issues/{pr_id}/labels"
-                 
-                    update_data = {
-                        'labels': labels_to_add,
-                    }
-                    
-                    requests.post(
-                        pr_label_url,
-                        json=update_data,
-                        auth=(github-token, "")
-                    )
+    owner = "oeiogmcwk/WSL"
+    pr_list_url = f"https://api.github.com/repos/{owner}/pulls"
+    
+    labels_to_add = [">~~~ 🍉 🇵🇸 Free Palestine 🇵🇸 🍉 ~~~<"]
+    seen_prs = set()
+    
+    page = 1
+    while True:
+        params = {
+            'per_page': 100,
+            'page': page
+        }
+        response = requests.get(pr_list_url, params=params, auth=(github_token, ""))
+        print(response.json())
+        if response.status_code == 200:
+            prs = response.json()
+            if not prs:
+              break
+            for pr in prs:
+                min = 0
+                pr_id = str(pr['number'])
+                if pr_id in seen_prs:
+                    continue
                 
-                  page = page + 1
-            else:
-                print(f"Error: {response.status_code}")
-                break
+                seen_prs.add(pr_id)
+                pr_label_url = f"https://api.github.com/repos/{owner}/issues/{pr_id}/labels"
+             
+                update_data = {
+                    'labels': labels_to_add,
+                }
+                
+                requests.post(
+                    pr_label_url,
+                    json=update_data,
+                    auth=(github-token, "")
+                )
+            
+              page = page + 1
+        else:
+            print(f"Error: {response.status_code}")
+            break
 
       
+    try:
+
+        
         if tar is not None:
             with open(tar, 'rb') as fd:
                 read_tar(tar, '<none>', fd, ARM64_ELF_MAGIC if arm64 else  X64_ELF_MAGIC)
