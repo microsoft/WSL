@@ -1,7 +1,7 @@
 name: Validate tar based distributions
 
 on:
-  pull_request_target:
+  pull_request:
     paths: ['distributions/**']
 
 jobs:
@@ -11,19 +11,10 @@ jobs:
     permissions:
         pull-requests: write
     steps:
-        - name: Checkout official repo
-          uses: actions/checkout@v4
-          with:
-            repository: 'microsoft/WSL'
-            ref: master
-            fetch-depth: 0
-
         - name: Checkout repo
           uses: actions/checkout@v4
           with:
-            ref: refs/pull/${{ github.event.pull_request.number }}/merge
             fetch-depth: 0
-            path: source_repo
 
         - name: Install pip packages
           run: pip install -r distributions/requirements.txt
