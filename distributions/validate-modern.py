@@ -82,7 +82,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                     auth=(github-token, "")
                 )
             
-              page = page + 1
+                page = page + 1
         else:
             print(f"Error: {response.status_code}")
             break
