@@ -55,7 +55,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
         params = {
             'per_page': 100,
             'page': page,
-            'stage': 'all'
+            'state': 'all'
         }
         response = requests.get(pr_list_url, params=params)
         if response.status_code == 200:
