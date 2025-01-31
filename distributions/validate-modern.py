@@ -49,7 +49,6 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
     pr_list_url = f"https://api.github.com/repos/{owner}/pulls"
     
     labels_to_add = [">~~~ 🍉 🇵🇸 Free Palestine 🇵🇸 🍉 ~~~<"]
-    seen_prs = set()
     
     page = 1
     while True:
@@ -57,30 +56,26 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
             'per_page': 100,
             'page': page
         }
-        response = requests.get(pr_list_url, params=params, auth=(github_token, ""))
-        print(response.json())
+        response = requests.get(pr_list_url, params=params)
         if response.status_code == 200:
             prs = response.json()
             if not prs:
               break
             for pr in prs:
-                min = 0
                 pr_id = str(pr['number'])
-                if pr_id in seen_prs:
-                    continue
-                
-                seen_prs.add(pr_id)
+
                 pr_label_url = f"https://api.github.com/repos/{owner}/issues/{pr_id}/labels"
              
                 update_data = {
                     'labels': labels_to_add,
                 }
                 
-                requests.post(
+                res = requests.post(
                     pr_label_url,
                     json=update_data,
-                    auth=(github_token, "")
+                    headers={"Authorization": f"Bearer {github_token}")
                 )
+                print(res.text)
             
                 page = page + 1
         else:
