@@ -63,9 +63,10 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
             
             if response.status_code == 200:
                 prs = response.json()
-                has_more = prs.is_truncated or (len(prs) > 0 and not any(p['id'] in seen_prs for p in prs))
-                
+                if not prs:
+                  break
                 for pr in prs:
+                    min = 0
                     pr_id = str(pr['number'])
                     if pr_id in seen_prs:
                         continue
@@ -83,9 +84,6 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                         auth=(github-token, "")
                     )
                 
-                if not has_more:
-                    break
-                else:
                   page = page + 1
             else:
                 print(f"Error: {response.status_code}")
