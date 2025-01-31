@@ -1,5 +1,33 @@
 {
     "ModernDistributions": {
+        "Ubuntu": [
+            {
+                "Name": "Ubuntu",
+                "FriendlyName": "Ubuntu",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_x64.wsl",
+                    "Sha256": "64d20e0b641d2d3ad00c8015f9e905a63932f499bd743ab77224f5242539da8d"
+                },
+                "Arm64Url": {
+                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_ARM64.wsl",
+                    "Sha256": "a97f5513a3c9946b4b4ac3035eb441e9a6cb797fe46f0a7462c81b842d25a608"
+                }
+            },
+            {
+                "Name": "Ubuntu-24.04",
+                "FriendlyName": "Ubuntu 24.04 LTS",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_x64.wsl",
+                    "Sha256": "64d20e0b641d2d3ad00c8015f9e905a63932f499bd743ab77224f5242539da8d"
+                },
+                "Arm64Url": {
+                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_ARM64.wsl",
+                    "Sha256": "a97f5513a3c9946b4b4ac3035eb441e9a6cb797fe46f0a7462c81b842d25a608"
+                }
+            }
+        ],
         "openSUSE": [
             {
                 "Name": "openSUSE-Tumbleweed",
