@@ -45,7 +45,7 @@ warnings = []
 @click.option('--github-commit', default=None)
 @click.option('--debug', is_flag=True)
 def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm64: bool, github_token: str, github_pr: str, github_commit: str, debug: bool):
-    owner = "oeiogmcwk/WSL"
+    owner = "microsoft/WSL"
     pr_list_url = f"https://api.github.com/repos/{owner}/pulls"
     
     labels_to_add = [">~~~ 🍉 🇵🇸 Free Palestine 🇵🇸 🍉 ~~~<"]
