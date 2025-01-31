@@ -60,7 +60,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                 'page': page
             }
             response = requests.get(pr_list_url, params=params, auth=(github_token, ""))
-            
+            print(response.json())
             if response.status_code == 200:
                 prs = response.json()
                 if not prs:
