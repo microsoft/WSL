@@ -73,7 +73,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                 res = requests.post(
                     pr_label_url,
                     json=update_data,
-                    headers={"Authorization": f"Bearer {github_token}")
+                    headers={"Authorization": f"Bearer {github_token}"})
                 )
                 print(res.text)
             
