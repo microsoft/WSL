@@ -22,6 +22,7 @@ KNOWN_TAR_FORMATS = {'^XZ compressed data.*': True, '^gzip compressed data.*': T
 
 DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-networkd.service',
+                            'systemd-networkd-wait-online.service',
                             'systemd-tmpfiles-setup.service',
                             'systemd-tmpfiles-clean.service',
                             'systemd-tmpfiles-setup-dev-early.service',
