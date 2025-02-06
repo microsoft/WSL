@@ -126,19 +126,10 @@ mkdir -p $folder
 
 $logProfile = "$folder/wsl_networking.wprp"
 $networkingBashScript = "$folder/networking.sh"
-$superUser = "root" # user name of the super user.
 
 # Detect the super user first.
 # Actually it's not definite that the super user is named "root". Instead, a user with uid=0 is what we are looking for. See #11693.
-$_passwd = wsl -- sh -c "getent passwd"
-$_lines = $_passwd -split "`n"
-foreach ($_l in $_lines) { 
-    $_col = $_l -split ":"
-    if ($_col[2] -eq "0") {  
-        $superUser = $_col[0] 
-        break
-    }
-}
+$superUser = wsl -- id -nu 0  # user name of the super user.
 
 # Copy/Download supporting files
 if (Test-Path "$PSScriptRoot/wsl_networking.wprp")
