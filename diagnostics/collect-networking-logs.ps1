@@ -129,7 +129,7 @@ $networkingBashScript = "$folder/networking.sh"
 
 # Detect the super user first.
 # Actually it's not definite that the super user is named "root". Instead, a user with uid=0 is what we are looking for. See #11693.
-$superUser = wsl -- id -nu 0  # user name of the super user.
+$superUser = & wsl.exe -- id -nu 0  # user name of the super user.
 
 # Copy/Download supporting files
 if (Test-Path "$PSScriptRoot/wsl_networking.wprp")
