@@ -36,6 +36,5 @@ jobs:
     - uses: ./.github/actions/triage
       with: 
         similar_issues_text: "${{ needs.getSimilarIssues.outputs.job_status == 'success' && needs.getSimilarIssues.outputs.message || '' }}"
-        else
         issue: "${{ github.event.issue.number }}"
         token: ${{ secrets.GITHUB_TOKEN }}
