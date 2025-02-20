@@ -26,6 +26,7 @@ jobs:
     name: Run wti
     needs: getSimilarIssues
     runs-on: windows-2022
+    if: 'always()' # Run even if getSimilarIssues fails
     permissions:
       issues: write
     steps: 
@@ -34,6 +35,6 @@ jobs:
     
     - uses: ./.github/actions/triage
       with: 
-        similar_issues_text: "${{ needs.getSimilarIssues.outputs.message }}"
+        similar_issues_text: "${{ needs.getSimilarIssues.outputs.job_status == 'success' && needs.getSimilarIssues.outputs.message || '' }}"
         issue: "${{ github.event.issue.number }}"
         token: ${{ secrets.GITHUB_TOKEN }}
