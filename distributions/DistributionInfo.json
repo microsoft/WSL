@@ -68,18 +68,33 @@
                 }
             }
         ],
-        "kali":[
+        "kali": [
             {
-                "Name":"kali-linux",
-                "FriendlyName":"Kali Linux Rolling",
-                "Default":true,
-                "Amd64Url":{
-                    "Url":"https://kali.download/wsl-images/current/kali-linux-2024.4-wsl-rootfs-amd64.wsl",
-                    "Sha256":"fc1449607f616ac737bd8b1245b080e5eba50f3452a7cfc8bb96607327128de3"
+                "Name": "kali-linux",
+                "FriendlyName": "Kali Linux Rolling",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://kali.download/wsl-images/current/kali-linux-2024.4-wsl-rootfs-amd64.wsl",
+                    "Sha256": "fc1449607f616ac737bd8b1245b080e5eba50f3452a7cfc8bb96607327128de3"
                 },
-                "Arm64Url":{
-                    "Url":"https://kali.download/wsl-images/current/kali-linux-2024.4-wsl-rootfs-arm64.wsl",
-                    "Sha256":"7a389cbf3fd6ebab80d5a3a1dbf3a9e6484921f8197ce53e11aa186873c37a34"
+                "Arm64Url": {
+                    "Url": "https://kali.download/wsl-images/current/kali-linux-2024.4-wsl-rootfs-arm64.wsl",
+                    "Sha256": "7a389cbf3fd6ebab80d5a3a1dbf3a9e6484921f8197ce53e11aa186873c37a34"
+                }
+            }
+        ],
+        "Debian": [
+            {
+                "Name": "Debian",
+                "FriendlyName": "Debian GNU/Linux",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/7130915/artifacts/raw/Debian_WSL_AMD64_v1.20.0.0.wsl",
+                    "Sha256": "51a0c7af534929305238bd356a217b371562e6a0fcdfab65c7e49fb8252e2f23"
+                },
+                "Arm64Url": {
+                    "Url": "https://salsa.debian.org/debian/WSL/-/jobs/7130915/artifacts/raw/Debian_WSL_ARM64_v1.20.0.0.wsl",
+                    "Sha256": "ceb883ce1c016f7bc01c2f58dfa3224684d49efb0d1b2a216ce889cac2738bc5"
                 }
             }
         ]
