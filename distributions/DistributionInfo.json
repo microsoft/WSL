@@ -6,12 +6,12 @@
                 "FriendlyName": "Ubuntu",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_x64.wsl",
-                    "Sha256": "64d20e0b641d2d3ad00c8015f9e905a63932f499bd743ab77224f5242539da8d"
+                    "Url": "https://releases.ubuntu.com/noble/ubuntu-24.04.2-wsl-amd64.wsl",
+                    "Sha256": "5d1eea52103166f1c460dc012ed325c6eb31d2ce16ef6a00ffdfda8e99e12f43"
                 },
                 "Arm64Url": {
-                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_ARM64.wsl",
-                    "Sha256": "a97f5513a3c9946b4b4ac3035eb441e9a6cb797fe46f0a7462c81b842d25a608"
+                    "Url": "https://cdimages.ubuntu.com/releases/24.04.2/release/ubuntu-24.04.2-wsl-arm64.wsl",
+                    "Sha256": "75e6660229fabb38a6fdc1c94eec7d834a565fa58a64b7534e540da5319b2576"
                 }
             },
             {
@@ -19,12 +19,12 @@
                 "FriendlyName": "Ubuntu 24.04 LTS",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_x64.wsl",
-                    "Sha256": "64d20e0b641d2d3ad00c8015f9e905a63932f499bd743ab77224f5242539da8d"
+                    "Url": "https://releases.ubuntu.com/noble/ubuntu-24.04.2-wsl-amd64.wsl",
+                    "Sha256": "5d1eea52103166f1c460dc012ed325c6eb31d2ce16ef6a00ffdfda8e99e12f43"
                 },
                 "Arm64Url": {
-                    "Url": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu2404-250130_ARM64.wsl",
-                    "Sha256": "a97f5513a3c9946b4b4ac3035eb441e9a6cb797fe46f0a7462c81b842d25a608"
+                    "Url": "https://cdimages.ubuntu.com/releases/24.04.2/release/ubuntu-24.04.2-wsl-arm64.wsl",
+                    "Sha256": "75e6660229fabb38a6fdc1c94eec7d834a565fa58a64b7534e540da5319b2576"
                 }
             }
         ],
