@@ -3,7 +3,7 @@
 # This script downloads and installs the latest version of the WSL MSI package
 
 # Get current language code
-$chcp_num = (chcp) -replace '\D+\(\d+)','$1'
+$chcp_num = (chcp) -replace '[^\d]+(\d+).*','$1'
 
 # Set language to english
 chcp 437
