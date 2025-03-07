@@ -97,6 +97,47 @@
                     "Sha256": "ceb883ce1c016f7bc01c2f58dfa3224684d49efb0d1b2a216ce889cac2738bc5"
                 }
             }
+        ],
+        "AlmaLinux": [
+            {
+                "Name": "AlmaLinux-8",
+                "FriendlyName": "AlmaLinux OS 8",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v8.10.20250307.0/AlmaLinux-8.10_x64_20250307.0.wsl",
+                    "Sha256": "a25b758445d309550dc9bb71dcb87757e378eb2861e78e8817efb4ed9f8ff09e"
+                },
+                "Arm64Url": {
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v8.10.20250307.0/AlmaLinux-8.10_ARM64_20250307.0.wsl",
+                    "Sha256": "0d692a6d23164f91727e2fe57c6bf6ca7162fa9aba0d31abafba48ffad616771"
+                }
+            },
+            {
+                "Name": "AlmaLinux-9",
+                "FriendlyName": "AlmaLinux OS 9",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.5.20250307.0/AlmaLinux-9.5_x64_20250307.0.wsl",
+                    "Sha256": "99a28c9340a5bee943758191391bee8a16a0b4c4360ec0b743f6e23249c35cd2"
+                },
+                "Arm64Url": {
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.5.20250307.0/AlmaLinux-9.5_ARM64_20250307.0.wsl",
+                    "Sha256": "790ff4d6026053cea01396b7238a96f05eeb76a004396bc7cd91fe73011bdb19"
+                }
+            },
+            {
+                "Name": "AlmaLinux-Kitten-10",
+                "FriendlyName": "AlmaLinux OS Kitten 10",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20250307.0/AlmaLinux-Kitten-10_x64_20250307.0.wsl",
+                    "Sha256": "53ffba9cd052921da0f67e13f91e16c1bacdda6f96b67a0e4900e01ce965c949"
+                },
+                "Arm64Url": {
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20250307.0/AlmaLinux-Kitten-10_ARM64_20250307.0.wsl",
+                    "Sha256": "9c5804fc58108a138f53ff111961e17217b1cf429f8e5c8365b52062b621e8e5"
+                }
+            }
         ]
     },
     "Default": "Ubuntu",
