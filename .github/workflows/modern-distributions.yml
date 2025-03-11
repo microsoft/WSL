@@ -8,8 +8,6 @@ jobs:
   check:
     name: Validate tar based distributions changes
     runs-on: ubuntu-latest
-    permissions:
-        pull-requests: write
     steps:
         - name: Checkout repo
           uses: actions/checkout@v4
@@ -26,7 +24,5 @@ jobs:
             --repo-path . \
             --compare-with-branch 'origin/${{ github.base_ref }}' \
             --manifest distributions/DistributionInfo.json \
-            --github-token '${{ secrets.GITHUB_TOKEN }}' \
-            --github-pr '${{ github.event.pull_request.number }}' \
-            --github-commit '${{ github.sha }}'
+
           shell: bash

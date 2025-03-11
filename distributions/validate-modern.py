@@ -41,11 +41,8 @@ warnings = []
 @click.option('--compare-with-branch')
 @click.option('--repo-path', '..')
 @click.option('--arm64', is_flag=True)
-@click.option('--github-token', default=None)
-@click.option('--github-pr', default=None, type=int)
-@click.option('--github-commit', default=None)
 @click.option('--debug', is_flag=True)
-def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm64: bool, github_token: str, github_pr: str, github_commit: str, debug: bool):
+def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm64: bool, debug: bool):
     try:
         if tar is not None:
             with open(tar, 'rb') as fd:
@@ -58,7 +55,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                 manifest_content = json.loads(fd.read())
 
             baseline_manifest = None
-            if compare_with_branch is not None:
+            if False and compare_with_branch is not None:
                 repo = git.Repo(repo_path)
                 baseline_json = repo.commit(compare_with_branch).tree / 'distributions/DistributionInfo.json'
                 baseline_manifest = json.load(baseline_json.data_stream).get('ModernDistributions', {})
@@ -113,10 +110,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                 if default_entries != 1:
                     error(flavor, None, 'Found no default distribution' if default_entries == 0 else 'Found multiple default distributions')
 
-        if github_pr is not None:
-            assert github_token is not None and github_commit is not None and manifest is not None
-
-            report_status_on_pr(github_pr, github_token, github_commit, manifest)
+        report_status_on_pr(manifest)
 
     except:
         if debug:
@@ -127,10 +121,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
         else:
             raise
 
-def report_status_on_pr(pr: int, github_token: str, github_commit: str, manifest: str):
-    github = Github(github_token)
-    repo = github.get_repo('microsoft/WSL')
-
+def report_status_on_pr(manifest: str):
     def format_list(entries: list) -> str:
         output = '\n'
 
@@ -139,19 +130,13 @@ def report_status_on_pr(pr: int, github_token: str, github_commit: str, manifest
 
         return output + '\n'
 
-    body = 'Thank you for your contribution to WSL.\n'
     if errors:
-        body += f'**The following fatal errors have been found in this pull request:** {format_list(errors)}\n'
-    else:
-        body += 'No fatal errors have been found.\n'
+        text = f'The following fatal errors have been found in this pull request: {format_list(errors)}\n'
+        print(f'::error file={manifest},::{text}')
 
     if warnings:
-        body += f'**The following suggestions have been found in this pull request:** {format_list(warnings)}\n'
-    else:
-        body += 'No suggestions have been found.\n'
-
-    repo.get_pull(pr).create_review(body=body, commit=repo.get_commit(github_commit))
-
+        text = f'The following suggestions have been found in this pull request: {format_list(warnings)}\n'
+        print(f'::warning file={manifest},::{text}')
 
 def read_config_keys(config: configparser.ConfigParser) -> dict:
     keys = {}
