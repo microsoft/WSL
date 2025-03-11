@@ -146,7 +146,7 @@ def report_status_on_pr(manifest: str):
         output = ''
         for e in entries:
             output += f'\n* {e}'
-            
+
         return output
 
     for line, text in errors.items():
