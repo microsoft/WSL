@@ -463,10 +463,10 @@ def read_url(node, url: dict, elf_magic):
 
 def error(node, message: str):
     global errors
-    
+
     line = jsoncfg.node_location(node).line
     click.secho(f'Error on line {line}: {message}', fg='red')
-    
+
     errors[line] = errors.get(line, []) + [message]
 
 def warning(node, message: str):
