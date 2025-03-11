@@ -132,11 +132,11 @@ def report_status_on_pr(manifest: str):
 
     if errors:
         text = f'The following fatal errors have been found in this pull request: {format_list(errors)}\n'
-        print(f'::error file={manifest},::{text}')
+        print(f'::error file={manifest},::{text.replace('\n', '%0A')}')
 
     if warnings:
         text = f'The following suggestions have been found in this pull request: {format_list(warnings)}\n'
-        print(f'::warning file={manifest},::{text}')
+        print(f'::warning file={manifest},::{text.replace('\n', '%0A')}')
 
 def read_config_keys(config: configparser.ConfigParser) -> dict:
     keys = {}
