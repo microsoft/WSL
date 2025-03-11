@@ -1,5 +1,6 @@
 import click
 import jsoncfg
+from jsoncfg.config_classes import ConfigJSONObject, ConfigJSONArray, ConfigJSONScalar
 import requests
 import tempfile
 import hashlib
@@ -34,6 +35,24 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
 errors = {}
 warnings = {}
 
+def subset(inner, outer) -> bool:
+    for key, value in inner:
+        if key not in outer:
+            return True
+
+        if not node_equals(value, outer[key]):
+            return False
+
+    return True
+
+def node_equals(left, right):
+    if isinstance(left, ConfigJSONScalar):
+        return left() == right()
+
+    elif isinstance(left, ConfigJSONArray):
+        return len(left) == len(right) and all(node_equals(l, r) for l, r in zip(left, right))
+    else:
+        return subset(left, right) and subset(right, left)
 
 @click.command()
 @click.option('--manifest', default=None)
@@ -54,13 +73,13 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
             manifest_content = jsoncfg.load_config(manifest)
 
             baseline_manifest = None
-            if False and compare_with_branch is not None:
+            if compare_with_branch is not None:
                 repo = git.Repo(repo_path)
                 baseline_json = repo.commit(compare_with_branch).tree / 'distributions/DistributionInfo.json'
-                baseline_manifest = json.load(baseline_json.data_stream).get('ModernDistributions', {})
+                baseline_manifest = jsoncfg.loads_config(baseline_json.data_stream.read().decode())['ModernDistributions']
 
             for flavor, versions in manifest_content["ModernDistributions"]:
-                baseline_flavor = baseline_manifest.get(flavor, None) if baseline_manifest else None
+                baseline_flavor = baseline_manifest[flavor] if baseline_manifest and flavor in baseline_manifest else None
 
                 for e in versions:
                     name = e['Name']() if 'Name' in e else None
@@ -70,16 +89,16 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                         continue
 
                     if baseline_flavor is not None:
-                        baseline_version = next((entry for entry in baseline_flavor if entry['Name'] == name), None)
+                        baseline_version = next((entry for entry in baseline_flavor if entry['Name']() == name), None)
                         if baseline_version is None:
                             click.secho(f'Found new entry for flavor "{flavor}": {name}', fg='green', bold=True)
-                        elif baseline_version != e:
+                        elif not node_equals(baseline_version, e):
                             click.secho(f'Found changed entry for flavor "{flavor}": {name}', fg='green', bold=True)
                         else:
                             click.secho(f'Distribution entry "{flavor}/{name}" is unchanged, skipping')
                             continue
 
-                    click.secho(f'Reading information for distribution: {e["Name"]()}', bold=True)
+                    click.secho(f'Reading information for distribution: {name}', bold=True)
                     if 'FriendlyName' not in e:
                         error(e, 'Manifest entry is missing a "FriendlyName" entry')
 
@@ -106,7 +125,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
 
                 default_entries = sum(1 for e in versions if 'Default' in e and e['Default']())
                 if default_entries != 1:
-                    error(e, None, 'Found no default distribution' if default_entries == 0 else 'Found multiple default distributions')
+                    error(e, 'Found no default distribution' if default_entries == 0 else 'Found multiple default distributions')
 
         report_status_on_pr(manifest)
 
@@ -123,7 +142,7 @@ def report_status_on_pr(manifest: str):
     def format_list(entries: list) -> str:
         if len(entries) == 1:
             return entries[0]
-        
+
         output = ''
         for e in entries:
             output += f'\n* {e}'
