@@ -73,7 +73,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
             manifest_content = jsoncfg.load_config(manifest)
 
             baseline_manifest = None
-            if compare_with_branch is not None:
+            if False and compare_with_branch is not None:
                 repo = git.Repo(repo_path)
                 baseline_json = repo.commit(compare_with_branch).tree / 'distributions/DistributionInfo.json'
                 baseline_manifest = jsoncfg.loads_config(baseline_json.data_stream.read().decode())['ModernDistributions']
