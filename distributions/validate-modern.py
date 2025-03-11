@@ -79,7 +79,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                             click.secho(f'Distribution entry "{flavor}/{name}" is unchanged, skipping')
                             continue
 
-                    click.secho(f'Reading information for distribution: {e["Name"]}', bold=True)
+                    click.secho(f'Reading information for distribution: {e["Name"]()}', bold=True)
                     if 'FriendlyName' not in e:
                         error(e, 'Manifest entry is missing a "FriendlyName" entry')
 
@@ -89,11 +89,11 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                     url_found = False
 
                     if 'Amd64Url' in e:
-                       read_url(e, e['Amd64Url'], X64_ELF_MAGIC)
+                       read_url(e['Amd64Url'], X64_ELF_MAGIC)
                        url_found = True
 
                     if 'Arm64Url' in e:
-                       read_url(e, e['Arm64Url'], ARM64_ELF_MAGIC)
+                       read_url(e['Arm64Url'], ARM64_ELF_MAGIC)
                        url_found = True
 
                     if not url_found:
@@ -103,7 +103,6 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                     for key, value in e:
                         if key not in expectedKeys:
                             error(e, f'Unexpected key: "{key}"')
-
 
                 default_entries = sum(1 for e in versions if 'Default' in e and e['Default']())
                 if default_entries != 1:
@@ -404,12 +403,12 @@ def read_tar(node, file, elf_magic: str):
             if unit in DISCOURAGED_SYSTEM_UNITS:
                 warning(node, f'Found discouraged system unit: {path}')
 
-def read_url(node, url: dict, elf_magic):
+def read_url(url: dict, elf_magic):
      hash = hashlib.sha256()
      address = url['Url']()
 
      if not address.endswith('.wsl'):
-         warning(node, f'Url does not point to a .wsl file: {address}')
+         warning(url, f'Url does not point to a .wsl file: {address}')
 
      tar_format = None
      if address.startswith('file://'):
@@ -444,22 +443,22 @@ def read_url(node, url: dict, elf_magic):
 
      expected_sha = url['Sha256']() if 'Sha256' in url else None
      if expected_sha is None:
-         error(node, 'URL is missing "Sha256"')
+         error(url, 'URL is missing "Sha256"')
      else:
          if expected_sha.startswith('0x'):
              expected_sha = expected_sha[2:]
 
          sha = hash.digest()
          if bytes.fromhex(expected_sha) != sha:
-            error(node, f'URL {address} Sha256 does not match. Expected: {expected_sha}, actual: {hash.hexdigest()}')
+            error(url, f'URL {address} Sha256 does not match. Expected: {expected_sha}, actual: {hash.hexdigest()}')
          else:
              click.secho(f'Hash for {address} matches ({expected_sha})', fg='green')
 
      known_format = next((value for key, value in KNOWN_TAR_FORMATS.items() if re.match(key, tar_format)), None)
      if known_format is None:
-        error(node, f'Unknown tar format: {tar_format}')
+        error(url, f'Unknown tar format: {tar_format}')
      elif not known_format:
-        warning(node, f'Tar format not supported by WSL1: {tar_format}')
+        warning(url, f'Tar format not supported by WSL1: {tar_format}')
 
 def error(node, message: str):
     global errors
