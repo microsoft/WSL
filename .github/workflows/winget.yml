@@ -18,13 +18,15 @@ jobs:
           $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
           $wingetRelevantAssetx64 = $assets | Where-Object { $_.name -like '*x64.msi' } | Select-Object -First 1
           $wingetRelevantAssetARM64 = $assets | Where-Object { $_.name -like '*arm64.msi' } | Select-Object -First 1
+          $wingetRelevantAssetMSIX = $assets | Where-Object { $_.name -like '*.msixbundle' } | Select-Object -First 1
           
           $version = "${{ github.event.release.tag_name }}"
 
           $wingetx64URL = $wingetRelevantAssetx64.browser_download_url
           $wingetARM64URL = $wingetRelevantAssetARM64.browser_download_url
+          $wingetMSIXURL = $wingetRelevantAssetMSIX.browser_download_url
 
           $wingetPackage = "Microsoft.WSL"
 
           & curl.exe -JLO https://aka.ms/wingetcreate/latest
-          & .\wingetcreate.exe update $wingetPackage -s -v $version -u "$wingetx64URL|x64" "$wingetARM64URL|arm64" -t "${{ secrets.WINGET_TOKEN }}"
+          & .\wingetcreate.exe update $wingetPackage -s -v $version -u "$wingetx64URL|x64" "$wingetARM64URL|arm64" "$wingetMSIXURL|x64" "$wingetMSIXURL|arm64" -t "${{ secrets.WINGET_TOKEN }}"
