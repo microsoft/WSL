@@ -65,7 +65,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
     try:
         if tar is not None:
             with open(tar, 'rb') as fd:
-                read_tar(tar, '<none>', fd, ARM64_ELF_MAGIC if arm64 else  X64_ELF_MAGIC)
+                read_tar(None, fd, ARM64_ELF_MAGIC if arm64 else  X64_ELF_MAGIC)
         else:
             if manifest is None:
                 raise RuntimeError('Either --tar or --manifest is required')
@@ -127,7 +127,7 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
                 if default_entries != 1:
                     error(e, 'Found no default distribution' if default_entries == 0 else 'Found multiple default distributions')
 
-        report_status_on_pr(manifest)
+            report_status_on_pr(manifest)
 
     except:
         if debug:
@@ -480,20 +480,26 @@ def read_url(url: dict, elf_magic):
         warning(url, f'Tar format not supported by WSL1: {tar_format}')
 
 def error(node, message: str):
-    global errors
+    if node is None:
+        click.secho(f'Error: {message}', fg='red')
+    else:
+        global errors
 
-    line = jsoncfg.node_location(node).line
-    click.secho(f'Error on line {line}: {message}', fg='red')
+        line = jsoncfg.node_location(node).line
+        click.secho(f'Error on line {line}: {message}', fg='red')
 
-    errors[line] = errors.get(line, []) + [message]
+        errors[line] = errors.get(line, []) + [message]
 
 def warning(node, message: str):
-    global warnings
+    if node is None:
+        click.secho(f'Error: {message}', fg='red')
+    else:
+        global warnings
 
-    line = jsoncfg.node_location(node).line
-    click.secho(f'Warning on line {line}: {message}', fg='yellow')
+        line = jsoncfg.node_location(node).line
+        click.secho(f'Warning on line {line}: {message}', fg='yellow')
 
-    warnings[line] = warnings.get(line, []) + [message]
+        warnings[line] = warnings.get(line, []) + [message]
 
 if __name__ == "__main__":
     main()
