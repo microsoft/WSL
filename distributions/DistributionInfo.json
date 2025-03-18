@@ -138,6 +138,21 @@
                     "Sha256": "9c5804fc58108a138f53ff111961e17217b1cf429f8e5c8365b52062b621e8e5"
                 }
             }
+        ],
+        "Fedora": [
+            {
+                "Name": "Fedora-42-Beta",
+                "FriendlyName": "Fedora Linux 42 Beta",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/test/42_Beta/Container/x86_64/images/Fedora-WSL-Base-42_Beta-1.4.x86_64.tar.xz",
+                    "Sha256": "268c1bd353e05fa852c4c8e697b5143b5d4ae7567a9355524b8f04f579ac629e"
+                },
+                "Arm64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/test/42_Beta/Container/aarch64/images/Fedora-WSL-Base-42_Beta-1.4.aarch64.tar.xz",
+                    "Sha256": "5e5ea1fd30c903e8daedd2f6b2c15d10517dc5b67b8108eec647576867798bef"
+                }
+            }
         ]
     },
     "Default": "Ubuntu",
