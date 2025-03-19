@@ -138,6 +138,21 @@
                     "Sha256": "9c5804fc58108a138f53ff111961e17217b1cf429f8e5c8365b52062b621e8e5"
                 }
             }
+        ],
+        "AOSCOS": [
+            {
+                "Name": "AOSCOS",
+                "FriendlyName": "AOSC OS",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://releases.aosc.io/os-amd64/wsl/aosc-os_wsl_20250319_amd64.wsl",
+                    "Sha256": "8f507177cf42649e158fdf0da0d1dfb61d57a4b994c1026ec6aa1441eabfb69f"
+                },
+                "Arm64Url": {
+                    "Url": "https://releases.aosc.io/os-arm64/wsl/aosc-os_wsl_20250319_arm64.wsl",
+                    "Sha256": "2bafbcd16ddb20b64e809658834d4b2c9ceb5e54d49b4505adc2f8e68980438a"
+                }
+            }
         ]
     },
     "Default": "Ubuntu",
