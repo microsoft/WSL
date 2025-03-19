@@ -14,6 +14,8 @@ from github import Github
 
 
 USR_LIB_WSL = '/usr/lib/wsl'
+USR_LIBEXEC_WSL = '/usr/libexec/wsl'
+USR_SHARE_WSL = '/usr/share/wsl'
 
 MAGIC = magic.Magic()
 X64_ELF_MAGIC = re.compile('^ELF 64-bit.* x86-64, version 1')
@@ -380,14 +382,14 @@ def read_tar(node, file, elf_magic: str):
             return keys
 
         defaultUid = None
-        if validate_mode('/etc/wsl-distribution.conf', [oct(0o664), oct(0o644)], 0, 0):
+        if validate_mode('/etc/wsl-distribution.conf', [oct(0o664), oct(0o644)], 0, 0, follow_symlink=True):
             config = validate_config('/etc/wsl-distribution.conf', ['oobe.command', 'oobe.defaultuid', 'shortcut.icon', 'oobe.defaultname', 'windowsterminal.profiletemplate'])
 
             if oobe_command := config.get('oobe.command', None):
                 validate_mode(oobe_command, [oct(0o775), oct(0o755)], 0, 0)
 
-                if not oobe_command.startswith(USR_LIB_WSL):
-                    warning(node, f'value for oobe.command is not under {USR_LIB_WSL}: "{oobe_command}"')
+                if not oobe_command.startswith(USR_LIB_WSL) and not oobe_command.startswith(USR_LIBEXEC_WSL):
+                    warning(node, f'value for oobe.command is not under {USR_LIB_WSL} or {USR_LIBEXEC_WSL}: "{oobe_command}"')
 
             if defaultUid := config.get('oobe.defaultuid', None):
                 if defaultUid != '1000':
@@ -398,8 +400,10 @@ def read_tar(node, file, elf_magic: str):
             if shortcut_icon := config.get('shortcut.icon', None):
                 validate_mode(shortcut_icon, [oct(0o664), oct(0o644)], 0, 0, 1024 * 1024)
 
-                if not shortcut_icon.startswith(USR_LIB_WSL):
-                    warning(node, f'value for shortcut.icon is not under {USR_LIB_WSL}: "{shortcut_icon}"')
+                if not shortcut_icon.startswith(USR_LIB_WSL) and not shortcut_icon.startswith(USR_SHARE_WSL):
+                    warning(node, f'value for shortcut.icon is not under {USR_LIB_WSL} or {USR_SHARE_WSL}: "{shortcut_icon}"')
+            else:
+                warning(node, 'No shortcut.icon provided')
 
             if terminal_profile := config.get('windowsterminal.profileTemplate', None):
                 validate_mode(terminal_profile, [oct(0o660), oct(0o640)], 0, 0, 1024 * 1024)
@@ -407,13 +411,13 @@ def read_tar(node, file, elf_magic: str):
                 if not terminal_profile.startswith(USR_LIB_WSL):
                     warning(node, f'value for windowsterminal.profileTemplate is not under {USR_LIB_WSL}: "{terminal_profile}"')
 
-        if validate_mode('/etc/wsl.conf', [oct(0o664), oct(0o644)], 0, 0, optional=True):
+        if validate_mode('/etc/wsl.conf', [oct(0o664), oct(0o644)], 0, 0, optional=True, follow_symlink=True):
             config = validate_config('/etc/wsl.conf', ['boot.systemd'])
             if config.get('boot.systemd', False):
                 validate_mode('/sbin/init', [oct(0o775), oct(0o755)], 0, 0, magic=elf_magic, follow_symlink=True)
 
         validate_mode('/etc/passwd', [oct(0o664), oct(0o644)], 0, 0, parse_method = lambda fd: read_passwd(node, defaultUid, fd))
-        validate_mode('/etc/shadow', [oct(0o640), oct(0o600)], 0, None)
+        validate_mode('/etc/shadow', [oct(0o640), oct(0o600), oct(0)], 0, None)
         validate_mode('/bin/bash', [oct(0o755), oct(0o775)], 0, 0, magic=elf_magic, follow_symlink=True)
         validate_mode('/bin/sh', [oct(0o755), oct(0o775)], 0, 0, magic=elf_magic, follow_symlink=True)
 
@@ -446,7 +450,12 @@ def read_url(url: dict, elf_magic):
             read_tar(url, fd, elf_magic)
      else:
          with requests.get(address, stream=True) as response:
-            response.raise_for_status()
+
+            try:
+                response.raise_for_status()
+            except Exception as e:
+                error(url, str(e))
+                return
 
             with tempfile.NamedTemporaryFile() as file:
                 for e in response.iter_content(chunk_size=4096 * 4096):
@@ -492,7 +501,7 @@ def error(node, message: str):
 
 def warning(node, message: str):
     if node is None:
-        click.secho(f'Error: {message}', fg='red')
+        click.secho(f'Warning: {message}', fg='yellow')
     else:
         global warnings
 
