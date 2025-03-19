@@ -413,7 +413,7 @@ def read_tar(node, file, elf_magic: str):
                 validate_mode('/sbin/init', [oct(0o775), oct(0o755)], 0, 0, magic=elf_magic, follow_symlink=True)
 
         validate_mode('/etc/passwd', [oct(0o664), oct(0o644)], 0, 0, parse_method = lambda fd: read_passwd(node, defaultUid, fd))
-        validate_mode('/etc/shadow', [oct(0o640), oct(0o600)], 0, None)
+        validate_mode('/etc/shadow', [oct(0o640), oct(0o600), oct(0)], 0, None)
         validate_mode('/bin/bash', [oct(0o755), oct(0o775)], 0, 0, magic=elf_magic, follow_symlink=True)
         validate_mode('/bin/sh', [oct(0o755), oct(0o775)], 0, 0, magic=elf_magic, follow_symlink=True)
 
@@ -492,7 +492,7 @@ def error(node, message: str):
 
 def warning(node, message: str):
     if node is None:
-        click.secho(f'Error: {message}', fg='red')
+        click.secho(f'Warning: {message}', fg='yellow')
     else:
         global warnings
 
