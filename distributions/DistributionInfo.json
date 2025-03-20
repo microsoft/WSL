@@ -248,8 +248,8 @@
             "StoreAppId": "9PDTJHBQRQPF",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELeap15p6-250320_x64.Appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELeap15p6-250320_ARM64.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSELeap15p6-250320_x64.Appx",
+            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSELeap15p6-250320_ARM64.Appx",
             "PackageFamilyName": "46932SUSE.openSUSELeap15.6_022rs5jcyhyac"
         },
         {
