@@ -34,8 +34,12 @@
                 "FriendlyName": "openSUSE Tumbleweed",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250110.0/openSUSE-Tumbleweed-20250108.x86_64-7.31-Build7.31.tar.xz",
-                    "Sha256": "0x8c89f858145e2ff778eb061817d91d31ee5bee3b2797af7e4000d236553872b0"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Tumbleweed-20250316.x86_64-15.8-Build15.8.wsl",
+                    "Sha256": "0xd3fc19e7a28143aa68dbfc0d9bacd8f670f312bf29dc9cc44138a60975e755ea"
+                },
+                "Arm64Url": {
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Tumbleweed-20250316.aarch64-15.8-Build15.8.wsl",
+                    "Sha256": "0xc4a6844cfa0b791ab934c4e871a1245b217de734cb8c75a33bdc644fa0675e39"
                 }
             },
             {
@@ -43,8 +47,12 @@
                 "FriendlyName": "openSUSE Leap 15.6",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250110.0/openSUSE-Leap-15.6-15.6.x86_64-7.19-Build7.19.tar.xz",
-                    "Sha256": "0x81d1abf44ab438e5333ff7da09baa101a7c9b64873bb37cfeaf5bf5f0cbed57a"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Leap-15.6-15.6.x86_64-15.2-Build15.2.wsl",
+                    "Sha256": "0x63ea1828168026c86522743d551b2c88f0f4f94d813d2adc5881164d176b0ea1"
+                },
+                "Arm64Url": {
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Leap-15.6-15.6.aarch64-15.2-Build15.2.wsl",
+                    "Sha256": "0x0a3c646f69bb83889c4264e41030076104a2f3d71ae6a1e14a1e0653dfd2e3d4"
                 }
             }
         ],
@@ -63,8 +71,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 15 SP6",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250123.0/SUSE-Linux-Enterprise-15-SP6-15.6.x86_64-11.1-Build11.1.wsl",
-                    "Sha256": "0x8edc5a47003d06e72b17d35d169c5b8b0e7e4285d59110c4f3c73863fb578136"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250320.0/SUSE-Linux-Enterprise-15-SP6-15.6.x86_64-18.4-Build18.4.wsl",
+                    "Sha256": "0x88c59b7b3a50fee4fdfbf978c1899e59b6e0b51db5af925eb570b171e895a671"
                 }
             }
         ],
