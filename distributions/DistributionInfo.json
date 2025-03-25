@@ -83,11 +83,11 @@
                 "Default": true,
                 "Amd64Url": {
                     "Url": "https://kali.download/wsl-images/current/kali-linux-2025.1-wsl-rootfs-amd64.wsl",
-                    "Sha256": "717cd5a665f5b37f8dab2929d8323a03e0eaf85eba9b4577bcd356015045d33c"
+                    "Sha256": "e308ffd0b82408d5b5b8b296000a97fe481ab076067d3ca5378b942db9a980d3"
                 },
                 "Arm64Url": {
                     "Url": "https://kali.download/wsl-images/current/kali-linux-2025.1-wsl-rootfs-arm64.wsl",
-                    "Sha256": "114f746e3bbe9174aaa9ad1a4bdfa629b088b81c74f74f62d66263b5943cd091"
+                    "Sha256": "267fc6477d660b3cb04bfc1de180491225087038c4c81b07e89dfb147472169b"
                 }
             }
         ],
