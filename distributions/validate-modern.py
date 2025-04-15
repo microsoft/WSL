@@ -34,6 +34,8 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'NetworkManager.service',
                             'networking.service']
 
+WSL1_UNSUPPORTED_XATTRS = ['security.selinux', 'security.ima', 'security.evm']
+
 errors = {}
 warnings = {}
 
@@ -322,6 +324,21 @@ def get_tar_file(tar, path: str, follow_symlink=False, symlink_depth=10):
 
     return None, None
 
+def find_unsupported_attrs(tar):
+    found_xattrs = set()
+    first_file = None
+
+    for e in tar.getmembers():
+        for name in e.pax_headers:
+            if any(name.startswith('SCHILY.xattr.' + xattr) for xattr in WSL1_UNSUPPORTED_XATTRS):
+                found_xattrs.add(name.replace('SCHILY.xattr.', ''))
+
+                if first_file is None:
+                    first_file  = e.name
+
+    return first_file, found_xattrs
+
+
 def read_tar(node, file, elf_magic: str):
     with tarfile.open(fileobj=file) as tar:
 
@@ -425,6 +442,10 @@ def read_tar(node, file, elf_magic: str):
         for unit, path in enabled_systemd_units.items():
             if unit in DISCOURAGED_SYSTEM_UNITS:
                 warning(node, f'Found discouraged system unit: {path}')
+
+        first_file, found_xattrs = find_unsupported_attrs(tar)
+        if first_file is not None:
+            warning(node, f'Found extended attributes that are not supported in WSL1: {found_xattrs}. Sample file: {first_file}')
 
 def read_url(url: dict, elf_magic):
      hash = hashlib.sha256()
