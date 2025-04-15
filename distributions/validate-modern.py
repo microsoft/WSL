@@ -383,7 +383,7 @@ def read_tar(node, file, elf_magic: str):
 
         defaultUid = None
         if validate_mode('/etc/wsl-distribution.conf', [oct(0o664), oct(0o644)], 0, 0, follow_symlink=True):
-            config = validate_config('/etc/wsl-distribution.conf', ['oobe.command', 'oobe.defaultuid', 'shortcut.icon', 'oobe.defaultname', 'windowsterminal.profiletemplate'])
+            config = validate_config('/etc/wsl-distribution.conf', ['oobe.command', 'oobe.defaultuid', 'shortcut.icon', 'shortcut.enabled', 'oobe.defaultname', 'windowsterminal.profiletemplate'])
 
             if oobe_command := config.get('oobe.command', None):
                 validate_mode(oobe_command, [oct(0o775), oct(0o755)], 0, 0)
