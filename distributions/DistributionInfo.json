@@ -146,8 +146,8 @@
                     "Sha256": "f48a55e9fd4da1b84c2a9e960a9f3bc6e9fa65387ed9181826e1f052b2ce545e"
                 }
             }
-	],
-	"archlinux": [
+        ],
+        "archlinux": [
             {
                 "Name": "archlinux",
                 "FriendlyName": "Arch Linux",

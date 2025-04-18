@@ -3,6 +3,7 @@ import json
 import sys
 import hashlib
 import base64
+import difflib
 from urllib.request import urlretrieve
 from xml.etree import ElementTree
 import tempfile
@@ -65,7 +66,16 @@ if __name__ == "__main__":
         exit(1)
 
     with open(sys.argv[1]) as fd:
-        content = json.loads(fd.read())
+        data = fd.read()
+        content = json.loads(data)
+        diff = difflib.unified_diff(
+            data.splitlines(keepends=True),
+            (json.dumps(content, indent=4) + "\n").splitlines(keepends=True),
+            fromfile="a" + sys.argv[1],
+            tofile="b" + sys.argv[1],
+        )
+        diff = "".join(diff)
+        assert diff == "", diff
 
     distros = content['Distributions']
     assert is_unique([e.get('StoreAppId') for e in distros if e])
