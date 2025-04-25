@@ -179,12 +179,12 @@
                 "FriendlyName": "Ultramarine Linux 41",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://images.fyralabs.com/images/ultramarine/41/wsl-wsl-x86_64.tar.gz",
-                    "Sha256": "e5bb81b17d916108c2e4192ca18f3dd713cf2cdff77a5a10964ba409c70371ea"
+                    "Url": "https://images.fyralabs.com/images/ultramarine/41/wsl-wsl-x86_64.wsl",
+                    "Sha256": "7bc6f13096f50e124dce34c9ea622f8973c6eca267a8ab8cfb98fee1451dc92f"
                 },
                 "Arm64Url": {
-                    "Url": "https://images.fyralabs.com/images/ultramarine/41/wsl-wsl-aarch64.tar.gz",
-                    "Sha256": "069c2ecc517b6ec69788d2b2915074a0dfe2883b6f8a3088684c262c9478ffe1"
+                    "Url": "https://images.fyralabs.com/images/ultramarine/41/wsl-wsl-aarch64.wsl",
+                    "Sha256": "188ed696b970bca0c67080eaf9948a040acc291d705de98fa231de82d2095476"
                 }
             }
         ]
