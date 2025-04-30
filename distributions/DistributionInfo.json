@@ -82,12 +82,12 @@
                 "FriendlyName": "Kali Linux Rolling",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://kali.download/wsl-images/current/kali-linux-2025.1-wsl-rootfs-amd64.wsl",
-                    "Sha256": "e308ffd0b82408d5b5b8b296000a97fe481ab076067d3ca5378b942db9a980d3"
+                    "Url": "https://kali.download/wsl-images/kali-2025.1c/kali-linux-2025.1c-wsl-rootfs-amd64.wsl",
+                    "Sha256": "1f1b0171b3b92dd7163ddbab2bb6b93c4a9d2e95fccd66237403cccf648d2b8e"
                 },
                 "Arm64Url": {
-                    "Url": "https://kali.download/wsl-images/current/kali-linux-2025.1-wsl-rootfs-arm64.wsl",
-                    "Sha256": "267fc6477d660b3cb04bfc1de180491225087038c4c81b07e89dfb147472169b"
+                    "Url": "https://kali.download/wsl-images/kali-2025.1c/kali-linux-2025.1c-wsl-rootfs-arm64.wsl",
+                    "Sha256": "b0c5742e3baa4e5588deb974eeae81b45e18a49afa6cb7567321b8b6639d4034"
                 }
             }
         ],
