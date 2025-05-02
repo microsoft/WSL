@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PMS Modern UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(145deg, #f5faff, #e9f2fa);
+      }
+    </style>
+  </head>
+  <body class="min-h-screen p-4">
+    <div class="max-w-md mx-auto">
+      <!-- Header Buttons -->
+      <div class="flex justify-between mb-4">
+        <button class="flex items-center gap-2 bg-white/70 backdrop-blur rounded-2xl px-4 py-2 shadow text-blue-900 font-semibold text-sm">
+          <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 000 2h18a1 1 0 100-2H3zm0 6a1 1 0 000 2h18a1 1 0 100-2H3zm0 6a1 1 0 000 2h18a1 1 0 100-2H3z" /></svg>
+          Select Date
+        </button>
+        <button class="flex items-center gap-2 bg-white/70 backdrop-blur rounded-2xl px-4 py-2 shadow text-blue-900 font-semibold text-sm">
+          <svg class="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3"/></svg>
+          Category
+        </button>
+      </div>
+
+      <!-- Donut Chart Card -->
+      <div class="bg-white/70 backdrop-blur rounded-3xl p-4 mb-6 shadow">
+        <div class="flex items-center justify-between">
+          <div class="relative w-24 h-24">
+            <svg viewBox="0 0 100 100" class="w-full h-full">
+              <circle cx="50" cy="50" r="40" stroke="#dbeafe" stroke-width="14" fill="none" />
+              <circle cx="50" cy="50" r="40" stroke="#3b82f6" stroke-width="14" fill="none" stroke-dasharray="240" stroke-dashoffset="80" stroke-linecap="round" />
+              <circle cx="50" cy="50" r="40" stroke="#fbbf24" stroke-width="14" fill="none" stroke-dasharray="60" stroke-dashoffset="280" stroke-linecap="round" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center font-bold text-2xl text-blue-900">80</div>
+          </div>
+          <div class="space-y-2 text-sm text-blue-900">
+            <div class="bg-white/80 px-3 py-1 rounded-full inline-block font-semibold shadow">All Rooms</div>
+            <div class="font-medium">0 <span class="text-gray-500">Booked</span></div>
+            <div class="font-medium">2 <span class="text-gray-500">Occupied</span></div>
+            <button class="mt-2 bg-gradient-to-r from-sky-400 to-blue-500 text-white px-4 py-1.5 rounded-full text-xs shadow">Advance Booking</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Room Cards -->
+      <div class="space-y-4">
+        <!-- Room Card -->
+        <div class="bg-white/70 backdrop-blur p-4 rounded-3xl shadow">
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="flex items-center gap-2 text-blue-900 font-bold text-lg">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2L2 7v11h6v-5h4v5h6V7l-8-5z"/></svg>
+                Triple
+                <span class="bg-orange-100 text-orange-600 text-xs px-3 py-1 rounded-full font-medium">Booked</span>
+              </div>
+              <div class="flex items-center text-sm gap-2 mt-1 text-gray-800">
+                <div class="flex items-center gap-1">
+                  <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h11M9 21V3" /></svg>
+                  ₹2000
+                </div>
+                <div class="text-xs text-gray-500">Lastleaned 4/23/24</div>
+              </div>
+            </div>
+            <button class="bg-gradient-to-r from-sky-400 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium shadow flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+              Check In
+            </button>
+          </div>
+        </div>
+
+        <!-- Available Room Card -->
+        <div class="bg-white/70 backdrop-blur p-4 rounded-3xl shadow">
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="flex items-center gap-2 text-blue-900 font-bold text-lg">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2L2 7v11h6v-5h4v5h6V7l-8-5z"/></svg>
+                Triple
+                <span class="bg-green-100 text-green-600 text-xs px-3 py-1 rounded-full font-medium">Available</span>
+              </div>
+              <div class="flex items-center text-sm gap-2 mt-1 text-gray-800">
+                <div class="flex items-center gap-1">
+                  <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h11M9 21V3" /></svg>
+                  ₹2000
+                </div>
+              </div>
+            </div>
+            <button class="bg-gradient-to-r from-sky-400 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium shadow flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+              Check In
+            </button>
+          </div>
+        </div>
+
+        <!-- Duplicate the above block for more rooms as needed -->
+
+      </div>
+    </div>
+  </body>
+</html>
