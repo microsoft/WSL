@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestMap>
+  <TestJobGroup Name="TaefTestsGroup" TestSystem="Default" ConfigPath="[BuildRoot]\testbin\${TARGET_PLATFORM}\cloudtest\${image}-wsl${version}\TestGroup.xml" IsActive="true"/>
+  <Providers>
+    <Provider Type="PipelineArtifacts">
+      <Properties>
+        <Add Name="CloudTest.ProviderCustomName" Value="[drop]" />
+        <Add Name="PipelineArtifactBuildUrl" Value="https://microsoft.visualstudio.com/Microsoft.WSL/_build/results?buildId=${PIPELINE_BUILD_ID}"/>
+        <Add Name="PipelineArtifactName" Value="drop_wsl_build"/>
+      </Properties>
+    </Provider>
+    <Provider Type="VSODrop">
+      <Properties>
+        <Add Name="CloudTest.ProviderCustomName" Value="[test_distro]" />
+        <!-- When updating the drops for this make sure the rentention is set to never expire -->
+        <Add Name="DropURL" Value="https://microsoft.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/WSL/${CLOUDTEST_TEST_DISTRO_DROP}"/>
+      </Properties>
+    </Provider>
+    <Provider Type="VSODrop">
+      <Properties>
+        <Add Name="CloudTest.ProviderCustomName" Value="[test_packages]" />
+        <!-- When updating the drops for this make sure the rentention is set to never expire -->
+        <Add Name="DropURL" Value="https://microsoft.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/WSL/${CLOUDTEST_TEST_PACKAGES}"/>
+      </Properties>
+    </Provider>
+    <Provider Type="VSODrop">
+      <Properties>
+        <Add Name="CloudTest.ProviderCustomName" Value="[dump_tool]" />
+        <!-- When updating the drops for this make sure the rentention is set to never expire -->
+        <Add Name="DropURL" Value="https://microsoft.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/WSL/${DUMPTOOL_DROP}"/>
+      </Properties>
+    </Provider>
+  </Providers>
+</TestMap>

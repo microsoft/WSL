@@ -1,0 +1,1870 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Linuxos Windows-alrendszer</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer lehetővé teszi, hogy a fejlesztők GNU/Linux környezetet futtassanak -- beleértve a legáltalánosabb parancssori eszközöket, segédprogramokat és alkalmazásokat -- közvetlenül a Windowsban, módosítások nélkül, a hagyományos virtuális gépek vagy kettős rendszerindítási beállítások okozta többletterhelés nélkül.</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>Nem sikerült leválasztani a lemezt: {}. További részletekért futtassa a dmesg parancsot a WSL2-ben.
+A WSL2 leállításának és leválasztásának kényszerítéséhez futtassa a wsl.exe {} parancsot.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>A(z) {} lemez már csatlakoztatva van.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>A kötet már csatlakoztatva van a WSL2-ben.</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>Már van ilyen nevű lemez csatlakoztatva; válassza le a lemezt, vagy válasszon egy új nevet, és próbálkozzon újra.</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>A megadott csatlakoztatásnév érvénytelen "/" karaktert tartalmaz. Próbálkozzon újra az érvénytelen karakter nélkül.</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>A lemez sikeresen csatlakoztatva a következőként: /mnt/wsl/{}.
+Megjegyzés: A hely eltérő lesz, ha módosította az automount.root beállítást az /etc/wsl.conf fájlban.
+A lemez csatlakoztatásának bontásához és leválasztásához futtassa a 'wsl.exe {} {}' parancsot.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>A lemez csatlakoztatva van, de nem sikerült csatlakoztatni: {}.
+További részletekért futtassa a "dmesg" parancsot a WSL2-ben.
+A lemez leválasztásához futtassa a wsl.exe {} {} parancsot.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>Az alábbi lista az érvényes, telepíthető disztribúciókat tartalmazza.
+Telepítés a wsl.exe {} &lt;Distro&gt; használatával.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>A disztribúciónév már be van állítva.</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>A megadott telepítési hely már használatban van.</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>Már létezik a megadott nevű terjesztés. A --name használatával válasszon másik nevet.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>Nincs a megadott névvel rendelkező terjesztés.</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>A lemez csatlakoztatásához rendszergazdai hozzáférés szükséges.</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>A disztribúció exportálása nem sikerült.</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>A disztribúció Linuxos Windows-alrendszer fájlrendszerének egyszeri frissítése...</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>Nem indítható el, mert egy másik példány nem emelt szintű jogosultságszinten fut.  Emelt szintű és nem emelt szintű példányok nem futtathatók egyszerre.</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>A disztribúció importálása nem sikerült.</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>Választható Windows-összetevő telepítése: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>Letöltés: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>Telepítés: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>Terjesztés importálása</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>{} letöltve.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer folytat egy korábbi telepítést...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>Érvénytelen disztribúciónév: {}.
+Az érvényes disztribúciók listájának eléréséhez használja a 'wsl.exe --list --online' parancsot.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer példánya leállt.</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>Érvénytelen parancssori argumentum: {}
+A támogatott argumentumok listájának beolvasásához használja a(z) {} --help'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>A(z) {} parancssori argumentumnak értékre van szüksége.
+A támogatott argumentumok listájának lekéréséhez használja a '{} --help' parancsot.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>Nem támogatott konzolbeállítások. A funkció használatához le kell tiltani az örökölt konzolt.</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>A(z) {} nem érvényes egész szám.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>A disztribúció telepítése, eltávolítása vagy konvertálása folyamatban van.</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>A(z) {} indítása...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>Nem indítható el, mert egy másik példány emelt szintű jogosultságszinten fut.  Emelt szintű és nem emelt szintű példányok nem futtathatók egyszerre.</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer nem rendelkezik telepített disztribúciókkal.
+A probléma megoldásához telepítsen egy disztribúciót az alábbi utasításokat követve:
+
+A 'wsl.exe --list --online' parancs használatával listázhatja az elérhető disztribúciókat
+és a 'wsl.exe --install &lt;Distro&gt;' parancs használatával végezheti el a telepítést.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>Nincsenek futó disztribúciók.</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (alapértelmezett)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Linuxos Windows-alrendszer disztribúciók:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>Alapértelmezett disztribúció: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>Alapértelmezett verzió: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>Regisztráció megszüntetése folyamatban.</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>A felhasználó nem található.</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>A WSL 2 fő különbségeivel kapcsolatos információkért látogasson el a https://aka.ms/wsl2 oldalra</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>A konvertálás folyamatban van, ez eltarthat néhány percig.</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>A disztribúció már a kért verzióval rendelkezik.</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>Az örökölt disztribúció nem támogatja a WSL 2-t.</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>A jelenlegi számítógép-konfiguráció nem támogatja a WSL2-t.
+Engedélyezze a „Virtuálisgép-platform” választható összetevőt, és győződjön meg arról, hogy a virtualizálás engedélyezve van a BIOS-ban.
+A „Virtuálisgép-platform” engedélyezéséhez futtassa a következőt: wsl.exe --install --no-distribution
+További információért látogasson el a https://aka.ms/enablevirtualization oldalra</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>Túl sok virtuális merevlemez vagy fizikai lemez van csatlakoztatva.</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>A virtuális merevlemez már csatlakoztatva van a következővel: wsl.exe --mount, Kérjük, az indítás előtt válassza le a lemezt.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>A jelenlegi gépkonfiguráció nem támogatja a WSL1-et.
+A WSL1 használatához engedélyezze a Linuxos Windows-alrendszer választható összetevőt.</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>Ezt a műveletet csak a WSL2 támogatja.</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>Használat:
+    --networking-mode
+       Az aktuális hálózati mód megjelenítése.
+
+    --msal-proxy-path
+        Az MSAL proxyalkalmazás elérési útjának megjelenítése.
+
+    --version
+        A WSL-csomag verziójának megjelenítése.
+
+    -n
+        Ne nyomtasson új sort.</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>Használat:
+    -a
+        Az eredmény kényszerítése abszolút elérésiút-formátumra.
+    -u
+        Fordítás Windows-útvonalról WSL-útvonalra (alapértelmezett).
+    -w
+        Fordítás WSL-útvonalról Windows-útvonalra.
+    -m
+        Fordítás WSL-útvonalról Windows-útvonalra '\\' helyett '/' karakterrel
+
+Példa: wslpath 'c:\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>Felügyeleti műveletek végrehajtása Linuxos Windows-alrendszeren
+
+Használat:
+    /l, /list [Option]
+        A regisztrált disztribúciók listázása.
+        /all – Az összes disztribúció listázása, beleértve 
+               jelenleg telepítés vagy eltávolítás alatt állókat is.
+
+        /running – Csak a jelenleg futó disztribúciók listázása.
+
+    /s, /setdefault &lt;DistributionName&gt;
+        Az adott disztribúció beállítása alapértelmezettként.
+
+    /t, /terminate &lt;DistributionName&gt;
+        Megszakítja a disztribúciót.
+
+    /u, /unregister &lt;DistributionName&gt;
+        A disztribúció regisztrációjának megszüntetése és a gyökérszintű fájlrendszer törlése.</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Szerzői jog (c) Microsoft Corporation. Minden jog fenntartva.
+További információ a termékről: https://aka.ms/privacy.
+
+Használat: wsl.exe [Argumentum] [Kapcsolók...] [Parancssor]
+
+Linuxos bináris fájlok futtatására szolgáló argumentumok:
+
+    Ha nincs megadva parancssor, a wsl.exe az alapértelmezett rendszerhéjat indítja el.
+
+    --exec, -e &lt;CommandLine&gt;
+        A megadott parancs végrehajtása az alapértelmezett Linux-rendszerhéj használata nélkül.
+
+    --shell-type &lt;standard|login|none&gt;
+        A megadott parancs végrehajtása a megadott rendszerhéjtípussal.
+
+    --
+        A parancssor fennmaradó részének átadása változtatás nélkül.
+
+Kapcsolók:
+    --cd &lt;Directory&gt;
+        A megadott könyvtár aktuális munkakönyvtárként való beállítása.
+        Tilde (~) karakter használata esetén a rendszer a Linux-felhasználó kezdőkönyvtárának elérési útját használja. Ha az elérési út
+        perjel (/) karakterrel kezdődik, a rendszer az elérési utat linuxos abszolút elérési útként értelmezi.
+        Ellenkező esetben az értéknek windowsos abszolút elérési útnak kell lennie.
+
+    --distribution, -d &lt;DistroName&gt;
+        A megadott disztribúció futtatása.
+
+    --distribution-id &lt;DistroGuid&gt;
+        A megadott disztribúcióazonosító futtatása.
+
+    --user, -u &lt;USerName&gt;
+        Futtatás a megadott felhasználóként.
+
+    --system
+        A rendszer-disztribúció rendszerhéjának indítása.
+
+A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
+
+    --help
+        Használati információk megjelenítése.
+
+    --debug-shell
+        A WSL2 hibakeresési rendszerhéjának diagnosztikai célból történő megnyitása.
+
+    --install [Disztribúció] [Kapcsolók...]
+        WSL-disztribúció telepítése.
+        Az érvényes disztribúciók listája a 'wsl.exe --list --online' paranccsal jeleníthető meg.
+
+        Kapcsolók:
+            --enable-wsl1
+                A WSL1-támogatás engedélyezése.
+
+            --fixed-vhd
+                Rögzített méretű lemez létrehozása a disztribúció tárolásához.
+
+            --from-file &lt;Path&gt;
+                Disztribúció telepítése helyi fájlból.
+
+            --legacy
+                Az örökölt disztribúciós jegyzékfájl használata.
+
+            --location &lt;Location&gt;
+                A disztribúció telepítési útvonalának beállítása.
+
+            --name &lt;Name&gt;
+                Állítsa be a disztribúció nevét.
+
+            --no-distribution
+                Csak a szükséges választható összetevők telepítése, nem telepít disztribúciót.
+
+            --no-launch, -n
+                Telepítés után ne indítsa el a disztribúciót.
+
+            --version &lt;Version&gt;
+                Az új disztribúcióhoz használandó verzió megadása.
+
+            --vhd-size &lt;MemoryString&gt;
+                Megadja a disztribúció tárolására szolgáló lemez méretét.
+
+            --web-download
+                Töltse le a disztribúciót az internetről a Microsoft Store helyett.
+
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Disztribúcióspecifikus beállítások módosítása.
+
+        Beállítások:
+            --move &lt;Location&gt;
+                Helyezze át a disztribúciót egy új helyre.
+
+            --set-sparse, -s &lt;true|false&gt;
+                Állítsa a disztribúció vhdx-fájlját ritkítás értékre, így a lemezterület automatikusan visszanyerhető.
+
+            --set-default-user &lt;Username&gt;
+                Állítsa be a disztribúció alapértelmezett felhasználóját.
+
+            --resize &lt;MemoryString&gt;
+                A disztribúció lemezének átméretezése a megadott méretre.
+
+    --mount &lt;Disk&gt;
+        Fizikai vagy virtuális lemez csatlakoztatása és felcsatolása az összes WSL 2-disztribúcióban.
+
+        Beállítások:
+            --vhd
+                Annak megadása, hogy a &lt;Lemez&gt; virtuális merevlemezre hivatkozik.
+
+            --bare
+                Csatlakoztatja a lemezt a WSL2-höz, de nem csatolja fel.
+
+            --name &lt;Name&gt;
+                Felcsatolja a lemezt a csatlakoztatási pont egyéni nevének használatával.
+
+            --type &lt;Type&gt;
+                Lemez felcsatolásához használandó fájlrendszer, ha nincs megadva az alapértelmezett érték az ext4.
+
+            --options &lt;Options&gt;
+                További felcsatolási lehetőségek.
+
+            --partition &lt;Index&gt;
+                A felcsatolni kívánt partíció indexe, ha nincs megadva alapértelmezett érték a teljes lemezre.
+
+    --set-default-version &lt;Version&gt;
+        Az új disztribúciók alapértelmezett telepítési verziójának módosítása.
+
+    --shutdown
+        Azonnal leállítja az összes futó disztribúciót és a WSL 2
+        egyszerűsített segédprogram virtuális gépet.
+
+        Beállítások:
+            --force
+                Leállítja a WSL 2 virtuális gépet, még akkor is, ha egy művelet folyamatban van. Adatvesztést okozhat.
+
+    --status
+        A Linuxos Windows-alrendszer állapotának megjelenítése.
+
+    --unmount [Disk]
+        Lemez lecsatolása és leválasztása a WSL2 összes disztribúciójáról.
+        Lecsatolja és leválasztja az összes lemezt, ha argumentum nélkül hívják meg.
+
+    --uninstall
+        Eltávolítja a Linuxos Windows-alrendszer csomagot erről a gépről.
+
+    --update
+        A Linuxos Windows-alrendszer csomagjának frissítése.
+
+        Beállítások:
+            --pre-release
+                Ha elérhető, töltsön le egy előzetes verziót.
+
+    --version, -v
+        Verzióinformációk megjelenítése.
+
+A disztribúcióknak a Linuxos Windows-alrendszerben való kezelésére szolgáló argumentumok:
+
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        A disztribúciót exportálja tar kiterjesztésű fájlba.
+        A fájlnév a következő lehet: stdout.
+
+        Beállítások:
+            --format &lt;Format&gt;
+                Az exportálási formátum megadása. Támogatott értékek: tar, tar.gz, tar.xz, vhd.
+
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        A megadott, tar kiterjesztésű fájl importálása új disztribúcióként.
+        A fájlnév a következő lehet: stdin.
+
+        Beállítások:
+            --version &lt;Version&gt;
+                Az új disztribúcióhoz használandó verzió megadása.
+
+            --vhd
+                Azt adja meg, hogy a megadott fájl .vhdx fájl, nem tar fájl.
+                Ez a művelet másolatot készít a .vhdx fájlról a megadott telepítési helyen.
+
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        A megadott, vhdx kiterjesztésű fájl importálása új disztribúcióként.
+        Ezt a virtuális merevlemezt az ext4 fájlrendszertípussal kell formázni.
+
+    --list, -l [Options]
+        A disztribúciók listázása.
+
+        Beállítások:
+            --all
+                Az összes disztribúciót listázza, beleértve a
+                jelenleg telepítés vagy eltávolítás alatt állókat is.
+
+            --running
+                Csak a jelenleg futó disztribúciók listázása.
+
+            --quiet, -q
+                Csak a disztribúciók nevének megjelenítése.
+
+            --verbose, -v
+                Az összes disztribúció részletes adatainak megjelenítése.
+
+            --online, -o
+                Megjeleníti a 'wsl.exe --install' paranccsal telepíthető, elérhető disztribúciók listáját.
+
+    --set-default, -s &lt;Distro&gt;
+        Az adott disztribúció beállítása alapértelmezettként.
+
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        A megadott disztribúció verziójának módosítása.
+
+    --terminate, -t &lt;Distro&gt;
+        Leállítja a megadott disztribúciót.
+
+    --unregister &lt;Distro&gt;
+        A disztribúció regisztrációjának megszüntetése és a gyökérszintű fájlrendszer törlése.</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>WSL-verzió: {}
+Kernelverzió: {}
+WSLg-verzió: {}
+MSRDC-verzió: {}
+Direct3D-verzió: {}
+DXCore-verzió: {}
+Windows-verzió: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>MSBuild verziója: {}
+Véglegesítés: {}
+Létrehozás időpontja: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>A(z) {} helyen megadott egyéni kernel nem található: "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>A(z) {} helyen lévő egyéni kernelmodulok virtuális merevlemeze nem található: „{}”.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>A(z) {} helyen megadott egyéni rendszerterjesztés nem található vagy nem megfelelő formátumú.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation. Minden jog fenntartva.
+A termékre vonatkozó adatvédelmi információkért keresse fel a következőt: https://aka.ms/privacy.
+
+Szintaxis: wslg.exe [Argumentum] [Beállítások...] [Parancssor]
+
+Argumentumok:
+    --cd &lt;Directory&gt;
+        A megadott könyvtárat állítja be aktuális munkakönyvtárként.
+        Ha ~ van használatban, a rendszer a Linux-felhasználó kezdőkönyvtárának elérési útját használja. Ha az elérési út
+        a / karakterrel kezdődik, a parancs linuxos abszolút elérési útként értelmezi.
+        Ellenkező esetben az értéknek abszolút Windows-elérési útnak kell lennie.
+
+    --distribution, -d &lt;Distro&gt;
+        Futtassa a megadott disztribúciót.
+
+    --user, -u &lt;USerName&gt;
+        Futtatás a megadott felhasználóként.
+
+    --shell-type &lt;standard|login|none&gt;
+        A megadott parancs végrehajtása a megadott rendszerhéjtípussal.
+
+    --help
+        Használati információk megjelenítése.
+
+    --
+        A parancssor fennmaradó részének átadása változtatás nélkül.</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>A folytatáshoz nyomjon meg egy billentyűt...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>A(z) {} argumentumból hiányzik egy kötelező paraméter.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>Az exportálás folyamatban van, ez eltarthat néhány percig.</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>Az importálás folyamatban van, ez eltarthat néhány percig.</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>A grafikus felhasználói felületű alkalmazások támogatása le van tiltva a következőn keresztül: {} vagy /etc/wsl.conf.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>Frissítések keresése.</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>Ez a terjesztés csak a Microsoft Store áruházban érhető el.</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>az ARM64-wsl.exe --mount a Windows 27653-es vagy újabb verzióját igényli.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>Az Linuxos Windows-alrendszer legújabb verziója már telepítve van.</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer frissítése a(z) {} verzióra.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>Ehhez az alkalmazáshoz szükség van a Linuxos Windows-alrendszer választható összetevőre.
+Telepítse a következő futtatásával: wsl.exe --install --no-distribution
+Lehet, hogy újra kell indítani a rendszert, hogy a módosítások érvénybe lépjenek.</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>A megadott fájlnak .vhdx kiterjesztésűnek kell lennie.</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>A(z) {} VmSwitch nem található. Elérhető kapcsolók: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>A hálózati hídhoz be kell állítani a wsl2.vmSwitch kapcsolót.</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>Nem sikerült beolvasni a listaterjesztést a következőből: {}. {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>Nem sikerült csatlakoztatni a(z) {} lemezt a WSL2-höz: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>Nem sikerült a lemez átméretezése.</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>Az útvonal fordítása nem sikerült.</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>Nem található érték.</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>A(z) {} Windows-verzió nem támogatja a Linuxos Windows-alrendszer csomagolt verzióját.
+Telepítse a szükséges frissítést a Windows Update-en vagy a következőn keresztül: {}
+További információért látogasson el a https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>A hibakeresési felület futtatásához rendszergazdai wsl.exe fájlt kell futtatni.</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>A(z) {} disztribúció telepítési folyamata a következő kilépési kóddal meghiúsult: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>Érvénytelen GUID-formátum: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>Érvénytelen szakasznév itt: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>Érvénytelen kulcsnév itt: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>Várt érték: {} itt: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>Érvénytelen feloldott karakter: {} itt: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>Ismeretlen {} kulcs itt: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>Érvénytelen egész érték ({}) a(z) {}kulcshoz a következőben: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>Érvénytelen IP-érték ({}) a(z) {} kulcshoz a következőben: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>Érvénytelen logikai érték ({}) a(z) {}kulcshoz a következőben: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>Érvénytelen MAC-cím ({}) a(z) {} kulcshoz a következőben: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>Nem sikerült megnyitni a(z) {}, {} konfigurációs fájlt</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>Hiba történt a WSL indításakor</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>Eseménynapló megnyitása</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>Ez a terjesztés nem tartalmaz alapértelmezett nevet. A terjesztési név kiválasztásához használja a --name .</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>A(z) {} és a(z) {} argumentum nem adható meg egyszerre.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>A(z) {} argumentumhoz a(z) {} argumentum szükséges.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>Érvénytelen disztribúciónév: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>Örökölt disztribúciós regisztráció használata. Fontolja meg inkább tar-alapú disztribúció használatát.</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>Az örökölt terjesztési regisztrációk nem támogatják a --version argumentumot.</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>A(z) {} eloszlást egy felülbírálási jegyzék biztosítja.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>A terjesztési kivonat nem egyezik. Várt: {}, tényleges kivonat: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>Érvénytelen hexadecimális karakterlánc: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>A(z) {} nem támogatott örökölt disztribúciók telepítésekor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>A terjesztés telepítése sikerült. A wsl.exe -d {} használatával indítható el</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>Érvénytelen {} memóriasztring a(z) {} .wslconfig bejegyzéshez itt: {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>Nem sikerült létrehozni a felcserélési lemezt itt: {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>A beágyazott virtualizálás nem támogatott ezen a gépen.</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>Nem sikerült létrehozni a(z) {} című hálózati végpontot. A hozzárendelt új cím: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>Nem sikerült létrehozni a(z) {} címtartományú virtuális hálózatot, új hálózat létrehozva a következő tartománnyal: {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>CSÖKKENTETT MÓD ENGEDÉLYEZVE – számos funkció le lesz tiltva</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>A tükrözött hálózati mód nem támogatott: {}.
+Visszaállás NAT-hálózatkezelésre.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>A Linux Kernel 5.10-es vagy újabb verziójára van szükség</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Windows-verzió: {}. {} nem rendelkezik a szükséges funkciókkal</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>A Hyper-V tűzfal nem támogatott</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>A DNS-alagút nem támogatott</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>A wsl2.localhostForwarding beállításnak nincs hatása tükrözött hálózati mód használatakor</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>A rendszer HTTP-proxymódosítást észlelt a gazdagépen. A módosítás alkalmazásához indítsa újra a WSL-t.</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>A rendszer localhost-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A NAT módban futó WSL nem támogatja a localhost proxykat.</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>A rendszer egy IPv6-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A WSL NAT-módban nem támogatja az IPv6 proxyt.</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>A rendszer localhost IPv6-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A WSL nem támogatja a localhost IPv6-proxykat.</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>Váratlan hiba történt a proxybeállítások feloldása közben. A proxybeállítások nem lettek tükrözve a WSL-be.</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>Hiba történt a beállításjegyzék elérésekor. Elérési út: {}. Hiba: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>Nem sikerült elindítani a localhost továbbítófolyamatot. Hiba: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>Nem sikerült elindítani a virtuális hálózatot – telepítse a nem kötelező virtuálisgép-platform összetevőt a következő futtatásával: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>Nem sikerült konfigurálni a hálózatot (networkingMode {}), visszatérés a networkingMode {} módba.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>Nem sikerült engedélyezni a(z) {} Windows-összetevőt (kilépési kód: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>A(z) {} beépülő modul végzetes hibát adott vissza</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>A(z) {} beépülő modul végzetes hibát adott vissza. Hibaüzenet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>A(z) {} beépülő modulhoz a WSL újabb verziója szükséges. Futtassa a következőt: wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>A(z) {} .wslconfig beállítást letiltotta a számítógép-házirend.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>A számítógép-házirend letiltotta a hibakeresési felületet.</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>wsl.exe --mount műveletet a számítógép-házirend letiltotta.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>A WSL1-et a számítógép-házirend letiltotta.</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>A WSL2-re való frissítéshez futtassa a wsl.exe --set-version {} 2 parancsot.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>A WSL befejezi a frissítést...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>A frissítés nem sikerült (kilépési kód: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>Az eltávolítás nem sikerült (kilépési kód: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>Naplófájl: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>Nem sikerült eltávolítani az MSIX-csomagot (hiba: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>Nem sikerült telepíteni az MSIX-csomagot (hiba: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>A WSL futtatásához szükséges választható összetevők nincsenek telepítve.</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>Hiányzó összetevők telepítése.</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>Az importált fájl nem érvényes Linux-disztribúció.</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>Nyomjon meg egy billentyűt a kilépéshez...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>Elérhető a Linuxos Windows-alrendszer új verziója.</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>Frissítsen a(z) {} verzióra, vagy tekintse meg alább a kibocsátási megjegyzéseit.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>Frissítés</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>Dokumentumok megtekintése</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>A művelet nem hajtható végre, mert a vhdx jelenleg használatban van. A WSL használatának kényszerítése: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>A(z) {} nem érvényes logikai érték, &lt;true|false&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>A ritka vhdx csak WSL2 esetén támogatott.</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>A WSL helyi rendszerként való futtatása nem támogatott.</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>Teljesítménytipp:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>Ha I/O-intenzív műveletet hajt végre, például {} a Windows-meghajtókon, gyenge lesz a teljesítménye. Fontolja meg a projektfájlok Linux fájlrendszerbe való áthelyezését a jobb teljesítmény érdekében. További információért kattintson az alábbi gombra.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>Dokumentumok megtekintése</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>Ne jelenjen meg többé</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>A WSL2 virtuális gép összeomlott.</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>A veremkivonat a következő helyre lett mentve: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>Nem sikerült elindítani a terjesztést. Hibakód: {}, hibalépés: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>A terjesztés nem indult el, mert a virtuális lemeze sérült.</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>Duplikált konfigurációs kulcs ({}) a következőben: {}:{} (Ütköző kulcs: {}, {}:{})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>Érvénytelen "{}" érték a(z) "{}" konfigurációs kulcshoz a következőben: {}:{} (Érvényes értékek: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>Várakozás a(z) „{}” disztribúció OOBE parancsának befejezésére...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>Nem sikerült beolvasni a(z) {} tulajdonságot a(z) {} disztribúcióból </value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>Ez egy VHDX-fájlnak tűnik. VHDX importálásához használja a --vhd formátumot tar helyett.</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>Nem sikerült telepíteni a(z) {} alkalmazást a Microsoft Store: {}
+Webes letöltési... megkísérlése</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>Nincs konfigurálva alapértelmezett terjesztés. Adja meg a telepítendő terjesztést.</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>A wsl2.virtio9p le van tiltva, vsock átvitellel visszaesik 9p értékre.</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>Úgy tűnik, hogy a WSL-telepítés sérült (hibakód: {}).
+Nyomjon meg egy billentyűt a WSL javításához, vagy CTRL-C a megszakításhoz.
+Ez a kérés 60 másodpercen belül túllépi az időkorlátot.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>Nem sikerült elemezni a terminálprofilt a következő terjesztés regisztrálásakor: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>Érvénytelen méret: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+Hibakód: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>Érvénytelen JSON-dokumentum. Elemzési hiba: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>A wsl2.processzorok száma nem haladhatja meg a rendszer logikai processzorainak számát ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>Nem sikerült lekérdezni a hálózati módot</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>Az egyéni rendszermagmodulok egyéni rendszermag megadása nélkül lettek megadva. További információért tekintse meg a https://aka.ms/wslcustomkernel.</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>A Globális biztonságos hozzáférés ügyféllel kapcsolatos jelenlegi kompatibilitási probléma miatt a DNS-alagútképzés le van tiltva.</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>A ritka VHD-támogatás jelenleg le van tiltva, mivel lehetséges adatsérülés léphet fel.
+A ritka virtuális merevlemez használatának kényszerítéséhez futtassa a következő parancsot:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>A(z) {} csatlakoztatása nem sikerült. További részletekért tekintse meg a dmesg fájlt.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>A /etc/fstab feldolgozása a mount -a parancs használatával nem sikerült.</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>Hiba történt a terjesztési lemez csatlakoztatása közben. A lemez tartalékként írásvédettként lett csatlakoztatva.
+Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>Nem sikerült lefordítani a következőt: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>Hiba történt. Próbálkozzon újra később.</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>Névjegy</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>Tudnivalók a Linuxos Windows-alrendszer Gépházról</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft. Minden jog fenntartva.</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>Linuxos Windows-alrendszer Gépház</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer Gépházban a fejlesztők grafikus felhasználói felületre épülő alkalmazással kezelhetik a .wslconfig fájlt.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>Automatikus memória-visszanyerés</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>Automatikusan felszabadítja a gyorsítótárazott memóriát az üresjárati CPU-használat észlelése után. Lassú felszabadítás esetén gradual, a gyorsítótárazott memória azonnali felszabadításához pedig dropcache értékre állítsa.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Automatikus memória-visszanyerés.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Automatikusan felszabadítja a gyorsítótárazott memóriát az üresjárati CPU-használat észlelése után. Lassú felszabadítás esetén gradual, a gyorsítótárazott memória azonnali felszabadításához pedig dropcache értékre állítsa.</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>Automatikus proxy engedélyezve</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>Lehetővé teszi a WSL-nek a Windows HTTP-proxyadatainak használatát.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Automatikus proxy engedélyezve.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Lehetővé teszi a WSL-nek a Windows HTTP-proxyadatainak használatát.</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>A lehető legjobb DNS-elemzést használja</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.dnsTunneling értéke true. Ha igaz értékre van állítva, a Windows kinyeri a kérdést a DNS-kérelemből, és megkísérli a megoldását, figyelmen kívül hagyva az ismeretlen rekordokat.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>A lehető legjobb DNS-elemzést használja.</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.dnsTunneling értéke true. Ha igaz értékre van állítva, a Windows kinyeri a kérdést a DNS-kérelemből, és megkísérli a megoldását, figyelmen kívül hagyva az ismeretlen rekordokat.</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>Egyéni kernel</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>Egy egyéni Linux-kernel abszolút Windows-elérési útja.</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>Kernelek tallózása</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Egyéni kernel</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Egy egyéni Linux-kernel abszolút Windows-elérési útja.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>Egyedi kernelmodulok</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>Egyéni Linux-kernel modulok virtuális merevlemezének abszolút Windows-elérési útja.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>Kernelmodulok böngészése</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Egyedi kernelmodulok</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Egyéni Linux-kernel modulok virtuális merevlemezének abszolút Windows-elérési útja.</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>Egyéni rendszer disztribúciója</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>Böngészés a disztribúciók között</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>Adja meg egy olyan VHD elérési útját, amely egyéni rendszer-disztribúcióként lesz betöltve, amelyet elsősorban a WSL grafikus felhasználói felületi alkalmazásaihoz használnak. [További információ a rendszer disztribúcióiról itt].</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Egyéni rendszer disztribúciója</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Adja meg egy olyan VHD elérési útját, amely egyéni rendszer-disztribúcióként lesz betöltve, amelyet elsősorban a WSL grafikus felhasználói felületi alkalmazásaihoz használnak.</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>Hibakeresési konzol engedélyezése</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>Logikai érték egy kimeneti konzolablak bekapcsolásához, amely megjeleníti a dmesg tartalmát egy WSL 2 disztribúciós példány indításakor.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hibakeresési konzol engedélyezése.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Logikai érték egy kimeneti konzolablak bekapcsolásához, amely megjeleníti a diagnosztikai üzenetek tartalmát egy WSL 2 disztribúciós példány indításakor.</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>Alapértelmezett VHD-méret</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>A bővíthető WSL virtuális merevlemez (VHD) alapértelmezett maximális mérete csak az újonnan létrehozott disztribúciókhoz.</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>Méret visszaállítása</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Alapértelmezett VHD-méret</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>A bővíthető WSL virtuális merevlemez (VHD) alapértelmezett megabájtban mért maximális mérete csak az újonnan létrehozott disztribúciókhoz.</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>Fejlesztő</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>Dokumentáció</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>DrvFS mód módosítása</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>Az operációs rendszerek közötti fájlhozzáférés implementálásának módosítása a WSL-ben.</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>DNS proxy engedélyezve</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.networkingMode NAT értékre van beállítva. Logikai érték, amely tájékoztatja a WSL-t, hogy konfigurálja a DNS-kiszolgálót Linux rendszeren a gazdagép NAT-jára. A false értékre állítás a DNS-kiszolgálókat Windowsról Linuxra tükrözi.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS proxy engedélyezve.</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.networkingMode NAT értékre van beállítva. Logikai érték, amely tájékoztatja a WSL-t, hogy konfigurálja a DNS-kiszolgálót Linux rendszeren a gazdagép NAT-jára. A false értékre állítás a DNS-kiszolgálókat Windowsról Linuxra tükrözi.</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>DNS-alagútkezelés engedélyezve</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>A DNS-kérések WSL-ről Windowsra történő proxyzása szerint változik.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-alagútkezelés engedélyezve.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>A DNS-kérések WSL-ről Windowsra történő proxyzása szerint változik.</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>Fájlrendszer</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>Grafikus felhasználói felületű alkalmazások engedélyezése</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>Logikai érték a grafikus felhasználói felületi alkalmazások ([WSLg]) WSL-ben való támogatásának be- vagy kikapcsolásához.</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Grafikus felhasználói felületű alkalmazások engedélyezése.</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Logikai érték a grafikus felhasználói felületi alkalmazások (más néven WSL g) WSL-ben való támogatásának be- vagy kikapcsolásához.</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>Hardverteljesítmény-számlálók engedélyezése</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>Lehetővé teszi a linuxos hardverteljesítmény-számlálók használatát.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hardverteljesítmény-számlálók engedélyezése.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Lehetővé teszi a linuxos hardverteljesítmény-számlálók használatát.</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>Hyper-V tűzfal engedélyezve</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>Engedélyezi a Hyper-V tűzfalat, amely lehetővé teszi a Windows tűzfal szabályait, valamint a Hyper-V-forgalomra vonatkozó szabályokat a WSL hálózati forgalom szűréséhez.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hyper-V tűzfal engedélyezve.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Engedélyezi a Hyper-V tűzfalat, amely lehetővé teszi a Windows tűzfal szabályait, valamint a Hyper-V-forgalomra vonatkozó szabályokat a WSL hálózati forgalom szűréséhez.</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>Állomáscím visszacsatolása</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha wsl2.networkingMode tükrözöttre van beállítva. Ha Igaz értékre van állítva, a tároló egy, a gazdagéphez rendelt IP-cím használatával csatlakozhat a gazdagéphez, vagy a gazdagép csatlakozhat a tárolóhoz. Vegye figyelembe, hogy a 127.0.0.1 visszacsatolási cím mindig használható – ez a beállítás lehetővé teszi az összes további hozzárendelt helyi IP-cím használatát is.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Állomáscím visszacsatolása.</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.networkingMode tükrözött értékre van állítva. Ha Igaz értékre van állítva, a tároló egy, a gazdagéphez rendelt IP-cím használatával csatlakozhat a gazdagéphez, vagy a gazdagép csatlakozhat a tárolóhoz. Vegye figyelembe, hogy a 127.0.0.1 visszacsatolási cím mindig használható – ez a beállítás lehetővé teszi az összes további hozzárendelt helyi IP-cím használatát is.</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>Figyelmen kívül hagyott portok</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.networkingMode mirrored értékre van beállítva. Megadja, hogy mely portokhoz kapcsolódhatnak a Linux-alkalmazások, amelyek nem lesznek automatikusan továbbítva vagy figyelembe véve a Windowsban. Vesszővel tagolt listában kell formázni, például 3000,9000,9090.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>Portok alaphelyzetbe állítása</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Figyelmen kívül hagyott portok</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.networkingMode mirrored értékre van beállítva. Megadja, hogy mely portokhoz kapcsolódhatnak a Linux-alkalmazások, amelyek nem lesznek automatikusan továbbítva vagy figyelembe véve a Windowsban. Vesszővel tagolt listában kell formázni, például 3000, 9000, 9090.</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>Kezdeti automatikus proxy időtúllépése</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.autoProxy igaz értékre van állítva. Konfigurálja, hogy a WSL mennyi ideig (ezredmásodpercben) várja meg a HTTP-proxyadatok lekérését a WSL-tároló indításakor. Ha ezt követően feloldja a proxybeállításokat, a WSL-példányt újra kell indítani a lekért proxybeállítások használatához.</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>Időtúllépés alaphelyzetbe állítása</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Kezdeti automatikus proxy időtúllépése</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Csak akkor alkalmazható, ha a wsl2.autoProxy igaz értékre van állítva. Konfigurálja, hogy a WSL mennyi ideig (ezredmásodpercben) várja meg a HTTP-proxyadatok lekérését a WSL-tároló indításakor. Ha ezt követően feloldja a proxybeállításokat, a WSL-példányt újra kell indítani a lekért proxybeállítások használatához.</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>Kernel parancssora</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>További kernel parancssori argumentumok.</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>Localhost-továbbítás engedélyezése</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>Logikai érték, amely azt határozza meg, hogy a WSL 2 virtuális gép helyettesítő karaktereihez vagy localhost eleméhez kötött portok csatlakoztathatók legyenek-e a gazdagépről a localhost:port használatával.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Localhost-továbbítás engedélyezése.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Logikai érték, amely azt határozza meg, hogy a WSL 2 virtuális gép helyettesítő karaktereihez vagy localhost eleméhez kötött portok csatlakoztathatók legyenek-e a gazdagépről a localhost, kettőspont, port használatával.</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>Memória és processzor</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>Memóriaméret</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>A WSL 2 virtuális géphez hozzárendelendő memória mennyisége.</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>Méret visszaállítása</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Memóriaméret</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>A WSL 2 virtuális géphez rendelendő, megabájtban megadott memóriamennyiség.</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} ezredmásodperc</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>Beágyazott virtualizálás engedélyezése</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>Logikai érték a beágyazott virtualizálás be- vagy kikapcsolásához, ami lehetővé teszi más beágyazott virtuális gépek futtatását a WSL 2-ben.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Beágyazott virtualizálás engedélyezése.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Logikai érték a beágyazott virtualizálás be- vagy kikapcsolásához, ami lehetővé teszi más beágyazott virtuális gépek futtatását a WSL 2-ben.</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>Hálózati mód</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>Megadja a WSL hálózati módját.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Hálózati mód.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Megadja a WSL hálózati módját.</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>Hálózatkezelés</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>Az összes fájljával különböző operációs rendszereken dolgozhat!</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>Operációs rendszerek közötti fájlhozzáférés</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>Windows-fájlok elérése Linuxból</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>A Windows-fájlokat a Linuxon belül érheti el, ha a „/mnt” helyre, majd a Windows meghajtóbetűjelére lép, a C-meghajtó alábbi példájához hasonlóan:
+
+'cd /mnt/c'</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>A Linux-fájlok elérése a Fájlkezelőben</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>A Linux-fájlokat a Fájlkezelőben a '\\wsl.localhost\' mappában vagy a Linux ikonra kattintva tekintheti meg.</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>Windows-fájlok és -programok indítása WSL-ből</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>A WSL használata közben is közvetlenül a Bash-ből futtathatja a Windows végrehajtható fájljait. Próbálja futtatni
+a 'powershell.exe /c start .' parancsot a Fájlkezelő megnyitásához az aktuális mappában.</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>Linux hálózati alkalmazások elérése a Windowsból</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>Ha hálózati alkalmazást (például NodeJS-en vagy SQL-kiszolgálón futó alkalmazást) hoz létre a Linux-disztribúcióban, a localhost használatával elérheti azt egy Windows-alkalmazásból (például a Microsoft Edge vagy a Chrome böngészőből). Ez azt jelenti, hogy ha olyan Linux-kiszolgálót indított el, amely a 3000-es portot figyeli, a windowsos [http://localhost:3000] elérési úton érheti el.</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>Tükrözött módú hálózat</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>A WSL egy új, tükrözött módot is tartalmaz, amely fejlett funkciókat biztosít, például IPv6-támogatást, valamint hozzáférést a hálózati alkalmazásokhoz a helyi hálózaton.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>További információ az operációs rendszerek közötti fájlhozzáférésről</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>Üdvözli a Linuxos Windows-alrendszer</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>A WSL kiváló módja a különböző Linux-disztribúciók kipróbálásának.</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>Disztribúciókezelés</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>További információ az alapszintű WSL-parancsokról</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>További információ a linuxos disztribúciók importálásáról</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>Telepíthető WSL-disztribúciók listázása parancs</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l -o'</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>Nevesített WSL-disztribúció telepítése parancs</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;DistroName&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>Elérhető WSL-disztribúciók listázása parancs</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>A Docker Desktop nagyszerűen működik együtt a WSL-lel, hogy segítsen a Linux-tárolókkal való fejlesztésben.
+
+A Docker Desktop WSL-lel való használatának néhány előnye:
+
+• Docker-parancsokat futtathat WSL-ben vagy Windowsban, ugyanazzal a Docker-démonnal és lemezképekkel.
+• A windowsos meghajtók WSL-beli automatikus csatlakoztatásával zökkenőmentesen oszthat meg fájlokat és mappákat Windows és Linux között.
+• A WSL együttműködési képességének köszönhetően a kívánt Windows-eszközökkel és -szerkesztőkkel dolgozhat Linux-kódon és -fájlokon, vagy fordítva.</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Docker Desktop-integráció</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>További információ a WSL használatáról Dockerrel</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>A Linuxos Windows-alrendszer (WSL) segítségével közvetlenül a Windowson futtathatja kedvenc Linux-eszközeit, segédprogramjait, alkalmazásait és munkafolyamatait.
+
+Szánjon egy kis időt a közösség néhány kedvenc funkciójának előzetes megtekintésére, vagy tekintse meg átfogó dokumentációnkat.</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>Üdvözli a WSL</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>Ajánlott eljárások a beállításhoz</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Első lépések Linuxszal</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>A linuxos Windows-alrendszer (WSL) dokumentációja</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>Grafikus linuxos alkalmazásokat használhat natív Windows-interakciókkal, például alt-tab billentyűkombinációval, start menü indítása, tálca kitűzése, valamint a kivágás és beillesztés támogatása.</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>Grafikus felhasználói felületű alkalmazások</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>A WSL képes kihasználni a Windows GPU-t gépi tanulási munkafolyamatokhoz
+
+A WSL-ben futó Linux bináris fájlok automatikusan használhatják a GPU-t a Windowsban a teljesítményük gyorsításához. Ezeket a munkafolyamatokat ugyanúgy kell telepítenie és futtatnia, mint egy normál linuxos gépen. Számos különböző módon kezdheti meg a CUDA futtatását egy Docker-tárolóban, ha NVIDIA grafikus kártyával rendelkezik, a PyTorch vagy a TensorFlow DirectML-vel való futtatásához AMD- vagy Intel- vagy NVIDIA-videokártyán. További információért tekintse meg az alábbi kezdő útmutatót.</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>GPU-gyorsítás</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>További információ a GPU-gyorsításról</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>További információ a WSL GUI-alkalmazásokról</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>Íme a kipróbálandó alkalmazások listája (az összes alkalmazást telepítheti Ubuntuban a 'sudo apt install &lt;Az alkalmazás neve&gt;' beírásával)
+
+    • gedit – Basic szövegszerkesztő
+    • audacity – Hangfájlok rögzítése és szerkesztése
+    • blender – 3D animációk és vizualizációk készítése
+    • gimp – Fényképek szerkesztése
+    • nautilus – Egy Linux fájlkezelő
+    • vlc – Videolejátszó</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>A windowsos és a linuxos operációs rendszereken is könnyedén elérheti a hálózati alkalmazásokat.</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>Hálózati integráció</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>További információ a hálózati alkalmazásokról</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>További információ a tükrözött módú hálózatkezelésről</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>A WSL-t közvetlenül a VS Code-ból teljes munkaidős fejlesztési környezetként is használhatja.</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>VS Code-integráció</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>További információ a WSL használatáról VS Code-dal</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>A telepítés módja</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>A VS Code telepítése után telepítheti a távoli WSL-bővítményt a Windows terminálból:
+
+'code –install-extension ms-vscode-remote.remote-wsl'</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>WSL-projekt megnyitása Visual Studio Code-ban</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>Ha a WSL-disztribúcióból szeretne megnyitni egy projektet a VS Code-ban, nyissa meg a terjesztési parancssort, és futtassa a 'code .' parancsot egy projektfájl megnyitásához.
+
+A VS Code-ban található parancskatalógusban további VS Code Remote beállításokat is elérhet. A „SHIFT+CTRL+P” billentyűkombinációval nyissa meg a parancspalettát, és írja be a "Remote-WSL" parancsot a rendelkezésre álló VS Code Remote-beállítások listájának megtekintéséhez, lehetővé téve a mappa újbóli megnyitását egy távoli munkamenetben, adja meg a megnyitni kívánt disztribúciót és egyebeket.</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>Használati útmutató</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>Választható funkciók</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>Lapjelentés engedélyezése</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>Az alapértelmezett igaz beállítás lehetővé teszi, hogy a Windows visszanyerje a WSL 2 virtuális gép számára lefoglalt nem használt memóriát.</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>Adatvédelmi nyilatkozat</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>Processzorok száma</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>A WSL 2 virtuális géphez hozzárendelni kívánt logikai processzorok száma.</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>Szám alaphelyzetbe állítása</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Processzorok száma</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>A WSL 2 virtuális géphez hozzárendelni kívánt logikai processzorok száma.</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>Kapcsolódó hivatkozások</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>Kibocsátási megjegyzések</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>Csökkentett mód engedélyezése</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>Futtatja a WSL-t csökkentett módban, amely számos funkciót letilt, és a rossz állapotú disztribúciók helyreállítására szolgál.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Csökkentett mód engedélyezése.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Futtatja a WSL-t csökkentett módban, amely számos funkciót letilt, és a rossz állapotú disztribúciók helyreállítására szolgál.</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>Névjegy</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>Fejlesztő</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Disztribúciókezelés</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Docker Desktop-integráció</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>Fájlrendszer</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>Általános</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>GPU-gyorsítás</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>Grafikus felhasználói felületű alkalmazások</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>Wsl.exe indítása</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>Memória és processzor</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>Hálózatkezelés</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>Hálózati integráció</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>Üdvözli a WSL</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>Választható funkciók</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>Beállítás</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>VS Code-integráció</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>Újdonságok</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>Fájlrendszerek közötti munka</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>Problémák</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>Ritka VHD engedélyezése alapértelmezés szerint</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>Az újonnan létrehozott virtuális merevlemezek automatikus ritkításra lesznek beállítva, ha engedélyezve vannak.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ritka VHD engedélyezése alapértelmezés szerint.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Az újonnan létrehozott virtuális merevlemezek automatikus ritkításra lesznek beállítva, ha engedélyezve vannak.</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>Fájl helyének felcserélése</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>A virtuális merevlemez felcserélésére szolgáló abszolút Windows-elérési út.</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>Tallózás a felcserélési fájlok között</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Fájl helyének felcserélése</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>A virtuális merevlemez felcserélésére szolgáló abszolút Windows-elérési út.</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>Felcserélési méret</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>Mennyi lapozóterületet kell hozzáadni a WSL 2 virtuális géphez, 0-t a felcserélés nélküli fájlhoz. A felcserélési tároló lemezalapú RAM, amit akkor használ a rendszer ha a memóriaigény meghaladja a hardvereszközökre vonatkozó korlátot.</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>Méret visszaállítása</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Felcserélési méret</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>A WSL 2 virtuális géphez hozzáadandó lapozótár megabájtban megadva. 0 a felcserélés nélküli fájlhoz. A felcserélési tároló lemezalapú RAM, amit akkor használ a rendszer ha a memóriaigény meghaladja a hardvereszközökre vonatkozó korlátot.</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>VirtIO engedélyezése</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>A 9. csomag helyett használjon virtuális kódot a gazdagépfájlok eléréséhez, ezzel növelve a sebességet.</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>Virtio 9p engedélyezése</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>Engedélyezi a 9P-fájlrendszer csatlakoztatását a gazdagépről a virtio átvitellel.</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>Virtuális gép üresjárati időkorlátja</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>A virtuális gép üresjárati ideje ezredmásodpercben a leállítás előtt.</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Időtúllépés alaphelyzetbe állítása</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Virtuális gép üresjárati időkorlátja</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>A virtuális gép üresjárati ideje ezredmásodpercben a leállítás előtt.</value>
+  </data>
+</root>

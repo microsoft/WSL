@@ -1,0 +1,2129 @@
+NOTICES AND INFORMATION
+Do Not Translate or Localize
+
+This software incorporates material from third parties.
+Microsoft makes certain open source code available at https://3rdpartysource.microsoft.com,
+or you may send a check or money order for US $5.00, including the product name,
+the open source component name, platform, and version number, to:
+
+Source Code Compliance Team
+Microsoft Corporation
+One Microsoft Way
+Redmond, WA 98052
+USA
+
+Notwithstanding any other terms, you may reverse engineer this software to the extent
+required to debug changes to any libraries licensed under the GNU Lesser General Public License.
+
+---------------------------------------------------------
+
+llvm/llvm-project d32170dbd5b0d54436537b6b75beaf44324e0c28 - Apache-2.0 WITH LLVM-exception
+
+
+(c) (tm)
+(c) Value A
+(c) auto AS
+(c) Value Sd
+(c) auto AST
+(c) CXType PT
+(c) Type I1Ty
+(c) Value RHS
+(c) X1 ... X1
+(c) Type I32Ty
+(c) Value Elt0
+Copyright 2014
+(c) Type Int8Ty
+(c) Type V8x8Ty
+(c) Value FMSub
+(c) unsigned AS
+(c) Constant One
+(c) Type FloatTy
+(c) Type Int16Ty
+(c) Type Int32Ty
+(c) Type Int64Ty
+(c) Value AllocA
+(c) Value Alloca
+Alloc1 a1 (c) R1
+Alloc1 a2 (c) R1
+(c) FileID MainID
+(c) Lower C Upper
+(c) Stmt NumExprs
+(c) Type DoubleTy
+(c) Type I32PtrTy
+(c) Value AllocaA
+Coproc, Opc1, CRm
+(c) ConstantInt C2
+(c) EUR CHECK-NEXT
+(c) Scale 1 Offset
+(c) State UNQUOTED
+(c) Type IndexType
+Copyright (c) 2012
+Copyright (c) 2013
+Copyright (c) 2019
+Exprs new (c) Stmt
+(c) ExprResult NewE
+(c) Metadata Ops MD
+(c) SelectInst SelI
+(c) SmallVector MDs
+(c) TransferBatch B
+(c) Type Int32PtrTy
+(c) Type Int64PtrTy
+(c) BasicBlock Entry
+(c) CXXRecordDecl CD
+(c) FunctionType FTy
+(c) Offset C- Offset
+Copyright 2010 INRIA
+Copyright 2011 INRIA
+Copyright 2012 INRIA
+Copyright 2014 INRIA
+Copyright 2015 INRIA
+Copyright 2016 INRIA
+(c) FunctionType FnTy
+(c) QualType ResultTy
+(c) SourceRange Range
+AsmToks new (c) Token
+SubExprs new (c) Stmt
+(c) 2008 Red Hat, Inc.
+(c) 2011 Anthony Green
+(c) BasicBlock EntryBB
+(c) FunctionType FFnTy
+(c) FunctionType IFnTy
+(c) SourceLocation Loc
+Condition (c) Branches
+Context (c) LineToUnit
+Copyright (c) 2013 IBM
+(c) ErrMsg Stream Error
+(c) SmallVector NewVars
+(c) SmallVector ToErase
+Bbb kind copyright' Bbb
+(c) Constant PosDivisorC
+CommonPtr new (c) Common
+Copyright (c) 2012 CHECK
+(c) CharUnits AlignedSize
+(c) Constant NullV2I32Ptr
+(c) Constant PosDividendC
+Copyright 2010-2011 INRIA
+Copyright 2014-2015 INRIA
+COPYRIGHT,v 1.3 2003/06/02
+Coproc, Opc1, Rt, Rt2, CRm
+Copyright 2003 Google Inc.
+Copyright 2008 Google Inc.
+Copyright 2009 Google Inc.
+Copyright 2015 Google Inc.
+Copyright 2018 Google Inc.
+Copyright The LLVM project
+coprime. APInt A HugePrime
+copyrighted by the author.
+(c) IdentifierInfo NumExprs
+(c) VectorType Int8PtrVecTy
+(c) Willem van Schaik, 1999
+Copyright (c) 1997, Phillip
+Copyright 2005, Google Inc.
+Copyright 2006, Google Inc.
+Copyright 2007, Google Inc.
+Copyright 2008, Google Inc.
+Copyright 2012 Google, Inc.
+Copyright 2013, Google Inc.
+Copyright 2015, Google Inc.
+InitCache (c) TransferBatch
+copyright u'2015, LLVM Team
+Copyright 2006, Dean Edwards
+(c) CHECK-NEXT 194 CHECK-NEXT
+(c) CXXBaseSpecifier NumBases
+(c) Designator NumDesignators
+(c) StringLiteral NumClobbers
+Constraints new (c) StringRef
+Copyright (c) 2002 Bo Thorsen
+Copyright (c) 2010 Apple Inc.
+Copyright (c) by P.J. Plauger
+Copyright 2010 Zencoder, Inc.
+Copyright 2017 Roman Lebedev.
+ParamInfo new (c) ParmVarDecl
+Copyright (c) 2000 Software AG
+Copyright (c) 2002 Roger Sayle
+Copyright (c) 2008 David Daney
+Copyright (c) 2009 Google Inc.
+Copyright (c) 2016 Aaron Watry
+Copyright (c) 2017 Google Inc.
+Copyright (c) 2018 Jim Ingham.
+Copyright 2009 The Go Authors.
+Copyright 2010 The Go Authors.
+Copyright 2011 The Go Authors.
+Copyright 2012 The Go Authors.
+Copyright 2013 The Go Authors.
+Copyright 2014 The Go Authors.
+Copyright 2015 The Go Authors.
+(c) (3) educational corporation
+(c) CHECK-NEXT foo() CHECK-NEXT
+(copr0) ConstantDataVector CDV1
+(copr1) ConstantDataVector CDV2
+Copyright (c) 1994 X Consortium
+Copyright (c) 2008 Matteo Frigo
+Copyright (c) 2009 Matteo Frigo
+Copyright (c) 2010 CodeSourcery
+Copyright (c) 2011 Kyle Moffett
+Copyright (c) 2011 Tilera Corp.
+Copyright (c) 2011 Timothy Wall
+Copyright (c) 2012 Peter Harris
+Copyright (c) 2012 Tilera Corp.
+Copyright 2008-2010 Apple, Inc.
+Copyright 2015 Sven Verdoolaege
+Copyright 2016 Sven Verdoolaege
+Copyright 2017 Sven Verdoolaege
+Copyright 2018 Sven Verdoolaege
+Copyright, License, and Patents
+Other Coprocessor Instructions.
+(c) StringLiteral NumConstraints
+Copyright (c) 1996 Red Hat, Inc.
+Copyright (c) 2002 Ranjit Mathew
+Copyright (c) 2004 Anthony Green
+Copyright (c) 2004 Simon Posnjak
+Copyright (c) 2008 Anthony Green
+Copyright (c) 2008 Red Hat, Inc.
+Copyright (c) 2011 Anthony Green
+Copyright (c) 2012 Anthony Green
+Copyright (c) 2014 Red Hat, Inc.
+Copyright 2011 Sven Verdoolaege.
+(c) foo() pragma omp target teams
+Copyright (c) 1992 Henry Spencer.
+Copyright (c) 2000 John Hornkvist
+Copyright (c) 2001 John Hornkvist
+Copyright (c) 2006 Kirill Simonov
+Copyright (c) 2012 Alan Hourihane
+Copyright 2001-2004 Unicode, Inc.
+copyright u'2003- d, LLVM Project
+copyright u'2011- d, LLVM Project
+(c) CyclesSaved + LocalCyclesSaved
+Copyright (c) 1999-2007 Apple Inc.
+Copyright (c) 2009 The Go Authors.
+Copyright (c) 2009-2019 Polly Team
+Copyright (c) 2012 Thorsten Glaser
+Copyright (c) 2013 Tensilica, Inc.
+Copyright 2012 Universiteit Leiden
+Copyright 2016-2017 Tobias Grosser
+copyright u'2007- d, The LLDB Team
+copyright u'2013- d, Analyzer Team
+Constraint new (c) AtomicConstraint
+Copyright (c) 1998 Cygnus Solutions
+Copyright (c) 1998 Geoffrey Keating
+Copyright (c) 2001 David E. O'Brien
+Copyright (c) 2013 Mentor Graphics.
+Copyright (c) 2015the LLVM Project.
+Copyright 2009-2010 The Go Authors.
+copyright u'2007- d, The Clang Team
+copyright u'2010- d, The Polly Team
+copyright u'2011-2018, LLVM Project
+Copyright (C ) Microsoft Corporation
+Copyright (c) 2000, 2007 Software AG
+Copyright (c) 2001 Alexander Peslyak
+Copyright (c) 2012, 2013 Xilinx, Inc
+Copyright (c) 2014, 2015 Google Inc.
+Copyright (c) 2019 The MLIR Authors.
+Copyright (c) Microsoft Corporation.
+Copyright 2009, 2010 The Go Authors.
+Copyright 2015-2016 Sven Verdoolaege
+Copyright 2016, 2017 Tobias Grosser.
+Copyright 2016-2017 Sven Verdoolaege
+(c) PointerType InitPtrType InitValue
+Copyright (c) 1996-2003 Red Hat, Inc.
+Copyright (c) 1996-2004 Red Hat, Inc.
+Copyright (c) 1999-2003 Steve Purcell
+Copyright (c) 2012-2016, Yann Collet.
+Copyright 2011,2015 Sven Verdoolaege.
+Copyright (c) 1996, 1998 Red Hat, Inc.
+Copyright (c) 1998, 2008 Red Hat, Inc.
+Copyright (c) 1999, 2008 Red Hat, Inc.
+Copyright (c) 2004 Renesas Technology.
+Copyright (c) 2008 Christian Haggstrom
+Copyright (c) 2008, 2010 Red Hat, Inc.
+Copyright (c) 2011, 2012 Anthony Green
+Copyright (c) 2011, 2013 Anthony Green
+Copyright (c) 2011, 2014 Anthony Green
+Copyright (c) 2012, 2013 Anthony Green
+Copyright (c) 2012, 2014 Anthony Green
+Copyright 2007-2010 by the Sphinx team
+(c) 2006 Free Software Foundation, Inc.
+(c) CHECK-NEXT T break CHECK-NEXT Preds
+Copyright (c) 1998, 2012 Andreas Schwab
+Copyright (c) 2002-2004 Tim J. Robbins.
+Copyright (c) 2005 Free Standards Group
+Copyright 2005-2007 Universiteit Leiden
+Copyright 2006-2007 Universiteit Leiden
+Copyright 2012 Ecole Normale Superieure
+Copyright 2013 Ecole Normale Superieure
+Copyright 2014 Ecole Normale Superieure
+Copyright 2016 Ismael Jimenez Martinez.
+Portions Copyright 2009 The Go Authors.
+in LLVM, Diploma Thesis, (c) April 2011
+(c) StringRef NumClobbers // FIXME Avoid
+Copyright (c) 1996-1998 John D. Polstra.
+Copyright (c) 2002-2008, 2012 Kaz Kojima
+Copyright (c) 1997-2019 Intel Corporation
+Copyright (c) 2005 Axis Communications AB
+Copyright (c) 2010-2015 Benjamin Peterson
+Copyright 1992, 1993, 1994 Henry Spencer.
+coproc_option_imm Operand let PrintMethod
+(c) CXXCtorInitializer NumIvarInitializers
+Copyright (c) 2000 Hewlett Packard Company
+Copyright (c) 2002 Bo Thorsen <bo@suse.de>
+Copyright (c) 1996-2003, 2010 Red Hat, Inc.
+Copyright (c) 2004 eXtensible Systems, Inc.
+Copyright (c) 2009-2014 by the contributors
+Copyright (c) 2009-2015 by the contributors
+Copyright (c) 2009-2016 by the contributors
+Copyright (c) 2009-2019 by the contributors
+Copyright (c) 2011 Free Software Foundation
+Copyright (c) 2011-2014 by the contributors
+Copyright (c) 2011-2019 by the contributors
+Copyright (c) 2013 Imagination Technologies
+Copyright (c) 2017-2019 by the contributors
+(c) CHECK-NEXT Preds (1) B4 CHECK-NEXT Succs
+(c) CHECK-NEXT Preds (1) B5 CHECK-NEXT Succs
+(c) CHECK-NEXT Preds (1) B7 CHECK-NEXT Succs
+CoprocNumAsmOperand AsmOperandClass let Name
+CoprocRegAsmOperand AsmOperandClass let Name
+Copyright (c) 1993 by Sun Microsystems, Inc.
+Copyright (c) 1996, 1998, 2005 Red Hat, Inc.
+Copyright (c) 1996, 1998, 2007 Red Hat, Inc.
+Copyright (c) 1998, 2008, 2011 Red Hat, Inc.
+Copyright (c) 1999, 2007, 2008 Red Hat, Inc.
+Copyright (c) 2004 by Sun Microsystems, Inc.
+Copyright (c) 2007, 2009, 2010 Red Hat, Inc.
+Copyright (c) 2011, 2012, 2013 Anthony Green
+Copyright 2012,2014 Ecole Normale Superieure
+Copyright 2012-2013 Ecole Normale Superieure
+Copyright 2012-2014 Ecole Normale Superieure
+Copyright 2013-2014 Ecole Normale Superieure
+Copyright (c) 1992, 1993, 1994 Henry Spencer.
+Copyright (c) 2002-2007 Michael J. Fromberger
+Copyright (c) 2009, 2010, 2011, 2012 ARM Ltd.
+Copyright (c) 2012, 2013 Anthony Green Target
+Copyright 2000 Free Software Foundation, Inc.
+Copyright 2004 Free Software Foundation, Inc.
+Copyright (c) 2008 Ryan McCabe <ryan@numb.org>
+(c) 2003-2004 Randolph Chung <tausq@debian.org>
+CoprocOptionAsmOperand AsmOperandClass let Name
+Copyright (c) 2003, 2004, 2006, 2008 Kaz Kojima
+Copyright (c) 2014 Advanced Micro Devices, Inc.
+Copyright (c) 2015 Advanced Micro Devices, Inc.
+Copyright (c) 1994-1999 Lucent Technologies Inc.
+Copyright (c) 2002, 2007 Bo Thorsen <bo@suse.de>
+Copyright (c) 2013 Imagination Technologies Ltd.
+(c) Designator NumDesigs NumDesignators NumDesigs
+Copyright (c) 1992, 1993 UNIX International, Inc.
+Copyright (c) 1996-2003, 2007, 2008 Red Hat, Inc.
+Copyright (c) 2004 Free Software Foundation, Inc.
+Copyright (c) 2006 Free Software Foundation, Inc.
+Copyright (c) 2007 Free Software Foundation, Inc.
+Copyright (c) 2008 Free Software Foundation, Inc.
+Copyright (c) 2009 Free Software Foundation, Inc.
+Copyright (c) 2011 Free Software Foundation, Inc.
+Copyright (c) 2012 Free Software Foundation, Inc.
+Copyright (c) 2012, Noah Spurrier <noah@noah.org>
+Copyright (c) 2013-2014, Pexpect development team
+Copyright (c) 2013-2016, Pexpect development team
+Copyright (c) 2014 Free Software Foundation, Inc.
+Copyright (c) 2015 Paul Norman <penorman@mac.com>
+Copyright (c) 2016 Aaron Watry <awatry@gmail.com>
+Copyright extcopyright~ he year the LLVM Project.
+(c) CHECK-NEXT Preds (3) B3 B4 B2 CHECK-NEXT Succs
+(c) CHECK-NEXT Preds (3) B3 B5 B6 CHECK-NEXT Succs
+Copyright (c) 1996, 2007, 2008, 2011 Red Hat, Inc.
+Copyright (c) 1998, 2001, 2007, 2008 Red Hat, Inc.
+Copyright (c) 1998, 2007, 2008, 2012 Red Hat, Inc.
+Copyright (c) 2000, 2003, 2004, 2008 Red Hat, Inc.
+Copyright (c) 2003-2010 Python Software Foundation
+Copyright (c) 2012 Zack Weinberg <zackw@panix.com>
+Copyright 1992-2018 Free Software Foundation, Inc.
+Copyright 2008-2009 Katholieke Universiteit Leuven
+(c) Stmt NumExprs std::copy Exprs, Exprs + NumExprs
+Copyright (c) 1996, MPEG Software Simulation Group.
+Copyright (c) 2003 Jakub Jelinek <jakub@redhat.com>
+Copyright (c) 2008 Guido U. Draheim <guidod@gmx.de>
+Copyright (c) 2008 Stepan Kasal <skasal@redhat.com>
+Copyright (c) 2011 Plausible Labs Cooperative, Inc.
+Copyright (c) 2012 Qualcomm Innovation Center, Inc.
+Copyright (c) 2008 Benjamin Kosnik <bkoz@redhat.com>
+Copyright (c) 2013 Synopsys, Inc. (www.synopsys.com)
+Copyright (c) 2013 Synposys, Inc. (www.synopsys.com)
+Copyright (c) 2014,2015 Advanced Micro Devices, Inc.
+Copyright (c) 2002, 2003, 2004, 2006, 2008 Kaz Kojima
+Copyright (c) 2003, 2004, 2006, 2007, 2012 Kaz Kojima
+Copyright (c) 2013 Miodrag Vallat. <miod@openbsd.org>
+Copyright (c) 2014, 2015 Advanced Micro Devices, Inc.
+Copyright (c) 2016 Krzesimir Nowak <qdlacz@gmail.com>
+Copyright (c) 1994-2014 Free Software Foundation, Inc.
+Copyright (c) 1994-2017 Free Software Foundation, Inc.
+Copyright (c) 1996, 2003-2004, 2007-2008 Red Hat, Inc.
+Copyright (c) 1996-2014 Free Software Foundation, Inc.
+Copyright (c) 1996-2015 Free Software Foundation, Inc.
+Copyright (c) 1996-2017 Free Software Foundation, Inc.
+Copyright (c) 1997-2014 Free Software Foundation, Inc.
+Copyright (c) 1997-2017 Free Software Foundation, Inc.
+Copyright (c) 1999-2013 Free Software Foundation, Inc.
+Copyright (c) 1999-2014 Free Software Foundation, Inc.
+Copyright (c) 1999-2017 Free Software Foundation, Inc.
+Copyright (c) 2001-2014 Free Software Foundation, Inc.
+Copyright (c) 2001-2017 Free Software Foundation, Inc.
+Copyright (c) 2002-2014 Free Software Foundation, Inc.
+Copyright (c) 2002-2017 Free Software Foundation, Inc.
+Copyright (c) 2003-2014 Free Software Foundation, Inc.
+Copyright (c) 2003-2017 Free Software Foundation, Inc.
+Copyright (c) 2004-2014 Free Software Foundation, Inc.
+Copyright (c) 2004-2015 Free Software Foundation, Inc.
+Copyright (c) 2004-2017 Free Software Foundation, Inc.
+Copyright (c) 2006-2014 Free Software Foundation, Inc.
+Copyright (c) 2006-2017 Free Software Foundation, Inc.
+Copyright (c) 2007, 2008 Free Software Foundation, Inc
+Copyright (c) 2008 Sven Verdoolaege <skimo@kotnet.org>
+Copyright (c) 2009-2014 Free Software Foundation, Inc.
+Copyright (c) 2009-2017 Free Software Foundation, Inc.
+Copyright (c) 2010-2015 Free Software Foundation, Inc.
+Copyright (c) 2010-2017 Free Software Foundation, Inc.
+Copyright (c) 2011-2013 Free Software Foundation, Inc.
+Copyright (c) 2011-2014 Free Software Foundation, Inc.
+Copyright (c) 2012-2014 Free Software Foundation, Inc.
+Copyright (c) 2012-2015 Free Software Foundation, Inc.
+Copyright (c) 2013-2014 Free Software Foundation, Inc.
+Copyright (c) 2013-2015 Free Software Foundation, Inc.
+Copyright (c) 2002, 2009 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005 Free Software Foundation, Inc.
+Copyright (c) 2004, 2010 Free Software Foundation, Inc.
+Copyright (c) 2006, 2008 Free Software Foundation, Inc.
+Copyright (c) 2008, 2010 Free Software Foundation, Inc.
+Copyright (c) 2014 Sebastian Macke <sebastian@macke.de>
+Copyright (c) 2015 Moritz Klammler <moritz@klammler.eu>
+Copyright (c) 1996, 1997, 2003, 2004, 2008 Red Hat, Inc.
+Copyright (c) 1998, 2001, 2007, 2008, 2011, 2014 Red Hat
+Copyright (c) 2009 Bradley Smith <brad@brad-smith.co.uk>
+Copyright (c) 2013 Jesse Towner <jessetowner@lavabit.com>
+Copyright (c) 2013 Roy Stogner <roystgnr@ices.utexas.edu>
+(c) Type AtExitFuncArgs VoidStar FunctionType AtExitFuncTy
+copyright (c) 1991-2011, Thomas G. Lane, Guido Vollbeding.
+(c) GlobalVariable Handle new GlobalVariable M, DsoHandleTy
+(c) Type ArgTys Int32Ty, Int32Ty, Int32Ty FunctionType FnTy
+Copyright (c) 2004 Scott James Remnant <scott@netsplit.com>
+Copyright (c) 2008 Steven G. Johnson <stevenj@alum.mit.edu>
+Copyright (c) 2009 Steven G. Johnson <stevenj@alum.mit.edu>
+Copyright (c) 2004, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2007, 2008, 2010 Free Software Foundation, Inc
+Copyright (c) 2007, 2009, 2010 Free Software Foundation, Inc
+Copyright (c) 2013 Victor Oliveira <victormatheus@gmail.com>
+Copyright 1984, 1987, 1989, 1992, 2000 by Stephen L. Moshier
+(c) DeclRefExpr DR M.makeDeclRefExpr(PV) ImplicitCastExpr ICE
+(c) IdentifierInfo NumExprs std::copy Names, Names + NumExprs
+Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>
+Copyright (c) 2001, 2003, 2005 Free Software Foundation, Inc.
+Copyright (c) 2002, 2003, 2009 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005, 2012 Free Software Foundation, Inc.
+Copyright (c) 2006, 2008, 2010 Free Software Foundation, Inc.
+(c) BranchInst BI BranchInst::Create(Exit, Exit, False, Entry)
+Copyright (c) 1996, 1998, 1999, 2001, 2007, 2008 Red Hat, Inc.
+Copyright (c) 1996, 1998, 2001, 2002, 2003, 2005 Red Hat, Inc.
+Copyright (c) 1996, 1998, 2005, 2007, 2009, 2010 Red Hat, Inc.
+Copyright (c) 1996,1998,2001-2003,2005,2008,2010 Red Hat, Inc.
+Copyright (c) 1994 The Regents of the University of California.
+Copyright (c) 1996-2014 Anthony Green, Red Hat, Inc and others.
+Copyright (c) 1992-1996, 1998-2012 Free Software Foundation, Inc.
+Copyright (c) 1996-2001, 2003-2015 Free Software Foundation, Inc.
+Copyright (c) 2001, 2003, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 2001, 2003, 2005, 2011 Free Software Foundation, Inc.
+Copyright (c) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
+Copyright (c) 2003-2019 University of Illinois at Urbana-Champaign.
+Copyright (c) 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005, 2007, 2009 Free Software Foundation, Inc.
+Copyright (c) 2007-2018 University of Illinois at Urbana-Champaign.
+Copyright (c) 2007-2019 University of Illinois at Urbana-Champaign.
+Copyright (c) 2002, 2003, 2004, 2010, Free Software Foundation, Inc.
+Copyright (c) 2006-2009 Steven J. Bethard <steven.bethard@gmail.com>
+Copyright (c) 1992, 1993 The Regents of the University of California.
+(c) StringLiteral NumClobbers std::copy Clobbers, Clobbers + NumClobbers
+Copyright (c) 2000-2007 Vita Nuova Holdings Limited (www.vitanuova.com).
+Copyright (c) 2001, 2002, 2003, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 2001, 2002, 2003, 2005, 2009 Free Software Foundation, Inc.
+Copyright (c) 2001, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
+Copyright (c) 2001, 2003, 2005, 2008, 2011 Free Software Foundation, Inc.
+Copyright (c) 2002, 2006, 2007, 2009, 2010 Free Software Foundation, Inc.
+Copyright (c) 2003, 2004, 2005, 2006, 2011 Free Software Foundation, Inc.
+Copyright (c) 2004, 2005, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1992, 1993, 1994 The Regents of the University of California.
+Copyright (c) 2004-2005, 2007-2008, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2004-2005, 2007-2009, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2004-2005, 2007, 2009, 2011-2015 Free Software Foundation, Inc.
+Copyright (c) 2012 Alexandre K. I. de Mendonca <alexandre.keunecke@gmail.com>
+Copyright (c) 2001, 2002, 2003, 2005, 2008, 2010 Free Software Foundation, Inc.
+Copyright (c) 2002, 2003, 2005, 2006, 2007, 2008 Free Software Foundation, Inc.
+(c) StringLiteral NumConstraints std::copy Constraints, Constraints + NumConstraints
+Copyright (c) 1996, 1997, 2000, 2001, 2003, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2001, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 2002, 2003, 2005, 2006, 2007, 2008, 2011 Free Software Foundation, Inc.
+Copyright (c) 1995, 1996, 1997, 2003, 2004, 2005, 2007, 2009 Free Software Foundation, Inc.
+Copyright (c) 1997, 1999, 2000, 2001, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 1997, 2000, 2001, 2003, 2004, 2005, 2006, 2008 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005, 2008 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2009 Free Software Foundation, Inc.
+Copyright (c) 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2011 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1999, 2000, 2003, 2004, 2005, 2006, 2007, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
+Copyright (c) 2012 Alexandre K. I. de Mendonca <alexandre.keunecke@gmail.com> , Paulo Pizarro <paulo.pizarro@gmail.com>
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2008, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1995, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2010, 2011, 2014 Free Software Foundation, Inc.
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+Copyright (c) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012 Free Software Foundation, Inc.
+
+Apache-2.0 WITH LLVM-exception
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+StrawberryPerl 5.28.0.1 - GPL-1.0-or-later OR Artistic-1.0-Perl
+
+
+(c) 2009,2012
+(c) OMIX, Inc.
+Copyright 1998
+Copyright 2000
+Copyright 2004
+Copyright 2010
+Copyright 2001.
+copyright 2014.
+(c) Mnemonic C's
+Copyright 1998 I
+(c) 2000 Dr. Seuss
+(c) Copyright 2000
+COPYRIGHT (c) 2010
+Copyright (c) 2000
+Copyright (c) 2001
+Copyright (c) 2006
+Copyright (c) 2008
+Copyright (c) 2010
+Copyright (c) 2011
+Copyright (c) 2012
+Copyright (c) 2013
+Copyright (c) 2016
+Copyright (c) 2017
+Copyright (c) 2018
+copyright (c) 2011
+Copyright 1995-2015
+Copyright 2009-2017
+copyright 1996 King
+copyright_year 2017
+2003 SP1, Sever 2008
+COPYRIGHT Yves Orton
+Copyright 1996 Zenin
+copyright 1995-2004.
+copyright year//2017
+copyrighted (c) 1996
+(c) 2005 Byrne Reese.
+2003 SP1, Server 2008
+Copyright Mark Fowler
+copyrighted by Adobe.
+Copyright (c) 1994-1997
+Copyright (c) 2001-2015
+Copyright (c) 2004-2014
+Copyright (c) 2005-2015
+Copyright (c) 2010 KMX.
+Copyright (c) 2010-2012
+Copyright (c) 2010-2016
+Copyright (c) 2011-2015
+Portions Copyright 2001
+copyright 1996 King Tut
+copyright 2000 Fred Foo
+(c) Rafael Garcia-Suarez
+Copyright (c) 1997, 1998
+Copyright (c) 2009, 2011
+Copyright Mark Overmeer.
+(c) 2017 Unicode(r), Inc.
+Copyright (c) 2001 Single
+Copyright (c) 2005 by mst
+Copyright (c) 2006 - 2011
+Copyright (c) 2007 - 2010
+Copyright (c) 2007 - 2013
+Copyright 2000 Gisle Aas.
+Copyright 2001 Gisle Aas.
+Copyright 2002 Gisle Aas.
+Copyright 2002 Johnny Lee
+Copyright 2003, Gisle Aas
+Copyright 2006 Yves Orton
+Copyright 2009 Gisle Aas.
+Gisle Aas, Copyright 2003
+copyright 2004, Published
+copyright by Ken Williams
+COPYRIGHT Tom Christiansen
+Copyright (c) 2009 by yvbl
+Copyright 2003 Graham Barr
+Copyright 2004 Simon Flack
+Copyright 2015 Chad Granum
+Copyright 2016 Chad Granum
+Copyright 2016 cPanel Inc.
+Copyright 2018 Chad Granum
+copyright (c) 2008 by yvbl
+(c) 2004 Dennis K. Paulsen.
+(c) Copyright 2000 Fred Foo
+Copyright (c) 1996 by Eryq.
+Copyright (c) 2007 - 2010 L
+Copyright (c) Ken Williams.
+Copyright 1999 Tye McQueen.
+Copyright 2001, Larry Wall.
+Copyright 2006 Chris Dolan.
+Copyright 2010 Adam Kennedy
+Copyright 2010 Grant McLean
+Copyright 2012 David Golden
+Copyright 2017 Jens Rehsack
+copyright 2008 Audrey Tang.
+Copyright (c) 1998 Gisle Aas
+Copyright (c) 2001,2002 RIPE
+Copyright (c) 2001-2005 RIPE
+Copyright (c) 2002 Your Name
+Copyright (c) 2003 Tim Bunce
+Copyright (c) 2003-2005 RIPE
+Copyright (c) 2007 Bob Free.
+Copyright (c) 2015 Bob Free.
+Copyright 2006-2018 Sisyphus
+Copyright 2009, Paul Fenwick
+Copyright 2010, Shlomi Fish.
+Copyright 2011 Joachim Zobel
+Copyright 2012 David Oswald.
+Copyright 2014 Laurent Dami.
+Copyright 2016 Unicode, Inc.
+Copyright 2017 Stefan Hermes
+Copyright, 2005 Simon Wistow
+Copyright, 2006 Simon Wistow
+Copyright (c) 1995 Your Name.
+Copyright (c) 1996 Dave Roth.
+Copyright (c) 1998, Tim Bunce
+Copyright (c) 2001 Dave Cross
+Copyright (c) 2002 Sam Tregar
+Copyright (c) 2009-2010, Goro
+Copyright (c) 2013 Fred Moyer
+Copyright (c) 2014 Steve Hay.
+Copyright (c) 2016 Cpanel Inc
+Copyright (c) Takumi Akiyama.
+Copyright 2000-2002 Tim Bunce
+Copyright 2001, Sean M. Burke
+Copyright 2002 Sreeji K. Das.
+Copyright 2002-2014 Dan Kogai
+Copyright 2004 by Daniel Muey
+Copyright 2006 by Randy Kobes
+Copyright 2010 Curtis Jewell.
+Copyright 2013, Niels Thykier
+Copyright Laurent Dami, 2014.
+(c) Copyright 2007 Arthur Dent
+Copyright (c) 2000 Mark Kvale.
+Copyright (c) 2004-2005 Nokia.
+Copyright (c) 2005 Byrne Reese
+Copyright (c) 2006 Google Inc.
+Copyright (c) 2006-2017 Hatuka
+Copyright (c) 2009, Goro Fuji.
+Copyright (c) 2009-2012 Hatuka
+Copyright (c) 2009-2013 Hatuka
+Copyright (c) 2009-2018 Hatuka
+Copyright (c) 2011 Mark Allen.
+Copyright (c) 2012 M. Nunberg.
+Copyright (c) 2013 Google Inc.
+Copyright (c) 2014 cPanel Inc.
+Copyright (c) 2017 Mark Allen.
+Copyright (c) 2017 Reini Urban
+Copyright 1987-2018 Larry Wall
+Copyright 1995 Martijn Koster.
+Copyright 1995, Martijn Koster
+Copyright 1995-1998 Gisle Aas.
+Copyright 1995-1999 Gisle Aas.
+Copyright 1995-2000 Gisle Aas.
+Copyright 1995-2001 Gisle Aas.
+Copyright 1995-2004 Gisle Aas.
+Copyright 1995-2006 Gisle Aas.
+Copyright 1995-2009 Gisle Aas.
+Copyright 1995-2009, Gisle Aas
+Copyright 1995-2017 Mark Adler
+Copyright 1996,2001 Gisle Aas.
+Copyright 1996-2001 Gisle Aas.
+Copyright 1996-2001, Gisle Aas
+Copyright 1996-2003, Gisle Aas
+Copyright 1996-2004 Gisle Aas.
+Copyright 1996-2010, Gisle Aas
+Copyright 1996-2016 Gisle Aas.
+Copyright 1997 Uwe Hollerbach.
+Copyright 1997-1998, Gisle Aas
+Copyright 1997-1999 Gisle Aas.
+Copyright 1997-2011 Gisle Aas.
+Copyright 1998-1999 Gisle Aas.
+Copyright 1998-2000 Gisle Aas.
+Copyright 1998-2001 Gisle Aas.
+Copyright 1998-2002 Gisle Aas.
+Copyright 1998-2003 Gisle Aas.
+Copyright 1998-2005 Gisle Aas.
+Copyright 1998-2006 Gisle Aas.
+Copyright 1998-2008 Gisle Aas.
+Copyright 1998-2010 Gisle Aas.
+Copyright 1999-2004 Gisle Aas.
+Copyright 2001 Benjamin Trott.
+Copyright 2001-2017 Ray Finch.
+Copyright 2002, Sean M. Burke.
+Copyright 2003 Julius C. Duque
+Copyright 2007 David Cantrell.
+Copyright 2010 by Mark Dootson
+Copyright 2012 Steffen Mueller
+copyright (c) 2002 Jos Boumans
+copyright (c) 2005 Jos Boumans
+copyright (c) 2014 cPanel Inc.
+(c) 1995 Microsoft Corporation.
+(c) 1999 Microsoft Corporation.
+Copyright (c) 1998 Graham Barr.
+Copyright (c) 2000 Clark Cooper
+Copyright (c) 2000 Graham Barr.
+Copyright (c) 2002 Mark Fowler.
+Copyright (c) 2002 T.J. Mather.
+Copyright (c) 2003 Graham Barr.
+Copyright (c) 2004 X Consortium
+Copyright (c) 2006 Bob Mathews.
+Copyright (c) 2006 DelTel, Inc.
+Copyright (c) 2008 Paul Fenwick
+Copyright (c) 2010 Mark Dootson
+Copyright (c) 2011 Dick Franks.
+Copyright (c) 2011 Tim Jenness.
+Copyright (c) 2012 Dick Franks.
+Copyright (c) 2013 Dick Franks.
+Copyright (c) 2014 Dick Franks.
+Copyright (c) 2015 Dick Franks.
+Copyright (c) 2016 Dick Franks.
+Copyright (c) 2016, cPanel Inc.
+Copyright (c) 2017 Dick Franks.
+Copyright (c) Mihai Bazon 2008.
+Copyright (c) MingW-W64 Project
+Copyright 1995-1999, Gisle Aas.
+Copyright 2002 Jonathan Leffler
+Copyright 2008 by Laurent Dami.
+Copyright 2011 Christian Hansen
+Copyright 2012 by Dana Jacobsen
+Copyright 2013 by Dana Jacobsen
+Copyright 2017 by Dana Jacobsen
+copyright 1998 by Gabor Egressy
+copyright 2000 - 2004 Ned Konz.
+copyrighted by Dovecot authors.
+Copyright (c) 1997 Michael Fuhr.
+Copyright (c) 2000 Andy Wardley.
+Copyright (c) 2000 Michael Fuhr.
+Copyright (c) 2000, W3Works, LLC
+Copyright (c) 2001, Kurt Kincaid
+Copyright (c) 2003 Simon Cozens.
+Copyright (c) 2008 Andy Wardley.
+Copyright (c) 2008 Yuval Kogman.
+Copyright (c) 2016 Unicode, Inc.
+Copyright (c) jQuery Foundation.
+Copyright 1995 Lincoln D. Stein.
+Copyright 1995,1996 Neil Winton.
+Copyright 1995-1996 Neil Winton.
+Copyright 1998 The Perl Journal.
+Copyright 1999 Barrie Slaymaker.
+Copyright 1999-2004 Grant McLean
+Copyright 2001 Barrie Slaymaker.
+Copyright 2001, Barrie Slaymaker
+Copyright 2002-2008 by chromatic
+Copyright 2004-2010 John Peacock
+Copyright 2004-2018 by Dan Sully
+Copyright 2005-2008 Andy Lester.
+Copyright 2007-2009 Matt S Trout
+Copyright 2008 by Chia-liang Kao
+Copyright 2011-2015 Mateu Hunter
+Copyright 2013 Tom Christiansen.
+Copyright 2018 Gianni Ceccarelli
+Copyright MM-MMX, John McNamara.
+Copyrights 1995-2000 Graham Barr
+copyright (c) 1994 by Tim Bunce.
+copyright 2000 The Perl Journal.
+COPYRIGHT (c) MMV, John McNamara.
+Copyright (c) 1990-2007 Info-ZIP.
+Copyright (c) 1994-2006 Tim Bunce
+Copyright (c) 1994-2007 Tim Bunce
+Copyright (c) 1997-8 Graham Barr.
+Copyright (c) 1999, Ken Williams.
+Copyright (c) 2000-2002 Ned Konz.
+Copyright (c) 2001 Paul Kulchenko
+Copyright (c) 2002 James Tillman.
+Copyright (c) 2002 Richard Clamp.
+Copyright (c) 2002 Sean M. Burke.
+Copyright (c) 2003 Richard Clamp.
+Copyright (c) 2004 Sean M. Burke.
+Copyright (c) 2004 by Jeff Zucker
+Copyright (c) 2005 Paul Marquess.
+Copyright (c) 2005, Damian Conway
+Copyright (c) 2007 Martin Kutter.
+Copyright (c) 2007-14 Rob Kinyon.
+Copyright (c) 2009 Yann Kerherve.
+Copyright (c) 2010-2015 the Moo L
+Copyright (c) 2012, Steve Peters.
+Copyright (c) 2013 by Joel Berger
+Copyright (c) 2014 A. Sinan Unur.
+Copyright (c) 2014 Douglas Wilson
+Copyright (c) 2017 Stefan Hermes.
+Copyright 2000,2001 Sean M. Burke
+Copyright 2001 Abhijit Menon-Sen.
+Copyright 2001-2014. Ingy dot Net
+Copyright 2002-2006 Abe Timmerman
+Copyright 2002-2007 Adrian Howard
+Copyright 2008-2009, Paul Fenwick
+Copyright Andy Wardley 1998-2007.
+Copyright Micheal G Schwern 2001.
+copyright (c) 2004 by Casey West.
+copyright (c) 2014 by Arthur Axel
+copyright (c) 2014 by Mark Allen.
+copyright (c) 2016 by Arthur Axel
+copyright (c) 2018 by Arthur Axel
+copyright 1999-2010 W3Works, LLC.
+copyright 2004, Lincoln D. Stein.
+parts copyright 2011 Aaron Crane.
+COPYRIGHT (c) MMXV, John McNamara.
+Copyright (c) 1994-2013 Larry Wall
+Copyright (c) 1997 Alan Citterman.
+Copyright (c) 1997 Jochen Wiedmann
+Copyright (c) 1998+ Sean M. Burke.
+Copyright (c) 1998-2004 Tom Hughes
+Copyright (c) 2000 Paul Kulchenko.
+Copyright (c) 2000 Simon Matthews.
+Copyright (c) 2000, Andrew Benham.
+Copyright (c) 2000-9, Leon Brocard
+Copyright (c) 2001+ Sean M. Burke.
+Copyright (c) 2001, Paul Marquess.
+Copyright (c) 2003-2005 Yves Orton
+Copyright (c) 2003-2017 J-L Morel.
+Copyright (c) 2006 Simon Wilkinson
+Copyright (c) 2007 Brandon L Black
+Copyright (c) 2008- Martin Kutter.
+Copyright (c) 2010 Krasimir Berov.
+Copyright (c) 2010 by Jens Rehsack
+Copyright (c) 2011 by Dave Rolsky.
+Copyright (c) 2013 Chris Williams.
+Copyright (c) 2013-2014 Steve Hay.
+Copyright (c) 2013-2016 Steve Hay.
+Copyright (c) 2013-2017 Steve Hay.
+Copyright (c) 2014 by Dave Rolsky.
+Copyright (c) 2015-2016 cPanel Inc
+Copyright (c) 2016 Chris Marshall.
+Copyright (c) 2016 by Dave Rolsky.
+Copyright (c) 2017 by Dave Rolsky.
+Copyright 1999 - 2006 Tye McQueen.
+Copyright 2000-2005 Sean M. Burke.
+Copyright 2000-2018, Steve Hancock
+Copyright 2001, t0mas@netlords.net
+Copyright 2001-2003 AxKit.com Ltd.
+Copyright 2001-2009 AxKit.com Ltd.
+Copyright 2001-2018. Ingy dot Net.
+Copyright 2002 by Janek Schleicher
+Copyright 2002-2010 by Audrey Tang
+Copyright 2003 - 2007 Fergal Daly.
+Copyright 2003 by Michel Rodriguez
+Copyright 2003-2008 by Audrey Tang
+Copyright 2003-2010 by Audrey Tang
+Copyright 2003-2011 by Audrey Tang
+Copyright 2004-2009 by Audrey Tang
+Copyright 2004-2014. Ingy dot Net.
+Copyright 2004-2017. Ingy dot Net.
+Copyright 2005, 2006 Adam Kennedy.
+Copyright 2005-2018. Ingy dot Net.
+Copyright 2006,2008 by Randy Kobes
+Copyright 2007-2018. Ingy dot Net.
+Copyright 2012 Alessandro Ghedini.
+Copyright 2013 Alessandro Ghedini.
+Copyright 2013 by Kenichi Ishigaki
+Copyright 2013-2014, Niels Thykier
+Copyright 2014 Alessandro Ghedini.
+Copyright MM-MMXII, John McNamara.
+Copyright MM-MMXVI, John McNamara.
+Portions Copyright 2001 Ray Finch.
+copyright (c) 2009 by Philip Gwyn.
+copyright (c) 2017 by Dave Rolsky.
+copyright (c) 2018 by Dave Rolsky.
+copyright 2002, Daniel J. Harasty.
+parts copyright 2005 Steve Peters.
+parts copyright 2006 Chris Nandor.
+parts copyright 2009 Adam Kennedy.
+parts copyright 2010 Adam Kennedy.
+COPYRIGHT 2001-2007, AxKit.com Ltd.
+Copyright (c) 1998, Jochen Wiedmann
+Copyright (c) 2000 Andrew Tridgell.
+Copyright (c) 2001 Michael Hennecke
+Copyright (c) 2001, Colin McMillen.
+Copyright (c) 2001-2010 Neil Bowers
+Copyright (c) 2002 Jonathan Leffler
+Copyright (c) 2002-2003, Rob Brown.
+Copyright (c) 2002-2009 Neil Bowers
+Copyright (c) 2003 Chris Reinhardt.
+Copyright (c) 2003-2018 Mark Shelor
+Copyright (c) 2004 Peter Marschall.
+Copyright (c) 2006-2008 Gabor Szabo
+Copyright (c) 2007,2008 NLnet Labs.
+Copyright (c) 2007-10 Max Maischein
+Copyright (c) 2009 by David Golden.
+Copyright (c) 2011 by Joachim Zobel
+Copyright (c) 2012 by Daniel Dragan
+Copyright (c) 2013 by David Golden.
+Copyright (c) 2013,2015 Dick Franks
+Copyright (c) 2014 by David Golden.
+Copyright (c) 2014,2017 Dick Franks
+Copyright (c) 2014-2017 cPanel Inc.
+Copyright (c) 2016 by Jesse Luehrs.
+Copyright (c) 2016- by Jens Rehsack
+Copyright 1995-1998,2004 Gisle Aas.
+Copyright 2000-2010, John McNamara.
+Copyright 2001 - 2011 Adam Kennedy.
+Copyright 2001 by Jarkko Hietaniemi
+Copyright 2001 by Michael G Schwern
+Copyright 2001-2009, AxKit.com Ltd.
+Copyright 2003, 2004 by Fergal Daly
+Copyright 2003, R. Barrie Slaymaker
+Copyright 2005 - 2009 Adam Kennedy.
+Copyright 2005 - 2011 Adam Kennedy.
+Copyright 2005 - 2012 Adam Kennedy.
+Copyright 2006 - 2010 Adam Kennedy.
+Copyright 2006 - 2011 Adam Kennedy.
+Copyright 2006 - 2013 Adam Kennedy.
+Copyright 2006-2008 Curtis Ovid Poe
+Copyright 2007 - 2011 Adam Kennedy.
+Copyright 2007-2011 Andy Armstrong.
+Copyright 2008 - 2009 Adam Kennedy.
+Copyright 2008 - 2011 Adam Kennedy.
+Copyright 2009 - 2011 Adam Kennedy.
+Copyright 2009 - 2012 Adam Kennedy.
+Copyright 2010- Tatsuhiko Miyagawa.
+Copyright 2011 Breno G. de Oliveira
+Copyright 2014 - 2018 Jens Rehsack.
+Copyright 2015-2017 by Jens Rehsack
+Copyright 2017- by Kenichi Ishigaki
+copyright (c) 2003 by Simon Cozens.
+copyright (c) 2004 by Simon Cozens.
+copyright (c) 2010 by Adam Kennedy.
+copyright (c) 2013 by David Golden.
+copyright (c) 2013 by Jesse Luehrs.
+copyright (c) 2014 by Jesse Luehrs.
+copyright (c) 2015 by Robin Berjon.
+copyright (c) 2016 by Adam Kennedy.
+copyright (c) 2016 by David Golden.
+copyright (c) 2016 by Jesse Luehrs.
+copyright (c) 2017 by Adam Kennedy.
+copyright (c) 2017 by Graham Ollis.
+parts copyright 2000 Sean M. Burke.
+Copyright (c) 1995-1997 Graham Barr.
+Copyright (c) 1995-1998 Graham Barr.
+Copyright (c) 1995-2004 Graham Barr.
+Copyright (c) 1995-2006 Graham Barr.
+Copyright (c) 1995-2009 Graham Barr.
+Copyright (c) 1997, 1999 Tom Phoenix
+Copyright (c) 1997-1998 Graham Barr.
+Copyright (c) 1998-2004 Graham Barr.
+Copyright (c) 1998-2005 Graham Barr.
+Copyright (c) 1998-2011 Graham Barr.
+Copyright (c) 2000 Ilya Zakharevich.
+Copyright (c) 2000,2002 Thomas Pfau.
+Copyright (c) 2000-2004 Tim Jenness.
+Copyright (c) 2002-2004 Graham Barr.
+Copyright (c) 2003 Sidney Markowitz.
+Copyright (c) 2003- Euro6IX project.
+Copyright (c) 2005-6 Joshua Hoblitt.
+Copyright (c) 2006, Portugal Telecom
+Copyright (c) 2008 - 2010 Kazuho Oku
+Copyright (c) 2009 Tokuhiro Matsuno.
+Copyright (c) 2009,2012 Dick Franks.
+Copyright (c) 2009-2011 Dick Franks.
+Copyright (c) 2011-2012 Dick Franks.
+Copyright (c) 2011-2014 Reini Urban.
+Copyright (c) 2012 Tom Christiansen.
+Copyright (c) 2012,2016 Dick Franks.
+Copyright (c) 2012-2013 Google, Inc.
+Copyright (c) 2012-2017 Joel Berger.
+Copyright (c) 2017- Kenichi Ishigaki
+Copyright 1987-2018, Larry Wall Perl
+Copyright 1997 - 2001 Damian Conway.
+Copyright 2001-2008 Barrie Slaymaker
+Copyright 2006, William Hart. SIMPQS
+Copyright 2006-2016 by Brian Cassidy
+Copyright 2007-2008 Brandon L. Black
+Copyright 2008-2009 by Brian Cassidy
+Copyright 2009 - 2011 Jerome Quelin.
+Copyright 2011 by Serguei Trouchelle
+Copyright 2011-2017 by Dana Jacobsen
+Copyright 2012-2013 by Dana Jacobsen
+Copyright 2012-2016 by Dana Jacobsen
+Copyright 2014 Christopher J. Madsen
+Copyright 2014-2016 by Dana Jacobsen
+Copyright MM-MMXVIII, John McNamara.
+copyright (c) 1998 by Gabor Egressy.
+copyright (c) 2001 by Damian Conway.
+copyright (c) 2007 by Shawn M Moore.
+copyright (c) 2008 by Shawn M Moore.
+copyright (c) 2012-2017 Joel Berger.
+copyright 2002 - 2007 Matt Sergeant.
+(c) by Tels L <http://bloodgate.com/>
+Copyright (c) 1996-2000 Andy Wardley.
+Copyright (c) 1996-2001 Andy Wardley.
+Copyright (c) 1996-2006 Andy Wardley.
+Copyright (c) 1996-2007 Andy Wardley.
+Copyright (c) 1996-2008 Andy Wardley.
+Copyright (c) 1996-2013 Andy Wardley.
+Copyright (c) 1996-2014 Andy Wardley.
+Copyright (c) 1996-2015 Andy Wardley.
+Copyright (c) 1997,1998 Michael Fuhr.
+Copyright (c) 1997-2000 Michael Fuhr.
+Copyright (c) 1997-2001 Michael Fuhr.
+Copyright (c) 1997-2003 Andy Wardley.
+Copyright (c) 1997-2007 Andy Wardley.
+Copyright (c) 1998 by Jochen Wiedmann
+Copyright (c) 1998-2008 Andy Wardley.
+Copyright (c) 1999-2003 Joshua Chamas
+Copyright (c) 2000,2001 Michael Fuhr.
+Copyright (c) 2000-2007 Andy Wardley.
+Copyright (c) 2001-2006 Ken Williams.
+Copyright (c) 2001-2007 Andy Wardley.
+Copyright (c) 2001-2008 Ken Williams.
+Copyright (c) 2001-2008 Robin Berjon.
+Copyright (c) 2001-2009 Andy Wardley.
+Copyright (c) 2001-2011 Ken Williams.
+Copyright (c) 2002 Tim Bunce Ireland.
+Copyright (c) 2002,3,4 Sean M. Burke.
+Copyright (c) 2002-2007 Andy Wardley.
+Copyright (c) 2003-2005 Ken Williams.
+Copyright (c) 2003-2014 Max Maischein
+Copyright (c) 2006 by Steffen Mueller
+Copyright (c) 2006, 2013 Google Inc..
+Copyright (c) 2007-2008 Martin Kutter
+Copyright (c) 2009-2013 John McNamara
+Copyright (c) 2010-2014 A. Sinan Unur
+Copyright (c) 2010-2018 Sullivan Beck
+Copyright (c) 2011-2015 Buddy Burden.
+Copyright (c) 2011-2018 Sullivan Beck
+Copyright (c) 2012 by Leon Timmermans
+Copyright (c) 2013-2017 Jens Rehsack.
+Copyright (c) 2014 by David A Golden.
+Copyright (c) 2015 by Salvador FandiE
+Copyright (c) 2017-2018, Reini Urban.
+Copyright (c) 2018 by David A Golden.
+Copyright 1990,2015 by Johan Vromans.
+Copyright 1996-1998 Gurusamy Sarathy.
+Copyright 1999-2000 Michael A. Chase.
+Copyright 2001-2011 Jarkko Hietaniemi
+Copyright 2006 - 2011 Benjamin Trott.
+Copyright 2013 - 2017 by Jens Rehsack
+Copyrights 1995-2018 by Mark Overmeer
+Copyrights 2016-2018 by Mark Overmeer
+Portions copyright 2007 David Golden.
+copyright (c) 1994-2017 by Gisle Aas.
+copyright (c) 1998 by Maurice Aubrey.
+copyright (c) 2001-2017 by Gisle Aas.
+copyright (c) 2002 - 2009 Jos Boumans
+copyright (c) 2002-2017 by Gisle Aas.
+copyright (c) 2004 by Ricardo SIGNES.
+copyright (c) 2005 by Ricardo SIGNES.
+copyright (c) 2006 by Ricardo Signes.
+copyright (c) 2007 by Ricardo Signes.
+copyright (c) 2010 by Ricardo Signes.
+copyright (c) 2013 by Ricardo Signes.
+copyright (c) 2015 by Ricardo SIGNES.
+copyright (c) 2015 by Ricardo Signes.
+copyright (c) 2017 by Ricardo Signes.
+copyright (c) 2018 by Ricardo Signes.
+(c) Copyright 1998-2007 by Mark Mielke
+Copyright (c) 1994,1997,1998 Tim Bunce
+Copyright (c) 1995-2011 Paul Marquess.
+Copyright (c) 1995-2016 Paul Marquess.
+Copyright (c) 1995-2018 Paul Marquess.
+Copyright (c) 1997 Roderick Schertler.
+Copyright (c) 1997,1999 Tim Bunce With
+Copyright (c) 1997-2007, Damian Conway
+Copyright (c) 1997-2015 Paul Marquess.
+Copyright (c) 1998, Robert D. Cameron.
+Copyright (c) 1998-2004 Sean M. Burke.
+Copyright (c) 1999-2002 Marko Asplund.
+Copyright (c) 1999-2004 Sean M. Burke.
+Copyright (c) 2000 by James H. Turner.
+Copyright (c) 2000, Vipul Ved Prakash.
+Copyright (c) 2000-2006 Kawai Takanori
+Copyright (c) 2000-2008 Takanori Kawai
+Copyright (c) 2001, Vipul Ved Prakash.
+Copyright (c) 2001-2004 Sean M. Burke.
+Copyright (c) 2001-2011 Ian Robertson.
+Copyright (c) 2002 Andreas Gustafsson.
+Copyright (c) 2002,2011 Richard Clamp.
+Copyright (c) 2002-2004 Sean M. Burke.
+Copyright (c) 2002-2007 Sean M. Burke.
+Copyright (c) 2002-2009 Richard Clamp.
+Copyright (c) 2004-2009 by Jeff Zucker
+Copyright (c) 2005 Aristotle Pagaltzis
+Copyright (c) 2005-2018 Paul Marquess.
+Copyright (c) 2006-2007 David Landgren
+Copyright (c) 2009-2017 H.Merijn Brand
+Copyright (c) 2011-2018 Paul Marquess.
+Copyright (c) AEvar Arnfjord Bjarmason
+Copyright 1995-1998, Lincoln D. Stein.
+Copyright 2005-2010 by Steffen Mueller
+Copyright 2006-2009 by Steffen Mueller
+Copyright 2006-2010 by Steffen Mueller
+Portions Copyright (c) 2002 Rob Brown.
+copyright (c) 1996- by Andreas Koenig.
+copyright (c) 2001 - 2007, Jos Boumans
+copyright (c) 2003 Mark Jason Dominus.
+copyright (c) 2005 by Curtis Ovid Poe.
+copyright (c) 2008 by Florian Ragwitz.
+copyright (c) 2008 by Leon Timmermans.
+copyright (c) 2009 by Florian Ragwitz.
+copyright (c) 2010 by Leon Timmermans.
+copyright (c) 2012 by Leon Timmermans.
+copyright (c) 2013 by Karen Etheridge.
+copyright (c) 2013 by Leon Timmermans.
+copyright (c) 2014 by Karen Etheridge.
+copyright (c) 2014 by Leon Timmermans.
+copyright (c) 2015 by Leon Timmermans.
+copyright 1995-2005, Lincoln D. Stein.
+copyright 1995-2007, Lincoln D. Stein.
+copyright 1995-2010, Lincoln D. Stein.
+parts copyright 2006 Stephen Steneker.
+Copyright (c) 1995-98 Ilya Zakharevich.
+Copyright (c) 1997,1998 Jochen Wiedmann
+Copyright (c) 1998-2002 Ernesto Guisado
+Copyright (c) 1999, Kenneth Albanowski.
+Copyright (c) 2000-2001 Paul Kulchenko.
+Copyright (c) 2000-2001, Damian Conway.
+Copyright (c) 2000-2004 Paul Kulchenko.
+Copyright (c) 2000-2005 Paul Kulchenko.
+Copyright (c) 2000-2007 Paul Kulchenko.
+Copyright (c) 2000-2008 James H. Turner
+Copyright (c) 2000-2014, Damian Conway.
+Copyright (c) 2001-2014, Damian Conway.
+Copyright (c) 2002-2005 Peter Behroozi.
+Copyright (c) 2003-2005 Allison Randal.
+Copyright (c) 2006 by Philipp K. Janert
+Copyright (c) 2006-2008 by Paul Fenwick
+Copyright (c) 2007, Tim Bunce, Ireland.
+Copyright (c) 2007-2011, Andy Armstrong
+Copyright (c) 2007-2016 H.Merijn Brand.
+Copyright (c) 2007-2018 H.Merijn Brand.
+Copyright (c) 2009-2012 Daniel Stenberg
+Copyright (c) 2010, Tim Bunce, Ireland.
+Copyright (c) 2011 John Scoles. Canada.
+Copyright (c) 2013-2015 Salvador FandiE
+Copyright (c) 2016,2017 by Jens Rehsack
+Copyright 1995 - 2013 by Andreas Koenig
+Copyright 2010 Gisle Aas <gisle@aas.no>
+Copyright 2015-2018 by Janek Schleicher
+Parts Copyright (c) 2000-2004 Ned Konz.
+Portions Copyright (c) 2014 Dick Franks
+Portions copyright 2007, Joel Bernstein
+copyright (c) 1998-2003 by Mark Mielke.
+copyright (c) 2002 by Ilya Zakharevich.
+copyright (c) 2004-2016 by Andy Lester.
+copyright (c) 2015 by Christian Hansen.
+copyright (c) 2016 by Christian Hansen.
+parts copyright 2008 Wolfgang Sourdeau.
+(c) JS Foundation and other contributors
+COPYRIGHT (c) MM-MMXVIII, John McNamara.
+Copyright (c) 1996, 1997 Malcolm Beattie
+Copyright (c) 1998-2001 Jochen Wiedmann.
+Copyright (c) 2000-2011 Adekunle Olonoh.
+Copyright (c) 2000-2018 by Steve Hancock
+Copyright (c) 2003,2004 Chris Reinhardt.
+Copyright (c) 2004-2006 Peter Marschall.
+Copyright (c) 2004-2011 Steffen Goeldner
+Copyright (c) 2006-2007 by (Anno Siegel)
+Copyright (c) 2006-2014 Steffen Ullrich.
+Copyright (c) 2008, 2009 Florian Ragwitz
+Copyright (c) 2009 Christopher Marshall.
+Copyright (c) 2013-2014, 2016 Steve Hay.
+Copyright 1995-1997,2002-2004 Gisle Aas.
+Copyright 2001-2008 by Michael G Schwern
+Copyright 2003 Matthew Simon Cavalletto.
+Copyright 2004-2007, 2010 by Audrey Tang
+Copyright 2007-2008 by Michael G Schwern
+Copyright 2011-2017 Breno G. de Oliveira
+Copyright 2011-2017 by Christian Hansen.
+Copyright 2013-2017 by Christian Hansen.
+Copyright 2015-2017 by Christian Hansen.
+Portions Copyright (c) 2011 Dick Franks.
+Portions Copyright (c) 2012 Dick Franks.
+Portions Copyright (c) 2013 Dick Franks.
+Portions Copyright (c) 2015 Dick Franks.
+Portions Copyright (c) 2017 Dick Franks.
+Portions Copyright 2006 Portugal Telecom
+copyright (c) 2008 by John Napiorkowski.
+copyright (c) 2014-2018 by Graham Ollis.
+copyright (c) 2016 by chromatic@wgz.org.
+parts copyright 2008 Francis J. Lacoste.
+parts copyright 2009-2011 Jerome Quelin.
+COPYRIGHT (c) 1995 Microsoft Corporation.
+Copyright (c) 1994-2003 Tim Bunce Ireland
+Copyright (c) 1994-2010 Tim Bunce Ireland
+Copyright (c) 1994-2012 Tim Bunce Ireland
+Copyright (c) 1995-2001, Raphael Manfredi
+Copyright (c) 1996-2017 Gurusamy Sarathy.
+Copyright (c) 1997-2002 Tim Bunce Ireland
+Copyright (c) 1999-2000 by Marek Rouchal.
+Copyright (c) 2000-2003 Stephen McCamant.
+Copyright (c) 2001-2016 by Marek Rouchal.
+Copyright (c) 2002-2005 Steffen Goeldner.
+Copyright (c) 2003 - 2018 by Dave Rolsky.
+Copyright (c) 2004 by the Perl 5 Porters.
+Copyright (c) 2006-2009 by Steffen Muller
+Copyright (c) 2009-2011,2017 Dick Franks.
+Copyright (c) 2012 - 2017 by Dave Rolsky.
+Copyright (c) 2016 - 2018 by Dave Rolsky.
+Copyright (c) 2017, GoodData Corporation.
+Copyright 2004, 2006, 2010 by Audrey Tang
+Copyright 2010 by Makamaka Hannyaharamitu
+Copyright 2011-2013 by Serguei Trouchelle
+Copyright 2011-2014 by Serguei Trouchelle
+Portions Copyright (c) 1997 Michael Fuhr.
+Portions Copyright (c) 2001 Tony M Hoyle.
+Portions Copyright (c) 2003 Olaf Kolkman.
+Portions Copyright (c) 2005 Olaf Kolkman.
+copyright (c) 2003 - 2018 by Dave Rolsky.
+copyright (c) 2014, 2017 by Toby Inkster.
+parts copyright 2006 - 2012 Adam Kennedy.
+parts copyright 2007 - 2009 Adam Kennedy.
+parts copyright 2008 - 2009 Adam Kennedy.
+parts copyright 2008 - 2013 Adam Kennedy.
+parts copyright 2010 - 2011 Adam Kennedy.
+Copyright (c) 1994-2005 Tim Bunce, Ireland
+Copyright (c) 1996, Kenneth J. Albanowski.
+Copyright (c) 1998, 2002, 2003 Jon Orwant.
+Copyright (c) 1998-2004 by Jochen Wiedmann
+Copyright (c) 2000 - 2017 by David Rolsky.
+Copyright (c) 2001,2002 Michael K. Neylon.
+Copyright (c) 2002,2003 Tim Bunce Ireland.
+Copyright (c) 2006-2007 Jarkko Hietaniemi.
+Copyright (c) 2006-2009 by Steffen Mueller
+Copyright (c) 2010-2018, Sebastian Riedel.
+Copyright (c) 2011, 2012, 2013 Andrew Main
+Copyright (c) 2012-2018 by Richard Simoes.
+Portions Copyright (c) 1994-1997 Tim Bunce
+Portions copyright 2006-2008 Adam Kennedy.
+(c) (c) PS. Attributes PSPS EUR. Attributes
+Additions copyright 1996 by Charles Bailey.
+Copyright (c) 1994,1995,1996,1998 Tim Bunce
+Copyright (c) 1994-2006 Tim Bunce. Ireland.
+Copyright (c) 1994-2012 Tim Bunce. Ireland.
+Copyright (c) 1998,1999 Kenneth Albanowski.
+Copyright (c) 2000, 2003, 2004 Tim Jenness.
+Copyright (c) 2000-2001, Vipul Ved Prakash.
+Copyright (c) 2000-2008, Vipul Ved Prakash.
+Copyright (c) 2001-2002 Michael G. Schwern.
+Copyright (c) 2002 VeriSign, Mike Schiraldi
+Copyright (c) 2004, 2008 Matthijs van Duin.
+Copyright (c) 2005, 2006 by David B. Robins
+Copyright (c) 2007, 2008, 2009 Matt S Trout
+Copyright (c) 2008 by Larry Wall and others
+Copyright (c) 2008-2009 Greg Sabino Mullane
+Copyright (c) 2012 by Larry Wall and others
+Copyright (c) 2014 by Larry Wall and others
+Copyright (c) 2015 by Larry Wall and others
+Copyright 1990-1992 RSA Data Security, Inc.
+Copyright 1991-1992 RSA Data Security, Inc.
+Copyright 2002, 2003, 2004 by Autrijus Tang
+Copyright 2005 Ken Williams and Randy Sims.
+Copyright 2013, Paul Fenwick <pjf@cpan.org>
+Copyright E Chris Williams and Jos Boumans.
+Portions Copyright (c) 1997 Alan Citterman.
+copyright (c) 2008 by Infinity Interactive.
+copyrighted by the Free Software Foundation
+Copyright (c) 1994-2018, Greg Sabino Mullane
+Copyright (c) 1996-2009 David Muir Sharnoff.
+Copyright (c) 2000 Lincoln D. Stein Slightly
+Copyright (c) 2000, Tim Bunce, Thomas Lowery
+Copyright (c) 2000, by Larry Wall and others
+Copyright (c) 2002, ActiveState Corporation.
+Copyright (c) 2004-14 by the Perl 5 Porters.
+Copyright (c) 2005 Olaf Kolkman, NLnet Labs.
+Copyright (c) 2007 Olaf Kolkman, NLnet Labs.
+Copyright (c) 2007-2008, Tim Bunce, Ireland.
+Copyright (c) 2008 Olaf Kolkman, NLnet Labs.
+Copyright (c) 2009 Olaf Kolkman, NLnet Labs.
+Copyright (c) 2011 - 2018 by Salvador FandiE
+Copyright 1997, 2000, 2002, 2013 Jay Rogers.
+Copyright 2006 by Infinity Interactive, Inc.
+Portions Copyright (c) 2002 Jeffrey W. Baker
+Portions Copyright (c) 2003 Chris Reinhardt.
+Portions Copyright (c) 2007,2008 NLnet Labs.
+Portions Copyright (c) 2007-2015 Dick Franks
+Portions Copyright 1994 David Muir Sharnoff.
+copyright (c) 1996 by Kenneth J. Albanowski.
+copyright (c) 2013 by Tim Jenness and the UK
+copyright (c) 2014 by Christopher J. Madsen.
+portions Copyright (c) 1997-2004 Jeff Urlwin
+Copyright (c) 1991-2, RSA Data Security, Inc.
+Copyright (c) 1994-2000 by Bradford Appleton.
+Copyright (c) 1996-2000 by Bradford Appleton.
+Copyright (c) 1996-2002 Douglas E. Wegscheid.
+Copyright (c) 1998-2000 by Bradford Appleton.
+Copyright (c) 2002-2007 by D.H. aka PodMaster
+Copyright (c) 2002-2014 by the Perl 5 Porters
+Copyright (c) 2003-2008, 2012-2014 Steve Hay.
+Copyright (c) 2008,2009 Larry Wall and others
+Copyright (c) 2012 Willem Toorop, NLnet Labs.
+Copyright 2004 - 2010 by Tassilo von Parseval
+Portions Copyright (c) 1997-2001 Edmund Mergl
+Portions Copyright (c) 2002-2009 Olaf Kolkman
+Portions Copyright (c) 2007,2012 Dick Franks.
+Portions Copyright (c) 2010,2012 Dick Franks.
+Portions Copyright (c) 2011,2017 Dick Franks.
+Portions Copyright (c) 2012,2015 Dick Franks.
+Portions Copyright (c) 2012,2017 Dick Franks.
+Portions Copyright (c) 2014,2015 Dick Franks.
+Portions Copyright (c) 2014-2017 Dick Franks.
+copyright (c) 2004, 2008 by Matthijs van Duin
+parts copyright 2009 - 2013 Kenichi Ishigaki.
+portions Copyright (c) 1997 Thomas K. Wenrich
+COPYRIGHTS Benjamin Trott, ben@rhumba.pair.com
+Copyright (c) 1996, 1997, 1998 Malcolm Beattie
+Copyright (c) 1997 Jochen Wiedmann Am Eisteich
+Copyright (c) 1997,1998,1999 Tim Bunce England
+Copyright (c) 1999-2004 Igor Pavlov 2004-02-15
+Copyright (c) 2000 Lincoln D. Stein Formatting
+Copyright (c) 2000,2001 Kawai Takanori. Japan.
+Copyright (c) 2004,2007 by the Perl 5 Porters.
+Copyright (c) 2004-2013 by the Perl 5 Porters.
+Copyright (c) 2005-2013 by Adriano R. Ferreira
+Copyright 2005-2013 by Makamaka Hannyaharamitu
+Copyright 2005-2015 by Makamaka Hannyaharamitu
+Copyright 2006-2011, 2014, 2016, 2018 Sisyphus
+Copyright 2007-2011 by Makamaka Hannyaharamitu
+Copyright 2007-2012 by Makamaka Hannyaharamitu
+Copyright 2007-2014 by Makamaka Hannyaharamitu
+Copyright 2007-2016 by Makamaka Hannyaharamitu
+Copyright 2015 Michael LaGrasta and Dan Kogai.
+Copyright Benjamin Trott, cpan@stupidfool.org.
+Portions Copyright (c) 2003-2005 Rudolf Lippan
+Portions Copyright (c) 2005-2007 Olaf Kolkman.
+copyright (c) 2007 by Robert phaylon Sedlacek.
+copyright (c) 2012 by Robert phaylon Sedlacek.
+copyright (c) 2013-2014, 2017 by Toby Inkster.
+copyright 2008-2009, Ash Berlin <ash@cpan.org>
+parts copyright 2004 - 2005 Richard Soderberg.
+(c) 1998-2007 (W3C) MIT, ERCIM, Keio University
+(c) 1998-2008 (W3C) MIT, ERCIM, Keio University
+Copyright (c) 1999,2001 by ZeeGee Software Inc.
+Copyright (c) 2001 Canon Research Centre Europe
+Copyright (c) 2004-2013, Marcus Holland-Moritz.
+Copyright (c) 2015-2018 by Pali <pali@cpan.org>
+Copyright (c) 2016-2017 by Pali <pali@cpan.org>
+Copyright 1995-1999, 2001-2004, 2010 Gisle Aas.
+Copyright 1997, 2000, 2002, 2013 by Jay Rogers.
+Copyright 2000, Andrew Benham, adsb@bigfoot.com
+Copyright 2001, Lincoln Stein <lstein@cshl.org>
+Copyright 2003, 2004, 2005, 2006 by Audrey Tang
+Copyright 2004, 2005, 2006, 2007 by Audrey Tang
+Portions Copyright 2006-2011 by Benjamin Trott.
+copyright (c) 2014 by Dagfinn Ilmari Mannsaker.
+portions copyright 2006, 2007 by Joel Bernstein
+(c) Paul Evans, 2010-2015 leonerd@leonerd.org.uk
+Copyright (c) 1991-1992, RSA Data Security, Inc.
+Copyright (c) 1998 Graham Barr <gbarr@pobox.com>
+Copyright (c) 2002 Graham Barr <gbarr@pobox.com>
+Copyright (c) 2004 Cold Spring Harbor Laboratory
+Copyright (c) 2004-2015 Best Practical Solutions
+Copyright (c) 2005-2015 Makamaka Hannyaharamitu.
+Copyright (c) 2007-2015 Makamaka Hannyaharamitu.
+Copyright (c) 2008 Graham Barr <gbarr@pobox.com>
+Copyright (c) 2008, 2010, 2013, 2014 Reini Urban
+Copyright (c) 2015-2018 by Pali E pali@cpan.orgE
+Copyright 1998 (c) Byron Brummer. Copyright 1998
+Copyright 2004 by Audrey Tang <cpan@audreyt.org>
+Copyright 2009, 2010, 2011, 2012 Steffen Mueller
+Portions Copyright (c) 1997-2003 Jochen Wiedmann
+Portions Copyright (c) 2001 Jonathan M Gilligan.
+copyright (c) 1998 Francois Desarmenien, France.
+copyright (c) 2006 by Infinity Interactive, Inc.
+copyright 2005 Fergal Daly <fergal@esatclear.ie>
+copyright Systemics Ltd http://www.systemics.com
+portions Copyright (c) 2007-2014 Martin J. Evans
+Copyright (c) 1989 Free Software Foundation, Inc.
+Copyright (c) 1990-2011 by Larry Wall and others.
+Copyright (c) 1990-2012 by Larry Wall and others.
+Copyright (c) 1999 Tuomas J. Lukka <lukka@iki.fi>
+Copyright (c) 2001-2005 RIPE NCC, Olaf M. Kolkman
+Copyright (c) 2007, 2011 by Larry Wall and others
+Copyright (c) 2008 Marc Lehmann <json@schmorp.de>
+Copyright (c) 2010, 2011 by Larry Wall and others
+Copyright (c) Katholieke Universiteit Leuven 1996
+Copyright 1991 Bell Communications Research, Inc.
+Copyright 2000 by Joe Smith <Joe.Smith@inwap.com>
+Copyright 2001 Abhijit Menon-Sen <ams@toroid.org>
+Portions Copyright (c) 2002,2003 Chris Reinhardt.
+Portions Copyright (c) 2002-2003 Chris Reinhardt.
+Portions Copyright (c) 2002-2004 Chris Reinhardt.
+Portions Copyright (c) 2004-2006 Alexey Stroganov
+Portions Copyright (c) 2005 Robert Martin-Legene.
+Copyright (c) 1995 Graham Barr & Nick Ing-Simmons.
+Copyright (c) 1996-8 Graham Barr <gbarr@pobox.com>
+Copyright (c) 1997-8 Graham Barr <gbarr@pobox.com>
+Copyright (c) 1998-2000 Joshua Nathaniel Pritikin.
+Copyright (c) 2001-2012, SADAHIRO Tomoyuki. Japan.
+Copyright (c) 2001-2017, SADAHIRO Tomoyuki. Japan.
+Copyright (c) 2004 Peter Marschall <peter@adpm.de>
+Copyright (c) 2004-2017, SADAHIRO Tomoyuki. Japan.
+Copyright 2000-2007 Michael Stevens, Andy Wardley.
+Copyright 2005, 2006 by Infinity Interactive, Inc.
+Portions Copyright (c) 2003,2006-2011 Dick Franks.
+Portions Copyright (c) 2004-2013 Patrick Galbraith
+copyright (c) 2004 by Simon Cozens and Casey West.
+Copyright (c) 1998-2000 Larry Wall and Clark Cooper
+Copyright (c) 1998-2004 Tom Hughes <tom@compton.nu>
+Copyright (c) 1999, Tim Bunce, Phlip, Thomas Lowery
+Copyright (c) 2000-2006 Paul Kulchenko, Byrne Reese
+Copyright (c) 2002, 2003, 2006, 2007 Richard Clamp.
+Copyright (c) 2002, Thomas Lowery, Steffen Goeldner
+Copyright (c) 2003, Thomas Lowery, Steffen Goeldner
+Copyright (c) 2007-2008 NLnet Labs, Olaf M. Kolkman
+Copyright (c) 2010 by H.Merijn Brand & Jens Rehsack
+Copyright (c) 2011 by Jonathan Yu <jawnsy@cpan.org>
+Copyright 1995-2017 Jean-loup Gailly and Mark Adler
+Copyright 2001 Benjamin Trott, ben@rhumba.pair.com.
+Copyright 2001 Benjamin Trott, cpan@stupidfool.org.
+Copyright 2001-2006 Ken Williams. 2010 Matt S Trout
+Copyright 2003 by Fergal Daly <fergal@esatclear.ie>
+Copyright 2004 Benjamin Trott, cpan@stupidfool.org.
+Portions Copyright (c) 2005-2009 O.M, Kolkman, RIPE
+copyright (c) 2015 by Simon Flack and David Golden.
+copyright_holder E. Xavier Ample <example@cpan.org>
+Copyright (c) 1997-2001 Canon Research Centre Europe
+Copyright (c) 1998 Canon Research Centre Europe Ltd.
+Copyright (c) 2000-2012 Graham Barr <gbarr@cpan.org>
+Copyright (c) 2005 Florian Ragwitz <rafl@debian.org>
+Copyright (c) 2010-2011 Matt Trout and David Golden.
+Copyright 2012 Kurt Starsinic <kstarsinic@gmail.com>
+Copyright 2017 Marty Pauley <marty+perl@martian.org>
+Portions Copyright (c) 2009 Olaf Kolkman, NLnet Labs
+copyright (c) 2004 by Ken Williams, Leon Timmermans.
+copyright (c) 2006 by Ken Williams, Leon Timmermans.
+copyright (c) 2011 by Ken Williams, Leon Timmermans.
+copyright (c) 2011 by Leon Timmermans, David Golden.
+copyright (c) 2014 by Adam Kennedy and Contributors.
+copyright (c) 2017 by Kent Fredric <kentnl@cpan.org>
+Copyright (c) 1997-2003 Graham Barr <gbarr@pobox.com>
+Copyright (c) 1997-2007 Graham Barr <gbarr@pobox.com>
+Copyright (c) 1997-2009 Graham Barr <gbarr@pobox.com>
+Copyright (c) 2000-2002 Graham Barr <gbarr@pobox.com>
+Copyright (c) 2000-2005 Graham Barr <gbarr@pobox.com>
+Copyright (c) 2004-2006 Graham Barr <gbarr@pobox.com>
+Copyright (c) 2008-2018, Sebastian Riedel and others.
+Copyright (c) 2010 by David Golden and Ricardo Signes
+Copyright 1998, 1999, 2000, 2001, 2012 M. J. Dominus.
+Portions Copyright (c) 2005 Olaf Kolkman, NLnet Labs.
+Portions Copyright (c) 2006 Olaf Kolkman (NLnet Labs)
+Copyright (c) 1996-2002,2005,2006 David Muir Sharnoff.
+Copyright (c) 1996-2003 Sampo Kellomaki <sampo@iki.fi>
+Copyright (c) 2000-2007 Michael Stevens, Andy Wardley.
+Copyright (c) 2001-2007 Nathan Wiger <nwiger@cpan.org>
+Copyright (c) 2002-2018 Greg Sabino Mullane and others
+Copyright (c) 2003-2018 Mark Shelor <mshelor@cpan.org>
+Copyright (c) 2005 Mike McCauley <mikem@airspayce.com>
+Copyright (c) 2007-2014 Dave Rolsky <autarch@urth.org>
+Copyright (c) 2014 Paul Evans <leonerd@leonerd.org.uk>
+Copyright 1999-2000 by Russ Allbery <rra@stanford.edu>
+Copyright 2000-2010, John McNamara, jmcnamara@cpan.org
+Copyright 2000-2012, John McNamara, jmcnamara@cpan.org
+Copyright 2000-2016, John McNamara, jmcnamara@cpan.org
+Copyright 2000-2018, John McNamara, jmcnamara@cpan.org
+Copyright 2004, 2010 by Audrey Tang <cpan@audreyt.org>
+Copyright 2009, 2010, 2011, 2012, 2013 Steffen Mueller
+copyright (c) 2004 by Adam Kennedy and Ricardo SIGNES.
+copyright (c) 2010 by David Golden and Ricardo Signes.
+Copyright (c) 2007-2016 H.Merijn Brand for PROCURA B.V.
+Copyright (c) 2008, 2010, 2011 by Larry Wall and others
+Copyright 1998 M-J. Dominus. (mjd-perl-diff@plover.com)
+Copyright 2004-2014 by Christian Renz <crenz@web42.com>
+Copyrights 1999-2018 by Mark Overmeer <markov@cpan.org>
+Copyrights 2007-2018 by Mark Overmeer <markov@cpan.org>
+copyright (c) 1997 - 2018 by Graham Barr & Dave Rolsky.
+copyright (c) 2017 by Michael Schwern and David Golden.
+Copyright (c) 2003-2004, 2012-2013 by the gtk2-perl team
+Copyright (c) 2009-2013 by H.Merijn Brand & Jens Rehsack
+Copyright (c) 2010 Simon Josefsson <simon@josefsson.org>
+Copyright (c) 2010-2013 by H.Merijn Brand & Jens Rehsack
+Copyright (c) 2010-2013 by Jens Rehsack & H.Merijn Brand
+Portions Copyright (c) 2005 Olaf M. Kolkman, NLnet Labs.
+Copyright (c) 1997,1998 Canon Research Centre Europe Ltd.
+Copyright (c) 1998-2000 Canon Research Centre Europe Ltd.
+Copyright (c) 1998-2001 Canon Research Centre Europe Ltd.
+Copyright (c) 1998-2003 Canon Research Centre Europe Ltd.
+Copyright (c) 2000, 1996, 1991, 2012 O'Reilly Media, Inc.
+Copyright (c) 2000-2016 Hajimu UMEMOTO <ume@mahoroba.org>
+Copyright (c) 2002, 2003, 2004, 2012 Elizabeth Mattijsen.
+Copyright (c) 2004-2009, Sara Golemon <sarag@libssh2.org>
+Copyright (c) 2005-2006 Florian Ragwitz <rafl@debian.org>
+Copyrights 2013-2018 by Mark Overmeer <mark@overmeer.net>
+Copyright 1999-2010, 2012-2018 Russ Allbery <rra@cpan.org>
+copyright (c) 2015 by Michael G. Schwern and David Golden.
+Copyright (c) 1996-2003 Sampo Kellomaki <sampo@symlabs.com>
+Copyright (c) 1997-2010 Tom Christiansen, Nathan Torkington
+Copyright (c) 1997-2013 Tom Christiansen, Nathan Torkington
+Copyright (c) 2008 Martin Kutter (martin.kutter@fen-net.de)
+Copyright 2000 Christian Lackas, Imperia Software Solutions
+Copyright (c) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+Copyright (c) 1998 - 2016, Daniel Stenberg, <daniel@haxx.se>
+Copyright (c) 2000-2007 Thierry-Michel Barral, Andy Wardley.
+Copyright (c) 2014-2018 by David Pinkowitz <dapink@cpan.org>
+Copyright 1998, 1999, 2000, 2001, 2012 by Mark Jason Dominus
+Copyright 2004, 2006, 2010 by Audrey Tang <cpan@audreyt.org>
+Copyright 2006-2010, Andy Lester 2010-2015 David E. Wheeler.
+copyright (c) 2002 by Per Einar Ellefsen <pereinar@cpan.org>
+Copyright (c) 2000-2005, Damian Conway and Michael G Schwern.
+Copyright (c) 1996, 2000, 2001, 2005, by Larry Wall and others
+Copyright (c) 2000-2001 Paul Kulchenko (paulclinger@yahoo.com)
+Copyright (c) 2000-2003 Paul Kulchenko (paulclinger@yahoo.com)
+Copyright (c) 2000-2004 Paul Kulchenko (paulclinger@yahoo.com)
+Copyright (c) 2000-2005 Paul Kulchenko (paulclinger@yahoo.com)
+Copyright (c) 2000-2007 Paul Kulchenko (paulclinger@yahoo.com)
+Copyright (c) 2001, Tim Bunce, Thomas Lowery, Steffen Goeldner
+Copyright (c) 2004-2017 Jean-Louis Morel <jl_morel@bribes.org>
+Copyright (c) 2002, 2003, 2004, 2006, 2009, 2011 Richard Clamp.
+Copyright (c) 2006-2008 John Scoles (The Pythian Group), Canada
+Copyright 2007-2014 by Alexandr Ciornii, L <http://chorny.net/>
+copyright (c) 2006, 2009 by Qindel Formacion y Servicios, S. L.
+Copyright (c) 2006, 2007, 2009, 2010, 2011 Larry Wall and others
+Copyright (c) 2006-2011 John Scoles (The Pythian Group). Canada.
+Copyright (c) 2010 - 2016 by Rafael Kitover (rkitover@cpan.org).
+Copyright 1998-2001, 2004, 2007 by Sean M. Burke and David Hand.
+Copyright (c) 2005 - 2010 by David B. Robins (dbrobins@cpan.org).
+Copyright (c) 1995, 1996 Systemics Ltd (http://www.systemics.com/)
+Copyright (c) 2006-2010 Matt S. Trout <mst@shadowcatsystems.co.uk>
+Copyright 2001, 2008, 2009, 2014, 2018 Russ Allbery <rra@cpan.org>
+copyright (c) 1994 by the Regents of the University of California.
+Copyright (c) 2002, 2003, 2005, 2006, 2007 by Larry Wall and others
+Copyright (c) 2008, 2009, 2010, 2011, 2012, 2013 by Steffen Mueller
+Portions (c) 1999 ActiveState Tool Corp, http://www.ActiveState.com
+Copyright (c) 1995, 1996, 1997, 1998 Doug MacEachern and Jon Orwant.
+Copyright (c) 1989, 1993 The Regents of the University of California.
+Copyright (c) 2000-2002 Kawai Takanori and Nippon-RAD Co. OP Division
+Copyright (c) 2006 Simon Wilkinson, Achim Grolms and Peter Marschall.
+Copyright 2001, 2004, 2008, 2014, 2018 by Russ Allbery <rra@cpan.org>
+Parts Copyright (c) 1999, 2001 W3Works, LLC (http://www.w3works.com/)
+Copyright (c) 1984, 1989-1990, 2000-2013 Free Software Foundation, Inc.
+Copyright (c) 1998-2000, 2002, 2003, 2004, 2005, 2006 Stephen McCamant.
+Copyright Tim Bunce, Thomas K. Wenrich, Jeff Urlwin and Martin J. Evans
+Parts Copyright (c) 1995, 1996 Systemics Ltd (http://www.systemics.com/)
+Copyright (c) 1991, 1992, 1993, 2000, 2004, 2011 by Larry Wall and others
+Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007, 2008 Jarkko Hietaniemi.
+Copyright (c) 2003- Rafael Martinez Torres <rafael.martinez@novagnet.com>
+Copyright 2002-2014 by Ken Williams, David Golden and other contributors.
+Copyright 2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017 Vincent Pit
+copyright (c) 2008 by Infinity Interactive, Inc. http://www.iinteractive.com.
+Copyright (c) 2004, 2006, 2007, 2009, 2010, 2011, 2012, 2014, 2017 Andrew Main
+Copyright 1999, 2001, 2004, 2006, 2008, 2009, 2018 Russ Allbery <rra@cpan.org>
+copyright (c) 2008, 2009, 2010, 2011, 2012 by Leon Timmermans <leont@cpan.org>
+Copyright (c) 1994-1999 Kenneth Albanowski. 2001-2005 Jonathan Stowe and others
+Copyright 2003-2004, 2012-2013 by muppet, Ross McFarland, and the gtk2-perl team
+copyright (c) 2018 by Jos Boumans, Ken Williams, Chris Williams and David Golden.
+Copyright 1999-2001, 2004, 2006, 2008, 2010, 2012-2018 Russ Allbery <rra@cpan.org>
+copyright (c) 2010 by David Golden, Ricardo Signes, Adam Kennedy and Contributors.
+Copyright 1999, 2000, 2001, 2004, 2006, 2008, 2010, 2015 Russ Allbery <rra@cpan.org>
+Copyright (c) 1997, 1998, 2000, 2001, 2005, 2006, 2007, 2011 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1995, 1996, 1998, 2000, 2001, by Larry Wall and others
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, by Larry Wall and others
+Copyright 1999-2002, 2004, 2006, 2008-2009, 2012-2016, 2018 Russ Allbery <rra@cpan.org>
+copyright 1998 The Perl Journal. It appears courtesy of Jon Orwant and The Perl Journal.
+copyright 1999 The Perl Journal. It appears courtesy of Jon Orwant and The Perl Journal.
+copyright 2000 The Perl Journal. It appears courtesy of Jon Orwant and The Perl Journal.
+Copyright (c) 1997-2003 Jonathan Leffler, Jochen Wiedmann, Steffen Goeldner and Tim Bunce
+Copyright (c) 1997-2006 Jonathan Leffler, Jochen Wiedmann, Steffen Goeldner and Tim Bunce
+Copyright 1999, 2000, 2001, 2004, 2006, 2008, 2010, 2015, 2018 Russ Allbery <rra@cpan.org>
+Copyright (c) 2000, 2001, 2002, 2005, 2006, 2007, 2009, 2010, 2011 by Larry Wall and others
+Copyright (c) 2002, 2003, 2005, 2006, 2007, 2008, 2009, 2010, 2011 by Larry Wall and others
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, by Larry Wall and others
+Copyright 1999, 2001-2002, 2004, 2006, 2008-2009, 2014-2015, 2018 Russ Allbery <rra@cpan.org>
+Copyright (c) 1998-2002 Graham Barr <gbarr@pobox.com> and 2001 Chris Ridd <chris.ridd@isode.com>
+Copyright (c) 1997-2006 by Gurusamy Sarathy <gsar@cpan.org> and Jan Dubois <jand@activestate.com>
+Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1999, 2001, 2002, 2003, 2004, 2005, 2007, by Larry Wall and others
+Copyright (c) 1993, 1994, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2007, by Larry Wall and others
+copyright (c) Charles Bailey, Tim Bunce, David Landgren, James Keenan and Richard Elberger 1995-2017.
+Copyright (c) 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002, 2005, 2006, 2007 by Larry Wall and others
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1996, 1997, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, by Larry Wall and others
+Copyright (c) 1993, 1994, 1996, 1997, 1999, 2000, 2001, 2003, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 2003-2009 Graham Barr, Djamel Boudjerda, Paul Connolly, Julian Onions, Nexor and Yann Kerherve.
+Copyright (c) 1993, 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002, 2003, 2006, 2007, by Larry Wall and others
+Copyright (c) 2001, 2002, 2003, 2005, 2006, 2007, 2009, 2010, 2011 by Larry Wall, Nick Ing-Simmons, and others
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1999, 2000, 2002, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006 by Larry Wall and others
+Copyright (c) 1993, 1994, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2016 by Larry Wall and others
+Copyright (c) 2003-2009 Graham Barr, Djamel Boudjerda, Paul Connolly, Julian Onions, Nexor, Peter Marschall and Yann Kerherve.
+Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007 by Larry Wall and others
+Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2005, 2006, 2007, 2008, by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008, by Larry Wall and others
+Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2005, 2006, 2007, by Larry Wall and others
+Copyright (c) 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, by Larry Wall and others
+Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 by Larry Wall and others
+Copyright 1995-1998 Gisle Aas, 1999-2004 Sean M. Burke, 2005 Andy Lester, 2006 Pete Krawczyk, 2010 Jeff Fearn, 2012 Christopher J. Madsen.
+Copyright 1996, 1997, 1998, 2000, 2001, 2002, 2005, 2006, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016 Russ Allbery <rra@cpan.org>
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1999, 2000, 2001, 2002, 2004, 2005, 2006, 2007, 2008, 2012 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008 by Larry Wall and others
+Copyright (c) 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 by Larry Wall and others
+Copyright (c) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2011, 2012, 2013 by Larry Wall and others
+Copyright (c) 1998-2003 World Wide Web Consortium (Massachusetts Institute of Technology, European Research Consortium for Informatics and Mathematics, Keio University).
+Copyright (c) 1998-2008 World Wide Web Consortium (Massachusetts Institute of Technology, European Research Consortium for Informatics and Mathematics, Keio University).
+
+GPL-1.0-or-later OR Artistic-1.0-Perl
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.Windows.SDK.NET.Ref 10.0.26100.57 - LicenseRef-scancode-unknown
+
+
+(c) Microsoft Corporation
+Copyright (c) Microsoft Corporation
+
+LicenseRef-scancode-unknown
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+CommunityToolkit.Mvvm 8.4.0 - MIT
+
+
+Copyright (c) 2021 Sergio Pedri
+Copyright (c) 2020 Michael Dietrich
+Copyright (c) Microsoft Corporation
+(c) .NET Foundation and Contributors
+Copyright (c) 2009 - 2018 Laurent Bugnion
+Copyright (c) .NET Foundation and Contributors
+Copyright (c) 2017 Pedro Lamas, http://www.pedrolamas.com
+
+# .NET Community Toolkit
+
+Copyright © .NET Foundation and Contributors
+
+All rights reserved.
+
+## MIT License (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+CommunityToolkit.WinUI.Animations 8.2.250402 - MIT
+
+
+(c) .NET Foundation and Contributors
+Copyright (c) .NET Foundation and Contributors
+
+# Windows Community Toolkit
+
+Copyright © .NET Foundation and Contributors
+
+All rights reserved.
+
+## MIT License (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+CommunityToolkit.WinUI.Controls.SettingsControls 8.2.250402 - MIT
+
+
+(c) .NET Foundation and Contributors
+Copyright (c) .NET Foundation and Contributors
+
+# Windows Community Toolkit
+
+Copyright © .NET Foundation and Contributors
+
+All rights reserved.
+
+## MIT License (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.Extensions.Hosting 9.0.4 - MIT
+
+
+Copyright (c) 2021
+Copyright (c) Six Labors
+(c) Microsoft Corporation
+Copyright (c) 2022 FormatJS
+Copyright (c) Andrew Arnott
+Copyright 2019 LLVM Project
+Copyright (c) 1998 Microsoft
+Copyright 2018 Daniel Lemire
+Copyright (c) .NET Foundation
+Copyright (c) 2011, Google Inc.
+Copyright (c) 2020 Dan Shechter
+(c) 1997-2005 Sean Eron Anderson
+Copyright (c) 2015 Andrew Gallant
+Copyright (c) 2022, Wojciech Mula
+Copyright (c) 2017 Yoshifumi Kawai
+Copyright (c) 2022, Geoff Langdale
+Copyright (c) 2005-2020 Rich Felker
+Copyright (c) 2012-2021 Yann Collet
+Copyright (c) Microsoft Corporation
+Copyright (c) 2007 James Newton-King
+Copyright (c) 1991-2022 Unicode, Inc.
+Copyright (c) 2013-2017, Alfred Klomp
+Copyright (c) 2018 Nemanja Mijailovic
+Copyright 2012 the V8 project authors
+Copyright (c) 1999 Lucent Technologies
+Copyright (c) 2008-2016, Wojciech Mula
+Copyright (c) 2011-2020 Microsoft Corp
+Copyright (c) 2015-2017, Wojciech Mula
+Copyright (c) 2015-2018, Wojciech Mula
+Copyright (c) 2005-2007, Nick Galbreath
+Copyright (c) 2015 The Chromium Authors
+Copyright (c) 2018 Alexander Chermyanin
+Copyright (c) The Internet Society 1997
+Copyright (c) 2004-2006 Intel Corporation
+Copyright (c) 2011-2015 Intel Corporation
+Copyright (c) 2013-2017, Milosz Krajewski
+Copyright (c) 2016-2017, Matthieu Darbois
+Copyright (c) The Internet Society (2003)
+Copyright (c) .NET Foundation Contributors
+(c) 1995-2024 Jean-loup Gailly and Mark Adler
+Copyright (c) 2020 Mara Bos <m-ou.se@m-ou.se>
+Copyright (c) .NET Foundation and Contributors
+Copyright (c) 2012 - present, Victor Zverovich
+Copyright (c) 2006 Jb Evain (jbevain@gmail.com)
+Copyright (c) 2008-2020 Advanced Micro Devices, Inc.
+Copyright (c) 2019 Microsoft Corporation, Daan Leijen
+Copyright (c) 2011 Novell, Inc (http://www.novell.com)
+Copyright (c) 2015 Xamarin, Inc (http://www.xamarin.com)
+Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors
+Copyright (c) 2014 Ryan Juckett http://www.ryanjuckett.com
+Copyright (c) 1990- 1993, 1996 Open Software Foundation, Inc.
+Portions (c) International Organization for Standardization 1986
+Copyright (c) YEAR W3C(r) (MIT, ERCIM, Keio, Beihang) Disclaimers
+Copyright (c) 2015 THL A29 Limited, a Tencent company, and Milo Yip
+Copyright (c) 1980, 1986, 1993 The Regents of the University of California
+Copyright 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018 The Regents of the University of California
+Copyright (c) 1989 by Hewlett-Packard Company, Palo Alto, Ca. & Digital Equipment Corporation, Maynard, Mass
+
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.NETCore.App.Runtime.win-arm64 9.0.4 - MIT
+
+
+Copyright (c) 2021
+Copyright (c) Six Labors
+(c) Microsoft Corporation
+Copyright (c) 2022 FormatJS
+Copyright (c) Andrew Arnott
+Copyright 2019 LLVM Project
+Copyright (c) 1998 Microsoft
+Copyright 2018 Daniel Lemire
+Copyright (c) .NET Foundation
+Copyright 1995-2022 Mark Adler
+Copyright 1995-2024 Mark Adler
+Copyright (c) 2011, Google Inc.
+Copyright (c) 2020 Dan Shechter
+(c) 1997-2005 Sean Eron Anderson
+Copyright (c) 2015 Andrew Gallant
+Copyright (c) 2022, Wojciech Mula
+Copyright (c) 2017 Yoshifumi Kawai
+Copyright (c) 2022, Geoff Langdale
+Copyright (c) 2005-2020 Rich Felker
+Copyright (c) 2012-2021 Yann Collet
+Copyright (c) Microsoft Corporation
+Copyright (c) 2007 James Newton-King
+Copyright (c) 1991-2022 Unicode, Inc.
+Copyright (c) 2013-2017, Alfred Klomp
+Copyright (c) 2018 Nemanja Mijailovic
+Copyright 2012 the V8 project authors
+Copyright (c) 1999 Lucent Technologies
+Copyright (c) 2008-2016, Wojciech Mula
+Copyright (c) 2011-2020 Microsoft Corp
+Copyright (c) 2015-2017, Wojciech Mula
+Copyright (c) 2015-2018, Wojciech Mula
+Copyright (c) 2005-2007, Nick Galbreath
+Copyright (c) 2015 The Chromium Authors
+Copyright (c) 2018 Alexander Chermyanin
+Copyright (c) The Internet Society 1997
+Copyright (c) 2004-2006 Intel Corporation
+Copyright (c) 2011-2015 Intel Corporation
+Copyright (c) 2013-2017, Milosz Krajewski
+Copyright (c) 2016-2017, Matthieu Darbois
+Copyright (c) The Internet Society (2003)
+Copyright (c) .NET Foundation Contributors
+(c) 1995-2024 Jean-loup Gailly and Mark Adler
+Copyright (c) 2020 Mara Bos <m-ou.se@m-ou.se>
+Copyright (c) .NET Foundation and Contributors
+Copyright (c) 2012 - present, Victor Zverovich
+Copyright (c) 2006 Jb Evain (jbevain@gmail.com)
+Copyright (c) 2008-2020 Advanced Micro Devices, Inc.
+Copyright (c) 2019 Microsoft Corporation, Daan Leijen
+Copyright (c) 2011 Novell, Inc (http://www.novell.com)
+Copyright (c) 2015 Xamarin, Inc (http://www.xamarin.com)
+Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors
+Copyright (c) 2014 Ryan Juckett http://www.ryanjuckett.com
+Copyright 1995-2024 Jean-loup Gailly and Mark Adler Qkkbal
+Copyright (c) 1990- 1993, 1996 Open Software Foundation, Inc.
+Portions (c) International Organization for Standardization 1986
+Copyright (c) YEAR W3C(r) (MIT, ERCIM, Keio, Beihang) Disclaimers
+Copyright (c) 2015 THL A29 Limited, a Tencent company, and Milo Yip
+Copyright (c) 1980, 1986, 1993 The Regents of the University of California
+Copyright 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018 The Regents of the University of California
+Copyright (c) 1989 by Hewlett-Packard Company, Palo Alto, Ca. & Digital Equipment Corporation, Maynard, Mass
+
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.NETCore.App.Runtime.win-x64 9.0.4 - MIT
+
+
+Copyright (c) 2021
+Copyright (c) Six Labors
+(c) Microsoft Corporation
+Copyright (c) 2022 FormatJS
+Copyright (c) Andrew Arnott
+Copyright 2019 LLVM Project
+Copyright (c) 1998 Microsoft
+Copyright 2018 Daniel Lemire
+Copyright (c) .NET Foundation
+Copyright 1995-2022 Mark Adler
+Copyright 1995-2024 Mark Adler
+Copyright (c) 2011, Google Inc.
+Copyright (c) 2020 Dan Shechter
+(c) 1997-2005 Sean Eron Anderson
+Copyright (c) 2015 Andrew Gallant
+Copyright (c) 2022, Wojciech Mula
+Copyright (c) 2017 Yoshifumi Kawai
+Copyright (c) 2022, Geoff Langdale
+Copyright (c) 2005-2020 Rich Felker
+Copyright (c) 2012-2021 Yann Collet
+Copyright (c) Microsoft Corporation
+Copyright (c) 2007 James Newton-King
+Copyright (c) 1991-2022 Unicode, Inc.
+Copyright (c) 2013-2017, Alfred Klomp
+Copyright (c) 2018 Nemanja Mijailovic
+Copyright 2012 the V8 project authors
+Copyright (c) 1999 Lucent Technologies
+Copyright (c) 2008-2016, Wojciech Mula
+Copyright (c) 2011-2020 Microsoft Corp
+Copyright (c) 2015-2017, Wojciech Mula
+Copyright (c) 2015-2018, Wojciech Mula
+Copyright (c) 2005-2007, Nick Galbreath
+Copyright (c) 2015 The Chromium Authors
+Copyright (c) 2018 Alexander Chermyanin
+Copyright (c) The Internet Society 1997
+Copyright (c) 2004-2006 Intel Corporation
+Copyright (c) 2011-2015 Intel Corporation
+Copyright (c) 2013-2017, Milosz Krajewski
+Copyright (c) 2016-2017, Matthieu Darbois
+Copyright (c) The Internet Society (2003)
+Copyright (c) .NET Foundation Contributors
+(c) 1995-2024 Jean-loup Gailly and Mark Adler
+Copyright (c) 2020 Mara Bos <m-ou.se@m-ou.se>
+Copyright (c) .NET Foundation and Contributors
+Copyright (c) 2012 - present, Victor Zverovich
+Copyright (c) 2006 Jb Evain (jbevain@gmail.com)
+Copyright (c) 2008-2020 Advanced Micro Devices, Inc.
+Copyright (c) 2019 Microsoft Corporation, Daan Leijen
+Copyright (c) 2011 Novell, Inc (http://www.novell.com)
+Copyright (c) 2015 Xamarin, Inc (http://www.xamarin.com)
+Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors
+Copyright (c) 2014 Ryan Juckett http://www.ryanjuckett.com
+Copyright 1995-2024 Jean-loup Gailly and Mark Adler Qkkbal
+Copyright (c) 1990- 1993, 1996 Open Software Foundation, Inc.
+Portions (c) International Organization for Standardization 1986
+Copyright (c) YEAR W3C(r) (MIT, ERCIM, Keio, Beihang) Disclaimers
+Copyright (c) 2015 THL A29 Limited, a Tencent company, and Milo Yip
+Copyright (c) 1980, 1986, 1993 The Regents of the University of California
+Copyright 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018 The Regents of the University of California
+Copyright (c) 1989 by Hewlett-Packard Company, Palo Alto, Ca. & Digital Equipment Corporation, Maynard, Mass
+
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.Windows.ImplementationLibrary 1.0.250325.1 - MIT
+
+
+(c) Microsoft 2025
+Copyright (c) Microsoft
+(c) Microsoft Corporation
+Copyright (c) Microsoft Corporation
+Copyright (c) 2009-2014 by the contributors
+
+    MIT License
+
+    Copyright (c) Microsoft Corporation. All rights reserved.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+Microsoft.Xaml.Behaviors.WinUI.Managed 3.0.0 - MIT
+
+
+(c) Microsoft Corporation
+
+MIT License
+
+Copyright (c) <year> <copyright holders>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+microsoft/gsl 0f6dbc9e2915ef5c16830f3fa3565738de2a9230 - MIT
+
+
+Copyright 2008, Google Inc.
+Copyright (c) 2015 Microsoft Corporation.
+
+Copyright (c) 2015 Microsoft Corporation. All rights reserved. 
+ 
+This code is licensed under the MIT License (MIT). 
+
+Permission is hereby granted, free of charge, to any person obtaining a copy 
+of this software and associated documentation files (the "Software"), to deal 
+in the Software without restriction, including without limitation the rights 
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+of the Software, and to permit persons to whom the Software is furnished to do 
+so, subject to the following conditions: 
+
+The above copyright notice and this permission notice shall be included in all 
+copies or substantial portions of the Software. 
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE. 
+
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+vswhere 3.1.7 - MIT
+
+
+(c) 2023 GitHub, Inc.
+(c) Microsoft Corporation
+Copyright (c) by P.J. Plauger
+Copyright (c) Microsoft Corporation
+
+MIT License
+
+Copyright (c) <year> <copyright holders>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+WinUIEx 2.5.1 - MIT
+
+
+
+MIT License
+
+Copyright (c) <year> <copyright holders>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+wix 5.0.2 - MS-RL
+
+
+Copyright James Newton-King 2008
+Copyright UpdateUrl DisableModify
+Copyright (c) Microsoft Corporation
+(c) .NET Foundation and contributors
+Copyright James Newton-King 2008 Json.NET
+Copyright AssemblyDescription AssemblyProduct
+Copyright (c) .NET Foundation and contributors
+
+Microsoft Reciprocal License (Ms-RL)
+
+This license governs use of the accompanying software. If you use the software, you accept this license. If you do not accept the license, do not use the software.
+
+   1. Definitions
+
+   The terms "reproduce," "reproduction," "derivative works," and "distribution" have the same meaning here as under U.S. copyright law.
+
+   A "contribution" is the original software, or any additions or changes to the software.
+
+   A "contributor" is any person that distributes its contribution under this license.
+
+   "Licensed patents" are a contributor's patent claims that read directly on its contribution.
+
+   2. Grant of Rights
+
+      (A) Copyright Grant- Subject to the terms of this license, including the license conditions and limitations in section 3, each contributor grants you a non-exclusive, worldwide, royalty-free copyright license to reproduce its contribution, prepare derivative works of its contribution, and distribute its contribution or any derivative works that you create.
+
+      (B) Patent Grant- Subject to the terms of this license, including the license conditions and limitations in section 3, each contributor grants you a non-exclusive, worldwide, royalty-free license under its licensed patents to make, have made, use, sell, offer for sale, import, and/or otherwise dispose of its contribution in the software or derivative works of the contribution in the software.
+
+   3. Conditions and Limitations
+
+      (A) Reciprocal Grants- For any file you distribute that contains code from the software (in source code or binary format), you must provide recipients the source code to that file along with a copy of this license, which license will govern that file. You may license other files that are entirely your own work and do not contain code from the software under any terms you choose.
+
+      (B) No Trademark License- This license does not grant you rights to use any contributors' name, logo, or trademarks.
+
+      (C) If you bring a patent claim against any contributor over patents that you claim are infringed by the software, your patent license from such contributor to the software ends automatically.
+
+      (D) If you distribute any portion of the software, you must retain all copyright, patent, trademark, and attribution notices that are present in the software.
+
+      (E) If you distribute any portion of the software in source code form, you may do so only under this license by including a complete copy of this license with your distribution. If you distribute any portion of the software in compiled or object code form, you may only do so under a license that complies with this license.
+
+      (F) The software is licensed "as-is." You bear the risk of using it. The contributors give no express warranties, guarantees, or conditions. You may have additional consumer rights under your local laws which this license cannot change. To the extent permitted under your local laws, the contributors exclude the implied warranties of merchantability, fitness for a particular purpose and non-infringement.
+
+---------------------------------------------------------
+

@@ -1,0 +1,384 @@
+parameters:
+  - name: isRelease
+    type: boolean
+    default: true
+
+  - name: packageVersion
+    type: string
+    default: ""
+
+  - name: isNightly
+    type: boolean
+    default: false
+
+  - name: nugetPackages
+    type: object
+    default:
+      - Microsoft.WSL.PluginApi.nuspec
+
+  - name: traceLoggingConfig
+    type: string
+    default: ''
+
+  - name: targets
+    type: object
+    default:
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings.dll,wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,lxutil.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll"
+      - target: "msixgluepackage"
+        pattern: "gluepackage.msix"
+      - target: "msipackage"
+        pattern: "wsl.msi"
+
+  - name: platforms
+    type: object
+    default:
+      - x64
+      - arm64
+
+  - name: esrp
+    type: object
+    default:
+      ConnectedServiceName: "AzureConnection-AME"
+      signConfigType: "inlineSignParams"
+      SessionTimeout: 60
+      MaxConcurrency: 50
+      MaxRetryAttempts: 5
+      ServiceEndpointUrl: $(EsrpServiceEndpointUrl)
+      AuthAKVName: $(EsrpAuthAKVName)
+      AuthSignCertName: $(EsrpAuthSignCertName)
+      AppRegistrationClientId: $(EsrpAppRegistrationClientId)
+      AppRegistrationTenantId: $(EsrpAppRegistrationTenantId)
+      EsrpClientId: $(EsrpClientId)
+
+stages:
+  - stage: build
+    jobs:
+      - job:
+        displayName: "Formatting & localization checks"
+        timeoutInMinutes: 30
+        pool:
+          type: windows
+        variables:
+          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+
+        steps:
+          - script: python tools/devops/validate-localization.py localization/strings en-US
+            displayName: Validate localization resources
+
+          - script: python tools\devops\validate-copyright-headers.py src
+            displayName: Validate copyright headers (src/)
+
+          - script: python tools\devops\validate-copyright-headers.py test
+            displayName: Validate copyright headers (test/)
+
+          - task: CMake@1
+            displayName: "CMake ."
+            inputs:
+              workingDirectory: "."
+              cmakeArgs: .
+
+          - task: PowerShell@2
+            inputs:
+              targetType: "filePath"
+              filePath: FormatSource.ps1
+              arguments: "-ModifiedOnly $false -Verify $true"
+            displayName: "Clang-format check"
+
+      - job: build
+        displayName: "Build WSL package"
+        timeoutInMinutes: 120
+        pool:
+          type: windows
+
+        variables:
+          NUGET_PLUGIN_HANDSHAKE_TIMEOUT_IN_SECONDS: 60
+          NUGET_PLUGIN_REQUEST_TIMEOUT_IN_SECONDS: 60
+          ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+          ob_artifactBaseName: 'drop_wsl'
+          ob_artifactSuffix: '_build'
+          ob_sdl_codeSignValidation_excludes: -|**testbin\**
+          Codeql.PublishDatabaseLog: true
+          Codeql.SourceRoot: src
+
+        steps:
+
+          - task: CodeQL3000Init@0
+            inputs:
+              Enabled: ${{ and(parameters.isNightly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))}}
+
+          - task: UseDotNet@2
+            displayName: Install .NET Core SDK (required by EsrpCodeSigning)
+            condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+            inputs:
+              packageType: "sdk"
+
+          - task: PowerShell@2
+            displayName: Set trace logging configuration
+            condition: ne('${{ parameters.traceLoggingConfig }}', '')
+            inputs:
+                targetType: 'inline'
+                script: 'Set-Content -Path src/windows/inc/traceloggingconfig.h -Value $env:config.replace("\n", "`n")'
+            env:
+                config: '${{ parameters.traceLoggingConfig }}'
+
+          - task: PowerShell@2
+            displayName: "Compute package version"
+            name: version
+            inputs:
+              targetType: inline
+              ${{ if eq(parameters.packageVersion, '') }}:
+                script: |
+                  $gitversion_version = (Select-Xml -Path packages.config  -XPath '/packages/package[@id=''GitVersion.CommandLine'']/@version').Node.Value
+                  $env:path = "packages/GitVersion.CommandLine.$gitversion_version/tools;$env:path"
+                  . .\tools\devops\version_functions.ps1
+                  $version = Get-VersionInfo -Nightly $${{ parameters.isNightly }}
+                  Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$($version.MsixVersion)"
+                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$($version.NugetVersion)"
+
+              ${{ else }}:
+                script: |
+                  Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}' + '.0'))"
+                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}'))"
+
+          - ${{ each platform in parameters.platforms }}:
+              - task: CMake@1
+                displayName: "CMake ${{ platform }}"
+                inputs:
+                  workingDirectory: "."
+                  cmakeArgs: . --fresh -A ${{ platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DPIPELINE_BUILD_ID=$(Build.BuildId)
+
+              # This additional Restore NuGet package task is added as a workaround for WSL Settings to have its' packages restored properly.
+              # Without this, building wsl settings may encounter the following error:
+              #
+              # The plugin credential provider could not acquire credentials. Authentication may require manual action.
+              # Consider re-running the command with --interactive for `dotnet`, /p:NuGetInteractive="true" for MSBuild or removing the -NonInteractive switch for `NuGet`
+              # Response status code does not indicate success: 401 (Unauthorized)
+              - script: _deps\nuget.exe restore -NonInteractive
+
+              - ${{ each target in parameters.targets }}:
+                  - script: cmake --build . --config Release --target ${{ target.target }} -- -m
+                    condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+                    displayName: "Build ${{ target.target }} (${{ platform }})"
+
+                  - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+                    displayName: "Sign ${{ target.target }} (${{ platform }})"
+                    condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+                    inputs:
+                      ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
+                      signConfigType: ${{ parameters.esrp.signConfigType }}
+                      SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
+                      MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
+                      MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
+                      ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
+                      AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
+                      AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
+                      AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
+                      AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
+                      FolderPath: "bin\\${{ platform }}"
+                      Pattern: "${{ target.pattern }}"
+                      UseMSIAuthentication: true
+                      EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
+                      inlineOperation: |
+                        [
+                              {
+                                  "KeyCode": "CP-230012",
+                                  "OperationCode": "SigntoolSign",
+                                  "Parameters" : {
+                                        "OpusName" : "Microsoft",
+                                        "OpusInfo" : "http://www.microsoft.com",
+                                        "FileDigest" : "/fd \"SHA256\"",
+                                        "PageHash" : "/NPH",
+                                        "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                                    },
+                                    "ToolName" : "sign",
+                                    "ToolVersion" : "1.0"
+                                },
+                                {
+                                    "KeyCode" : "CP-230012",
+                                    "OperationCode" : "SigntoolVerify",
+                                    "Parameters" : {},
+                                    "ToolName" : "sign",
+                                    "ToolVersion" : "1.0"
+                                }
+                          ]
+
+                  # Replace the intermediate wslsettings binaries file with the signed versions so that any future steps building wslsettings will use the signed versions
+                  - task: PowerShell@2
+                    displayName: 'Replace wslsettings binaries in intermediate folder with signed versions'
+                    condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+                    inputs:
+                      targetType: inline
+                      script: |
+                        $arch = '${{ platform }}'
+                        $wslsettingsbinpath = "bin\$arch\release\wslsettings"
+                        $wslsettingsobjpath = "src\windows\wslsettings\obj\$arch\release"
+                        # Update the timestamp of wslsettings.exe so that it doesn't get rebuilt
+                        (Get-Item $wslsettingsbinpath\wslsettings.exe).LastWriteTime = Get-Date
+                        Copy-Item $wslsettingsbinpath\wslsettings.dll $wslsettingsobjpath\wslsettings.dll -Force
+                        Copy-Item $wslsettingsbinpath\wslsettings.exe $wslsettingsobjpath\apphost.exe -Force
+
+              - script: cmake --build . --config Release -- -m
+                displayName: "Build installer msix and tests (${{ platform }})"
+
+              - task: PowerShell@2
+                displayName: "Move ${{ platform }} installer msi to output directory"
+                inputs:
+                  targetType: inline
+                  script: |
+                      New-Item -ItemType Directory -Path "$(ob_outputDirectory)\bundle" -Force
+                      $arch = '${{ platform }}'
+                      Copy-Item -Path "bin\$arch\release\wsl.msi" -Destination "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).$arch.msi"
+
+          - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+            displayName: "Sign the bundle"
+            condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+            inputs:
+              ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
+              signConfigType: ${{ parameters.esrp.signConfigType }}
+              SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
+              MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
+              MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
+              ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
+              AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
+              AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
+              AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
+              AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
+              FolderPath: "bundle"
+              Pattern: "*.msixbundle"
+              UseMSIAuthentication: true
+              EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
+              inlineOperation: |
+                [
+                      {
+                          "KeyCode": "CP-230012",
+                          "OperationCode": "SigntoolSign",
+                          "Parameters" : {
+                                "OpusName" : "Microsoft",
+                                "OpusInfo" : "http://www.microsoft.com",
+                                "FileDigest" : "/fd \"SHA256\"",
+                                "PageHash" : "/NPH",
+                                "TimeStamp" : "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+                            },
+                            "ToolName" : "sign",
+                            "ToolVersion" : "1.0"
+                        },
+                        {
+                            "KeyCode" : "CP-230012",
+                            "OperationCode" : "SigntoolVerify",
+                            "Parameters" : {},
+                            "ToolName" : "sign",
+                            "ToolVersion" : "1.0"
+                        }
+                  ]
+
+          - script: md.exe $(ob_outputDirectory)\bin\nuget
+            displayName: "Create the nuget directory"
+
+          - ${{ each package in parameters.nugetPackages }}:
+              - script: nuget.exe pack ${{ package }} -OutputDirectory $(ob_outputDirectory)\bin\nuget -NonInteractive
+                displayName: Build ${{ package }}
+
+          - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
+            displayName: "Sign nuget packages"
+            condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+            inputs:
+              ConnectedServiceName: ${{ parameters.esrp.ConnectedServiceName}}
+              signConfigType: ${{ parameters.esrp.signConfigType }}
+              SessionTimeout: ${{ parameters.esrp.SessionTimeout }}
+              MaxConcurrency: ${{ parameters.esrp.MaxConcurrency }}
+              MaxRetryAttempts: ${{ parameters.esrp.MaxRetryAttempts }}
+              ServiceEndpointUrl: ${{ parameters.esrp.ServiceEndpointUrl }}
+              AuthAKVName: ${{ parameters.esrp.AuthAKVName }}
+              AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
+              AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
+              AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
+              FolderPath: '$(ob_outputDirectory)\bin\nuget'
+              Pattern: "*.nupkg"
+              UseMSIAuthentication: true
+              EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
+              inlineOperation: |
+                [
+                    {
+                        "KeyCode": "CP-401405",
+                        "OperationCode": "NuGetSign",
+                        "Parameters" : {},
+                          "ToolName" : "sign",
+                          "ToolVersion" : "1.0"
+                      },
+                      {
+                          "KeyCode" : "CP-401405",
+                          "OperationCode" : "NuGetVerify",
+                          "Parameters" : {},
+                          "ToolName" : "sign",
+                          "ToolVersion" : "1.0"
+                      }
+                ]
+
+          - powershell: |
+              foreach ($arch in @("x64", "ARM64"))
+              {
+                  $binFolder = ".\bin\$arch\Release"
+                  $pdbFolder = Join-Path $(ob_outputDirectory) "pdb\$arch\Release"
+                  mkdir $pdbFolder
+                  foreach ($filter in @("*.pdb", "*.debug"))
+                  {
+                      foreach ($e in (Get-ChildItem -Recurse -Path $binFolder -Filter $filter)) {Copy-Item -Path $e.fullname -Destination (Join-Path $pdbFolder $e.name)}
+                  }
+              }
+
+            displayName: Collect symbols
+
+          - powershell: |
+              mkdir appxsym
+              foreach ($arch in @("x64", "ARM64"))
+              {
+                  Get-ChildItem -Path $(ob_outputDirectory)\pdb\$arch\release\*.pdb -Exclude wsltests.pdb | Compress-Archive -DestinationPath appxsym/Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_$arch.zip
+                  Copy-Item -Path appxsym/Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_$arch.zip -Destination appxsym/Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_$arch.appxsym
+              }
+              mkdir $(ob_outputDirectory)/appxupload
+              Get-ChildItem -Path appxsym/*.appxsym,bundle/release/Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_x64_ARM64.msixbundle | Compress-Archive -DestinationPath $(ob_outputDirectory)/appxupload/Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_x64_ARM64.zip
+              Move-Item -Path $(ob_outputDirectory)/appxupload/Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_x64_ARM64.zip -Destination $(ob_outputDirectory)/appxupload/Microsoft.WSL_$(version.WSL_PACKAGE_VERSION)_x64_ARM64.appxupload
+              rm appxsym/*.appxsym
+
+            displayName: Create appxupload
+            condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+
+          - powershell: |
+              $taefVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.Taef'']/@version').Node.Value
+              New-Item -ItemType Directory -Path "$(ob_outputDirectory)\bundle" -Force
+              foreach ($arch in @("x64", "ARM64"))
+              {
+                mkdir $(ob_outputDirectory)\testbin\$arch\release
+
+                Move-Item -Path "bin\$arch\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\wsltests.dll"
+                Move-Item -Path "bin\$arch\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\testplugin.dll"
+                Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\$arch" -Destination "$(ob_outputDirectory)\testbin\$arch\release\taef"
+              }
+
+              Move-Item -Path "bin\x64\cloudtest" -Destination "$(ob_outputDirectory)\testbin\x64\cloudtest"
+              Move-Item -Path "tools\test\test-setup.ps1" -Destination "$(ob_outputDirectory)\testbin\test-setup.ps1"
+              Move-Item -Path "tools\test\CloudTest-Setup.bat" -Destination "$(ob_outputDirectory)\testbin\CloudTest-Setup.bat"
+              Move-Item -Path "tools\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
+              Move-Item -Path "test\linux\unit_tests" -Destination "$(ob_outputDirectory)\testbin\unit_tests"
+              
+              Move-Item -Path bundle\release\* -Destination $(ob_outputDirectory)\bundle
+              $TestDistroVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
+              Copy-Item "packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz" "$(ob_outputDirectory)\testbin\x64"
+
+            displayName: Move artifacts to drop directory
+
+          - task: PublishSymbols@2
+            displayName: Publish symbols
+            inputs:
+              SymbolServerType: "TeamServices"
+              TreatNotIndexedAsWarning: true
+              SymbolsProduct: WSL
+              SymbolsVersion: $(version.WSL_PACKAGE_VERSION)
+              SearchPattern: |
+                $(ob_outputDirectory)/pdb/**/*.pdb
+                $(ob_outputDirectory)/bin/**/*.exe
+                $(ob_outputDirectory)/bin/**/*.dll
+
+          - task: CodeQL3000Finalize@0
+            condition: ${{ and(parameters.isNightly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))}}

@@ -1,0 +1,1870 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Windows-subsysteem voor Linux</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Met Windows Subsystem for Linux kunnen ontwikkelaars een GNU/Linux-omgeving uitvoeren, inclusief de meeste opdrachtregelprogramma's, hulpprogramma's en toepassingen, rechtstreeks in Windows, ongewijzigd, zonder de overhead van een traditionele virtuele machine of dualboot-installatie.</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>De schijf kan niet worden losgekoppeld: {}. Voer 'dmesg' uit in WSL2 voor meer informatie.
+Voer wsl.exe {} uit om WSL2 te dwingen de schijf te stoppen en los te koppelen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>De schijf {} is al gekoppeld.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>Dat volume is al gekoppeld in WSL2.</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>Er is al een schijf met die naam gekoppeld; ontkoppel de schijf of kies een nieuwe naam en probeer het opnieuw.</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>De opgegeven koppelingsnaam bevat een ongeldig /-teken. Probeer het opnieuw zonder het ongeldige teken.</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>De schijf is gekoppeld als /mnt/wsl/{}.
+Opmerking: de locatie is anders als u de instelling automount.root hebt gewijzigd in /etc/wsl.conf.
+Als u de schijf wilt ontkoppelen en ontkoppelen, voert u wsl.exe {} {} uit.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>De schijf is gekoppeld, maar kan niet worden gekoppeld: {}.
+Voer 'dmesg' uit in WSL2 voor meer informatie.
+Als u de schijf wilt ontkoppelen, voert u wsl.exe {} {} uit.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>Hier volgt een lijst met geldige distributies die kunnen worden geïnstalleerd.
+Installeren met wsl.exe {} &lt;Distro&gt;.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>De distributienaam is al ingesteld.</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>De opgegeven installatielocatie is al in gebruik.</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>Er bestaat al een distributie met de opgegeven naam. Gebruik --name om een andere naam te kiezen.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>Er is geen distributie met de opgegeven naam.</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>Beheerderstoegang is vereist om een schijf te koppelen.</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>Het exporteren van de distributie is mislukt.</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>Eenmalige upgrade uitvoeren van het Windows-subsysteem voor Linux-bestandssysteem voor deze distributie...</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>Kan niet starten omdat een ander exemplaar zonder verhoogde bevoegdheden wordt uitgevoerd.  Instanties met verhoogde bevoegdheden en niet-verhoogde bevoegdheden mogen niet tegelijkertijd worden uitgevoerd.</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>Het importeren van de distributie is mislukt.</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>Optioneel Windows-onderdeel installeren: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>Downloaden: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>Installeren: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>Distributie importeren</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>{} is gedownload.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>Windows-subsysteem voor Linux hervat een vorige installatie...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>Ongeldige distributienaam: {}.
+Gebruik wsl.exe --list --online' om een lijst met geldige distributies op te halen.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>Het Windows-subsysteem voor Linux exemplaar is beëindigd.</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>Ongeldig opdrachtregelargument: {}
+Gebruik {} --help' om een lijst met ondersteunde argumenten op te halen.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>Voor het opdrachtregelargument {} is een waarde vereist.
+Gebruik {} --help' om een lijst met ondersteunde argumenten op te halen.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>Niet-ondersteunde console-instellingen. Als u deze functie wilt gebruiken, moet de verouderde console zijn uitgeschakeld.</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>{} is geen geldig geheel getal.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>Er wordt een installatie, verwijdering of conversie uitgevoerd voor deze distributie.</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>{} starten...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>Kan niet starten omdat een ander exemplaar wordt uitgevoerd met verhoogde bevoegdheden.  Instanties met verhoogde bevoegdheden en niet-verhoogde bevoegdheden mogen niet tegelijkertijd worden uitgevoerd.</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>Windows-subsysteem voor Linux heeft geen geïnstalleerde distributies.
+U kunt dit oplossen door een distributie te installeren met de onderstaande instructies:
+
+Gebruik 'wsl.exe --list --online' om een lijst te maken van beschikbare distributies
+en 'wsl.exe --install &lt;Distro&gt;' om te installeren.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>Er zijn geen actieve distributies.</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (Standaard)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Windows-subsysteem voor Linux distributies:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>Standaarddistributie: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>Standaardversie: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>Afmelden.</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>Gebruiker niet gevonden.</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>Ga naar https://aka.ms/wsl2 voor informatie over de belangrijkste verschillen met WSL 2</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>Conversie wordt uitgevoerd. Dit kan enkele minuten duren.</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>De distributie is al de aangevraagde versie.</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>WSL 2 wordt niet ondersteund door de verouderde distributie.</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>WSL2 wordt niet ondersteund met de huidige computerconfiguratie. 
+Schakel het optionele onderdeel Virtual Machine Platform in en zorg ervoor dat virtualisatie is ingeschakeld in het BIOS.
+Schakel Virtual Machine Platform in door uit te voeren: wsl.exe --install --no-distribution
+Ga naar https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>Er zijn te veel virtuele harde schijven of fysieke schijven gekoppeld.</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>VHD is al gekoppeld via wsl.exe --mount, Ontkoppel de schijf voordat u start.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>WSL1 wordt niet ondersteund met de huidige computerconfiguratie.
+Schakel het optionele onderdeel 'Windows Subsystem for Linux' in om WSL1 te gebruiken.</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>Deze bewerking wordt alleen ondersteund door WSL2.</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>Gebruik:
+    --networking-mode
+       Huidige netwerkmodus weergeven.
+
+    --msal-proxy-path
+        Geef het pad naar de MSAL-proxytoepassing weer.
+
+    --version
+        De versie van het WSL-pakket weergeven.
+
+    -n
+        Druk geen nieuwe regel af.</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>Gebruik:
+    -a
+        Resultaat forceren naar absolute padindeling.
+    -u
+        Vertalen van een Windows-pad naar een WSL-pad (standaard).
+    -w
+        Vertalen van een WSL-pad naar een Windows-pad.
+    -m
+        Vertalen van een WSL-pad naar een Windows-pad, met '/' in plaats van '\\'
+
+Voorbeeld: wslpath 'c:\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>Voert beheerbewerkingen uit op Windows-subsysteem voor Linux
+
+Gebruik:
+    /l, /list [Optie]
+        Hiermee worden geregistreerde distributies opgenoemd.
+        /all - Optioneel alle distributies vermelden, inclusief distributies die
+               worden momenteel geïnstalleerd of verwijderd.
+
+        /running - Alleen distributies weergeven die momenteel worden uitgevoerd.
+
+    /s, /setdefault &lt;DistributionName&gt;
+        Hiermee stelt u de distributie als standaard in.
+
+    /t, /terminate &lt;DistributionName&gt;
+        Hiermee wordt de distributie beëindigd.
+
+    /u, /unregister &lt;DistributionName&gt;
+        Hiermee maakt u de registratie van de distributie ongedaan en wordt het hoofdbestandssysteem verwijderd.</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation. Alle rechten voorbehouden.
+Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.
+
+Gebruik: wsl.exe [Argument] [Opties...] [Opdrachtregel]
+
+Argumenten voor het uitvoeren van binaire Linux-bestanden:
+
+    Als er geen opdrachtregel is opgegeven, wordt de standaardshell gestart met wsl.exe.
+
+    --exec, -e &lt;CommandLine&gt;
+        De opgegeven opdracht uitvoeren zonder de standaardshell voor Linux te gebruiken.
+
+    --shell-type &lt;standard|login|none&gt;
+        De opgegeven opdracht uitvoeren met het opgegeven shelltype.
+
+    --
+        De resterende opdrachtregel in de huidige staat doorgeven.
+
+Opties:
+    --cd &lt;Directory&gt;
+        De opgegeven map instellen als de huidige werkmap.
+        Als ~ wordt gebruikt, wordt het basispad van de Linux-gebruiker gebruikt. Als het pad begint
+        met een /-teken, wordt het geïnterpreteerd als een absoluut Linux-pad.
+        Anders moet de waarde een absoluut Windows-pad zijn.
+
+    --distribution, -d &lt;DistroName&gt;
+        De opgegeven distributie uitvoeren.
+
+    --distribution-id &lt;DistroGuid&gt;
+        De opgegeven distributie-id uitvoeren.
+
+    --user, -u &lt;UserName&gt;
+        Uitvoeren als de opgegeven gebruiker.
+
+    --system
+        Een shell voor de systeemdistributie starten.
+
+Argumenten voor het beheren van het Windows-subsysteem voor Linux:
+
+    --help
+        Gebruiksgegevens weergeven.
+
+    --debug-shell
+        Een WSL2-foutopsporingsshell voor diagnostische doeleinden openen.
+
+    --install [Distributie] [Opties...]
+        Een Windows-subsysteem voor Linux-distributie installeren.
+        Gebruik 'wsl.exe --list --online' voor een lijst met geldige distributies.
+
+        Opties:
+            --enable-wsl1
+                WSL1-ondersteuning inschakelen.
+
+            --fixed-vhd
+                Maak een schijf met een vaste grootte om de distributie op te slaan.
+
+            --from-file &lt;Path&gt;
+                Een distributie installeren vanaf een lokaal bestand.
+
+            --legacy
+                Het verouderde distributiemanifest gebruiken.
+
+            --location &lt;Location&gt;
+                Het installatiepad voor de distributie instellen.
+
+            --name &lt;Name&gt;
+                De naam van de distributie instellen.
+
+            --no-distribution
+                Door alleen de vereiste optionele onderdelen te installeren, wordt geen distributie geïnstalleerd.
+
+            --no-launch, -n
+                De distributie niet na de installatie starten.
+
+            --version &lt;Version&gt;
+                Hiermee geeft u de versie op die moet worden gebruikt voor de nieuwe distributie.
+
+            --vhd-size &lt;MemoryString&gt;
+                Geeft de grootte van de schijf op om de distributie op te slaan.
+
+            --web-download
+                De distributie downloaden van internet in plaats van Microsoft Store.
+
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Hiermee worden specifieke opties voor de distributie gewijzigd.
+
+        Opties:
+            --move &lt;Location&gt;
+                Verplaats de distributie naar een nieuwe locatie.
+
+            --set-sparse, -s &lt;true|false&gt;
+                De vhdx van distro instellen op sparse, zodat schijfruimte automatisch opnieuw kan worden geclaimd.
+
+            --set-default-user &lt;Username&gt;
+                De standaardgebruiker van de distributie instellen.
+
+            --resize &lt;MemoryString&gt;
+                De grootte van de schijf van de distributie wijzigen in de opgegeven grootte.
+
+    --mount &lt;Disk&gt;
+        Hiermee wordt een fysieke of virtuele schijf in alle WSL 2-distributies toegevoegd en gekoppeld.
+
+        Opties:
+            --vhd
+                Hiermee geef je aan dat &lt;Disk&gt; naar een virtuele harde schijf verwijst.
+
+            --bare
+                De schijf toevoegen aan WSL2, maar niet koppelen.
+
+            --name &lt;Name&gt;
+                De schijf koppelen met een aangepaste naam voor het koppelpunt.
+
+            --type &lt;Type&gt;
+                Het bestandssysteem dat moet worden gebruikt bij het koppelen van een schijf wordt, indien niet opgegeven, standaard ingesteld op ext4.
+
+            --options &lt;Options&gt;
+                Aanvullende koppelingsopties.
+
+            --partition &lt;Index&gt;
+                De index van de partitie die moet worden gekoppeld wordt, indien niet opgegeven, standaard ingesteld op de hele schijf.
+
+    --set-default-version &lt;Version&gt;
+        Hiermee wijzig je de standaardinstallatieversie voor nieuwe distributies.
+
+    --shutdown
+        Hiermee beëindig je onmiddellijk alle actieve distributies en de WSL 2
+        lichtgewicht virtuele machine voor hulpprogramma's.
+
+        Opties:
+            --force
+                Beëindig de WSL 2 virtuele machine, zelfs als er een bewerking wordt uitgevoerd. Dit kan gegevensverlies veroorzaken.
+
+    --status
+        De status van het Windows-subsysteem voor Linux weergeven.
+
+    --unmount [Disk]
+        Hiermee wordt een schijf ontkoppeld en losgemaakt van alle WSL2-distributies.
+        Hiermee worden alle schijven ontkoppeld en losgemaakt bij een aanroep zonder argument.
+
+    --uninstall
+        Hiermee verwijder je het Windows-subsysteem voor Linux-pakket van deze computer.
+
+    --update
+        Het Windows-subsysteem voor Linux-pakket bijwerken.
+
+        Opties:
+            --pre-release
+                Een voorlopige versie downloaden, indien beschikbaar.
+
+    --version, -v
+        Versiegegevens weergeven.
+
+Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linux:
+
+    --export &lt;Distro&gt; &lt;FileName&gt; [Opties]
+        Hiermee exporteer je de distributie naar een TAR-bestand.
+        De bestandsnaam kan - zijn voor stdout.
+
+        Opties:
+            --format &lt;Format&gt;
+                De exportindeling opgeven. Ondersteunde waarden: tar, tar.gz, tar.xz, vhd.
+
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Opties]
+        Hiermee importeer je het opgegeven TAR-bestand als een nieuwe distributie.
+        De bestandsnaam kan - zijn voor stdin.
+
+        Opties:
+            --version &lt;Version&gt;
+                Hiermee geef je de versie op die moet worden gebruikt voor de nieuwe distributie.
+
+            --vhd
+                Hiermee geef je op dat het opgegeven bestand een VHDX-bestand is en geen TAR-bestand.
+                Met deze bewerking wordt een kopie gemaakt van het VHDX-bestand op de opgegeven installatielocatie.
+
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        Hiermee importeer je het opgegeven VHDX-bestand als een nieuwe distributie.
+        Deze virtuele harde schijf moet zijn geformatteerd met het ext4-type bestandssysteem.
+
+    --list, -l [Opties]
+        Hiermee wordt een lijst met distributies weergegeven.
+
+        Opties:
+            --all
+                Alle distributies weergeven, inclusief distributies die
+                momenteel worden geïnstalleerd of verwijderd.
+
+            --running
+                Alleen distributies weergeven die momenteel worden uitgevoerd.
+
+            --quiet, -q
+                Alleen distributienamen weergeven.
+
+            --verbose, -v
+                Gedetailleerde informatie over alle distributies weergeven.
+
+            --online, -o
+                Geeft een lijst weer met beschikbare distributies voor installatie met 'wsl.exe --install'.
+
+    --set-default, -s &lt;Distro&gt;
+        Hiermee stel je de distributie als standaard in.
+
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        Hiermee wijzig je de versie van de opgegeven distributie.
+
+    --terminate, -t &lt;Distro&gt;
+        Hiermee wordt de opgegeven distributie beëindigd.
+
+    --unregister &lt;Distro&gt;
+        De registratie van de distributie ongedaan maken en het hoofdbestandssysteem verwijderen.</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>WSL-versiie: {}
+Kernelversie: {}
+WSLg-versie: {}
+MSRDC-versie: {}
+Direct3D-versie: {}
+DXCore-versie: {}
+Windows-versie: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>MSBuild-versie: {}
+Doorvoeren: {}
+Buildtijd: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>De aangepaste kernel die is opgegeven in {} is niet gevonden: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>De VHD van de aangepaste kernelmodules in {} is niet gevonden: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>De aangepaste systeemdistributie die is opgegeven in {} is niet gevonden of heeft niet de juiste indeling.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation. Alle rechten voorbehouden.
+Ga naar https://aka.ms/privacy voor privacyinformatie over dit product.
+
+Gebruik: wslg.exe [Argument] [Opties...] [CommandLine]
+
+Argumenten:
+    --cd &lt;Map&gt;
+        Hiermee stelt u de opgegeven map in als de huidige werkmap.
+        Als ~ wordt gebruikt, wordt het startpad van de Linux-gebruiker gebruikt. Als het pad begint
+        met een /-teken, wordt het geïnterpreteerd als een absoluut Linux-pad.
+        Anders moet de waarde een absoluut Windows-pad zijn.
+
+    --distribution, -d &lt;Distro&gt;
+        Voer de opgegeven distributie uit.
+
+    --user, -u &lt;Gebruikersnaam&gt;
+        Uitvoeren als de opgegeven gebruiker.
+
+    --shell-type &lt;standard|login|none&gt;
+        De opgegeven opdracht uitvoeren met het opgegeven shelltype.
+
+    --help
+        Gebruiksgegevens weergeven.
+
+    --
+        De resterende opdrachtregel ongewijzigd doorgeven.</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>Druk op een willekeurige toets om door te gaan...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>Voor argument {} ontbreekt een vereiste parameter.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>Exporteren wordt uitgevoerd. Dit kan enkele minuten duren.</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>Importeren wordt uitgevoerd. Dit kan enkele minuten duren.</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>Ondersteuning voor GUI-toepassingen is uitgeschakeld via {} of /etc/wsl.conf.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>Controleren op updates.</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>Deze distributie is alleen beschikbaar vanuit de Microsoft Store.</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>voor wsl.exe --mount op ARM64 is Windows-versie 27653 of nieuwere versie vereist.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>De meest recente versie van Windows-subsysteem voor Linux is al geïnstalleerd.</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>Windows-subsysteem voor Linux bijwerken naar versie: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>Voor deze toepassing is het Windows-subsysteem voor Linux optionele onderdeel vereist.
+Installeer het door het uit te voeren: wsl.exe --install --no-distribution
+Het systeem moet mogelijk opnieuw worden opgestart, zodat de wijzigingen van kracht kunnen worden.</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>Het opgegeven bestand moet de bestandsextensie .vhdx hebben.</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>Kan de VmSwitch {} niet vinden. Beschikbare switches: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>Voor brugnetwerken moet wsl2.vmSwitch worden ingesteld.</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>Kan de lijstdistributie niet ophalen uit {}. {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>Kan de schijf {} niet koppelen aan WSL2: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>Kan het formaat van de schijf niet wijzigen.</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>Kan pad niet vertalen.</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>Geen waarde gevonden.</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>Windows-versie {} biedt geen ondersteuning voor de pakketversie van Windows-subsysteem voor Linux.
+Installeer de vereiste update via Windows Update of via: {}
+Ga naar https://aka.ms/wslinstall voor meer informatie</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>Als u de foutopsporingsshell wilt uitvoeren, moet u wsl.exe als beheerder uitvoeren.</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>Het installatieproces voor distributie {} is mislukt met afsluitcode: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>Ongeldige GUID-indeling: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>Ongeldige sectienaam in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>Ongeldige sleutelnaam in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>{} wordt verwacht in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>Ongeldig escapeteken: {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>Onbekende sleutel {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>Ongeldige integerwaarde {} voor sleutel {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>Ongeldige IP-waarde {} voor sleutel {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>Ongeldige booleaanse waarde {} voor sleutel {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>Ongeldig mac-adres {} voor sleutel {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>Kan configuratiebestand {}, {} niet openen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>Er zijn fouten opgetreden tijdens het opstarten van WSL</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>EventViewer openen</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>Deze distributie bevat geen standaardnaam. Gebruik --name om de distributienaam te kiezen.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>Argumenten {} en {} kunnen niet tegelijkertijd worden opgegeven.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>Argument {} vereist het {}-argument.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>Ongeldige distributienaam: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>Verouderde distributieregistratie wordt gebruikt. Overweeg in plaats daarvan een op teer gebaseerde distributie te gebruiken.</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>Verouderde distributieregistraties ondersteunen het argument --version niet.</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>De distributie '{}' wordt geleverd door een onderdrukkingsmanifest.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>De distributiehash komt niet overeen. Verwacht: {}, werkelijke hash: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>Ongeldige hexadecimale tekenreeks: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>'{}' wordt niet ondersteund bij het installeren van verouderde distributies.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>Distributie is geïnstalleerd. Het kan worden gestart via wsl.exe -d {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>Ongeldige geheugentekenreeks {} voor .wslconfig-vermelding {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>Kan de wisselschijf niet maken in {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>Geneste virtualisatie wordt niet ondersteund op deze computer.</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>Kan het netwerkeindpunt met het adres {} niet maken, er is een nieuw adres toegewezen: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>Kan geen virtueel netwerk maken met adresbereik: {}, nieuw netwerk gemaakt met bereik: {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>VEILIGE MODUS INGESCHAKELD - veel functies worden uitgeschakeld</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>Gespiegelde netwerkmodus wordt niet ondersteund: {}.
+Terugvallen op NAT-netwerken.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>Linux Kernel versie 5.10 of nieuwere is vereist</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Windows-versie {}. {} beschikt niet over de vereiste functies</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>Hyper-V-firewall wordt niet ondersteund</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>DNS-tunneling wordt niet ondersteund</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>De instelling wsl2.localhostForwarding heeft geen effect bij het gebruik van de gespiegelde netwerkmodus</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>Er is een http-proxywijziging gedetecteerd op de host. Start WSL opnieuw om de wijziging toe te passen.</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>Er is een localhost-proxyconfiguratie gedetecteerd, maar niet gespiegeld in WSL. WSL in nat-modus biedt geen ondersteuning voor localhostproxy's.</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>Er is een IPv6-proxyconfiguratie gedetecteerd, maar niet gespiegeld in WSL. WSL in nat-modus biedt geen ondersteuning voor IPv6.</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>Er is een localhost IPv6-proxyconfiguratie gedetecteerd, maar niet gespiegeld in WSL. WSL biedt geen ondersteuning voor localhost IPv6-proxy's.</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>Er is een onverwachte fout opgetreden tijdens het omzetten van proxy-instellingen. Proxy-instellingen zijn niet gespiegeld in WSL.</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>Er is een fout opgetreden bij het openen van het register. Pad: {}. Fout: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>Kan het relay-proces van localhost niet starten. Fout: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>Kan het virtuele netwerk niet starten. Installeer het optionele onderdeel Virtual Machine Platform door wsl.exe --install --no-distribution uit te voeren</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>Kan netwerk (networkingMode {}) niet configureren. Er wordt teruggevallen op networkingMode {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>Kan Windows-onderdeel {} niet inschakelen (afsluitcode {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>Er is een onherstelbare fout geretourneerd door de invoegtoepassing {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>Er is een onherstelbare fout geretourneerd door de invoegtoepassing {}. Foutbericht: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>Voor de invoegtoepassing {} is een nieuwere versie van WSL vereist. Uitvoeren: wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>De instelling .wslconfig '{}' is uitgeschakeld door het computerbeleid.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>De foutopsporingsshell is uitgeschakeld door het computerbeleid.</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>wsl.exe --mount is uitgeschakeld door het computerbeleid.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>WSL1 is uitgeschakeld door het computerbeleid.</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>Voer wsl.exe --set-version {} 2 uit om een upgrade uit te voeren naar WSL2.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>WSL rondt een upgrade af...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>Bijwerken is mislukt (afsluitcode: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>Installatie ongedaan maken is mislukt (afsluitcode: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>Logboekbestand: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>Kan het MSIX-pakket niet verwijderen (fout: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>Kan het MSIX-pakket niet installeren (fout: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>Optionele onderdelen die nodig zijn om WSL uit te voeren, zijn niet geïnstalleerd.</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>Ontbrekende onderdelen installeren.</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>Het geïmporteerde bestand is geen geldige Linux-distributie.</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>Druk op een willekeurige toets om af te sluiten...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>Er is een nieuwe versie van Windows-subsysteem voor Linux beschikbaar.</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>Werk bij naar versie {} of bekijk de releaseopmerkingen hieronder.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>Bijwerken</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>Documenten weergeven</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>De bewerking kan niet worden voltooid omdat de VHDX momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>{} is geen geldige booleaanse waarde, &lt;waar|onwaar&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>Sparse vhdx wordt alleen ondersteund op WSL2.</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>Het uitvoeren van WSL als lokaal systeem wordt niet ondersteund.</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>Prestaties tip:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>Het gebruik van een I/O-intensieve bewerking zoals {} op uw Windows-stations heeft slechte prestaties. Overweeg uw projectbestanden naar het Linux-bestandssysteem te verplaatsen voor betere prestaties. Klik hieronder voor meer informatie.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>Documenten weergeven</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>Niet meer weergeven</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>De WSL2-virtuele machine is vastgelopen.</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>De stacktracering is opgeslagen in: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>De distributie kan niet worden gestart. Foutcode: {}, foutstap: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>De distributie kan niet worden gestart omdat de virtuele schijf beschadigd is.</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>Dubbele configuratiesleutel {} in {}:{} (conflicterende sleutel: {} in {}:{})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>Ongeldige waarde {} voor configuratiesleutel {} in {}:{} (geldige waarden: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>Wachten tot de OOBE-opdracht is voltooid voor distributie {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>Kan de eigenschap {} niet lezen uit distributie {} </value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>Dit ziet eruit als een VHDX-bestand. Gebruik --vhd om een VHDX te importeren in plaats van een tar.</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>Kan {} niet installeren vanaf de Microsoft Store: {}
+Poging tot downloaden van web...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>Er is geen standaarddistributie geconfigureerd. Geef een distributie op om te installeren.</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>wsl2.virtio9p is uitgeschakeld en valt terug naar 9p met vsock-transport.</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>WSL-installatie lijkt beschadigd te zijn (foutcode: {}).
+Druk op een toets om WSL te herstellen of CTRL-C om te annuleren.
+Er treedt over 60 seconden een time-out op voor deze prompt.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>Kan het terminalprofiel niet parseren tijdens het registreren van de distributie: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>Ongeldige grootte: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+Foutcode: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>Ongeldig JSON-document. Fout bij parseren: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>wsl2.processors mogen niet groter zijn dan het aantal logische processors op het systeem ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>Kan netwerkmodus niet opvragen</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>Er zijn kernelmodules geleverd zonder een kernel op te geven. Raadpleeg https://aka.ms/wslcustomkernel voor meer informatie.</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>Vanwege een huidig compatibiliteitsprobleem met de Wereldwijde Beveiligde Toegang-client is DNS-tunneling uitgeschakeld.</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>Sparse VHD-ondersteuning is momenteel uitgeschakeld vanwege mogelijk beschadigde gegevens.
+Om een distributie te dwingen een sparse vhd te gebruiken, voer je het volgende uit:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>Kan {} niet koppelen. Zie dmesg voor meer informatie.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>Verwerken van /etc/fstab met mount -a is mislukt.</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>Er is een fout opgetreden bij het koppelen van de distributieschijf. Deze is als terugval gekoppeld met het kenmerk Alleen-lezen.
+Zie de herstelinstructies voor: https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>Kan '{}' niet vertalen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>Er is iets foutgegaan. Probeer het later opnieuw.</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>Info</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>Over instellingen voor Windows-subsysteem voor Linux</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft. Alle rechten voorbehouden.</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>Windows Subsystem voor Linux-instellingen</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>Met Windows-subsysteem voor Linux-instellingen kunnen ontwikkelaars het .wslconfig-bestand beheren met behulp van een GUI-toepassing.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>Automatisch geheugen vrijmaken</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>Automatisch geheugen in cache vrijmaken na detectie van niet-actief CPU-gebruik. Ingesteld op geleidelijk voor langzame release en dropcache voor directe vrijgave van geheugen in cache.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Automatisch geheugen vrijmaken.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Automatisch geheugen in cache vrijmaken na detectie van niet-actief CPU-gebruik. Ingesteld op geleidelijk voor langzame release en dropcache voor directe vrijgave van geheugen in cache.</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>Automatische proxy ingeschakeld</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>Hiermee kan WSL de HTTP-proxygegevens van Windows gebruiken.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Automatische proxy ingeschakeld.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hiermee kan WSL de HTTP-proxygegevens van Windows gebruiken.</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>DNS-analyse met de beste poging gebruiken</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.dnsTunneling is ingesteld op true. Als deze optie is ingesteld op true, wordt de vraag geëxtraheerd uit de DNS-aanvraag en wordt geprobeerd deze op te lossen, waarbij de onbekende records worden genegeerd.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-analyse met de beste poging gebruiken.</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.dnsTunneling is ingesteld op true. Als deze optie is ingesteld op true, wordt de vraag geëxtraheerd uit de DNS-aanvraag en wordt geprobeerd deze op te lossen, waarbij de onbekende records worden genegeerd.</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>Aangepaste kernel</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>Een absoluut Windows-pad naar een aangepaste Linux-kernel.</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>Koor kernels bladeren</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Aangepaste kernel</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Een absoluut Windows-pad naar een aangepaste Linux-kernel.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>Aangepaste kernelmodules</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>Een absoluut Windows-pad naar een aangepaste Linux-kernel modules VHD.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>Door kernelmodules bladeren</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Aangepaste kernelmodules</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Een absoluut Windows-pad naar een aangepaste Linux-kernel modules VHD.</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>Aangepaste systeemdistributie</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>Bladeren door distro's</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>Geef een pad op naar een VHD die wordt geladen als een aangepaste systeemdistributie, die voornamelijk wordt gebruikt om GUI-apps in WSL aan te zetten. [Meer informatie over systeemdistributies hier].</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Aangepaste systeemdistributie</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Geef een pad op naar een VHD die wordt geladen als een aangepaste systeemdistributie, die voornamelijk wordt gebruikt om GUI-apps in WSL aan te zetten.</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>Foutopsporingsconsole inschakelen</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>Booleaanse waarde voor het inschakelen van een uitvoerconsolevenster waarin de inhoud van dmesg wordt weergegeven bij het begin van een WSL 2-distributie-exemplaar.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Foutopsporingsconsole inschakelen.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Booleaanse waarde voor het inschakelen van een uitvoerconsolevenster waarin de inhoud van di berichten wordt weergegeven bij het begin van een WSL 2-distributie-exemplaar.</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>Standaardgrootte van VHD</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>De standaard maximale grootte voor de uitbreidbare virtuele harde WSL-schijf (VHD) alleen voor nieuw gemaakte distributies.</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>Grootte opnieuw instellen</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Standaardgrootte van VHD</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>De standaard maximale grootte, opgegeven in megabytes, voor de uitbreidbare virtuele harde WSL-schijf (VHD) alleen voor nieuw gemaakte distributies.</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>Ontwikkelaar</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>Documentatie</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>DrvFS-modus wijzigen</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>Hiermee wijzigt u de implementatie van bestandstoegang tussen besturingssystemen in WSL.</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>DNS-proxy ingeschakeld</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.networkingMode is ingesteld op NAT. Booleaanse waarde om WSL te informeren over het configureren van de DNS-server in Linux naar nat op de host. Als u instelt op onwaar, worden DNS-servers gespiegeld van Windows naar Linux.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-proxy ingeschakeld.</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.networkingMode is ingesteld op NAT. Booleaanse waarde om WSL te informeren over het configureren van de DNS-server in Linux naar nat op de host. Als u instelt op onwaar, worden DNS-servers gespiegeld van Windows naar Linux.</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>DNS-tunneling ingeschakeld</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>Hiermee wijzigt u de wijze waarop DNS-aanvragen van WSL naar Windows worden geproxy'd.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-tunneling ingeschakeld.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hiermee wijzigt u de wijze waarop DNS-aanvragen van WSL naar Windows worden geproxy'd.</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>Bestandssysteem</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>GUI-toepassingen inschakelen</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>Booleaanse waarde voor het in- of uitschakelen van ondersteuning voor GUI-toepassingen ([WSLg]) in WSL.</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>GUI-toepassingen inschakelen.</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Booleaanse waarde voor het in- of uitschakelen van ondersteuning voor GUI-toepassingen (ook wel WSL g genoemd) in WSL.</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>Prestatiemeteritems voor hardware inschakelen</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>Hiermee schakelt u hardwareprestatiemeteritems voor Linux in.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Prestatiemeteritems voor hardware inschakelen.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hiermee schakelt u hardwareprestatiemeteritems voor Linux in.</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>Hyper-V Firewall ingeschakeld</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>Hiermee wordt de Hyper-V-firewall ingeschakeld waarmee de Windows Firewall-regels en regels die specifiek zijn voor Hyper-V-verkeer, WSL-netwerkverkeer kunnen filteren.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hyper-V Firewall ingeschakeld.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hiermee wordt de Hyper-V-firewall ingeschakeld waarmee de Windows Firewall-regels en regels die specifiek zijn voor Hyper-V-verkeer, WSL-netwerkverkeer kunnen filteren.</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>Loopback van hostadres</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.networkingMode is ingesteld op gespiegeld. Als deze optie is ingesteld op Waar, kan de container verbinding maken met de host of de host om verbinding te maken met de container door een IP-adres dat aan de host is toegewezen. Het loopback-adres 127.0.0.1 kan altijd worden gebruikt. Met deze optie kunnen ook alle extra toegewezen lokale IP-adressen worden gebruikt.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Loopback van hostadres.</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.networkingMode is ingesteld op gespiegeld. Als deze optie is ingesteld op Waar, kan de container verbinding maken met de host of de host om verbinding te maken met de container door een IP-adres dat aan de host is toegewezen. Het loopback-adres 127.0.0.1 kan altijd worden gebruikt. Met deze optie kunnen ook alle extra toegewezen lokale IP-adressen worden gebruikt.</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>Genegeerde poorten</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.networkingMode is ingesteld op gespiegeld. Hiermee geeft u op aan welke poorten Linux-toepassingen kunnen binden, die niet automatisch worden doorgestuurd of overwogen in Windows. Moet worden opgemaakt in een door komma's gescheiden lijst, bijvoorbeeld: 3000.9000.9090.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>Poorten opnieuw instellen</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Genegeerde poorten</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.networkingMode is ingesteld op gespiegeld. Hiermee geeft u op aan welke poorten Linux-toepassingen kunnen binden, die niet automatisch worden doorgestuurd of overwogen in Windows. Moet worden opgemaakt in een door komma's gescheiden lijst, bijvoorbeeld: 3000, 9000, 9090.</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>Time-out voor eerste automatische proxy</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.autoProxy is ingesteld op true. Hiermee configureert u hoe lang (in milliseconden) WSL wacht op het ophalen van HTTP-proxygegevens bij het starten van een WSL-container. Als de proxyinstellingen na deze tijd worden omgezet, moet het WSL-exemplaar opnieuw worden gestart om de opgehaalde proxyinstellingen te gebruiken.</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>Time-out voor opnieuw instellen</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Time-out voor eerste automatische proxy</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Alleen van toepassing wanneer wsl2.autoProxy is ingesteld op true. Hiermee configureert u hoe lang in milliseconden door WSL wordt gewacht op het ophalen van HTTP-proxygegevens bij het starten van een WSL-container. Als de proxyinstellingen na deze tijd worden omgezet, moet het WSL-exemplaar opnieuw worden gestart om de opgehaalde proxyinstellingen te gebruiken.</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>Kernelopdrachtregel</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>Aanvullende kernelopdrachtregelargumenten.</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>Localhost-doorsturen inschakelen</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>Booleaanse waarde die aangeeft of poorten zijn gebonden aan jokertekens of localhost in de WSL 2-VM, kunnen worden verbonden vanaf de host via localhost:port.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Localhost-doorsturen inschakelen.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Booleaanse waarde die aangeeft of poorten zijn gebonden aan jokertekens of localhost in de WSL 2-VM, kunnen worden verbonden vanaf de host via localhost, colon, port.</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>Geheugen en processor</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>Geheugengrootte</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>Hoeveel geheugen moet worden toegewezen aan de VM van WSL 2.</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>Grootte opnieuw instellen</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Geheugengrootte</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hoeveel geheugen, opgegeven in megabytes, moet worden toegewezen aan de VM van WSL 2.</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} milliseconden</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>Geneste virtualisatie inschakelen</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>Booleaanse waarde voor het in- of uitschakelen van geneste virtualisatie, waardoor andere geneste VM's kunnen worden uitgevoerd in WSL 2.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Geneste virtualisatie inschakelen.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Booleaanse waarde voor het in- of uitschakelen van geneste virtualisatie, waardoor andere geneste VM's kunnen worden uitgevoerd in WSL 2.</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>Netwerkmodus</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>Hiermee geeft u de netwerkmodus voor WSL.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Netwerkmodus.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hiermee geeft u de netwerkmodus voor WSL.</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>Netwerken</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>U kunt op alle besturingssystemen met al uw bestanden werken.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>Bestandstoegang tussen verschillende besturingssystemen</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>Toegang tot uw Windows-bestanden vanuit Linux</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>U hebt vanuit Linux toegang tot uw Windows-bestanden door te navigeren naar '/mnt' en vervolgens naar uw Windows-stationsletter, zoals in dit voorbeeld voor het C-station:
+
+'cd /mnt/c'</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>Toegang tot uw Linux-bestanden met Bestandenverkenner</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>U kunt uw Linux-bestanden weergeven in Verkenner door te navigeren naar '\\wsl.localhost\' of door op het Linux-pictogram te klikken.</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>Windows-bestanden en -programma's starten vanuit WSL</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>Zelfs wanneer u WSL gebruikt, kunt u de uitvoerbare Windows-bestanden rechtstreeks uitvoeren vanuit Bash. Probeer het volgende uit te voeren:
+'powershell.exe /c start .' om Verkenner te openen in uw huidige map.</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>Toegang tot Linux-netwerk-apps vanuit Windows</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>Als u een netwerk-app bouwt (bijvoorbeeld een app die wordt uitgevoerd op een NodeJS- of SQL-server) in uw Linux-distributie, hebt u toegang tot de app vanuit een Windows-app (zoals uw Edge- of Chrome-internetbrowser) met localhost (net zoals normaal). Dit betekent dat als u een Linux-server hebt gestart die luistert naar poort 3000, u naar [http://localhost:3000] kunt gaan in Edge op Windows om toegang te krijgen tot de server.</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>Netwerken in gespiegelde modus</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>WSL bevat ook een nieuwe netwerkmodus, de gespiegelde modus, die geavanceerde mogelijkheden toevoegt, zoals IPv6-ondersteuning en de mogelijkheid om toegang te krijgen tot uw netwerktoepassingen in uw bedrijfsnetwerk.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>Meer informatie over bestandstoegang tussen verschillende besturingssystemen</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>Welkom bij Windows-subsysteem voor Linux</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>WSL is een geweldige manier om verschillende Linux-distributies uit te proberen.</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>Distro-beheer</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>Meer informatie over standaard WSL-opdrachten</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>Meer informatie over het importeren van Linux-distributies</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>Installeerbare WSL Distros-opdracht weergeven</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l -o'</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>Een benoemde WSL-distro-opdracht installeren</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;DistroName&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>Beschikbare WSL-distros-opdracht weergeven</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Docker Desktop werkt ideaal met WSL om u te helpen ontwikkelen met Linux-containers.
+
+Enkele voordelen van het gebruik van Docker Desktop met WSL zijn:
+
+• U kunt Docker-opdrachten uitvoeren in WSL of in Windows, met gebruik van dezelfde Docker-daemon en -installatiekopieën.
+• U kunt bestanden en mappen soepel delen tussen Windows en Linux met behulp van de automatische koppeling van Windows-stations in WSL.
+• U kunt uw favoriete Windows-hulpprogramma's en -editors gebruiken om te werken aan Linux-code en -bestanden, en omgekeerd, dankzij de interoperabiliteit van WSL.</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Docker Desktop-integratie</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>Meer informatie over het gebruik van WSL met Docker</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>Met het Windows-subsysteem voor Linux (WSL) kunt u uw favoriete Linux-hulpprogramma's, toepassingen en werkstromen rechtstreeks in Windows uitvoeren.
+
+Neem even de tijd om een voorbeeld te bekijken van de favoriete functies van de community of bekijk onze uitgebreide documentatie.</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>Welkom bij WSL</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>Aanbevolen procedures voor installatie</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Aan de slag met Linux</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>Documentatie voor Windows-subsysteem voor Linux (WSL)</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>U kunt grafische Linux-toepassingen gebruiken met systeemeigen Windows-interacties, zoals alt-tab, het openen van het startmenu, vastmaken van taakbalk en ondersteuning voor knippen en plakken.</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>GUI-apps</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>WSL kan gebruikmaken van je Windows GPU voor Machine Learning-werkstromen
+
+Binaire Linux-bestanden die worden uitgevoerd in WSL kunnen automatisch je GPU in Windows gebruiken om hun prestaties te versnellen. Je hoeft deze werkstromen slechts op dezelfde manier te installeren en uit te voeren als op een normale Linux-computer. Je kunt op verschillende manieren aan de slag gaan, van het uitvoeren van CUDA in een Docker-container als je een NVIDIA-grafische kaart hebt, tot het uitvoeren van PyTorch of TensorFlow met DirectML op je AMD-, Intel- of NVIDIA-grafische kaart. Zie de Aan de slag-gids hieronder voor meer informatie.</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>GPU-versnelling</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>Meer informatie over GPU-versnelling</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>Meer informatie over WSL GUI-apps</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>Hier ziet u een lijst met apps die u kunt proberen (u kunt al deze apps installeren in Ubuntu door 'sudo apt install &lt;De app-naam&gt;' te typen)
+
+    • gedit – Eenvoudige teksteditor
+    • audacity – Audiobestanden opnemen en bewerken
+    • blender – 3D-animaties en -visualisaties maken
+    • gimp – Foto's bewerken
+    • nautilus – Een Linux-bestandenverkenner
+    • vlc – Videospeler</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>U hebt eenvoudig toegang tot netwerk-apps in Windows- en Linux-besturingssystemen.</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>Netwerkintegratie</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>Meer informatie over netwerktoepassingen</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>Meer informatie over netwerken in gespiegelde modus</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>U kunt WSL rechtstreeks vanuit VS Code gebruiken als uw fulltime-ontwikkelomgeving.</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>VS Code-integratie</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>Meer informatie over het gebruik van WSL met VS Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>Installatie-instructies</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>Nadat u VS Code hebt geïnstalleerd, kunt u de externe WSL-extensie installeren vanuit Windows Terminal:
+
+'code –install-extension ms-vscode-remote.remote-wsl'</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>Open een WSL-project in Visual Studio Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>Om een project te openen in VS Code vanuit uw WSL-distributie, opent u de opdrachtregel van de distributie en voert u 'code .' uit om een projectbestand te openen.
+
+U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS Code zelf. Druk op SHIFT+CTRL+P op het toetsenbord om het opdrachtpalet te openen en typ 'Remote-WSL' om een lijst met beschikbare externe VS Code-opties weer te geven (bijvoorbeeld de map opnieuw openen in een externe sessie, opgeven welke distributie u wilt openen en meer).</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>Informatie over het gebruik</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>Optionele onderdelen</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>Paginarapportage inschakelen</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>Met de standaardinstelling Waar, kan Windows ongebruikt geheugen vrijmaken dat is toegewezen aan de virtuele WSL 2-machine.</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>Privacyverklaring</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>Aantal processors</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>Hoeveel logische processors moeten worden toegewezen aan de VM van WSL 2.</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>Aantal opnieuw instellen</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Aantal processors</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hoeveel logische processors moeten worden toegewezen aan de VM van WSL 2.</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>Verwante koppelingen</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>Opmerkingen bij de release</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>Veilige modus inschakelen</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>Voer WSL uit in de veilige modus. Hierdoor worden veel functies uitgeschakeld en kunnen distributies met een slechte status worden hersteld.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Veilige modus inschakelen.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Voer WSL uit in de veilige modus. Hierdoor worden veel functies uitgeschakeld en kunnen distributies met een slechte status worden hersteld.</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>Info</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>Ontwikkelaar</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Distributiebeheer</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Docker Desktop-integratie</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>Bestandssysteem</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>Algemeen</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>GPU-versnelling</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>GUI-apps</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>wsl.exe starten</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>Geheugen en processor</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>Netwerken</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>Netwerkintegratie</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>Welkom bij WSL</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>Optionele onderdelen</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>Instellingen</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>VS Code-integratie</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>Nieuwe functies</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>Werken tussen bestandssystemen</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>Problemen</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>Sparse VHD standaard inschakelen</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>Nieuwe VHD's worden automatisch ingesteld op schaars wanneer deze is ingeschakeld.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Sparse VHD standaard inschakelen.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Nieuwe VHD's worden automatisch ingesteld op schaars wanneer deze is ingeschakeld.</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>Bestandslocatie wisselen</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>Een absoluut Windows-pad naar de verwisselbare virtuele harde schijf.</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>Bladeren door wisselbestanden</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Bestandslocatie wisselen</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Een absoluut Windows-pad naar de verwisselbare virtuele harde schijf.</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>Formaat wijzigen</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>Hoeveel wisselruimte moet worden toegevoegd aan de VM van WSL 2, 0 voor geen wisselbestand. Wisselopslag is ram op schijf die wordt gebruikt wanneer de geheugenvraag de limiet op het hardwareapparaat overschrijdt.</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>Grootte opnieuw instellen</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Formaat wijzigen</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hoeveel wisselruimte, opgegeven in megabytes, moet worden toegevoegd aan de VM van WSL 2. 0 voor geen wisselbestand. Wisselopslag is ram op schijf die wordt gebruikt wanneer de geheugenvraag de limiet op het hardwareapparaat overschrijdt.</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>VirtIO inschakelen</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>Gebruik Virtiofs in plaats van plan 9 om toegang te krijgen tot hostbestanden, waardoor de snelheid toeneemt.</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>Virtio 9p inschakelen</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>Maakt het koppelen van het 9P-bestandssysteem vanaf de host mogelijk met behulp van het Virtio-transport.</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>VM Idle-time-out</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>Het aantal milliseconden dat een VM inactief is voordat deze wordt afgesloten.</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Time-out voor opnieuw instellen</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>VM Idle-time-out</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Het aantal milliseconden dat een VM inactief is voordat deze wordt afgesloten.</value>
+  </data>
+</root>

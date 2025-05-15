@@ -1,0 +1,23 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WslInstallerProxyStub.rc
+
+Abstract:
+
+    This file contains resources for WslInstallerProxyStub.dll.
+
+--*/
+
+#include <windows.h>
+#include "wslversioninfo.h"
+
+#define VER_INTERNALNAME_STR "WslInstallerProxyStub.dll"
+#define VER_ORIGINALFILENAME_STR "WslInstallerProxyStub.dll"
+
+#define VER_FILEDESCRIPTION_STR "WSL Installer ProxyStub DLL"
+
+#include <common.ver>

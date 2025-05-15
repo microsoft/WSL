@@ -1,0 +1,5 @@
+LIBRARY wslinstallerproxystub.dll
+
+EXPORTS
+    DllGetClassObject      PRIVATE
+    DllCanUnloadNow        PRIVATE

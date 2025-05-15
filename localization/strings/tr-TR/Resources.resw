@@ -1,0 +1,1870 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Windows Subsystem for Linux, geliştiricilerin bir GNU/Linux ortamını -- çoğu komut satırı aracı, yardımcı program ve uygulama dahil -- doğrudan Windows üzerinde, değiştirilmeden, geleneksel bir sanal makine veya çift önyükleme kurulumunun ek yükü olmadan çalıştırmasını sağlar.</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>Disk ayrılamadı: {}. Daha fazla ayrıntı için lütfen WSL2 içinde 'dmesg' çalıştırın.
+WSL2'yi diski durdurmaya ve ayırmaya zorlamak için 'wsl.exe {}' çalıştırın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>'{}' diski zaten eklenmiş.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>Bu birim zaten WSL2 içine bağlı.</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>Bu ada sahip bir disk zaten takılı; lütfen diskin bağlantısını kesin veya yeni bir ad seçin ve tekrar deneyin.</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>Belirtilen bağlama adı geçersiz bir '/' karakteri içeriyor. Lütfen geçersiz karakter olmadan yeniden deneyin.</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>Disk başarıyla '/mnt/wsl/{}' olarak bağlandı.
+Not: /etc/wsl.conf içinde automount.root ayarını değiştirdiyseniz konum farklı olacak.
+Diski çıkarıp ayırmak için '{} {}' wsl.exe çalıştırın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>Disk eklendi ancak bağlanamadı: {}.
+Daha fazla ayrıntı için WSL2 içinde 'dmesg' çalıştırın.
+Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>Aşağıdakiler, yüklenemedik geçerli dağıtımların listesidir.
+'wsl.exe {} &lt;Distro&gt;' kullanarak yükleyin.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>Dağıtım adı zaten ayarlanmış.</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>Sağlanan yükleme konumu zaten kullanılıyor.</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>Sağlanan ada sahip bir dağıtım zaten var. Farklı --name bir ad seçin.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>Sağlanan ada sahip dağıtım yok.</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>Bir diski bağlamak için yönetici erişimi gerekiyor.</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>Dağıtım dışarı aktarılamadı.</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>Bu dağıtım sistemi için Linux için Windows Alt Sistemi dosya sisteminin bir kez yükseltmesi gerçekleştiriliyor...</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>Başka bir örnek yükseltilmeyen olarak çalıştığından başlatılamıyor.  Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>Dağıtım içeri aktarılamadı.</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>Windows isteğe bağlı bileşeni yükleniyor: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>İndiriliyor: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>Yükleniyor: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>Dağıtım içeri aktarılıyor</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>{} indirildi.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi önceki bir yükleme işlemi devam...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>Geçersiz dağıtım adı: '{}'.
+Geçerli dağıtımların listesini almak için 'wsl.exe --list --online'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi örneği sonlandırıldı.</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>Geçersiz komut satırı bağımsız değişkeni: {}
+Desteklenen bağımsız değişkenlerin --help' almak için lütfen '{} öğesini kullanın.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>{} komut satırı bağımsız değişkeni bir değer gerektiriyor.
+Desteklenen bağımsız değişkenlerin --help' almak için lütfen '{} öğesini kullanın.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>Desteklenmeyen konsol ayarları. Bu özelliği kullanmak için eski konsolun devre dışı olması gerekir.</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>{} geçerli bir tamsayı değil.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>Bu dağıtım için bir yükleme, kaldırma veya dönüştürme işlemi devam ediyor.</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>Başlatılıyor {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>Başka bir örnek yükseltilmiş olarak çalıştığından başlatılamıyor.  Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi yüklü dağıtımı yok.
+Aşağıdaki yönergeleri içeren bir dağıtım yükleyerek bu sorunu çözebilirsiniz:
+
+Kullanılabilir dağıtımları wsl.exe --list --online' için 'wsl.exe --list --online' 'i kullanın
+ve 'wsl.exe --install &lt;Distro&gt;' kullanın.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>Çalışan dağıtım yok.</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (Varsayılan)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi Dağıtımları:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>Varsayılan Dağıtım: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>Varsayılan Sürüm: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>Kayıt siliniyor.</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>Kullanıcı bulunamadı.</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>WSL 2 ile temel farklılıklar hakkında bilgi için lütfen https://aka.ms/wsl2 adresini ziyaret edin.</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>Dönüştürme devam ediyor, bu işlem birkaç dakika sürebilir.</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>Dağıtım zaten istenen sürüm.</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>Eski dağıtım WSL 2'yi desteklemez.</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>WSL2 geçerli makine yapılandırmanız ile desteklenmiyor.
+Lütfen "Sanal Makine Platformu" isteğe bağlı bileşenini etkinleştirin ve sanallaştırmanın BIOS'da etkinleştirildiğinden emin olun.
+Şu komutu çalıştırarak "Sanal Makine Platformu"nu  wsl.exe --install --no-distribution
+Bilgi için lütfen şu adresi ziyaret https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>Çok fazla sanal sabit disk veya fiziksel disk bağlı.</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>VHD zaten wsl.exe --mount, aracılığıyla bağlandı, lütfen başlatmadan önce diskin bağlantısını kesin.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>WSL1, mevcut makine yapılandırmanızla desteklenmiyor.
+Lütfen WSL1'i kullanmak için "Windows Subsystem for Linux" isteğe bağlı bileşenini etkinleştirin.</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>Bu işlem yalnızca WSL2 tarafından desteklenir.</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>Kullanım:
+    --networking-mode
+       Geçerli ağ modunu görüntüle.
+
+    --msal-proxy-path
+        MSAL ara sunucu uygulamasının yolunu görüntüle.
+
+    --version
+        WSL paketinin sürümünü görüntüle.
+
+    -n
+        Yeni bir satır yazdırma.</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>Kullanım:
+    -a
+        Sonucu mutlak yol biçimine zorla.
+    -u
+        Windows yolundan WSL yoluna çevirin (varsayılan).
+    -w
+        WSL yolundan Windows yoluna çevirin.
+    -m
+        WSL yolundan '\\' yerine '/' içeren bir Windows yoluna çevirin
+
+Örnek: wslpath 'c:\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>Linux için Windows Alt Sisteminde yönetimsel işlemler gerçekleştirir
+
+Kullanım:
+    /l, /list [Seçenek]
+        Kayıtlı dağıtımları listeler.
+        /all - Şu anda yüklenmekte veya kaldırılmakta olan
+               dağıtımlar da dahil olmak üzere tüm dağıtımları listeler.
+
+        /running - Yalnızca şu anda çalışmakta olan dağıtımları listeler.
+
+    /s, /setdefault &lt;DistributionName&gt;
+        Dağıtımı varsayılan olarak ayarlar.
+
+    /t, /terminate &lt;DistributionName&gt;
+        Dağıtımı sonlandırır.
+
+    /u, /unregister &lt;DistributionName&gt;
+        Dağıtımın kaydını siler ve kök dosya sistemini siler.</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Telif Hakkı (c) Microsoft Corporation. Tüm hakları saklıdır.
+Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfasını ziyaret edin.
+
+Kullanım: wsl.exe [Bağımsız Değişken] [Seçenekler...] [KomutSatırı]
+
+Linux ikili dosyalarını çalıştırmak için bağımsız değişkenler:
+
+    Komut satırı sağlanmamışsa wsl.exe varsayılan kabuğu başlatır.
+
+    --exec, -e &lt;CommandLine&gt;
+        Varsayılan Linux kabuğunu kullanmadan belirtilen komutu yürütür.
+
+    --shell-type &lt;standard|login|none&gt;
+        Belirtilen komutu sağlanan kabuk türüyle yürütür.
+
+    --
+        Kalan komut satırını olduğu gibi geçirir.
+
+Seçenekler:
+    --cd &lt;Directory&gt;
+        Belirtilen dizini geçerli çalışma dizini olarak ayarlar.
+        ~ kullanılıyorsa Linux kullanıcı giriş yolu kullanılır. Yol
+        / karakteriyle başlarsa mutlak bir Linux yolu olarak yorumlanır.
+        Aksi takdirde değerin mutlak bir Windows yolu olması gerekir.
+
+    --distribution, -d &lt;DistroName&gt;
+        Belirtilen dağıtımı çalıştırır.
+
+    --distribution-id &lt;DistroGuid&gt;
+        Belirtilen dağıtım kimliğini çalıştırır.
+
+    --user, -u &lt;UserName&gt;
+        Belirtilen kullanıcı olarak çalıştırır.
+
+    --system
+        Sistem dağıtımı için bir kabuk başlatır.
+
+Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler:
+
+    --help
+        Kullanım bilgilerini görüntüler.
+
+    --debug-shell
+        Tanılama amacıyla bir WSL2 hata ayıklama kabuğu açar.
+
+    --install [Dağıtım] [Seçenekler...]
+        Linux için Windows Alt Sistemi dağıtımı yükler.
+        Geçerli dağıtımların listesi için 'wsl.exe --list --online' kullanın.
+
+        Seçenekler:
+            --enable-wsl1
+                WSL1 desteğini etkinleştirir.
+
+            --fixed-vhd
+                Dağıtımı depolamak için sabit boyutlu bir disk oluşturun.
+
+            --from-file &lt;Path&gt;
+                Yerel dosyadan bir dağıtım yükler.
+
+            --legacy
+                Eski dağıtım bildirimini kullanır.
+
+            --location &lt;Location&gt;
+                Dağıtımın yükleme yolunu ayarlar.
+
+            --name &lt;Name&gt;
+                Dağıtımın adını ayarlar.
+
+            --no-distribution
+                Yalnızca gerekli isteğe bağlı bileşenleri yükler, dağıtımı yüklemez.
+
+            --no-launch, -n
+                Yüklemeden sonra dağıtımı başlatmaz.
+
+            --version &lt;Version&gt;
+                Yeni dağıtım için kullanılacak sürümü belirtir.
+
+            --vhd-size &lt;MemoryString&gt;
+                Dağıtımın depolanacağı diskin boyutunu belirtir.
+
+            --web-download
+                Dağıtımı Microsoft Store yerine internetten indirir.
+
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Dağıtıma özgü seçenekleri değiştirir.
+
+        Seçenekler:
+            --move &lt;Location&gt;
+                Dağıtımı yeni bir konuma taşır.
+
+            --set-sparse, -s &lt;true|false&gt;
+                Dağıtım vhdx'inin aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
+
+            --set-default-user &lt;Username&gt;
+                Dağıtımın varsayılan kullanıcısını ayarlar.
+
+            --resize &lt;MemoryString&gt;
+                Dağıtımın diskini belirtilen boyuta yeniden boyutlandırır.
+
+    --mount &lt;Disk&gt;
+        Tüm WSL 2 dağıtımlarında fiziksel veya sanal diski ekler ve bağlar.
+
+        Seçenekler:
+            --vhd
+                &lt;Disk&gt;'in sanal bir sabit diske başvurduğunu belirtir.
+
+            --bare
+                Diski WSL2'ye ekler, ancak bağlamaz.
+
+            --name &lt;Name&gt;
+                Bağlama noktası için özel bir ad kullanarak diski bağlar.
+
+            --type &lt;Type&gt;
+                Bir diski takarken dosya sistemi kullanılır, belirtilmemişse varsayılan ext4 olur.
+
+            --options &lt;Options&gt;
+                Ek bağlama seçenekleri.
+
+            --partition &lt;Index&gt;
+                Bağlanacak bölümün dizini, belirtilmemişse varsayılan olarak tüm diske ayarlanır.
+
+    --set-default-version &lt;Version&gt;
+        Yeni dağıtımlar için varsayılan yükleme sürümünü değiştirir.
+
+    --shutdown
+        Çalışan tüm dağıtımları ve WSL 2
+        basit yardımcı yazılım sanal makinesini anında sonlandırır.
+
+        Seçenekler:
+            --force
+                Devam eden bir işlem olsa bile WSL 2 sanal makinesini sonlandırın. Veri kaybına neden olabilir.
+
+    --status
+        Linux için Windows Alt Sistemi'nin durumunu gösterir.
+
+    --unmount [Disk]
+        Bir diskin tüm WSL2 dağıtımlarından bağlantısını keser ve ayırır.
+        Bağımsız değişken olmadan çağrılırsa tüm disklerin bağlantısını keser ve ayırır.
+
+    --uninstall
+        Bu makineden Linux için Windows Alt Sistemi paketini kaldırır.
+
+    --update
+        Linux için Windows Alt Sistemi'nin durumunu güncelleştirir.
+
+        Seçenekler:
+            --pre-release
+                Varsa bir yayın öncesi sürümü indirir.
+
+    --version, -v
+        Sürüm bilgilerini görüntüler.
+
+Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız değişkenler:
+
+    --export &lt;Distro&gt; &lt;FileName&gt; [Seçenekler]
+        Dağıtımı bir tar dosyasına dışarı aktarır.
+        Dosya adı - for stdout olabilir.
+
+        Seçenekler:
+            --format &lt;Format&gt;
+                Dışarı aktarma biçimini belirtir. Desteklenen değerler: tar, tar.gz, vhd.
+
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        Belirtilen tar dosyasını yeni bir dağıtım olarak içeri aktarır.
+        Dosya adı - for stdin olabilir.
+
+        Seçenekler:
+            --version &lt;Version&gt;
+                Yeni dağıtım için kullanılacak sürümü belirtir.
+
+            --vhd
+                Sağlanan dosyanın tar dosyası değil, .vhdx dosyası olduğunu belirtir.
+                Bu işlem, belirtilen yükleme konumunda .vhdx dosyasının bir kopyasını oluşturur.
+
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        Belirtilen .vhdx dosyasını yeni bir dağıtım olarak içeri aktarır.
+        Bu sanal sabit diskin ext4 dosya sistemi türüyle biçimlendirilmesi gerekir.
+
+    --list, -l [Seçenekler]
+        Dağıtımları listeler.
+
+        Seçenekler:
+            --all
+                Şu anda yüklenmekte veya kaldırılmakta olan
+                dağıtımlar da dahil olmak üzere tüm dağıtımları listeler.
+
+            --running
+                Yalnızca şu anda çalışmakta olan dağıtımları listeler.
+
+            --quiet, -q
+                Yalnızca dağıtım adlarını gösterir.
+
+            --verbose, -v
+                Tüm dağıtımlar hakkında ayrıntılı bilgi gösterir.
+
+            --online, -o
+                'wsl.exe --install' ile yüklenebilecek kullanılabilir dağıtımların listesini görüntüler.
+
+    --set-default, -s &lt;Distro&gt;
+        Dağıtımı varsayılan olarak ayarlar.
+
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        Belirtilen dağıtımın sürümünü değiştirir.
+
+    --terminate, -t &lt;Distro&gt;
+        Belirtilen dağıtımı sonlandırır.
+
+    --unregister &lt;Distro&gt;
+        Dağıtımın kaydını siler ve kök dosya sistemini siler.</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>WSL sürümü: {}
+Çekirdek sürümü: {}
+WSLg sürümü: {}
+MSRDC sürümü: {}
+Direct3D sürümü: {}
+DXCore sürümü: {}
+Windows sürümü: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>MSBuild sürümü: {}
+İşleme: {}
+Derleme zamanı: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>{} içinde belirtilen özel çekirdek bulunamadı: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>{} içinde vhd özel çekirdek modülleri bulunamadı: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>{} içinde belirtilen özel sistem dağıtımı bulunamadı veya doğru biçimde değil.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Telif Hakkı (c) Microsoft Corporation. Tüm hakları saklıdır.
+Bu ürünle ilgili gizlilik bilgileri için lütfen https://aka.ms/privacy sayfasını ziyaret edin.
+
+Kullanım: wslg.exe [Argument] [Options...] [CommandLine]
+
+Bağımsız değişkenler:
+    --cd &lt;Directory&gt;
+        Belirtilen dizini geçerli çalışma dizini olarak ayarlar.
+        ~ kullanılıyorsa, Linux kullanıcı giriş yolu kullanılır. Yol
+        / karakteriyle başlarsa, mutlak bir Linux yolu olarak yorumlanır.
+        Aksi takdirde değerin mutlak bir Windows yolu olması gerekir.
+
+    --distribution, -d &lt;Distro&gt;
+        Belirtilen dağıtımı çalıştırma.
+
+    --user, -u &lt;UserName&gt;
+        Belirtilen kullanıcı olarak çalıştırır.
+
+    --shell-type &lt;standard|login|none&gt;
+        Belirtilen komutu sağlanan kabuk türüyle yürütür.
+
+    --help
+        Kullanım bilgilerini görüntüler.
+
+    --
+        Kalan komut satırını olduğu gibi geçirir.</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>Devam etmek için herhangi bir tuşa basın...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>{} bağımsız değişkeninde gerekli bir parametre eksik.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>Dışarı aktarma devam ediyor, bu işlem birkaç dakika sürebilir.</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>İçeri aktarma devam ediyor, bu işlem birkaç dakika sürebilir.</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>GUI uygulama desteği {} veya /etc/wsl.conf aracılığıyla devre dışı bırakıldı.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>Güncelleştirmeler denetleniyor.</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>Bu dağıtım yalnızca Microsoft Store’dan kullanılabilir.</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>arm64 wsl.exe --mount , Windows sürüm 27653 veya daha yenisini gerektirir.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>Bu uygulamanın en Linux için Windows Alt Sistemi sürümü zaten yüklü.</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>Güncelleştirme Linux için Windows Alt Sistemi sürümüne güncelleştiriliyor: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>Bu uygulama isteğe bağlı Linux için Windows Alt Sistemi gerektirir.
+Şu işlemi çalıştırarak yükleyin: wsl.exe --install --no-distribution
+Değişikliklerin etkili olması için sistemin yeniden başlatılması gerekebilir.</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>Belirtilen dosyanın .vhdx dosya uzantısı olmalıdır.</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>'{}' VmSwitch bulunamadı. Uygun anahtarlar: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>Bağlantılı ağ kuralları wsl2.vmSwitch anahtarının ayarlanmasını gerektirir.</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>'{}' konumundan liste dağıtımı getirilemedi. {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>'{}' diski WSL2'ye eklenemedi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>Disk yeniden boyutlandırılamadı.</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>Yol çevrilemedi.</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>Değer bulunamadı.</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>{} Windows sürümü, uygulamanın paketlenmiş sürümünü Linux için Windows Alt Sistemi.
+Gerekli güncelleştirmeyi Windows Update veya {} aracılığıyla yükleyin
+Bilgi için lütfen şu adresi ziyaret https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>Hata ayıklama kabuğu çalıştırmak için yönetici wsl.exe çalıştırmanız gerekir.</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>'{}' dağıtımı için yükleme işlemi şu çıkış koduyla başarısız oldu: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>Geçersiz GUID biçimi: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>{}:{} içinde geçersiz bölüm adı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>{}:{} içinde geçersiz anahtar adı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>{}:{} içinde {} bekleniyor</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>{}:{} içinde geçersiz kaçış karakteri: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>{}:{} içinde bilinmeyen anahtar: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>{}:{} içinde '{}' anahtarı için '{}' tamsayı değeri geçersiz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>{}:{} içinde '{}' anahtarı için geçersiz '{}' IP değeri</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>{}:{} içinde '{}' anahtarı için geçersiz '{}' boole değeri</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>{}:{} içinde '{}' anahtarı için '{}' mac adresi geçersiz</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>{} yapılandırma dosyası açılamadı, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>WSL başlatılırken hatalar oluştu</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>EventViewer'ı aç</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım --name seçmek için bu adı kullanın.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>{} ve {} bağımsız değişkenleri aynı anda belirtilemez.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>{} bağımsız değişkeni {} bağımsız değişkenini gerektirir.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>Geçersiz dağıtım adı: "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>Eski dağıtım kaydı kullanılarak. Bunun yerine tar tabanlı bir dağıtım kullanmayı düşünün.</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>Eski dağıtım kayıtları bağımsız değişken --version desteklemez.</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>"{}" dağıtımı bir geçersiz kılma bildirimi tarafından sağlandı.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>Dağıtım karması eşleşmiyor. Beklenen: {}, gerçek karma: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>Geçersiz onaltılık dize: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>Eski dağıtımlar yüklenirken '{}' desteklenmiyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>Dağıtım başarıyla yüklendi. 'wsl.exe -d {}' ile başlatılabilir</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>{}:{} içinde '{}' .wslconfig için geçersiz '{}' bellek dizesi</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>'{}' içinde takas diski oluşturulamadı: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>İç içe sanallaştırma bu makinede desteklenmiyor.</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>Ağ uç noktası şu adresle oluşturulamadı: '{}', atanan yeni adres: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>Adres aralığı '{}' olan sanal ağ oluşturulamadı, şu aralıkla yeni ağ oluşturuldu: '{}', {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>GÜVENLİ MOD ETKİN: birçok özellik devre dışı bırakılır</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>Yansıtılmış ağ modu desteklenmiyor: {}.
+NAT ağ bağlantısına geri dönülüyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>Linux Çekirdeği sürüm 5.10 veya daha yenisi gerekiyor</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Windows sürümü {}. {} gerekli özelliklere sahip değil</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>Hyper-V güvenlik duvarı desteklenmiyor</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>DNS Tüneli desteklenmiyor</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>Yansıtılmış ağ modu kullanılırken wsl2.localhostForwarding ayarının etkisi yoktur</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>Konakta bir Http Proxy değişikliği algılandı. Değişikliği uygulamak için lütfen WSL'yi yeniden başlatın.</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>Bir localhost proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. NAT modundaki WSL, localhost proxy'lerini desteklemez.</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>Bir IPv6 proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. NAT modunda WSL, IPv6'yı desteklemez.</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>Bir localhost IPv6 proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. WSL, localhost IPv6 proxy'lerini desteklemez.</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>Proxy ayarları çözümlanmaya çalışılırken beklenmeyen bir hata oluştu, proxy ayarları WSL'ye yansıtılamadı.</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>Kayıt defterine erişilirken bir hata oluştu. Yol: '{}'. Hata: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>localhost geçiş işlemi başlatılamadı. Hata: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>Sanal ağ başlatılamadı - lütfen şu komutu çalıştırarak isteğe bağlı Sanal Makine Platformu bileşenini yükleyin: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>Ağ yapılandırılamadı (networkingMode {}), networkingMode {} durumuna geri dönüüyor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>'{}' Windows bileşeni etkinleştirilemedi (çıkış kodu {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>'{}' eklentisi tarafından önemli bir hata döndürüldü</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>'{}' eklentisi tarafından önemli bir hata döndürüldü. Hata iletisi: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>'{}' eklentisi daha yeni bir WSL sürümü gerektiriyor. Lütfen şu komutu çalıştırın: wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>'{}' .wslconfig ayarı bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>Hata ayıklama kabuğu, bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>wsl.exe --mount bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>WSL1, bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>WSL2'ye yükseltmek için lütfen 'wsl.exe --set-version {} 2' çalıştırın.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>WSL bir yükseltme işlemini bitiriyor...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>Güncelleştirme başarısız (çıkış kodu: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>Kaldırma başarısız oldu (çıkış kodu: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>Günlük dosyası: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>MSIX paketi kaldırılamadı (hata: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>MSIX paketi yüklenemedi (hata: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>WSL'yi çalıştırmak için gereken isteğe bağlı bileşenler yüklü değil.</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>Eksik bileşenleri yükleyin.</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>İçeri aktarılan dosya geçerli bir Linux dağıtımı değil.</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>Çıkmak için herhangi bir tuşa basın...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>Yeni bir Linux için Windows Alt Sistemi sürümü var.</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>{} sürümüne güncelleştirin veya sürüm notlarını aşağıda görüntüleyin.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>Güncelleştir</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>Belgeleri Göster</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>vhdx şu anda kullanımda olduğundan işlem tamamlanamadı. WSL'yi durmaya zorlamak için şunu kullanın: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>{} geçerli bir boole değil, &lt;true|false&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>Seyrek vhdx yalnızca WSL2'de desteklenir.</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>WSL'nin yerel sistem olarak çalıştırılması desteklenmez.</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>Performans İpuçları:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>Windows sürücüleriniz üzerinde {} gibi yoğun G/Ç kullanımı düşük performansa sahip olur. Daha iyi performans için proje dosyalarını Linux dosya sistemine taşımayı düşünün. Daha fazla bilgi için aşağıya tıklayın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>Belgeleri Görüntüleyin</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>Tekrar Gösterme</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>WSL2 Sanal Makinesi çöktü.</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>Yığın izlemesi şu konuma kaydedildi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>Dağıtım başlatılamadı. Hata kodu: {}, hata adımı: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>Dağıtım, sanal diski bozuk olduğundan başlatılamadı.</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>{}:{} içinde yinelenen '{}' yapılandırma anahtarı ({}:{} içinde çakışan anahtar: '{}')</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>{}:{} içinde '{}' yapılandırma anahtarı için geçersiz '{}' değeri (Geçerli değerler: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>"{}" dağıtımı için OOBE komutunun tamamlanması ...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>'{}' özelliği {}  dağıtımından okunamadı</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>Bu bir VHDX dosyası gibi görünüyor. Katran --vhd VHDX içeri aktarın.</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>Microsoft Store'dan {} yüklenemedi: {}
+Web'den indirme deneniyor...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>Varsayılan dağıtım yapılandırılmadı. Lütfen yüklenecek bir dağıtım girin.</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>wsl2.virtio9p devre dışı bırakıldı, vsock aktarımıyla 9p'ye geri dönülüyor.</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>WSL yüklemesi bozulmuş gibi görünüyor (Hata kodu: {}).
+WSL'yi onarmak için herhangi bir tuşa basın veya CTRL-C tuşlarına basın.
+Bu istem 60 saniye içinde zaman aşımına uğradı.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>Dağıtım kaydedilirken terminal profili ayrıştırılamadı: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>Geçersiz boyut: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+Hata kodu: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>Geçersiz JSON belgesi. Ayrıştırma hatası: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>wsl2.processors, sistemdeki mantıksal işlemci sayısını ({} veya {}) &gt; aşamıyor</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>Ağ modu sorgulanamadı</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>Özelleştirilmiş çekirdek modülleri özelleştirilmiş bir çekirdek belirtilmeden sağlandı. Daha fazla https://aka.ms/wslcustomkernel için lütfen ayrıntılara bakın.</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>Küresel Güvenli Erişim İstemcisiyle ilgili mevcut bir uyumluluk sorunu nedeniyle DNS Tünelleme devre dışı bırakıldı.</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>Seyrek VHD desteği olası veri bozulması nedeniyle şu anda devre dışıdır.
+Bir dağıtımı seyrek VHD kullanmaya zorlamak için lütfen şu komutu çalıştırın:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>{} bağlanamadı, daha fazla ayrıntı için dmesg komutuna bakın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>/etc/fstab with mount -a işlenemedi.</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>Dağıtım diski bağlanırken bir hata oluştu, geri dönüş olarak salt okunur olarak bağlandı.
+Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>‘{}’ çevrilemedi</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>Bir sorun oluştu. Daha sonra yeniden deneyin.</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>Hakkında</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi Ayarları hakkında</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft. Tüm hakları saklıdır.</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi Ayarları</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi Ayarları, geliştiricilerin gui tabanlı .wslconfig kullanarak bu dosyayı yönetmesini sağlar.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>Otomatik bellek geri kazanma</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>Boşta CPU kullanımı algılandıktan sonra önbelleğe alınan belleği otomatik olarak serbest bırakır. Yavaş serbest bırakma için kademeli olarak ve önbelleğe alınan belleğin anında serbest bırakılması için dropcache olarak ayarlayın.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Otomatik bellek geri kazanma.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Boşta CPU kullanımı algılandıktan sonra önbelleğe alınan belleği otomatik olarak serbest bırakır. Yavaş serbest bırakma için kademeli olarak ve önbelleğe alınan belleğin anında serbest bırakılması için dropcache olarak ayarlayın.</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>Otomatik Ara Sunucu etkin</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>WSL'nin Windows'un HTTP ara sunucusu bilgilerini kullanmasına olanak verir.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Otomatik Ara Sunucu etkin.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL'nin Windows'un HTTP ara sunucusu bilgilerini kullanmasına olanak verir.</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>DNS ayrıştırma için en iyi çabayı kullan</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>Yalnızca wsl2.dnsTunneling true olarak ayarlandığında geçerlidir. True olarak ayarlandığında, Windows soruyu DNS isteğinden çıkarır ve bilinmeyen kayıtları yok sayarak çözmeye çalışır.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS ayrıştırma için en iyi girişimi kullanın.</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Yalnızca wsl2.dnsTunneling true olarak ayarlandığında geçerlidir. True olarak ayarlandığında, Windows soruyu DNS isteğinden çıkarır ve bilinmeyen kayıtları yok sayarak çözmeye çalışır.</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>Özel çekirdek</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>Özel bir Linux çekirdeğinin mutlak Windows yolu.</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>Çekirdeklere gözat</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Özel çekirdek</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Özel bir Linux çekirdeğinin mutlak Windows yolu.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>Özel çekirdek modülleri</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>Özel bir Linux çekirdek modülü VHD'sine giden mutlak bir Windows yolu.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>Çekirdek modüllerine göz at</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Özel çekirdek modülleri</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Özel bir Linux çekirdek modülü VHD'sine giden mutlak bir Windows yolu.</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>Özel sistem dağıtımı</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>Dağıtımlara gözat</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>Öncelikle WSL'deki GUI uygulamalarına güç sağlamak için kullanılan özel bir sistem dağıtımı olarak yüklenecek bir VHD'ye giden yolu belirtin. [Buradan sistem dağıtımları hakkında daha fazla bilgi edinin].</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Özel sistem dağıtımı</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Öncelikli olarak WSL'deki GUI uygulamalarına güç sağlamak için kullanılan özel bir sistem dağıtımı şeklinde yüklenecek VHD'ye giden yolu belirtin.</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>Hata ayıklama konsolunu etkinleştir</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>WSL 2 dağıtım örneği başlatıldığında dmesg içeriğini gösteren bir konsol penceresi çıktısını açan boole değeri.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hata ayıklama konsolunu etkinleştirin.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 dağıtım örneği başlatıldığında tanılama iletilerinin içeriğini gösteren bir konsol penceresi çıktısını açan Boole değeri.</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>Varsayılan VHD Boyutu</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>Yalnızca yeni oluşturulan dağıtımlar için genişletilebilir WSL sanal sabit diski (VHD) için varsayılan en büyük boyut.</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>Boyutu sıfırla</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Varsayılan VHD Boyutu</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Yalnızca yeni oluşturulan dağıtımlar için genişletilebilir WSL sanal sabit diski (VHD) için megabayt olarak belirtilen varsayılan en büyük boyut.</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>Geliştirici</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>Belgeler</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>DrvFS modunu değiştir</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>WSL'de işletim sistemleri arası dosya erişimi uygulamasını değiştirir.</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>DNS Ara Sunucusu etkin</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>Sadece wsl2.networkingMode NAT olarak ayarlandığında uygulanabilir. WSL'ye Linux'taki DNS Sunucusunu ana bilgisayardaki NAT'a göre yapılandırmasını bildiren boole değeri. False olarak ayarlandığında Windows'tan Linux'a DNS sunucuları yansıtılır.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS Ara Sunucusu etkin.</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Sadece wsl2.networkingMode NAT olarak ayarlandığında uygulanabilir. WSL'ye Linux'taki DNS Sunucusunu ana bilgisayardaki NAT'a göre yapılandırmasını bildiren boole değeri. False olarak ayarlandığında Windows'tan Linux'a DNS sunucuları yansıtılır.</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>DNS Tüneli etkin</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>DNS isteklerinin WSL'den Windows'a ara sunucudan aktarılma şeklini değiştirir.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS Tüneli etkin.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>DNS isteklerinin WSL'den Windows'a ara sunucudan aktarılma şeklini değiştirir.</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>Dosya Sistemi</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>GUI uygulamalarını etkinleştir</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>WSL'de GUI uygulamaları ([WSLg]) için desteği açmak veya kapatmak için Boole değeri.</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>GUI uygulamalarını etkinleştirin.</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL'de GUI uygulamaları (WSL g olarak bilinir) için desteği açmak veya kapatmak için Boolean.</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>Donanım performans sayaçlarını etkinleştir</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>Linux için donanım performans sayaçlarını etkinleştirir.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Donanım performans sayaçlarını etkinleştirin.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Linux için donanım performans sayaçlarını etkinleştirir.</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>Hyper-V Güvenlik Duvarı etkin</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>WSL ağ trafiğini filtrelemek için Windows Güvenlik Duvarı kurallarının yanı sıra Hyper-V trafiğine özel kurallara izin veren Hyper-V güvenlik duvarını sağlar.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hyper-V Güvenlik Duvarı etkin.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL ağ trafiğini filtrelemek için Windows Güvenlik Duvarı kurallarının yanı sıra Hyper-V trafiğine özel kurallara izin veren Hyper-V güvenlik duvarını sağlar.</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>Ana Bilgisayar Adresi Geri Döngüsü</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>Yalnızca wsl2.networkingMode olarak ayarlandığında uygulanabilir. True olarak ayarlandığında, Kapsayıcının Ana Bilgisayara veya Konak'a atanmış bir IP adresiyle Kapsayıcıya bağlanmasına izin ver. 127.0.0.1 geri döngü adresinin her zaman kullanabildiğine dikkat edin. Bu seçenek, ek olarak atanmış tüm yerel IP adreslerinin de kullanılabilir olduğunu unutmayın.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ana Bilgisayar Adresi Geri Döngüsü.</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Sadece wsl2.networkingMode yansıtılmış olarak ayarlandığında uygulanabilir. True olarak ayarlandığında, Ana Bilgisayar'a atanmış bir IP adresi aracılığıyla Kapsayıcı'nın Ana Bilgisayar'a veya Ana Bilgisayar'ın Kapsayıcı'ya bağlanmasına izin verir. 127.0.0.1 geri döngü adresinin her zaman kullanılabileceğini unutmayın. Bu seçenek, ek olarak atanan tüm yerel IP adreslerinin kullanılmasına da olanak verir.</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>Yoksayılan bağlantı noktaları</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>Yalnızca wsl2.networkingMode olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'da değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin: 3000.9000.9090.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>Bağlantı noktalarını sıfırla</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Yoksayılan bağlantı noktaları</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Yalnızca wsl2.networkingMode yansıtılmış olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'da değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin, 3000, 9000, 9090.</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>İlk Otomatik Ara Sunucu zaman aşımı</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>Yalnızca wsl2.autoProxy true olarak ayarlandığında geçerlidir. WSL kapsayıcısını başlatırken WSL'nin HTTP ara sunucusu bilgilerini almak için beklediği süreyi (milisaniye cinsinden) yapılandırır. Ara sunucu ayarları bu süreden sonra çözülürse, alınan ara sunucu ayarlarını kullanmak için WSL örneğinin yeniden başlatılması gerekir.</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>Zaman aşımını sıfırla</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>İlk Otomatik Ara Sunucu zaman aşımı</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Yalnızca wsl2.autoProxy true olarak ayarlandığında geçerlidir. WSL kapsayıcısını başlatırken WSL'nin HTTP ara sunucusu bilgilerini almak için beklediği süreyi (milisaniye cinsinden) yapılandırır. Ara sunucu ayarları bu süreden sonra çözülürse, alınan ara sunucu ayarlarını kullanmak için WSL örneğinin yeniden başlatılması gerekir.</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>Çekirdek Komut Satırı</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>Ek çekirdek komut satırı bağımsız değişkenleri.</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>Localhost iletmeyi etkinleştir</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>WSL 2 VM'de wildcard veya localhost'a bağlı bağlantı noktalarının localhost:port üzerinden ana bilgisayardan bağlanıp bağlanamayacağını belirten boole değeri.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>localhost iletmeyi etkinleştirin.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 VM'de wildcard veya localhost'a bağlı bağlantı noktalarının localhost iki nokta üst üste port üzerinden ana bilgisayardan bağlanıp bağlanamayacağını belirten Boole değeri.</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>Bellek ve işlemci</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>Bellek Boyutu</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>WSL 2 VM'ye atanacak bellek miktarı.</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>Boyutu sıfırla</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Bellek Boyutu</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 VM'sine atanacak, megabayt cinsinden bellek.</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} milisaniye</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>İç içe sanallaştırmayı etkinleştir</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>İç içe sanallaştırmayı açmak veya kapatmak için Boole değeri, diğer iç içe VM'lerin WSL 2 içinde çalışmasına olanak sağlar.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>İç içe sanallaştırmayı etkinleştirin.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>İç içe sanallaştırmayı açıp kapatmaya yarayan Boole değeri, diğer iç içe VM'lerin WSL 2'nin içinde çalışmasına olanak verir.</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>Ağ modu</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>WSL için ağ modunu belirtir.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Ağ modu.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL için ağ modunu belirtir.</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>Ağ İletişimi</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>Tüm dosyalarınızda işletim sistemleri arasında çalışabilirsiniz.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>İşletim Sistemleri Arası Dosya Erişimi</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>Windows dosyalarınıza Linux'tan erişme</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>Windows dosyalarınıza Linux içinden '/mnt' ve ardından bu örnekteki C sürücüsü gibi Windows sürücü harfinize giderek erişebilirsiniz:
+
+'cd /mnt/c'</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>Linux dosyalarınıza Dosya Gezgini ile erişme</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>Linux dosyalarınızı Dosya Gezgini'nden '\\wsl.localhost\' konumuna giderek veya 'Linux' simgesine tıklayarak görüntüleyebilirsiniz.</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>Windows dosyalarını ve programlarını WSL'den başlatma</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>WSL kullanırken bile Windows çalıştırılabilir dosyalarınızı doğrudan bash'ten çalıştırabilirsiniz. Dosya Gezgini’ni geçerli klasörünüzde açmak için
+'powershell.exe /c start .' komutunu çalıştırmayı deneyin.</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>Linux Ağ Uygulamalarına Windows'tan Erişme</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>Linux dağıtımınızda bir ağ uygulaması (örneğin, NodeJS veya SQL sunucusunda çalışan bir uygulama) oluşturuyorsanız, localhost'u (normalde yaptığınız gibi) kullanarak bu uygulamaya bir Windows uygulamasından (Edge veya Chrome internet tarayıcınız gibi) erişebilirsiniz. Bu, 3000 numaralı bağlantı noktasını dinleyen bir Linux sunucusu başlattıysanız, ona erişmek için Windows'ta Edge'de [http://localhost:3000] sayfasına gidebileceğiniz anlamına gelir.</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>Yansıtılmış Mod Ağı</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>WSL ayrıca, IPv6 desteği ve yerel alan ağınızdaki ağ uygulamalarınıza erişme yeteneği gibi gelişmiş özellikler ekleyen, yansıtılmış mod adı verilen yeni bir ağ modunu da içerir.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>İşletim Sistemleri Arası Dosya Erişimi Hakkında Daha Fazla Bilgi Edinin</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi'a hoş geldiniz</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>WSL, farklı Linux dağıtımlarını denemenin harika bir yoludur.</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>Dağıtım Yönetimi</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>Temel WSL komutları hakkında daha fazla bilgi edinin</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>Herhangi bir Linux dağıtımını içeri aktarma hakkında daha fazla bilgi edinin</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>Yüklenebilir WSL Dağıtımlarını Listele Komutu</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l -o'</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>Adlandırılmış bir WSL Dağıtım Komutu Yükleme</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;DistroName&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>Kullanılabilir WSL Dağıtımlarını Listele Komutu</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Docker Masaüstü, Linux kapsayıcılarıyla geliştirmenize yardımcı olmak için WSL ile harika çalışır.
+
+Docker Masaüstü'nü WSL ile kullanmanın avantajlarından bazıları şunlardır:
+
+• Docker komutlarını WSL'de veya Windows'da aynı Docker daemon'ını ve resimlerini kullanarak çalıştırabilirsiniz.
+• WSL'de Windows sürücülerinin otomatik olarak bağlanmasını kullanarak Windows ve Linux arasında dosya ve klasörleri sorunsuz bir şekilde paylaşabilirsiniz.
+• WSL'nin birlikte çalışabilirliği sayesinde, Linux kodu ve dosyaları üzerinde çalışmak için tercih ettiğiniz Windows araçlarını ve düzenleyicilerini kullanabilir veya tam tersini yapabilirsiniz.</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Docker Masaüstü Tümleştirmesi</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>WSL'yi Docker ile Kullanma Hakkında Daha Fazla Bilgi Edinin</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi (WSL), sık kullandığınız Linux araçlarınızı, yardımcı programlarınızı, uygulamalarınızı ve iş akışlarınızı doğrudan Windows üzerinde çalıştırmanıza olanak sağlar.
+
+Topluluğun sık kullanılan özelliklerinden bazılarını önizlemek veya kapsamlı belgelerimizi görüntülemek için birkaç dakikanızı ayırın.</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>WSL’ye Hoş Geldiniz</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>Kurulum için En İyi Yöntemler</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Linux'a Başlarken</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>Linux için Windows Alt Sistemi (WSL) Belgeleri</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>Grafik tabanlı Linux uygulamalarını alt-sekme, başlat menüsünü başlatma, görev çubuğu sabitleme ve kes-yapıştır desteği gibi yerel Windows etkileşimleriyle kullanabilirsiniz.</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>GUI Uygulamaları</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>WSL, Makine Öğrenimi iş akışları için Windows GPU'nuzdan yararlanabilir
+
+WSL'de çalışan Linux ikili dosyaları, performanslarını hızlandırmak için Windows'taki GPU'nuzu otomatik olarak kullanabilir. Bu iş akışlarını normal bir Linux makinesindekiyle aynı şekilde yüklemeniz ve çalıştırmanız yeterlidir. NVIDIA grafik kartınız varsa CUDA'yı docker kapsayıcısında çalıştırmaktan, AMD, Intel veya NVIDIA grafik kartınızda PyTorch veya TensorFlow'u DirectML ile çalıştırmaya kadar başlamanın birçok farklı yolu vardır. Daha fazla bilgi edinmek için aşağıda başlarken kılavuzumuza bakın.</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>GPU Hızlandırma</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>GPU Hızlandırma hakkında daha fazla bilgi edinin</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>WSL GUI Uygulamaları Hakkında Daha Fazla Bilgi Edinin</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>Denenecek uygulamaların listesini aşağıda bulabilirsiniz (Bunların hepsini Ubuntu'ya 'sudo apt install &lt;The App Name&gt;' yazarak yükleyebilirsiniz)
+
+    • gedit: Temel metin düzenleyici
+    • audacity: Ses dosyalarını kaydetme ve düzenleme
+    • blender: 3B animasyonlar ve görselleştirmeler yapma
+    • gimp: Fotoğrafları düzenleme
+    • nautilus: Linux dosya gezgini
+    • vlc: Video oynatıcı</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>Windows ve Linux işletim sistemlerindeki ağ uygulamalarına kolayca erişebilirsiniz.</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>Ağ Tümleştirmesi</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>Ağ Uygulamaları Hakkında Daha Fazla Bilgi Edinin</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>Yansıtılmış Mod Ağı Hakkında Daha Fazla Bilgi Edinin</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>WSL'yi tam zamanlı geliştirme ortamınız olarak doğrudan VS Code'dan kullanabilirsiniz.</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>VS Code Tümleştirmesi</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>WSL'yi VS Code ile Kullanma Hakkında Daha Fazla Bilgi Edinin</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>Yükleme</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>VS Code'u yükledikten sonra Remote WSL uzantısını Windows Terminal'dan yükleyebilirsiniz:
+
+'code –install-extension ms-vscode-remote.remote-wsl'</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>Visual Studio Code'da bir WSL Projesi Açma</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>WSL dağıtımınızdan VS Code'da bir proje açmak için dağıtımın komut satırını açın ve bir proje dosyası açmak için 'code .' komutunu çalıştırın.
+
+Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Remote seçeneğine de erişebilirsiniz. Komut paletini açmak için klavyenizdeki “SHIFT+CTRL+P” tuşlarına basın ve kullanılabilir VS Code Remote seçeneklerinin listesini görmek için ‘Remote-WSL’ yazın. Bu işlem, uzak bir oturumda klasörü yeniden açmanıza, hangi dağıtımı açmak istediğinizi belirtmenize ve daha fazlasına olanak sağlar.</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>Kullanma</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>İsteğe Bağlı Özellikler</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>Sayfa raporlamayı etkinleştir</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>Varsayılan true ayarı, Windows'un WSL 2 sanal makinesine ayrılan kullanılmayan belleği geri kazanmasını sağlar.</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>Gizlilik Bildirimi</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>İşlemci Sayısı</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>WSL 2 VM'ye atanacak mantıksal işlemci sayısı.</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>Sayımı sıfırla</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>İşlemci Sayısı</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 VM'ye atanacak mantıksal işlemci sayısı.</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>İlgili bağlantılar</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>Sürüm notları</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>Güvenli modu etkinleştir</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>WSL'yi birçok özelliği devre dışı bırakan ve kötü durumdaki dağıtımları kurtarmak için kullanılması amaçlanan "Güvenli Mod "da çalıştırın.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Güvenli modu etkinleştirin.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL'yi birçok özelliği devre dışı bırakan ve kötü durumdaki dağıtımları kurtarmak için kullanılması amaçlanan "Güvenli Mod "da çalıştırın.</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>Hakkında</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>Geliştirici</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Dağıtım Yönetimi</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Docker Masaüstü Tümleştirmesi</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>Dosya Sistemi</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>Genel</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>GPU Hızlandırma</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>GUI Uygulamaları</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>wsl.exe başlat</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>Bellek ve işlemci</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>Ağ İletişimi</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>Ağ Tümleştirmesi</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>WSL’ye Hoş Geldiniz</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>İsteğe Bağlı Özellikler</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>Ayarlar</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>VS Code Tümleştirmesi</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>Yenilikler</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>Dosya Sistemlerinde Çalışma</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>Sorunlar</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>Seyrek VHD'yi varsayılan olarak etkinleştir</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>Yeni oluşturulan tüm sanal sabit diskler, etkinleştirildiğinde otomatik olarak seyrek olarak ayarlanır.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Seyrek VHD'yi varsayılan olarak etkinleştirin.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Yeni oluşturulan tüm sanal sabit diskler, etkinleştirildiğinde otomatik olarak seyrek olarak ayarlanır.</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>Takas Dosya Konumu</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>Takas sanal sabit diskine giden mutlak bir Windows yolu.</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>Takas dosyalarına gözat</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Takas Dosya Konumu</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Takas sanal sabit diskine giden mutlak bir Windows yolu.</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>Takas Boyutu</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>WSL 2 VM'ye ekli takas alanı boyutu, takas dosyası yoksa 0. Takas depolama alanı, bellek ihtiyacı donanım aygıtındaki sınırı aştığında kullanılan disk tabanlı RAM'dir.</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>Boyutu sıfırla</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Takas Boyutu</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 VM'sine eklenecek, megabayt cinsinden takas alanı. Takas dosyası yoksa 0. Takas depolama alanı, bellek ihtiyacı donanım cihazındaki sınırı aştığında kullanılan disk tabanlı RAM'dir.</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>VirtIO’yu etkinleştir</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>Konak dosyalarına erişmek için plan 9 yerine virtiofs kullanın ve hızı arttırın.</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>Virtio 9p'yi etkinleştir</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>Virtio aktarımını kullanarak ana bilgisayardan 9P dosya sisteminin bağlanmasını etkinleştirir.</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>VM Boşta Kalma Zaman Aşımı</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>Bir VM'nin kapatılmadan önce boşta olduğu milisaniye sayısı.</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Zaman aşımını sıfırla</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>VM Boşta Kalma Zaman Aşımı</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Bir VM'nin kapatılmadan önce boşta olduğu milisaniye sayısı.</value>
+  </data>
+</root>

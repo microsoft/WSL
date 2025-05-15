@@ -1,0 +1,1870 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Windows-undersystem for Linux</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Med Windows-undersystem for Linux kan utviklere kjøre et GNU/Linux-miljø – inkludert de fleste kommandolinjeverktøy, verktøy og programmer – direkte på Windows, uendret, uten kostnadene ved en tradisjonell virtuell maskin eller konfigurasjon av dobbeltoppstart.</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>Kan ikke koble fra disken: {}. Hvis du vil ha mer informasjon, kan du kjøre dmesg i WSL2.
+Hvis du vil tvinge WSL2 til å stoppe og koble fra disken, kjører du wsl.exe {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>Disken {} er allerede tilkoblet.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>Volumet er allerede montert i WSL2.</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>En disk med dette navnet er allerede montert. demonter disken, eller velg et nytt navn, og prøv på nytt.</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>Det angitte monteringsnavnet inneholder et ugyldig /-tegn. Prøv på nytt uten det ugyldige tegnet.</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>Disken er koblet til som «/mnt/wsl/{}».
+Obs! Plasseringen vil være en annen hvis du har endret innstillingen automount.root i /etc/wsl.conf.
+Kjør wsl.exe {} {} for å koble fra disken.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>Disken ble koblet til, men kan ikke monteres: {}.
+Hvis du vil ha mer informasjon, kan du kjøre dmesg i WSL2.
+Kjør wsl.exe {} {} for å koble fra disken.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>Nedenfor vises en liste over gyldige distribusjoner som kan installeres.
+Installer ved hjelp av wsl.exe {} &lt;Distro&gt;.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>Distribusjonsnavnet er allerede angitt.</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>Den angitte installasjonsplasseringen er allerede i bruk.</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>Det finnes allerede en distribusjon med det angitte navnet. Bruk --name til å velge et annet navn.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>Det finnes ingen distribusjon med det angitte navnet.</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>Administratortilgang kreves for å montere en disk.</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>Eksport av distribusjonen mislyktes.</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>Utfører engangsoppgradering av Windows-undersystem for Linux-filsystem for denne distribusjonen...</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>Kan ikke starte fordi en annen forekomst kjører opphøyd.  Forhøyede og uhøyde forekomster har ikke tillatelse til å kjøre samtidig.</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>Import av distribusjonen mislyktes.</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>Installerer valgfri Windows-komponent: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>Laster ned: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>Installerer: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>Importerer distribusjon</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>{} er lastet ned.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>Windows-undersystem for Linux gjenopptar en tidligere installasjon...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>Ugyldig distribusjonsnavn: {}.
+Hvis du vil ha en liste over gyldige distribusjoner, kan du bruke 'wsl.exe --list --online'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>Windows-undersystem for Linux-forekomsten er avsluttet.</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>Ugyldig kommandolinjeargument: {}
+Bruk {} --help' for å få en liste over argumenter som støttes.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>Kommandolinjeargumentet {} krever en verdi.
+Bruk {} --help' for å få en liste over argumenter som støttes.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>Konsollinnstillinger som ikke støttes. For å kunne bruke denne funksjonen må den eldre konsollen deaktiveres.</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>{} er ikke et gyldig heltall.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>En installering, avinstallering eller konvertering pågår for denne distribusjonen.</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>Starter {} …</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>Kan ikke starte fordi en annen forekomst kjører i opphøyd modus.  Forhøyede og uhøyde forekomster har ikke tillatelse til å kjøre samtidig.</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>Windows-undersystem for Linux har ingen installerte distribusjoner.
+Du kan løse dette ved å installere en distribusjon med instruksjonene nedenfor:
+
+Bruk wsl.exe --list --online' til å vise tilgjengelige distribusjoner
+og "wsl.exe --install &lt;Distro&gt;" som skal installeres.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>Det finnes ingen distribusjoner som kjører.</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (standard)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Windows-undersystem for Linux-distribusjoner:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>Standarddistribusjon: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>Standardversjon: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>Avregistrerer.</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>Finner ikke bruker.</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>Hvis du vil ha informasjon om viktige forskjeller med WSL 2, kan du gå til https://aka.ms/wsl2</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>Konvertering pågår. Dette kan ta noen minutter.</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>Distribusjonen er allerede den forespurte versjonen.</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>Eldre distribusjon støtter ikke WSL 2.</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>WSL2 støttes ikke med gjeldende maskinkonfigurasjon.
+Aktiver den valgfrie komponenten Virtual Machine Platform, og kontroller at virtualisering er aktivert i BIOS.
+Aktiver Plattform for virtuell maskin ved å kjøre: wsl.exe --install --no-distribution
+Hvis du vil ha mer informasjon, kan du gå til https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>For mange virtuelle harddisker eller fysiske disker er koblet til.</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>VHD-disken er allerede montert via wsl.exe --mount, Demonter disken før du starter.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>WSL1 støttes ikke med gjeldende maskinkonfigurasjon.
+Aktiver den valgfrie Windows-undersystem for Linux-komponenten for å bruke WSL1.</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>Denne operasjonen støttes bare av WSL2.</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>Bruk:
+    --networking-mode
+       Vis gjeldende nettverksmodus.
+
+    --msal-proxy-path
+        Vis banen til MSAL-proxyprogrammet.
+
+    --version
+        Vis versjonen av WSL-pakken.
+
+    –n
+        Ikke skriv ut et linjeskift.</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>Bruk: 
+    -a
+        Tving resultat til absolutt baneformat.
+    -u
+        Oversett fra en Windows-bane til en WSL-bane (standard).
+    -w
+        Oversett fra en WSL-bane til en Windows-bane.
+    -m
+        Oversett fra en WSL-bane til en Windows-bane, med / stedet for \\
+
+Eksempel: wslpath c:\\users</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>Utfører administrative operasjoner på Windows-undersystem for Linux
+
+Bruk:
+    /l, /list [Alternativ]
+        Lister opp registrerte distribusjoner.
+        /all – Du kan også liste opp alle distribusjoner, inkludert distribusjoner som
+               for øyeblikket installeres eller avinstalleres.
+
+        /running – Lister bare opp distribusjoner som kjører for øyeblikket.
+
+    /s, /setdefault &lt;DistributionName&gt;
+        Setter distribusjonen som standard.
+
+    /t, /terminate &lt;DistributionName&gt;
+        Avslutter distribusjonen.
+
+    /u, /unregister &lt;DistributionName&gt;
+        Avregistrerer distribusjonen og sletter rotfilsystemet.</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation. Med enerett.
+Hvis du vil ha informasjon om personvern vedrørende dette produktet, kan du gå til https://aka.ms/privacy.
+
+Bruk: wsl.exe [argument] [alternativer...] [kommandolinje]
+
+Argumenter for å kjøre Linux-binærfiler:
+
+    Hvis ingen kommandolinje er angitt, starter wsl.exe standardgrensesnittet.
+
+    --exec, -e &lt;CommandLine&gt;
+        Kjører den angitte kommandoen uten å bruke standard Linux-grensesnitt.
+
+    --shell-type &lt;standard|login|none&gt;
+        Kjør den spesifiserte kommandoen med den angitte grensesnittypen.
+
+    --
+        Send den gjenstående kommandolinjen slik den er.
+
+Alternativer:
+    --cd &lt;Directory&gt;
+        Angir den spesifiserte katalogen som gjeldende arbeidskatalog.
+        Hvis ~ brukes, brukes Linux-brukerens startbane. Hvis banen starter
+        med et /-tegn, blir den tolket som en absolutt Linux-bane.
+        Hvis ikke må verdien være en absolutt Windows-bane.
+
+    --distribution, -d &lt;distronavn&gt;
+        Kjør den spesifiserte distribusjonen.
+
+    --distribution-id &lt;distroguid&gt;
+        Kjør den spesifiserte distribusjon-ID-en.
+
+    --user, -u &lt;UserName&gt;
+        Kjør som den spesifiserte brukeren.
+
+    --system
+        Starter et skall for systemdistribusjonen.
+
+Argumenter for å behandle Windows-undersystemet for Linux:
+
+    --help
+        Vis informasjon om bruk.
+
+    --debug-shell
+        Åpner et WSL 2-feilsøkingsgrensesnitt for diagnoseformål.
+
+    --install [Distro] [Options...]
+        Installerer en distribusjon av typen Windows-undersystem for Linux.
+        Hvis du vil ha en liste over gyldige distribusjoner, kan du bruke 'wsl.exe --list --online'.
+
+        Alternativer:
+            --enable-wsl1
+                Aktiver WSL1-støtte.
+
+            --fixed-vhd
+                Opprett en disk med fast størrelse for lagring av distribusjonen.
+
+            --from-file &lt;bane&gt;
+                Installer en distribusjon fra en lokal fil.
+
+            --legacy
+                Bruk det eldre distribusjonsmanifestet.
+
+            --location &lt;Location&gt;
+                Angi installasjonsbanen for distribusjonen.
+
+            --name &lt;navn&gt;
+                Angi navnet på distribusjonen.
+
+            --no-distribution
+                Installerer bare de nødvendige valgfrie komponentene. Installerer ikke en distribusjon.
+
+            --no-launch, -n
+                Ikke start distribusjonen etter installasjon.
+
+            --version &lt;versjon&gt;
+                Angir hvilken versjon som skal brukes for den nye distribusjonen.
+
+            --vhd-size &lt;MemoryString&gt;
+                Angir størrelsen på disken for å lagre distribusjonen.
+
+            --web-download
+                Laster ned distribusjonen fra Internett i stedet for fra Microsoft Store.
+
+    --manage &lt;distribusjon&gt; &lt;alternativer ...&gt;
+        Endrer bestemte alternativer for distribusjonen.
+
+        Alternativer:
+            --move &lt;plassering&gt;
+                Flytt utrullingen til en ny plassering.
+
+            --set-sparse, -s &lt;sann|usann&gt;
+                Angir at VHDX-filen for distribusjonen skal være plassbesparende, slik at diskplass kan frigjøres automatisk.
+
+            --set-default-user &lt;brukernavn&gt;
+                Angi standardbruker for distribusjonen.
+
+            --resize &lt;minnestreng&gt;
+                Endre størrelsen på disken for fordelingen til den angitte størrelsen.
+
+    --mount &lt;disk&gt;
+        Kobler til og monterer en fysisk eller virtuell disk på alle WSL 2-distribusjoner.
+
+        Alternativer:
+            --vhd
+                Angir at &lt;disk&gt; refererer til en virtuell harddisk.
+
+            --bare
+                Kobler disken til WSL 2, men monterer den ikke.
+
+            --name &lt;navn&gt;
+                Monterer disken og bruker et egendefinert navn for monteringspunktet.
+
+            --type &lt;type&gt;
+                Filsystemet som skal brukes ved montering av en disk. Hvis det ikke angis, brukes ext4 som standard.
+
+            --options &lt;alternativer&gt;
+                Flere monteringsalternativer.
+
+            --partition &lt;indeks&gt;
+                Indeksen for partisjonen som skal monteres. Hvis den ikke angis, brukes hele disken som standard.
+
+    --set-default-version &lt;versjon&gt;
+        Endrer standard installasjonsversjon for nye distribusjoner.
+
+    --shutdown
+        Avslutter umiddelbart alle kjørende distribusjoner og WSL 2
+        virtuell maskin for lette verktøy.
+
+        Alternativer:
+            --force
+                Avslutt den virtuelle WSL 2-maskinen selv om en operasjon pågår. Kan føre til tap av data.
+
+    --status
+        Viser statusen til Windows-undersystem for Linux.
+
+    --unmount [disk]
+        Demonterer og kobler fra en disk fra alle WSL 2-distribusjoner.
+        Demonterer og kobler fra alle disker hvis den kalles uten argument.
+
+    --uninstall
+        Avinstallerer Windows-undersystemet for Linux-pakke fra denne maskinen.
+
+    --update
+        Oppdaterer pakken med Windows-undersystemet for Linux.
+
+        Alternativer:
+            --pre-release
+                Laster ned en forhåndsversjon hvis den er tilgjengelig.
+
+    --version, -v
+        Viser versjonsinformasjon.
+
+Argumenter for behandling av distribusjoner i Windows-undersystem for Linux:
+
+    --export &lt;distribusjon&gt; &lt;filnavn&gt; [alternativer]
+        Eksporterer distribusjonen til en TAR-fil.
+        Filnavnet kan være - for standard utdata.
+
+        Alternativer:
+            --format &lt;Format&gt;
+                Angir eksportformatet. Støttede verdier: tar, tar.gz, vhd.
+
+    --import &lt;distribusjon&gt; &lt;installasjonsplassering&gt; &lt;filnavn&gt; [alternativer]
+        Importerer den angitte TAR-filen som en ny distribusjon.
+        Filnavnet kan være - for standard inndata.
+
+        Alternativer:
+            --version &lt;versjon&gt;
+                Angir hvilken versjon som skal brukes for den nye distribusjonen.
+
+            --vhd
+                Angir at den angitte filen er en VHDX-fil, ikke en TAR-fil.
+                Denne operasjonen lager en kopi av VHDX-filen på den angitte installasjonsplasseringen.
+
+    --import-in-place &lt;distribusjon&gt; &lt;filnavn&gt;
+        Importerer den angitte VHDX-filen som en ny distribusjon.
+        Denne virtuelle harddisken må være formatert med filsystemtypen EXT4.
+
+    --list, -l [alternativer]
+        Viser en liste over distribusjoner.
+
+        Alternativer:
+            --all
+                Viser en liste over alle distribusjoner, inkludert distribusjoner som
+                installeres eller avinstalleres for øyeblikket.
+
+            --running
+                Viser en liste over bare distribusjoner som kjører.
+
+            --quiet, -q
+                Vis bare distribusjonsnavn.
+
+            --verbose, -v
+                Vis detaljert informasjon om alle distribusjoner.
+
+            --online, -o
+                Viser en liste over distribusjoner som kan installeres med 'wsl.exe --install'.
+
+    --set-default, -s &lt;distribusjon&gt;
+        Angir distribusjonen som standard.
+
+    --set-version &lt;distribusjon&gt; &lt;versjon&gt;
+        Endrer versjonen til den angitte distribusjonen.
+
+    --terminate, -t &lt;distribusjon&gt;
+        Avslutter den angitte distribusjonen.
+
+    --unregister &lt;distribusjon&gt;
+        Avregistrerer distribusjonen og sletter rotfilsystemet.</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>WSL-versjon: {}
+Kernelversjon: {}
+WSLg-versjon: {}
+MSRDC-versjon: {}
+Direct3D-versjon: {}
+DXCore-versjon: {}
+Windows-versjon: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>MSBuild-versjon: {}
+Commit: {}
+Build-tid: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>Finner ikke den egendefinerte kjernen som er definert i {}: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>VHD-en for tilpassede kjernemoduler i {} ble ikke funnet: «{}».</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>Den egendefinerte systemdistribusjonen som er angitt i {} ble ikke funnet, eller har feil format.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation. Med enerett.
+Hvis du vil ha informasjon om personvern vedrørende dette produktet, kan du gå til https://aka.ms/privacy.
+
+Bruk: wslg.exe [Argument] [Alternativer...] [Kommandolinje]
+
+Argumenter:
+    --cd &lt;Directory&gt;
+        Angir den angitte mappen som gjeldende arbeidsmappe.
+        Hvis ~ brukes, brukes Linux-brukerens startbane. Hvis banen starter
+        med et /-tegn, blir den tolket som en absolutt Linux-bane.
+        Hvis ikke må verdien være en absolutt Windows-bane.
+
+    --distribution, -d &lt;Distro&gt;
+        Kjør den angitte distribusjonen.
+
+    --user, -u &lt;UserName&gt;
+        Kjør som angitt bruker.
+
+    --shell-type &lt;standard|login|none&gt;
+        Kjør den angitte kommandoen med den angitte skalltypen.
+
+    --help
+        Vis informasjon om bruk.
+
+    --
+        Send gjenstående kommandolinje slik den er.</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>Trykk på en tast for å fortsette...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>Argumentet {} mangler et nødvendig parameter.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>Eksport pågår. Dette kan ta noen minutter.</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>Import pågår. Dette kan ta noen minutter.</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>GUI-programstøtte er deaktivert via {} eller /etc/wsl.conf.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>Ser etter oppdateringer.</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>Denne distribusjonen er bare tilgjengelig fra Microsoft Store.</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>wsl.exe --mount på ARM64 krever Windows versjon 27653 eller nyere.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>Den nyeste versjonen av Windows-undersystem for Linux er allerede installert.</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>Oppdaterer Windows-undersystem for Linux til versjon: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>Dette programmet krever Windows-undersystem for Linux valgfri komponent.
+Installer den ved å kjøre: wsl.exe --install --no-distribution
+Systemet må kanskje startes på nytt slik at endringene kan tre i kraft.</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>Den angitte filen må ha filtypen VHDX.</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>Finner ikke VmSwitch {}. Tilgjengelige brytere: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>Brolagt nettverk krever at wsl2.vmSwitch angis.</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>Kan ikke hente listedistribusjonen fra {}. {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>Kan ikke koble til disken {} til WSL2: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>Kan ikke endre størrelsen på disken.</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>Kan ikke oversette banen.</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>Finner ingen verdi.</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>Windows-versjon {} støtter ikke den pakkede versjonen av Windows-undersystem for Linux.
+Installer den nødvendige oppdateringen via Windows Update eller via: {}
+Hvis du vil ha mer informasjon, kan du gå til https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>Kjøring av feilsøkingsskallet krever kjøring wsl.exe som administrator.</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>Installasjonsprosessen for distribusjonen {} mislyktes med avslutningskoden: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>Ugyldig GUID-format: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>Ugyldig seksjonsnavn i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>Ugyldig nøkkelnavn i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>Forventet {} i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>Ugyldig escape-tegn: {} i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>Ukjent nøkkel {} i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>Ugyldig heltallsverdi {} for nøkkelen {} i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>Ugyldig IP-verdi {} for nøkkelen {} i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>Ugyldig boolsk verdi {} for nøkkelen {} i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>Ugyldig mac-adresse {} for nøkkelen {} i {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>Kan ikke åpne konfigurasjonsfilen {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>Det oppstod feil under WSL-oppstart</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>Åpne EventViewer</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>Denne distribusjonen inneholder ikke et standardnavn. Bruk --name til å velge distribusjonsnavnet.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>Argumentene {} og {} kan ikke angis samtidig.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>Argumentet {} krever argumentet {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>Ugyldig distribusjonsnavn: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>Bruker eldre distribusjonsregistrering. Vurder å bruke en tar-basert distribusjon i stedet.</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>Eldre distribusjonsregistreringer støtter ikke --version argumentet.</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>Distribusjonen {} leveres av et overstyringsmanifest.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>Distribusjonshashen samsvarer ikke. Forventet: {}, faktisk hash: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>Ugyldig heksadesimalstreng: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>{} støttes ikke ved installering av eldre distribusjoner.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>Distribusjonen er installert. Den kan startes via wsl.exe -d {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>Ugyldig minnestreng {} for .wslconfig-oppføringen {} i {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>Kan ikke opprette swapdisken i {}: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>Nestet virtualisering støttes ikke på denne maskinen.</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>Kan ikke opprette et nettverksendepunkt med adressen {}, tilordnet ny adresse: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>Kan ikke opprette virtuelt nettverk med adresseområde: {}, opprettet nytt nettverk med området: {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>SIKKERMODUS AKTIVERT – mange funksjoner vil bli deaktivert</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>Avspeilet nettverksmodus støttes ikke: {}.
+Faller tilbake til NAT-nettverk.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>Linux Kernel versjon 5.10 eller nyere kreves</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Windows-versjon {}. {} har ikke de nødvendige funksjonene</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>Brannmuren støtter ikke Hyper-V</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>DNS-tunnelering støttes ikke</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>Innstillingen wsl2.localhostForwarding har ingen effekt ved bruk av avspeilet nettverksmodus</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>Det ble oppdaget en http-proxy-endring på verten. Start WSL på nytt for å bruke endringen.</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>En localhost-proxykonfigurasjon ble oppdaget, men ikke avspeilet i Windows Subsystem for Linux. Windows Subsystem for Linux i NAT-modus støtter ikke localhost-proxyer.</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>En IPv6-proxykonfigurasjon ble oppdaget, men ikke avspeilet i WSL. WSL i NAT-modus støtter ikke IPv6.</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>En IPv6-proxy-konfigurasjon for localhost ble oppdaget, men er ikke avspeilet i WSL. WSL støtter ikke IPv6-proxyer for localhost.</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>Det oppstod en uventet feil under forsøk på å løse proxy-innstillinger. Proxy-innstillinger ble ikke speilet til WSL.</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>Det oppstod en feil under tilgang til registeret. Bane: {}. Feil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>Kan ikke starte reléprosessen for localhost. Feil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>Kan ikke starte virtuelt nettverk . Installer den valgfrie komponenten Virtual Machine Platform ved å kjøre: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>Kan ikke konfigurere nettverk (networkingMode {}), som faller tilbake til networkingMode {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>Kan ikke aktivere Windows-komponenten {} (feilkode {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>En uopprettelig feil ble returnert av plugin-modulen {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>Programtillegget returnerte en uopprettelig feil: {}. Feilmelding: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>Programtillegget {} krever en nyere versjon av WSL. Kjør wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>.wslconfig-innstillingen {} er deaktivert av datamaskinpolicyen.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>Feilsøkingsskallet er deaktivert av datamaskinpolicyen.</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>wsl.exe --mount er deaktivert av datamaskinpolicyen.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>WSL1 er deaktivert av datamaskinpolicyen.</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>Kjør wsl.exe --set-version {} 2 for å oppgradere til WSL2.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>WSL fullfører en oppgradering ...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>Oppdateringen mislyktes (feilkode: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>Avinstalleringen mislyktes (feilkode: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>Loggfil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>Kan ikke fjerne MSIX-pakken (feil: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>Kan ikke installere MSIX-pakken (feil: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>Valgfrie komponenter som kreves for å kjøre WSL, er ikke installert.</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>Installer manglende komponenter.</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>Den importerte filen er ikke en gyldig Linux-distribusjon.</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>Trykk på en tast for å avslutte...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>En ny versjon av Windows-undersystem for Linux er tilgjengelig.</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>Oppdater til versjon {} eller vis produktmerknadene nedenfor.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>Oppdater</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>Vis dokumenter</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>Operasjonen kan ikke fullføres fordi VHDX-filen er i bruk. Slik tvinger du WSL til å stoppe bruk: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>{} er ikke en gyldig boolsk verdi, &lt;sann|usann&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>Sparse vhdx støttes bare på WSL2.</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>Kjøring av WSL som lokalt system støttes ikke.</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>Ytelsestips:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>Hvis du bruker en I/U-intensiv operasjon som {} på Windows-stasjonene, får du dårlig ytelse. Vurder å flytte prosjektfilene til Linux-filsystemet for å få bedre ytelse. Klikk nedenfor for å finne ut mer.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>Vis dokumenter</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>Ikke vis flere ganger</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>Den virtuelle WSL2-maskinen krasjet.</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>Stakksporingen er lagret i: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>Distribusjonen startet ikke. Feilkode: {}, feiltrinn: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>Distribusjonen startet ikke fordi den virtuelle disken er skadet.</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>Duplisert konfigurasjonsnøkkel {} i {}:{} (Nøkkelkonflikt: {} i {}:{})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>Ugyldig verdi {} for konfigurasjonsnøkkel {} i {}:{} (gyldige verdier: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>Venter på at OOBE-kommandoen skal fullføres for distribusjonen {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>Kan ikke lese egenskapen {} fra distribusjonen {} </value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>Dette ser ut som en VDHX-fil. Bruk --vhd til å importere en VHDX i stedet for en tar.</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>Kan ikke installere {} fra Microsoft Store: {}
+Forsøker å laste ned...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>Ingen standarddistribusjon er konfigurert. Angi en distribusjon som skal installeres.</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>wsl2.virtio9p er deaktivert, og faller tilbake til 9p med vsock-transport.</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>WSL-installasjonen ser ut til å være skadet (feilkode: {}).
+Trykk en tast for å reparere WSL, eller CTRL-C for å avbryte.
+Denne meldingen blir tidsavbrutt om 60 sekunder.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>Kan ikke analysere terminalprofil under registrering av distribusjon: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>Ugyldig størrelse: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+Feilkode: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>Ugyldig JSON-dokument. Analyseringsfeil: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>wsl2.processors kan ikke overskride antall logiske prosessorer på systemet ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>Kan ikke spørre etter nettverksmodus</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>Tilpassede kjernemoduler ble levert uten å angi en tilpasset kjerne. Se https://aka.ms/wslcustomkernel for mer informasjon.</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>DNS-tunnelering er deaktivert på grunn av et nåværende kompatibilitetsproblem med Global sikker tilgang-klienten.</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>Sparsom VHD-støtte er deaktivert på grunn av potensiell dataskade.
+Hvis du vil tvinge en distribusjon til å bruke en sparsom vhd, kan du kjøre:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>Kan ikke montere {}. Se dmesg hvis du vil ha mer informasjon.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>Behandling av /etc/fstab med mount -a mislyktes.</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>Det oppstod en feil under montering av distribusjonsdisken. Den ble montert som skrivebeskyttet.
+Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>Kan ikke oversette {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>Noe gikk galt. Prøv på nytt senere.</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>Om</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>Om Windows-undersystem for Linux-innstillinger</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft. Med enerett.</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>Windows-undersystem for Linux innstillinger</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>Windows-undersystem for Linux Innstillinger lar utviklere administrere .wslconfig filen ved hjelp av et GUI-basert program.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>Automatisk minnegjenbruk</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>Frigir automatisk hurtigbufret minne etter å ha oppdaget inaktiv CPU-bruk. Angi gradvis for langsom frigivelse, og dropcache for umiddelbar frigivelse av hurtigbufret minne.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Automatisk minnefrigjøring.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Frigir automatisk hurtigbufret minne etter å ha oppdaget inaktiv CPU-bruk. Angi gradvis for langsom frigivelse, og dropcache for umiddelbar frigivelse av hurtigbufret minne.</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>Automatisk proxy aktivert</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>Gjør det mulig for WSL å bruke HTTP-proxyinformasjon for Windows.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Automatisk proxy aktivert.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gjør det mulig for WSL å bruke HTTP-proxyinformasjon for Windows.</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>Bruk beste forsøk på DNS-analyse</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>Gjelder bare når wsl2.dnsTunneling er satt til sann. Når satt til sann, trekker Windows ut spørsmålet fra DNS-forespørselen og prøver å løse det, og de ukjente postene ignoreres.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Bruk DNS-analyse med beste innsats.</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gjelder bare når wsl2.dnsTunneling er satt til sann. Når satt til sann, trekker Windows ut spørsmålet fra DNS-forespørselen og prøver å løse det, og de ukjente postene ignoreres.</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>Egendefinert kjerne</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>En absolutt Windows-bane til en egendefinert Linux-kjerne.</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>Bla gjennom kjerner</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Egendefinert kjerne</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>En absolutt Windows-bane til en egendefinert Linux-kjerne.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>Egendefinerte kjernemoduler</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>En absolutt Windows-bane til modul-VHD for en egendefinert Linux-kjerne.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>Bla gjennom kjernemoduler</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Egendefinerte kjernemoduler</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>En absolutt Windows-bane til modul-VHD for en egendefinert Linux-kjerne.</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>Egendefinert systemdeaktivering</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>Bla gjennom distroer</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>Angi en bane til en VHD som lastes inn som en egendefinert systemdeaktivering, først og fremst brukt til å drive GUI-apper i WSL. [Mer informasjon om systemdespsjoner her].</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Egendefinert systemdeaktivering</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Angi en bane til en VHD som lastes inn som en egendefinert systemdistro, hovedsakelig brukt til å drive GUI-apper i WSL.</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>Aktiver feilsøkingskonsoll</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>Boolsk for å aktivere et utdatakonsollvindu som viser innholdet i dmesg ved starten av en WSL 2-utgående forekomst.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Aktiver feilsøkingskonsoll.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Boolsk verdi for å aktivere et utdatakonsollvindu som viser innholdet i diagnosemeldinger ved start av en WSL 2-distroforekomst.</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>Standard VHD-størrelse</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>Standard maksimal størrelse for den utvidbare virtuelle WSL-harddisken (VHD) bare for nyopprettede distribusjoner.</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>Tilbakestill størrelse</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Standard VHD-størrelse</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Standard maksimal størrelse, angitt i megabyte, bare for den utvidbare virtuelle WSL-harddisken (VHD) for nylig opprettede distribusjoner.</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>Utvikler</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>Dokumentasjon</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>Endre DrvFS-modus</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>Endrer implementering av filtilgang på tvers av operativsystemer i WSL.</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>DNS-proxy aktivert</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>Gjelder bare når wsl2.networkingMode er satt til NAT. Boolsk for å informere WSL om å konfigurere DNS-serveren i Linux til NAT på verten. Hvis du setter til Usann, speiler dette DNS-servere fra Windows til Linux.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-proxy aktivert.</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gjelder bare når wsl2.networkingMode er satt til NAT. Boolean for å informere WSL om å konfigurere DNS-serveren i Linux til NAT på verten. Hvis du setter til Usann, speiler dette DNS-servere fra Windows til Linux.</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>DNS-tunnelering aktivert</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>Endrer hvordan DNS-forespørsler er proxy fra WSL til Windows.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-tunnelering aktivert.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Endrer hvordan DNS-forespørsler er proxy fra WSL til Windows.</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>Filsystem</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>Aktiver GUI-programmer</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>Boolsk for å aktivere eller deaktivere støtte for GUI-programmer ([WSLg]) i WSL.</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Aktiver GUI-programmer.</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Boolsk for å aktivere eller deaktivere støtte for GUI-programmer (kjent som WSL g) i WSL.</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>Aktiver ytelsestellere for maskinvare</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>Aktiverer maskinvareytelsestellere for Linux.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Aktiver maskinvareytelsestellere.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Aktiverer maskinvareytelsestellere for Linux.</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>Hyper-V-brannmur aktivert</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>Aktiverer Hyper-V-brannmur som tillater reglene for Windows-brannmur, i tillegg til regler som er spesifikke for Hyper-V-trafikk, for å filtrere WSL-nettverkstrafikk.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hyper-V-brannmur aktivert.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Aktiverer Hyper-V-brannmur som tillater reglene for Windows-brannmur, i tillegg til regler som er spesifikke for Hyper-V-trafikk, for å filtrere WSL-nettverkstrafikk.</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>Tilbakekobling for vertsadresse</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>Gjelder bare når wsl2.networkingMode er avspeilet. Når satt til Sann, tillates beholderen å koble til verten, eller verten for å koble til beholderen, med en IP-adresse som er tilordnet verten. Vær oppmerksom på at 127.0.0.1-tilbakekoblingsadressen alltid kan brukes . Dette alternativet gjør det mulig å bruke alle ekstra tilordnede lokale IP-adresser også.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Vertsadressetilbakekobling.</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gjelder bare når wsl2.networkingMode er satt til avspeilet. Når satt til Sann, tillates beholderen å koble til verten, eller verten for å koble til beholderen, med en IP-adresse som er tilordnet verten. Vær oppmerksom på at 127.0.0.1-tilbakekoblingsadressen alltid kan brukes . Dette alternativet gjør det mulig å bruke alle ekstra tilordnede lokale IP-adresser også.</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>Ignorerte porter</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>Gjelder bare når wsl2.networkingMode er satt til avspeilet. Angir hvilke porter Linux-programmer kan binde til som ikke videresendes eller vurderes automatisk i Windows. Skal formateres i en kommadelt liste, for eksempel 3000,9000,9090.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>Tilbakestill porter</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Ignorerte porter</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gjelder bare når wsl2.networkingMode er satt til avspeilet. Angir hvilke porter Linux-programmer kan binde til som ikke videresendes eller vurderes automatisk i Windows. Skal formateres i en kommadelt liste, for eksempel 3000, 9000, 9090.</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>Første tidsavbrudd for automatisk proxy</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>Gjelder bare når wsl2.autoProxy er satt til sann. Konfigurerer hvor lenge (i millisekunder) WSL skal vente på henting av HTTP-proxyinformasjon når du starter en WSL-beholder. Hvis proxy-innstillingene løses etter dette tidspunktet, må WSL-forekomsten startes på nytt for å bruke de hentede proxy-innstillingene.</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>Tilbakestill tidsavbrudd</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Første tidsavbrudd for automatisk proxy</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Gjelder bare når wsl2.autoProxy er satt til sann. Konfigurerer hvor lenge WSL i millisekunder venter på å hente HTTP-proxyinformasjon når en WSL-beholder startes. Hvis proxy-innstillingene løses etter dette tidspunktet, må WSL-forekomsten startes på nytt for å bruke de hentede proxy-innstillingene.</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>Kjernekommandolinje</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>Flere kjernekommandolinjeargumenter.</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>Aktiver videresending av localhost</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>Boolsk verdi som angir om porter som er bundet til jokertegn eller localhost i WSL 2 VM, skal kunne kobles til fra verten via localhost:port.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Aktiver videresending av localhost.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Boolsk verdi som angir om porter som er bundet til jokertegn eller localhost i den virtuelle WSL 2-maskinen, skal kunne kobles til fra verten via localhost, colon, port.</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>Minne og prosessor</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>Minnestørrelse</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>Hvor mye minne som skal tilordnes WSL 2 VM.</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>Tilbakestill størrelse</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Minnestørrelse</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hvor mye minne, angitt i megabyte, som skal tilordnes WSL 2 VM.</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} millisekunder</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>Aktiver nestet virtualisering</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>Boolsk for å aktivere eller deaktivere nestet virtualisering, slik at andre nestede virtuelle maskiner kan kjøres i WSL 2.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Aktiver nestet virtualisering.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Boolsk for å aktivere eller deaktivere nestet virtualisering, slik at andre nestede virtuelle maskiner kan kjøres i WSL 2.</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>Nettverksmodus</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>Angir nettverksmodus for WSL.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Nettverksmodus.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Angir nettverksmodus for WSL.</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>Nettverk</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>Du kan jobbe på tvers av operativsystemer med alle filene dine!</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>Filtilgang på tvers av operativsystemer</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>Få tilgang til Windows-filer fra Linux</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>Du kan få tilgang til Windows-filer fra Linux ved å navigere til /mnt og deretter til Windows-stasjonsbokstaven, slik som dette eksemplet for C-stasjonen:
+
+cd /mnt/c</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>Få tilgang til Linux-filer med Filutforsker</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>Du kan vise Linux-filene fra Filutforsker ved å navigere til \\wsl.localhost\ eller klikke på Linux-ikonet.</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>Start Windows-filer og -programmer fra WSL</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>Selv når du bruker WSL, kan du kjøre filer som kan kjøres i Windows direkte fra feilsøk. Prøv å kjøre
+powershell.exe /c start . for å åpne Filutforsker i gjeldende mappe.</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>Få tilgang til Linux-nettverksapper fra Windows</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>Hvis du bygger en nettverksapp (for eksempel en app som kjører på en NodeJS- eller SQL-server) i Linux-distribusjonen, kan du få tilgang til den fra en Windows-app (for eksempel Edge- eller Chrome-nettleseren) ved hjelp av localhost (på vanlig måte). Dette betyr at hvis du startet en Linux-server som lytter til port 3000, kan du gå til [http://localhost:3000] i Edge på Windows for å få tilgang til den.</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>Nettverk med avspeilet modus</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>WSL inkluderer også en ny nettverksmodus, kalt avspeilet modus som legger til avanserte funksjoner som IPv6-støtte og muligheten til å få tilgang til nettverksprogrammer i lokalnettet.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>Mer informasjon om filtilgang på tvers av operativsystemer</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>Velkommen til Windows-undersystem for Linux</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>WSL er en flott måte å prøve ut forskjellige Linux-distribusjoner på.</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>Distro-behandling</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>Mer informasjon om grunnleggende WSL-kommandoer</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>Mer informasjon om import av Linux-distribusjoner</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>Vis kommando for installerbare WSL-distroer</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>wsl.exe -l -o</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>Installer en navngitt WSL Distro-kommando</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;DistroName&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>Vis kommando for tilgjengelige WSL-distroer</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Docker Desktop fungerer bra med WSL for å hjelpe deg med å utvikle Linux-beholdere.
+
+Noen av fordelene med å bruke Docker Desktop med WSL er:
+
+• Du kan kjøpe Docker-kommandoer i WSL eller i Windows med samme Docker-daemon og -bilder.
+• Du kan dele filer og mapper mellom Windows og Linux sømløst med automatisk montering av Windows-stasjoner i WSL.
+• Du kan bruke dine foretrukne Windows-verktøy og -redigeringsprogrammer til å jobbe på Linux-kode og -filer og omvendt, takket være interoperabiliteten til WSL.</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Docker Desktop-integrasjon</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>Mer informasjon om hvordan du bruker WSL med Docker</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>Med Windows-undersystemet for Linux (WSL) kan du kjøre favorittverktøyene, -programmene og -arbeidsflytene i Linux direkte på Windows.
+
+Bruk litt tid på å forhåndsvise noen av fellesskapets favorittfunksjoner, eller se på den omfattende dokumentasjonen.</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>Velkommen til WSL</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>Anbefalte fremgangsmåter for oppsett</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Komme i gang med Linux</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>Dokumentasjon for Windows-undersystem for Linux (WSL)</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>Du kan bruke grafikkbaserte Linux-programmer med opprinnelige Windows-samhandlinger som alt-tab, starte startmeny, feste oppgavelinje og støtte for klipp ut og lim inn.</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>GUI-apper</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>WSL kan utnytte Windows GPU for maskinlæringsarbeidsflyter
+
+Linux-binærfiler som kjører i WSL, kan automatisk bruke GPU i Windows for å øke hastigheten til ytelsen. Du trenger bare å installere og kjøre disse arbeidsflytene på samme måte som på en vanlig Linux-maskin. Det finnes mange ulike måter å komme i gang fra å kjøre CUDA i en docker-beholder hvis du har et NVIDIA-grafikkort, til å kjøre PyTorch eller TensorFlow med DirectML på AMD-, Intel- eller NVIDIA-grafikkortet. Se Komme i gang-guiden nedenfor for mer informasjon.</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>GPU-akselerasjon</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>Mer informasjon om GPU-akselerasjon</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>Mer informasjon om GUI-apper i WSL</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>Her er en liste over apper du kan prøve (Du kan installere alle disse i Ubuntu ved å skrive inn sudo apt install &lt;Navnet på appen&gt;)
+
+    • gedit – grunnleggende tekstredigeringsprogram
+    • audacity – ta opp og rediger lydfiler
+    • blender – lag 3D-animasjoner og visualiseringer
+    • gimp – rediger bilder
+    • nautilus – en Linux-filutforsker
+    • vlc – videospiller</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>Du kan enkelt få tilgang til nettverksapper på tvers av Windows- og Linux-operativsystemer.</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>Nettverksintegrasjon</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>Mer informasjon om nettverksprogrammer</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>Mer informasjon om nettverk med avspeilet modus</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>Du kan bruke WSL som utviklingsmiljø på heltid direkte fra VS Code.</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>VS Code-integrasjon</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>Mer informasjon om hvordan du bruker WSL med VS Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>Slik installerer du</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>Etter at du har installert VS Code, kan du installere den eksterne WSL-utvidelsen fra Windows Terminal:
+
+code –install-extension ms-vscode-remote.remote-wsl</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>Åpne et WSL-prosjekt i Visual Studio Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>For å åpne et prosjekt i VS Code WSL-distribusjonen, åpner du distribusjonens kommandolinje og kjører code . for å åpne en prosjektfil.
+
+Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopaletten i selve VS Code. Trykk på Skift+Ctrl+P på tastaturet for å åpne kommandopaletten, og skriv inn «Remote-WSL» for å se en liste over de eksterne alternativene for VS Code, slik at du kan åpne mappen på nytt i en ekstern økt, angi hvilken distribusjon du vil åpne, og mer.</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>Brukerveiledning</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>Valgfrie funksjoner</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>Aktiver siderapportering</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>Standard sann innstilling gjør det mulig for Windows å frigjøre ubrukt minne tildelt til virtuell WSL 2-maskin.</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>Personvernerklæring</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>Prosessorantall</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>Hvor mange logiske prosessorer som skal tilordnes WSL 2 VM.</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>Tilbakestill antall</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Prosessorantall</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hvor mange logiske prosessorer som skal tilordnes WSL 2 VM.</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>Beslektede koblinger</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>Produktmerknader</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>Aktiver Sikker modus</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>Kjør WSL i Sikkermodus som deaktiverer mange funksjoner og er ment å brukes til å gjenopprette distribusjoner som er i ugyldige tilstander.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Aktiver sikkermodus.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Kjør WSL i Sikkermodus som deaktiverer mange funksjoner og er ment å brukes til å gjenopprette distribusjoner som er i ugyldige tilstander.</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>Om</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>Utvikler</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Distro-håndtering</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Skrivebordsintegrering for Docker</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>Filsystem</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>Generelt</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>Grafikkbehandlingsenhet-akselerasjon</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>Visuelt grensesnitt-apper</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>Start wsl.exe</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>Minne og prosessor</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>Nettverk</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>Nettverksintegrasjon</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>Velkommen til WSL</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>Valgfrie funksjoner</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>Innstillinger</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>VS Code-integrasjon</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>Hva er nytt</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>Arbeider på tvers av filsystemer</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>Problemer</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>Aktiver sparsommelig VHD som standard</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>En nyopprettet VHD settes til spredt automatisk når den er aktivert.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Aktiver sparse VHD som standard.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>En nyopprettet VHD settes til spredt automatisk når den er aktivert.</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>Bytt filplassering</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>En absolutt Windows-bane til den virtuelle harddisken for bytting.</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>Bla gjennom vekslefiler</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Bytt filplassering</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>En absolutt Windows-bane til den virtuelle harddisken for bytting.</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>Bytt størrelse</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>Hvor mye bytteplass som skal legges til WSL 2 VM, 0 for ingen byttingsfil. Bytt lagring er diskbasert RAM som brukes når minnebehovet overskrider grensen på maskinvareenhet.</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>Tilbakestill størrelse</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Bytt størrelse</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Hvor mye veksleplass, angitt i megabyte, som skal legges til VM-en for WSL 2. 0 for ingen vekslefil. Vekslelagring er diskbasert RAM som brukes når minnebehovet overskrider grensen på maskinvareenheten.</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>Aktiver VirtIO</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>Bruk virtiofs i stedet for plan 9 for å få tilgang til vertsfiler, noe som øker hastigheten.</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>Aktiver Virtio 9p</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>Aktiverer montering av 9P-filsystemet fra verten ved hjelp av virtio-transport.</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>Tidsavbrudd for inaktiv virtuell maskin</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>Antall millisekunder en virtuell maskin er inaktiv, før den avsluttes.</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Tilbakestill tidsavbrudd</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Tidsavbrudd for inaktiv virtuell maskin</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Antall millisekunder en virtuell maskin er inaktiv, før den avsluttes.</value>
+  </data>
+</root>

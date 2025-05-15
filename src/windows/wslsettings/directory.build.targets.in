@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup>
+    <FrameworkReference Update="Microsoft.Windows.SDK.NET.Ref" RuntimeFrameworkVersion="${WINDOWS_SDK_DOTNET_VERSION}" TargetingPackVersion="${WINDOWS_SDK_DOTNET_VERSION}" />
+    <!-- The below can be removed when the OneBranch pipeline container image is updated to use a newer version of the dotnet SDK -->
+    <WindowsSdkSupportedTargetPlatformVersion Include="10.0.26100.0" Exclude="@(WindowsSdkSupportedTargetPlatformVersion)" WindowsSdkPackageVersion="10.0.26100.0" MinimumNETVersion="6.0" />
+    <SdkSupportedTargetPlatformVersion Include="10.0.26100.0" Exclude="@(SdkSupportedTargetPlatformVersion)"/>
+  </ItemGroup>
+</Project>

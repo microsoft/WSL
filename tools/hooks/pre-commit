@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# run only on Windows
+if [[ "$OSTYPE" == "msys" ]]; then
+	exec powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ".\FormatSource.ps1" -Staged '$true' -Verify '$true' -NoFail '$true'
+fi
+
+exit 0

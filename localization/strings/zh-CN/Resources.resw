@@ -1,0 +1,1876 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>适用于 Linux 的 Windows 子系统</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Windows Subsystem for Linux 使开发人员可以直接在 Windows 上运行未经修改的 GNU/Linux 环境 -- 包括大多数命令行工具、实用工具和应用程序 -- 而无需传统虚拟机或双引导设置的开销。</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>磁盘分离失败： {}。有关详细信息，请在 WSL2 内运行 “dmesg”。
+若要强制 WSL2 停止并分离磁盘，请运行“wsl.exe {}”。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>该磁盘“{}”已连接。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>该卷已装载到 WSL2 内。</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>已装载具有该名称的磁盘;请卸载磁盘或选择新名称，然后重试。</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>指定的装载名称包含无效的 "/" 字符。请在没有无效字符的情况下重试。</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>已成功将磁盘装载为“/mnt/wsl/{}”。
+注意: 如果修改了 /etc/wsl.conf 中的 automount.root 设置，则位置会有所不同。
+若要卸载和分离磁盘，请运行“wsl.exe {} {}”。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>已连接磁盘，但装载失败: {}。
+有关更多详细信息，请在 WSL2 中运行“dmesg”。
+若要分离磁盘，请运行“wsl.exe {} {}”。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>以下是可安装的有效分发的列表。
+使用“wsl.exe {} &lt;Distro&gt;”安装。
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>分发名称已设置。</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>提供的安装位置已在使用中。</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>已存在具有所提供名称的分发。使用 --name 选择其他名称。</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>不存在具有所提供名称的分发。</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>需要管理员访问权限才能装载磁盘。</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>导出分发失败。</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>为此分发实施适用于 Linux 的 Windows 子系统文件系统的一次性升级...
+</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>无法启动，因为另一个实例正在权限未提升的状态下运行。不允许同时运行已提升权限的实例和未提升权限的实例。
+</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>导入分发失败。</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>正在安装 Windows 可选组件: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>正在下载: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>正在安装: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>正在导入通讯组</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>{} 已下载。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>适用于 Linux 的 Windows 子系统正在恢复以前的安装...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>无效的分发名称：“{}”。
+若要获取有效分发列表，请使用“wsl.exe --list --online'”。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>适用于 Linux 的 Windows 子系统实例已终止。</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>无效的命令行参数： {}
+请使用“{} --help' 获取受支持的参数列表。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>命令行参数 {} 需要一个值。
+请使用“{} --help' 获取受支持的参数列表。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>不受支持的控制台设置。若要使用此功能，必须禁用旧的控制台。
+</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>{} 不是有效整数。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>正在进行此分发的安装、卸载或转换。
+</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>正在启动 {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>无法启动，因为另一个实例正在权限已提升的状态下运行。已提升权限的实例和未提升权限的实例不允许同时运行。
+</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>适用于 Linux 的 Windows 子系统没有已安装的分发。
+可通过安装包含以下说明的分发来解决此问题：
+
+使用“wsl.exe --list --online' ”列出可用的分发
+和 “wsl.exe --install &lt;Distro&gt;” 进行安装。</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>没有正在运行的分发。</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (默认值)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>适用于 Linux 的 Windows 子系统分发:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>默认分发: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>默认版本: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>正在注销。</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>找不到用户。</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>有关与 WSL 2 关键区别的信息，请访问 https://aka.ms/wsl2
+</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>正在进行转换，这可能需要几分钟时间。</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>该分发已是请求的版本。</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>旧分发不支持 WSL 2。</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>当前计算机配置不支持 WSL2。
+请启用“虚拟机平台”可选组件，并确保在 BIOS 中启用虚拟化。
+通过运行以下命令启用“虚拟机平台”: wsl.exe --install --no-distribution
+有关信息，请访问 https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>附加的虚拟硬盘或物理磁盘过多。</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>已通过 wsl.exe --mount, 装载 VHD，请在启动之前卸载磁盘。</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>当前计算机配置不支持 WSL1。
+若要使用 WSL1，请启用“Windows Subsystem for Linux”可选组件。</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>仅 WSL2 支持此操作。</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>使用量:
+    --networking-mode
+       显示当前网络模式。
+
+    --msal-proxy-path
+        显示 MSAL 代理应用程序的路径。
+
+    --version
+        显示 WSL 包的版本。
+
+    -n
+        不要打印换行符。</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>用法：
+    -a
+        强制结果为绝对路径格式。
+    -u
+        从 Windows 路径转换为 WSL 路径(默认)。
+    -w
+        从 WSL 路径转换为 Windows 路径。
+    -m
+        从 WSL 路径转换为 Windows 路径，使用“/”而不是“\\”
+
+示例: wslpath 'c:\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>对适用于 Linux 的 Windows 子系统执行管理操作
+
+用法:
+    /l, /list [选项]
+        列出已注册的分发版。
+        /all - (可选)列出所有分发版，包括
+               当前安装或未安装的分发版。
+
+        /running - 仅列出当前正在运行的分发版。
+
+    /s, /setdefault &lt;DistributionName&gt;
+        将分发版设置为默认值。
+
+    /t, /terminate &lt;DistributionName&gt;
+        终止分发版。
+
+    /u, /unregister &lt;DistributionName&gt;
+        取消注册分发版并删除根文件系统。</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>版权所有 (c) Microsoft Corporation。保留所有权利。
+有关此产品的隐私信息，请访问 https://aka.ms/privacy。
+
+用法: wsl.exe [Argument][Options...][CommandLine]
+
+运行 Linux 二进制文件的参数:
+
+    如果未提供命令行，wsl.exe 将启动默认 shell。
+
+    --exec, -e &lt;CommandLine&gt;
+        在不使用默认 Linux shell 的情况下执行指定的命令。
+
+    --shell-type &lt;standard|login|none&gt;
+        使用提供的 shell 类型执行指定的命令。
+
+    --
+        按原样传递剩余的命令行。
+
+选项:
+    --cd &lt;Directory&gt;
+        将指定目录设置为当前工作目录。
+        如果使用 ~，则将使用 Linux 用户的主路径。如果路径以
+        / 字符开始，它将被解释为绝对 Linux 路径。
+        否则，该值必须是绝对 Windows 路径。
+
+    --distribution, -d &lt;DistroName&gt;
+        运行指定的分发版。
+
+    --distribution-id &lt;DistroGuid&gt;
+        运行指定的分发版 ID。
+
+    --user, -u &lt;UserName&gt;
+        以指定用户身份运行。
+
+    --system
+        为系统分发版启动 shell。
+
+用于管理适用于 Linux 的 Windows 子系统的参数:
+
+    --help
+        显示使用情况信息。
+
+    --debug-shell
+        出于诊断目的打开 WSL2 调试 shell。
+
+    --install [Distro] [Options...]
+        安装适用于 Linux 的 Windows 子系统分发版。
+        有关有效分发版的列表，请使用 'wsl.exe --list --online'。
+
+        选项:
+            --enable-wsl1
+                启用 WSL1 支持。
+
+            --fixed-vhd
+                创建固定大小的磁盘来存储分发版。
+
+            --from-file &lt;Path&gt;
+                从本地文件安装分发版。
+
+            --legacy
+                使用旧分发版清单。
+
+            --location &lt;Location&gt;
+                设置分发版的安装路径。
+
+            --name &lt;Name&gt;
+                设置分发版的名称。
+
+            --no-distribution
+                仅安装所需的可选组件，不安装分发版。
+
+            --no-launch, -n
+                安装后不要启动分发版。
+
+            --version &lt;Version&gt;
+                指定要用于新分发的版本。
+
+            --vhd-size &lt;MemoryString&gt;
+                指定用于存储分发版的磁盘的大小。
+
+            --web-download
+                从 Internet 而不是 Microsoft Store 下载分发版。
+
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        更改发行版特定选项。
+
+        选项:
+            --move &lt;Location&gt;
+                将分发版移到新位置。
+
+            --set-sparse, -s &lt;true|false&gt;
+                将发行版的 vhdx 设置为稀疏，从而允许自动回收磁盘空间。
+
+            --set-default-user &lt;Username&gt;
+                设置分发版的默认用户。
+
+            --resize &lt;MemoryString&gt;
+                将分发版的磁盘大小调整为指定大小。
+
+    --mount &lt;Disk&gt;
+        在所有 WSL 2 分发版中附加和装载物理磁盘或虚拟磁盘。
+
+        选项:
+            --vhd
+                指定 &lt;Disk&gt; 引用虚拟硬盘。
+
+            --bare
+                将磁盘附加到 WSL2，但不要装载它。
+
+            --name &lt;Name&gt;
+                使用装入点的自定义名称装载磁盘。
+
+            --type &lt;Type&gt;
+                装载磁盘时要使用的文件系统(如果未指定)默认为 ext4。
+
+            --options &lt;Options&gt;
+                其他装载选项。
+
+            --partition &lt;Index&gt;
+                要装载的分区的索引(如果未指定)默认为整个磁盘。
+
+    --set-default-version &lt;Version&gt;
+        更改新分发版的默认安装版本。
+
+    --shutdown
+        立即终止所有正在运行的分发版和 WSL 2
+        轻型实用工具虚拟机。
+
+        选项:
+            --force
+                即使正在执行操作，也终止 WSL 2 虚拟机。可能导致数据丢失。
+
+    --status
+        显示适用于 Linux 的 Windows 子系统状态。
+
+    --unmount [磁盘]
+        从所有 WSL2 分发版中卸载和分离磁盘。
+        如果在没有参数的情况下调用，则卸载和分离所有磁盘。
+
+    --uninstall
+        从此计算机卸载适用于 Linux 的 Windows 子系统包。
+
+    --update
+        更新适用于 Linux 的 Windows 子系统包。
+
+        选项:
+            --pre-release
+                下载预发行版本(如果可用)。
+
+    --version, -v
+        显示版本信息。
+
+用于在适用于 Linux 的 Windows 子系统中管理分发版的参数:
+
+    --export &lt;Distro&gt; &lt;FileName&gt; [选项]
+        将分发版导出到 tar 文件。
+        文件名可以是 - for stdout。
+
+        选项:
+            --format &lt;Format&gt;
+                指定导出格式。支持的值: tar、tar.gz、tar.xz、vhd。
+
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [选项]
+        将指定的 tar 文件作为新分发版导入。
+        文件名可以是 - for stdin。
+
+        选项:
+            --version &lt;Version&gt;
+                指定要用于新分发的版本。
+
+            --vhd
+                指定所提供的文件是 .vhdx 文件，而不是 tar 文件。
+                此操作在指定的安装位置创建 .vhdx 文件的副本。
+
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        将指定的 .vhdx 文件作为新分发版导入。
+        必须使用 ext4 文件系统类型设置此虚拟硬盘的格式。
+
+    --list, -l [选项]
+        列出分发版。
+
+        选项:
+            --all
+                列出所有分发版，包括当前
+                正在安装或卸载的分发版。
+
+            --running
+                仅列出当前正在运行的分发版。
+
+            --quiet, -q
+                仅显示分发版名称。
+
+            --verbose, -v
+                显示有关所有分发版的详细信息。
+
+            --online, -o
+                显示适合通过 'wsl --install' 安装的可用分发版列表。
+
+    --set-default, -s &lt;Distro&gt;
+        将分布版设置为默认值。
+
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        更改指定分发版的版本。
+
+    --terminate, -t &lt;Distro&gt;
+        终止指定的分发版。
+
+    --unregister &lt;Distro&gt;
+        取消注册分发版并删除根文件系统。</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>WSL 版本: {}
+内核版本: {}
+WSLg 版本: {}
+MSRDC 版本: {}
+Direct3D 版本: {}
+DXCore 版本: {}
+Windows: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>MSBuild 版本: {}
+提交: {}
+生成时间: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>找不到 {} 中指定的自定义内核:“{}”。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>找不到 {} 中的自定义内核模块 vhd:“{}”。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>在 {} 中指定的自定义系统分发找不到或格式不正确。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>版权所有(c) Microsoft Corporation。保留所有权利。
+有关此产品的隐私信息，请访问 https://aka.ms/privacy。
+
+用法: wslg.exe [参数] [选项...][命令行]
+
+参数:
+   --cd &lt;Directory&gt;
+       将指定目录设置为当前工作目录。
+       如果使用 ~，则将使用 Linux 用户的主路径。如果路径开始于
+       对于 /字符，它将解释为绝对 Linux 路径。
+       否则，该值必须是绝对 Windows 路径。
+
+   --distribution, -d &lt;Distro&gt;
+       运行指定的分发。
+
+   --user, -u &lt;UserName&gt;
+       以指定用户身份运行。
+
+   --shell-type &lt;standard|login|none&gt;
+       使用提供的 shell 类型执行指定的命令。
+
+   --help
+       显示使用情况信息。
+
+   --
+       按时传递剩余的命令行。</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>按任意键继续...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>自变量 {} 缺少必需的参数。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>正在导出，这可能需要几分钟时间。</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>正在导入，这可能需要几分钟时间。</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>通过 {} 或 /etc/wsl.conf 禁用 GUI 应用程序支持。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>正在检查更新。</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>此分发版仅在Microsoft Store中可用。</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>在 ARM64 上 wsl.exe --mount 需要 Windows 版本 27653 或更高版本。</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>已安装最新版本的适用于 Linux 的 Windows 子系统。</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>正在更新适用于 Linux 的 Windows 子系统: {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>此应用程序需要适用于 Linux 的 Windows 子系统可选组件。
+通过运行安装它： wsl.exe --install --no-distribution
+可能需要重新启动系统才能使更改生效。</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>指定的文件必须具有 .vhdx 文件扩展名。</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>找不到 VmSwitch“{}”。可用开关: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>桥接网络需要设置 wsl2.vmSwitch。</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>无法从“{}”提取列表分发。{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>无法将磁盘“{}”附加到 WSL2: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>未能重设磁盘大小。</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>无法转换路径。</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>找不到值。</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>Windows 版本 {} 不支持打包版本的 适用于 Linux 的 Windows 子系统。
+通过 Windows 更新或通过以下方式安装所需的更新： {}
+有关信息，请访问 https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>运行调试 shell 需要以管理员身份运行 wsl.exe。</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>分发“{}”的安装过程失败，退出代码: {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>无效的 GUID 格式:“{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>{}:{} 中的节名称无效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>{}:{} 中的键名称无效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>{}:{} 中应为 {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>{}:{} 中的转义字符“{}”无效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>{}:{} 中的键“{}”未知</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>{}:{} 中键“{}”的整数值“{}”无效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>{}:{} 中键“{}”的 IP 值“{}”无效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>{}:{} 中的键“{}”的布尔值“{}”无效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>{}:{} 中键“{}”的 mac 地址“{}”无效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>未能打开配置文件 {}，{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>WSL 启动期间出错</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>打开 EventViewer</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>此分发不包含默认名称。使用 --name 选择分发名称。</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>不能同时指定参数 {} 和 {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>参数 {} 需要 {} 参数。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>分发名称无效:“{}”。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>使用旧分发注册。请考虑改用基于 tar 的分发。</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>旧分发注册不支持 --version 参数。</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>分发“{}”由替代清单提供。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>分发哈希不匹配。预期: {}，实际哈希: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>无效 HEX 字符串: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>安装旧版分发时不支持“{}”。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>已成功安装分发。可以通过 “wsl.exe -d {}” 启动它</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>{}:{} 中的 .wslconfig 条目“{}”的内存字符串“{}”无效</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>未能在“{}”中创建交换磁盘: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>此计算机上不支持嵌套虚拟化。</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>无法创建地址为“{}”的网络终结点，已分配新地址:“{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>无法创建地址范围为“{}”的虚拟网络，已创建具有以下范围的新网络:“{}”，{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>安全模式已启用 - 许多功能都将被禁用</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>不支持镜像网络模式： {}。
+正在回退到 NAT 网络。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>需要 Linux 内核版本 5.10 或更高版本</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Windows 版本 {}。{} 没有所需的功能</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>Hyper-V 防火墙不受支持</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>DNS 隧道不受支持</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>使用镜像网络模式时，wsl2.localhostForwarding 设置无效</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>在主机上检测到 Http 代理更改。请重启 WSL 以应用更改。</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>检测到 localhost 代理配置，但未镜像到 WSL。NAT 模式下的 WSL 不支持 localhost 代理。</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>检测到 IPv6 代理配置，但未镜像到 WSL。NAT 模式下的 WSL 不支持 IPv6。</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>检测到 localhost IPv6 代理配置，但未镜像到 WSL 中。WSL 不支持 localhost IPv6 代理。</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>尝试解析代理设置时发生意外错误，代理设置未镜像到 WSL 中。</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>访问注册表时出错。路径：“{}”。错误： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>未能启动 localhost 中继进程。错误： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>无法启动虚拟网络 - 请通过运行： wsl.exe --install --no-distribution 安装可选组件虚拟机平台</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>无法配置网络 (networkingMode {})，回退到 networkingMode {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>无法启用 Windows 组件“{}”(退出代码 {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>插件“{}”返回了一个错误</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>插件“{}”返回了一个错误。错误消息:“{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>插件“{}”需要较新版本的 WSL。请运行： wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>计算机策略已禁用 .wslconfig 设置“{}”。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>计算机策略禁用调试 shell。</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>wsl.exe --mount 被计算机策略禁用。</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>WSL1 被计算机策略禁用。</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>请运行“wsl.exe --set-version {} 2”以升级到 WSL2。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>WSL 正在完成升级...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>更新失败(退出代码: {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>卸载失败(退出代码: {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>日志文件: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>无法删除 MSIX 程序包 (错误： {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>无法安装 MSIX 程序包 (错误： {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>未安装运行 WSL 所需的可选组件。</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>安装缺少的组件。</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>导入的文件不是有效的 Linux 分发。</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>按任意键即可退出...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>有新版本的适用于 Linux 的 Windows 子系统可用。</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>更新到版本 {} 或查看下面的发行说明。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>请参阅文档</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>无法完成该操作，因为 vhdx 当前正在使用中。若要强制 WSL 停止使用： wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>{} 不是有效的布尔值，&lt;true|false&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>仅 WSL2 支持稀疏 vhdx。</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>不支持将 WSL 作为本地系统运行。</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>性能提示:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>在 Windows 驱动器上使用像 {} 这样的 I/O 密集型操作将具有较差的性能。请考虑将项目文件移动到 Linux 文件系统以获得更好的性能。单击下方了解详细信息。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>查看文档</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>不再显示</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>WSL2 虚拟机崩溃。</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>堆栈跟踪已保存在： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>无法启动分发。错误代码： {}，失败步骤： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>无法启动分发，因为其虚拟磁盘已损坏。</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>{}:{} 中的配置键“{}”重复({}:{}中的键“{}”冲突)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>{}:{} 中配置键“{}”的值“{}”无效（有效值: {}）</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>正在等待 OOBE 命令完成分发“{}”...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>无法从分发 {} 读取属性“{}”</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>这似乎是 VHDX 文件。使用 --vhd 导入 VHDX 而不是 tar。</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>未能从以下Microsoft Store安装 {}： {}
+正在尝试 Web 下载...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>尚未配置默认分发。请提供要安装的分发。</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>已禁用 wsl2.virtio9p，使用 vsock 传输回退到 9p。</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>WSL 安装似乎已损坏 (错误代码： {})。
+按任意键修复 WSL，或 CTRL-C 取消。
+此提示将在 60 秒后超时。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>注册分发时无法分析终端配置文件： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>大小无效: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+错误代码: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>JSON 文档无效。分析错误: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>wsl2.processors 不能超过系统上的逻辑处理器数 ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>查询网络模式失败</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>提供了自定义内核模块，但没有指定自定义内核。有关详细信息，请参阅 https://aka.ms/wslcustomkernel。</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>由于当前与全球安全访问客户端的兼容性问题，DNS 隧道被禁用。</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>由于潜在的数据损坏，目前已禁用稀疏 VHD 支持。
+若要强制分发使用稀疏 vhd，请运行：
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>未能装载 {}，有关更多详细信息，请参阅 dmesg。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>使用装载 -a 处理 /etc/fstab 失败。</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>装载分发磁盘时出错，该磁盘作为回退以只读方式装载。
+请参阅以下位置的恢复说明： https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>翻译“{}”失败</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>出现错误。请稍后再试一次。</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>关于适用于 Linux 的 Windows 子系统设置</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft。保留所有权利。</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>适用于 Linux 设置的 Windows 子系统</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>适用于 Linux 的 Windows 子系统设置允许开发人员使用基于 GUI 的应用程序管理 .wslconfig 文件。</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>自动内存回收</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>检测到空闲 CPU 使用情况后自动释放缓存内存。为缓存的即时释放设置为慢速释放和 dropcache。</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自动内存回收。</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>检测到空闲 CPU 使用情况后自动释放缓存内存。为缓存的即时释放设置为慢速释放和 dropcache。</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>已启用自动代理</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>使 WSL 能够使用 Windows 的 HTTP 代理信息。</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已启用自动代理。</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>使 WSL 能够使用 Windows 的 HTTP 代理信息。</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>尽力进行 DNS 分析</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>仅当 wsl2.dnsTunneling 设置为 true 时适用。设置为 true 时，Windows 将从 DNS 请求中提取问题并尝试解决该问题，忽略未知记录。</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>尽力进行 DNS 分析。</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>仅当 wsl2.dnsTunneling 设置为 true 时才适用。设置为 true 时，Windows 将从 DNS 请求中提取问题并尝试解决该问题，忽略未知记录。</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>自定义内核</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>自定义 Linux 内核的绝对 Windows 路径。</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>浏览内核</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自定义内核</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>自定义 Linux 内核的绝对 Windows 路径。</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>自定义内核模块</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>自定义 Linux 内核模块 VHD 的绝对 Windows 路径。</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>浏览内核模块</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自定义内核模块</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>自定义 Linux 内核模块 VHD 的绝对 Windows 路径。</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>自定义系统发行版</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>浏览发行版</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>指定 VHD 的路径，该路径将作为自定义系统发行版加载，主要用于为 WSL 中的 GUI 应用提供电源。[在此处详细了解系统发行]。</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自定义系统发行版</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>指定 VHD 的路径，该路径将作为自定义系统发行版加载，主要用于为 WSL 中的 GUI 应用提供电源。</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>启用调试控制台</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>用于打开输出控制台窗口的布尔值，该窗口在 WSL 2 发行版实例启动时显示 dmesg 的内容。</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>启用调试控制台。</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>用于打开输出控制台窗口的布尔值，该窗口在 WSL 2 发行版实例启动时显示诊断消息的内容。</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>默认 VHD 大小</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>对于新创建的分发，可扩展 WSL 虚拟硬盘 (VHD) 的默认最大大小。</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>重设大小</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>默认 VHD 大小</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD) 仅用于新创建的分发。</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>开发人员</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>文档</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>更改 DrvFS 模式</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>更改 WSL 中的跨 OS 文件访问实施。</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>已启用 DNS 代理</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>仅当 wsl2.networkingMode 设置为 NAT 时适用。布尔值通知 WSL 将 Linux 中的 DNS 服务器配置为主机上的 NAT。设置为 false 将镜像从 Windows 到 Linux 的 DNS 服务器。</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已启用 DNS 代理。</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>仅当 wsl2.networkingMode 设置为 NAT 时适用。布尔值通知 WSL 将 Linux 中的 DNS 服务器配置为主机上的 NAT。设置为 false 将镜像从 Windows 到 Linux 的 DNS 服务器。</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>已启用 DNS 隧道</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>更改 DNS 请求从 WSL 代理到 Windows 的方式。</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已启用 DNS 隧道。</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>更改 DNS 请求从 WSL 代理到 Windows 的方式。</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>文件系统</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>启用 GUI 应用程序</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>用于在 WSL 中打开或关闭对 GUI 应用程序 ([WSLg]) 的支持的布尔值。</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>启用 GUI 应用程序。</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>布尔值，用于在 WSL 中启用或禁用对 GUI 应用程序(名为 WSL g)的支持。</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>启用硬件性能计数器</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>为 Linux 启用硬件性能计数器。</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>启用硬件性能计数器。</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>为 Linux 启用硬件性能计数器。</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>已启用 Hyper-V 防火墙</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>启用 Hyper-V 防火墙，该防火墙允许 Windows 防火墙规则以及 Hyper-V 流量特定的规则来筛选 WSL 网络流量。</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已启用 Hyper-V 防火墙。</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>启用 Hyper-V 防火墙，该防火墙允许 Windows 防火墙规则以及 Hyper-V 流量特定的规则来筛选 WSL 网络流量。</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>主机地址环回</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>仅当 wsl2.networkingMode 设置为镜像时适用。设置为 True 时，将允许容器通过分配给主机的 IP 地址连接到主机或主机连接到容器。请注意，始终可以使用 127.0.0.1 环回地址 - 此选项还允许使用所有额外分配的本地 IP 地址。</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>主机地址环回。</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>仅当 wsl2.networkingMode 设置为镜像时适用。设置为 True 时，将允许容器通过分配给主机的 IP 地址连接到主机或主机连接到容器。请注意，始终可以使用 127.0.0.1 环回地址 - 此选项还允许使用所有额外分配的本地 IP 地址。</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>忽略的端口</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>仅当 wsl2.networkingMode 设置为镜像时适用。指定 Linux 应用程序可以绑定到的端口，不会在 Windows 中自动转发或考虑这些端口。应以逗号分隔的列表格式化，例如： 3000,9000,9090。</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>重置端口</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>忽略的端口</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>仅当 wsl2.networkingMode 设置为镜像时适用。指定 Linux 应用程序可以绑定到的端口，不会在 Windows 中自动转发或考虑这些端口。应以逗号分隔的列表格式化，例如 3000、9000、9090。</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>初始自动代理超时</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>仅当 wsl2.autoProxy 设置为 true 时适用。配置在启动 WSL 容器时 WSL 等待检索 HTTP 代理信息) (毫秒。如果在此时间后解析代理设置，则必须重新启动 WSL 实例才能使用检索到的代理设置。</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>重置超时</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>初始自动代理超时</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>仅当 wsl2.autoProxy 设置为 true 时才适用。配置启动 WSL 容器时 WSL 等待检索 HTTP 代理信息的时间，以毫秒为单位。如果在此时间后解析代理设置，则必须重新启动 WSL 实例才能使用检索到的代理设置。</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>内核命令行</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>其他内核命令行参数。</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>启用 localhost 转发</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>布尔值，指定是否应通过 localhost：port 从主机连接到 WSL 2 VM 中通配符或 localhost 的端口。</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>启用 localhost 转发。</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>一个布尔值，指定绑定到 WSL 2 VM 中的通配符或 localhost 的端口是否应可通过 localhost、colon、port 从主机连接。</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>内存和处理器</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>内存大小</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>要分配给 WSL 2 VM 的内存量。</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>重设大小</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>内存大小</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>以 MB 为单位指定的要分配给 WSL 2 VM 的内存量。</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} 毫秒</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>启用嵌套虚拟化</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>用于打开或关闭嵌套虚拟化的布尔值，使其他嵌套 VM 能够在 WSL 2 内运行。</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>启用嵌套虚拟化。</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>用于打开或关闭嵌套虚拟化的布尔值，使其他嵌套 VM 能够在 WSL 2 内运行。</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>网络模式</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>指定 WSL 的网络模式。</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>网络模式。</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>指定 WSL 的网络模式。</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>网络</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>你可以跨操作系统处理所有文件!</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>跨 OS 文件访问</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>从 Linux 访问 Windows 文件</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>通过导航到 '/mnt'，然后导航到你的 Windows 驱动器号(例如在本示例中为 C 驱动器)，可以从 Linux 中访问你的 Windows 文件:
+
+'cd /mnt/c'</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>使用文件资源管理器访问 Linux 文件</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>可以通过导航到 '\\wsl.localhost\' 或单击 'Linux' 图标来查看文件资源管理器中的 Linux 文件。</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>从 WSL 启动 Windows 文件和程序</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>即使使用 WSL 时，也可以直接从 bash 运行 Windows 可执行文件。尝试运行
+'powershell.exe /c start .'，在当前文件夹中打开文件资源管理器。</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>从 Windows 访问 Linux 网络应用</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>如果要在 Linux 分发版中生成网络应用(例如在 NodeJS 或 SQL Server 上运行的应用)，则可以(像通常那样)使用 localhost 从 Windows 应用(如 Edge 或 Chrome Internet 浏览器)访问它。这意味着，如果启动了侦听端口 3000 的 Linux 服务器，则可以在 Windows 上的 Edge 中转到 [http://localhost:3000] 来访问它。</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>镜像模式网络</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>WSL 还包括一种称为镜像模式的新网络模式，该模式添加了 IPv6 支持等高级功能，并且能够访问局域网中的网络应用程序。</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>了解有关跨 OS 文件访问的详细信息</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>欢迎使用适用于 Linux 的 Windows 子系统</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>WSL 是试用不同 Linux 发行版的好方法。</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>发行版管理</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>详细了解基本 WSL 命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>详细了解如何导入任何 Linux 发行版</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>列出可安装的 WSL 发行版命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l -o'</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>安装命名的 WSL 发行版命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;DistroName&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>列出可用的 WSL 发行版命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Docker Desktop 非常适合与 WSL 配合使用，可帮助你使用 Linux 容器进行开发。
+
+将 Docker Desktop 与 WSL 配合使用的一些优点是:
+
+• 可以使用相同的 Docker 守护程序和映像在 WSL 或 Windows 中运行 Docker 命令。
+• 可以使用 WSL 中的 Windows 驱动器自动装载功能在 Windows 和 Linux 之间无缝共享文件和文件夹。
+• 由于 WSL 的互操作性，你可以使用首选的 Windows 工具和编辑器处理 Linux 代码和文件，反之亦然。</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Docker Desktop 集成</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>详细了解如何将 WSL 与 Docker 配合使用</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>通过适用于 Linux 的 Windows 子系统(WSL)，可以直接在 Windows 上运行你最喜爱的 Linux 工具、实用工具、应用程序和工作流。
+
+花点时间预览社区的一些热门功能或查看我们的综合文档。</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>欢迎使用 WSL</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>安装的最佳做法</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Linux 入门</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>适用于 Linux 的 Windows 子系统 (WSL) 文档</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>可以通过本机 Windows 交互操作(例如 alt-tab、开始菜单启动、任务栏固定以及剪切和粘贴支持)使用基于图形的 Linux 应用程序。</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>GUI 应用</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>WSL 可以利用 Windows GPU 进行机器学习工作流
+
+在 WSL 中运行的 Linux 二进制文件可以自动使用 Windows 中的 GPU 来加快性能。只需像在常规 Linux 计算机上那样安装和运行这些工作流。开始入门有很多种不同的方法，如果使用 NVIDIA 显卡，可以在 docker 容器中运行 CUDA，还可以在 AMD、Intel 或 NVIDIA 显卡上使用 DirectML 运行 PyTorch 或 TensorFlow。请参阅下面的入门指南了解详细信息。</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>GPU 加速</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>详细了解 GPU 加速</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>详细了解 WSL GUI 应用</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>下面是可尝试的应用列表(可以通过键入 'sudo apt install &lt;The App Name&gt;' 在 Ubuntu 中安装所有这些应用)
+
+    • gedit - 基本文本编辑器
+    • audacity - 录制和编辑音频文件
+    • blender - 制作 3D 动画和可视化效果
+    • gimp - 编辑照片
+    • nautilus - Linux 文件资源管理器
+    • vlc - 视频播放器</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>可以跨 Windows 和 Linux 操作系统轻松访问网络应用。</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>网络集成</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>详细了解网络应用程序</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>详细了解镜像模式网络</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>可以直接从 VS Code 使用 WSL 作为全时开发环境。</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>VS Code 集成</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>详细了解如何将 WSL 与 VS Code 配合使用</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>如何安装</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>安装 VS Code 后，可以从 Windows 终端安装远程 WSL 扩展:
+
+"code –install-extension ms-vscode-remote.remote-wsl"</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>在 Visual Studio Code 中打开 WSL 项目</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>若要在 WSL 发行版中使用 VS Code 打开项目，请打开该发行版的命令行并运行 'code .' 以打开项目文件。
+
+还可以通过 VS Code 自身的命令面板访问更多 VS Code 远程选项。在键盘上点击 "Shift+Ctrl+P" 打开命令面板并键入 "Remote-WSL" 以查看可用的 VS Code 远程选项列表，以便可以重新打开远程会话中的文件夹、指定要打开的发行版，等等。</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>使用方法</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>可选功能</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>启用页面报告</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>默认的 true 设置使 Windows 能够回收分配给 WSL 2 虚拟机的未使用的内存。</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>隐私声明</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>处理器计数</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>要分配给 WSL 2 VM 的逻辑处理器数量。</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>重置计数</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>处理器计数</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>要分配给 WSL 2 VM 的逻辑处理器数量。</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>相关链接</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>发行说明</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>启用安全模式</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>在“安全模式”下运行 WSL，这将禁用许多功能，并用于恢复处于错误状态的分发。</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>启用安全模式。</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>在“安全模式”下运行 WSL，这将禁用许多功能，并用于恢复处于错误状态的分发。</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>开发商</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>发行版管理</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Docker Desktop 集成</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>文件系统</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>常规</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>GPU 加速</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>GUI 应用</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>启动 wsl.exe</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>内存和处理器</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>网络</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>网络集成</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>欢迎使用 WSL</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>可选功能</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>VS Code 集成</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>新增功能</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>跨文件系统工作</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>问题</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>默认启用稀疏 VHD</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>启用后，任何新创建的 VHD 都将自动设置为稀疏。</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>默认启用稀疏 VHD。</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>启用后，任何新创建的 VHD 都将自动设置为稀疏。</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>交换文件位置</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>交换虚拟硬盘的绝对 Windows 路径。</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>浏览交换文件</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>交换文件位置</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>交换虚拟硬盘的绝对 Windows 路径。</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>交换大小</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>要添加到 WSL 2 VM 的交换空间量，0 表示没有交换文件。当内存需求超出硬件设备的限制时，交换存储是基于磁盘的 RAM。</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>重设大小</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>交换大小</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>要添加到 WSL 2 VM 的交换空间，以 MB 为单位指定。0 表示没有交换文件。当内存需求超出硬件设备的限制时，交换存储是基于磁盘的 RAM。</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>启用 VirtIO</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>使用 virtiofs 而不是计划 9 来访问主机文件，加快速度。</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>启用 Virtio 9p</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>使用 virtio 传输从主机启用 9P 文件系统装载。</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>VM 空闲超时</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>重置超时</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>VM 空闲超时</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>VM 在关闭之前处于空闲状态的毫秒数。</value>
+  </data>
+</root>

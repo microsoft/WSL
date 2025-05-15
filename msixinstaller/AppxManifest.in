@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+         xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+         xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+         xmlns:desktop7="http://schemas.microsoft.com/appx/manifest/desktop/windows10/7"
+         xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+         xmlns:com2="http://schemas.microsoft.com/appx/manifest/com/windows10/2"
+         xmlns:com3="http://schemas.microsoft.com/appx/manifest/com/windows10/3"
+         IgnorableNamespaces="uap uap3 uap10 rescap desktop desktop6 com com2 com3">
+
+    <Identity Name="MicrosoftCorporationII.WindowsSubsystemForLinux" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" Version="${PACKAGE_VERSION}" ProcessorArchitecture="${TARGET_PLATFORM}"/>
+    <Properties>
+        <DisplayName>ms-resource:AppName</DisplayName>
+        <PublisherDisplayName>Microsoft Corp.</PublisherDisplayName>
+        <Logo>Images\StoreLogo.png</Logo>
+        <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
+        <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
+        <uap10:PackageIntegrity>
+            <uap10:Content Enforcement="on"/>
+        </uap10:PackageIntegrity>
+    </Properties>
+    <Dependencies>
+        <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0"/>
+    </Dependencies>
+    <Resources>
+        ${SUPPORTED_LANGS_MANIFEST_ENTRIES}
+        <Resource uap:Scale="200"/>
+    </Resources>
+    <Applications>
+        <Application Id="wsl"
+          Executable="wsl.exe"
+          EntryPoint="Windows.FullTrustApplication"
+          uap10:Parameters="--cd ~">
+            <uap:VisualElements
+              DisplayName="ms-resource:AppName"
+              Description="ms-resource:AppDescription"
+              BackgroundColor="transparent"
+              Square150x150Logo="Images\Square150x150Logo.png"
+              Square44x44Logo="Images\Square44x44Logo.png"
+              AppListEntry="none">
+                <uap:DefaultTile Wide310x150Logo="Images\Wide310x150Logo.png" ShortName="ms-resource:AppShortName" Square71x71Logo="Images\SmallTile.png" Square310x310Logo="Images\LargeTile.png"/>
+                <uap:SplashScreen Image="Images\SplashScreen.png"/>
+            </uap:VisualElements>
+            <Extensions>
+                <desktop6:Extension Category="windows.service" Executable="wslinstaller.exe" EntryPoint="main">
+                    <desktop6:Service Name="WslInstaller" StartupType="auto" StartAccount="localSystem">
+                    </desktop6:Service>
+                </desktop6:Extension>
+                <uap3:Extension Category="windows.appExecutionAlias" Executable="wsl.exe" EntryPoint="Windows.FullTrustApplication">
+                    <uap3:AppExecutionAlias>
+                        <desktop:ExecutionAlias Alias="bash.exe"/>
+                        <desktop:ExecutionAlias Alias="wsl.exe"/>
+                        <desktop:ExecutionAlias Alias="wslconfig.exe"/>
+                    </uap3:AppExecutionAlias>
+                </uap3:Extension>
+                <uap3:Extension Category="windows.appExtension">
+                    <uap3:AppExtension Name="com.microsoft.windows.wsl"
+                        Id="Wsl-EntryPoint"
+                        DisplayName="WSL entry point"
+                        Description="Entry point for the Windows Subsystem for Linux"
+                        PublicFolder="Public">
+                        <uap3:Properties>
+                            <Clsid>{a9b7a1b9-0671-405c-95f1-e0612cb4ce7e}</Clsid>
+                            <EntryPoint>wsl.exe</EntryPoint>
+                        </uap3:Properties>
+                    </uap3:AppExtension>
+                </uap3:Extension>
+                <com2:Extension Category="windows.comServer">
+                    <com2:ComServer>
+                        <com3:ServiceServer ServiceName="WslInstaller"
+                            LaunchAndActivationPermission="O:BAG:BAD:(A;;11;;;AU)(A;;11;;;PS)(A;;11;;;SY)">
+                            <com3:Class Id="B5AEB4C3-9541-492F-AD4D-505951F6ADA4" DisplayName="WslInstaller"/>
+                        </com3:ServiceServer>
+                    </com2:ComServer>
+                </com2:Extension>
+                <com2:Extension Category="windows.comInterface">
+                    <com2:ComInterface>
+                        <com:Interface Id="1E912664-C599-474A-A552-DAEAF73B3164" ProxyStubClsid="CE1044F6-36C5-4599-A5A8-3BBF27BA5495"/>
+                        <com:ProxyStub Id="CE1044F6-36C5-4599-A5A8-3BBF27BA5495" Path="WslInstallerProxyStub.dll"></com:ProxyStub>
+                    </com2:ComInterface>
+                </com2:Extension>
+            </Extensions>
+        </Application>
+    </Applications>
+    <Capabilities>
+        <Capability Name="internetClient"/>
+        <rescap:Capability Name="runFullTrust"/>
+        <rescap:Capability Name="unvirtualizedResources"/>
+        <rescap:Capability Name="packagedServices"/>
+        <rescap:Capability Name="localSystemServices"/>
+        <rescap:Capability Name="packageManagement"/>
+    </Capabilities>
+</Package>

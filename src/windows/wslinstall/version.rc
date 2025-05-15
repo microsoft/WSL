@@ -1,0 +1,29 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    version.rc
+
+Abstract:
+
+    This file contains resources for wslinstall.dll.
+
+--*/
+
+#include <windows.h>
+#include "wslversioninfo.h"
+
+#define VER_INTERNALNAME_STR "wslinstall.dll"
+#define VER_ORIGINALFILENAME_STR "wslinstall.dll"
+
+#define VER_FILEDESCRIPTION_STR "WSL Install library"
+
+#include <common.ver>
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    100 "WSLINSTALL"
+    101 "Installation logic for WSL"
+END

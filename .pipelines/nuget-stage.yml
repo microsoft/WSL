@@ -1,0 +1,48 @@
+parameters:
+- name: isNightly
+  type: boolean
+  default: false
+  
+- name: nugetPackages
+  type: object
+  default:
+      - Microsoft.WSL.PluginApi
+
+stages:
+- stage: nuget
+  dependsOn: [build, test]
+  jobs:
+  - job: nuget
+    displayName: 'Publish nuget packages'
+    condition: and(succeeded(), or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.isNightly }}', false)))
+    dependsOn: [] # The stage handles this dependency
+
+    pool:
+      type: windows
+
+    variables:
+      WSL_NUGET_PACKAGE_VERSION: $[ dependencies.build.outputs['version.WSL_NUGET_PACKAGE_VERSION'] ]
+      NUGET_PLUGIN_HANDSHAKE_TIMEOUT_IN_SECONDS: 60
+      NUGET_PLUGIN_REQUEST_TIMEOUT_IN_SECONDS: 60
+      ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+      ob_artifactBaseName: 'drop_wsl'
+      ob_artifactSuffix: '_nuget'
+
+    steps:
+
+    - task: DownloadPipelineArtifact@2
+      displayName: Download nuget artifacts
+      inputs:          
+        artifact: "drop_wsl_build"
+        path: drop
+
+      # Note: this task might fail if there's been no commits between two nightly pipelines, which is fine.
+    - ${{ each package in parameters.nugetPackages }}:
+        - task: NuGetCommand@2
+          displayName: Push nuget/${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg
+          inputs:
+            command: 'push'
+            packagesToPush: drop/nuget/${{ package }}.$(WSL_NUGET_PACKAGE_VERSION).nupkg
+            nuGetFeedType: 'internal'
+            publishVstsFeed: wsl
+            allowPackageConflicts: ${{ parameters.isNightly }}

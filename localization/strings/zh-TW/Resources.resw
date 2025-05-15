@@ -1,0 +1,1876 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Windows 子系統 Linux 版</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Windows 子系統 Linux 版可讓開發人員直接在 Windows 上執行 GNU/Linux 環境 (包括大部分的命令列工具、公用程式和應用程式)，而不需要傳統虛擬機器或雙重開機設定的額外負荷。</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>磁碟無法中斷連結： {}。如需詳細數據，請在 WSL2 內執行 'dmesg'。
+若要強制 WSL2 停止並中斷連結磁碟，請執行 『wsl.exe {}』。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>磁碟 '{}' 已連結。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>該磁碟區已掛接在 WSL2 內。</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>已掛接具有該名稱的磁碟; 請卸載磁碟或選擇新名稱，然後再試一次。</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>指定的掛接名稱包含不正確 '/' 字元。請不要使用不正確字元再試一次。</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>磁碟已成功掛接為 『/mnt/wsl/{}』。
+注意： 如果您在 /etc/wsl.conf 中修改 automount.root 設定，位置會不一樣。
+若要卸除並卸離磁碟，請執行 'wsl.exe {} {}'。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>磁碟已連結，但無法掛接： {}。
+如需詳細數據，請在 WSL2 內執行 'dmesg'。
+若要中斷連結磁碟，請執行 'wsl.exe {} {}'。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>下列是可安裝的有效發佈清單。
+使用 'wsl.exe {} &lt;Distro&gt;' 安裝.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>已設定發佈名稱。</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>提供的安裝位置已在使用中。</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>具有所提供名稱的發佈已經存在。使用 --name 選擇不同的名稱。</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>沒有具有所提供名稱的發佈。</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>需要系統管理員存取權才能掛接磁碟。</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>匯出發佈失敗。</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>正在為此次發佈執行 Windows 子系統 Linux 版一次性升級...
+</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>無法啟動，因為有另一個執行個體正以未提高權限的方式執行。不允許同時執行提高權限和未提高權限的執行個體。
+</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>匯入發布失敗。</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>正在安裝 Windows 選用元件: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>正在下載: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>正在安裝: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>正在匯入發佈</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>已下載 {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>Windows 子系統 Linux 版正在繼續先前的安裝...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>無效的發佈名稱： '{}'。
+若要取得有效發佈的清單，請使用 『wsl.exe --list --online'。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>Windows 子系統 Linux 版執行個體已終止。</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>無效的命令行自變數： {}
+請使用 '{} --help' 取得支援的自變數清單。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>命令行自變數 {} 需要值。
+請使用 '{} --help' 取得支援的自變數清單。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>不支援的主控台設定。若要使用此功能，必須停用舊版主控台。
+</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>{} 不是有效的整數。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>此發佈正在進行安裝、解除安裝或轉換。
+</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>正在啟動 {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>無法啟動，因為有另一個執行個體正以提高權限的方式執行。不允許同時執行提高權限和未提高權限的執行個體。
+</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>Windows 子系統 Linux 版 沒有已安裝的發佈。
+您可以使用下列指示安裝發佈以解決此問題：
+
+使用 『wsl.exe --list --online' 列出可用的發佈
+和 『wsl.exe --install &lt;Distro&gt;』 來安裝。</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>沒有任何執行中的發佈。</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (預設)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Windows 子系統 Linux 版發佈:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>預設通訊群組: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>預設版本: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>取消註冊中。</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>找不到使用者。</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>有關 WSL 2 的主要差異詳細資訊，請瀏覽 https://aka.ms/wsl2
+</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>轉換進行中，這可能需要幾分鐘的時間。</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>發佈已是要求的版本。</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>舊版發佈不支援 WSL 2。</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>您目前的電腦設定不支援 WSL2。
+請啟用「虛擬機器平台」選擇性元件，並確保 BIOS 中已啟用虛擬化。
+啟用以下項目，以執行 [虛擬機器平台]: wsl.exe --install --no-distribution
+如需詳細資訊，請瀏覽 https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>連結太多虛擬硬碟或實體磁碟。</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>VHD 已透過 wsl.exe --mount, 掛接，請先卸載磁碟再啟動。</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>您目前的電腦設定不支援 WSL1。
+請啟用「Windows 子系統 Linux 版」選用元件以使用 WSL1。</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>只有 WSL2 支援此作業。</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>使用方式: 
+    --networking-mode
+       顯示當前的網路模式。
+
+    --msal-proxy-path
+        顯示 MSAL Proxy 應用程式的路徑。
+
+    --version
+        顯示 WSL 套件的版本。
+
+    -n
+        不要列印新行。</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>用法：
+    -a
+        強制結果使用絕對路徑格式。
+    -u
+        將 Windows 路徑轉換成 WSL 路徑 (預設)。
+    -w
+        將 WSL 路徑轉換成 Windows 路徑。
+    -m
+        在將 WSL 路徑轉換成 Windows 路徑時，使用 '/' 而非 '\\'
+
+範例： wslpath 'c：\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>在 Windows 子系統 Linux 版上執行系統管理作業
+
+使用情況:
+    /l, /list [Option]
+        列出已註冊的發行版本。
+        /all - 選擇性地列出所有發行版本，包括
+               目前正在安裝或卸載的發行版本。
+
+        /running - 只列出目前正在執行的發行版本。
+
+    /s, /setdefault &lt;DistributionName&gt;
+        將發行版本設定為預設值。
+
+    /t, /terminate &lt;DistributionName&gt;
+        終止發行版本。
+
+    /u, /unregister &lt;DistributionName&gt;
+        取消註冊發行版本並刪除根檔案系統。</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation。著作權所有，並保留一切權利。
+如需此產品的隱私權資訊，請瀏覽 https://aka.ms/privacy。
+
+使用方式: wsl.exe [Argument] [Options...] [CommandLine]
+
+用於執行 Linux 二進位檔案的引數:
+
+    如果未提供命令列，wsl.exe 會啟動預設殼層。
+
+    --exec, -e &lt;CommandLine&gt;
+        執行指定的命令，而不使用預設的 Linux 殼層。
+
+    --shell-type &lt;standard|login|none&gt;
+        使用提供的殼層類型執行指定的命令。
+
+    --
+        按原樣傳遞剩餘的命令列。
+
+選項:
+    --cd &lt;Directory&gt;
+        將指定的目錄設定為目前的工作目錄。
+        如果使用 ~，將會使用 Linux 使用者首頁路徑。如果路徑開頭
+        為 / 字元，它將被解譯為絕對 Linux 路徑。
+        否則，此值必須是絕對 Windows 路徑。
+
+    --distribution, -d &lt;DistroName&gt;
+        執行指定的發行版本。
+
+    --distribution-id &lt;DistroGuid&gt;
+        執行指定的發行版本識別碼。
+
+    --user, -u &lt;UserName&gt;
+        作為指定的使用者執行。
+
+    --system
+        啟動系統發行版本的殼層。
+
+用於管理 Windows 子系統 Linux 版的引數: 
+
+    --help
+        顯示使用資訊。
+
+    --debug-shell
+        開啟 WSL2 偵錯工具進行診斷。
+
+    --install [Distro] [Options...]
+        安裝 Windows 子系統 Linux 版發行版本。
+        對於有效的通訊群組清單，請使用 'wsl.exe --list --online'。
+
+        選項:
+            --enable-wsl1
+                啟用 WSL1 支援。
+
+            --fixed-vhd
+                建立固定大小的磁碟以儲存發行版本。
+
+            --from-file &lt;Path&gt;
+                從本機檔案安裝發行版本。
+
+            --legacy
+                使用舊版發行版本資訊清單。
+
+            --location &lt;Location&gt;
+                設定發行版本的安裝路徑。
+
+            --name &lt;Name&gt;
+                設定發行版本的名稱。
+
+            --no-distribution
+                只安裝必要的選擇性元件，不會安裝發行版本。
+
+            --no-launch, -n
+                安裝之後請勿啟動發行版本。
+
+            --version &lt;Version&gt;
+                指定要用於新發行版本的版本。
+
+            --vhd-size &lt;MemoryString&gt;
+                指定要儲存發行版本之磁碟的大小。
+
+            --web-download
+                從網際網路下載發行版本，而非從 Microsoft Store 下載。
+
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        變更發行版本特定選項。
+
+        選項:
+            --move &lt;Location&gt;
+                將發行版本移至新位置。
+
+            --set-sparse, -s &lt;true|false&gt;
+                將發行版本的 vhdx 設定為稀疏，允許自動回收磁碟空間。
+
+            --set-default-user &lt;Username&gt;
+                設定發行版本的預設使用者。
+
+            --resize &lt;MemoryString&gt;
+                將發行版本的磁碟大小調整為指定的大小。
+
+    --mount &lt;Disk&gt;
+        在所有 WSL 2 發行版本中連結和掛載實體或虛擬磁碟。
+
+        選項:
+            --vhd
+                指定 &lt;Disk&gt; 參照虛擬硬碟。
+
+            --bare
+                將磁碟附加到 WSL2，但不掛載。
+
+            --name &lt;Name&gt;
+                使用掛載點的自訂名稱掛載磁碟。
+
+            --type &lt;Type&gt;
+                掛載磁碟時使用的檔案系統 (若未指定，則預設為 ext4)。
+
+            --options &lt;Options&gt;
+                其他掛載選項。
+
+            --partition &lt;Index&gt;
+                要掛載之磁碟分割的索引 (若未指定，則預設為整個磁碟)。
+
+    --set-default-version &lt;Version&gt;
+        變更新發行版本的預設安裝版本。
+
+    --shutdown
+        立即終止所有執行中的發行版本和 WSL 2
+        輕量型公用程式虛擬機器。
+
+        選項:
+            --force
+                終止 WSL 2 虛擬機器，即使有作業正在進行中。可能會導致資料遺失。
+
+    --status
+        顯示 Windows 子系統 Linux 版的狀態。
+
+    --unmount [Disk]
+        從所有 WSL2 發行版本卸載並中斷與磁碟的連結。
+        如果在沒有引數的情況下進行調用，會卸載和中斷與所有磁碟的連結。
+
+    --uninstall
+        自此電腦解除安裝 Windows 子系統 Linux 版套件。
+
+    --update
+        更新 Windows 子系統 Linux 版封裝。
+
+        選項:
+            --pre-release
+                下載發行前版本 (如果可用)。
+
+    --version, -v
+        顯示版本資訊。
+
+在 Windows 子系統 Linux 版中管理發行版本的引數: 
+
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        將發行版本匯出至 tar 檔案。
+        檔案名稱可以是 - 代表標準輸出。
+
+        選項:
+            --format &lt;Format&gt;
+                指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
+
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        將指定的 tar 檔案做為新的發行版本。
+        檔案名稱可以是 - 代表標準輸入。
+
+        選項:
+            --version &lt;Version&gt;
+                指定要用於新發行版本的版本。
+
+            --vhd
+                指定提供的檔案是 .vhdx 檔案，而非 tar 檔案。
+                此作業會複製指定安裝位置的 .vhdx 檔案。
+
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        將指定的 .vhdx 檔案匯入為新的發行版本。
+        此虛擬硬碟必須使用 ext4 檔案系統類型進行格式化。
+
+    --list, -l [Options]
+        列出發行版本。
+
+        選項:
+            --all
+                列出所有發行版本，包括
+                目前正在安裝或卸載的發行版本。
+
+            --running
+                只列出目前正在執行的發行版本。
+
+            --quiet, -q
+                只顯示發行版本名稱。
+
+            --verbose, -v
+                顯示所有發行版本的詳細資訊。
+
+            --online, -o
+                顯示可用發行版本的清單，以使用 'wsl.exe --install' 安裝。
+
+    --set-default, -s &lt;Distro&gt;
+        將發行版本設定為預設。
+
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        變更指定發行版本的版本。
+
+    --terminate, -t &lt;Distro&gt;
+        終止指定的發行版本。
+
+    --unregister &lt;Distro&gt;
+        取消註冊發行版本並刪除根檔案系統。</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>WSL 版本： {}
+核心版本： {}
+WSLg 版本： {}
+MSRDC 版本： {}
+Direct3D 版本： {}
+DXCore 版本： {}
+Windows 版本： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>MSBuild 版本： {}
+認可： {}
+建置時間： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>找不到 {} 中指定的自定義核心： '{}'。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>找不到 {} 中的自定義核心模組 vhd： '{}'。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>找不到 {} 中指定的自定義系統發佈，或其格式不正確。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation。著作權所有，並保留一切權利。
+如需此產品的隱私權資訊，請瀏覽https://aka.ms/privacy。
+
+使用方式: wslg.exe [引數] [選項...][CommandLine]
+
+引數:
+   --cd &lt;Directory&gt;
+       將指定的目錄設定為目前的工作目錄。
+       如果使用 ~，將會使用 Linux 使用者首頁路徑。如果路徑開頭為
+       與 / 字元，它將被解譯為絕對 Linux 路徑。
+       否則，此值必須是絕對 Windows 路徑。
+
+   --distribution, -d &lt;Distro&gt;
+       執行指定的發佈。
+
+   --user, -u &lt;UserName&gt;
+       以指定的使用者執行。
+
+   --shell-type &lt;standard|login|none&gt;
+       使用提供的殼層類型執行指定的命令。
+
+   --help
+       顯示使用資訊。
+
+   --
+       將剩餘的命令列傳遞為目前。</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>請按任意鍵繼續...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>引數 {} 遺失必要的參數。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>匯出進行中，這可能需要幾分鐘的時間。</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>正在匯入，這可能需要幾分鐘的時間。</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>已透過 {} 或 /etc/wsl.conf 停用 GUI 應用程式支援。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>正在檢查更新。</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>此發佈僅可從 Microsoft Store 取得。</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>ARM64 上的 wsl.exe --mount 需要 Windows 27653 版或更新版本。</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>已安裝最新版的Windows 子系統 Linux 版。</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>正在將 Windows 子系統 Linux 版 更新為版本： {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>此應用程式需要 Windows 子系統 Linux 版選用元件。
+執行下列項目，以進行安裝: wsl.exe --install --no-distribution
+系統可能需要重新啟動，變更才會生效。</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>指定的檔案必須有 .vhdx 副檔名。</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>找不到 VmSwitch '{}'。可用參數: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>橋接器網路需要設定 wsl2.vmSwitch。</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>無法從 '{}' 擷取清單發佈。{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>無法將磁碟 '{}' 連結到 WSL2： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>無法調整磁碟。</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>無法翻譯路徑。</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>找不到任何值。</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>Windows 版本 {} 不支持封裝版本的 Windows 子系統 Linux 版。
+透過 Windows 更新或透過下列方式安裝必要的更新： {}
+如需詳細資訊，請造訪 https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>執行偵錯殼層需要以系統管理員身分執行 wsl.exe。</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>發佈 '{}' 的安裝程序失敗，結束代碼： {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>無效的 GUID 格式: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>{}:{} 中的章節名稱無效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>{}:{} 中的金鑰名稱無效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>預期 {}:{} 中有 {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>無效的逸出字元: {}:{} 中的 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>{}:{} 中不明的按鍵 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>{}：{} 中索引鍵 '{}' 的整數值 '{}' 無效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>{}：{} 中機碼 '{}' 的 IP 值 '{}' 無效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>{}：{} 中索引鍵 '{}' 的布爾值 '{}' 無效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>{}：{} 中索引鍵 '{}' 的 mac 地址 '{}' 無效</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>無法開啟設定檔 {}，{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>在 WSL 設定期間發生錯誤</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>開啟 EventViewer</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>此發佈不包含預設名稱。使用 --name 來選擇發佈名稱。</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>無法同時指定 {} 和 {} 自變數。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>引數 {} 需要 {} 引數。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>發佈名稱無效: "{}"。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>使用舊版散發註冊。請考慮改用 tar 型發佈。</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>舊版散發註冊不支援 --version 自變數。</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>發佈 "{}" 是由覆寫資訊清單所提供。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>發佈雜湊不相符。預期: {}，實際: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>不正確的十六進位字串: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>安裝舊版發佈時不支援 『{}』。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>已成功安裝發佈。可以透過 『wsl.exe -d {}' 啟動</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>{}：{} 中 .wslconfig 專案 '{}' 的記憶體字符串 '{}' 無效</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>無法在 '{}'： {} 中建立交換磁碟</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>此電腦不支援巢狀虛擬化。</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>無法建立位址為 '{}'、已指派新位址為 '{}' 的網络端點</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>無法建立位址範圍為 『{}』 的虛擬網路，已建立範圍為 『{}』、{} 的新網路</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>安全模式已啟用 - 許多功能將會停用</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>不支援鏡像網路模式： {}。
+回到 NAT 網路。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>需要 Linux 核心 5.10 版或更新版本</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Windows 版本 {}。{} 沒有所需的功能</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>不支援 Hyper-V 防火牆</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>不支援 DNS 通道</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>使用鏡像網路模式時，wsl2.localhostForwarding 設定沒有作用</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>在主機上偵測到 Http Proxy 變更。請重新開機 WSL 以套用變更。</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>偵測到 localhost Proxy 設定，但未鏡像到 WSL。NAT 模式中的 WSL 不支援 localhost Proxy。</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>偵測到 IPv6 Proxy 設定，但未鏡像到 WSL。NAT 模式中的 WSL 不支援 IPv6。</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>偵測到 localhost IPv6 Proxy 設定，但未鏡像到 WSL。WSL 不支援 localhost IPv6 Proxy。</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>嘗試解析 Proxy 設定時發生意外的錯誤，Proxy 設定未鏡像到 WSL。</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>存取登錄時發生錯誤。路徑： '{}'。錯誤： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>無法啟動localhost轉送進程。錯誤： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>無法啟動虛擬網路 - 請執行 ： wsl.exe --install --no-distribution 以安裝選擇性元件 Virtual Machine Platform</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>無法設定 networkingMode {}) 的網络 (，回到 networkingMode {}。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>無法啟用結束代碼 {}) (Windows 元件 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>外掛程式 '{}' 傳回嚴重錯誤</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>外掛程式 '{}' 傳回嚴重錯誤。錯誤訊息： '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>外掛程式 '{}' 需要較新版本的 WSL。請執行： wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>計算機原則已停用 .wslconfig 設定 『{}』。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>電腦原則已停用偵錯殼層。</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>wsl.exe --mount 已由電腦原則停用。</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>WSL1 已由電腦原則停用。</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>請執行 'wsl.exe --set-version {} 2' 以升級至 WSL2。</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>WSL 正在完成升級...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>更新失敗 (結束代碼: {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>解除安裝失敗 (結束代碼: {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>記錄檔: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>無法移除 MSIX 套件 (錯誤： {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>無法安裝 MSIX 套件 (錯誤： {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>未安裝執行 WSL 所需的選用元件。</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>安裝遺失的元件。</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>匯入的檔案不是有效的 Linux 發佈。</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>按任意鍵離開...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>有新版的 Windows 子系統 Linux 版可供使用。</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>更新至版本 {} 或在下方檢視其版本資訊。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>查看文件</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>無法完成作業，因為 vhdx 目前正在使用中。若要強制 WSL 停止使用： wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>{} 不是有效的布林值，&lt;true|false&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>只有 WSL2 支援疏鬆 vhdx。</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>系統不支援將 WSL 執行為本機系統。</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>效能提示:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>在您的 Windows 磁碟驅動器上使用如 {} 的 I/O 密集型操作，效能將會不佳。請考慮將項目檔移至 Linux 檔案系統，以獲得較佳的效能。按兩下下方以深入瞭解。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>檢視文件</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>不再顯示</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>WSL2 虛擬機器已損毀。</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>堆棧追蹤已儲存於： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>發佈無法啟動。錯誤碼： {}，失敗步驟： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>無法啟動分佈，因為其虛擬磁碟已損毀。</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>{}：{} 中的重複設定索引鍵 '{}' (衝突密鑰： {}：{}) 中的 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>{}：{} 中設定索引鍵 '{}' 的值 '{}' 無效 (有效值： {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>正在等候 OOBE 命令完成，以進行散發「{}」...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>無法從發佈 {}  讀取屬性 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>這似乎是 VHDX 檔案。使用 --vhd 匯入 VHDX 而非 tar。</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>無法從Microsoft Store安裝 {}： {}
+正在嘗試 Web 下載...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>尚未設定預設發佈。請提供要安裝的發佈。</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>已停用 wsl2.virtio9p，退回到使用 vsock 傳輸的 9p。</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>WSL 安裝似乎已損毀，(錯誤碼： {})。
+按任意鍵以修復 WSL，或 CTRL-C 取消。
+此提示將在 60 秒內逾時。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>註冊發佈時無法剖析終端機配置檔： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>無效的大小: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+錯誤碼: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>無效的 JSON 文件。剖析錯誤: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>wsl2.processors 不能超過系統上的邏輯處理器數目 ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>無法查詢網路模式</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>提供了自定義的核心模組，但未指定自定義核心。如需詳細資訊，請參閱 https://aka.ms/wslcustomkernel。</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>由於目前與全球安全存取用戶端的相容性問題，已停用 DNS 通道。</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>目前已停用 疏鬆 VHD 支援，因為可能會導致資料損毀。
+若要強制發行版本使用疏鬆 VHD，請執行:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>無法掛接 {}，如需詳細數據，請參閱 dmesg。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>處理掛載 -a 的 /etc/fstab 失敗。</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>掛接散發磁碟時發生錯誤，它是以唯讀方式掛接為遞補。
+請參閱復原指示： https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>無法翻譯 '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>發生錯誤。請稍後再試一次。</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>關於</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>關於 Windows 子系統 Linux 版設定</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft.著作權所有，並保留一切權利。</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>適用於 Linux 的 Windows 子系統設定</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>Windows 子系統 Linux 版 設定可讓開發人員使用 GUI 應用程式來管理 .wslconfig 檔案。</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>自動記憶體回收</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>偵測到閑置 CPU 使用量後，自動釋放快取的記憶體。設定為緩時釋放的漸進式，以及快取記憶體的即時釋放投遞。</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自動記憶體回收。</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>偵測到閑置 CPU 使用量後，自動釋放快取的記憶體。設定為緩時釋放的漸進式，以及快取記憶體的即時釋放投遞。</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>已啟用自動 Proxy</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>讓 WSL 使用 Windows 的 HTTP Proxy 資訊。</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已啟用自動 Proxy。</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>讓 WSL 使用 Windows 的 HTTP Proxy 資訊。</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>使用最佳作業效果的 DNS 剖析</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>僅適用於 wsl2.dnsTunneling 設為 true 時。設定為 true 時，Windows 會從 DNS 要求擷取問題，並嘗試加以解決，並忽略未知的記錄。</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>使用最佳作用的 DNS 剖析。</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>僅適用於 wsl2.dnsTunneling 設為 true 時。設定為 true 時，Windows 會從 DNS 要求擷取問題，並嘗試加以解決，並忽略未知的記錄。</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>自訂核心</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>自訂Linux核心的絕對 Windows 路徑。</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>瀏覽核心</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自訂核心</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>自訂Linux核心的絕對 Windows 路徑。</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>自訂核心模組</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>自訂Linux核心模組 VHD 的絕對 Windows 路徑。</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>瀏覽核心模組</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自訂核心模組</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>自訂Linux核心模組 VHD 的絕對 Windows 路徑。</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>自訂系統發行版</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>瀏覽發行套件</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>指定要載入為自訂系統發行版的 VHD 路徑，主要用於在 WSL 中啟用 GUI 應用程式。[在此深入了解系統發行]。</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>自訂系統發行版</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>指定要載入為自訂系統發行版的 VHD 路徑，主要用於在 WSL 中啟用 GUI 應用程式。</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>啟用偵錯主控台</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>布林值，可開啟輸出控制台視窗，該視窗會在啟動 WSL 2 發行版執行個體時顯示 dmesg 的內容。</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>啟用偵錯主控台。</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>布爾值，可開啟輸出控制台視窗，該視窗會在啟動 WSL 2 發行例項時顯示診斷訊息的內容。</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>預設 VHD 大小</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>僅新建立之發佈之可擴充 WSL 虛擬硬碟 (VHD) 的預設大小上限。</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>重設大小</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>預設 VHD 大小</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>只針對新建的發佈指定可擴充 WSL 虛擬硬碟 (VHD) 的預設大小上限，以 MB 為單位。</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>開發人員</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>文件</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>變更 DrvFS 模式</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>變更 WSL 中的跨作業系統檔案存取實作。</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>已啟用 DNS Proxy</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>只有在 wsl2.networkingMode 設為 NAT 時才適用。布爾值會通知 WSL 將 Linux 中的 DNS 伺服器設定為主機上的 NAT。設定為 false 會將 DNS 伺服器從 Windows 鏡像到 Linux。</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已啟用 DNS Proxy。</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>只有在 wsl2.networkingMode 設定為 NAT 時才適用。布爾值會通知 WSL 將 Linux 中的 DNS 伺服器設定為主機上的 NAT。設定為 false 會將 DNS 伺服器從 Windows 鏡像到 Linux。</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>已啟用 DNS 通道</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>變更從 WSL 到 Windows 進行 DNS 要求的 Proxy 處理方式。</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已啟用 DNS 通道。</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>變更從 WSL 到 Windows 進行 DNS 要求的 Proxy 處理方式。</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>檔案系統</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>啟用 GUI 應用程式</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>用於開啟或關閉 GUI 應用程式支援 ([WSLg]) WSL 的布爾值。</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>啟用 GUI 應用程式。</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>用於開啟或關閉 GUI 應用程式支援 (在 WSL 中稱為 WSL g) 的布林值。</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>啟用硬體效能計數器</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>啟用 Linux 的硬體效能計數器。</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>啟用硬體效能計數器。</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>啟用 Linux 的硬體效能計數器。</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>已啟用 Hyper-V 防火牆</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>啟用 Hyper-V 防火牆，允許 Windows 防火牆規則以及 Hyper-V 流量專用的規則，以篩選 WSL 網路流量。</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已啟用 Hyper-V 防火牆。</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>啟用 Hyper-V 防火牆，允許 Windows 防火牆規則以及 Hyper-V 流量專用的規則，以篩選 WSL 網路流量。</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>主機位址回送</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>只有在 wsl2.networkingMode 設為鏡像時才適用。設定為 True 時，將允許容器透過指派給主機的 IP 位址連線到主機，或允許主機連線到容器。請注意，一律可以使用 127.0.0.1 回送位址 - 此選項也允許使用所有額外指派的本機 IP 位址。</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>主機位址回送。</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>僅適用於 wsl2.networkingMode 設為鏡像時。設定為 True 時，將允許容器透過指派給主機的 IP 位址連線到主機，或允許主機連線到容器。請注意，一律可以使用 127.0.0.1 回送位址 - 此選項也允許使用所有額外指派的本機 IP 位址。</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>已忽略的連接埠</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>只有在 wsl2.networkingMode 設為鏡像時才適用。指定 Linux 應用程式可以繫結到哪些埠，而這些埠不會自動轉送，也不會在 Windows 中納入考慮。格式應為逗號分隔清單，例如： 3000,9000,9090。</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>重設連接埠</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>已忽略的連接埠</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>僅適用於 wsl2.networkingMode 設為鏡像時。指定 Linux 應用程式可以繫結到哪些埠，而這些埠不會自動轉送，也不會在 Windows 中納入考慮。應以逗號分隔清單格式化，例如 3000、9000、9090。</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>初始自動 Proxy 逾時</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>僅適用於 wsl2.autoProxy 設為 true 時。設定 WSL 啟動 WSL 容器時，WSL 等候擷取 HTTP Proxy 資訊的時間) (毫秒。如果在此時間之後解析 Proxy 設定，則必須重新啟動 WSL 實例，才能使用擷取的 Proxy 設定。</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>重設逾時</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>初始自動 Proxy 逾時</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>僅適用於 wsl2.autoProxy 設為 true 時。設定啟動 WSL 容器時，WSL 將等候擷取 HTTP Proxy 資訊的時間，以毫秒為單位。如果在此時間之後解析 Proxy 設定，則必須重新啟動 WSL 實例，才能使用擷取的 Proxy 設定。</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>核心命令列</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>其他核心命令列引數。</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>啟用 localhost 轉送</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>布林值，指定繫結至 WSL 2 VM 中萬用字元或 localhost 的連接埠是否應可透過 localhost:port 從主機連結。</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>啟用 localhost 轉送。</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>布林值，指定繫結至 WSL 2 VM 中萬用字元或 localhost 的連接埠是否應可透過 localhost、冒號、連接埠從主機連結。</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>記憶體與處理器</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>記憶體大小</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>要指派給 WSL 2 VM 的記憶體。</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>重設大小</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>記憶體大小</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>要指派給 WSL 2 VM 的記憶體指定量，以 MB 為單位。</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} 毫秒</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>啟用巢狀虛擬化</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>開啟或關閉巢狀虛擬化的布爾值，可讓其他巢狀 VM 在 WSL 2 內執行。</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>已啟用巢狀虛擬化。</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>開啟或關閉巢狀虛擬化的布爾值，可讓其他巢狀 VM 在 WSL 2 內執行。</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>網路模式</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>指定 WSL 的網路模式。</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>網路模式。</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>指定 WSL 的網路模式。</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>網路功能</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>您可以跨作業系統處理所有檔案!</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>跨 OS 存取檔案</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>從 Linux 存取 Windows 檔案</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>您可以依序瀏覽至 ‘/mnt’ 與 Windows 磁碟機代號 (如範例所示的 C 磁碟機)，藉以在 Linux 中存取 Windows 檔案:
+
+'cd /mnt/c'</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>使用檔案總管存取 Linux 檔案</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>您可以瀏覽至 '\\wsl.localhost\' 按一下 ‘Linux’ 圖示，從檔案總管檢視 Linux 檔案。</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>從 WSL 啟動 Windows 檔案和程式</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>即使在使用 WSL 時，您也可以直接從 bash 執行 Windows 可執行檔。請嘗試執行
+'powershell.exe /c start .'，以在目前的資料夾中開啟檔案總管。</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>從 Windows 存取 Linux 網路應用程式</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>如果您是在 Linux 發行版本中建置網路應用程式 (例如在 NodeJS 或 SQL 伺服器上執行的應用程式)，可以使用 localhost (方式與平常相同) 透過 Windows 應用程式 (例如 Edge 或 Chrome 網際網路瀏覽器) 加以存取。這代表如果您啟動接聽連接埠 3000 的 Linux 伺服器，即可透過 Windows 上的 Edge 前往 [http://localhost:3000] 加以存取。</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>鏡像模式網路功能</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>WSL 也包含稱為「鏡像模式」的新網路模式，加入了 IPv6 支援等進階功能，並且能夠存取區域網路中的網路應用程式。</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>深入了解如何跨 OS 存取檔案</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>歡迎使用 Windows 子系統 Linux 版</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>WSL 非常適合用來嘗試不同的 Linux 發行版本。</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>發行版本管理</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>深入了解基本 WSL 命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>深入了解如何匯入任何 Linux 發行版本</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>列出可安裝的 WSL 發行版本命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l -o'</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>安裝具名 WSL 發行版本命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;DistroName&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>列出可用的 WSL 發行版本命令</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Docker Desktop 非常適合與 WSL 搭配使用，可協助您利用 Linux 容器進行開發。
+
+搭配使用 Docker Desktop 與 WSL 的優點有:
+
+• 您可以使用相同的 Docker 精靈和映像，在 WSL 或 Windows 中執行 Docker 命令。
+• 您可以使用 WSL 中的 Windows 磁碟自動掛接，在 Windows 和 Linux 之間平順無礙地分享檔案和資料夾。
+• 您可以透過 WSL 的互通性，使用偏好的 Windows 工具和編輯器處理 Linux 程式碼和檔案，反之亦然。</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Docker Desktop 整合</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>深入了解如何搭配使用 WSL 與 Docker</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>您可利用 Windows 子系統 Linux 版 (WSL)，直接在 Windows 中執行偏好的 Linux 工具，公用程式、應用程式和工作流程。
+
+請花一些時間預覽最受社群喜愛的一些功能，或查看我們提供的詳盡文件。</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>歡迎使用 WSL</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>設定最佳做法</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>開始使用 Linux</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>Windows 子系統 Linux 版 (WSL) 文件</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>您可以透過原生 Windows 互動使用圖形化 Linux 應用程式，例如 alt-tab、啟動 [開始] 功能表、工作列、釘選，以及剪下貼上功能。</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>GUI 應用程式</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>WSL 可將 Windows GPU 用於機器學習工作流程
+
+在 WSL 中執行的 Linux 二進位檔案可自動使用 Windows GPU，以加快效能速度。您只需使用與一般 Linux 機器相同的操作方式，安裝並執行這些工作流程即可。您可以利用許多不同方式開始使用，包含在 Docker 容器中執行 CUDA (如有 NVIDIA 顯示卡)，一直到在 AMD、Intel 或 NVIDIA 顯示卡上使用 DirectML 執行 PyTorch 或 TensorFlow。請參閱下方的入門指南深入了解。</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>GPU 加速</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>深入了解 GPU 加速</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>深入了解 WSL GUI 應用程式</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>以下列出可嘗試的應用程式 (您可以鍵入 'sudo apt install &lt;應用程式名稱&gt;`，藉此在 Ubuntu 中安裝所有這些應用程式)
+
+    • gedit – 基本文字編輯器
+    • audacity – 錄製及編輯音訊檔案
+    • blender – 製作 3D 動畫和視覺效果
+    • gimp – 編輯相片
+    • nautilus – Linux 檔案總管
+    • vlc – 影片播放器</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>您可以跨 Windows 和 Linux 作業系統，輕鬆存取網路應用程式。</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>網路整合</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>深入了解網路應用程式</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>深入了解鏡像模式網路功能</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>您可以直接從 VS Code 完全使用 WSL 作為開發環境。</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>VS Code 整合</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>深入了解如何搭配使用 WSL 與 VS Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>安裝方式</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>安裝 VS Code 之後，即可從 Windows 終端機安裝遠端 WSL 延伸模組:
+
+'code –install-extension ms-vscode-remote.remote-wsl'</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>使用 Visual Studio Code 開啟 WSL 專案</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>如要透過 WSL 發行版本使用 VS Code 開啟專案，請開啟該發行版本的命令列，然後執行 'code .' 來開啟專案檔案。
+
+您也可以透過 VS Code 本身的命令選擇區，使用更多 VS Code 遠端選項。在鍵盤上按 “SHIFT+CTRL+P” 開啟命令選擇區，然後鍵入 ‘Remote-WSL’ 來查看可用的 VS Code 遠端選項清單。這樣做可讓您在遠端工作階段中重新開啟資料夾，並指定要開啟的發行版本等。</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>如何使用</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>選用功能</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>啟用頁面報告</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>預設的 True 設定可讓 Windows 回收配置給 WSL 2 虛擬機的未使用記憶體。</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>隱私權聲明</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>處理器計數</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>要指派給WSL 2 VM 的邏輯處理器數目。</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>重設計數</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>處理器計數</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>要指派給WSL 2 VM 的邏輯處理器數目。</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>相關連結</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>版本資訊</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>啟用安全模式</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>以「安全模式」執行 WSL，此模式會停用許多功能，並用於復原處於錯誤狀態的發佈。</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>啟用安全模式。</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>以「安全模式」執行 WSL，此模式會停用許多功能，並用於復原處於錯誤狀態的發佈。</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>關於</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>開發人員</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Distro 管理</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Docker Desktop 整合</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>檔案系統</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>一般</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>GPU 加速</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>GUI 應用程式</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>啟動 wsl.exe</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>記憶體與處理器</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>網路功能</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>網路整合</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>歡迎使用 WSL</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>選用功能</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>VS Code 整合</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>新增功能</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>跨檔案系統工作</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>問題</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>預設啟用疏鬆 VHD</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>啟用時，任何新建立的 VHD 都會自動設定為疏鬆。</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>預設啟用疏鬆 VHD。</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>啟用時，任何新建立的 VHD 都會自動設定為疏鬆。</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>交換檔案位置</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>交換虛擬硬碟的絕對 Windows 路徑。</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>瀏覽交換檔案</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>交換檔案位置</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>交換虛擬硬碟的絕對 Windows 路徑。</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>交換大小</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>要新增多少交換空間至 WSL 2 VM，0 表示沒有交換檔。當記憶體需求超過硬體裝置的限制時，交換記憶體是磁碟型 RAM 所使用。</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>重設大小</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>交換大小</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>要新增至 WSL 2 VM 的交換空間，以 MB 為單位。0 表示沒有交換檔。當記憶體需求超過硬體裝置的限制時，交換記憶體是磁碟型 RAM 所使用。</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>啟用 VirtIO</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>使用 virtiofs 而非方案 9 存取主機檔案，加快速度。</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>啟用 Virtio 9p</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>使用 virtio 傳輸，從主機啟用 9P 檔案系統掛接。</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>VM 閒置逾時</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>VM 在關機前閒置的毫秒數。</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>重設逾時</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>VM 閒置逾時</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>VM 在關機前閒置的毫秒數。</value>
+  </data>
+</root>

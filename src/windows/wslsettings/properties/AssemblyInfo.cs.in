@@ -1,0 +1,18 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+using System;
+using System.Reflection;
+
+[assembly: System.Reflection.AssemblyTitleAttribute("Windows Subsystem for Linux Settings")]
+[assembly: System.Reflection.AssemblyDescriptionAttribute("$Windows Subsystem for Linux Settings")]
+[assembly: System.Reflection.AssemblyProductAttribute("Windows Subsystem for Linux")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("Microsoft Corporation")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("")]
+[assembly: System.Reflection.AssemblyCopyrightAttribute("Copyright (c) Microsoft Corporation")]
+[assembly: System.Reflection.AssemblyTrademarkAttribute("")]
+[assembly: System.Reflection.AssemblyCultureAttribute("")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("${PACKAGE_VERSION}")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("${PACKAGE_VERSION_MAJOR}.${PACKAGE_VERSION_MINOR}.${PACKAGE_VERSION_REVISION}")]
+[assembly: System.Reflection.AssemblyVersionAttribute("${PACKAGE_VERSION_MAJOR}.${PACKAGE_VERSION_MINOR}.${PACKAGE_VERSION_REVISION}")]
+[assembly: System.Runtime.Versioning.TargetPlatformAttribute("${WINDOWS_TARGET_PLATFORM_VERSION}")]
+[assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("${WINDOWS_TARGET_PLATFORM_MIN_VERSION}")]

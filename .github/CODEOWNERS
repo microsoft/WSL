@@ -1,0 +1,4 @@
+# File containing policy for file ownership
+
+# Reviewers for all files in the repository
+* @microsoft/wsl-maintainers

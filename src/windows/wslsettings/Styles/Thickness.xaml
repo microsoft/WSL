@@ -1,0 +1,42 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Thickness x:Key="InputControlSpacingMargin">4,0</Thickness>
+    
+    <Thickness x:Key="LargeTopMargin">0,36,0,0</Thickness>
+    <Thickness x:Key="LargeTopBottomMargin">0,36,0,36</Thickness>
+
+    <Thickness x:Key="MediumTopMargin">0,24,0,0</Thickness>
+    <Thickness x:Key="MediumTopBottomMargin">0,24,0,24</Thickness>
+    <Thickness x:Key="MediumLeftRightMargin">24,0,24,0</Thickness>
+    <Thickness x:Key="MediumBottomMargin">0,0,0,24</Thickness>
+
+    <Thickness x:Key="MediumSmallBottomMargin">0,0,0,16</Thickness>
+
+    <Thickness x:Key="SmallLeftMargin">12,0,0,0</Thickness>
+    <Thickness x:Key="SmallLeftRightMargin">12,0,12,0</Thickness>
+    <Thickness x:Key="SmallTopMargin">0,12,0,0</Thickness>
+    <Thickness x:Key="SmallRightMargin">0,0,12,0</Thickness>
+    <Thickness x:Key="SmallTopBottomMargin">0,12,0,12</Thickness>
+
+    <Thickness x:Key="XSmallLeftMargin">8,0,0,0</Thickness>
+    <Thickness x:Key="XSmallTopMargin">0,8,0,0</Thickness>
+    <Thickness x:Key="XSmallTopBottomMargin">0,8,0,8</Thickness>
+    <Thickness x:Key="XSmallLeftTopRightBottomMargin">8,8,8,8</Thickness>
+
+    <Thickness x:Key="XXSmallTopMargin">0,4,0,0</Thickness>
+    <Thickness x:Key="XXSmallLeftTopRightBottomMargin">4,4,4,4</Thickness>
+
+    <Thickness x:Key="HyperlinkButtonNegativeMargin">-12,0,0,0</Thickness>
+
+    <Thickness x:Key="ContentPageMargin">16,0,24,8</Thickness>
+
+    <Thickness x:Key="MenuBarContentMargin">36,24,36,0</Thickness>
+
+    <Thickness x:Key="SettingsPageHyperlinkButtonMargin">-12,4,0,0</Thickness>
+
+    <Thickness x:Key="SettingsCardMargin">0,0,0,4</Thickness>
+    <x:Double x:Key="SettingsCardSpacing">4</x:Double>
+    <Thickness x:Key="SettingsExpanderItemMargin">-46,0,0,0</Thickness>
+</ResourceDictionary>

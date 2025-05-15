@@ -1,72 +1,49 @@
-This repo is for:
+# Welcome to the Windows Subsystem for Linux (WSL) repository
 
-- Reporting of issues found within and when using Windows Subsystem for Linux.
-  Please read [CONTRIBUTING.md](https://github.com/Microsoft/WSL/blob/master/CONTRIBUTING.md) before making an issue submission
+<p align="center">
+  <img src="./Images/Square44x44Logo.targetsize-256.png" alt="WSL logo"/>
+</p>
 
-  > Do not open Github issues for Windows crashes (BSODs) or security issues. Please direct all Windows crashes and security issues to secure@microsoft.com. Issues with security vulnerabilities may be edited to hide the vulnerability details.
+[Learn more about WSL](https://aka.ms/wsldocs) | [Downloads & Release notes](https://github.com/microsoft/WSL/releases) | [Contributing to WSL](./CONTRIBUTING.md)
 
-- Surrounding discussions about the Windows Subsystem for Linux.
+## About
 
-## Reporting issues in Windows Console or WSL text rendering/user experience
+Windows Subsystem for Linux (WSL) is a powerful way for you to run your Linux command-line tools, utilities and applications, all unmodified and directly on Windows without the overhead of a traditional virtual machine or dual boot setup.
 
-Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*. 
+You can install WSL right away by running this command inside of your Windows command line:
 
-## Labels:
+```powershell
+wsl --install
+```
 
-This is your best way to interact directly with the Windows Subsystem for Linux teams. We will be monitoring and responding to issues as best we can. Please attempt to avoid filing duplicates of open or closed items when possible. Issues may be tagged with with the following labels:
+You can learn more about [best practices for setup](https://learn.microsoft.com/windows/wsl/setup/environment), [overviews of WSL](https://learn.microsoft.com/windows/wsl/about) and more at our [WSL documentation page](https://learn.microsoft.com/windows/wsl/).
 
-- **bug** – The issue considered to be a bug internally by the dev team. This tag is generally for gaps in implemented (read: intended to be working) WSL behavior. Things marked with **bug** have a corresponding bug in on Microsoft’s internal bug tracking system. Example: "du -h reports wrong file size on DrvFs" [(#1894)](https://github.com/microsoft/WSL/issues/1894)
+## Related repositories
 
-- **feature** – Denotes something understood as not working and is not yet implemented. Example: "Cuda can not be installed" [(#327)](https://github.com/microsoft/WSL/issues/327)
+WSL also has related open source repositories:
 
-- **fixinbound** / **fixedinNNNN** – The bug or feature request originally submitted has been addressed in whole or in part. Related or ongoing bug or feature gaps should be opened as a new issue submission if one does not already exist.
+- [microsoft/WSL2-Linux-Kernel](https://github.com/microsoft/WSL2-Linux-Kernel) - The Linux kernel shipped with WSL
+- [microsoft/WSLg](https://github.com/microsoft/wslg) - Support for Linux GUI apps in WSL
+- [microsoftdocs/wsl](https://github.com/microsoftdocs/wsl) - WSL documentation at aka.ms/wsldocs
 
-- **duplicate** – The submission is substantially duplicative of an existing issue, and/or has the same underlying cause.
+## Contributing
 
-- **need-repro** – The issue submission is missing fields from the issue [template](https://github.com/microsoft/WSL/tree/master/.github/ISSUE_TEMPLATE), cannot be reproduced with the information provided, or is not actionable.
+This project welcomes contributions of all types, including coding features / bug fixes, documentation fixes, design proposals and more. 
 
-- **discussion** / **question** – Submissions which are not a bug report or feature request. Example: Windows Subsystem for Linux is not open source [(#178)](https://github.com/Microsoft/WSL/issues/178)
+We ask that before you start working on a contribution, please read our [Contributor's Guide](./CONTRIBUTING.md).
 
-- **bydesign** / **linux-behavior** – Denotes that an issue that is considered working as intended or would behave analogously on a native Linux kernel.
+For guidance on developing for WSL, please read the [developer docs](./doc/docs/dev-loop.md) for instructions on how to build WSL from source and details on its architecture.
 
-- **console** – The submission should be directed to the [console issue tracker](https://github.com/microsoft/console/issues).
+## Code of Conduct
 
-- **documentation** – The submission should be directed to the [WSL documentation issue tracker](https://github.com/MicrosoftDocs/WSL).
+This project has adopted the [Microsoft Open Source Code of Conduct](./CODE_OF_CONDUCT.md)
 
-- **wsl2** - The issue relates specifically to WSL 2.
+## Trademarks
 
-- **fixed-in-wsl2** - The issue could be resolved by switching the distro to use the WSL 2 architecture.
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow [Microsoft’s Trademark & Brand Guidelines](https://www.microsoft.com/legal/intellectualproperty/trademarks). Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party’s policies.
 
-Additional tags may be used to denote specific types of issues.
+## Privacy and telemetry
 
-- **9p-linux-file-access** - The issue is related to accessing Linux files from Windows.
+The application logs basic diagnostic data (telemetry). For more information on privacy and what we collect, see our [data and privacy documentation](DATA_AND_PRIVACY.md).
 
-## Closing:
-
-Issues may be closed by the original poster at any time.  We will close issues if:
-- The issue is not a bug or feature request
-- The issue has been addressed
-- The issue is a duplicate of another issue
-- Discussions or questions that have ran their course
-
-### Microsoft Links:
-
-- [Microsoft Docs](https://docs.microsoft.com/en-us/windows/wsl/about)
-- [Release Notes](https://docs.microsoft.com/en-us/windows/wsl/release-notes)
-- [WSL Blog](https://blogs.msdn.microsoft.com/wsl) (Historical)
-- [Command Line Blog](https://blogs.msdn.microsoft.com/commandline/) (Active)
-
-### Community Links:
-
-- Stack Overflow: https://stackoverflow.com/questions/tagged/wsl
-- Ask Ubuntu: https://askubuntu.com/questions/tagged/wsl
-- reddit: https://www.reddit.com/r/bashonubuntuonwindows
-- List of programs that work and don't work
-    - https://github.com/ethanhs/WSL-Programs
-    - https://github.com/davatron5000/can-i-subsystem-it
-- Awesome WSL: https://github.com/sirredbeard/Awesome-WSL
-- Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
-
-### Troubleshooting:
-
-Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting).
+The software may collect information about you and your use of the software and send it to Microsoft. Microsoft may use this information to provide services and improve our products and services. You may turn off the telemetry as described in the repository. There are also some features in the software that may enable you and Microsoft to collect data from users of your applications. If you use these features, you must comply with applicable law, including providing appropriate notices to users of your applications together with a copy of Microsoft’s privacy statement. Our privacy statement is located at https://go.microsoft.com/fwlink/?LinkID=824704. You can learn more about data collection and use in the help documentation and our privacy statement. Your use of the software operates as your consent to these practices.

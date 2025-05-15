@@ -1,123 +1,44 @@
-Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux.
+# WSL contributing guide
 
-## Important: Reporting BSODs and Security issues
+There are a few main ways to contribute to WSL, with guides to each one:
+
+1. [Add a feature or bugfix to WSL](#add-a-feature-or-bugfix-to-wsl)
+2. [File a WSL issue](#file-a-wsl-issue)
+
+## Add a feature or bugfix to WSL
+
+We welcome any contributions to the WSL source code to add features or fix bugs! Before you start actually working on the feature, please **[file it as an issue, or a feature request in this repository](https://github.com/microsoft/WSL/issues)** so that we can track it and provide any feedback if necessary.
+
+Once you have done so, please see [the developer docs](./doc/docs/dev-loop.md) for instructions on how to build WSL locally on your machine for development. 
+
+When your fix is ready, please [submit it as a pull request in this repository](https://github.com/microsoft/WSL/pulls) and the WSL team will triage and respond to it. Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us the rights to use your contribution. For details, visit https://cla.microsoft.com.
+
+## File a WSL issue
+
+You can file issues for WSL at the WSL repository, or linked repositories. Before filing an issue please search for any existing issues and upvote or comment on those if possible. 
+
+1. If your issue is related to WSL documentation, please file it at [microsoftdocs/wsl](https://github.com/microsoftdocs/WSL/issues)
+2. If your issue is related to a Linux GUI app, please file it at [microsoft/wslg](https://github.com/microsoft/wslg/issues)
+3. Otherwise if you have a technical issue related to WSL in general, such as start up issues, etc., please file it at [microsoft/wsl](https://github.com/microsoft/WSL/issues)
+
+Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux, and be sure to include logs as necessary!
+
+Please see the [notes for collecting WSL logs](#notes-for-collecting-wsl-logs) section below for more info on filing issues.
+
+## Thank you
+
+Thank you in advance for your contribution! We appreciate your help in making WSL a better tool for everyone.
+
+## Notes for collecting WSL logs
+
+### Important: Reporting BSODs and Security issues
 **Do not open GitHub issues for Windows crashes (BSODs) or security issues.**. Instead, send Windows crashes or other security-related issues to secure@microsoft.com.
 See the `10) Reporting a Windows crash (BSOD)` section below for detailed instructions.
 
-## Reporting issues in Windows Console or WSL text rendering/user experience
+### Reporting issues in Windows Console or WSL text rendering/user experience
 Note that WSL distro's launch in the Windows Console (unless you have taken steps to launch a 3rd party console/terminal). Therefore, *please file UI/UX related issues in the [Windows Console issue tracker](https://github.com/microsoft/console)*.
 
-## Reporting issues in WSL
-A well written bug report will follow the following template:
-
-### 1) Issue Title
-A title succinctly describing the issue.
-
-#### Example:
-`Traceroute not working.`
-
-### 2) Windows version / build number
-Your Windows build number.  This can be gathered from the CMD prompt using the `cmd.exe --version` command.
-
-```cmd.exe
-C:\ cmd.exe --version
-Microsoft Windows [Version 10.0.21354.1]
-```
-
-Note: The Windows Insider builds contain many updates and fixes. If you are running on the Creators Update (10.0.15063) please check to see if your issue has been resolved in a later build.  If you are running on a Version below (10.0.14393), please try to update your Version.
-
-#### Example:
-
-`Microsoft Windows [Version 10.0.21354.1]`
-
-### 3) Steps required to reproduce
-
-Should include all packages and environmental variables as well as other required configuration.
-
-#### Example: On linux 
-
-`$ sudo apt-get install traceroute && traceroute www.microsoft.com`
-
-#### Example: On Windows
-
-``
-`$ cmd.exe` 
-`CD C:\Windows\System32\`
-`tracert.exe`
-``
-
-### 4) Copy of the terminal output
-
-#### Example:
-
-```
-$ traceroute www.microsoft.com
-traceroute to www.microsoft.com (23.75.239.28), 30 hops max, 60 byte packets
-setsockopt IP_MTU_DISCOVER: Invalid argument
-```
-
-### 5) Expected Behavior
-
-What was the expected result of the command?  Include examples / documentation if possible.
-
-### 6) Strace of the failing command
-
-Run the failing command under [strace](http://manpages.ubuntu.com/manpages/wily/man1/strace.1.html).  Normal command structure is:
-
-```
-$ strace -ff <command>
-```
-
-> Note: `strace` can produce lengthy output. If the generated trace is more than about 20 lines please paste this into a [Gist](https://gist.github.com/) or another paste service and link in the bug.
-
-#### Example:
-
-```
-$ strace traceroute www.microsoft.com
-execve("/usr/bin/traceroute", ["traceroute", "www.microsoft.com"], [/* 22 vars */]) = 0
-brk(0)                                  = 0x7fffdd3bc000
-access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
-mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f1f4e820000
-access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
-...
-...
-...
-```
-
-### 7) Additional information
-
-Some bugs require additional information such as scripts to reproduce.  Please add to this section.
-
-If there are files required, email the files to InsiderSupport@microsoft.com with:
-
-* **Subject**:  Forward to WSL Team - RE: github issue <issue #>
-* **Body**:  "Please forward to WSL Team" and include your attachment.
-
-Common files are:
-
-* Memory dumps found under C:\Windows\MEMORY.DMP
-* Additional strace logs if the error occurs within a fork. The following
-  command generates an output file for every fork created:
-
-```
-$ strace -ff -o <outputfile> <command>
-```
-
-#### wsl --mount
-
-If the issue is about wsl --mount, please include the output of running `wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions` in an elevated command prompt.
-
-Example:
-
-```
-C:\WINDOWS\system32>wmic diskdrive get Availability,Capabilities,CapabilityDescriptions,DeviceID,InterfaceType,MediaLoaded,MediaType,Model,Name,Partitions
-Availability  Capabilities  CapabilityDescriptions                                       DeviceID            InterfaceType  MediaLoaded  MediaType              Model                       Name                Partitions
-              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE0  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB512HAJQ-000H2  \\.\PHYSICALDRIVE0  3
-              {3, 4}        {"Random Access", "Supports Writing"}                        \\.\PHYSICALDRIVE1  SCSI           TRUE         Fixed hard disk media  SAMSUNG MZVLB1T0HALR-000H2  \\.\PHYSICALDRIVE1  1
-              {3, 4, 10}    {"Random Access", "Supports Writing", "SMART Notification"}  \\.\PHYSICALDRIVE2  SCSI           TRUE         Fixed hard disk media  ST2000DM001-1ER164          \\.\PHYSICALDRIVE2  1
-```
-
-#### Collect WSL logs for networking issues
+### Collect WSL logs for networking issues
 
 Install tcpdump in your WSL distribution using the following commands.
 Note: This will not work if WSL has Internet connectivity issues.
@@ -127,7 +48,7 @@ Note: This will not work if WSL has Internet connectivity issues.
 # sudo apt-get -y install tcpdump
 ```
 
-Install [WPR](https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder)
+Install [WPR](https://learn.microsoft.com/windows-hardware/test/wpt/windows-performance-recorder)
 
 To collect WSL networking logs, do the following steps in an administrative powershell prompt:
 
@@ -142,9 +63,10 @@ The script will output the path of the log file once done.
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
 <div id="9-networking-logs"></div>
+<div id="8-collect-wsl-logs-recommended-method"></div>
 
 
-### 8) Collect WSL logs (recommended method)
+### Collect WSL logs (recommended method)
 
 If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue.
 
@@ -156,45 +78,6 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 .\collect-wsl-logs.ps1
 ```
 The script will output the path of the log file once done.
-
-### 9) Collect WSL logs with Feedback hub
-To collect WSL logs follow these steps: 
-
-#### Open Feedback Hub and enter the title and description of your issue
-
-- Open Feedback hub and create a new issue by pressing `Windows Key + F` on your keyboard. 
-- Enter in the details of your issue:
-   - In `Summarize your feedback` copy and paste in the title of your Github Issue
-   - In `Explain in more detail` copy and paste a link to your Github Issue
-
-![GIF Of networking instructions](img/networkinglog1.gif)
-
-#### Choose the WSL category 
-
-- Select that your issue is a `Problem`
-- Choose the `Developer Platform` category and the `Windows Subsystem for Linux` subcategory
-
-![GIF Of networking instructions](img/networkinglog2.gif)
-
-#### Recreate your problem in the 'Additional Details' section
-
-- Select 'Other' under 'Which of the following best describes your problem'
-- Click 'Recreate My Problem' under 'Attachments
-- Ensure that `Include Data About:` is checked to 'Windows Subsystem for Linux' 
-- 'Click Start Recording' to start collecting logs
-- Recreate your problem
-- Click 'Stop Recording'
-
-![GIF Of networking instructions](img/networkinglog3.gif)
-
-#### Check your attachments and submit
-
-- Verify your recording is attached and whether you would like to send the screenshot that is automatically attached
-- Hit Submit
-- Get a link to your feedback item by clicking on 'Share my Feedback' and post that link to the Github thread so we can easily get to your feedback!
-
-![GIF Of networking instructions](img/networkinglog4.gif)
-
 
 ### 10) Reporting a Windows crash (BSOD)
 
@@ -216,7 +99,7 @@ Make sure that the email body contains:
 
 ### 11) Reporting a WSL process crash
 
-The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps).
+The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/windows/win32/wer/collecting-user-mode-dumps).
 
 To collect dumps of all running WSL processe, please open a PowerShell prompt with admin privileges, navigate to a folder where you'd like to put your log files and run these commands: 
 

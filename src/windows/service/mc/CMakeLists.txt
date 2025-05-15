@@ -1,0 +1,2 @@
+add_mc(wslservicemc wsleventschema.mc)
+set_target_properties(wslservicemc PROPERTIES FOLDER windows)

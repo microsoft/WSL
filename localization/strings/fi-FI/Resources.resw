@@ -1,0 +1,1870 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille -teknologian avulla kehittäjät voivat suorittaa GNU/Linux-ympäristön, mukaan lukien useimmat komentorivityökalut, apuohjelmat ja sovellukset, suoraan Windowsissa muokkaamattomana ja ilman perinteisen virtuaalikoneen tai kaksoiskäynnistysasennuksen aiheuttamaa kuormitusta.</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>Levyn irrottaminen epäonnistui: {}. Saat lisätietoja suorittamalla dmesg-komennon WSL2:ssa.
+Jos haluat pakottaa WSL2:n pysäyttämään levyn ja irrottamaan sen, suorita wsl.exe {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>Levy {} on jo liitetty.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>Asema on jo otettu käyttöön WSL2:ssa.</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>Samanniminen levy on jo otettu käyttöön; poista levy käytöstä tai valitse uusi nimi ja yritä uudelleen.</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>Määritetty käyttöönottonimi sisältää virheellisen /-merkin. Yritä uudelleen ilman virheellistä merkkiä.</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>Levyn käyttöönotto nimellä /mnt/wsl/{} onnistui.
+Huomautus: Sijainti ei ole sama, jos olet muokannut automount.root-asetusta kohteessa /etc/wsl.conf.
+Jos haluat poistaa levyn käytöstä ja irrottaa sen, suorita wsl.exe {} {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>Levy liitettiin, mutta käyttöönotto epäonnistui: {}.
+Saat lisätietoja suorittamalla dmesg-määrityksen WSL2:ssa.
+Jos haluat irrottaa levyn, suorita wsl.exe {} {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>Seuraava on luettelo kelvollisista jakeluista, jotka voidaan asentaa.
+Asenna käyttämällä tiedostoa wsl.exe {} &lt;Distro&gt;.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>Jakelunimi on jo määritetty.</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>Annettu asennussijainti on jo käytössä.</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>Jakelu annetulla nimellä on jo olemassa. Valitse toinen nimi --name avulla.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>Annetulla nimellä ei ole jakelua.</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>Järjestelmänvalvojan oikeudet tarvitaan levyn käyttöönottoon.</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>Jakelun vienti epäonnistui.</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>Suoritetaan Windows-alijärjestelmä Linuxille ‑tiedostojärjestelmän kertapäivitystä tälle jakelulle...</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>Ei voida käynnistää, koska toista esiintymää suoritetaan laajentamattomana.  Laajennettuja ja laajentamattomia esiintymiä ei voida suorittaa samanaikaisesti.</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>Jakelun tuonti epäonnistui.</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>Windowsin valinnaisen osan asentaminen: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>Ladataan: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>Asennetaan: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>Tuodaan jakelua</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>{} on ladattu.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille jatkaa aiempaa asennusta...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>Virheellinen jakelunimi: {}.
+Jos haluat luettelon kelvollisista jakeluista, käytä wsl.exe --list --online'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille -esiintymä on lopetettu.</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>Komentorivin argumentti ei kelpaa: {}
+Hae tuettujen argumenttien luettelo käyttämällä komentoa '{} --help'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>Komentoriviargumentti {} vaatii arvon.
+Hae tuettujen argumenttien luettelo käyttämällä komentoa '{} --help'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>Konsolin asetuksia ei tueta. Tämän ominaisuuden käyttäminen edellyttää, että vanha konsoli on poistettu käytöstä.</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>{} ei ole kelvollinen kokonaisluku.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>Tämän jakelun asennus, asennuksen poistaminen tai muuntaminen on käynnissä.</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>Käynnistetään {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>Käynnistäminen ei onnistu, koska toista esiintymää suoritetaan järjestelmänvalvojana.  Laajennettuja ja ylentämättömiä esiintymiä ei sallita suoritettavaksi samanaikaisesti.</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille ei ole asennettuja jakeluja.
+Voit ratkaista ongelman asentamalla jakelun alla olevien ohjeiden avulla:
+
+Näytä käytettävissä olevien jakeluiden luettelo wsl.exe --list --online' -toiminnolla
+ja asenna wsl.exe --install &lt;Distro&gt;.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>Jakeluja ei ole käynnissä.</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (Oletus)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille -jakelut:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>Oletusjakelu: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>Oletusversio: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>Poistetaan rekisteröintiä.</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>Käyttäjää ei löydy.</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>Lisätietoja WSL 2:n tärkeistä eroista on osoitteessa https://aka.ms/wsl2</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>Muuntaminen on meneillään. Tämä voi kestää muutamia minuutteja.</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>Jakelu on jo pyydetty versio.</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>Vanha jakelu ei tue WSL 2 -koodausta.</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>WSL2:a ei tueta nykyisessä konekokoonpanossasi. 
+Ota virtuaalikoneympäristön valinnainen osa käyttöön ja varmista, että virtualisointi on otettu käyttöön BIOSissa.
+Ota virtuaalikoneympäristö käyttöön suorittamalla: wsl.exe --install --no-distribution
+Lisätietoja on https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>Liian monta virtuaalista tai fyysistä kiintolevyä liitetty.</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>Virtuaalikiintolevy (VHD) on jo otettu käyttöön komennolla wsl.exe --mount, Poista levy käytöstä ennen käynnistämistä.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>WSL1:tä ei tueta nykyisessä tietokoneen kokoonpanossa.
+Ota valinnainen Windows-alijärjestelmä Linuxille -osa käyttöön, jotta voit käyttää WSL1:tä.</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>Vain WSL2 tukee tätä toimintoa.</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>Käyttö:
+    --networking-mode
+       Näytä nykyinen verkkotila.
+
+    --msal-proxy-path
+        Näytä MSAL-välityspalvelinsovelluksen polku.
+
+    --version
+        Näytä WSL-paketin versio.
+
+    -n
+        Älä tulosta uutta riviä.</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>Käyttö:
+    -a
+        Pakota tulos absoluuttiseen polkumuotoon.
+    -u
+        Käännä Windows-polusta WSL-polkuun (oletus).
+    -w
+        Käännä WSL-polusta Windows-polkuun.
+    -m
+        Käännä WSL-polusta Windows-polkuun käyttäen '/'-merkkiä '\\'-merkin sijaan
+
+Esimerkki: wslpath 'c:\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>Suorittaa hallintatoimintoja Windows-alijärjestelmä Linuxille
+
+Käyttö:
+    /l, /list [Vaihtoehto]
+        Luetteloi rekisteröidyt jakelut.
+        /all - Näytä luettelo kaikista jakeluista, mukaan lukien jakelut, joita
+               asennetaan tai joiden asennusta poistetaan parhaillaan.
+
+        /running - Näytä vain parhaillaan käynnissä olevien jakeluiden luettelo.
+
+    /s, /setdefault &lt;DistributionName&gt;
+        Määrittää jakelun oletukseksi.
+
+    /t, /terminate &lt;DistributionName&gt;
+        Lopettaa määritetyn jakelun.
+
+    /u, /unregister &lt;DistributionName&gt;
+        Poistaa jakelun rekisteröinnin ja päätiedostojärjestelmän.</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Tekijänoikeus (c) Microsoft Corporation. Kaikki oikeudet pidätetään.
+Lisätietoja tämän tuotteen tietosuojasta löytyy osoitteesta https://aka.ms/privacy.
+
+Käyttö: wsl.exe [Argumentti] [Asetukset...] [Komentorivi]
+
+Linux-binaaritiedostojen suoritusargumentit:
+
+    Jos komentoriville ei anneta tekstiä, wsl.exe käynnistää oletusliittymän.
+
+    --exec, -e &lt;CommandLine&gt;
+        Suorita määritetty komento käyttämättä oletusarvoista Linux-liittymää.
+
+    --shell-type &lt;standard|login|none&gt;
+        Suorita määritetty komento annetulla liittymätyypillä.
+
+    --
+        Välitä jäljellä oleva komentorivi sellaisenaan.
+
+Asetukset:
+    --cd &lt;Directory&gt;
+        Asettaa määritetyn hakemiston nykyiseksi työhakemistoksi.
+        Jos ~ on käytössä, käytetään Linux-käyttäjän kotipolkua. Jos polku alkaa
+        merkillä /, se tulkitaan absoluuttiseksi Linux-poluksi.
+        Muussa tapauksessa arvon on oltava absoluuttinen Windows-polku.
+
+    --distribution, -d &lt;DistroName&gt;
+        Suorita määritetty jakelu.
+
+    --distribution-id &lt;DistroGuid&gt;
+        Suorita määritetty jakelutunnus.
+
+    --user, -u &lt;UserName&gt;
+        Suorita määritettynä käyttäjänä.
+
+    --system
+        Käynnistää liittymän järjestelmän jakelua varten.
+
+Argumentit Windows-alijärjestelmän Linuxille hallintaan:
+
+    --help
+        Näytä käyttötiedot.
+
+    --debug-shell
+        Avaa WSL2-virheenkorjausliittymä diagnostiikkatarkoitusta varten.
+
+    --install [Jakelu] [Asetukset...]
+        Asenna jakelu Windows-alijärjestelmään Linuxille.
+        Jos haluat luettelon kelvollisista jakeluista, käytä argumenttia 'wsl.exe --list --online'.
+
+        Asetukset:
+            --enable-wsl1
+                Ota WSL1-tuki käyttöön.
+
+            --fixed-vhd
+                Luo kooltaan kiinteä levy jakelun tallentamista varten.
+
+            --from-file &lt;Path&gt;
+                Asenna jakelu paikallisesta tiedostosta.
+
+            --legacy
+                Käytä vanhoja jakelun kokoonpanotietoja.
+
+            --location &lt;Location&gt;
+                Määritä jakelun asennuspolku.
+
+            --name &lt;Name&gt;
+                Määritä jakelun nimi.
+
+            --no-distribution
+                Asenna ainoastaan pakolliset valinnaiset komponentit, älä jakelua.
+
+            --no-launch, -n
+                Älä käynnistä jakelua asennuksen jälkeen.
+
+            --version &lt;Version&gt;
+                Määrittää uutta jakelua varten käytettävän version.
+
+            --vhd-size &lt;MemoryString&gt;
+                Määrittää jakelun tallennuslevyn koon.
+
+            --web-download
+                Lataa jakelu Internetistä Microsoft Storen sijaan.
+
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Muuttaa tietyn jakelun asetuksia.
+
+        Asetukset:
+            --move &lt;Location&gt;
+                Siirrä jakelu uuteen sijaintiin.
+
+            --set-sparse, -s &lt;true|false&gt;
+                Määritä jakelun virtuaalikiintolevy harvaksi, jolloin levytilaa voidaan vapauttaa automaattisesti.
+
+            --set-default-user &lt;Username&gt;
+                Määritä jakelun oletuskäyttäjä.
+
+            --resize &lt;MemoryString&gt;
+                Muuta jakelun levyn koko määritettyyn kokoon.
+
+    --mount &lt;Disk&gt;
+        Liittää ja ottaa käyttöön fyysisen tai virtuaalilevyn kaikissa WSL2-jakeluissa.
+
+        Asetuksia:
+            --vhd
+                Määrittää, että &lt;Disk&gt; viittaa virtuaalikiintolevyyn.
+
+            --bare
+                Liitä levy WSL2:een, mutta älä ota sitä käyttöön.
+
+            --name &lt;Name&gt;
+                Ota levy käyttöön käyttäen mukautettua nimeä käyttöönottopisteelle.
+
+            --type &lt;Type&gt;
+                Tiedostojärjestelmä levyn käyttöönoton yhteydessä. Jos sitä ei ole määritetty, käytetään oletusarvoa ext4.
+
+            --options &lt;Options&gt;
+                Käyttöönoton lisäasetukset.
+
+            --partition &lt;Index&gt;
+                Käyttöön otettavan osion indeksi. Jos sitä ei ole määritetty, käytetään oletusarvoisesti koko levyä.
+
+    --set-default-version &lt;Version&gt;
+        Muuttaa uusien jakeluiden oletusasennusversiota.
+
+    --shutdown
+        Lopettaa kaikki käynnissä olevat jakelut ja WSL 2:n
+        kevyen käytön näennäiskoneen.
+
+        Asetuksia:
+            --force
+                Lopeta WSL 2 -virtuaalikone, vaikka toiminto olisi käynnissä. Voi aiheuttaa tietojen menettämisen.
+
+    --status
+        Näytä Windows-alijärjestelmän Linuxille tila.
+
+    --unmount [Levy]
+        Poistaa levyn käytöstä ja irrottaa sen kaikista WSL2-jakeluista.
+        Poistaa käytöstä kaikki levyt ja irrottaa ne, jos sitä kutsutaan ilman argumenttia.
+
+    --uninstall
+        Poistaa Windows-alijärjestelmä Linuxille -paketin tästä tietokoneesta.
+
+    --update
+        Päivitä Windows-alijärjestelmä Linuxille -paketti.
+
+        Asetuksia:
+            --pre-release
+                Lataa ennakkoversio, jos se on saatavilla.
+
+    --version, -v
+        Näytä versiotiedot.
+
+Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
+
+    --export &lt;Distro&gt; &lt;FileName&gt; [Asetukset]
+        Vie jakelun tar-tiedostoon.
+        Tiedostonimi voi olla - STDOUT-siirrännälle.
+
+        Asetuksia:
+            --format &lt;Format&gt;
+                Määrittää vientimuodon. Tuetut arvot: tar, tar.gz, tar.xz, vhd.
+
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Asetukset]
+        Tuo määritetyn tar-tiedoston uutena jakeluna.
+        Tiedostonimi voi olla - STDIN-siirrännälle.
+
+        Asetuksia:
+            --version &lt;Version&gt;
+                Määrittää uudelle jakelulle käytettävän version.
+
+            --vhd
+                Määrittää, että annettu tiedosto on .vhdx-tiedosto, ei tar-tiedosto.
+                Tämä toiminto tekee .vhdx-tiedostosta kopion määritetyssä asennussijainnissa.
+
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        Tuo määritetyn .vhdx-tiedoston uutena jakeluna.
+        Tämä virtuaalikiintolevy on alustettava ext4-tiedostojärjestelmän tyypillä.
+
+    --list, -l [Asetukset]
+        Näyttää luettelon jakeluista.
+
+        Asetuksia:
+            --all
+                Näytä luettelo kaikista jakeluista, mukaan lukien jakelut, joita
+                asennetaan tai joiden asennusta poistetaan parhaillaan.
+
+            --running
+                Näytä vain parhaillaan käynnissä olevien jakeluiden luettelo.
+
+            --quiet, -q
+                Näytä vain jakeluiden nimet.
+
+            --verbose, -v
+                Näytä yksityiskohtaiset tiedot kaikista jakeluista.
+
+            --online, -o
+                Näyttää luettelon asennettavissa olevista jakeluista argumentilla 'wsl.exe --install'.
+
+    --set-default, -s &lt;Distro&gt;
+        Määrittää jakelun oletukseksi.
+
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        Muuttaa määritetyn jakelun versiota.
+
+    --terminate, -t &lt;Distro&gt;
+        Lopettaa määritetyn jakelun.
+
+    --unregister &lt;Distro&gt;
+        Poistaa jakelun rekisteröinnin ja päätiedostojärjestelmän.</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>WSL-versio: {}
+Ytimen versio: {}
+WSLg-versio: {}
+MSRDC-versio: {}
+Direct3D-versio: {}
+DXCore-versio: {}
+Windows-versio: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>MSBuild-versio: {}
+Commit: {}
+Koontiaika: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>Kohteessa {} määritettyä mukautettua ydintä ei löytynyt: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>Kohteen {} mukautettuja ydinmoduulien VHD:tä ei löytynyt: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>Tiedostossa {} määritettyä mukautettua järjestelmän jakelua ei löytynyt, tai se ei ole oikeassa muodossa.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Tekijänoikeus (c) Microsoft Corporation. Kaikki oikeudet pidätetään.
+Lisätietoja tämän tuotteen tietosuojasta on osoitteessa https://aka.ms/privacy.
+
+Käyttö: wslg.exe [Argumentti] [Asetukset...] [Komentorivi]
+
+Argumentit:
+    --cd &lt;Directory&gt;
+        Asettaa määritetyn hakemiston nykyiseksi työhakemistoksi.
+        Jos ~ on käytössä, käytetään Linux-käyttäjän kotipolkua. Jos polku alkaa
+        merkillä /, se tulkitaan absoluuttiseksi Linux-poluksi.
+        Muussa tapauksessa arvon on oltava absoluuttinen Windows-polku.
+
+    --distribution, -d &lt;Distro&gt;
+        Suorita määritetty jakelu.
+
+    --user, -u &lt;UserName&gt;
+        Suorita määritettynä käyttäjänä.
+
+    --shell-type &lt;standard|login|none&gt;
+        Suorita määritetty komento annetulla liittymätyypillä.
+
+    --help
+        Näytä käyttötiedot.
+
+    --
+        Välitä jäljellä oleva komentorivi sellaisenaan.</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>Jatka painamalla mitä tahansa näppäintä...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>Argumentista {} puuttuu pakollinen parametri.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>Vienti on meneillään. Tämä voi kestää muutaman minuutin.</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>Tuonti on käynnissä. Tämä voi kestää muutaman minuutin.</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>Gui-sovelluksen tuki on poistettu käytöstä toiminnolla {} tai /etc/wsl.conf.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>Tarkistetaan päivityksiä.</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>Tämä jakelu on käytettävissä vain Microsoft Storesta.</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>wsl.exe --mount ARM64:ssä edellyttää Windows-versiota 27653 tai uudempaa.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>Uusin versio Windows-alijärjestelmästä Linuxille on jo asennettu.</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>Päivitetään Windows-alijärjestelmä Linuxille versioksi: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>Tämä sovellus edellyttää Windows-alijärjestelmä Linuxille valinnaisen osan.
+Asenna se suorittamalla: wsl.exe --install --no-distribution
+Järjestelmä on ehkä käynnistettävä uudelleen, jotta muutokset tulevat voimaan.</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>Määritetyn tiedoston tiedostotunnisteen on oltava .vhdx.</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>VmSwitch-kohdetta {} ei löytynyt. Käytettävissä olevat valitsimet: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>Sillattu verkkotoiminto edellyttää wsl2.vmSwitchin määrittämistä.</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>Luettelon jakelua ei voitu noutaa kohteesta {}. {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>Levyn {} liittäminen WSL2:een epäonnistui: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>Levyn koon muuttaminen epäonnistui.</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>Polun kääntäminen epäonnistui.</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>Arvoa ei löytynyt.</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>Windows-versio {} ei tue Windows-alijärjestelmä Linuxille pakattua versiota.
+Asenna pakollinen päivitys Windows Updaten kautta tai seuraavan kautta: {}
+Saat lisätietoja osoitteesta https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>Virheenkorjausliittymän suorittaminen edellyttää wsl.exe suorittamista järjestelmänvalvojana.</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>Jakelun {} asennusprosessi epäonnistui, lopetuskoodi: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>Virheellinen GUID-muoto: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>Virheellinen osan nimi kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>Virheellinen avaimen nimi kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>Odotettiin kohdetta {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>Virheellinen ohjausmerkki: {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>Tuntematon avain {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>Virheellinen kokonaislukuarvo {} avaimelle {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>Virheellinen IP-arvo {} avaimelle {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>Virheellinen totuusarvo {} avaimelle {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>Virheellinen mac-osoite {} avaimelle {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>Kokoonpanotiedostoa {}, {} ei voitu avata</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>WSL-käynnistyksen aikana tapahtui virheitä</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>Avaa EventViewer</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>Tämä jakelu ei sisällä oletusnimeä. Valitse jakelun nimi --name avulla.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>Argumentteja {} ja {} ei voi määrittää samanaikaisesti.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>Argumentti {} edellyttää argumenttia {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>Virheellinen jakelunimi: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>Käytetään vanhaa jakelurekisteröintiä. Harkitse sen sijaan tervapohjaista jakaumaa.</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>Vanhat jakelurekisteröinnit eivät tue --version argumenttia.</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>Jakelun {} tarjoaa ohitusluettelo.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>Jakauman hajautusarvo ei täsmää. Odotettu: {}, todellinen hajautusarvo: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>Virheellinen heksadesimaalimerkkijono: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>Kohdetta {} ei tueta asennettaessa vanhoja jakeluja.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>Jakelun asennus onnistui. Se voidaan käynnistää kohteella wsl.exe -d {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>Virheellinen muistimerkkijono {} .wslconfig-merkinnälle {} kohteessa {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>Vaihtolevyn luominen kohteessa {}: {} epäonnistui</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>Sisäkkäistä virtualisointia ei tueta tässä tietokoneessa.</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>Verkon päätepisteen luominen osoitteella {} epäonnistui, määritetty uusi osoite: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>Virtuaaliverkkoa, jonka osoitealue on {}, ei voitu luoda, luotiin uusi verkko, jonka alue on {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>VIKASIETOTILA KÄYTÖSSÄ - monet ominaisuudet poistetaan käytöstä</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>Peilatun verkon tilaa ei tueta: {}.
+Palataan nat-verkkopalveluun.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>Linux-ytimen versio 5.10 tai uudempi vaaditaan</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Windows-versio {}. {} ei sisällä tarvittavia ominaisuuksia</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>Hyper-V-palomuuria ei tueta</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>DNS-tunnelointia ei tueta</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>wsl2.localhostForwarding-asetuksella ei ole vaikutusta käytettäessä peilatun verkon tilaa</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>Isännässä on havaittu HTTP-välityspalvelimen muutos. Ota muutos käyttöön käynnistämällä WSL uudelleen.</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>Havaittiin localhost-välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. WSL NAT-tilassa ei tue localhost-välityspalvelimia.</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>Havaittiin IPv6-välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. NAT-tilassa WSL ei tue IPv6:ta.</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>Havaittiin localhost IPv6 -välityspalvelimen määritys, mutta sitä ei peilattu WSL:ään. WSL ei tue localhost IPv6 -välityspalvelimia.</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>Odottamaton virhe yritettäessä selvittää välityspalvelimen asetuksia, välityspalvelimen asetuksia ei peilattu WSL:ksi.</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>Virhe käytettäessä rekisteriä. Polku: {}. Virhe: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>Localhost-välitysprosessin käynnistäminen epäonnistui. Virhe: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>Virtuaaliverkon käynnistäminen epäonnistui – asenna valinnainen virtuaalikoneympäristö suorittamalla: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>Verkon (networkingMode {}) määrittäminen epäonnistui. Palataan takaisin networkingMode-kohteeseen {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>Windows-osan {} käyttöönotto epäonnistui (lopetuskoodi {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>Laajennus {} palautti vakavan virheen</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>Laajennus {} palautti vakavan virheen. Virhesanoma: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>Laajennus {} edellyttää Uudempaa WSL-versiota. Suorita: wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>Tietokonekäytäntö on poistanut .wslconfig asetuksen {} käytöstä.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>Tietokoneen käytäntö on poistanut virheenkorjausliittymän käytöstä.</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>Tietokoneen voimassa olevan käytännön vuoksi wsl.exe --mount -komento ei ole käytettävissä.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>Tietokonekäytäntö on poistanut WSL1:n käytöstä.</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>Päivitä WSL2-versioksi suorittamalla wsl.exe --set-version {} 2.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>WSL viimeistelee päivitystä...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>Päivitys epäonnistui (lopetuskoodi: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>Asennuksen poistaminen epäonnistui (lopetuskoodi: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>Lokitiedosto: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>MSIX-paketin poistaminen epäonnistui (virhe: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>MSIX-paketin asentaminen epäonnistui (virhe: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>WSL:n suorittamiseen tarvittavia valinnaisia osia ei ole asennettu.</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>Asenna puuttuvat osat.</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>Tuotu tiedosto ei ole kelvollinen Linux-jakelu.</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>Poistu painamalla mitä tahansa näppäintä…</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>Uusi versio Windows-alijärjestelmästä Linuxille on saatavilla.</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>Päivitä versioon {} tai tarkastele sen julkaisutietoja alla.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>Päivitä</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>Näytä asiakirjat</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>Toimintoa ei voitu suorittaa loppuun, koska vhdx on parhaillaan käytössä. WSL:n käytön lopettaminen: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>{} ei ole kelvollinen totuusarvo, &lt;true|false&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>Harvaa vhdx:ää tuetaan vain WSL2:ssa.</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>WSL:n suorittamista paikallisena järjestelmänä ei tueta.</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>Suorituskykyvihje:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>Paljon I/O-toimintoa, kuten {} Windows-asemille, käytetään heikkoa suorituskykyä. Harkitse projektitiedostojen siirtämistä Linux-tiedostojärjestelmään suorituskyvyn parantamiseksi. Saat lisätietoja napsauttamalla alla.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>Näytä asiakirjat</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>Älä näytä uudelleen</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>WSL2-virtuaalikone kaatui.</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>Pinon jäljitys on tallennettu sijaintiin {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>Jakelun käynnistäminen epäonnistui. Virhekoodi: {}, virheen vaihe: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>Jakelu ei käynnistynyt, koska sen näennäislevy on vioittunut.</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>Määritysavaimen {} kaksoiskappale kohteessa {}:{} (ristiriitainen avain: {} kohteessa {}:{})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>Virheellinen arvo {} määritysavaimelle {} kohteessa {}:{} (kelvolliset arvot: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>Odotetaan, että OOBE-komento valmistuu jakelulle {}...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>Ominaisuuden {} lukeminen jakelusta {} epäonnistui </value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>Tämä näyttää VHDX-tiedostolta. --vhd näppäimellä voit tuoda VHDX:n tar-tiedoston sijaan.</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>Kohteen {} asentaminen epäonnistui Microsoft Store: {}
+Yritetään ladata verkkoa...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>Oletusjakelua ei ole määritetty. Anna jakelu asennettavaksi.</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>wsl2.virtio9p on poistettu käytöstä, palataan takaisin 9p:hen vsock-siirron avulla.</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>WSL-asennus vaikuttaa olevan vioittunut (virhekoodi: {}).
+Korjaa WSL painamalla mitä tahansa näppäintä tai peruuta CTRL-C.
+Tämä kehote aikakatkaistiin 60 sekunnin kuluttua.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>Pääteprofiilin jäsentäminen epäonnistui jakelua rekisteröitäessä: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>Virheellinen koko: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+Virhekoodi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>Virheellinen JSON-asiakirja. Jäsennysvirhe: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>wsl2.processors ei voi ylittää järjestelmän loogisten suorittimien määrää ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>Verkkotilan kysely epäonnistui</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>Mukautetut ydinmoduulit toimitettiin määrittämättä mukautettua ydintä. Lisätietoja on https://aka.ms/wslcustomkernel.</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>Globaalin suojatun käytön asiakasohjelman nykyisen yhteensopivuusongelman vuoksi DNS-tunnelointi on poistettu käytöstä.</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>Harva virtuaalikiintolevyn tuki on tällä hetkellä poistettu käytöstä tietojen mahdollisen vioittumisen vuoksi.
+Jos haluat pakottaa jakelun käyttämään harvaa virtuaalikiintolevyä, suorita seuraavasti:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>Kohteen {} käyttöönotto epäonnistui, katso lisätietoja dmesg:stä.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>Kohteen /etc/fstab käsitteleminen mount -a -komennolla epäonnistui.</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>Jakelulevyn asennuksessa tapahtui virhe. Se otettiin käyttöön vain luku -tilassa varalevynä.
+Katso palautusohjeet: https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>Kääntäminen epäonnistui {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>Tapahtui jokin virhe. Yritä myöhemmin uudelleen.</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>Tietoja</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>Tietoja Windows-alijärjestelmän asetuksista Linuxille</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft. Kaikki oikeudet pidätetään.</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille asetukset</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille -asetusten avulla kehittäjät voivat hallita .wslconfig-tiedostoa GUI-pohjaisen sovelluksen avulla.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>Automaattinen muistin palauttaminen</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>Vapauttaa välimuistiin tallennetun muistin automaattisesti käyttämättömän suoritinkäytön havaitsemisen jälkeen. Aseta gradual, jos haluat hidasta vapautusta, ja dropcache, jos haluat välitöntä vapautusta välimuistista.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Automaattinen muistin palauttaminen.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Vapauttaa välimuistiin tallennetun muistin automaattisesti käyttämättömän suoritinkäytön havaitsemisen jälkeen. Aseta gradual, jos haluat hidasta vapautusta, ja dropcache, jos haluat välitöntä vapautusta välimuistista.</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>Automaattinen välityspalvelin käytössä</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>Sallii WSL:n käyttää Windowsin HTTP-välityspalvelintietoja.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Automaattinen välityspalvelin käytössä.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Sallii WSL:n käyttää Windowsin HTTP-välityspalvelintietoja.</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>Käytä parasta mahdollista DNS-jäsennystä</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.dnsTunneling on true. Kun asetus on true, Windows poimii kysymyksen DNS-pyynnöstä ja yrittää ratkaista sen ohittaen tuntemattomat tietueet.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Käytä parasta mahdollista DNS-jäsennystä.</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.dnsTunneling-asetus on true. Kun asetus on true, Windows poimii kysymyksen DNS-pyynnöstä ja yrittää ratkaista sen ohittaen tuntemattomat tietueet.</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>Mukautettu ydin</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>Absoluuttinen Windows-polku mukautettuun Linux-ytimeen.</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>Selaa ytimiä</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Mukautettu ydin</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Absoluuttinen Windows-polku mukautettuun Linux-ytimeen.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>Mukautetut ydinmoduulit</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>Absoluuttinen Windows-polku mukautettuun Linux-ydinmoduulien VHD:hen.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>Selaa ydinmoduuleja</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Mukautetut ydinmoduulit</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Absoluuttinen Windows-polku mukautettuun Linux-ydinmoduulien VHD:hen.</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>Mukautettu järjestelmän distro</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>Selaa distroja</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>Määritä polku VHD-levylle, joka ladataan mukautettuna järjestelmädistrona, jota käytetään ensisijaisesti WSL:n GUI-sovellusten käyttämiseen. [Lisätietoja järjestelmädistroista täältä].</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Mukautettu järjestelmän distro</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Määritä polku VHD-levylle, joka ladataan mukautettuna järjestelmädistrona, jota käytetään ensisijaisesti WSL:n GUI-sovellusten käyttämiseen.</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>Ota virheenkorjauskonsoli käyttöön</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>Totuusarvo, joka ottaa käyttöön tulostuskonsolin ikkunan, joka näyttää dmesg:n sisällön WSL 2 -distro-esiintymän käynnistyksen yhteydessä.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ota virheenkorjauskonsoli käyttöön.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Totuusarvo, joka ottaa käyttöön tulostekonsolin ikkunan, joka näyttää diagnostiikkaviestien sisällön WSL 2 -distroesiintymän käynnistyksen yhteydessä.</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>Virtuaalikiintolevyn oletuskoko</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>Laajennettavan WSL-virtuaalikiintolevyn (VHD) oletusarvoinen enimmäiskoko vain äskettäin luoduille jakeluille.</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>Palauta koko</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Virtuaalikiintolevyn oletuskoko</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Laajennettavan WSL-virtuaalikiintolevyn (VHD) oletusarvoinen enimmäiskoko, megatavuina määritettynä, vain äskettäin luoduille jakeluille.</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>Kehittäjä</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>Dokumentaatio</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>Muuta DrvFS-tilaa</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>Muuttaa käyttöjärjestelmien välisten tiedostojen käytön toteutusta WSL:ssä.</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>DNS-välityspalvelin käytössä</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.networkingMode-asetuksena on NAT. Totuusarvo, joka ilmoittaa WSL:lle DNS-palvelimen määrittämisestä Linuxissa NAT-kohteelle isännässä. Jos arvoksi määritetään epätosi, DNS-palvelimet peilataan Windowsista Linuxiin.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-välityspalvelin käytössä.</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.networkingMode-asetuksena on NAT. Totuusarvo, joka ilmoittaa WSL:lle DNS-palvelimen määrittämisestä Linuxissa NAT-kohteelle isännässä. Jos arvoksi määritetään epätosi, DNS-palvelimet peilataan Windowsista Linuxiin.</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>DNS-tunnelointi käytössä</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>Muuttaa tapaa, miten DNS-pyyntöjä käytetään WSL:stä Windowsiin.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>DNS-tunnelointi käytössä.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Muuttaa tapaa, miten DNS-pyyntöjä käytetään WSL:stä Windowsiin.</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>Tiedostojärjestelmä</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>Ota graafiset käyttöliittymäsovellukset käyttöön</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>Totuusarvo, jolla GUI-sovellusten ([WSLg]) tuki WSL:ssä otetaan käyttöön tai poistetaan käytöstä.</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ota GUI-sovellukset käyttöön.</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Totuusarvo, jolla GUI-sovellusten tuki (tunnetaan nimellä WSL g) WSL:ssä otetaan käyttöön tai poistetaan käytöstä.</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>Ota laitteiston resurssilaskurit käyttöön</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>Ottaa Linuxin laitteiston suorituskykylaskurit käyttöön.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ota laitteiston suorituskykylaskurit käyttöön.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ottaa Linuxin laitteiston suorituskykylaskurit käyttöön.</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>Hyper-V-palomuuri käytössä</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>Ottaa käyttöön Hyper-V-palomuurin, joka sallii Windowsin palomuurin sääntöjen ja Hyper-V-liikennettä koskevien sääntöjen suodattaa WSL-verkkoliikennettä.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Hyper-V-palomuuri käytössä.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Ottaa käyttöön Hyper-V-palomuurin, joka sallii Windowsin palomuurin sääntöjen ja Hyper-V-liikennettä koskevien sääntöjen suodattaa WSL-verkkoliikennettä.</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>Isäntäosoitteen silmukka</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.networkingMode on asetettu peilatuksi. Kun asetus on True, säilö voi muodostaa yhteyden isäntään tai isäntään muodostamaan yhteyden säilöön isäntään määritetyllä IP-osoitteella. Huomaa, että 127.0.0.1-silmukkaosoitetta voi aina käyttää – tämä vaihtoehto mahdollistaa myös kaikkien lisäksi määritettyjen paikallisten IP-osoitteiden käyttämisen.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Isäntäosoitteen silmukka.</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.networkingMode-asetus on peilattu. Kun asetus on True, säilö voi muodostaa yhteyden isäntään tai isäntään muodostamaan yhteyden säilöön isäntään määritetyllä IP-osoitteella. Huomaa, että 127.0.0.1-silmukkaosoitetta voi aina käyttää – tämä vaihtoehto mahdollistaa myös kaikkien lisäksi määritettyjen paikallisten IP-osoitteiden käyttämisen.</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>Ohitetut portit</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.networkingMode on asetettu peilatuksi. Määrittää, mihin portteihin Linux-sovellukset voivat sitoa, joita ei lähetetä automaattisesti edelleen tai oteta huomioon Windowsissa. Tulee muotoilla pilkuin eroteltuna luettelona, esimerkiksi 3000,9000,9090.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>Palauta portit</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Ohitetut portit</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.networkingMode on asetettu peilatuksi. Määrittää, mihin portteihin Linux-sovellukset voivat sitoa, joita ei lähetetä automaattisesti edelleen tai oteta huomioon Windowsissa. Tulee muotoilla pilkuin eroteltuna luettelona, esimerkiksi 3000, 9000, 9090.</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>Alkuperäinen automaattisen välityspalvelimen aikakatkaisu</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.autoProxy-asetuksena on tosi. Määrittää, kuinka kauan (millisekunteina) WSL odottaa HTTP-välityspalvelintietojen noutamista WSL-säilöä käynnistettäessä. Jos välityspalvelimen asetukset ratkeavat tämän ajan kuluttua, WSL-esiintymä on käynnistettävä uudelleen, jotta noudetut välityspalvelimen asetukset voidaan käyttää.</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>Palauta aikakatkaisu</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Alkuperäinen automaattisen välityspalvelimen aikakatkaisu</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Käytettävissä vain, kun wsl2.autoProxy-asetuksena on tosi. Määrittää, kuinka kauan (millisekunteina) WSL odottaa HTTP-välityspalvelintietojen noutamista WSL-säilöä käynnistettäessä. Jos välityspalvelimen asetukset ratkeavat tämän ajan kuluttua, WSL-esiintymä on käynnistettävä uudelleen, jotta noudetut välityspalvelimen asetukset voidaan käyttää.</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>Ytimen komentorivi</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>Ytimen komentorivin lisäargumentit.</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>Ota localhostin edelleenlähetys käyttöön</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>Totuusarvo, joka määrittää, tuleeko WSL 2 VM:n yleismerkkiin tai localhostiin sidottujen porttien olla yhdistettävissä isännästä localhost:portin kautta.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ota localhostin edelleenlähetys käyttöön.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Totuusarvo, joka määrittää, tuleeko WSL 2 VM:n yleismerkkiin tai localhostiin sidottujen porttien olla yhdistettävissä isännästä localhostin, kaksoispisteen ja portin kautta.</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} Mt</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>Muisti ja suoritin</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>Muistin koko</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>WSL 2 VM:lle määritettävän muistin määrä.</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>Palauta koko</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Muistin koko</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 VM:ään määritettävän muistin määrä megatavuina.</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} millisekuntia</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>Ota käyttöön sisäkkäinen virtualisointi</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>Totuusarvo, joka ottaa sisäkkäisen virtualisoinnin käyttöön tai poistaa sen käytöstä, jolloin muut sisäkkäiset virtuaalikoneet voidaan suorittaa WSL 2:ssa.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ota käyttöön sisäkkäinen virtualisointi.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Totuusarvo, joka ottaa sisäkkäisen virtualisoinnin käyttöön tai poistaa sen käytöstä, jolloin muut sisäkkäiset virtuaalikoneet voidaan suorittaa WSL 2:ssa.</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>Verkkotila</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>Määrittää WSL:n verkkotilan.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Verkkotila.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Määrittää WSL:n verkkotilan.</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>Verkko</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>Voit käsitellä kaikkia tiedostojasi eri käyttöjärjestelmissä!</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>Käyttöjärjestelmätiedostojen välinen käyttö</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>Käytä Windows-tiedostoja Linuxista</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>Voit käyttää Windows-tiedostoja Linuxissa siirtymällä kohteeseen /mnt ja sitten Windows-aseman kirjaimeen, kuten tässä esimerkissä C-asemaan:
+
+cd /mnt/c</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>Käytä Linux-tiedostoja Resurssienhallinnalla</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>Voit tarkastella Linux-tiedostoja Resurssienhallinnassa siirtymällä kohtaan \\wsl.localhost\ tai napsauttamalla Linux-kuvaketta.</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>Käynnistä Windows-tiedostot ja -ohjelmat WSL:stä</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>Vaikka käyttäisit WSL:ää, voit suorittaa Windows-suoritettavat kohteet suoraan bashista. Yritä suorittaa
+Avaa Resurssienhallinta nykyisessä kansiossa valitsemalla 'powershell.exe /c start .'.</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>Linux-verkkosovellusten käyttäminen Windowsista</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>Jos olet luomassa verkkosovellusta (esimerkiksi NodeJS- tai SQL-palvelimella suoritettavaa sovellusta) Linux-jakelussa, voit käyttää sitä Windows-sovelluksesta (kuten Edgestä tai Chrome-Internet-selaimesta) localhostin avulla (aivan kuten normaalisti). Tämä tarkoittaa, että jos olet käynnistänyt Linux-palvelimen, joka kuuntelee porttia 3000, voit siirtyä Windowsin Edgessä kohtaan [http://localhost:3000] käyttääksesi sitä.</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>Peilatun tilan verkko</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>WSL sisältää myös uuden verkkotilan eli peilatun tilan, joka lisää lisäominaisuuksia, kuten IPv6-tuen ja mahdollisuuden käyttää verkkosovelluksiasi lähiverkossa.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>Lisätietoja tiedoston käytöstä käyttöjärjestelmien välisesti</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>Tervetuloa Windows-alijärjestelmään Linuxille</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>WSL on erinomainen tapa kokeilla eri Linux-jakeluja.</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>Distro-hallinta</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>Lisätietoja WSL-peruskomennosta</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>Lisätietoja Linux-jakelun tuomisesta</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>Luettelo asennettavista WSL-distroista -komento</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>wsl.exe -l -o</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>Asenna nimetty WSL-distrokomento</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>wsl.exe --install &lt;DistroName&gt;</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>Luettelo käytettävissä olevista WSL-distroista -komento</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>wsl.exe -l</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Docker Desktop toimii hyvin WSL:n kanssa ja auttaa sinua kehittämään Linux-säilöjen avulla.
+
+Docker Desktopin ja WSL:n käytön etuja ovat seuraavat:
+
+• Voit suorittaa Docker-komentoja WSL:ssä tai Windowsissa käyttämällä samaa Docker-daemonia ja kuvia.
+• Voit jakaa tiedostoja ja kansioita saumattomasti Windowsin ja Linuxin välillä käyttämällä Windows-asemien automaattista käyttöönottoa WSL:ssä.
+• Voit käyttää ensisijaisia Windows-työkaluja ja -editoreja Linux-koodin ja -tiedostojen kanssa ja päinvastoin WSL:n yhteentoimivuuden ansiosta.</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Docker-työpöytäintegrointi</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>Lisätietoja WSL:n käyttämisestä Dockerin kanssa</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille (WSL) -sovelluksen avulla voit suorittaa Linux-suosikkityökalujasi, -apuohjelmiasi, -sovelluksiasi ja -työnkulkujasi suoraan Windowsissa.
+
+Esikatsele yhteisön suosikkiominaisuuksia tai tutustu kattavaan dokumentaatioomme.</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>Tervetuloa käyttämään WSL:ää</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>Määrityksen parhaat käytännöt</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Aloitusopas Linuxiin</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>Windows-alijärjestelmä Linuxille (WSL) -ohjeet</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>Voit käyttää graafisia Linux-sovelluksia, joissa on alkuperäisiä Windows-vuorovaikutuksia, kuten alt-tab, aloitusvalikon käynnistäminen, tehtäväpalkin kiinnittäminen ja leikkaa ja liitä -tuki.</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>GUI-sovellukset</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>WSL voi hyödyntää Windowsin grafiikkasuoritinta koneoppimisen työnkuluissa
+
+WSL:ssä toimivat Linux-binaarit voivat nopeuttaa suorituskykyään automaattisesti Windowsin grafiikkasuorittimella. Sinun tarvitsee vain asentaa ja suorittaa nämä työnkulut samalla tavalla kuin tavallisessa Linux-koneessa. Voit aloittaa CUDA:n käyttämisen docker-säilössä useilla eri tavoilla, jos sinulla on NVIDIA-näytönohjain, ja suorittaa PyTorchin tai TensorFlow'n DirectML-toiminnolla AMD-, Intel- tai NVIDIA-näytönohjaimessa. Lisätietoja on alla olevassa aloitusoppaassa.</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>Grafiikkasuorittimen kiihdytys</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>Lisätietoja grafiikkasuorittimen kiihdytyksestä</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>Lisätietoja WSL GUI -sovelluksista</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>Tässä on luettelo sovelluksissa, joita voit kokeilla (voit asentaa kaikki nämä Ubuntussa kirjoittamalla sudo apt install &lt;sovelluksen nimi&gt;)
+
+    • gedit – Perustekstieditori
+    • audacity – Tallenna ja muokkaa äänitiedostoja
+    • blender – Tee 3D-animaatioita ja visualisointeja
+    • gimp – Muokkaa valokuvia
+    • nautilus – Linuxin resurssienhallinta
+    • vlc – Videosoitin</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>Voit käyttää verkkosovelluksia helposti Windows- ja Linux-käyttöjärjestelmissä.</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>Verkkointegrointi</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>Lisätietoja verkkosovelluksista</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>Lisätietoja peilatun tilan verkkotoiminnoista</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>Voit käyttää WSL:ää täysipäiväisenä kehitysympäristönä suoraan VS Codesta.</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>VS-koodin integrointi</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>Lisätietoja WSL:n käyttämisestä VS Coden kanssa</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>Asennusohje</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>Kun olet asentanut VS Coden, voit asentaa WSL-etälaajennuksen Windows-päätteestä:
+
+code –install-extension ms-vscode-remote.remote-wsl</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>Avaa WSL-projekti Visual Studio koodissa</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>Jos haluat avata projektin VS Codessa WSL-jakelusta, avaa jakelun komentorivi ja avaa projektitiedosto suorittamalla koodi .
+
+Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman kautta. Avaa komentovalikoima painamalla näppäinyhdistelmää VAIHTO+CTRL+P ja kirjoita Remote-WSL, niin näet luettelon käytettävissä olevista VS Code Remote -asetuksista, joiden avulla voit avata kansion uudelleen etäistunnossa, määrittää avattavan jakelun ja paljon muuta.</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>Toimintaohjeet</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>Valinnaiset ominaisuudet</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>Ota sivujen raportointi käyttöön</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>Oletusarvon mukainen tosi-asetus antaa Windowsille mahdollisuuden vapauttaa WSL 2 -virtuaalikoneelle varattua käyttämätöntä muistia.</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>Tietosuojatiedot</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>Suorittimen määrä</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>WSL 2 VM:lle määritettävät loogiset suorittimet.</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>Palauta määrä</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Suorittimen määrä</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 VM:lle määritettävät loogiset suorittimet.</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>Aiheeseen liittyviä linkkejä</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>Julkaisutiedot</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>Ota käyttöön vikasietotila</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>Suorita WSL vikasietotilassa, joka poistaa käytöstä monia ominaisuuksia ja jota on tarkoitus käyttää palauttamaan jakaumia, jotka ovat virheellisessä tilassa.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ota käyttöön vikasietotila.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Suorita WSL vikasietotilassa, joka poistaa käytöstä monia ominaisuuksia ja jota on tarkoitus käyttää palauttamaan jakaumia, jotka ovat virheellisessä tilassa.</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>Tietoja</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>Kehittäjä</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Distro-hallinta</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Docker-työpöytäintegrointi</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>Tiedostojärjestelmä</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>Yleiset</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>Grafiikkasuorittimen kiihdytys</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>GUI-sovellukset</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>Käynnistä wsl.exe</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>Muisti ja suoritin</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>Verkko</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>Verkkointegrointi</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>Tervetuloa käyttämään WSL:ää</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>Valinnaiset ominaisuudet</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>Asetukset</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>VS-koodin integrointi</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>Uudet ominaisuudet</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>Työskentely tiedostojärjestelmien välillä</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>Ongelmat</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>Ota käyttöön harva virtuaalikiintolevy oletusarvon mukaan</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>Uudet luodut virtuaalikiintolevyt asetetaan harvaksi automaattisesti, kun ne ovat käytössä.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Ota käyttöön harva virtuaalikiintolevy oletusarvoisesti.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Uudet luodut virtuaalikiintolevyt asetetaan harvaksi automaattisesti, kun ne ovat käytössä.</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>Sivutustiedoston sijainti</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>Absoluuttinen Windows-polku virtuaalikiintolevyn sivutustiedostoon.</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>Selaa sivutustiedostoja</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Sivutustiedoston sijainti</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Absoluuttinen Windows-polku virtuaalikiintolevyn sivutustiedostoon.</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>Sivutustiedoston koko</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>Kuinka paljon sivutustiedostotilaa WSL 2 VM:ään lisätään, 0 sivutustiedostoa ei ole. Sivutustiedostontallennustila on levypohjainen RAM-muisti, jota käytetään, kun muistintarve ylittää laitteistolaitteen rajoituksen.</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>Palauta koko</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Sivutustiedoston koko</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>WSL 2 VM:ään lisättävän sivutustilan määrä megatavuina. 0, jos sivutustiedostoa ei ole. Sivutustiedoston tallennustila on levypohjainen RAM-muisti, jota käytetään, kun muistintarve ylittää laitteistolaitteen rajoituksen.</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>Ota VirtIO käyttöön</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>Käytä virtiof-kohteita suunnitelman 9 sijaan isäntätiedostojen käyttämiseen, mikä lisää nopeutta.</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>Ota käyttöön Virtio 9p</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>Ottaa käyttöön 9P-tiedostojärjestelmän käyttöönoton isännästä virtio-siirron avulla.</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>Näennäiskoneen käyttämättömyystilanteen aikakatkaisu</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>Virtuaalikoneen käyttämättömyysaika millisekunteina, ennen kuin se sammutetaan.</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Palauta aikakatkaisu</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Näennäiskoneen käyttämättömyystilanteen aikakatkaisu</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Virtuaalikoneen käyttämättömyysaika millisekunteina, ennen kuin se sammutetaan.</value>
+  </data>
+</root>

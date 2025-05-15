@@ -1,0 +1,1876 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Microsoft ResX Schema
+
+    Version 2.0
+
+    The primary goals of this format is to allow a simple XML format
+    that is mostly human readable. The generation and parsing of the
+    various data types are done through the TypeConverter classes
+    associated with the data types.
+
+    Example:
+
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+
+    There are any number of "resheader" rows that contain simple
+    name/value pairs.
+
+    Each data row contains a name, and value. The row also contains a
+    type or mimetype. Type corresponds to a .NET class that support
+    text/value conversion through the TypeConverter architecture.
+    Classes that don't support this are serialized and stored with the
+    mimetype set.
+
+    The mimetype is used for serialized objects, and tells the
+    ResXResourceReader how to depersist the object. This is currently not
+    extensible. For a given mimetype the value must be set accordingly:
+
+    Note - application/x-microsoft.net.object.binary.base64 is the format
+    that the ResXResourceWriter will generate, however the reader can
+    read any of the formats listed below.
+
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve">
+    <value>Sottosistema Windows per Linux</value>
+  </data>
+  <data name="AppShortName" xml:space="preserve">
+    <value>WSL</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Il Sottosistema Windows per Linux consente agli sviluppatori di eseguire un ambiente GNU/Linux, inclusi la maggior parte degli strumenti da riga di comando, le utilità e le applicazioni, direttamente in Windows, senza modifiche, senza il sovraccarico di una macchina virtuale tradizionale o di una configurazione dualboot.</value>
+  </data>
+  <data name="MessageDetachFailed" xml:space="preserve">
+    <value>Impossibile scollegare il disco: {}. Per altri dettagli, eseguire 'dmesg' in WSL2.
+Per forzare l'arresto e lo scollegamento del disco in WSL2, eseguire 'wsl.exe {}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyAttached" xml:space="preserve">
+    <value>Il disco '{}' è già collegato.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskAlreadyMounted" xml:space="preserve">
+    <value>Il volume è già montato all'interno di WSL2.</value>
+  </data>
+  <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
+    <value>Un disco con questo nome è già montato; smontare il disco o scegliere un nuovo nome e riprovare.</value>
+  </data>
+  <data name="MessageDiskMountNameInvalid" xml:space="preserve">
+    <value>Il nome di montaggio specificato contiene un carattere '/' non valido. Riprovare senza il carattere non valido.</value>
+  </data>
+  <data name="MessageDiskMounted" xml:space="preserve">
+    <value>Montaggio del disco come '/mnt/wsl/{}' completato.
+Nota: il percorso sarà diverso se è stata modificata l'impostazione automount.root in /etc/wsl.conf.
+Per smontare e scollegare il disco, eseguire 'wsl.exe {} {}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskMountFailed" xml:space="preserve">
+    <value>Il disco è stato collegato ma non è stato possibile montarlo: {}.
+Per altri dettagli, eseguire 'dmesg' all'interno di WSL2.
+Per scollegare il disco, eseguire 'wsl.exe {} {}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionListOnline" xml:space="preserve">
+    <value>Di seguito è riportato un elenco di distribuzioni valide che è possibile installare.
+Installare con 'wsl.exe {} &lt;Distro&gt;'.
+</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroAlreadySet" xml:space="preserve">
+    <value>Il nome di distribuzione è già stato impostato.</value>
+  </data>
+  <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
+    <value>Il percorso di installazione specificato è già in uso.</value>
+  </data>
+  <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
+    <value>Esiste già una distribuzione con il nome specificato. Utilizzare --name per scegliere un nome diverso.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroNotFound" xml:space="preserve">
+    <value>Nessuna distribuzione con il nome specificato.</value>
+  </data>
+  <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
+    <value>Per montare un disco è necessario l'accesso amministratore.</value>
+  </data>
+  <data name="MessageExportFailed" xml:space="preserve">
+    <value>Esportazione della distribuzione non riuscita.</value>
+  </data>
+  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+    <value>Esecuzione dell'aggiornamento una tantum del file system del sottosistema Windows per Linux per questa distribuzione...
+</value>
+  </data>
+  <data name="MessageHigherIntegrity" xml:space="preserve">
+    <value>Non è possibile eseguire l'avvio perché un'altra istanza è in esecuzione con privilegi non elevati. Non è possibile eseguire contemporaneamente istanze con privilegi elevati e non elevati.
+</value>
+  </data>
+  <data name="MessageImportFailed" xml:space="preserve">
+    <value>Importazione della distribuzione non riuscita.</value>
+  </data>
+  <data name="MessageInstallingWindowsComponent" xml:space="preserve">
+    <value>Installazione del componente facoltativo di Windows: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDownloading" xml:space="preserve">
+    <value>Download in corso: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstalling" xml:space="preserve">
+    <value>Installazione: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageImportingDistribution" xml:space="preserve">
+    <value>Importazione distribuzione</value>
+  </data>
+  <data name="MessageDownloadComplete" xml:space="preserve">
+    <value>{} è stato scaricato.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstallContinue" xml:space="preserve">
+    <value>sottosistema Windows per Linux sta riprendendo un'installazione precedente...</value>
+  </data>
+  <data name="MessageInvalidDistributionName" xml:space="preserve">
+    <value>Nome di distribuzione non valido: '{}'.
+Per ottenere un elenco di distribuzioni valide, usare 'wsl.exe --list --online'.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInstanceTerminated" xml:space="preserve">
+    <value>Istanza di sottosistema Windows per Linux terminata.</value>
+  </data>
+  <data name="MessageInvalidCommandLine" xml:space="preserve">
+    <value>Argomento della riga di comando non valido: {}
+Usare '{} --help' per ottenere un elenco di argomenti supportati.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingArgument" xml:space="preserve">
+    <value>L'argomento {} della riga di comando richiede un valore.
+Usare '{} --help' per ottenere un elenco di argomenti supportati.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidConsole" xml:space="preserve">
+    <value>Impostazioni della console non supportate. Per utilizzare questa funzionalità, la console legacy deve essere disabilitata.
+</value>
+  </data>
+  <data name="MessageInvalidInteger" xml:space="preserve">
+    <value>{} non è un numero intero valido.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidState" xml:space="preserve">
+    <value>È in corso un'installazione, una disinstallazione o una conversione per questa distribuzione.
+</value>
+  </data>
+  <data name="MessageLaunchingDistro" xml:space="preserve">
+    <value>Avvio di {} in corso...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLowerIntegrity" xml:space="preserve">
+    <value>Non è possibile eseguire l'avvio perché un'altra istanza è in esecuzione con privilegi elevati. Non è possibile eseguire contemporaneamente istanze con privilegi elevati e non elevati.
+</value>
+  </data>
+  <data name="MessageNoDefaultDistro" xml:space="preserve">
+    <value>sottosistema Windows per Linux non ha distribuzioni installate.
+Per risolvere il problema, installare una distribuzione con le istruzioni seguenti:
+
+Usare 'wsl.exe --list --online' per elencare le distribuzioni disponibili
+e 'wsl.exe --install &lt;Distro&gt;' per l'installazione.</value>
+    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoRunningDistro" xml:space="preserve">
+    <value>Nessuna distribuzione in corso.</value>
+  </data>
+  <data name="MessagePrintDistroDefault" xml:space="preserve">
+    <value>{} (Predefinito)</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
+    <value>Distribuzioni del Sottosistema Windows per Linux:</value>
+  </data>
+  <data name="MessageStatusDefaultDistro" xml:space="preserve">
+    <value>Distribuzione predefinita: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusDefaultVersion" xml:space="preserve">
+    <value>Versione predefinita: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageStatusUnregistering" xml:space="preserve">
+    <value>Annullamento della registrazione.</value>
+  </data>
+  <data name="MessageUserNotFound" xml:space="preserve">
+    <value>Utente non trovato.</value>
+  </data>
+  <data name="MessageVmModeConversionInfo" xml:space="preserve">
+    <value>Per informazioni sulle differenze delle chiavi con WSL 2, visita https://aka.ms/wsl2
+</value>
+  </data>
+  <data name="MessageConversionStart" xml:space="preserve">
+    <value>Conversione in corso. L'operazione potrebbe richiedere alcuni minuti.</value>
+  </data>
+  <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
+    <value>La distribuzione è già nella versione richiesta.</value>
+  </data>
+  <data name="MessageVmModeNotSupported" xml:space="preserve">
+    <value>La distribuzione legacy non supporta WSL 2.</value>
+  </data>
+  <data name="MessageEnableVirtualization" xml:space="preserve">
+    <value>WSL2 non è supportato con la configurazione corrente del computer.
+Abilitare il componente facoltativo "Piattaforma macchina virtuale" e assicurarsi che la virtualizzazione sia abilitata nel BIOS.
+Abilitare "Piattaforma macchina virtuale" eseguendo: wsl.exe --install --no-distribution
+Per informazioni, vedere https://aka.ms/enablevirtualization</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyDisks" xml:space="preserve">
+    <value>Sono collegati troppi dischi rigidi virtuali o dischi fisici.</value>
+  </data>
+  <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
+    <value>VHD già montato tramite wsl.exe --mount, smontare il disco prima del lancio.</value>
+    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWsl1NotSupported" xml:space="preserve">
+    <value>WSL1 non è supportato con la configurazione del computer corrente.
+Per usare WSL1, è necessario abilitare il componente facoltativo "Sottosistema Windows per Linux".</value>
+  </data>
+  <data name="MessageWsl2Needed" xml:space="preserve">
+    <value>Questa operazione è supportata solo da WSL2.</value>
+  </data>
+  <data name="MessageWslInfoUsage" xml:space="preserve">
+    <value>Utilizzo:
+    --networking-mode
+       Visualizza la modalità di rete corrente.
+
+    --msal-proxy-path
+        Visualizza il percorso dell'applicazione proxy MSAL.
+
+    --version
+        Visualizza la versione del pacchetto WSL.
+
+    -n
+        Non stampare una nuova riga.</value>
+    <comment>{Locked="--networking-mode
+"}{Locked="--msal-proxy-path
+"}{Locked="--version
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslPathUsage" xml:space="preserve">
+    <value>Uso:
+    -a
+        Forza il risultato al formato di percorso assoluto.
+    -u
+        Converti da un percorso windows a un percorso WSL (impostazione predefinita).
+    -w
+        Converti da un percorso WSL a un percorso di Windows.
+    -m
+        Traduci da un percorso WSL a un percorso di Windows, con '/' invece di '\\'
+
+Esempio: wslpath 'c:\\users'</value>
+    <comment>{Locked="-a
+"}{Locked="-u
+"}{Locked="-w
+"}{Locked="-m
+"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="MessageWslconfigUsage" xml:space="preserve">
+    <value>Esegue operazioni amministrative su sottosistema Windows per Linux
+
+Utilizzo:
+    /l, /list [Opzione]
+        Elenca le distribuzioni registrate.
+        /all - Elenca facoltativamente tutte le distribuzioni, incluse quelle che
+               sono attualmente in fase di installazione o disinstallazione.
+
+        /running - Elenca solo le distribuzioni attualmente in esecuzione.
+
+    /s, /setdefault &lt;DistributionName&gt;
+        Imposta la distribuzione come predefinita.
+
+    /t, /terminate &lt;DistributionName&gt;
+        Termina la distribuzione.
+
+    /u, /unregister &lt;DistributionName&gt;
+        Annulla la registrazione della distribuzione ed elimina il file system radice.</value>
+    <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation. Tutti i diritti sono riservati.
+Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy.
+
+Sintassi: wsl.exe [Argument] [Options...] [CommandLine]
+
+Argomenti per l'esecuzione di file binari Linux:
+
+    Se non viene specificata alcuna riga di comando, wsl.exe avvia la shell predefinita.
+
+    --exec, -e &lt;CommandLine&gt;
+        Esegui il comando specificato senza usare la shell Linux predefinita.
+
+    --shell-type &lt;standard|login|none&gt;
+        Esegui il comando specificato con il tipo di shell fornito.
+
+    --
+        Passa la riga di comando rimanente senza modifiche.
+
+Opzioni:
+    --cd &lt;Directory&gt;
+        Imposta la directory specificata come directory di lavoro corrente.
+        Se si usa ~, verrà usato il percorso home dell'utente Linux. Se il percorso inizia
+        con un carattere /, verrà interpretato come un percorso Linux assoluto.
+        In caso contrario, il valore deve essere un percorso assoluto di Windows.
+
+    --distribution, -d &lt;DistroName&gt;
+        Esegui la distribuzione specificata.
+
+    --distribution-id &lt;DistroGuid&gt;
+        Esegui l'ID distribuzione specificato.
+
+    --user, -u &lt;UserName&gt;
+        Esegui il comando con il nome utente specificato.
+
+    --system
+        Avvia una shell per la distribuzione del sistema.
+
+Argomenti per la gestione del sottosistema Windows per Linux:
+
+    --help
+        Visualizza le informazioni sulla sintassi.
+
+    --debug-shell
+        Apri una shell di debug WSL2 a scopo di diagnostica.
+
+    --install [Distro] [Options...]
+        Installa una distribuzione di un sottosistema Windows per Linux.
+        Per un elenco di distribuzioni valide, usa 'wsl.exe --list --online'.
+
+        Opzioni:
+            --enable-wsl1
+                Abilita il supporto di WSL1.
+
+            --fixed-vhd
+                Crea un disco a dimensione fissa per archiviare la distribuzione.
+
+            --from-file &lt;Path&gt;
+                Installa una distribuzione da un file locale.
+
+            --legacy
+                Usa il manifesto della distribuzione legacy.
+
+            --location &lt;Location&gt;
+                Imposta il percorso di installazione per la distribuzione.
+
+            --name &lt;Name&gt;
+                Imposta il nome della distribuzione.
+
+            --no-distribution
+                Installa solo i componenti facoltativi necessari, senza installare una distribuzione.
+
+            --no-launch, -n
+                Non avviare la distribuzione dopo l'installazione.
+
+            --version &lt;Version&gt;
+                Specifica la versione da usare per la nuova distribuzione.
+
+            --vhd-size &lt;MemoryString&gt;
+                Specifica le dimensioni del disco in cui archiviare la distribuzione.
+
+            --web-download
+                Scarica la distribuzione da Internet anziché dal Microsoft Store.
+
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Modifica le opzioni specifiche della distribuzione.
+
+        Opzioni:
+            --move &lt;Location&gt;
+                Sposta la distribuzione in una nuova posizione.
+
+            --set-sparse, -s &lt;true|false&gt;
+                Imposta il vhdx della distribuzione su sparse, consentendo il recupero automatico dello spazio su disco.
+
+            --set-default-user &lt;Username&gt;
+                Imposta l'utente predefinito della distribuzione.
+
+            --resize &lt;MemoryString&gt;
+                Ridimensiona il disco della distribuzione alle dimensioni specificate.
+
+    --mount &lt;Disk&gt;
+        Collega e monta un disco fisico o virtuale in tutte le distribuzioni WSL2.
+
+        Opzioni:
+            --vhd
+                Specifica che &lt;Disk&gt; fa riferimento a un disco rigido virtuale.
+
+            --bare
+                Collega il disco a WSL2, senza montarlo.
+
+            --name &lt;Name&gt;
+                Monta il disco usando un nome personalizzato per il punto di montaggio.
+
+            --type &lt;Type&gt;
+                File system da usare durante il montaggio di un disco. Se non è specificato, il valore predefinito è ext4.
+
+            --options &lt;Options&gt;
+                Opzioni di montaggio aggiuntive.
+
+            --partition &lt;Index&gt;
+                Indice della partizione da montare. Se non è specificato, il valore predefinito è l'intero disco.
+
+    --set-default-version &lt;Version&gt;
+        Modifica la versione di installazione predefinita per le nuove distribuzioni.
+
+    --shutdown
+        Termina immediatamente tutte le distribuzioni in esecuzione e
+        la macchina virtuale dell'utilità leggera WSL2.
+
+        Opzioni:
+            --force
+                Termina la macchina virtuale WSL 2 anche se è in corso un'operazione. Può causare la perdita di dati.
+
+    --status
+        Mostra lo stato del sottosistema Windows per Linux.
+
+    --unmount [Disk]
+        Smonta e scollega un disco da tutte le distribuzioni WSL2.
+        Smonta e scollega tutti i dischi se viene chiamata senza argomento.
+
+    --uninstall
+        Disinstalla il pacchetto sottosistema Windows per Linux da questo computer.
+
+    --update
+        Aggiorna il pacchetto del sottosistema Windows per Linux.
+
+        Opzioni:
+            --pre-release
+                Scarica una versione non definitiva, se disponibile.
+
+    --version, -v
+        Mostra le informazioni sulla versione.
+
+Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux:
+
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        Esporta la distribuzione in un file TAR.
+        Il nome file può essere - per StdOut.
+
+        Opzioni:
+            --format &lt;Format&gt;
+                Specifica il formato di esportazione. Valori supportati: tar, tar.gz, tar.xz, vhd.
+
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        Importa il file TAR specificato come nuova distribuzione.
+        Il nome file può essere - per STDIN.
+
+        Opzioni:
+            --version &lt;Version&gt;
+                Specifica la versione da usare per la nuova distribuzione.
+
+            --vhd
+                Specifica che il file fornito è un file con estensione vhdx, non un file TAR.
+                Questa operazione crea una copia del file con estensione vhdx nel percorso di installazione specificato.
+
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        Importa il file con estensione vhdx specificato come nuova distribuzione.
+        Questo disco rigido virtuale deve essere formattato con il tipo di file system ext4.
+
+    --list, -l [Options]
+        Elenca le distribuzioni.
+
+        Opzioni:
+            --all
+                Elenca tutte le distribuzioni, incluse quelle che al momento
+                sono in fase di installazione o disinstallazione.
+
+            --running
+                Elenca solo le distribuzioni attualmente in esecuzione.
+
+            --quiet, -q
+                Mostra solo i nomi delle distribuzioni.
+
+            --verbose, -v
+                Mostra informazioni dettagliate su tutte le distribuzioni.
+
+            --online, -o
+                Visualizza un elenco di distribuzioni disponibili per l'installazione con 'wsl--install'.
+
+    --set-default, -s &lt;Distro&gt;
+        Imposta la distribuzione come predefinita.
+
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        Cambia la versione della distribuzione specificata.
+
+    --terminate, -t &lt;Distro&gt;
+        Termina la distribuzione specificata.
+
+    --unregister &lt;Distro&gt;
+        Annulla la registrazione della distribuzione ed elimina il file system radice.</value>
+  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+"}{Locked="--help
+"}{Locked="--debug-shell
+"}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
+"}{Locked="--fixed-vhd
+"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
+"}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--bare
+"}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
+"}{Locked="--force
+"}{Locked="--status
+"}{Locked="--unmount "}{Locked="--uninstall
+"}{Locked="--update
+"}{Locked="--pre-release
+"}{Locked="--version,"}{Locked="--export "}{Locked="--format "}{Locked="--import "}{Locked="--version "}{Locked="--vhd
+"}{Locked="--import-in-place "}{Locked="--list,"}{Locked="--all
+"}{Locked="--running
+"}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePackageVersions" xml:space="preserve">
+    <value>Versione WSL: {}
+Versione kernel: {}
+Versione WSLg: {}
+Versione MSRDC: {}
+Versione Direct3D: {}
+Versione DXCore: {}
+Versione di Windows: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageBuildInfo" xml:space="preserve">
+    <value>Versione di MSBuild: {}
+Commit: {}
+Tempo di compilazione: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelNotFound" xml:space="preserve">
+    <value>Il kernel personalizzato specificato in {} non è stato trovato: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
+    <value>Il disco rigido virtuale dei moduli kernel personalizzati in {} non è stato trovato: '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCustomSystemDistroError" xml:space="preserve">
+    <value>La distribuzione del sistema personalizzata specificata in {} non è stata trovata o non è nel formato corretto.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslgUsage" xml:space="preserve">
+    <value>Copyright (c) Microsoft Corporation. Tutti i diritti sono riservati.
+Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy.
+
+Sintassi: wslg.exe [Argument] [Options...] [CommandLine]
+
+Argomenti:
+    --cd &lt;Directory&gt;
+        Imposta la directory specificata come directory di lavoro corrente.
+        Se si usa ~, verrà usato il percorso home dell'utente Linux. Se il percorso inizia
+        con un carattere /, verrà interpretato come un percorso Linux assoluto.
+        In caso contrario, il valore deve essere un percorso assoluto di Windows.
+
+    --distribution, -d &lt;Distribuzione&gt;
+        Esegue la distribuzione specificata.
+
+    --user, -u &lt;Nome_utente&gt;
+        Esegue il comando con il nome utente specificato.
+
+    --shell-type &lt;standard|login|none&gt;
+        Esegue il comando specificato con il tipo di shell fornito.
+
+    --help
+        Visualizza le informazioni sulla sintassi.
+
+    --
+        Passa la riga di comando rimanente senza modifiche.</value>
+    <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePressAnyKeyToContinue" xml:space="preserve">
+    <value>Premere un tasto qualsiasi per continuare...</value>
+  </data>
+  <data name="MessageRequiredParameterMissing" xml:space="preserve">
+    <value>Nell'argomento {} manca un parametro obbligatorio.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageExportProgress" xml:space="preserve">
+    <value>Esportazione in corso. L'operazione potrebbe durare alcuni minuti.</value>
+  </data>
+  <data name="MessageImportProgress" xml:space="preserve">
+    <value>Importazione in corso. L'operazione potrebbe durare alcuni minuti.</value>
+  </data>
+  <data name="GuiApplicationsDisabled" xml:space="preserve">
+    <value>Il supporto dell'applicazione GUI è disabilitato tramite {} o /etc/wsl.conf.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCheckingForUpdates" xml:space="preserve">
+    <value>Verifica della disponibilità di aggiornamenti.</value>
+  </data>
+  <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
+    <value>Questa distribuzione è disponibile solo dal Microsoft Store.</value>
+  </data>
+  <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
+    <value>wsl.exe --mount in ARM64 richiede Windows versione 27653 o successiva.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdateNotNeeded" xml:space="preserve">
+    <value>La versione più recente di sottosistema Windows per Linux è già installata.</value>
+  </data>
+  <data name="MessageUpdatingToVersion" xml:space="preserve">
+    <value>Aggiornamento della sottosistema Windows per Linux alla versione: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
+    <value>Questa applicazione richiede il componente facoltativo sottosistema Windows per Linux.
+Installarlo eseguendo: wsl.exe --install --no-distribution
+Potrebbe essere necessario riavviare il sistema per rendere effettive le modifiche.</value>
+     <comment>{Locked="--install "}{Locked="--no-distribution
+"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
+    <value>Il file specificato deve avere l'estensione vhdx.</value>
+  </data>
+  <data name="MessageVmSwitchNotFound" xml:space="preserve">
+    <value>VmSwitch '{}' non è stato trovato. Switch disponibili: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVmSwitchNotSet" xml:space="preserve">
+    <value>La rete bridged richiede l'impostazione di wsl2.vmSwitch.</value>
+  </data>
+  <data name="MessageCouldFetchDistributionList" xml:space="preserve">
+    <value>Non è possibile recuperare la distribuzione degli elenchi da '{}'. {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToAttachDisk" xml:space="preserve">
+    <value>Non è stato possibile collegare il disco '{}' a WSL2: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToResizeDisk" xml:space="preserve">
+    <value>Non è possibile ridimensionare il disco.</value>
+  </data>
+  <data name="MessageFailedToTranslatePath" xml:space="preserve">
+    <value>Non è stato possibile tradurre il percorso.</value>
+  </data>
+  <data name="MessageNoValueFound" xml:space="preserve">
+    <value>Nessun valore trovato.</value>
+  </data>
+  <data name="MessageOsNotSupported" xml:space="preserve">
+    <value>La versione di Windows {} non supporta la versione in pacchetto di sottosistema Windows per Linux.
+Installa l'aggiornamento richiesto tramite Windows Update o tramite: {}
+Per informazioni, visitare https://aka.ms/wslinstall</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
+    <value>L'esecuzione della shell di debug richiede l'esecuzione wsl.exe come amministratore.</value>
+  </data>
+  <data name="MessageInstallProcessFailed" xml:space="preserve">
+    <value>Il processo di installazione per la distribuzione '{}' non è riuscito con codice di uscita: {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidGuid" xml:space="preserve">
+    <value>Formato GUID non valido: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidSection" xml:space="preserve">
+    <value>Nome di sezione non valido in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidKey" xml:space="preserve">
+    <value>Nome di chiave non valido in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigExpected" xml:space="preserve">
+    <value>Previsto {} in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
+    <value>Carattere di escape non valido: '{}' in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigUnknownKey" xml:space="preserve">
+    <value>Chiave sconosciuta '{}' in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidInteger" xml:space="preserve">
+    <value>Valore integer '{}' non valido per la chiave '{}' in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidIp" xml:space="preserve">
+    <value>Valore IP '{}' non valido per la chiave '{}' in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidBoolean" xml:space="preserve">
+    <value>Valore booleano '{}' non valido per la chiave '{}' in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigMacAddress" xml:space="preserve">
+    <value>Indirizzo Mac '{}' non valido per la chiave '{}' in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToOpenConfigFile" xml:space="preserve">
+    <value>Non è possibile aprire il file di configurazione {}, {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWarningDuringStartup" xml:space="preserve">
+    <value>Si sono verificati errori durante l'avvio di WSL</value>
+  </data>
+  <data name="MessageOpenEventViewer" xml:space="preserve">
+    <value>Apri EventViewer</value>
+  </data>
+  <data name="MessageDistributionNameNeeded" xml:space="preserve">
+    <value>Questa distribuzione non contiene un nome predefinito. Usare --name per scegliere il nome della distribuzione.</value>
+    <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
+    <value>Non è possibile specificare contemporaneamente gli argomenti {} e {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageArgumentNotValidWithout" xml:space="preserve">
+    <value>L’argomento {} richiede l’argomento {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
+    <value>Nome di distribuzione non valido: "{}".</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUsingLegacyDistribution" xml:space="preserve">
+    <value>Verrà usata la registrazione della distribuzione legacy. Provare a usare una distribuzione basata su tar.</value>
+  </data>
+  <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
+    <value>Le registrazioni di distribuzione legacy non supportano --version argument.</value>
+    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionOverriden" xml:space="preserve">
+    <value>La distribuzione "{}" è fornita da un manifesto di override.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHashMismatch" xml:space="preserve">
+    <value>L'hash di distribuzione non corrisponde. Previsto: {}, hash effettivo: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidHexString" xml:space="preserve">
+    <value>Stringa Hex non valida: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
+    <value>'{}' non è supportato durante l'installazione di distribuzioni legacy.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionInstalled" xml:space="preserve">
+    <value>Installazione della distribuzione completata. Può essere avviato tramite 'wsl.exe -d {}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidNumberString" xml:space="preserve">
+    <value>Stringa di memoria '{}' non valida per .wslconfig voce '{}' in {}:{}</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToCreateSwapVhd" xml:space="preserve">
+    <value>Non è stato possibile creare il disco di scambio in '{}': {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNestedVirtualizationNotSupported" xml:space="preserve">
+    <value>La virtualizzazione annidata non è supportata in questo computer.</value>
+  </data>
+  <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
+    <value>Non è stato possibile creare l'endpoint di rete con indirizzo: '{}', nuovo indirizzo assegnato: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToCreateNetwork" xml:space="preserve">
+    <value>Non è stato possibile creare la rete virtuale con l'intervallo di indirizzi: '{}', è stata creata una nuova rete con intervallo: '{}', {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSafeModeEnabled" xml:space="preserve">
+    <value>MODALITÀ PROVVISORIA ABILITATA - Molte funzionalità verranno disabilitate</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedReason" xml:space="preserve">
+    <value>La modalità di rete con mirroring non è supportata: {}.
+Fallback alla rete NAT.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedKernel" xml:space="preserve">
+    <value>È necessario il kernel Linux versione 5.10 o successiva</value>
+  </data>
+  <data name="MessageMirroredNetworkingNotSupportedWindowsVersion" xml:space="preserve">
+    <value>Versione di Windows {}. {} non dispone delle funzionalità necessarie</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageHyperVFirewallNotSupported" xml:space="preserve">
+    <value>Il firewall Hyper-V non è supportato</value>
+  </data>
+  <data name="MessageDnsTunnelingNotSupported" xml:space="preserve">
+    <value>Tunneling DNS non è supportato</value>
+  </data>
+  <data name="MessageLocalhostForwardingNotSupportedMirroredMode" xml:space="preserve">
+    <value>L'impostazione wsl2.localhostForwarding non ha effetto quando si usa la modalità di rete con mirroring</value>
+  </data>
+  <data name="MessageHttpProxyChangeDetected" xml:space="preserve">
+    <value>È stata rilevata una modifica del proxy HTTP nell'host. Riavviare WSL per applicare la modifica.</value>
+  </data>
+  <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
+    <value>È stata rilevata una configurazione proxy localhost ma non è stato eseguito il mirroring in WSL. WSL in modalità NAT non supporta i proxy localhost.</value>
+  </data>
+  <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
+    <value>È stata rilevata una configurazione proxy IPv6 ma non è stato eseguito il mirroring in WSL. WSL in modalità NAT non supporta IPv6.</value>
+  </data>
+  <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
+    <value>È stata rilevata una configurazione proxy IPv6 localhost, ma non è stato eseguito il mirroring in WSL. WSL non supporta i proxy IPv6 localhost.</value>
+  </data>
+  <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
+    <value>Si è verificato un errore imprevisto durante il tentativo di risolvere le impostazioni proxy; le impostazioni proxy non è stato eseguito il mirroring in WSL.</value>
+  </data>
+  <data name="MessageRegistryError" xml:space="preserve">
+    <value>Errore durante l'accesso al Registro di sistema. Percorso: '{}'. Errore: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageLocalhostRelayFailed" xml:space="preserve">
+    <value>Non è stato possibile avviare il processo di inoltro localhost. Errore: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageVirtualMachinePlatformNotInstalled" xml:space="preserve">
+    <value>Non è stato possibile avviare la rete virtuale. Installare il componente facoltativo Virtual Machine Platform eseguendo: wsl.exe --install --no-distribution</value>
+    <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
+    <value>Non è stato possibile configurare la rete (networkingMode {}). Verrà eseguito il fallback alla modalità di rete {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
+    <value>Non è stato possibile abilitare il componente di Windows '{}' (codice di uscita {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginError" xml:space="preserve">
+    <value>Il plug-in '{}' ha restituito un errore irreversibile</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
+    <value>Il plug-in '{}' ha restituito un errore irreversibile. Messaggio di errore: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePluginRequiresUpdate" xml:space="preserve">
+    <value>Il plug-in '{}' richiede una versione più recente di WSL. Eseguire: wsl.exe --update</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+    <value>L'impostazione .wslconfig '{}' è disabilitata dai criteri del computer.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDebugShellDisabled" xml:space="preserve">
+    <value>La shell di debug è disabilitata dai criteri del computer.</value>
+  </data>
+  <data name="MessageWSLMountDisabled" xml:space="preserve">
+    <value>wsl.exe --mount è disabilitato dai criteri del computer.</value>
+    <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWSL1Disabled" xml:space="preserve">
+    <value>WSL1 è disabilitato dai criteri del computer.</value>
+  </data>
+  <data name="MessageUpgradeToWSL2" xml:space="preserve">
+    <value>Eseguire 'wsl.exe --set-version {} 2' per eseguire l'aggiornamento a WSL2.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--set-version "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFinishMsiInstallation" xml:space="preserve">
+    <value>WSL sta ultimando un aggiornamento...</value>
+  </data>
+  <data name="MessageUpdateFailed" xml:space="preserve">
+    <value>Aggiornamento non riuscito (codice di uscita: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUninstallFailed" xml:space="preserve">
+    <value>Disinstallazione non riuscita (codice di uscita: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSeeLogFile" xml:space="preserve">
+    <value>File di registro: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToRemoveMsix" xml:space="preserve">
+    <value>Impossibile rimuovere il pacchetto MSIX (errore: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagedFailedToInstallMsix" xml:space="preserve">
+    <value>Impossibile installare il pacchetto MSIX (errore: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageMissingOptionalComponents" xml:space="preserve">
+    <value>I componenti facoltativi necessari per eseguire WSL non sono installati.</value>
+  </data>
+  <data name="MessageInstallMissingOptionalComponents" xml:space="preserve">
+    <value>Installa i componenti mancanti.</value>
+  </data>
+  <data name="MessageInvalidDistributionTar" xml:space="preserve">
+    <value>Il file importato non è una distribuzione Linux valida.</value>
+  </data>
+  <data name="MessagePressAnyKeyToExit" xml:space="preserve">
+    <value>Premi un tasto qualsiasi per uscire...</value>
+  </data>
+  <data name="MessageNewWslVersionAvailable" xml:space="preserve">
+    <value>È disponibile una nuova versione del sottosistema Windows per Linux.</value>
+  </data>
+  <data name="MessageUpdateToVersion" xml:space="preserve">
+    <value>Eseguire l'aggiornamento alla versione {} o visualizzarne le note sulla versione di seguito.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageUpdate" xml:space="preserve">
+    <value>Aggiorna</value>
+  </data>
+  <data name="MessageViewReleaseNotes" xml:space="preserve">
+    <value>Visualizza documenti</value>
+  </data>
+  <data name="MessageVhdInUse" xml:space="preserve">
+    <value>Non è stato possibile completare l'operazione perché vhdx è attualmente in uso. Per forzare l'arresto di WSL, usare: wsl.exe --shutdown</value>
+    <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidBoolean" xml:space="preserve">
+    <value>{} non è un valore booleano valido, &lt;true|false&gt;</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
+    <value>VHDX di tipo sparse supportato solo in WSL2.</value>
+  </data>
+  <data name="MessageLocalSystemNotSupported" xml:space="preserve">
+    <value>L'esecuzione di WSL come sistema locale non è supportata.</value>
+  </data>
+  <data name="MessagePerformanceTip" xml:space="preserve">
+    <value>Suggerimento per le prestazioni:</value>
+  </data>
+  <data name="MessageProblematicDrvFsUsage" xml:space="preserve">
+    <value>L'utilizzo di un'operazione di I/O intensivo come {} nelle unità Windows avrà prestazioni ridotte. Per prestazioni migliori, provare a spostare i file di progetto in Linux file system. Fare clic di seguito per altre informazioni.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageViewDocs" xml:space="preserve">
+    <value>Visualizza documenti</value>
+  </data>
+  <data name="MessageDontShowAgain" xml:space="preserve">
+    <value>Non visualizzare più questo messaggio</value>
+  </data>
+  <data name="MessageWSL2Crashed" xml:space="preserve">
+    <value>La macchina virtuale WSL2 ha subito un arresto anomalo.</value>
+  </data>
+  <data name="MessageWSL2CrashedStackTrace" xml:space="preserve">
+    <value>L'analisi dello stack è stata salvata in: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistributionFailedToStart" xml:space="preserve">
+    <value>Impossibile avviare la distribuzione. Codice errore: {}, passaggio errore: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDiskCorrupted" xml:space="preserve">
+    <value>Impossibile avviare la distribuzione. Il disco virtuale è danneggiato.</value>
+  </data>
+  <data name="MessageConfigKeyDuplicated" xml:space="preserve">
+    <value>Chiave di configurazione '{}' duplicata in {}:{} (chiave in conflitto: '{}' in {}:{})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageConfigInvalidEnum" xml:space="preserve">
+    <value>Valore '{}' non valido per la chiave di configurazione '{}' in {}:{} (valori validi: {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWaitingForOobe" xml:space="preserve">
+    <value>In attesa del completamento del comando OOBE per la distribuzione "{}"...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
+    <value>Non è stato possibile leggere la proprietà '{}' dalla distribuzione {} </value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePassVhdFlag" xml:space="preserve">
+    <value>Sembra un file VHDX. Usa --vhd per importare un VHDX anziché un tar.</value>
+    <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
+    <value>Non è stato possibile installare {} dal Microsoft Store: {}
+Tentativo di download web...</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNoInstallDefault" xml:space="preserve">
+    <value>Non è stata configurata alcuna distribuzione predefinita. Specificare una distribuzione da installare.</value>
+  </data>
+  <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
+    <value>wsl2.virtio9p è disabilitato. Verrà eseguito il fallback a 9p con il trasporto VSOCK.</value>
+  </data>
+  <data name="MessageInstallationCorrupted" xml:space="preserve">
+    <value>L'installazione di WSL sembra danneggiata (codice di errore: {}).
+Premere un tasto qualsiasi per ripristinare WSL oppure CTRL-C per annullare.
+Questo prompt smetterà di essere visualizzato tra 60 secondi.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
+    <value>Non è possibile analizzare il profilo del terminale durante la registrazione della distribuzione: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidSize" xml:space="preserve">
+    <value>Dimensioni non valide: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageErrorCode" xml:space="preserve">
+    <value>{}
+Codice errore: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageInvalidJson" xml:space="preserve">
+    <value>Documento JSON non valido. Errore di analisi: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageTooManyProcessors" xml:space="preserve">
+    <value>wsl2.processor non può superare il numero di processori logici nel sistema ({} &gt; {})</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFailedToQueryNetworkingMode" xml:space="preserve">
+    <value>Non è possibile eseguire query sulla modalità di rete</value>
+  </data>
+  <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
+    <value>Sono stati forniti moduli kernel personalizzati senza specificare un kernel personalizzato. Per altre informazioni, vedere https://aka.ms/wslcustomkernel.</value>
+  </data>
+  <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
+    <value>A causa di un problema di compatibilità con Accesso globale sicuro, il tunneling DNS è attualmente disabilitato.</value>
+  </data>
+  <data name="MessageSparseVhdDisabled" xml:space="preserve">
+    <value>Il supporto VHD di tipo Sparse è attualmente disabilitato a causa di un potenziale danneggiamento dei dati.
+Per forzare l'uso di un disco rigido virtuale di tipo Sparse in una distribuzione, esegui:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageDrvfsMountFailed" xml:space="preserve">
+    <value>Non è stato possibile montare {}. Per altri dettagli, vedere dmesg.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageFstabMountFailed" xml:space="preserve">
+    <value>Elaborazione di /etc/fstab con mount -a non riuscita.</value>
+  </data>
+  <data name="MessageReadOnlyDistro" xml:space="preserve">
+    <value>Si è verificato un errore durante il montaggio del disco di distribuzione. È stato montato in sola lettura come fallback.
+Vedere le istruzioni per il ripristino in: https://aka.ms/wsldiskmountrecovery</value>
+  </data>
+  <data name="MessageFailedToTranslate" xml:space="preserve">
+    <value>Traduzione di '{}' non riuscita</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
+    <value>C'è un problema. Riprova più tardi.</value>
+  </data>
+  <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
+    <value>Informazioni su</value>
+  </data>
+  <data name="Settings_About.Header" xml:space="preserve">
+    <value>Sulle impostazioni del sottosistema Windows per Linux</value>
+  </data>
+  <data name="Settings_About.Description" xml:space="preserve">
+    <value>© Microsoft. Tutti i diritti sono riservati.</value>
+  </data>
+  <data name="Settings_AppDisplayName" xml:space="preserve">
+    <value>Impostazioni del sottosistema Windows per Linux</value>
+  </data>
+  <data name="Settings_AppDescription" xml:space="preserve">
+    <value>Il sottosistema Windows per Linux Settings consente agli sviluppatori di gestire il file con estensione .wslconfig usando un'applicazione basata su GUI.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
+    <value>Recupero automatico memoria</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
+    <value>Rilascia automaticamente la memoria memorizzata nella cache dopo il rilevamento dell'utilizzo della CPU inattiva. Impostare su graduale per il rilascio lento e su DropCache per il rilascio istantaneo della memoria memorizzata nella cache.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Recupero automatico memoria.</value>
+  </data>
+  <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Rilascia automaticamente la memoria memorizzata nella cache dopo il rilevamento dell'utilizzo della CPU inattiva. Impostare su graduale per il rilascio lento e su DropCache per il rilascio istantaneo della memoria memorizzata nella cache.</value>
+  </data>
+  <data name="Settings_AutoProxy.Header" xml:space="preserve">
+    <value>Proxy automatico abilitato</value>
+  </data>
+  <data name="Settings_AutoProxy.Description" xml:space="preserve">
+    <value>Consente a WSL di utilizzare le informazioni sul proxy HTTP di Windows.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Proxy automatico abilitato.</value>
+  </data>
+  <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Consente a WSL di utilizzare le informazioni sul proxy HTTP di Windows.</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
+    <value>Usa l'analisi DNS più efficiente</value>
+  </data>
+  <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.dnsTunneling è impostato su true. Se impostato su true, Windows estrarrà la domanda dalla richiesta DNS e tenterà di risolverla ignorando i record sconosciuti.</value>
+    <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Usa l'analisi DNS più efficiente.</value>
+  </data>
+  <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.dnsTunneling è impostato su true. Se impostato su true, Windows estrarrà la domanda dalla richiesta DNS e tenterà di risolverla ignorando i record sconosciuti.</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
+    <value>Kernel personalizzato</value>
+  </data>
+  <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
+    <value>Percorso assoluto di Windows per un kernel Linux personalizzato.</value>
+  </data>
+  <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
+    <value>Esplora kernel</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Kernel personalizzato</value>
+  </data>
+  <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Percorso assoluto di Windows per un kernel Linux personalizzato.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
+    <value>Moduli kernel personalizzati</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
+    <value>Un percorso assoluto di Windows a un VHD di moduli kernel Linux personalizzati.</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
+    <value>Sfoglia moduli kernel</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Moduli kernel personalizzati</value>
+  </data>
+  <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Un percorso assoluto di Windows a un VHD di moduli kernel Linux personalizzati.</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
+    <value>Distribuzione di sistema personalizzata</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
+    <value>Esplora distribuzioni</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
+    <value>Specificare un percorso di un disco rigido virtuale che verrà caricato come distribuzione personalizzata del sistema, usato principalmente per l'alimentazione delle app GUI in WSL. [Altre informazioni sulle distribuzioni di sistema sono disponibili qui].</value>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgsystemdistro</value>
+    <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Distribuzione di sistema personalizzata</value>
+  </data>
+  <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Specificare un percorso di un disco rigido virtuale che verrà caricato come distribuzione personalizzata del sistema, usato principalmente per l'alimentazione delle app GUI in WSL.</value>
+  </data>
+  <data name="Settings_DebugConsole.Header" xml:space="preserve">
+    <value>Abilita la console di debug</value>
+  </data>
+  <data name="Settings_DebugConsole.Description" xml:space="preserve">
+    <value>Valore booleano per attivare una finestra della console di output che mostra il contenuto di dmesg all'inizio di un'istanza di distribuzione WSL 2.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Abilita la console di debug.</value>
+  </data>
+  <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Valore booleano per attivare una finestra della console di output che mostra il contenuto dei messaggi di diagnostica all'avvio di un'istanza di distribuzione WSL 2.</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
+    <value>Dimensioni predefinite del disco rigido virtuale</value>
+  </data>
+  <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
+    <value>Dimensioni massime predefinite per il disco rigido virtuale WSL espandibile (VHD) solo per le distribuzioni appena create.</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
+    <value>Reimposta dimensioni</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Dimensioni predefinite del disco rigido virtuale</value>
+  </data>
+  <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Dimensioni massime predefinite, specificate in megabyte, per il disco rigido virtuale WSL espandibile (VHD) solo per le distribuzioni appena create.</value>
+  </data>
+  <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
+    <value>Sviluppatore</value>
+  </data>
+  <data name="Settings_DocumentationLink.Content" xml:space="preserve">
+    <value>Documentazione</value>
+  </data>
+  <data name="Settings_DocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to Microsoft WSL documentation</comment>
+  </data>
+  <data name="Settings_DrvFSMode.Header" xml:space="preserve">
+    <value>Modifica la modalità DrvFS</value>
+  </data>
+  <data name="Settings_DrvFSMode.Description" xml:space="preserve">
+    <value>Modifica l'implementazione dell'accesso ai file tra sistemi operativi in WSL.</value>
+  </data>
+  <data name="Settings_DNSProxy.Header" xml:space="preserve">
+    <value>Proxy DNS abilitato</value>
+  </data>
+  <data name="Settings_DNSProxy.Description" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.networkingMode è impostato su NAT. Valore booleano per informare WSL di configurare il server DNS in Linux nel NAT nell'host. L'impostazione su false eseguirà il mirroring dei server DNS da Windows a Linux.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Proxy DNS abilitato.</value>
+  </data>
+  <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.networkingMode è impostato su NAT. Valore booleano per informare WSL di configurare il server DNS in Linux sul NAT nell'host. L'impostazione su false eseguirà il mirroring dei server DNS da Windows a Linux.</value>
+  </data>
+  <data name="Settings_DNSTunneling.Header" xml:space="preserve">
+    <value>Tunneling DNS abilitato</value>
+  </data>
+  <data name="Settings_DNSTunneling.Description" xml:space="preserve">
+    <value>Modifica la modalità di inoltro tramite proxy delle richieste DNS da WSL a Windows.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Tunneling DNS abilitato.</value>
+  </data>
+  <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Modifica la modalità di inoltro tramite proxy delle richieste DNS da WSL a Windows.</value>
+  </data>
+  <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
+    <value>File system</value>
+  </data>
+  <data name="Settings_GUIApplications.Header" xml:space="preserve">
+    <value>Abilita le applicazioni GUI</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
+    <value>Valore booleano per attivare o disattivare il supporto per le applicazioni GUI ([WSLg]) in WSL.</value>
+  </data>
+  <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgproject</value>
+    <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Abilita le applicazioni GUI.</value>
+  </data>
+  <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Valore booleano per attivare o disattivare il supporto per le applicazioni GUI (note come WSL g) in WSL.</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
+    <value>Abilita i contatori delle prestazioni hardware</value>
+  </data>
+  <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
+    <value>Abilita i contatori delle prestazioni hardware per Linux.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Abilita i contatori delle prestazioni hardware.</value>
+  </data>
+  <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Abilita i contatori delle prestazioni hardware per Linux.</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
+    <value>Firewall Hyper-V abilitato</value>
+  </data>
+  <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
+    <value>Abilita il firewall Hyper-V, che consente alle regole di Windows Firewall, nonché alle regole specifiche del traffico Hyper-V, di filtrare il traffico di rete WSL.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Firewall Hyper-V abilitato.</value>
+  </data>
+  <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Abilita il firewall Hyper-V, che consente alle regole di Windows Firewall, nonché alle regole specifiche del traffico Hyper-V, di filtrare il traffico di rete WSL.</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
+    <value>Loopback degli indirizzi host</value>
+  </data>
+  <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.networkingMode è impostato su mirroring. Se impostato su True, consentirà al contenitore di connettersi all'host o all'host di connettersi al contenitore tramite un indirizzo IP assegnato all'host. Si noti che è sempre possibile usare l'indirizzo di loopback 127.0.0.1. Questa opzione consente anche l'uso di tutti gli indirizzi IP locali assegnati.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Loopback degli indirizzi host.</value>
+  </data>
+  <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.networkingMode è impostato su mirroring. Se impostato su True, consentirà al contenitore di connettersi all'host o all'host di connettersi al contenitore tramite un indirizzo IP assegnato all'host. Si noti che è sempre possibile usare l'indirizzo di loopback 127.0.0.1. Questa opzione consente anche l'uso di tutti gli indirizzi IP locali assegnati.</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
+    <value>Porte ignorate</value>
+  </data>
+  <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.networkingMode è impostato su mirroring. Specifica a quali porte possono essere associate applicazioni Linux che non verranno inoltrate o considerate automaticamente in Windows. Deve essere formattato in un elenco delimitato da virgole, ad esempio 3000,9000,9090.</value>
+    <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
+    <value>Reimposta porte</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Porte ignorate</value>
+  </data>
+  <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.networkingMode è impostato su mirroring. Specifica le porte a cui le applicazioni Linux possono eseguire il binding che non verranno inoltrate o considerate automaticamente in Windows. Deve essere formattato in un elenco delimitato da virgole, ad esempio 3000, 9000, 9090.</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
+    <value>Timeout proxy automatico iniziale</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.autoProxy è impostato su true. Consente di configurare per quanto tempo (in millisecondi) WSL attenderà il recupero delle informazioni sul proxy HTTP all'avvio di un contenitore WSL. Se le impostazioni proxy vengono risolte dopo questo periodo di tempo, è necessario riavviare l'istanza di WSL per utilizzare le impostazioni del proxy recuperate.</value>
+    <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reimposta timeout</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Timeout proxy automatico iniziale</value>
+  </data>
+  <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Applicabile solo quando wsl2.autoProxy è impostato su true. Configura per quanto tempo, in millisecondi, WSL attenderà il recupero delle informazioni sul proxy HTTP all'avvio di un contenitore WSL. Se le impostazioni proxy vengono risolte dopo questo periodo di tempo, è necessario riavviare l'istanza di WSL per utilizzare le impostazioni del proxy recuperate.</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
+    <value>Riga di comando del kernel</value>
+  </data>
+  <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
+    <value>Argomenti aggiuntivi della riga di comando del kernel.</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
+    <value>Abilita l'inoltro localhost</value>
+  </data>
+  <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
+    <value>Valore booleano che specifica se le porte associate a caratteri jolly o localhost nella macchina virtuale WSL 2 devono essere connettibili dall'host tramite localhost:port.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Abilita l'inoltro localhost.</value>
+  </data>
+  <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Valore booleano che specifica se le porte associate a caratteri jolly o localhost nella macchina virtuale WSL 2 devono essere connettibili dall'host tramite localhost, due punti, porta.</value>
+  </data>
+  <data name="Settings_MegabyteStringFormat" xml:space="preserve">
+    <value>{0} MB</value>
+  </data>
+  <data name="Settings_MemAndProcPageTitle.Text" xml:space="preserve">
+    <value>Memoria e processore</value>
+  </data>
+  <data name="Settings_MemorySize.Header" xml:space="preserve">
+    <value>Dimensione memoria</value>
+  </data>
+  <data name="Settings_MemorySize.Description" xml:space="preserve">
+    <value>Quantità di memoria da assegnare alla macchina virtuale WSL 2.</value>
+  </data>
+  <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
+    <value>Reimposta dimensioni</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Dimensione memoria</value>
+  </data>
+  <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Quantità di memoria, specificata in megabyte, da assegnare alla macchina virtuale WSL 2.</value>
+  </data>
+  <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
+    <value>{0} millisecondi</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
+    <value>Abilita virtualizzazione annidata</value>
+  </data>
+  <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
+    <value>Valore booleano per attivare o disattivare la virtualizzazione annidata, consentendo l'esecuzione di altre macchine virtuali annidate in WSL 2.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Abilita virtualizzazione annidata.</value>
+  </data>
+  <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Valore booleano per attivare o disattivare la virtualizzazione annidata, consentendo l'esecuzione di altre macchine virtuali annidate in WSL 2.</value>
+  </data>
+  <data name="Settings_NetworkingMode.Header" xml:space="preserve">
+    <value>Modalità di rete</value>
+  </data>
+  <data name="Settings_NetworkingMode.Description" xml:space="preserve">
+    <value>Specifica la modalità di rete per WSL.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Modalità di rete.</value>
+  </data>
+  <data name="Settings_NetworkingModeComboBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Specifica la modalità di rete per WSL.</value>
+  </data>
+  <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
+    <value>Reti</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
+    <value>Puoi lavorare su tutti i file tra più sistemi operativi.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
+    <value>Accesso ai file tra più sistemi operativi</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
+    <value>Accedi ai file di Windows da Linux</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
+    <value>Puoi accedere ai file di Windows da Linux passando a ‘/mnt’ e quindi alla lettera di unità di Windows, come nell'esempio seguente per l'unità C:
+
+'cd /mnt/c'</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
+    <value>Accedi ai file Linux con Esplora file</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
+    <value>Puoi visualizzare i file Linux da Esplora file passando a '\\wsl.localhost\' o facendo clic sull'icona 'Linux'.</value>
+    <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
+    <value>Avvia i file e i programmi di Windows da WSL</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
+    <value>Anche durante l'uso di WSL, puoi eseguire i file eseguibili di Windows direttamente da bash. Prova a eseguire
+'powershell.exe /c start .' per aprire Esplora file nella cartella corrente.</value>
+    <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
+    <value>Accesso alle app di rete Linux da Windows</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
+    <value>Se stai creando un'app di rete (ad esempio un'app in esecuzione in un server NodeJS o SQL) nella distribuzione Linux, puoi accedervi da un'app di Windows (come il browser Internet Edge o Chrome) usando localhost (come faresti normalmente). Pertanto, se hai avviato un server Linux in ascolto della porta 3000, puoi passare a [http://localhost:3000] in Microsoft Edge in Windows per accedervi.</value>
+    <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
+    <value>http://localhost:3000</value>
+    <comment>{Locked}Uri to the localhost on port 3000</comment>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
+    <value>Rete in modalità mirroring</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
+    <value>WSL include anche una nuova modalità di rete, denominata modalità mirroring, che aggiunge funzionalità avanzate come il supporto IPv6 e la possibilità di accedere alle applicazioni di rete nella rete locale.</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
+    <value>Altre informazioni sull'accesso ai file tra più sistemi operativi</value>
+  </data>
+  <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslfilesystems</value>
+    <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
+  </data>
+  <data name="Settings_OOBEDisplayName" xml:space="preserve">
+    <value>Benvenuto in Sottosistema Windows per Linux</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
+   <value>WSL è un ottimo modo per provare diverse distribuzioni Linux.</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
+    <value>Gestione distribuzione</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
+    <value>Altre informazioni sui comandi WSL di base</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcommands</value>
+    <comment>{Locked}Uri to the basic WSL commands documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
+    <value>Altre informazioni sull'importazione delle distribuzioni Linux</value>
+  </data>
+  <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslcustomdistro</value>
+    <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
+    <value>Elenca comando distribuzioni WSL installabili</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l -o'</value>
+    <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
+    <value>Installa un comando di distribuzione WSL denominato</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe --install &lt;DistroName&gt;'</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
+    <value>Elenca comando distribuzioni WSL disponibili</value>
+  </data>
+  <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
+    <value>'wsl.exe -l'</value>
+    <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
+    <value>Docker Desktop funziona perfettamente con WSL per facilitare lo sviluppo con i contenitori Linux.
+
+Ecco alcuni dei vantaggi di usare Docker Desktop con WSL:
+
+• È possibile eseguire comandi Docker in WSL o in Windows usando lo stesso daemon Docker e le stesse immagini.
+• È possibile condividere file e cartelle tra Windows e Linux senza problemi, usando il montaggio automatico delle unità Windows in WSL.
+• È possibile usare gli editor e gli strumenti di Windows preferiti per lavorare su codice e file Linux e viceversa, grazie all'interoperabilità di WSL.</value>
+ </data>
+  <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
+    <value>Integrazione di Docker Desktop</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
+    <value>Altre informazioni sull'uso di WSL con Docker</value>
+  </data>
+  <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocker</value>
+    <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
+    <value>Sottosistema Windows per Linux (WSL) consente di eseguire strumenti, utilità, applicazioni e flussi di lavoro Linux preferiti direttamente in Windows.
+
+Prenditi un momento per visualizzare in anteprima alcune delle funzionalità preferite della community o leggere la documentazione completa.</value>
+  </data>
+  <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
+    <value>Ti diamo il benvenuto in WSL</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
+    <value>Procedure consigliate per l'installazione</value>
+  </data>
+  <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslsetup</value>
+    <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
+    <value>Introduzione a Linux</value>
+  </data>
+  <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgettingstarted</value>
+    <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
+    <value>Documentazione di Sottosistema Windows per Linux (WSL)</value>
+  </data>
+  <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wsldocs</value>
+    <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
+    <value>Puoi usare applicazioni Linux basate su grafica con interazioni native di Windows come ALT-TAB, avvio del menu Start, aggiunta alla barra delle applicazioni e supporto taglia e incolla.</value>
+  </data>
+  <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
+    <value>App GUI</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
+    <value>WSL può sfruttare la GPU di Windows per flussi di lavoro Machine Learning 
+
+I file binari Linux in esecuzione in WSL possono usare automaticamente la GPU in Windows per velocizzarne le prestazioni. È sufficiente installare ed eseguire questi flussi di lavoro come in un normale computer Linux. Esistono molti modi diversi per iniziare, tra cui eseguire CUDA in un contenitore Docker se si dispone di una scheda grafica NVIDIA, eseguire PyTorch o TensorFlow con DirectML sulla scheda grafica AMD, Intel o NVIDIA. Per altre informazioni, vedi la guida introduttiva riportata di seguito.</value>
+  </data>
+  <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
+    <value>Accelerazione GPU</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
+    <value>Altre informazioni sull'accelerazione GPU</value>
+  </data>
+  <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslgpu</value>
+    <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
+    <value>Altre informazioni sulle app WSL GUI</value>
+  </data>
+  <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslguiapps</value>
+    <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
+    <value>Ecco un elenco di app da provare (puoi installarle tutte in Ubuntu digitando `sudo apt install &lt;Nome dell'app&gt;')
+
+    • gedit: editor di testo di base
+    • audacity: registra e modifica i file audio
+    • blender: crea animazioni e visualizzazioni 3D
+    • gimp: modifica foto
+    • nautilus: esplora i file Linux
+    • vlc: lettore video</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
+    <value>È possibile accedere facilmente alle app di rete in tutti i sistemi operativi Windows e Linux.</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
+    <value>Integrazione di rete</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
+    <value>Altre informazioni sulle applicazioni di rete</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslnetworking</value>
+    <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
+    <value>Altre informazioni sulla rete in modalità mirroring</value>
+  </data>
+  <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslmirroredmode</value>
+    <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
+   <value>Puoi usare WSL come ambiente di sviluppo a tempo pieno direttamente da VS Code.</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
+    <value>Integrazione VS Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
+    <value>Altre informazioni sull'uso di WSL con VS Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslvscode</value>
+    <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
+    <value>Come installare</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
+    <value>Dopo aver installato VS Code, è possibile installare l'estensione WSL remota da Terminale Windows:
+
+'code –install-extension ms-vscode-remote.remote-wsl`</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
+    <value>Apri un progetto WSL in Visual Studio Code</value>
+  </data>
+  <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
+    <value>Per aprire un progetto in VS Code dalla distribuzione WSL, apri la riga di comando della distribuzione ed esegui 'code .' per aprire un file di progetto.
+
+Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi all'interno di VS Code. Premi "MAIUSC+CTRL+P" sulla tastiera per aprire il riquadro comandi e digita 'Remote-WSL' per visualizzare un elenco delle opzioni remote di VS Code disponibili; ciò consente di riaprire la cartella in una sessione remota, specificare la distribuzione da aprire e altro ancora.</value>
+  </data>
+  <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
+    <value>Modalità di utilizzo</value>
+  </data>
+  <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
+    <value>Funzionalità facoltative</value>
+  </data>
+  <data name="Settings_PageReporting.Header" xml:space="preserve">
+    <value>Abilita la creazione di report di pagine</value>
+  </data>
+  <data name="Settings_PageReporting.Description" xml:space="preserve">
+    <value>L'impostazione true predefinita consente a Windows di recuperare la memoria inutilizzata allocata alla macchina virtuale WSL 2.</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
+    <value>Informativa sulla privacy</value>
+  </data>
+  <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
+    <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
+    <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
+  </data>
+  <data name="Settings_ProcCount.Header" xml:space="preserve">
+    <value>Conteggio processori</value>
+  </data>
+  <data name="Settings_ProcCount.Description" xml:space="preserve">
+    <value>Numero di processori logici da assegnare alla macchina virtuale WSL 2.</value>
+  </data>
+  <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
+    <value>Numero di reimpostazioni</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Conteggio processori</value>
+  </data>
+  <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Numero di processori logici da assegnare alla macchina virtuale WSL 2.</value>
+  </data>
+  <data name="Settings_RelatedLinks.Text" xml:space="preserve">
+    <value>Collegamenti correlati</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
+    <value>Note sulla versione</value>
+  </data>
+  <data name="Settings_ReleaseNotesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslreleases</value>
+    <comment>{Locked}Uri to Microsoft WSL release notes</comment>
+  </data>
+  <data name="Settings_SafeMode.Header" xml:space="preserve">
+    <value>Abilita modalità provvisoria</value>
+  </data>
+  <data name="Settings_SafeMode.Description" xml:space="preserve">
+    <value>Eseguire WSL in "Modalità provvisoria" che disabilita molte funzionalità e deve essere utilizzato per ripristinare distribuzioni in stato non valido.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Abilita modalità provvisoria.</value>
+  </data>
+  <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Eseguire WSL in "Modalità provvisoria" che disabilita molte funzionalità e deve essere utilizzato per ripristinare distribuzioni in stato non valido.</value>
+  </data>
+  <data name="Settings_Shell_About.Content" xml:space="preserve">
+    <value>Informazioni su</value>
+  </data>
+  <data name="Settings_Shell_Developer.Content" xml:space="preserve">
+    <value>Sviluppatore</value>
+  </data>
+  <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
+    <value>Gestione distribuzione</value>
+  </data>
+  <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
+    <value>Integrazione di Docker Desktop</value>
+  </data>
+  <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
+    <value>File system</value>
+  </data>
+  <data name="Settings_Shell_General.Content" xml:space="preserve">
+    <value>Generale</value>
+  </data>
+  <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
+    <value>Accelerazione GPU</value>
+  </data>
+  <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
+    <value>App GUI</value>
+  </data>
+  <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
+    <value>Avvia wsl.exe</value>
+  </data>
+  <data name="Settings_Shell_MemAndProc.Content" xml:space="preserve">
+    <value>Memoria e processore</value>
+  </data>
+  <data name="Settings_Shell_Networking.Content" xml:space="preserve">
+    <value>Reti</value>
+  </data>
+  <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
+    <value>Integrazione di rete</value>
+  </data>
+  <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
+    <value>Ti diamo il benvenuto in WSL</value>
+  </data>
+  <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
+    <value>Funzionalità facoltative</value>
+  </data>
+  <data name="Settings_Shell_Settings.Content" xml:space="preserve">
+    <value>Impostazioni</value>
+  </data>
+  <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
+    <value>Integrazione VS Code</value>
+  </data>
+  <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
+    <value>Novità</value>
+  </data>
+  <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
+    <value>Operazioni su più file system</value>
+  </data>
+  <data name="Settings_IssuesLink.Content" xml:space="preserve">
+    <value>Problemi</value>
+  </data>
+  <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
+    <value>https://aka.ms/wslproject</value>
+    <comment>{Locked}Uri to Microsoft WSL issues</comment>
+  </data>
+  <data name="Settings_SparseVHD.Header" xml:space="preserve">
+    <value>Abilita il disco rigido virtuale di tipo sparse per impostazione predefinita</value>
+  </data>
+  <data name="Settings_SparseVHD.Description" xml:space="preserve">
+    <value>Se abilitata, qualsiasi disco rigido virtuale appena creato verrà impostato su sparse automaticamente.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Abilita il disco rigido virtuale di tipo sparse per impostazione predefinita.</value>
+  </data>
+  <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Se abilitata, qualsiasi disco rigido virtuale appena creato verrà impostato su sparse automaticamente.</value>
+  </data>
+  <data name="Settings_SwapFilePath.Header" xml:space="preserve">
+    <value>Scambia percorso file</value>
+  </data>
+  <data name="Settings_SwapFilePath.Description" xml:space="preserve">
+    <value>Percorso assoluto di Windows per il disco rigido virtuale di scambio.</value>
+  </data>
+  <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
+    <value>Sfoglia file di scambio</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Scambia percorso file</value>
+  </data>
+  <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Percorso assoluto di Windows per il disco rigido virtuale di scambio.</value>
+  </data>
+  <data name="Settings_SwapSize.Header" xml:space="preserve">
+    <value>Dimensioni scambio</value>
+  </data>
+  <data name="Settings_SwapSize.Description" xml:space="preserve">
+    <value>Quantità di spazio di scambio da aggiungere alla macchina virtuale WSL 2, 0 per nessun file di scambio. L'archiviazione di scambio è la RAM basata su disco usata quando la richiesta di memoria supera il limite nel dispositivo hardware.</value>
+  </data>
+  <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
+    <value>Reimposta dimensioni</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Dimensioni scambio</value>
+  </data>
+  <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Quantità di spazio di scambio, specificata in megabyte, da aggiungere alla macchina virtuale WSL 2. 0 per nessun file di scambio. L'archiviazione di scambio è la RAM basata su disco usata quando la richiesta di memoria supera il limite nel dispositivo hardware.</value>
+  </data>
+  <data name="Settings_Virtio.Header" xml:space="preserve">
+    <value>Abilita VirtIO</value>
+  </data>
+  <data name="Settings_Virtio.Description" xml:space="preserve">
+    <value>Usare i virtiof invece del piano 9 per accedere ai file host, aumentando la velocità.</value>
+  </data>
+  <data name="Settings_Virtio9p.Header" xml:space="preserve">
+    <value>Abilita Virtio 9p</value>
+  </data>
+  <data name="Settings_Virtio9p.Description" xml:space="preserve">
+    <value>Abilita il montaggio del file system 9P dall'host usando il trasporto virtio.</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
+    <value>Timeout di inattività della macchina virtuale</value>
+  </data>
+  <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
+    <value>Numero di millisecondi di inattività di una macchina virtuale prima dell'arresto.</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
+    <value>Reimposta timeout</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
+    <value>Timeout di inattività della macchina virtuale</value>
+  </data>
+  <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Numero di millisecondi di inattività di una macchina virtuale prima dell'arresto.</value>
+  </data>
+</root>
