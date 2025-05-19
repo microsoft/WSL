@@ -16,6 +16,8 @@ The following tools are required to build WSL:
     - C++ Clang compiler for Windows
     - .NET desktop development
     - .NET WinUI app development tools
+
+- Building WSL requires support for symbolic links. To ensure this capability, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) in Windows Settings or execute the build process with Administrator privileges.
     
 ## Building WSL
 
