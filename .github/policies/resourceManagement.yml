@@ -184,7 +184,7 @@ configuration:
             The scipt will output the path of the log file once done. 
 
 
-            Once completed please upload the output files to this Github issue.
+            Once completed please upload the output files to this GitHub issue.
 
 
             See [Collect WSL logs (recommended method)](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method).
@@ -229,7 +229,7 @@ configuration:
             The scipt will output the path of the log file once done. 
 
 
-            Once completed please upload the output files to this Github issue.
+            Once completed please upload the output files to this GitHub issue.
 
 
             See [Collect WSL logs (recommended method)](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method).

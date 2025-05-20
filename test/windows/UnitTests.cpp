@@ -5720,7 +5720,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
               "name": "wsl.2.4.12.0.x64.msi"
             }]})";
 
-            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGithubRelease(false, json);
+            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(false, json);
 
             VERIFY_ARE_EQUAL(version, L"2.4.12");
             VERIFY_ARE_EQUAL(asset.id, 2);
@@ -5754,7 +5754,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
           "name": "2.4.13"
         }])";
 
-            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGithubRelease(true, json);
+            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(true, json);
 
             VERIFY_ARE_EQUAL(version, L"2.5.1");
             VERIFY_ARE_EQUAL(asset.id, 2);

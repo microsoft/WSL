@@ -633,7 +633,7 @@ int Install(_In_ std::wstring_view commandLine)
 
             if (legacyDistro != nullptr)
             {
-                wsl::windows::common::distribution::Launch(*legacyDistro, installResult.InstalledViaGithub, !installResult.Alreadyinstalled);
+                wsl::windows::common::distribution::Launch(*legacyDistro, installResult.InstalledViaGitHub, !installResult.Alreadyinstalled);
             }
             else
             {

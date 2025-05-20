@@ -64,7 +64,7 @@ enum Context : ULONGLONG
     Install = 0x4000000000,
     ReadDistroConfig = 0x8000000000,
     UpdatePackage = 0x10000000000,
-    QueryLatestGithubRelease = 0x20000000000,
+    QueryLatestGitHubRelease = 0x20000000000,
     VerifyChecksum = 0x40000000000,
 };
 

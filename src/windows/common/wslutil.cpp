@@ -31,7 +31,7 @@ using namespace wsl::windows::common::wslutil;
 constexpr auto c_latestReleaseUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/latest";
 constexpr auto c_releaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases";
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
-constexpr auto c_userAgent = L"wsl-install"; // required to use the Github API
+constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";
 
 namespace {
@@ -171,7 +171,7 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
     X(UnregisterDistro),
     X(RegisterLxBus),
     X(MountDisk),
-    X(QueryLatestGithubRelease),
+    X(QueryLatestGitHubRelease),
     X(DebugShell),
     X(Plugin),
     X(CallMsi),
@@ -255,7 +255,7 @@ int UpdatePackageImpl(bool preRelease, bool repair)
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
 
-    auto [version, release] = GetLatestGithubRelease(preRelease);
+    auto [version, release] = GetLatestGitHubRelease(preRelease);
 
     if (!repair && ParseWslPackageVersion(version) <= wsl::shared::PackageVersion)
     {
@@ -899,7 +899,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     return GetSystemErrorString(result);
 }
 
-std::optional<std::pair<std::wstring, GithubReleaseAsset>> wsl::windows::common::wslutil::GetGithubAssetFromRelease(const GithubRelease& Release)
+std::optional<std::pair<std::wstring, GitHubReleaseAsset>> wsl::windows::common::wslutil::GetGitHubAssetFromRelease(const GitHubRelease& Release)
 {
     auto findAsset = [&Release](LPCWSTR Suffix) {
         for (const auto& asset : Release.assets)
@@ -913,7 +913,7 @@ std::optional<std::pair<std::wstring, GithubReleaseAsset>> wsl::windows::common:
             }
         }
 
-        return std::optional<std::pair<std::wstring, GithubReleaseAsset>>();
+        return std::optional<std::pair<std::wstring, GitHubReleaseAsset>>();
     };
 
     // Look for an MSI package first
@@ -929,31 +929,31 @@ std::optional<std::pair<std::wstring, GithubReleaseAsset>> wsl::windows::common:
     return asset.value();
 }
 
-std::pair<std::wstring, GithubReleaseAsset> wsl::windows::common::wslutil::GetLatestGithubRelease(bool preRelease)
+std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLatestGitHubRelease(bool preRelease)
 {
-    ExecutionContext context(Context::QueryLatestGithubRelease);
+    ExecutionContext context(Context::QueryLatestGitHubRelease);
 
     auto registryKey = registry::OpenLxssMachineKey();
     const auto url =
         registry::ReadString(registryKey.get(), nullptr, c_githubUrlOverrideRegistryValue, preRelease ? c_releaseListUrl : c_latestReleaseUrl);
-    WSL_LOG("PollLatestGithubRelease", TraceLoggingValue(url.c_str(), "url"));
+    WSL_LOG("PollLatestGitHubRelease", TraceLoggingValue(url.c_str(), "url"));
 
     winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
     response.EnsureSuccessStatusCode();
 
-    return GetLatestGithubRelease(preRelease, response.Content().ReadAsStringAsync().get().c_str());
+    return GetLatestGitHubRelease(preRelease, response.Content().ReadAsStringAsync().get().c_str());
 }
 
-std::pair<std::wstring, GithubReleaseAsset> wsl::windows::common::wslutil::GetLatestGithubRelease(bool preRelease, LPCWSTR releases)
+std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLatestGitHubRelease(bool preRelease, LPCWSTR releases)
 {
-    std::optional<GithubRelease> parsed{};
+    std::optional<GitHubRelease> parsed{};
 
     if (preRelease)
     {
         std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> highestVersion;
-        for (const auto& e : wsl::shared::FromJson<std::vector<GithubRelease>>(releases))
+        for (const auto& e : wsl::shared::FromJson<std::vector<GitHubRelease>>(releases))
         {
             auto version = ParseWslPackageVersion(e.name);
             if (!highestVersion.has_value() || version > highestVersion)
@@ -965,21 +965,21 @@ std::pair<std::wstring, GithubReleaseAsset> wsl::windows::common::wslutil::GetLa
     }
     else
     {
-        parsed = wsl::shared::FromJson<GithubRelease>(releases);
+        parsed = wsl::shared::FromJson<GitHubRelease>(releases);
     }
 
     THROW_HR_IF(E_UNEXPECTED, !parsed.has_value());
 
     // Find the latest release with an msix package asset
-    auto asset = GetGithubAssetFromRelease(parsed.value());
+    auto asset = GetGitHubAssetFromRelease(parsed.value());
     THROW_HR_IF_MSG(E_UNEXPECTED, !asset.has_value(), "No suitable WSL release found on github");
 
     return asset.value();
 }
 
-GithubRelease wsl::windows::common::wslutil::GetGithubReleaseByTag(_In_ const std::wstring& inTag)
+GitHubRelease wsl::windows::common::wslutil::GetGitHubReleaseByTag(_In_ const std::wstring& inTag)
 {
-    ExecutionContext context(Context::QueryLatestGithubRelease);
+    ExecutionContext context(Context::QueryLatestGitHubRelease);
 
     const winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
@@ -989,7 +989,7 @@ GithubRelease wsl::windows::common::wslutil::GetGithubReleaseByTag(_In_ const st
 
     const auto content = response.Content().ReadAsStringAsync().get();
 
-    return wsl::shared::FromJson<GithubRelease>(content.c_str());
+    return wsl::shared::FromJson<GitHubRelease>(content.c_str());
 }
 
 int wsl::windows::common::wslutil::GetLogicalProcessorCount()

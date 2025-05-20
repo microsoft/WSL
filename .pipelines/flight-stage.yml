@@ -115,6 +115,6 @@ stages:
                 pip install --user -r tools/devops/requirements.txt
                 python tools/devops/create-release.py '${{ parameters.packageVersion }}' drop\bundle\Microsoft.WSL_${{ parameters.packageVersion }}.0_x64_ARM64.msixbundle drop\bundle\wsl.${{ parameters.packageVersion }}.0.arm64.msi drop\bundle\wsl.${{ parameters.packageVersion }}.0.x64.msi --no-fetch --github-token "$env:token" ${{ iif(parameters.publishPackage, '--publish', '--use-current-ref') }}
 
-        displayName: Create Github release
+        displayName: Create GitHub release
         env:
             token: $(GITHUB_RELEASE_TOKEN)

@@ -23,7 +23,7 @@ logs_rules:
 
         If this is a networking issue, please use [collect-networking-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-networking-logs.ps1), following the instructions in [Collect WSL logs for networking issues](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#collect-wsl-logs-for-networking-issues)
         
-        Once completed please upload the output files to this Github issue.
+        Once completed please upload the output files to this GitHub issue.
          
         See [Collect WSL logs (recommended method)](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method).
         

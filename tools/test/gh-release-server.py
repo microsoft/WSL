@@ -62,7 +62,7 @@ def main(port: int, version: str, msi: str, msix: str, pre_release: bool):
             else:
                 print(f'Received unexpected request: {self.path}')
 
-    SetValueEx(lxss_key, 'GithubUrlOverride', 0, REG_SZ, f'http://127.0.0.1:{port}{RELEASES_PATH}')
+    SetValueEx(lxss_key, 'GitHubUrlOverride', 0, REG_SZ, f'http://127.0.0.1:{port}{RELEASES_PATH}')
 
     try:
 
@@ -70,7 +70,7 @@ def main(port: int, version: str, msi: str, msix: str, pre_release: bool):
             print(f'Serving on port {port}')
             server.serve_forever()
     finally:
-        DeleteValue(lxss_key, 'GithubUrlOverride')
+        DeleteValue(lxss_key, 'GitHubUrlOverride')
 
 if __name__ == '__main__':
     main()
