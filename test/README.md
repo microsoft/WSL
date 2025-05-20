@@ -113,7 +113,7 @@ For more in-depth examples of writing TAEF tests, check out `/tests/MountTests.c
 
 ### CMake
 
-For examples on how to get your test/s building within the repo, please view `/test/CMakeLists.txt` for the structure of creating add to the `wsltest.dll`. For additional information on how to use CMake, try [here](https://cmake.org/documentation/).
+For examples on how to get your test/s building within the repo, please view `/test/CMakeLists.txt` for the structure of creating add to the `wsltest.dll`. For additional information on how to use CMake, try [CMake Documentation and Community](https://cmake.org/documentation/).
 
 ### Building
 
