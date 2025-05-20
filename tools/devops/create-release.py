@@ -76,8 +76,7 @@ def get_github_pr_message(token: str, message: str) -> str:
                'Authorization': 'Bearer ' + token,
                'X-GitHub-Api-Version': '2022-11-28'}
 
-    # OSSTODO: Update repo once open source
-    response = requests.get(f'https://api.github.com/repos/microsoft/wsl-staging/pulls/{pr_number}', timeout=30, headers=headers)
+    response = requests.get(f'https://api.github.com/repos/microsoft/wsl/pulls/{pr_number}', timeout=30, headers=headers)
     response.raise_for_status()
 
     return response.json()['body'], pr_number

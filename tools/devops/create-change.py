@@ -4,7 +4,7 @@ import json
 from git import Repo
 
 COMMITER_EMAIL = 'noreply@microsoft.com'
-REPO = 'microsoft/wsl-staging' # OSSTODO: Replace with microsoft/wsl once fully open source
+REPO = 'microsoft/wsl'
 
 @click.command()
 @click.argument('repo_path', required=True)
