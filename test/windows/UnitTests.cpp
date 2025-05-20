@@ -3268,7 +3268,7 @@ autoProxy=false
 
             VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, wslConfigSettingWriteOut), ERROR_SUCCESS);
 
-            // Write out a new setting that doesn't exist in the original config but its' section
+            // Write out a new setting that doesn't exist in the original config but its section
             // does. The new setting should be appended to that section. There are two cases here::
             wslConfigSettingWriteOut.ConfigEntry = WslConfigEntry::HardwarePerformanceCountersEnabled;
             wslConfigSettingWriteOut.BoolValue = true;
