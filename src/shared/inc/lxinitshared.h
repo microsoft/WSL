@@ -155,7 +155,7 @@ Abstract:
 //
 // Typical default DrvFs-specific 9p mount options.
 //
-// N.B. These are used to pre-populate virtiofs shares with default mount options.
+// N.B. These are used to prepopulate virtiofs shares with default mount options.
 //      These will match the default values used by the system distro, and will typically
 //      match the default uid / gid for the user distro. If the values do not match, a new
 //      virtiofs share will be created.
