@@ -1686,7 +1686,7 @@ try
             // mirroredConnectedInterfaces won't equal m_hostConnectedInterfaces when:
             // - there are hidden host interfaces
             //   i.e., interfaces are in m_networkEndpoints but not in m_hostConnectedInterfaces
-            // - when HNS hasn't yet mirrored an connected host interface
+            // - when HNS hasn't yet mirrored a connected host interface
             //   i.e. interfaces are in m_hostConnectedInterfaces but not in m_networkEndpoints
             //
             // if HNS has not yet mirrored a host interface, we should not indicate we are in sync

@@ -733,7 +733,7 @@ Arguments:
 
     CommandLine - Supplies the command line of the process to launch.
 
-    Output - Supplies an optional pointer to an std::string to receive the output of the command.
+    Output - Supplies an optional pointer to a std::string to receive the output of the command.
         If no buffer is provied the output will appear in stdout.
 
     ExpectedStatus - Supplies the expected return status of the command.

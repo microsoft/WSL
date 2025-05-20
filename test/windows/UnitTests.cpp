@@ -4464,7 +4464,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             ValidateDistributionStarts(distroName);
         }
 
-        // Distribution with a a pre-existing hide profile.
+        // Distribution with a pre-existing hide profile.
         {
             constexpr auto distroName = L"custom-terminal-profile-hide";
             constexpr auto tarName = L"custom-terminal-profile-hide.tar";

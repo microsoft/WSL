@@ -1778,7 +1778,7 @@ try
     {
         //
         // Creating the temporary mount can fail if:
-        // - The distro VHD was mounted read-only (because an fsck is needed)
+        // - The distro VHD was mounted read-only (because a fsck is needed)
         // - The distro VHD is full
         //
         // Mount a writable overlay if that's the case so the distro can start.
