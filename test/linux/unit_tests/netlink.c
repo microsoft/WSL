@@ -654,7 +654,7 @@ Return Value:
             // Test case: Bind with nl_pid = 0, kernel should assign a unique
             //            ID. The first netlink socket of the process is
             //            assigned the process ID as the nl_pid. It also confirms
-            //            the the pad value is ignored.
+            //            the pad value is ignored.
             //
 
             LxtCheckErrno(Socket = socket(AF_NETLINK, Type, Family));

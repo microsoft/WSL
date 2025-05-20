@@ -2141,7 +2141,7 @@ Return Value:
     if (!g_originalDefaultDistro.empty())
     {
         // Edge case: If the previous default distro was the test distro, it might have been deleted during the testpass.
-        // Validate the the distro exists before restoring.
+        // Validate the distro exists before restoring.
 
         const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
 

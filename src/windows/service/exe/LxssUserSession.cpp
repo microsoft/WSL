@@ -1928,7 +1928,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
                 commandLine += " -v";
             }
 
-            // Run the bsdtar elf binary expand the the tar file using the socket as stdin.
+            // Run the bsdtar elf binary expand the tar file using the socket as stdin.
             commandLine += " -C " LXSS_ROOTFS_MOUNT LXSS_BSDTAR_EXTRACT_ARGS;
             auto elfContext = _RunElfBinary(
                 commandLine.c_str(),

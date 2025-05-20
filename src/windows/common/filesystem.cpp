@@ -804,7 +804,7 @@ std::pair<std::string, std::string> wsl::windows::common::filesystem::GetHostAnd
     WI_VERIFY(GetComputerNameExA(ComputerNameDnsDomain, nullptr, &size) == FALSE);
 
     // If there is no domain name, initialize with a default. Truncate the
-    // domain name to the max size that the the driver allows.
+    // domain name to the max size that the driver allows.
     // N.B. If the buffer is too small, GetComputerNameEx() sets 'size' to the string size,
     // ** including ** the null terminator. On success it returns the string size,
     // See: https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getcomputernameexa

@@ -4445,7 +4445,7 @@ Return Value:
         LxtCheckErrnoFailure(BytesReadWrite = write(PtsFd, WriteBuffer, WriteBufferLen), EAGAIN);
 
         //
-        // Try to write a byte, which will block. Wait for the the other thread
+        // Try to write a byte, which will block. Wait for the other thread
         // to unblock this request. Do this multiple times to test different
         // methods of unblocking.
         //
@@ -4601,7 +4601,7 @@ int PtMasterHangup1(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine will try to determine the the behavior when the subordinate
+    This routine will try to determine the behavior when the subordinate
     tries to write after the master has hangup.
     Expected Result: The write on subordinate should return with error 5:EIO.
 
@@ -4837,7 +4837,7 @@ int PtMasterHangup3(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine will try to determine the the behavior when the master opens,
+    This routine will try to determine the behavior when the master opens,
     writes some complete messages and closes. Subordinate then tries to read.
     Expected Result: The read on subordinate should return 0 bytes read.
 

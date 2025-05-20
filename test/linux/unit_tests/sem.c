@@ -1237,7 +1237,7 @@ int SemOpSyscall(PLXT_ARGS Args)
         //
         // Fill the operations buffer with a combination of valid operations
         // and operations that the caller does not have permission to do. The
-        // parent will verify the the semaphore values are adjusted correctly.
+        // parent will verify the semaphore values are adjusted correctly.
         //
 
         memset(Operations, 0, sizeof(Operations));

@@ -2267,7 +2267,7 @@ int VfsAccessSetFsUid(PLXT_ARGS Args)
     }
 
     //
-    // Verify that opening a the file fails since we no longer have the correct fsuid or capabilities.
+    // Verify that opening the file fails since we no longer have the correct fsuid or capabilities.
     //
 
     LxtCheckErrnoFailure(open(VFS_ACCESS_FSUID_FILE, O_RDWR), EACCES);
