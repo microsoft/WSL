@@ -107,7 +107,7 @@ For example, consider the file below, named `ExampleTest.cpp`:
     } //namespace ExampleTest
 ```
 
-For more in-depth examples of writing TAEF tests, check out `/tests/MountTests.cpp` and [here](https://docs.microsoft.com/windows-hardware/drivers/taef/authoring-tests-in-c--#advanced-authoring-tests-in-c).
+For more in-depth examples of writing TAEF tests, check out `/tests/MountTests.cpp` and [Advanced Authoring Tests in C++](https://docs.microsoft.com/windows-hardware/drivers/taef/authoring-tests-in-c--#advanced-authoring-tests-in-c).
 
 ## Building Tests
 
