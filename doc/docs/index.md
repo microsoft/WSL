@@ -1,4 +1,4 @@
-# WSL technical documentation
+# WSL open source documentation
 
 This site contains the developer documentation for the Windows Subsystem for Linux. 
 
