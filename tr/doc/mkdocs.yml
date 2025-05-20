@@ -1,0 +1,38 @@
+site_name: WSL
+
+nav:
+    - 'Home': 'index.md'
+    - 'Getting started':
+       - 'Building and testing WSL': 'dev-loop.md'
+       - 'Debugging WSL': 'debugging.md'
+    - 'WSL architecture':
+       - 'Overview': technical-documentation/index.md
+       - 'wsl.exe': technical-documentation/wsl.exe.md
+       - 'wslg.exe': technical-documentation/wslg.exe.md
+       - 'wslconfig.exe': technical-documentation/wslconfig.exe.md
+       - 'wslhost.exe': technical-documentation/wslhost.exe.md
+       - 'wslrelay.exe': technical-documentation/wslrelay.exe.md
+       - 'wslservice.exe': technical-documentation/wslservice.exe.md
+       - 'mini_init': technical-documentation/mini_init.md
+       - 'init': technical-documentation/init.md
+       - 'session leader': technical-documentation/session-leader.md
+       - 'relay': technical-documentation/relay.md
+       - 'gns': technical-documentation/gns.md
+       - 'localhost': technical-documentation/localhost.md
+       - 'plan9': technical-documentation/plan9.md  
+    - 'Technical documentation':
+       - 'Boot process': technical-documentation/boot-process.md
+       - 'Interop': technical-documentation/interop.md
+       - 'Drvfs & Plan9': technical-documentation/drvfs.md
+       - 'Systemd': technical-documentation/systemd.md
+      
+      
+plugins:
+    - search
+    - mermaid2:
+        version: 11.4.1
+        arguments:
+          securityLevel: 'loose'
+
+theme:
+    name: readthedocs
