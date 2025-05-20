@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - main
+    - master
     - release/*
 
 variables:
