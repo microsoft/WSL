@@ -442,7 +442,7 @@ void LxssInstance::_ConfigureFilesystem(_In_ ULONG Flags)
     // Part of this process will try to upgrade existing LxFs folders to
     // enable the per-directory case sensitivity flag. To allow easy detection
     // of already processed folders, and resumption in case the process is
-    // interrupted, directories are only marked case sensitive after their
+    // interrupted, directories are only marked case-sensitive after their
     // children are processed.
     //
     // Paths for LXSS instances look like so:

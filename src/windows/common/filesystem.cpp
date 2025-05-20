@@ -326,7 +326,7 @@ void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
     }
 
     //
-    // After all children are processed, mark the directory case sensitive.
+    // After all children are processed, mark the directory case-sensitive.
     //
     // N.B. This is done with a retry because if the NtfsEnableDirCaseSensitivity
     //      flag was just changed from 3 to 1, NTFS may not have updated its
@@ -562,7 +562,7 @@ void wsl::windows::common::filesystem::CreateRootFs(_In_ PCWSTR Path, _In_ ULONG
     }
 
     //
-    // Make sure the directory is marked case sensitive.
+    // Make sure the directory is marked case-sensitive.
     //
     // N.B. This is done without impersonating the client because setting this
     //      attribute requires the "delete subfolders and files" permission on
@@ -753,8 +753,8 @@ void wsl::windows::common::filesystem::EnsureDirectoryWithAttributes(
     SetExtendedAttributes(Path, LX_S_IFDIR | Mode, Uid, Gid, DistroVersion);
 
     //
-    // Mark a new directory case sensitive, or upgrade the entire tree if it
-    // exists. If the root is already case sensitive, it's assumed the entire
+    // Mark a new directory case-sensitive, or upgrade the entire tree if it
+    // exists. If the root is already case-sensitive, it's assumed the entire
     // tree is.
     //
 

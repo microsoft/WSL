@@ -124,7 +124,7 @@ std::pair<ULONG, ULONG> EnumerateFixedDrives(HANDLE Token = nullptr);
 bool EnsureDirectory(_In_ LPCWSTR pPath);
 
 /// <summary>
-/// Marks every directory in a tree case sensitive.
+/// Marks every directory in a tree case-sensitive.
 /// </summary>
 void EnsureCaseSensitiveDirectory(_In_ PCWSTR Path, _In_ ULONG Flags);
 

@@ -4700,13 +4700,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
 
-            // Verify that name matching is not case sensitive on the version.
+            // Verify that name matching is not case-sensitive on the version.
             ValidateInstall(L"Debian-12 --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
 
-            // Verify that name matching is not case sensitive on the flavor.
+            // Verify that name matching is not case-sensitive on the flavor.
             ValidateInstall(L"Debian --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
