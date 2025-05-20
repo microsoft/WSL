@@ -1899,7 +1899,7 @@ Return Value:
                 if (BytesWritten < 0)
                 {
                     //
-                    // If writing on stdin's pipe would block, mark the write as pending an continue.
+                    // If writing on stdin's pipe would block, mark the write as pending and continue.
                     // This is required blocking on the write() could lead to a deadlock if the child process
                     // is blocking trying to write on stderr / stdout while the relay tries to write stdin.
                     //
