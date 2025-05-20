@@ -3779,7 +3779,7 @@ Return Value:
 
             //
             // Check if drvfs actually used the requested fallback mode. This guards
-            // against a pre-existing instance (e.g. in another mount namespace)
+            // against a preexisting instance (e.g. in another mount namespace)
             // preventing the options from changing, or file system limitations causing
             // drvfs to use a different fallback mode than requested.
             //

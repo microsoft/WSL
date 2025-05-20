@@ -88,7 +88,7 @@ For example, consider the file below, named `ExampleTest.cpp`:
 
     #include "Common.h" // referring to /test/Common.h, where general utility functions for interacting with WSL in regards to testing reside
 
-    #define INLINE_TEST_METHOD_MARKUP // optional, but defined within the directory cmake build instructions. this is the practice that the pre-existing tests use
+    #define INLINE_TEST_METHOD_MARKUP // optional, but defined within the directory cmake build instructions. this is the practice that the preexisting tests use
 
     namespace ExampleTest
     {
