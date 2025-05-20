@@ -671,7 +671,7 @@ Return Value:
             LxtCheckEqual(AddressLength, sizeof(BindAddress), "%d");
 
             //
-            // Validate that a socket that is already bound, can not be bound again.
+            // Validate that a socket that is already bound, cannot be bound again.
             //
 
             memset(&BindAddress, 0, sizeof(BindAddress));
