@@ -213,7 +213,7 @@ revert_dir_case_sensitivity EnableNtfsDirCaseSensitivity()
 
     //
     // Just in case, make sure at least the main enable flag is set after
-    // reverting, otherwise WSL will break.
+    // reverting; otherwise, WSL will break.
     //
 
     WI_SetFlag(Flags, c_enableDirCaseSensitivity);
@@ -649,7 +649,7 @@ std::pair<ULONG, ULONG> wsl::windows::common::filesystem::EnumerateFixedDrives(H
 
 void wsl::windows::common::filesystem::EnsureCaseSensitiveDirectory(_In_ PCWSTR Path, _In_ ULONG Flags)
 {
-    // N.B. Passing SYNCHRONIZE and FILE_SYNCHRONOUS_IO_NONALERT is required, otherwise NtQueryDirectoryFile
+    // N.B. Passing SYNCHRONIZE and FILE_SYNCHRONOUS_IO_NONALERT is required; otherwise, NtQueryDirectoryFile
     // might return STATUS_PENDING, which would break our folder enumeration logic.
 
     const wil::unique_hfile Directory{CreateFileW(

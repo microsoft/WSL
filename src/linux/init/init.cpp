@@ -2941,7 +2941,7 @@ Return Value:
     //
 
     //
-    // N.B. SIGTTOU along with most other signals are blocked, otherwise
+    // N.B. SIGTTOU along with most other signals are blocked. Otherwise,
     //      this could generate a signal with the default behavior of
     //      stopping the process (waiting for SIGCONT to continue).
     //

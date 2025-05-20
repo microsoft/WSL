@@ -2894,7 +2894,7 @@ Arguments:
     Path - Supplies the path to translate.
 
     Reverse - Supplies a bool, if set perform translation from Windows->Linux
-        path, otherwise translation from Linux->Windows path.
+        path; otherwise, translation from Linux->Windows path.
 
 Return Value:
 
@@ -3015,7 +3015,7 @@ Arguments:
     Path - Supplies the path to translate.
 
     Reverse - Supplies a bool, if set perform translation from Windows->Linux
-        path, otherwise translation from Linux->Windows path.
+        path; otherwise, translation from Linux->Windows path.
 
 Return Value:
 

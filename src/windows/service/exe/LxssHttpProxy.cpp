@@ -266,7 +266,7 @@ try
         else
         {
             // note that the DropReason is not included in AreProxyStringsIdentical as we don't want to toast if that is only change,
-            // but we still want to make sure the drop reason is updated, otherwise we risk not reporting the correct drop reason to user
+            // but we still want to make sure the drop reason is updated; otherwise, we risk not reporting the correct drop reason to user
             if (newProxySettings.UnsupportedProxyDropReason != m_proxySettings->UnsupportedProxyDropReason)
             {
                 m_proxySettings->UnsupportedProxyDropReason = newProxySettings.UnsupportedProxyDropReason;

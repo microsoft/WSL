@@ -278,7 +278,7 @@ Return Value:
 
     //
     // Check that removing the first directory fails if a thread is still
-    // associated, otherwise it succeeds.
+    // associated; otherwise, it succeeds.
     //
 
     LxtCheckErrno(mkdir(CGROUP_TEST_MOUNT_POINT_DIR1, 0777));

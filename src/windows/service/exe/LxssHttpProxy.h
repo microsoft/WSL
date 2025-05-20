@@ -199,7 +199,7 @@ private:
     QueryState m_queryState{QueryState::NoQuery};
 
     /// <summary>
-    /// Used to impersonate user, as it is required for the proxy queries to run as the user, otherwise the results will be incorrect.
+    /// Used to impersonate user, as it is required for the proxy queries to run as the user; otherwise, the results will be incorrect.
     /// </summary>
     wil::unique_handle m_userToken{};
 

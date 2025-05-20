@@ -2106,7 +2106,7 @@ try
     }
 
     //
-    // Mount to a temporary location if overlayfs was requested, otherwise mount
+    // Mount to a temporary location if overlayfs was requested; otherwise, mount
     // the device directly on the target.
     //
 

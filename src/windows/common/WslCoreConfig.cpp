@@ -314,7 +314,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         MemorySizeBytes = std::min<UINT64>(MemorySizeBytes, MaximumMemorySizeBytes);
     }
 
-    // Use the user-defined swap size if one was specified, otherwise set to 25%
+    // Use the user-defined swap size if one was specified; otherwise, set to 25%
     // the memory size rounded up to the nearest GB.
     //
     // N.B. This heuristic is modeled after RedHat and Ubuntu's recommended swap size.

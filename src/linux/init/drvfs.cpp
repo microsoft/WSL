@@ -336,7 +336,7 @@ try
         return MountFilesystem(DRVFS_FS_TYPE, Source, Target, Options, ExitCode);
     }
 
-    // Use virtiofs if the source of the mount is the root of a drive, otherwise use 9p.
+    // Use virtiofs if the source of the mount is the root of a drive; otherwise, use 9p.
     if (WSL_USE_VIRTIO_FS(Config))
     {
         if (wsl::shared::string::IsDriveRoot(Source))
