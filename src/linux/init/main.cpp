@@ -2259,7 +2259,7 @@ Return Value:
     }
 
     //
-    // Chroot to system system distro mount point.
+    // Chroot to system distro mount point.
     //
     // N.B. This allows running binaries present in the system distro without having to chroot.
     //
