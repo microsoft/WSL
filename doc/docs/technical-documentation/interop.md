@@ -3,7 +3,7 @@
 The ability to launch Windows processes from Linux is controlled by 2 different levels of settings: 
 
 - The `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LxssManager\DistributionFlags` registry value, which controls the settings for all Windows users (setting the lowest significance bit disables interop)
-- The `[interop]` section in [/etc/wsl.conf](https://learn.microsoft.com/windows/wsl/wsl-config#wslconf), which controls the setting for a given WSL distribution
+- The `[interop]` section in [/etc/wsl.conf](https://learn.microsoft.com/windows/wsl/wsl-config#wslconf), which controls the setting for a given WSL distribution.
 
 ## binfmt interpreters for Windows executables 
 
