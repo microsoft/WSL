@@ -2366,7 +2366,7 @@ int ShmCtlSyscall(PLXT_ARGS Args)
 
     //
     // Generate an ID that does not refer to a valid memory region and attempt
-    // operations on the non-existent region.
+    // operations on the nonexistent region.
     //
 
     do

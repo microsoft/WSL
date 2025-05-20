@@ -1979,7 +1979,7 @@ Return Value:
     LxtCheckErrnoFailure(unlink(FS_RMDIR_TEST_DIR "/test/."), EISDIR);
 
     //
-    // Non-existent paths.
+    // Nonexistent paths.
     //
 
     LxtCheckErrnoFailure(rmdir(FS_RMDIR_TEST_DIR "/test2/.."), ENOENT);
@@ -2302,7 +2302,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Non-existent file tests.
+    // Nonexistent file tests.
     //
 
     LxtCheckErrnoFailure(creat(FS_TRAILING_TEST_FILE "/", 0666), EISDIR);
@@ -2404,7 +2404,7 @@ Return Value:
     LxtCheckErrnoFailure(rmdir(FS_TRAILING_TEST_FILE "/"), ENOTDIR);
 
     //
-    // Test a symlink to a non-existent target.
+    // Test a symlink to a nonexistent target.
     //
 
     LxtCheckErrnoZeroSuccess(unlink(FS_TRAILING_TEST_LINK));
@@ -2420,7 +2420,7 @@ Return Value:
     LxtCheckErrnoFailure(lstat(FS_TRAILING_TEST_LINK "/", &Stat), ENOENT);
 
     //
-    // Symlink to a non-existent target with trailing slash.
+    // Symlink to a nonexistent target with trailing slash.
     //
 
     LxtCheckErrnoZeroSuccess(unlink(FS_TRAILING_TEST_LINK));
@@ -3663,7 +3663,7 @@ Return Value:
     LxtCheckErrnoZeroSuccess(unlink(FS_MKNOD_TEST_FILE));
 
     //
-    // Non-existent block device.
+    // Nonexistent block device.
     //
     // N.B. Currently, no block devices exist in WSL.
     //

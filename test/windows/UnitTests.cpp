@@ -2548,7 +2548,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command.c_str(), nullptr, nullptr, nullptr, nullptr), 0u);
 
-        // Update .wslconfig and ensure an error is displayed if non-existent kernel or modules is specified.
+        // Update .wslconfig and ensure an error is displayed if nonexistent kernel or modules is specified.
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
         const std::wstring nonExistentFile = L"DoesNotExist";
         WslConfigChange configChange(LxssGenerateTestConfig({.kernel = nonExistentFile.c_str()}));
