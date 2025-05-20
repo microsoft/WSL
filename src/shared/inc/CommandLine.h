@@ -465,7 +465,7 @@ private:
         }
         else
         {
-            // Otherwise we need an actual value
+            // Otherwise, we need an actual value
             if (Value == nullptr)
             {
                 return -1;

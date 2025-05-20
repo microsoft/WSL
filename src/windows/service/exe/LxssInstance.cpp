@@ -474,7 +474,7 @@ void LxssInstance::_ConfigureFilesystem(_In_ ULONG Flags)
     ensureDirectoryWithAttributes(LXSS_ROOTFS_DIRECTORY, LXSS_ROOTFS_PERMISSIONS);
 
     // If this is the legacy distribution, ensure that the additional LxFs
-    // directories exist and have the correct attributes. Otherwise ensure that
+    // directories exist and have the correct attributes. Otherwise, ensure that
     // the rootfs/mnt directory exists for DrvFs mounts.
     switch (m_configuration.Version)
     {

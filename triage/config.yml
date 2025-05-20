@@ -5,7 +5,7 @@ logs_rules:
         # Logs are required for review from WSL team
         
         If this a feature request, please reply with '/feature'. If this is a question, reply with '/question'.
-        **Otherwise please attach logs by following the instructions below**, your issue will not be reviewed unless they are added. These logs will help us understand what is going on in your machine.
+        **Otherwise, please attach logs by following the instructions below**, your issue will not be reviewed unless they are added. These logs will help us understand what is going on in your machine.
         
         <details>
         
@@ -387,7 +387,7 @@ actions:
         defaultVhdSize = <size> # (example: 1500GB)
         ```
         
-        Otherwise if you need to increase the size of an existing distribution, you can follow [these instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-expand-the-size-of-your-wsl-2-virtual-hard-disk).
+        Otherwise, if you need to increase the size of an existing distribution, you can follow [these instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-expand-the-size-of-your-wsl-2-virtual-hard-disk).
 
     - when:
         condition:

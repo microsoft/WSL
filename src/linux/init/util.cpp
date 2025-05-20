@@ -3350,7 +3350,7 @@ int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<g
     }
     else if (execResult == sizeof(execResult))
     {
-        // Otherwise return the error code to the service
+        // Otherwise, return the error code to the service
         execResult = abs(execResult);
     }
     else

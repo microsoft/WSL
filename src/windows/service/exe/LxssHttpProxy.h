@@ -138,7 +138,7 @@ public:
 
     /// <summary>
     /// If no proxy queries have completed, wait for timeout for result.
-    /// Otherwise return the proxy settings.
+    /// Otherwise, return the proxy settings.
     /// </summary>
     std::optional<HttpProxySettings> WaitForInitialProxySettings();
 

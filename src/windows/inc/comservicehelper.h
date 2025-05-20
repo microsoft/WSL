@@ -59,7 +59,7 @@ namespace Windows { namespace Internal {
             }
             else
             {
-                // Otherwise take a reference on the MTA apartment.
+                // Otherwise, take a reference on the MTA apartment.
                 m_hrMtaInitialized = CoIncrementMTAUsage(&m_mtaUsageCookie);
             }
             RETURN_IF_FAILED(m_hrMtaInitialized);

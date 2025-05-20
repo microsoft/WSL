@@ -945,7 +945,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING));
 
-        // Write the location back to the original path in case the second registry write failed. Otherwise this is a no-op.
+        // Write the location back to the original path in case the second registry write failed. Otherwise, this is a no-op.
         registration.Write(Property::BasePath, distro.BasePath.c_str());
     });
 
