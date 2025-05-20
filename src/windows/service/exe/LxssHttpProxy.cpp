@@ -552,7 +552,7 @@ std::optional<HttpProxySettings> HttpProxyStateTracker::WaitForInitialProxySetti
 void HttpProxyStateTracker::ConfigureNetworkingMode(wsl::core::NetworkingMode mode) noexcept
 {
     auto lock = m_proxySettingsLock.lock();
-    // if we fallback to NAT mode need to strip bad settings
+    // if we fall back to NAT mode need to strip bad settings
     if (m_proxySettings.has_value() && mode != m_networkMode)
     {
         FilterProxySettingsByNetworkConfiguration(m_proxySettings.value(), mode);
