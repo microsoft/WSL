@@ -3,6 +3,12 @@ trigger:
     include:
     - master
     - release/*
+    
+pr:
+  branches:
+    include:
+      - master
+      - release/*
 
 variables:
   WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
