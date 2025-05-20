@@ -3450,7 +3450,7 @@ void WaitForBootProcess(wsl::linux::WslDistributionConfig& Config)
     }
 
     //
-    // Launch the boot process wait for for it to finish booting.
+    // Launch the boot process wait for it to finish booting.
     //
 
     MESSAGE_HEADER Message{};
