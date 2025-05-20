@@ -1433,7 +1433,7 @@ Return Value:
     //
     // Check if the prefix matches.
     //
-    // N.B. For Windows paths, this is done case insensitive.
+    // N.B. For Windows paths, this is done case-insensitive.
     //
 
     if (!wsl::shared::string::StartsWith(Path, Prefix, WinPath))
