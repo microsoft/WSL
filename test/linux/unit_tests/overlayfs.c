@@ -2064,7 +2064,7 @@ Return Value:
     //
     // Open the same file for read and write. The read file will be from the
     // lower layer, but opening the file for write will cause the file to be
-    // hydated in the upper layer and the inode updated.
+    // hydrated in the upper layer and the inode updated.
     //
 
     LxtCheckErrno(Fd = open(OVFS_TEST_MOUNT_PATH "/OnlyInLowerFile", O_RDONLY, 0));
