@@ -644,7 +644,7 @@ namespace Windows { namespace Internal {
                     // control codes to the service.
                     //
                     // We stop asynchronously to have the same codepath as system
-                    // stop requestes.
+                    // stop requests.
                     //
                     reinterpret_cast<TBase*>(this)->OnSystemShutdown();
                     StopAsync();
