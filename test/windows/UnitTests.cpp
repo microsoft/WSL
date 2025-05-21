@@ -4051,7 +4051,7 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
             InstallFromTar(L"distro-no-default-name.tar", L"", -1, expectedOutput);
 
-            // And suceed with --name
+            // And succeed with --name
             InstallFromTar(L"distro-no-default-name.tar", L"--name test-distro-no-default-name");
             ValidateDistributionStarts(L"test-distro-no-default-name");
 
