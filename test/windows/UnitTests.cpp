@@ -3106,13 +3106,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                     booleansToTest,
                 },
                 {
-                    {.ConfigEntry = WslConfigEntry::DNSTunellingEnabled},
+                    {.ConfigEntry = WslConfigEntry::DNSTunnelingEnabled},
                     // This setting is only enabled when NetworkingMode != Nat && NetworkingMode != Mirrored
                     booleansToTest,
                 },
                 {
                     {.ConfigEntry = WslConfigEntry::BestEffortDNSParsingEnabled},
-                    // This setting is only enabled when DNSTunellingEnabled = true
+                    // This setting is only enabled when DNSTunnelingEnabled = true
                     booleansToTest,
                 },
                 {

@@ -144,7 +144,7 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
         static_assert(std::is_same<decltype(wslConfigSetting.BoolValue), decltype(wslConfig->Config.EnableDnsProxy)>::value);
         wslConfigSetting.BoolValue = wslConfig->Config.EnableDnsProxy;
         break;
-    case DNSTunellingEnabled:
+    case DNSTunnelingEnabled:
         static_assert(std::is_same<decltype(wslConfigSetting.BoolValue), decltype(wslConfig->Config.EnableDnsTunneling)>::value);
         wslConfigSetting.BoolValue = wslConfig->Config.EnableDnsTunneling;
         break;
@@ -451,7 +451,7 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
     case DNSProxyEnabled:
         return SetWslConfigSetting(
             wslConfig, ConfigSetting::DnsProxy, defaultConfig.EnableDnsProxy, wslConfigSetting.BoolValue, wslConfig->Config.EnableDnsProxy);
-    case DNSTunellingEnabled:
+    case DNSTunnelingEnabled:
     {
         static_assert(std::is_same<decltype(wslConfigSetting.BoolValue), decltype(wslConfig->Config.EnableDnsTunneling)>::value);
         ConfigKey key({ConfigSetting::DnsTunneling, ConfigSetting::Experimental::DnsTunneling}, wslConfigSetting.BoolValue);

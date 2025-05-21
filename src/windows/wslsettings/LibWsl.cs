@@ -31,7 +31,7 @@ namespace LibWsl
         AutoProxyEnabled = 11,
         InitialAutoProxyTimeout = 12,
         DNSProxyEnabled = 13,
-        DNSTunellingEnabled = 14,
+        DNSTunnelingEnabled = 14,
         BestEffortDNSParsingEnabled = 15,
         AutoMemoryReclaim = 16,
         GUIApplicationsEnabled = 17,
