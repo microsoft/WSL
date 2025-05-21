@@ -598,7 +598,7 @@ catch (...)
 wsl::windows::common::filesystem::TempFile ExtractMsix(MSIHANDLE install)
 {
     // N.B. We need to open the database this way instead of calling MsiGetActiveDatabase() because
-    // this is defered action so we don't have access to the MSI context here.
+    // this is deferred action so we don't have access to the MSI context here.
     // The MSIX needs to be extracted like this because in the case of an upgrade this action runs before 'MoveFiles' so the WSL directory isn't available yet.
 
     const auto installTarget = GetInstallTarget(install);
