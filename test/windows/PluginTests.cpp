@@ -594,7 +594,7 @@ class PluginTests
             LR"(Plugin loaded. TestMode=15
                 VM created (settings->CustomConfigurationFlags=0)
                 Distribution registered, name=plugin-test-distro, package=, Flavor=debian, Version=12
-                OnDistributionRegisted: E_UNEXPECTED
+                OnDistributionRegistered: E_UNEXPECTED
                 Distribution unregistered, name=plugin-test-distro, package=, Flavor=debian, Version=12
                 OnDistributionUnregistered: E_UNEXPECTED
                 VM Stopping)";

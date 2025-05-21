@@ -306,7 +306,7 @@ HRESULT OnDistroStopping(const WSLSessionInformation* Session, const WSLDistribu
     return S_OK;
 }
 
-HRESULT OnDistributionRegisted(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* Distribution)
+HRESULT OnDistributionRegistered(const WSLSessionInformation* Session, const WslOfflineDistributionInformation* Distribution)
 {
     g_logfile << "Distribution registered, name=" << wsl::shared::string::WideToMultiByte(Distribution->Name)
               << ", package=" << wsl::shared::string::WideToMultiByte(Distribution->PackageFamilyName)
@@ -315,7 +315,7 @@ HRESULT OnDistributionRegisted(const WSLSessionInformation* Session, const WslOf
 
     if (g_testType == PluginTestType::FailToRegisterUnregisterDistro)
     {
-        g_logfile << "OnDistributionRegisted: E_UNEXPECTED" << std::endl;
+        g_logfile << "OnDistributionRegistered: E_UNEXPECTED" << std::endl;
         return E_UNEXPECTED;
     }
 
@@ -357,7 +357,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         Hooks->OnVMStopping = &OnVmStopping;
         Hooks->OnDistributionStarted = &OnDistroStarted;
         Hooks->OnDistributionStopping = &OnDistroStopping;
-        Hooks->OnDistributionRegistered = &OnDistributionRegisted;
+        Hooks->OnDistributionRegistered = &OnDistributionRegistered;
         Hooks->OnDistributionUnregistered = &OnDistributionUnregistered;
 
         if (g_testType == PluginTestType::FailToLoad)
