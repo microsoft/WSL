@@ -2516,7 +2516,7 @@ Arguments:
 
 Return Value:
 
-    The file descriptor represending the mount namespace on soccess, -1 on failure.
+    The file descriptor representing the mount namespace on soccess, -1 on failure.
 
 --*/
 
