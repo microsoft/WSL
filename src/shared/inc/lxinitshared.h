@@ -176,7 +176,7 @@ Abstract:
 #define LX_INIT_HVSOCKET_TIMEOUT_SECONDS (30)
 
 //
-// The data for begining a port listener.
+// The data for beginning a port listener.
 //
 
 #define LX_INIT_LOCALHOST_RELAY "localhost"
