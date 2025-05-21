@@ -141,7 +141,7 @@ DistributionList ReadFromManifest(const std::wstring& url)
             }
         }
 
-        // The "Default" string takes precendence. If not present, use the first legacy distro entry.
+        // The "Default" string takes precedence. If not present, use the first legacy distro entry.
         if (!distros.Default.has_value() && distros.Distributions.has_value() && distros.Distributions->size() > 0)
         {
             distros.Default = (*distros.Distributions)[0].Name;
