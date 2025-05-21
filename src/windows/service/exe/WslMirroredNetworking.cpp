@@ -1026,7 +1026,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
     const auto makingIpInterfaceUpdate = endpoint.Network->PendingIPInterfaceUpdate;
     // Linux may delete routes behind us when making interface, address, and route changes
     // will track when to refresh v4 and v6 routes to ensure routes are still present after changes
-    // a few custmomers have seen this when we update temporary v6 addresses, for example
+    // a few customers have seen this when we update temporary v6 addresses, for example
     auto refreshAllRoutes = false;
 
     // First: update Linux with any interface updates
