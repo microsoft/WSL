@@ -112,8 +112,8 @@ int PipeZeroByteRead(PLXT_ARGS Args);
 static const LXT_VARIATION g_LxtVariations[] = {
     {"Pipe0", PipeVariation0},
     {"Pipe1", PipeVariation1},
-    {"Pipe reader hanup", PipeReaderHangup},
-    {"Pipe writer hanup", PipeWriterHangup},
+    {"Pipe reader hangup", PipeReaderHangup},
+    {"Pipe writer hangup", PipeWriterHangup},
     {"Pipe ioctls", PipeVariationIoctl},
     {"Pipe - epoll", PipeEpoll},
     {"Pipe - Fifo", PipeFifo},
