@@ -196,7 +196,7 @@ int TimerFdBasic(PLXT_ARGS Args)
 
     //
     // Loop three times. In each iteration increase the wait time by one seconds.
-    // this should increase the expiration count by one in each interation.
+    // this should increase the expiration count by one in each iteration.
     //
 
     for (LoopIndex = 1; LoopIndex <= LXT_BASIC_TEST_LOOP_COUNT; LoopIndex += 1)
