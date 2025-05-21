@@ -1744,7 +1744,7 @@ int PtBufferTerminalFill(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine checks the internal implemenation of the buffer by attempting
+    This routine checks the internal implementation of the buffer by attempting
     to fill it.
 
 Arguments:
