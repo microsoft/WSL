@@ -95,7 +95,7 @@ Please send this dump to: secure@microsoft.com .
 Make sure that the email body contains:
 
 - The Github issue number, if any
-- That this dump is destinated to the WSL team
+- That this dump is destined to the WSL team
 
 ### 11) Reporting a WSL process crash
 
