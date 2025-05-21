@@ -104,7 +104,7 @@ CreateLxProcessData LxssCreateProcess::ParseArguments(
     return Parsed;
 }
 
-// static function defintions
+// static function definitions
 std::vector<gsl::byte> LxssCreateProcess::CreateMessage(_In_ LX_MESSAGE_TYPE MessageType, _In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid)
 {
     //

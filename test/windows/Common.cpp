@@ -1142,7 +1142,7 @@ Return Value:
     return output;
 }
 
-// WslKeepAlive class defintions
+// WslKeepAlive class definitions
 
 WslKeepAlive::WslKeepAlive(HANDLE Token) : m_token(Token)
 {
