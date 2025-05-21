@@ -758,7 +758,7 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | wc -l | grep 1"), 0u);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode -n | wc -l | grep 0"), 0u);
 
-            // Ensure various wslinfo functionaly works as expected.
+            // Ensure various wslinfo functionally works as expected.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
 
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
