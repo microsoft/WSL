@@ -5379,7 +5379,7 @@ Return Value:
     // Check for general set/get of the SO_PASSCRED socket option.
     //
     // N.B After this routine, the state of the 'SO_PASSCRED' socket option in
-    //     the socket is not gauranteed.
+    //     the socket is not guaranteed.
     //
 
     LxtCheckErrno(SocketGetSetBooleanSocketOption(Socket, SOL_SOCKET, SO_PASSCRED, false));
