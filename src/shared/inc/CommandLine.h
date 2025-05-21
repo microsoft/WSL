@@ -375,7 +375,7 @@ public:
                         const TChar* value = nullptr;
                         if (e.Positional)
                         {
-                            value = m_argv[i]; // Positonal arguments directly receive arvg[i]
+                            value = m_argv[i]; // Positional arguments directly receive arvg[i]
                         }
                         else if (i + 1 < m_argc)
                         {
