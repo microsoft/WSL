@@ -2962,7 +2962,7 @@ void WslCoreVm::ValidateNetworkingMode()
         {
             if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(m_vmConfig))
             {
-                // Since hyper-V firewall is enabled by default, only show the warning if the user explicitely asked for it.
+                // Since hyper-V firewall is enabled by default, only show the warning if the user explicitly asked for it.
                 if (m_vmConfig.FirewallConfigPresence == ConfigKeyPresence::Present)
                 {
                     EMIT_USER_WARNING(Localization::MessageHyperVFirewallNotSupported());
@@ -3001,7 +3001,7 @@ void WslCoreVm::ValidateNetworkingMode()
     // If DNS tunneling was requested, ensure it is supported by Windows.
     if (m_vmConfig.EnableDnsTunneling && !IsDnsTunnelingSupported())
     {
-        // Since DNS tunneling is enabled by default, only show the warning if the user explicitely asked for it.
+        // Since DNS tunneling is enabled by default, only show the warning if the user explicitly asked for it.
         if (m_vmConfig.DnsTunnelingConfigPresence == ConfigKeyPresence::Present)
         {
             EMIT_USER_WARNING(Localization::MessageDnsTunnelingNotSupported());
