@@ -3656,8 +3656,8 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
 void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
     _In_ HKEY LxssKey, _In_opt_ LPCWSTR Path, _In_opt_ LPCWSTR Name, const std::optional<GUID>& Exclude)
 {
-    // Use the cannonical path to compare distribution registration paths.
-    // The cannonical path allows us to compare paths regardless of symlinks.
+    // Use the canonical path to compare distribution registration paths.
+    // The canonical path allows us to compare paths regardless of symlinks.
     //
     // Even with this, it's theoretically possible to use different drive mounts to have two paths
     // that will point to the same underlying folder. To catch this, we'd need to use BY_HANDLE_FILE_INFORMATION and compare file & volume indexes.
