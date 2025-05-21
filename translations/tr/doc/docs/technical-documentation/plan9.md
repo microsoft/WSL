@@ -10,7 +10,7 @@ WSL1 dağıtımlarında, `plan9` dosya sistemini bir unix soketi üzerinden suna
 
 WSL2 dağıtımlarında, `plan9` dosya sistemini bir `hvsocket` üzerinden çalıştırır
 
-## Dağıtım dosyalarına Windows'tan erişme
+## Dağıtım Dosyalarına Windows'tan Erişme
 
 Windows'tan, özel bir yönlendirici sürücü (p9rdr.sys) hem `\\wsl$` hem de `\\wsl.localhost` adreslerini kaydeder. Bu yollardan herhangi birine erişildiğinde, `p9rdr.sys` belirli bir Windows kullanıcısı için mevcut dağıtımları listelemek üzere [wslservice.exe] (wslservice.exe.md) dosyasını çağırır.
 

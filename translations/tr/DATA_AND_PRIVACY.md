@@ -1,4 +1,4 @@
-# WSL verileri ve gizlilik
+# WSL Verileri ve Gizlilik
 
 ## Genel Bakış
 
@@ -6,7 +6,7 @@ WSL, diğer Windows bileşenleri gibi Windows telemetrisini kullanarak tanılama
 
 Daha fazla bilgi için lütfen [Microsoft gizlilik bildirimi](https://www.microsoft.com/privacy/privacystatement) adresini okuyun.
 
-## WSL ne toplar?
+## WSL Ne Toplar?
 
 1. Kullanım
    - WSL'de en sık hangi özelliklerin ve ayarların kullanıldığını anlamak, zamanımızı ve enerjimizi nereye odaklayacağımız konusunda karar vermemize yardımcı olur.

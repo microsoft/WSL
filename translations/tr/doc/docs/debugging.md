@@ -1,6 +1,6 @@
 # WSL'de Hata Ayıklama
 
-## Log kaydı
+## Log Kaydı
 
 WSL'de birden fazla log kaydı kaynağı vardır. Bunlardan en önemlisi Windows işlemlerinden yayılan ETL izidir.
 
@@ -9,7 +9,7 @@ Bir ETL izi toplamak için ([wsl.wprp bağlantısı](https://github.com/microsof
 ```
 wpr -start wsl.wprp -filemode
 
-[sorunu yeniden üretin]
+[sorunu yeniden oluşturun]
 
 wpr -stop logs.ETL
 ```
@@ -43,20 +43,20 @@ debugConsole=true
 dosyasını `%USERPROFILE%/.wslconfig` olarak değiştirin ve WSL'yi yeniden başlatın
 
 
-## Hata ayıklayıcıları ekleme
+## Hata Ayıklayıcıları Ekleme
 
 Usermode WSL Windows işlemlerine eklenebilir (wsl.exe, wslservice.exe, wslrelay.exe, ...). Semboller `bin/<platform>/<hedef>` klasörü altında mevcuttur. 
 
 İşlemler çöktüğünde otomatik olarak çökme dökümlerini toplamak için [bu numarayı](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#11-reporting-a-wsl-process-crash) da kullanabilirsiniz.
 
-## Linux hata ayıklama
+## Linux Hata Ayıklama
 
 `gdb` Linux süreçlerine eklenebilir (bkz. [man gdb](https://man7.org/linux/man-pages/man1/gdb.1.html)). 
 
 Bir WSL işleminde gdb ile hata ayıklamanın en basit yolu, koda gdb'den erişmek için `/mnt` bağlama noktalarını kullanmaktır. 
 Başladıktan sonra, kaynak dosyalara bağlanmak için gdb'de `dir /path/to/wsl/source` kullanın.
 
-## Root namespace hata ayıklama
+## Root Namespace Hata Ayıklama
 
 `gns` veya `mini_init` gibi bazı WSL işlemlerine WSL dağıtımları içinden erişilemez. Bunlara bir hata ayıklayıcı eklemek için, hata ayıklama kabuğunu kullanın:
 

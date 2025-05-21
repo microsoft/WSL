@@ -1,4 +1,4 @@
-# WSL açık kaynak belgeleri
+# WSL Açık Kaynak Belgeleri
 
 Derleme talimatları: 
 

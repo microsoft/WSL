@@ -11,11 +11,11 @@ Etkinleştirildiğinde, [init](init.md) dağıtım başladığında `/sbin/init`
 
 `Sbin/init` başlatıldıktan sonra, [init](init.md) systemd'nin hazır olması için `systemctl is-system-running` komutunun `running` ya da `degraded` değerlerinden birini döndürmesini bekler. Belirli bir süre sonunda WSL zaman aşımına uğrayacak ve systemd hazır olmasa bile dağıtımın başlamaya devam etmesine izin verecektir.
 
-## Kullanıcı oturumları
+## Kullanıcı Oturumları
 
 systemd etkinleştirildiğinde, WSL başlatma işlemlerini systemd kullanıcı oturumlarıyla senkronize etmeye çalışır. Bu, şu anda ilişkili systemd kullanıcı oturumunu başlatmak için `login -f <kullanıcı>` başlatılarak yapılmaktadır.
 
-## Ek systemd yapılandırması 
+## Ek systemd Yapılandırması 
 
 Systemd ile uyumluluğu artırmak için WSL, açılış sırasında (`/run` altında) çeşitli systemd yapılandırma dosyaları oluşturur. Bu konfigürasyon dosyaları şu amaçlarla kullanılır:
 

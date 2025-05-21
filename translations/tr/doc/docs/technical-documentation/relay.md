@@ -2,7 +2,7 @@
 
 Relay, bir [session leader](session-leader.md) tarafından oluşturulan bir WSL2 linux sürecidir. Görevi, kullanıcı adına bir linux süreci oluşturmak ve çıktısını Windows'a geri iletmektir. 
 
-## Bir kullanıcı süreci oluşturma
+## Bir Kullanıcı Süreci Oluşturma
 
 Bir `LxInitMessageCreateProcessUtilityVm` mesajı bir [session leader](session-leader.md)'a gönderildiğinde bir relay oluşturulur. Oluşturulduktan sonra, `relay` [wslservice.exe](wslservice.exe.md) ile birden fazla `hvsocket` kanalı oluşturur.
 

@@ -2,7 +2,7 @@
 
 `wslhost.exe` masaüstü bildirimlerini görüntülemek ve arka planda Linux işlemlerini çalıştırmak için kullanılan bir Windows yürütülebilir dosyasıdır.
 
-## COM sunucusu
+## COM Sunucusu
 
 COM sunucusu olarak çalışırken, `wslhost.exe` bir [NotificationActivatorFactory](https://learn.microsoft.com/dotnet/api/microsoft.toolkit.uwp.notifications.notificationactivator?view=win-comm-toolkit-dotnet-7.1) kaydeder ve bu daha sonra kullanıcıya masaüstü bildirimlerini görüntülemek için kullanılır.
 
@@ -14,7 +14,7 @@ Bildirimler şu amaçlarla kullanılabilir:
 
 Bakınız: `src/windows/common/notifications.cpp`
 
-## Arka plan işlemleri 
+## Arka Plan İşlemleri 
 
 [wsl.exe](wsl.exe.md) ilişkili Linux süreçleri sonlanmadan önce sonlandığında, `wslhost.exe` Linux sürecinin yaşam süresini devralır. 
 

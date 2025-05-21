@@ -37,7 +37,7 @@ Katkılarınız için şimdiden teşekkür ederiz! WSL’yi herkes için daha iy
 **Windows çökmesi (BSOD) veya güvenlik sorunları için GitHub’da sorun oluşturmayın.**. Bunun yerine, bu tür durumları secure@microsoft.com adresine e-posta ile bildirin. Detaylı bilgi için aşağıdaki `10) Reporting a Windows crash (BSOD)` bölümüne bakın.
 
 ### WSL Arayüz / Metin Görselleştirme / Kullanıcı Deneyimi Sorunları
-WSL dağıtımları genellikle Windows Konsolu’nda açılır (farklı bir terminal ayarlamadıysanız). Bu nedenle, konsol arayüzü ile ilgili sorunlar için lütfen [Windows Console hata izleyiciye](https://github.com/microsoft/console) bildirimde bulunun.
+WSL dağıtımları genellikle (farklı bir terminal ayarlamadıysanız) Windows Konsolu’nda açılır. Bu nedenle, konsol arayüzü ile ilgili sorunlar için lütfen [Windows Console hata izleyiciye](https://github.com/microsoft/console) bildirimde bulunun.
 
 ### Ağ Sorunları İçin WSL Loglarını Toplama
 
@@ -107,7 +107,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 
 Kod tamamlandığında günlük dosyasına giden yolun çıktısını verecektir.
 
-#### Otomatik çökme dökümü toplamayı etkinleştirme
+#### Otomatik Çökme Dökümü Toplamayı Etkinleştirme
 
 Çökmeniz düzensizse veya yeniden oluşturması zorsa, lütfen bu davranışa ilişkin günlükleri yakalamak için otomatik çökme dökümlerini etkinleştirin:
 
@@ -128,9 +128,9 @@ reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Repo
 
 ### 12) wslservice için Time Travel Debugging İzleri Toplama
 
-To collect time travel debugging traces:
+Time Travel Debugging İzleri'ni toplamak için:
 
-1) [Windbg Preview'ı yükleyin](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
+1) [Windbg Preview'i yükleyin](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
 
 2) Yönetici olarak açtığınız komut isteminde `windbgx` komutunu çalıştırarak windbg önizlemesini yönetici olarak açın
 

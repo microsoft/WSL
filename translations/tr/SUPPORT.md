@@ -1,6 +1,6 @@
 # Destek
 
-## Nasıl sorun bildirilir ve yardım alınır 
+## Nasıl Sorun Bildirilir ve Yardım Alınır 
 
 Bu proje [track bugs][gh-bug] ve [feature requests][gh-feature] için [GitHub Issues][gh-issue] kullanır. Yinelemeleri önlemek için lütfen yeni sorunlar açmadan önce mevcut sorunları arayın. Yeni sorunlar için, hatanızı veya özellik isteğini yeni bir Sorun olarak belirtin.
 

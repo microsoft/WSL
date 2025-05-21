@@ -1,10 +1,10 @@
-# Linux için Windows Alt Sistemi (WSL) deposuna hoş geldiniz
+# Linux için Windows Alt Sistemi (WSL) Deposuna Hoş Geldiniz
 
 <p align="center">
   <img src="../Images/Square44x44Logo.targetsize-256.png" alt="WSL logo"/>
 </p>
 
-[WSL hakkında daha fazla bilgi edinin](https://aka.ms/wsldocs) | [İndirmeler & Sürüm notları](https://github.com/microsoft/WSL/releases) | [WSL'ye Katkıda Bulunmak](./CONTRIBUTING.md)
+[WSL hakkında daha fazla bilgi edinin](https://aka.ms/wsldocs) | [İndirmeler ve Sürüm notları](https://github.com/microsoft/WSL/releases) | [WSL'ye Katkıda Bulunmak](./CONTRIBUTING.md)
 
 ## Hakkında
 
@@ -18,7 +18,7 @@ wsl --install
 
 [Kurulum için en iyi uygulamalar](https://learn.microsoft.com/windows/wsl/setup/environment) hakkında daha fazla bilgi edinebilirsiniz, [WSL'ye genel bakış](https://learn.microsoft.com/windows/wsl/about) ve daha fazlası [WSL dokümantasyon sayfamızda](https://learn.microsoft.com/windows/wsl/).
 
-## İlgili depolar
+## İlgili Depolar
 
 WSL ayrıca ilgili açık kaynak depolarına da sahiptir:
 
@@ -42,7 +42,7 @@ Bu proje [Microsoft Açık Kaynak Davranış Kuralları](./CODE_OF_CONDUCT.md)'n
 
 Bu proje, projeler, ürünler veya hizmetler için ticari markalar veya logolar içerebilir. Microsoft ticari markalarının veya logolarının yetkili kullanımı [Microsoft'un Ticari Marka ve Marka Yönergelerine](https://www.microsoft.com/legal/intellectualproperty/trademarks) tabidir ve bunlara uyulmalıdır. Bu projenin değiştirilmiş sürümlerinde Microsoft ticari markalarının veya logolarının kullanılması karışıklığa neden olmamalı veya Microsoft sponsorluğu anlamına gelmemelidir. Üçüncü taraf ticari markalarının veya logolarının kullanımı, söz konusu üçüncü tarafın politikalarına tabidir.
 
-## Gizlilik ve telemetri
+## Gizlilik ve Telemetri
 
 Uygulama temel tanılama verilerini (telemetri) günlüğe kaydeder. Gizlilik ve ne topladığımız hakkında daha fazla bilgi için [veri ve gizlilik belgelerimize](DATA_AND_PRIVACY.md) bakın.
 

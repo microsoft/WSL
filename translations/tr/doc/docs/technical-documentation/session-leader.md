@@ -1,8 +1,8 @@
-# Session leader
+# Session Leader
 
 Bir session leader, bir `LxInitMessageCreateSession` mesajı aldıktan sonra [init](init.md)'den çatallanan bir linux sürecidir (bkz. `src/linux/init.cpp`)
 
-## Linux süreçleri oluşturma
+## Linux Süreçleri Oluşturma
 
 Oturum liderleri kullanıcı adına linux süreçleri oluşturmak için kullanılır. Her linux session leader bir Windows konsoluyla ilişkilendirilir. 
 
@@ -13,7 +13,7 @@ Bir kullanıcı işlemi oluşturmak için [wslservice.exe](wslservice.exe.md), o
 - Ortam değişkenleri 
 - Kullanıcı adı
 
-### WSL1 süreci oluşturma
+### WSL1 Süreci Oluşturma
 
 Bir WSL1 dağıtımında çalışırken, session leader forks() yapar ve kullanıcı linux sürecine `exec()` yapmak için alt süreci kullanır. `Exec()` işlevini çağırmadan önce, child aşağıdaki gibi çeşitli ayarları yapılandırır:
 
@@ -21,6 +21,6 @@ Bir WSL1 dağıtımında çalışırken, session leader forks() yapar ve kullan�
 - Geçerli dizin
 - Standart dosya tanımlayıcıları (stdin, stdout, stderr)
 
-## WSL2 süreci oluşturma
+## WSL2 Süreci Oluşturma
 
 Bir WSL2 dağıtımında çalışırken, oturum liderleri kullanıcı sürecini oluşturmaktan ve çıktısını [wsl.exe](wsl.exe.md)'ye geri iletmekten sorumlu olan bir [relay](relay.md) süreci oluşturmak için forks()
