@@ -1110,7 +1110,7 @@ Arguments:
 
     String - Supplies the string to split.
 
-    Delim - The deliminiter to split the string on.
+    Delim - The delimiter to split the string on.
 
 Return Value:
 
