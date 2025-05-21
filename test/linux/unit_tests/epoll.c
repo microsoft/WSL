@@ -1423,7 +1423,7 @@ int EpollVariation0(PLXT_ARGS Args)
     LxtCheckErrnoFailure(epoll_ctl(EpollFileDescriptor, EPOLL_CTL_ADD, FileDescriptor1, &EpollControlEvent), EEXIST);
 
     //
-    // Add the second file descriptor back in to the epoll.
+    // Add the second file descriptor back to the epoll.
     //
 
     EpollControlEvent.events = EPOLLOUT | EPOLLPRI;
