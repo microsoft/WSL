@@ -2395,7 +2395,7 @@ Return Value:
             LxtCheckErrno(tcsetpgrp(PtsFd, GrandChildPid));
 
             //
-            // Disassocate terminal.
+            // Disassociate terminal.
             //
 
             LxtCheckErrno(ioctl(PtsFd, TIOCNOTTY, (char*)NULL));
