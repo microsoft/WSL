@@ -86,7 +86,7 @@ interface IVmFiovGuestMemoryFastNotification : IUnknown
 ]
 interface ICallingProcessInfo : IUnknown
 {
-    HRESULT OpenCallerProcessHandle(DWORD desiredAccess, [out, annotation("_Out_")] HANDLE *callerPocessHandle);
+    HRESULT OpenCallerProcessHandle(DWORD desiredAccess, [out, annotation("_Out_")] HANDLE *callerProcessHandle);
 };
 
 [
