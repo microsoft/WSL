@@ -3901,7 +3901,7 @@ int main(int Argc, char* Argv[])
     }
 
     //
-    // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
+    // Open kmsg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
     //
     // N.B. This is to work around a rare race condition where init is launched without /dev/console set as the controlling terminal.
     //
