@@ -1744,7 +1744,7 @@ try
     };
 
     //
-    // Set the communicaiton channel to expected file descriptor value.
+    // Set the communication channel to expected file descriptor value.
     //
 
     if (SocketFd != LX_INIT_UTILITY_VM_INIT_SOCKET_FD)
