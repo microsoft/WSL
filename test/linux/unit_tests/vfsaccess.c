@@ -1786,7 +1786,7 @@ void VfsAccessInodeChecksChild(void)
 
     //
     // For each file, check that read, write and execute is enforced. Similiarly
-    // for directotries check that list, create\delete, and search is enforced.
+    // for directories check that list, create\delete, and search is enforced.
     //
 
     for (Index = 0; Index < LXT_COUNT_OF(g_VfsInodeEntries); ++Index)
