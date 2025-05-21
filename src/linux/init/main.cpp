@@ -2361,7 +2361,7 @@ try
     auto* DeviceName = &DevicePath[sizeof(DEVFS_PATH)];
 
     //
-    // Find the partion on the specified device.
+    // Find the partition on the specified device.
     //
     // N.B. A retry is needed because there is a delay between when a device is
     //      hot-added, and when the device is available in the guest.
