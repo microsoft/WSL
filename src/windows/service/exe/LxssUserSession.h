@@ -204,7 +204,7 @@ public:
     IFACEMETHOD(AttachDisk)(_In_ LPCWSTR Disk, _In_ ULONG Flags, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Detach a passtrough disk from the utility VM.
+    /// Detach a passthrough disk from the utility VM.
     /// </summary>
     IFACEMETHOD(DetachDisk)(_In_ LPCWSTR Disk, _Out_ int* Result, _Out_ int* Step, _Out_ LXSS_ERROR_INFO* Error) override;
 
@@ -484,7 +484,7 @@ public:
     HRESULT AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags);
 
     /// <summary>
-    /// Detach a passtrough a disk from the utility VM.
+    /// Detach a passthrough a disk from the utility VM.
     /// </summary>
     HRESULT DetachDisk(_In_ LPCWSTR Disk, _Out_ int* Result, _Out_ int* Step);
 
