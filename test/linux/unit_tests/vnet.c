@@ -139,7 +139,7 @@ static const LXT_VARIATION g_LxtVariations[] = {
     //{"Virtual Ethernet Pair namespace data check", VirtualEthernetPairNamespaceData},
 
     //
-    // Moving physical adpaters between namespaces is not currently supported
+    // Moving physical adapters between namespaces is not currently supported
     //
 
     //{"Physical device basic namespace check", PhysicalDeviceNamespace1},
