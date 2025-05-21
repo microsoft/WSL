@@ -1872,7 +1872,7 @@ try
     }
 
     //
-    // Bind mount the init deamon into the distro namespace.
+    // Bind mount the init daemon into the distro namespace.
     //
 
     auto Path = std::format("{}{}", Target, LX_INIT_PATH);
