@@ -1607,7 +1607,7 @@ int PtCheck3(PLXT_ARGS Args)
 Routine Description:
 
     This routine validates that the pseudo terminal driver is able to
-    handle muliple opens on the same subordinate device.
+    handle multiple opens on the same subordinate device.
 
 Arguments:
 
