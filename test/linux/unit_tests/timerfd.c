@@ -152,7 +152,7 @@ int TimerFdBasic(PLXT_ARGS Args)
     }
 
     //
-    // Set timer fd to exipre at one second interval.
+    // Set timer fd to expire at one second interval.
     //
 
     Flags = 0;
