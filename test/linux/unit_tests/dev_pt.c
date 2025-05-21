@@ -542,7 +542,7 @@ Routine Description:
     This routine performs a very basic check for pseudo terminal. The steps are:
     - Open the master.
     - Open the subordinate.
-    - Turns off ONLR to verify termios applies only to subordinate.
+    - Turns off ICRNL to verify termios applies only to subordinate.
     - Perform simple read/write check on the master-subordinate.
 
 
