@@ -378,7 +378,7 @@ class PolicyTest
             // Ensure the top-level disable WSL policy works.
             testPolicy(wsl::windows::policies::c_allowWSL, HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), restartService);
 
-            // Verfiy the disable inbox WSL policy does not block lifted.
+            // Verify the disable inbox WSL policy does not block lifted.
             testPolicy(wsl::windows::policies::c_allowInboxWSL, S_OK, restartService);
         }
 
