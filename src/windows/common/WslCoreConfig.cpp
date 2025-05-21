@@ -329,7 +329,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         if (value != std::remove_reference_t<decltype(value)>{} && !wsl::windows::policies::IsFeatureAllowed(key.get(), ValueName))
         {
             value = std::remove_reference_t<decltype(value)>{};
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverridenByPolicy(SettingName));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverriddenByPolicy(SettingName));
         }
     };
 
@@ -376,7 +376,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
             (NetworkingMode != wsl::core::NetworkingMode::None) && (NetworkingMode != defaultNetworkingMode))
         {
             NetworkingMode = defaultNetworkingMode;
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverridenByPolicy(L"wsl2.networkingMode"));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.networkingMode"));
         }
     }
     else
@@ -391,7 +391,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
             !wsl::windows::policies::IsFeatureAllowed(key.get(), wsl::windows::policies::c_allowCustomFirewallUserSetting))
         {
             FirewallConfig.Enable();
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverridenByPolicy(L"wsl2.firewall"));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.firewall"));
         }
     }
 

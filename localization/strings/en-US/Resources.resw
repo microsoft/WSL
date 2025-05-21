@@ -813,7 +813,7 @@ For information please visit https://aka.ms/wslinstall</value>
     <value>Legacy distribution registrations do not support the --version argument.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>The distribution "{}" is provided by an override manifest.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -923,7 +923,7 @@ Falling back to NAT networking.</value>
     <value>The plugin '{}' requires a newer version of WSL. Please run: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>The .wslconfig setting '{}' is disabled by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
