@@ -1196,7 +1196,7 @@ int MremapTestEntry(int Argc, char* Argv[])
     }
 
     //
-    // Case 29: Remap while spliting source VAD.
+    // Case 29: Remap while splitting source VAD.
     //
 
     SharedPrivateMemory = mmap(NULL, 10 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
