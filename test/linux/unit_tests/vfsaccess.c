@@ -1027,7 +1027,7 @@ void VfsAccessChmodCapChild(void)
     CapData[1].effective = CapData[1].permitted;
 
     //
-    // Drop privlidges so the current process does not have CAP_FOWNER.
+    // Drop privileges so the current process does not have CAP_FOWNER.
     //
 
     LxtCheckErrno(prctl(PR_SET_KEEPCAPS, 1));
@@ -1108,7 +1108,7 @@ void VfsAccessOPathChild(void)
     Fd = -1;
 
     //
-    // Drop privlidges so the current process does not have VFS related
+    // Drop privileges so the current process does not have VFS related
     // capabilities.
     //
 
@@ -1249,7 +1249,7 @@ void VfsAccessRenameCapChild(void)
     CapData[1].effective = CapData[1].permitted;
 
     //
-    // Drop privlidges so the current process does not have CAP_FOWNER.
+    // Drop privileges so the current process does not have CAP_FOWNER.
     //
 
     LxtCheckErrno(prctl(PR_SET_KEEPCAPS, 1));
@@ -1305,7 +1305,7 @@ void VfsAccessRmdirCapChild(void)
     CapData[1].effective = CapData[1].permitted;
 
     //
-    // Drop privlidges so the current process does not have CAP_FOWNER.
+    // Drop privileges so the current process does not have CAP_FOWNER.
     //
 
     LxtCheckErrno(prctl(PR_SET_KEEPCAPS, 1));
@@ -1651,7 +1651,7 @@ int VfsAccessSetUserGroupId(PLXT_ARGS Args)
     if (g_LxtFsInfo.FsType != LxtFsTypeVirtioFs)
     {
         //
-        // Fork and drop privlidges so the current process does not have CAP_FOWNER
+        // Fork and drop privileges so the current process does not have CAP_FOWNER
         // which is required for changing the owner of a file with the set-user-id
         // or set-group-id bits set.
         //
@@ -1775,7 +1775,7 @@ void VfsAccessInodeChecksChild(void)
     CapHeader.version = _LINUX_CAPABILITY_VERSION_3;
 
     //
-    // Drop privlidges so the current process does not have VFS capabilities
+    // Drop privileges so the current process does not have VFS capabilities
     // and is in the other user\group.
     //
 
@@ -2135,7 +2135,7 @@ void VfsAccessUTimeCapChild(void)
     CapData[1].effective = CapData[1].permitted;
 
     //
-    // Drop privlidges so the current process does not have CAP_FOWNER.
+    // Drop privileges so the current process does not have CAP_FOWNER.
     //
 
     LxtCheckErrno(prctl(PR_SET_KEEPCAPS, 1));
