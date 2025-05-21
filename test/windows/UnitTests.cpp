@@ -1193,8 +1193,8 @@ class UnitTests
                 L"Wsl/Service/DetachDisk/ERROR_FILE_NOT_FOUND");
 
             ValidateErrorMessage(
-                WSL_MANAGE_ARG L" " LXSS_DISTRO_NAME_TEST L" " WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L" fulse",
-                L"fulse is not a valid boolean, <true|false>",
+                WSL_MANAGE_ARG L" " LXSS_DISTRO_NAME_TEST L" " WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L" false_",
+                L"false_ is not a valid boolean, <true|false>",
                 L"Wsl/E_INVALIDARG");
 
             const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
