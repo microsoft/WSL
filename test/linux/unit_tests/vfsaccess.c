@@ -2469,7 +2469,7 @@ int VfsAccessSetUid(PLXT_ARGS Args)
         //
         // This test checks that unprivileged processes can Set the euid
         // to the ruid or suid. Need to fork and wait as privileges are
-        // irreversably dropped by this syscall
+        // irreversibly dropped by this syscall
         //
 
         if (fork_wait() == 0)
