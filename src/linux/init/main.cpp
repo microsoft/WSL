@@ -3575,7 +3575,7 @@ Return Value:
     // set to SYS_BIND to make bind system call.
 #ifdef __x86_64__
         // 32bit:
-        // If syscall_nr == __NR_socketcall then contine else goto allow:
+        // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 3),
         // if syscall arg0 == SYS_BIND then goto user_notify: else goto allow:
