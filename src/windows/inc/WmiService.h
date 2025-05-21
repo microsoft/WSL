@@ -807,7 +807,7 @@ public:
 
 private:
     WmiService m_wbemServices;
-    // Marking wbemEnumerator mutabale to allow for const correctness of begin() and end()
+    // Marking wbemEnumerator mutable to allow for const correctness of begin() and end()
     //   specifically, invoking Reset() is an implementation detail and should not affect external contracts
     mutable wil::com_ptr<IEnumWbemClassObject> m_wbemEnumerator;
 };
