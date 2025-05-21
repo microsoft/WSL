@@ -258,7 +258,7 @@ try
     {
         wsl::shared::SocketChannel channel{wil::unique_socket{reinterpret_cast<SOCKET>(handle.release())}, "Interop-wslhost"};
 
-        // This is required because there could have been messages beetween the process and wsl.exe, and wslhost has no way to know what the sequence numbers were.
+        // This is required because there could have been messages between the process and wsl.exe, and wslhost has no way to know what the sequence numbers were.
         channel.IgnoreSequenceNumbers();
 
         wsl::windows::common::interop::VmModeWorkerThread(channel, vmId, true);
