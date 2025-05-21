@@ -479,7 +479,7 @@ extern "C" UINT __stdcall CleanMsixState(MSIHANDLE install)
 
         /*
          * Because of a probable bug in MSIX / Packaged COM, it's possible that an old registration is still present on the machine,
-         * which will break instanciations of LxssUserSessions.
+         * which will break instantiations of LxssUserSessions.
          * Because this method executes after all MSIX packages have been removed, we know that this registration shouldn't be there,
          * so delete it if it still happens to be there.
          * See: https://github.com/microsoft/WSL/issues/10782
