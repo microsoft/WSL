@@ -713,7 +713,7 @@ inline MacAddress ParseMacAddress(const std::basic_string<T>& Input, T Separator
 }
 
 template <typename TChar>
-inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar seperator)
+inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar separator)
 {
     std::basic_string<TChar> output(17, '\0');
 
@@ -724,15 +724,15 @@ inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar 
             output.size() + 1,
             MAC_ADDRESS_FORMAT_STRING,
             input[0],
-            seperator,
+            separator,
             input[1],
-            seperator,
+            separator,
             input[2],
-            seperator,
+            separator,
             input[3],
-            seperator,
+            separator,
             input[4],
-            seperator,
+            separator,
             input[5]);
     }
     else if constexpr (std::is_same_v<TChar, wchar_t>)
@@ -742,15 +742,15 @@ inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar 
             output.size() + 1,
             STRING_TO_WIDE_STRING(MAC_ADDRESS_FORMAT_STRING),
             input[0],
-            seperator,
+            separator,
             input[1],
-            seperator,
+            separator,
             input[2],
-            seperator,
+            separator,
             input[3],
-            seperator,
+            separator,
             input[4],
-            seperator,
+            separator,
             input[5]);
     }
     else
