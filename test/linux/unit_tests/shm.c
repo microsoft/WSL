@@ -1854,7 +1854,7 @@ int ShmGetSyscall(PLXT_ARGS Args)
     // N.B. There appears to be no error checking for invalid flags, only the
     //      presence of valid flags.
     //
-    // -1 includes the IPC_EXCL flag so this shoudl return EEXIST.
+    // -1 includes the IPC_EXCL flag so this should return EEXIST.
     //
 
     LxtCheckErrnoFailure(LxtShmGet(Key, PAGE_SIZE, -1), EEXIST);
