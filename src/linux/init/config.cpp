@@ -910,7 +910,7 @@ try
 
     if (WI_IsFlagSet(Config.FeatureFlags.value(), LxInitFeatureRootfsCompressed))
     {
-        LOG_WARNING("{} root file system is compressed, performance may be severly impacted.", DistributionName);
+        LOG_WARNING("{} root file system is compressed, performance may be severely impacted.", DistributionName);
     }
 
     //
