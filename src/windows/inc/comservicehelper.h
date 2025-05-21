@@ -277,7 +277,7 @@ namespace Windows { namespace Internal {
             RETURN_IF_WIN32_BOOL_FALSE(MakeAbsoluteSD(
                 pSDRelative, pSDAbsolute, &cbSDAbsolute, pDacl, &cbDacl, pSacl, &cbSacl, pOwner, &cbOwner, pPrimaryGroup, &cbPrimaryGroup));
 
-            // ...and now we can call CoInitializeSecuirity
+            // ...and now we can call CoInitializeSecurity
             RETURN_IF_FAILED(CoInitializeSecurity(
                 pSDAbsolute, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IDENTIFY, NULL, EOAC_NONE, nullptr));
 
