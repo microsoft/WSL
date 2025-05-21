@@ -56,7 +56,7 @@ Abstract:
 
 #define OVFS_TEST_MOUNT_DEFAULT "lowerdir=" OVFS_TEST_LOWER_DIR ",upperdir=" OVFS_TEST_UPPER_DIR ",workdir=" OVFS_TEST_WORK_DIR
 
-#define OVFS_TEST_MOUNT_MULI_LOWER \
+#define OVFS_TEST_MOUNT_MULTI_LOWER \
     "lowerdir=" OVFS_TEST_LOWER_DIR ":" OVFS_TEST_LOWER2_DIR ":" OVFS_TEST_LOWER3_DIR ",upperdir=" OVFS_TEST_UPPER_DIR \
     ",workdir=" OVFS_TEST_WORK_DIR
 
@@ -2926,7 +2926,7 @@ Return Value:
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     //
     // Check that the whiteout cannot be opened but are reported through readdir
@@ -3073,7 +3073,7 @@ Return Value:
     //
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     //
     // Check the behavior for VFS file object operations that support file
@@ -3314,7 +3314,7 @@ Return Value:
     //
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     LxtCheckErrno(stat(OVFS_TEST_MOUNT_PATH "/mixedType", &StatMergedBuffer));
     LxtCheckTrue(S_ISDIR(StatMergedBuffer.st_mode));
@@ -3381,7 +3381,7 @@ Return Value:
     //
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     LxtCheckErrno(stat(OVFS_TEST_MOUNT_PATH "/mixedType", &StatMergedBuffer));
     LxtCheckTrue(S_ISDIR(StatMergedBuffer.st_mode));
