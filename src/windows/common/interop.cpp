@@ -348,7 +348,7 @@ std::string FormatCommandLine(gsl::span<gsl::byte> CommandLineData, USHORT Comma
     //
     // N.B. Any empty arguments or arguments that contain whitespace must be
     //      encapsulated in quotes. Quotes must also be escaped according to
-    //      stardard command-line parsing rules:
+    //      standard command-line parsing rules:
     //      https://msdn.microsoft.com/en-us/library/17w5ykft.aspx.
     //
     //      This logic is largely taken from AppendQuotedForWindows in
