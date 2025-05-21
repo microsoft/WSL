@@ -1983,7 +1983,7 @@ Return Value:
     LxtCheckErrnoFailure(fcntl(Pipes[1], F_SETPIPE_SZ, sizeof(Buffer) - 1), EBUSY);
 
     //
-    // Try to increase the buffer from an unprivlided thread.
+    // Try to increase the buffer from an unprivileged thread.
     //
 
     LxtCheckErrno(ChildPid = fork());
