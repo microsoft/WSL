@@ -1154,7 +1154,7 @@ Return Value:
     }
 
     //
-    // You cannot ressurrect a file with link count 0.
+    // You cannot resurrect a file with link count 0.
     //
     // N.B. On real Linux, the error code this produces is ENOENT, but since
     //      NTFS returns STATUS_ACCESS_DENIED for this, WSL gives EACCES
