@@ -298,7 +298,7 @@ public:
     LxssNetworkingFirewallPort(const std::shared_ptr<LxssNetworkingFirewall>& Firewall, const Microsoft::WRL::ComPtr<INetFwRule>& Existing);
 
     /// <summary>
-    /// Desstructor.
+    /// Destructor.
     /// </summary>
     ~LxssNetworkingFirewallPort();
 
