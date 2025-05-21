@@ -3651,7 +3651,7 @@ int DrvFsTestSetup(PLXT_ARGS Args, int TestMode)
 
 Description:
 
-    This routine perofrms setup for the drvfs tests.
+    This routine performs setup for the drvfs tests.
 
 Arguments:
 
