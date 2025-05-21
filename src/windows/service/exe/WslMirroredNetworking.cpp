@@ -590,7 +590,7 @@ wsl::core::networking::WslMirroredNetworkManager::WslMirroredNetworkManager(
     // Subscribe for network change notifications. This is done before
     // obtaining the initial list of networks to connect to, in order to
     // avoid a race condition between the initial enumeration and any network
-    // changes that may be occuring at the same time. The subscription will
+    // changes that may be occurring at the same time. The subscription will
     // receive network change events, but will not be able to react to them
     // the lock is released.
     m_hcnCallback = windows::common::hcs::RegisterServiceCallback(HcnCallback, this);
