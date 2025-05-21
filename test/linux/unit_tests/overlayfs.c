@@ -2347,7 +2347,7 @@ Return Value:
         LxtCheckErrno(LxtCapSet(&CapHeader, CapData));
 
         //
-        // Open the file with different trunctate variations.
+        // Open the file with different truncate variations.
         //
 
         LxtCheckErrno(Fd = open(OVFS_TEST_LOWER_DIR "/OnlyInLowerFile", O_RDONLY, 0));
