@@ -1237,7 +1237,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         {
             auto trackedAddress = endpoint.StateTracking->IpAddresses.emplace(TrackedIpAddress(hostAddress)).first;
             // detect if previously sync'd addresses need to be updated
-            // this addresses issues we've seen where addresses were removed from Linux without our knowlege
+            // this addresses issues we've seen where addresses were removed from Linux without our knowledge
             shouldRefreshAllAddresses |= trackedAddress->SyncStatus == PendingAdd || trackedAddress->SyncStatus == PendingUpdate;
         }
 
@@ -1383,7 +1383,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         {
             const auto trackedRoute = endpoint.StateTracking->Routes.emplace(TrackedRoute(hostRoute)).first;
             // detect if previously sync'd routes need to be updated
-            // this addresses issues we've seen where routes were removed from Linux without our knowlege
+            // this addresses issues we've seen where routes were removed from Linux without our knowledge
             // and routes couldn't be updated later because required routes, like the prefix route, wasn't there
             refreshAllRoutes |= trackedRoute->SyncStatus == PendingAdd || trackedRoute->SyncStatus == PendingUpdate;
         }
