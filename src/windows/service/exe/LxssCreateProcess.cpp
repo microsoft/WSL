@@ -226,7 +226,7 @@ std::vector<gsl::byte> LxssCreateProcess::CreateMessage(_In_ LX_MESSAGE_TYPE Mes
     Common->CurrentWorkingDirectoryOffset = wsl::shared::string::CopyToSpan(CreateProcessData.CurrentWorkingDirectory, CommonSpan, Offset);
 
     //
-    // Populate the CommmandLine strings.
+    // Populate the CommandLine strings.
     //
 
     WI_ASSERT(CreateProcessData.CommandLine.size() <= USHORT_MAX);
