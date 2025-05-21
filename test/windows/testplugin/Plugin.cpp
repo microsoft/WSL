@@ -96,7 +96,7 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
         auto output = ReadFromSocket(socket.get());
         if (output != std::vector<char>{'O', 'K'})
         {
-            g_logfile << "Got unepected output from bash" << std::endl;
+            g_logfile << "Got unexpected output from bash" << std::endl;
             return E_ABORT;
         }
     }
