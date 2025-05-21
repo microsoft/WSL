@@ -1,6 +1,6 @@
 # Microsoft Açık Kaynak Davranış Kuralları
 
-Bu proje [Microsoft Açık Kaynak Davranış Kuralları](https://opensource.microsoft.com/codeofconduct/)'nı benimsemiştir .
+Bu proje [Microsoft Açık Kaynak Davranış Kuralları](https://opensource.microsoft.com/codeofconduct/)'nı benimsemiştir.
 
 Kaynaklar:
 
