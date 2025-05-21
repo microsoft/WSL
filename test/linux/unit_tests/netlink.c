@@ -2188,7 +2188,7 @@ Return Value:
     Timeout.tv_nsec = 0;
 
     //
-    // Setup the receive buffers.
+    // Set up the receive buffers.
     //
 
     memset(ReceiveMessages, 0, sizeof(ReceiveMessages));
@@ -2369,7 +2369,7 @@ Return Value:
     struct timespec Timeout;
 
     //
-    // The timeout value passed to recvmmsg() is ignored. Setup the receive
+    // The timeout value passed to recvmmsg() is ignored. Set up the receive
     // buffers.
     //
 

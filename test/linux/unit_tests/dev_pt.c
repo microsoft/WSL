@@ -5681,7 +5681,7 @@ Return Value:
     {
 
         //
-        // Setup the argument for the stress I/O thread.
+        // Set up the argument for the stress I/O thread.
         //
 
         ThreadArg[Itr].PtmFd = PtFds[Itr][0];

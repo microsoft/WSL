@@ -226,7 +226,7 @@ Return Value:
     int Result;
 
     //
-    // Setup the directories and ensure it's not a mount point yet.
+    // Set up the directories and ensure it's not a mount point yet.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -461,7 +461,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -740,7 +740,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -913,7 +913,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1191,7 +1191,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1373,7 +1373,7 @@ Return Value:
     struct stat StatMergedBuffer;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1550,7 +1550,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1720,7 +1720,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2048,7 +2048,7 @@ Return Value:
     FdWrite = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2411,7 +2411,7 @@ Return Value:
     FdLower = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2659,7 +2659,7 @@ Return Value:
     ssize_t ValueSize;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2835,7 +2835,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -3061,7 +3061,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
