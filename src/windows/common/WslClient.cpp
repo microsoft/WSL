@@ -1526,7 +1526,7 @@ int RunDebugShell()
     // a pipe is connected, so it's lost.
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(pipe.get(), "\n", 1, nullptr, nullptr));
 
-    // Create a thread to realy stdin to the pipe.
+    // Create a thread to relay stdin to the pipe.
     wsl::windows::common::SvcCommIo Io;
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread(
