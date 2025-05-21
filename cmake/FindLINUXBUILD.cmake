@@ -59,17 +59,17 @@ function(add_linux_library_no_sources target sources headers)
 endfunction()
 
 
-function(add_linux_executable target sources headers librairies)
+function(add_linux_executable target sources headers libraries)
     set(output "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/${target}")
     set(output_unstripped "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/${target}.unstripped")
 
     build_linux_objects("${sources}" "${headers}")
 
     set(libs -lunwind -lc++abi -lc++)
-    foreach(e ${librairies})
+    foreach(e ${libraries})
         set(libs ${libs} -l${e})
 
-        # Note: This makes the assumption that all librairies are static (.a and not .so).
+        # Note: This makes the assumption that all libraries are static (.a and not .so).
         # Executables need to depend on both the target and the underlying library file, so that
         # the libraries target get analyzed for changes, and the executable gets linked again if the .a files changed.
         list(APPEND lib_targets "lib${e}")
