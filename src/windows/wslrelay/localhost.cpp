@@ -217,7 +217,7 @@ void wsl::windows::wslrelay::localhost::Relay::StopPortListener(_In_ unsigned sh
 {
     try
     {
-        // Search through the woker threads and terminate any that match the address family and port.
+        // Search through the worker threads and terminate any that match the address family and port.
         auto lock = m_lock.lock_exclusive();
         const auto iter = m_RelayThreads.find({Family, Port});
         if (iter != m_RelayThreads.end())
