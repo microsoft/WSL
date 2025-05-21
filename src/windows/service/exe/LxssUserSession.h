@@ -199,7 +199,7 @@ public:
     IFACEMETHOD(SetVersion)(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Passtrough a disk to the utility VM.
+    /// Pass through a disk to the utility VM.
     /// </summary>
     IFACEMETHOD(AttachDisk)(_In_ LPCWSTR Disk, _In_ ULONG Flags, _Out_ LXSS_ERROR_INFO* Error) override;
 
@@ -479,7 +479,7 @@ public:
     SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle);
 
     /// <summary>
-    /// Passtrough a disk to the utility VM.
+    /// Pass through a disk to the utility VM.
     /// </summary>
     HRESULT AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags);
 
