@@ -812,7 +812,7 @@ int SemOpFlags(PLXT_ARGS Args)
     LXT_SYNCHRONIZATION_POINT();
 
     //
-    // Wait for child to perform second operation and set the smeaphore value
+    // Wait for child to perform second operation and set the semaphore value
     // to zero. This should remove the pending semaphore adjustment.
     //
 
@@ -922,7 +922,7 @@ int SemOpFlags(PLXT_ARGS Args)
     LxtCheckEqual(0, LxtSemCtl(Id, 1, GETVAL, NULL), "%d");
 
     //
-    // Create two threads, one sharing the sempahore adjustment structure
+    // Create two threads, one sharing the semaphore adjustment structure
     // and one not.
     //
 
