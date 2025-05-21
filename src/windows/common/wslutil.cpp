@@ -825,7 +825,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
 
         return Localization::MessageOsNotSupported(helpers::GetWindowsVersionString().c_str(), kbUrl.c_str());
 
-    // All the errors below this comment are not supposed to be reachable here (since there's meant to be emmited from the
+    // All the errors below this comment are not supposed to be reachable here (since there's meant to be emitted from the
     // service). But if we somehow hit them here, it's better show something useful to the user.
     case WSL_E_VM_MODE_MOUNT_NAME_ALREADY_EXISTS:
         return Localization::MessageDiskMountNameAlreadyExists();
