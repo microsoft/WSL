@@ -451,7 +451,7 @@ int RobustFutex(PLXT_ARGS Args)
     LxtCheckErrnoFailure(my_set_robust_list(&Head, (sizeof(struct robust_list_head) + 1)), EINVAL);
 
     //
-    // get_robust_list validates the buffesr.
+    // get_robust_list validates the buffers.
     //
 
     LxtCheckErrnoFailure(my_get_robust_list(0, NULL, &SizeReturned), EFAULT);
