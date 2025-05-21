@@ -737,7 +737,7 @@ Return Value:
         LxtCheckEqual(TerminalForegroundId, ForegroundId, "%d");
 
         //
-        // Do a aimple IO check.
+        // Do a simple IO check.
         //
 
         LxtCheckErrno(RawInit(PtsFd));
