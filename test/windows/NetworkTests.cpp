@@ -2634,7 +2634,7 @@ class NetworkTests
 
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
-        // needs to be accesible from the new namespace, so it can't use a 127* IP.
+        // needs to be accessible from the new namespace, so it can't use a 127* IP.
         WslConfigChange config(LxssGenerateTestConfig({
             .guiApplications = true,
             .dnsTunneling = true,
@@ -2662,7 +2662,7 @@ class NetworkTests
 
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
-        // needs to be accesible from the new namespace, so it can't use a 127* IP
+        // needs to be accessible from the new namespace, so it can't use a 127* IP
         WslConfigChange config(LxssGenerateTestConfig(
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true, .dnsTunnelingIpAddress = L"10.255.255.254"}));
         WaitForMirroredStateInLinux();
