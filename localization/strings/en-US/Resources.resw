@@ -181,7 +181,7 @@ Install using 'wsl.exe {} &lt;Distro&gt;'.
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Exporting the distribution failed.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>Performing one-time upgrade of the Windows Subsystem for Linux file system for this distribution...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
