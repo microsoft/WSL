@@ -113,7 +113,7 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
     case IgnoredPorts:
     {
         // The IgnoredPorts member is stored as a set of 16-bit unsigned integers.
-        // These are convereted back to a string here for the caller to consume.
+        // These are converted back to a string here for the caller to consume.
         wslConfig->IgnoredPortsStr.clear();
         std::vector<uint16_t> ignoredPorts{wslConfig->Config.IgnoredPorts.begin(), wslConfig->Config.IgnoredPorts.end()};
         std::sort(ignoredPorts.begin(), ignoredPorts.end());
