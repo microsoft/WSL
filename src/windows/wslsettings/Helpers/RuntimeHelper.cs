@@ -37,7 +37,7 @@ public class RuntimeHelper
         return openPicker.PickSingleFileAsync();
     }
 
-    public static void TryMoveFocusPrevousControl(Button? button)
+    public static void TryMoveFocusPreviousControl(Button? button)
     {
         if (button == null)
         {

@@ -40,7 +40,7 @@ public sealed partial class NetworkingPage : Page
             return;
         }
 
-        RuntimeHelper.TryMoveFocusPrevousControl(sender as Button);
+        RuntimeHelper.TryMoveFocusPreviousControl(sender as Button);
     }
 
     private void InitialAutoProxyTimeoutTextBox_TextChanged(object sender, TextChangedEventArgs e)
