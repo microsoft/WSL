@@ -1312,7 +1312,7 @@ int SemOpSyscall(PLXT_ARGS Args)
     }
 
     //
-    // Wait for the child to do the fisrt semop and query the values.
+    // Wait for the child to do the first semop and query the values.
     //
 
     LXT_SYNCHRONIZATION_POINT(); // (1)
