@@ -3930,7 +3930,7 @@ VERSION_ID="Invalid|Format"
         };
 
         auto InstallFromTar =
-            [](LPCWSTR TarName, LPCWSTR ExtraArgs = L"", int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpextedWarnings = nullptr) {
+            [](LPCWSTR TarName, LPCWSTR ExtraArgs = L"", int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpectedWarnings = nullptr) {
                 auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
                     std::format(L"--install --no-launch --from-file {} {}", TarName, ExtraArgs), ExpectedExitCode);
 
@@ -3939,9 +3939,9 @@ VERSION_ID="Invalid|Format"
                     VERIFY_ARE_EQUAL(ExpectedOutput, out);
                 }
 
-                if (ExpextedWarnings != nullptr)
+                if (ExpectedWarnings != nullptr)
                 {
-                    VERIFY_ARE_EQUAL(ExpextedWarnings, err);
+                    VERIFY_ARE_EQUAL(ExpectedWarnings, err);
                 }
             };
 
@@ -4153,7 +4153,7 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             };
 
             auto InstallFromVhd =
-                [](LPCWSTR DistroName, LPCWSTR VhdName, int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpextedWarnings = nullptr) {
+                [](LPCWSTR DistroName, LPCWSTR VhdName, int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpectedWarnings = nullptr) {
                     auto [out, err] =
                         LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place {} {}", DistroName, VhdName), ExpectedExitCode);
 
@@ -4162,9 +4162,9 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
                         VERIFY_ARE_EQUAL(ExpectedOutput, out);
                     }
 
-                    if (ExpextedWarnings != nullptr)
+                    if (ExpectedWarnings != nullptr)
                     {
-                        VERIFY_ARE_EQUAL(ExpextedWarnings, err);
+                        VERIFY_ARE_EQUAL(ExpectedWarnings, err);
                     }
                 };
 
