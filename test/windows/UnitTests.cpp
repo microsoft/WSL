@@ -1871,7 +1871,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // This loop is here because of a race condition when starting WSL to get the warnings.
             // If a p9rdr distribution startup notification arrives just before wsl.exe calls CreateInstance(),
-            // the warnings will be 'consummed' before wsl.exe can read them.
+            // the warnings will be 'consumed' before wsl.exe can read them.
             // To work around that, loop for up to 2 minutes while we don't get any warnings
 
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(2);
@@ -1928,7 +1928,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // This loop is here because of a race condition when starting WSL to get the warnings.
             // If a p9rdr distribution startup notification arrives just before wsl.exe calls CreateInstance(),
-            // the warnings will be 'consummed' before wsl.exe can read them.
+            // the warnings will be 'consumed' before wsl.exe can read them.
             // To work around that, loop for up to 2 minutes while we don't get any warnings
 
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(2);
