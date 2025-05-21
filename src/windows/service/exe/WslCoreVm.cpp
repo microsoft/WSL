@@ -203,7 +203,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     CATCH_LOG();
 
-    // If a private kernel was not speicifed, use the default.
+    // If a private kernel was not specified, use the default.
     m_defaultKernel = m_vmConfig.KernelPath.empty();
     if (m_defaultKernel)
     {

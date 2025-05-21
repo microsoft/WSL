@@ -2565,7 +2565,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
     if (instance->GetIdleTimeout() >= 0)
     {
         // Register a client termination callback with the lifetime manager. If the
-        // ignore client callback flag is specifed and there are no other clients,
+        // ignore client callback flag is specified and there are no other clients,
         // the timer is immediately queued.
         wil::unique_handle currentProcess{};
         if (WI_IsFlagClear(Flags, LXSS_CREATE_INSTANCE_FLAGS_IGNORE_CLIENT))
