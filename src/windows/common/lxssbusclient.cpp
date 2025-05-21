@@ -392,7 +392,7 @@ Arguments:
 
     BufferSize - Supplies the size of the buffer in bytes.
 
-    SizeReceieved - Supplies a buffer to store the number of bytes received.
+    SizeReceived - Supplies a buffer to store the number of bytes received.
 
 Return Value:
 
@@ -469,7 +469,7 @@ Arguments:
 
     BufferSize - Supplies the size of the buffer in bytes.
 
-    SizeReceieved - Supplies a buffer to store the number of bytes received.
+    SizeReceived - Supplies a buffer to store the number of bytes received.
 
     IoStatus - Supplies a pointer to an io status block.
 
