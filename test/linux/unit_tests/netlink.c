@@ -1745,7 +1745,7 @@ Return Value:
     // technically there is space in the receive buffer for the response.
     // The test sends a message with a unique sequence number. Later on, the
     // entire receive buffer will be drained and all responses checked to
-    // verify that this unqiue sequence number is not in any of the responses.
+    // verify that this unique sequence number is not in any of the responses.
     //
 
     Request.nlmsg_seq = 0x98765432;
