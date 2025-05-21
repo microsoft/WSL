@@ -2765,7 +2765,7 @@ void LxssUserSessionImpl::_CreateVm()
 
         m_vmId.store(vmId);
 
-        // Create the utiliy VM and register for callbacks.
+        // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
 
         m_utilityVm->GetRuntimeId();
