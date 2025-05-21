@@ -2763,7 +2763,7 @@ Routine Description:
 
 Arguments:
 
-    Config - Supplies the distribution configuraiton.
+    Config - Supplies the distribution configuration.
 
 Return Value:
 
