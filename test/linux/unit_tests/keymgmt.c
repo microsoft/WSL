@@ -161,7 +161,7 @@ int KeymgmtSessionKeyringAssociation(PLXT_ARGS Args)
     KeyType = KEY_SPEC_SESSION_KEYRING;
 
     //
-    // This test checks to see where the session keyring is assocaited. The
+    // This test checks to see where the session keyring is associated. The
     // documentation is unclear if it is the threadgroup, thread, or user
     // namespace. The test below validates that the session keyring is
     // associated to the threadgroup and inherited across fork.
@@ -194,7 +194,7 @@ int KeymgmtSessionKeyringAssociation(PLXT_ARGS Args)
 
     //
     // Create a child process and thread, checking that the session keyring id
-    // continues to be assocaited.
+    // continues to be associated.
     //
 
     LxtCheckErrno(ChildPid = fork());
@@ -235,7 +235,7 @@ int KeymgmtSessionKeyringAssociation(PLXT_ARGS Args)
 
     //
     // Create a user namespace and check that the session keyring id continues
-    // to be assocaited.
+    // to be associated.
     //
 
     LxtCheckErrno(ChildPid = fork());
