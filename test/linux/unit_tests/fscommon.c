@@ -503,7 +503,7 @@ Return Value:
     int Result;
 
     //
-    // Don't set close on exec on file desciptors in the main test process;
+    // Don't set close on exec on file descriptors in the main test process;
     // this would cause later tests to fail.
     //
 

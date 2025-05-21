@@ -296,7 +296,7 @@ namespace Windows { namespace Internal {
         // COM callback object to support unloading shared-process services
         Microsoft::WRL::ComPtr<IContextCallback> m_icc;
 
-        // COM Server descritptor
+        // COM Server descriptor
         ServerDescriptor m_serverDescriptor{};
     };
 
