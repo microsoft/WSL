@@ -206,7 +206,7 @@ Return Value:
     }
 
     //
-    // For a signle threaded process, Thread ID == Process ID
+    // For a single threaded process, Thread ID == Process ID
     //
 
     if (Pid != Tid)
