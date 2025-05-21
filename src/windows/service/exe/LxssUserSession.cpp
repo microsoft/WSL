@@ -1378,12 +1378,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
         // Determine the filesystem version. If WslFs is not enabled, downgrade
         // the version.
-        ULONG FilesytemVersion = LXSS_DISTRO_VERSION_CURRENT;
+        ULONG FilesystemVersion = LXSS_DISTRO_VERSION_CURRENT;
         if (wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, WSL_NEW_DISTRO_LXFS, 0) != 0)
         {
-            if (LXSS_DISTRO_USES_WSL_FS(FilesytemVersion) != FALSE)
+            if (LXSS_DISTRO_USES_WSL_FS(FilesystemVersion) != FALSE)
             {
-                FilesytemVersion = LXSS_DISTRO_VERSION_1;
+                FilesystemVersion = LXSS_DISTRO_VERSION_1;
             }
         }
 
@@ -1451,7 +1451,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 lxssKey.get(),
                 DistributionId,
                 DistributionName,
-                FilesytemVersion,
+                FilesystemVersion,
                 distributionPath.c_str(),
                 flags,
                 LX_UID_ROOT,
