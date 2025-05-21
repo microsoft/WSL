@@ -5692,7 +5692,7 @@ Return Value:
         {
 
             //
-            // Create I/O Strss thread#ThreadItr for PT#Itr
+            // Create I/O Stress thread#ThreadItr for PT#Itr
             //
 
             LxtCheckErrno(pthread_create(&Thread[Itr][ThreadItr], NULL, PerformIoStressThread, (void*)&ThreadArg[Itr]));
