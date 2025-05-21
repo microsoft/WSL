@@ -118,7 +118,7 @@ class LxssNetworkingFirewallPort;
 class LxssNetworkingNat;
 
 /// <summary>
-/// Emulate iptables functionailty.
+/// Emulate iptables functionality.
 /// </summary>
 class LxssIpTables
 {
