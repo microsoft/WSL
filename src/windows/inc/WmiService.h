@@ -448,7 +448,7 @@ public:
     }
 
     // Invokes an instance method with zero -> 5 arguments from the instantiated IWbemClassObject
-    // Returns a WmiInstace containing the [out] parameters from the method call
+    // Returns a WmiInstance containing the [out] parameters from the method call
     // (the property "ReturnValue" contains the return value)
     WmiInstance execute_method(PCWSTR method)
     {

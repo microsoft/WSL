@@ -2096,7 +2096,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceT
             WI_ASSERT(!PreventNewInstances || !m_disableNewInstanceCreation);
 
             // This is used when the session is being deleted.
-            // This is in place to prevent a CreateInstace() call from succeeding
+            // This is in place to prevent a CreateInstance() call from succeeding
             // after the session is shut down since this would mean that the destructor,
             // which could run on that thread (if the session already dropped its LxssUserSessionImpl reference)
             // would have to do all the cleanup work.
