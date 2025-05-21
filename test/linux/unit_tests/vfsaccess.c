@@ -107,7 +107,7 @@ struct reuid_t
 
 int VfsAccessCheckResult(int ResultActual, int ResultExpected, int ErrnoActual, int ErrnoExpected, char* Message, int VariationIndex);
 
-void VfsAcccessFileObjectCleanup(void);
+void VfsAccessFileObjectCleanup(void);
 
 int VfsAccessFileObjectCreateFiles(void);
 
@@ -217,7 +217,7 @@ ErrorExit:
     return !LXT_SUCCESS(Result);
 }
 
-void VfsAcccessFileObjectCleanup(void)
+void VfsAccessFileObjectCleanup(void)
 
 /*++
 
@@ -2106,7 +2106,7 @@ ErrorExit:
 
     if (Cleanup != false)
     {
-        VfsAcccessFileObjectCleanup();
+        VfsAccessFileObjectCleanup();
         LxtFsTestCleanup(VFS_ACCESS_PARENT_DIR, "/vfsaccesstest", g_UseDrvFs);
     }
 
