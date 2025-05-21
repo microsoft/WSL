@@ -6564,7 +6564,7 @@ int PtUTF8Basic7(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine sends a string ending with a UTF-8 character, follwed by the
+    This routine sends a string ending with a UTF-8 character, followed by the
     delete char. This is expected to remove only a single byte from the string.
 
 Arguments:
