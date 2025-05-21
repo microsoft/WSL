@@ -778,7 +778,7 @@ int VForkTest(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPoll(ChildPid, LXT_RESULT_SUCCESS));
 
     //
-    // Repease the above with execv.
+    // Release the above with execv.
     //
 
     ChildPidFromChild = -1;
