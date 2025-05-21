@@ -2029,7 +2029,7 @@ try
     // Initialize the mount options.
     //
     // N.B. If the options weren't specified, ConfigDrvFsOptions will be an
-    //      emptry string. Since DrvFs ignores empty mount options, the extra
+    //      empty string. Since DrvFs ignores empty mount options, the extra
     //      comma on the end in that case is not a problem.
     //
 
