@@ -899,7 +899,7 @@ int ShmAtDtSyscall(PLXT_ARGS Args)
     LxtCheckEqual(Stat.shm_nattch, 1, "%Iu");
 
     //
-    // Use detatch to clear the range.
+    // Use detach to clear the range.
     //
 
     LxtCheckErrno(LxtShmDt(Address));
@@ -1076,7 +1076,7 @@ int ShmAtDtSyscall(PLXT_ARGS Args)
     LxtCheckEqual(Stat.shm_nattch, 2, "%Iu");
 
     //
-    // Detatch both mapped regions.
+    // Detach both mapped regions.
     //
 
     LxtCheckErrno(LxtShmDt(Address));
@@ -1136,7 +1136,7 @@ int ShmAtDtSyscall(PLXT_ARGS Args)
     LxtCheckEqual(Stat.shm_nattch, 2, "%Iu");
 
     //
-    // Detatch the original address and validate the second region remains.
+    // Detach the original address and validate the second region remains.
     //
 
     LxtCheckErrno(LxtShmDt(Address));
