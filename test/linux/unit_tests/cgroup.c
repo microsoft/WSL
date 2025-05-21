@@ -390,7 +390,7 @@ ErrorExit:
 typedef struct _CGROUP_TEST_PROCFS_ENTRY
 {
     char Name[CGROUP_TEST_MAX_NAME_LENGTH];
-    int Hierarcy;
+    int Hierarchy;
     int NumCgroups;
     int Enabled;
 } CGROUP_TEST_PROCFS_ENTRY, *PCGROUP_TEST_PROCFS_ENTRY;
@@ -444,7 +444,7 @@ Return Value:
             Line,
             "%s\t%d\t%d\t%d",
             Data->Entries[NumCgroups].Name,
-            &Data->Entries[NumCgroups].Hierarcy,
+            &Data->Entries[NumCgroups].Hierarchy,
             &Data->Entries[NumCgroups].NumCgroups,
             &Data->Entries[NumCgroups].Enabled);
 
@@ -464,7 +464,7 @@ ErrorExit:
 
 typedef struct _CGROUP_TEST_PROCFS_PID_ENTRY
 {
-    int Hierarcy;
+    int Hierarchy;
     char Subsystems[CGROUP_TEST_DEFAULT_BUFFER_SIZE];
     char CgroupPath[CGROUP_TEST_DEFAULT_BUFFER_SIZE];
 } CGROUP_TEST_PROCFS_PID_ENTRY, *PCGROUP_TEST_PROCFS_PID_ENTRY;
@@ -510,7 +510,7 @@ Return Value:
         sscanf(
             Line,
             "%d:%[^:]:%[^:\n]",
-            &Data->Entries[NumCgroups].Hierarcy,
+            &Data->Entries[NumCgroups].Hierarchy,
             Data->Entries[NumCgroups].Subsystems,
             Data->Entries[NumCgroups].CgroupPath);
 
@@ -580,7 +580,7 @@ Return Value:
         if (strcmp(ProcfsNew.Entries[Index].Name, "devices") == 0)
         {
             LxtCheckNotEqual(Found, 1, "%d");
-            LxtCheckNotEqual(ProcfsNew.Entries[Index].Hierarcy, 0, "%d");
+            LxtCheckNotEqual(ProcfsNew.Entries[Index].Hierarchy, 0, "%d");
             Found = 1;
         }
     }
@@ -598,7 +598,7 @@ Return Value:
         if (strstr(ProcfsPidNew.Entries[Index].Subsystems, "devices") != NULL)
         {
             LxtCheckNotEqual(Found, 1, "%d");
-            LxtCheckNotEqual(ProcfsPidNew.Entries[Index].Hierarcy, 0, "%d");
+            LxtCheckNotEqual(ProcfsPidNew.Entries[Index].Hierarchy, 0, "%d");
             LxtCheckStringEqual(ProcfsPidNew.Entries[Index].CgroupPath, "/");
             Found = 1;
         }
@@ -933,7 +933,7 @@ Return Value:
         if (strcmp(ProcfsNew.Entries[Index].Name, "devices") == 0)
         {
             LxtCheckNotEqual(Found, 1, "%d");
-            LxtCheckNotEqual(ProcfsNew.Entries[Index].Hierarcy, 0, "%d");
+            LxtCheckNotEqual(ProcfsNew.Entries[Index].Hierarchy, 0, "%d");
             Found = 1;
         }
     }
