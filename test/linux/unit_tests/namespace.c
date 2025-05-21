@@ -1088,7 +1088,7 @@ int NamespacePid(PLXT_ARGS Args)
     LxtWaitPidPoll(ChildPid, 0);
 
     //
-    // Check the pid namesapce behavior for reboot.
+    // Check the pid namespace behavior for reboot.
     //
 
     LxtCheckErrno(ChildPid = fork());
