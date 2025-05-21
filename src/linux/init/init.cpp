@@ -2396,7 +2396,7 @@ Return Value:
             }
 
             //
-            // Initialize distro init agruments and environment.
+            // Initialize distro init arguments and environment.
             //
 
             auto InitializeStringVector = [&](std::vector<const char*>& PointerVector,
