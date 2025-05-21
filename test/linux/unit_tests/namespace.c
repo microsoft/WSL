@@ -505,7 +505,7 @@ int NamespacePidCheckProcPidStatStatusFiles(char* Dir)
 ErrorExit:
 
     //
-    // Intentially do not close the files. These files are leaked to ensure
+    // Intentionally do not close the files. These files are leaked to ensure
     // the private procfs instance is cleaned up correctly when there are
     // file descriptors that need to be closed during thread group end.
     //
