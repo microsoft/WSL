@@ -1785,7 +1785,7 @@ void VfsAccessInodeChecksChild(void)
     LxtCheckErrno(LxtCapSet(&CapHeader, CapData));
 
     //
-    // For each file, check that read, write and execute is enforced. Similiarly
+    // For each file, check that read, write and execute is enforced. Similarly
     // for directories check that list, create\delete, and search is enforced.
     //
 
