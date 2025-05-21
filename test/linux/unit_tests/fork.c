@@ -866,7 +866,7 @@ int VForkTest(PLXT_ARGS Args)
 #if defined(__i386__) || defined(__amd64__)
 
     //
-    // Check that floating point context is preserved accross vfork.
+    // Check that floating point context is preserved across vfork.
     //
 
     _FPU_GETCW(OriginalControlWord);

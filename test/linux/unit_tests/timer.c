@@ -161,7 +161,7 @@ int ITimerPerThreadGroup(PLXT_ARGS Args)
     pthread_t Thread = {0};
 
     //
-    // Check that the timer is per threadgroup and not preserved accross fork.
+    // Check that the timer is per threadgroup and not preserved across fork.
     //
 
     memset(&NewTimer, 0, sizeof(NewTimer));
