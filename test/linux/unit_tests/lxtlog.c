@@ -60,7 +60,7 @@ void LxtLog(LxtLogLevel LogLevel, const char* Message, ...)
 
     //
     // N.B. The signal handling code may use this function and not all of the
-    //      functions used here are re-entrant safe, resulting in possible
+    //      functions used here are reentrant safe, resulting in possible
     //      deadlocks or crashes. To avoid these keep an active count and skip
     //      functions known to be problematic in the signal case. The functions
     //      identified at this point are:
