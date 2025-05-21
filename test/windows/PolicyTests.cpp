@@ -201,9 +201,9 @@ class PolicyTest
             WslShutdown();
 
             const auto kernelWarning =
-                std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageSettingOverridenByPolicy(L"wsl2.kernel"));
+                std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.kernel"));
             const auto modulesWarning =
-                std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageSettingOverridenByPolicy(L"wsl2.kernelModules"));
+                std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageSettingOverriddenByPolicy(L"wsl2.kernelModules"));
 
             ValidateWarnings(std::format(L"{}{}", kernelWarning, modulesWarning));
 

@@ -695,7 +695,7 @@ int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPC
         {
             if (result == WSL_E_FS_UPGRADE_NEEDED)
             {
-                wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageFsUpdgadeNeeded(), stderr);
+                wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageFsUpgradeNeeded(), stderr);
             }
             else
             {
