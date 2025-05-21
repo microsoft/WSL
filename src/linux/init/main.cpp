@@ -762,7 +762,7 @@ void EnableCrashDumpCollection()
         return;
     }
 
-    // If the first character is a pipe, then the kernel will interperet this path as a command.
+    // If the first character is a pipe, then the kernel will interpret this path as a command.
     constexpr auto core_pattern = "|/" LX_INIT_WSL_CAPTURE_CRASH " %t %E %p %s";
     WriteToFile("/proc/sys/kernel/core_pattern", core_pattern);
 }
