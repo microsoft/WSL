@@ -1481,7 +1481,7 @@ int EpollVariation0(PLXT_ARGS Args)
         LXT_SYNCHRONIZATION_POINT();
 
         LXT_SYNCHRONIZATION_POINT();
-        LxtLogInfo("T2: Making data avilable for read...");
+        LxtLogInfo("T2: Making data available for read...");
         LxtCheckErrno((BytesReadWrite = write(Master, "\n", 1)));
 
         Result = LXT_RESULT_SUCCESS;
