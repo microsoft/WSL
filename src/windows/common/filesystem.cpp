@@ -907,7 +907,7 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts()
         std::string LineCopy = Line;
 
         // Each line is in the following format:
-        // <host-adress> <host-alias1> <host-alias2> ...
+        // <host-address> <host-alias1> <host-alias2> ...
         //
         // N.B. There must be at least one host aliases for each host address.
 
