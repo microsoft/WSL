@@ -2467,7 +2467,7 @@ Return Value:
         LxtLogInfo("Child's view of ChildPid %d", getpid());
 
         //
-        // Attatch the shared segment.
+        // Attach the shared segment.
         //
 
         LxtCheckMapErrno(Address2 = LxtShmAt(Id, NULL, 0));
