@@ -575,7 +575,7 @@ int ShmAtAccess(PLXT_ARGS Args)
 
         //
         // Change the caller GID and attempt to map, this should still fail
-        // because the caller has a supplimentaty group membership.
+        // because the caller has a supplementary group membership.
         //
 
         LxtCheckErrno(setgid(SHM_ACCESS_GID));
@@ -588,7 +588,7 @@ int ShmAtAccess(PLXT_ARGS Args)
         }
 
         //
-        // Drop supplimentary group membership, finally this should succeed.
+        // Drop supplementary group membership, finally this should succeed.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1278,7 +1278,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1371,7 +1371,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1451,7 +1451,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Change the GID (callers still has supplimentary group membership so
+        // Change the GID (callers still has supplementary group membership so
         // this should succeed).
         //
 
@@ -1465,7 +1465,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1545,7 +1545,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Change the GID (callers still has supplimentary group membership so
+        // Change the GID (callers still has supplementary group membership so
         // this should succeed).
         //
 
@@ -1559,7 +1559,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership (this should succeed).
+        // Drop supplementary group membership (this should succeed).
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1647,7 +1647,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Change the GID (callers still has supplimentary group membership so
+        // Change the GID (callers still has supplementary group membership so
         // this should succeed).
         //
 
@@ -1665,7 +1665,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership (this should succeed).
+        // Drop supplementary group membership (this should succeed).
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -2035,7 +2035,7 @@ int ShmCtlSyscall(PLXT_ARGS Args)
         LxtCheckErrno(LxtShmCtl(Id, IPC_SET, &Stat));
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -2114,7 +2114,7 @@ int ShmCtlSyscall(PLXT_ARGS Args)
         LxtCheckErrno(LxtShmCtl(Id, IPC_SET, &Stat));
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
