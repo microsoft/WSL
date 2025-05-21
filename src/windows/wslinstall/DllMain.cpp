@@ -699,7 +699,7 @@ try
         catch (...)
         {
             // For convenience, automatically trust the MSIX's certificate if this is NOT an official build and
-            // the package installation failed because of an unstrusted certificate.
+            // the package installation failed because of an untrusted certificate.
 #ifndef WSL_OFFICIAL_BUILD
             auto error = wil::ResultFromCaughtException();
             if (error == CERT_E_UNTRUSTEDROOT)
