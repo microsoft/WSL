@@ -168,7 +168,7 @@ class PluginTests
         ValidateLogFile(ExpectedOutput);
     }
 
-    TEST_METHOD(CustomKernelOverridenByPolicy)
+    TEST_METHOD(CustomKernelOverriddenByPolicy)
     {
         WSL2_TEST_ONLY();
 

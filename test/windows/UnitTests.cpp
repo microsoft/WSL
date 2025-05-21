@@ -343,7 +343,7 @@ class UnitTests
             // Enable systemd (restarts distro).
             auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
 
-            // Validate that WSL's binfmt interpreter is overriden
+            // Validate that WSL's binfmt interpreter is overridden
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
             VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
         }
@@ -4202,18 +4202,18 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             VERIFY_IS_FALSE(std::filesystem::exists(shortcutPath));
         }
 
-        // Distribution with overriden default location
+        // Distribution with overridden default location
         {
             auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overriden-default-location"); });
+                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overridden-default-location"); });
 
             auto currentPath = std::filesystem::current_path();
             WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
 
-            InstallFromTar(g_testDistroPath.c_str(), L"--name test-overriden-default-location");
-            ValidateDistributionStarts(L"test-overriden-default-location");
+            InstallFromTar(g_testDistroPath.c_str(), L"--name test-overridden-default-location");
+            ValidateDistributionStarts(L"test-overridden-default-location");
 
-            auto distroKey = OpenDistributionKey(L"test-overriden-default-location");
+            auto distroKey = OpenDistributionKey(L"test-overridden-default-location");
             VERIFY_IS_TRUE(!!distroKey);
 
             auto shortcutPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"ShortcutPath", L"");
@@ -4225,7 +4225,7 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             // Validate that the distribution was created in the correct path
             VERIFY_ARE_EQUAL(std::filesystem::path(basePath).parent_path().string(), currentPath.string());
 
-            ValidateDistributionShortcut(L"test-overriden-default-location", nullptr);
+            ValidateDistributionShortcut(L"test-overridden-default-location", nullptr);
 
             cleanup.reset();
 
@@ -4853,7 +4853,7 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
-        // Validate that modern distros takes precedences, but can be overriden.
+        // Validate that modern distros takes precedences, but can be overridden.
         {
             auto manifest = std::format(
                 R"({{
@@ -4897,7 +4897,7 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
-        // Validate that distribution can be overriden
+        // Validate that distribution can be overridden
         {
             auto manifest = std::format(
                 R"({{
@@ -4934,7 +4934,7 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
         "debian": [
             {{
                 "Name": "debian-12",
-                "FriendlyName": "DebianFriendlyNameOverriden",
+                "FriendlyName": "DebianFriendlyNameOverridden",
                 "Amd64Url": {{
                     "Url": "{}",
                     "Sha256": "{}"
