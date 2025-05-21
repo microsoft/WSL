@@ -126,7 +126,7 @@ Daha sonra çökme dökümleri otomatik olarak C:\crashes dosyasına yazılacakt
 reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" /f
 ```
 
-### 12) wslservice için Time Travel Debugging İzleri Toplama
+### 12) wslservice İçin Time Travel Debugging İzleri Toplama
 
 To collect time travel debugging traces:
 
