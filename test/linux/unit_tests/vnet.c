@@ -675,7 +675,7 @@ int DeleteVirtualDeviceViaNetlink(const char* Name)
 
 Routine Description:
 
-    This routine removes a virtual device using the netlink RTM_DELLLINK
+    This routine removes a virtual device using the netlink RTM_DELLINK
     message.
 
 Arguments:
