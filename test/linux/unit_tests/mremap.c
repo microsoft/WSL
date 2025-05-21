@@ -740,7 +740,7 @@ int MremapTestEntry(int Argc, char* Argv[])
     }
 
     //
-    // Case 19: Large region of copy-on-written pages with same protecion.
+    // Case 19: Large region of copy-on-written pages with same protection.
     //
 
     FileSize = (512 * 1024);
