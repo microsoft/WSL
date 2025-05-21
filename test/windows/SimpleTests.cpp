@@ -183,7 +183,7 @@ class SimpleTests
             {nullptr, std::nullopt},
             {"", std::nullopt},
             {"2", std::nullopt},
-            {"tru", std::nullopt},
+            {"true_", std::nullopt},
             {"false_", std::nullopt},
         };
 
