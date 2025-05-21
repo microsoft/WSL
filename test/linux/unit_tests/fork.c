@@ -711,7 +711,7 @@ int VForkTestBasic(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPoll(ChildPid, LXT_RESULT_SUCCESS));
 
     //
-    // Repeat the above with the clone variaent of vfork.
+    // Repeat the above with the clone variant of vfork.
     //
 
     LxtCheckErrno(ChildPid = LxtCloneSyscall(CLONE_VM | CLONE_VFORK | SIGCHLD, NULL, NULL, NULL, NULL));
