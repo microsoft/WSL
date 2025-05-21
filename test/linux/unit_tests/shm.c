@@ -2408,7 +2408,7 @@ Routine Description:
     and the parent and
     child communicate across a unix socket connection. Each side queries the
     credentials of the other side via SO_PEERCRED and ancillary messages and
-    validates that the appriate credentials are returned.
+    validates that the appropriate credentials are returned.
 
 Arguments:
 
