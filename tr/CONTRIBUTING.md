@@ -109,7 +109,7 @@ Kod tamamlandığında günlük dosyasına giden yolun çıktısını verecektir
 
 #### Otomatik çökme dökümü toplamayı etkinleştirme
 
-Çökmeniz düzensizse veya yeniden üretilmesi zorsa, lütfen bu davranışa ilişkin günlükleri yakalamak için otomatik çökme dökümlerini etkinleştirin: 
+Çökmeniz düzensizse veya yeniden oluşturması zorsa, lütfen bu davranışa ilişkin günlükleri yakalamak için otomatik çökme dökümlerini etkinleştirin:
 
 ```
 md C:\crashes
