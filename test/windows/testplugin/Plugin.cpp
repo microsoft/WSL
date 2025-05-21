@@ -29,7 +29,7 @@ std::optional<uint32_t> g_previousInitPid;
 
 std::vector<char> ReadFromSocket(SOCKET socket)
 {
-    // Simplfied error handling for the sake of the demo.
+    // Simplified error handling for the sake of the demo.
     int result = 0;
     int offset = 0;
 
