@@ -222,7 +222,7 @@ int ITimerSignal(PLXT_ARGS Args)
     //
 
     //
-    // Default disposistion should terminate
+    // Default disposition should terminate
     //
 
     LxtCheckResult(ChildPid = fork());
@@ -238,7 +238,7 @@ int ITimerSignal(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, SIGALRM, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Default disposistion should not terminate if canceled.
+    // Default disposition should not terminate if canceled.
     //
 
     LxtCheckResult(ChildPid = fork());
@@ -328,7 +328,7 @@ int AlarmSyscall(PLXT_ARGS Args)
     //
 
     //
-    // Default disposistion should terminate
+    // Default disposition should terminate
     //
 
     LxtCheckResult(ChildPid = fork());
@@ -342,7 +342,7 @@ int AlarmSyscall(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, SIGALRM, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Default disposistion should not terminate if canceled.
+    // Default disposition should not terminate if canceled.
     //
 
     LxtCheckResult(ChildPid = fork());
