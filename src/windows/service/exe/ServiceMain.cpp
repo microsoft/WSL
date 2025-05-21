@@ -253,7 +253,7 @@ void WslService::ServiceStopped()
     // Tear down telemetry.
     WslTraceLoggingUninitialize();
 
-    // unitialize COM. This must be done here because this call can cause cleanups that will be fail
+    // uninitialize COM. This must be done here because this call can cause cleanups that will be fail
     // if the CRT is shutting down.
     m_coInit.reset();
 }
