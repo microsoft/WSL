@@ -2886,7 +2886,7 @@ class NetworkTests
     {
         // Verify that we have an initially working connection.
         // This also ensures that WSL is started to allow for
-        // valdiating the initial Hyper-V port state
+        // validating the initial Hyper-V port state
         GuestClient(L"tcp-connect:bing.com:80");
 
         if (expectHyperVFirewallObjects == FirewallObjects::Required)
@@ -2952,7 +2952,7 @@ class NetworkTests
     static auto AddFirewallRuleAndValidateTraffic(const FirewallRule& rule, FirewallTestConnectivity expectedConnectivityAfterRule)
     {
         LogInfo(
-            "Validing ruleType=[%ls] name=[%ls] and expectedConnectivity=[%ls]",
+            "Validating ruleType=[%ls] name=[%ls] and expectedConnectivity=[%ls]",
             (rule.Type == FirewallType::Host) ? L"Host" : L"HyperV",
             rule.Name.c_str(),
             expectedConnectivityAfterRule == FirewallTestConnectivity::Allowed ? L"Allowed" : L"Blocked");
