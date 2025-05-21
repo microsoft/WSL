@@ -2411,7 +2411,7 @@ Return Value:
     {
         LxtLogError(
             "recvmmsg should return 0 messages read, "
-            "but it retured %d messages for flags %x",
+            "but it returned %d messages for flags %x",
             MessagesRead,
             Flags);
 

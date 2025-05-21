@@ -3751,7 +3751,7 @@ Return Value:
     {
         LxtLogError(
             "getdents should return 0 when end of directory is reached, "
-            "but it retuend: %d.",
+            "but it returned: %d.",
             Size);
 
         Result = EINVAL;
