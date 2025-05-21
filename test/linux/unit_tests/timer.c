@@ -654,7 +654,7 @@ int TimerCreateSyscall(PLXT_ARGS Args)
     LxtCheckResult(sigprocmask(SIG_UNBLOCK, &SigMask, NULL));
 
     //
-    // Wait for the signal to be delievered.
+    // Wait for the signal to be delivered.
     //
 
     LxtCheckErrno(Signal = sigtimedwait(&SigMask, &SignalInfo, NULL));
