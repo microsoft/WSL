@@ -2491,7 +2491,7 @@ void ProcessLaunchInitMessage(
         //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
         //
-        // N.B. A connection for the system disto must established even if the distro opts out
+        // N.B. A connection for the system distro must established even if the distro opts out
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
