@@ -684,7 +684,7 @@ Return Value:
             //            kernel assigns to the non-first sockets of the process).
             //            Test that the kernel will skip any negative nl_pid's that
             //            the user already specified. For example, Socket2 gets
-            //            an auto-assigned nl_pid of -5. Socket3 is binded with
+            //            an auto-assigned nl_pid of -5. Socket3 is bound with
             //            the user specifying nl_pid of -4. Socket4 gets an
             //            auto-assigned nl_pid of -3, since -4 was already taken
             //            by the user.
