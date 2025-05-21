@@ -8715,7 +8715,7 @@ Return Value:
     tcflag_t InputFlags;
     int PtmFd;
     int PtsFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     char ReadBuffer[20];
     int Result;
     int SerialNumber;

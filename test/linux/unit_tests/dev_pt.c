@@ -1222,7 +1222,7 @@ Return Value:
     char MessageBuffer[10];
     size_t MessageLength;
     int PtmFd;
-    char PtsBuffer[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsBuffer[PTS_DEV_NAME_BUFFER_SIZE];
     int Result;
     pid_t SelfPid;
     pid_t SessionId;
@@ -1352,7 +1352,7 @@ Return Value:
 {
 
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int Result;
     int SerialNumber;
@@ -1387,7 +1387,7 @@ Return Value:
     // It should fail.
     //
 
-    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFER_SIZE));
+    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFFER_SIZE));
     LxtLogInfo("Subordinate Device is:%s", PtsDevName);
     PtsFd = open(PtsDevName, O_RDWR);
     LxtCheckErrnoFailure(open(PtsDevName, O_RDWR), EIO);
@@ -1492,7 +1492,7 @@ Return Value:
 {
 
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int Result;
     int SerialNumber1;
@@ -1532,7 +1532,7 @@ Return Value:
 
     LxtCheckErrno((PtmFd = open("/dev/ptmx", O_RDWR)));
     LxtLogInfo("Master opened at FD:%d", PtmFd);
-    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFER_SIZE));
+    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFFER_SIZE));
     LxtLogInfo("Subordinate Device is:%s", PtsDevName);
     LxtCheckErrno((SerialNumber2 = GetPtSerialNumFromDeviceString(PtsDevName)));
 
@@ -1622,7 +1622,7 @@ Return Value:
 {
 
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int PtsFd1;
     int PtsFd2;
@@ -1727,7 +1727,7 @@ Return Value:
     char Message1[] = "ls -al\n";
     char Message2[] = "date\n";
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     char ReadBuffer[50];
     int Result;
@@ -3042,7 +3042,7 @@ Return Value:
 
     int Result;
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
 
     //
@@ -3060,7 +3060,7 @@ Return Value:
     LxtLogInfo("Master opened at FD:%d", PtmFd);
     LxtCheckErrno(grantpt(PtmFd));
     LxtCheckErrno(unlockpt(PtmFd));
-    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFER_SIZE));
+    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFFER_SIZE));
     LxtLogInfo("Subordinate Device is:%s", PtsDevName);
 
     //
@@ -3111,7 +3111,7 @@ Return Value:
 
     int Result;
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int SerialNumber;
 
@@ -5042,7 +5042,7 @@ Return Value:
     int Loop;
     int LoopCount;
     int NumPtToTest;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int Result;
 
     //
