@@ -2567,7 +2567,7 @@ try
     // Attempt to open the /etc/default/locale file. If the file does not exist
     // then the $LANG environment variable will not be updated.
     //
-    // N.B. This file is being opened by root. The only user-visable content
+    // N.B. This file is being opened by root. The only user-visible content
     //      will be the contents of the last line of the file that contains
     //      "LANG=".
     //
