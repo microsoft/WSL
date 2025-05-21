@@ -2487,7 +2487,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanup =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(L"--set-version test_distro " + originalVersion); });
 
-        // Convert the test distribuiton to the target version and back to the original.
+        // Convert the test distribution to the target version and back to the original.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--set-version test_distro " + targetVersion), 0u);
         ValidateDistributionShortcut(LXSS_DISTRO_NAME_TEST_L, nullptr);
         ValidateDistributionTerminalProfile(LXSS_DISTRO_NAME_TEST_L, true);

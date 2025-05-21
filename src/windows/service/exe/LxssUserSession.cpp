@@ -719,7 +719,7 @@ try
         E_INVALIDARG,
         ((DefaultUid == LX_UID_INVALID) || (Flags != LXSS_DISTRO_FLAGS_UNCHANGED && WI_IsAnyFlagSet(Flags, ~LXSS_DISTRO_FLAGS_ALL))));
 
-    // If the configuration is changed, terminate the distribuiton so the new settings will take effect.
+    // If the configuration is changed, terminate the distribution so the new settings will take effect.
     bool modified = false;
     if (DefaultUid != distribution.Read(Property::DefaultUid))
     {
@@ -1570,7 +1570,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 THROW_HR_IF(WSL_E_IMPORT_FAILED, exitStatus != 0);
             }
 
-            // Invoke the init binary with the option to export the distribuiton information via stdout.
+            // Invoke the init binary with the option to export the distribution information via stdout.
             {
                 std::pair<wil::unique_handle, wil::unique_handle> input;
                 THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&input.first, &input.second, nullptr, 0));

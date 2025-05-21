@@ -755,7 +755,7 @@ private:
     static wil::unique_hkey s_OpenLxssUserKey();
 
     /// <summary>
-    /// Ensures the distribuiton name is valid.
+    /// Ensures the distribution name is valid.
     /// </summary>
     static void s_ValidateDistroName(_In_ LPCWSTR Name);
 

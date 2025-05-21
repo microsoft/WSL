@@ -1079,7 +1079,7 @@ LaunchProcessOptions ParseLegacyArguments(_Inout_ std::wstring_view& commandLine
     // Strip any leading whitespace.
     commandLine = wsl::windows::common::string::StripLeadingWhitespace(commandLine);
 
-    // Check for a distributon GUID as the first parameter and strip it out if present.
+    // Check for a distribution GUID as the first parameter and strip it out if present.
     auto argument = wsl::windows::common::helpers::ParseArgument(commandLine);
     auto distroGuid = wsl::shared::string::ToGuid(argument);
     if (distroGuid.has_value())
