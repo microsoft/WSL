@@ -2521,7 +2521,7 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
         else
         {
-            // The VM has already been terminated, invoke the callback on a seperate thread.
+            // The VM has already been terminated, invoke the callback on a separate thread.
             std::thread([terminationCallback = std::move(TerminationCallback), runtimeId = m_runtimeId]() {
                 wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
                 terminationCallback(runtimeId);
