@@ -14,7 +14,7 @@ When a Linux process is created, [wslservice.exe](wslservice.exe.md) determines 
 
 *Note: This section only applies to WSL2 distributions. *
 
-When a [session leader](session-leader.md) is created, [wslsevice.exe](wslservice.exe.md) starts a [plan9](https://9fans.github.io/plan9port/man/man9/intro.html) file server. This file server can be connected to from the WSL2 virtual machine to mount Windows drives. 
+When a [session leader](session-leader.md) is created, [wslservice.exe](wslservice.exe.md) starts a [plan9](https://9fans.github.io/plan9port/man/man9/intro.html) file server. This file server can be connected to from the WSL2 virtual machine to mount Windows drives. 
 
 When the WSL distribution is created, [wslservice.exe](wslservice.exe.md) uses the `LX_INIT_CONFIGURATION_INFORMATION` message to indicate whether the process that created the distribution is elevated or not. Based on this, [init](init.md) will mount either or the elevated, or un-elevated version of the plan9 server.
 
