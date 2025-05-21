@@ -275,7 +275,7 @@ int ITimerSignal(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, LXT_RESULT_SUCCESS, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Check that the signal handler is invoked within a resonable time
+    // Check that the signal handler is invoked within a reasonable time
     // interval.
     //
 
@@ -380,7 +380,7 @@ int AlarmSyscall(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, LXT_RESULT_SUCCESS, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Check that the signal handler is invoked within a resonable time
+    // Check that the signal handler is invoked within a reasonable time
     // interval.
     //
 
@@ -440,7 +440,7 @@ int ITimerPeriodicSignal(PLXT_ARGS Args)
     struct itimerval NewTimer;
 
     //
-    // Check that the signal handler is invoked within a resonable time
+    // Check that the signal handler is invoked within a reasonable time
     // interval.
     //
 
