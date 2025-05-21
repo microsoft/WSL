@@ -281,7 +281,7 @@ class PolicyTest
         auto revert = SetPolicy(c_allowDebugShellUserSetting, 0);
         WslShutdown();
 
-        // Only testing the negative case since the debug shell is difficult to programatically exit.
+        // Only testing the negative case since the debug shell is difficult to programmatically exit.
 
         WslKeepAlive keepAlive;
         ValidateOutput(L"--debug-shell", L"The debug shell is disabled by the computer policy.\r\n", L"", 1);
