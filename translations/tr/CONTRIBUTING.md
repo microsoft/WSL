@@ -130,7 +130,7 @@ reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Repo
 
 Time Travel Debugging İzleri'ni toplamak için:
 
-1) [Windbg Preview'i yükleyin](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
+1) [WinDbg Preview'i yükleyin](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?rtc=1)
 
 2) Yönetici olarak açtığınız komut isteminde `windbgx` komutunu çalıştırarak windbg önizlemesini yönetici olarak açın
 
