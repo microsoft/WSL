@@ -247,7 +247,7 @@ std::variant<Distribution, ModernDistributionVersion> wsl::windows::common::dist
         auto distribution = LookupDistributionInManifest(manifest.OverrideManifest.value(), name, legacy);
         if (distribution.has_value())
         {
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageDistributionOverriden(name));
+            EMIT_USER_WARNING(wsl::shared::Localization::MessageDistributionOverridden(name));
             return distribution.value();
         }
     }

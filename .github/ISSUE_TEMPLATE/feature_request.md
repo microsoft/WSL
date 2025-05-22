@@ -1,6 +1,6 @@
 ---
-name: Feature request
-about: Suggest a feature for Windows Subsystem for Linux
+name: Feature request / Contribution idea
+about: Suggest a feature or improvement for the Windows Subsystem for Linux
 title: ''
 labels: 'feature'
 assignees: ''
