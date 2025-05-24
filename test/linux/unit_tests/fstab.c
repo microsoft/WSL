@@ -100,7 +100,7 @@ Return Value:
 
         //
         // Check that there is only one mount for C: (or any variation therefore, like C:\ or c:),
-        // and that that mount uses the exact options specified in fstab.
+        // and that its mount uses the exact options specified in fstab.
         //
 
         if (strcmp(FsType, "9p") == 0)

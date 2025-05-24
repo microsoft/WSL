@@ -19,7 +19,7 @@ You can file issues for WSL at the WSL repository, or linked repositories. Befor
 
 1. If your issue is related to WSL documentation, please file it at [microsoftdocs/wsl](https://github.com/microsoftdocs/WSL/issues)
 2. If your issue is related to a Linux GUI app, please file it at [microsoft/wslg](https://github.com/microsoft/wslg/issues)
-3. Otherwise if you have a technical issue related to WSL in general, such as start up issues, etc., please file it at [microsoft/wsl](https://github.com/microsoft/WSL/issues)
+3. Otherwise, if you have a technical issue related to WSL in general, such as start up issues, etc., please file it at [microsoft/wsl](https://github.com/microsoft/WSL/issues)
 
 Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux, and be sure to include logs as necessary!
 
@@ -94,14 +94,14 @@ After reboot, the kernel dump will be in `%SystemRoot%\MEMORY.DMP` (unless this 
 Please send this dump to: secure@microsoft.com .
 Make sure that the email body contains:
 
-- The Github issue number, if any
-- That this dump is destinated to the WSL team
+- The GitHub issue number, if any
+- That this dump is destined to the WSL team
 
 ### 11) Reporting a WSL process crash
 
 The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/windows/win32/wer/collecting-user-mode-dumps).
 
-To collect dumps of all running WSL processe, please open a PowerShell prompt with admin privileges, navigate to a folder where you'd like to put your log files and run these commands: 
+To collect dumps of all running WSL processes, please open a PowerShell prompt with admin privileges, navigate to a folder where you'd like to put your log files and run these commands: 
 
 ```
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1

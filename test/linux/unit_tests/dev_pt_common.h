@@ -49,7 +49,7 @@ Abstract:
 #define FALSE 0
 #define TRUE 1
 
-#define PTS_DEV_NAME_BUFER_SIZE 50
+#define PTS_DEV_NAME_BUFFER_SIZE 50
 
 #define IS_CONTROL_CHAR_ECHO_STRING(s, c) (((s)[0] == '^') && (((s)[1] > 0x40)) && (((s)[1] - 0x40) == (c)))
 

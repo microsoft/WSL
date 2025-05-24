@@ -465,7 +465,7 @@ int SemGetSyscall(PLXT_ARGS Args)
     // N.B. There appears to be no error checking for invalid flags, only the
     //      presence of valid flags.
     //
-    // -1 includes the IPC_EXCL flag so this shoudl return EEXIST.
+    // -1 includes the IPC_EXCL flag so this should return EEXIST.
     //
 
     LxtCheckErrnoFailure(LxtSemGet(Key, SEM_COUNT, -1), EEXIST);
@@ -812,7 +812,7 @@ int SemOpFlags(PLXT_ARGS Args)
     LXT_SYNCHRONIZATION_POINT();
 
     //
-    // Wait for child to perform second operation and set the smeaphore value
+    // Wait for child to perform second operation and set the semaphore value
     // to zero. This should remove the pending semaphore adjustment.
     //
 
@@ -922,7 +922,7 @@ int SemOpFlags(PLXT_ARGS Args)
     LxtCheckEqual(0, LxtSemCtl(Id, 1, GETVAL, NULL), "%d");
 
     //
-    // Create two threads, one sharing the sempahore adjustment structure
+    // Create two threads, one sharing the semaphore adjustment structure
     // and one not.
     //
 
@@ -1237,7 +1237,7 @@ int SemOpSyscall(PLXT_ARGS Args)
         //
         // Fill the operations buffer with a combination of valid operations
         // and operations that the caller does not have permission to do. The
-        // parent will verify the the semaphore values are adjusted correctly.
+        // parent will verify the semaphore values are adjusted correctly.
         //
 
         memset(Operations, 0, sizeof(Operations));
@@ -1312,7 +1312,7 @@ int SemOpSyscall(PLXT_ARGS Args)
     }
 
     //
-    // Wait for the child to do the fisrt semop and query the values.
+    // Wait for the child to do the first semop and query the values.
     //
 
     LXT_SYNCHRONIZATION_POINT(); // (1)

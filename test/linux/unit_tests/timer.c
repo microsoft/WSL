@@ -161,7 +161,7 @@ int ITimerPerThreadGroup(PLXT_ARGS Args)
     pthread_t Thread = {0};
 
     //
-    // Check that the timer is per threadgroup and not preserved accross fork.
+    // Check that the timer is per threadgroup and not preserved across fork.
     //
 
     memset(&NewTimer, 0, sizeof(NewTimer));
@@ -222,7 +222,7 @@ int ITimerSignal(PLXT_ARGS Args)
     //
 
     //
-    // Default disposistion should terminate
+    // Default disposition should terminate
     //
 
     LxtCheckResult(ChildPid = fork());
@@ -238,7 +238,7 @@ int ITimerSignal(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, SIGALRM, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Default disposistion should not terminate if canceled.
+    // Default disposition should not terminate if canceled.
     //
 
     LxtCheckResult(ChildPid = fork());
@@ -275,7 +275,7 @@ int ITimerSignal(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, LXT_RESULT_SUCCESS, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Check that the signal handler is invoked within a resonable time
+    // Check that the signal handler is invoked within a reasonable time
     // interval.
     //
 
@@ -328,7 +328,7 @@ int AlarmSyscall(PLXT_ARGS Args)
     //
 
     //
-    // Default disposistion should terminate
+    // Default disposition should terminate
     //
 
     LxtCheckResult(ChildPid = fork());
@@ -342,7 +342,7 @@ int AlarmSyscall(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, SIGALRM, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Default disposistion should not terminate if canceled.
+    // Default disposition should not terminate if canceled.
     //
 
     LxtCheckResult(ChildPid = fork());
@@ -380,7 +380,7 @@ int AlarmSyscall(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPollOptions(ChildPid, LXT_RESULT_SUCCESS, 0, LXT_SHORT_TIMER_WAIT_PID));
 
     //
-    // Check that the signal handler is invoked within a resonable time
+    // Check that the signal handler is invoked within a reasonable time
     // interval.
     //
 
@@ -440,7 +440,7 @@ int ITimerPeriodicSignal(PLXT_ARGS Args)
     struct itimerval NewTimer;
 
     //
-    // Check that the signal handler is invoked within a resonable time
+    // Check that the signal handler is invoked within a reasonable time
     // interval.
     //
 
@@ -654,7 +654,7 @@ int TimerCreateSyscall(PLXT_ARGS Args)
     LxtCheckResult(sigprocmask(SIG_UNBLOCK, &SigMask, NULL));
 
     //
-    // Wait for the signal to be delievered.
+    // Wait for the signal to be delivered.
     //
 
     LxtCheckErrno(Signal = sigtimedwait(&SigMask, &SignalInfo, NULL));

@@ -45,7 +45,7 @@ std::vector<std::wstring> GetUserLanguages(bool impersonate)
 {
     if (g_runningInService)
     {
-        // N.B. If we're in the service the locale needs to be queried everytime since different users
+        // N.B. If we're in the service the locale needs to be queried every time since different users
         // can have different language configurations.
         std::optional<wil::unique_coreverttoself_call> revert;
         if (impersonate)

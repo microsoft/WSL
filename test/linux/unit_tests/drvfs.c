@@ -270,7 +270,7 @@ static const LXT_VARIATION g_LxtFatVariations[] = {
     {"DrvFs - inotify with epoll", DrvFsTestInotifyEpoll},
     {"DrvFs - inotify unmounting of a bind mount", DrvFsTestInotifyUnmountBind},
     {"DrvFs - block count", DrvFsTestBlockCount},
-    {"DrvFs - FAT32 case insensitive", DrvFsTestFatCaseInsensitive},
+    {"DrvFs - FAT32 case-insensitive", DrvFsTestFatCaseInsensitive},
     {"DrvFs - FAT32 unsupported features", DrvFsTestFatUnsupported},
     {"DrvFs - FAT32 utimensat", DrvFsTestFatUtimensat},
     {"DrvFs - FAT32 mount point junction", DrvFsTestFatJunction},
@@ -295,7 +295,7 @@ static const LXT_VARIATION g_LxtSmbVariations[] = {
     {"DrvFs - rename", DrvFsTestRename},
     {"DrvFs - renameat", DrvFsTestRenameAt},
     {"DrvFs - hard links", DrvFsTestHardLinks},
-    {"DrvFs - SMB case insensitive", DrvFsTestFatCaseInsensitive},
+    {"DrvFs - SMB case-insensitive", DrvFsTestFatCaseInsensitive},
     {"DrvFs - SMB unsupported features", DrvFsTestSmbUnsupported},
     {"DrvFs - SMB utimensat", DrvFsTestSmbUtimensat},
     {"DrvFs - fstat", DrvFsTestFstat},
@@ -1650,7 +1650,7 @@ int DrvFsTestFatCaseInsensitive(PLXT_ARGS Args)
 
 Description:
 
-    This routine tests the case insensitive behavior of FAT.
+    This routine tests the case-insensitive behavior of FAT.
 
 Arguments:
 
@@ -1707,7 +1707,7 @@ Return Value:
     // renaming on FAT.
     //
     // N.B. With SMB over Plan 9, because Linux doesn't know the file system is
-    //      case insensitive and NTFS does let you change the case on rename,
+    //      case-insensitive and NTFS does let you change the case on rename,
     //      this actually does change the case.
     //
 
@@ -1720,7 +1720,7 @@ Return Value:
     // directory entries are cached.
     //
     // N.B. This is not the case with Plan 9 because Linux doesn't know the
-    //      file system is case insensitive.
+    //      file system is case-insensitive.
     //
 
     if (g_LxtFsInfo.FsType != LxtFsTypePlan9)
@@ -3651,7 +3651,7 @@ int DrvFsTestSetup(PLXT_ARGS Args, int TestMode)
 
 Description:
 
-    This routine perofrms setup for the drvfs tests.
+    This routine performs setup for the drvfs tests.
 
 Arguments:
 
@@ -3779,7 +3779,7 @@ Return Value:
 
             //
             // Check if drvfs actually used the requested fallback mode. This guards
-            // against a pre-existing instance (e.g. in another mount namespace)
+            // against a preexisting instance (e.g. in another mount namespace)
             // preventing the options from changing, or file system limitations causing
             // drvfs to use a different fallback mode than requested.
             //

@@ -236,7 +236,7 @@ unsigned int StartTelemetryAgent()
                 }
             }
 
-            // Regularily flush messages back to the service.
+            // Regularly flush messages back to the service.
 
             auto now = std::chrono::steady_clock::now();
             if (drvfsNotifyCommand.has_value() || now > nextFlush)

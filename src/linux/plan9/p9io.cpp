@@ -79,7 +79,7 @@ void CoroutineIoIssuer::PostIssue(CoroutineIoOperation& operation, CancelToken& 
     else if (token.Cancelled())
     {
         // The IO did not complete synchronously, but the operation has been
-        // cancelled. Depending on when the cancel occured, the IO may not have
+        // cancelled. Depending on when the cancel occurred, the IO may not have
         // been cancelled, so cancel it now.
         aio_cancel(operation.ControlBlock.aio_fildes, &operation.ControlBlock);
     }

@@ -392,7 +392,7 @@ Arguments:
 
     BufferSize - Supplies the size of the buffer in bytes.
 
-    SizeReceieved - Supplies a buffer to store the number of bytes received.
+    SizeReceived - Supplies a buffer to store the number of bytes received.
 
 Return Value:
 
@@ -469,7 +469,7 @@ Arguments:
 
     BufferSize - Supplies the size of the buffer in bytes.
 
-    SizeReceieved - Supplies a buffer to store the number of bytes received.
+    SizeReceived - Supplies a buffer to store the number of bytes received.
 
     IoStatus - Supplies a pointer to an io status block.
 
@@ -754,7 +754,7 @@ LxBusClientWaitForConnection(_In_ HANDLE ServerPortHandle, _Out_ PLXBUS_IPC_SERV
 
 Routine Description:
 
-    Waits for for a client connection on the provided server port.
+    Waits for a client connection on the provided server port.
 
 Arguments:
 
@@ -780,7 +780,7 @@ LxBusClientWaitForLxProcess(_In_ HANDLE LxProcessHandle, _Out_ PLXBUS_IPC_LX_PRO
 
 Routine Description:
 
-    Waits for for a client connection on the provided server port.
+    Waits for a client connection on the provided server port.
 
 Arguments:
 
