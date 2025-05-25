@@ -1,0 +1,18 @@
+trigger:
+  branches:
+    include:
+    - master
+    - release/*
+
+git:
+  fetchDepth: -1
+  fetchTags: true
+
+stages:
+- template: build-stage.yml@self
+  parameters:
+    isRelease: false
+
+- template: test-stage.yml@self
+  parameters:
+    rs_prerelease_only: true

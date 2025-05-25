@@ -46,8 +46,8 @@ set(HEADERS
     wslpath.h)
 
 set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS} -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil")
-set(INIT_LIBRAIRIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)
-add_linux_executable(init "${SOURCES}" "${HEADERS}" "${INIT_LIBRAIRIES}")
+set(INIT_LIBRARIES ${COMMON_LINUX_LINK_LIBRARIES} netlinkutil plan9 mountutil configfile)
+add_linux_executable(init "${SOURCES}" "${HEADERS}" "${INIT_LIBRARIES}")
 add_dependencies(init localization)
 
 set(INITRAMFS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/initrd.img)

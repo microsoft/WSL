@@ -364,7 +364,7 @@ set(LINUX_LDFLAGS -target ${LLVM_TARGET}
                   -l:libc.a
                   -static)
 
-set(COMMON_LINUX_LINK_LIBRAIRIES configfile)
+set(COMMON_LINUX_LINK_LIBRARIES configfile)
 
 if(DEFINED ENV{WSL_DEV_BINARY_PATH})
     set(WSL_DEV_BINARY_PATH $ENV{WSL_DEV_BINARY_PATH})
