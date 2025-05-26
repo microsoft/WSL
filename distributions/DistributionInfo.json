@@ -164,8 +164,8 @@
                 "FriendlyName": "Gentoo Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/HUSTLUG/Gentoo-wsl/releases/download/2025-5-25/gentoo_2025-05-25.wsl",
-                    "Sha256": "0x451B290338D1779673B37595D2D9FF83818E88C58D3FF3F387F461BF448FBABC"
+                    "Url": "https://github.com/HUSTLUG/Gentoo-wsl/releases/download/20250525/gentoo_20250525.wsl",
+                    "Sha256": "e42042c69a682043eabf0ec614999798302115b73b41deea02a4563aa2c2fe04"
                 }
             }
         ],
