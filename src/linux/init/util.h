@@ -93,7 +93,6 @@ public:
     InteropServer(InteropServer&& other) noexcept :
         m_InteropSocketPath(std::move(other.m_InteropSocketPath)), m_InteropSocket(std::move(other.m_InteropSocket))
     {
-        m_InteropSocketPath.clear();
     }
 
     int Create();
