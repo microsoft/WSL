@@ -74,10 +74,10 @@ typedef struct _CREATE_PROCESS_PARSED_COMMON
 typedef struct _CREATE_PROCESS_PARSED
 {
     CREATE_PROCESS_PARSED_COMMON Common;
-    int EventFd;
-    int StdFd[LX_INIT_STD_FD_COUNT];
-    int TtyFd;
-    int ServiceFd;
+    wil::unique_fd EventFd;
+    wil::unique_fd StdFd[LX_INIT_STD_FD_COUNT];
+    wil::unique_fd ServiceFd;
+    wil::unique_fd TtyFd;
 } CREATE_PROCESS_PARSED, *PCREATE_PROCESS_PARSED;
 
 struct sigaction g_SavedSignalActions[_NSIG];
@@ -104,15 +104,11 @@ void CreateProcess(PCREATE_PROCESS_PARSED Parsed, const wsl::linux::WslDistribut
 
 void CreateProcessCommon(PCREATE_PROCESS_PARSED_COMMON Common, int TtyFd, int ServiceSocketFd, const wsl::linux::WslDistributionConfig&);
 
-int CreateProcessParse(PCREATE_PROCESS_PARSED CreateProcessParsed, gsl::span<gsl::byte> Buffer, int MessageFd, int TtyFd);
+CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd);
 
 int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config);
 
-void CreateProcessParseFree(PCREATE_PROCESS_PARSED CreateProcessParsed);
-
-void CreateProcessParseInitialize(PCREATE_PROCESS_PARSED CreateProcessParsed);
-
-int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED CreateProcessParsed, pid_t CreateProcessPid, int MessageFd);
+int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED Parsed, pid_t CreateProcessPid, int MessageFd);
 
 void CreateWslSystemdUnits(const wsl::linux::WslDistributionConfig& Config);
 
@@ -144,9 +140,9 @@ void HardenMirroredNetworkingSettingsAgainstSystemd();
 
 void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT>& Message, const char* ExtractedPath);
 
-int SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, int TtyFd);
+void SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd);
 
-void SessionLeaderEntry(int MessageFd, int TtyFd, const wsl::linux::WslDistributionConfig& Config);
+void SessionLeaderEntry(int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config);
 
 void SessionLeaderEntryUtilityVm(wsl::shared::SocketChannel& Channel, const wsl::linux::WslDistributionConfig& Config);
 
@@ -457,7 +453,7 @@ Routine Description:
 
 Arguments:
 
-    Parsed - Supplies a pointer to a create process parsed.
+    Parsed - Supplies a pointer to a create process parsed structure.
 
     Config - Supplies the distribution configuration.
 
@@ -479,23 +475,23 @@ Return Value:
 
     for (StdFdIndex = 0; StdFdIndex < LX_INIT_STD_FD_COUNT; StdFdIndex += 1)
     {
-        if (dup2(Parsed->StdFd[StdFdIndex], StdFdIndex) < 0)
+        //
+        // If a standard file descriptor is not set, use the TTY file descriptor.
+        //
+
+        if (dup2(Parsed->StdFd[StdFdIndex] ? Parsed->StdFd[StdFdIndex].get() : Parsed->TtyFd.get(), StdFdIndex) < 0)
         {
             FATAL_ERROR("dup2 failed {}", errno);
         }
 
-        if (Parsed->StdFd[StdFdIndex] != Parsed->TtyFd)
-        {
-            CLOSE(Parsed->StdFd[StdFdIndex]);
-            Parsed->StdFd[StdFdIndex] = -1;
-        }
+        Parsed->StdFd[StdFdIndex].reset();
     }
 
     //
     // Read the eventfd data from the wsl service.
     //
 
-    BytesRead = TEMP_FAILURE_RETRY(read(Parsed->EventFd, &EventFdData, sizeof(EventFdData)));
+    BytesRead = TEMP_FAILURE_RETRY(read(Parsed->EventFd.get(), &EventFdData, sizeof(EventFdData)));
     if (BytesRead != sizeof(EventFdData))
     {
         FATAL_ERROR("Failed to read (size {}) EventFd {}", BytesRead, errno);
@@ -505,8 +501,7 @@ Return Value:
     // Launch the process.
     //
 
-    CreateProcessCommon(&Parsed->Common, Parsed->TtyFd, Parsed->ServiceFd, Config);
-    Parsed->TtyFd = -1;
+    CreateProcessCommon(&Parsed->Common, Parsed->TtyFd.get(), Parsed->ServiceFd.get(), Config);
     return;
 }
 
@@ -811,7 +806,7 @@ catch (...)
     FATAL_ERROR("Create process failed");
 }
 
-int CreateProcessParse(PCREATE_PROCESS_PARSED CreateProcessParsed, gsl::span<gsl::byte> Buffer, int MessageFd, int TtyFd, const wsl::linux::WslDistributionConfig& Config)
+CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -820,9 +815,6 @@ Routine Description:
     This routine parses a create process message.
 
 Arguments:
-
-    CreateProcessParsed - Supplies a buffer to store the create process
-        parameters.
 
     Buffer - Supplies the create process message.
 
@@ -834,74 +826,49 @@ Arguments:
 
 Return Value:
 
-    0 on success, -1 on failure.
+    The create process parameters.
 
 --*/
 
 {
-    int EventFd;
-    unsigned short Index;
-    int Result;
-    int StdFd[LX_INIT_STD_FD_COUNT];
-    LXBUS_IPC_MESSAGE_UNMARSHAL_FORK_TOKEN_PARAMETERS UnmarshalForkToken;
-    LXBUS_IPC_MESSAGE_UNMARSHAL_HANDLE_PARAMETERS UnmarshalHandle;
-    LXBUS_IPC_MESSAGE_UNMARSHAL_SERVER_PARAMETERS UnmarshalServer;
-
-    EventFd = -1;
-    memset(StdFd, -1, sizeof(StdFd));
-
     //
     // Validate the message size.
     //
 
-    auto* CreateProcess = gslhelpers::try_get_struct<LX_INIT_CREATE_PROCESS>(Buffer);
-    if (!CreateProcess)
-    {
-        FATAL_ERROR("Unexpected create process size {}", Buffer.size());
-    }
+    auto* Message = gslhelpers::try_get_struct<LX_INIT_CREATE_PROCESS>(Buffer);
+    THROW_ERRNO_IF(EINVAL, !Message);
 
     //
     // Parse common create process information.
     //
 
-    Result = CreateProcessParseCommon(&CreateProcessParsed->Common, Buffer.subspan(offsetof(LX_INIT_CREATE_PROCESS, Common)), Config);
-    if (Result < 0)
-    {
-        goto CreateProcessParseEnd;
-    }
+    CREATE_PROCESS_PARSED Parsed{};
+    Parsed.TtyFd = std::move(TtyFd);
+    int Result = CreateProcessParseCommon(&Parsed.Common, Buffer.subspan(offsetof(LX_INIT_CREATE_PROCESS, Common)), Config);
+    THROW_ERRNO_IF(EINVAL, Result < 0);
 
     //
     // Create the eventfd.
     //
 
-    EventFd = eventfd(0, EFD_CLOEXEC);
-    if (EventFd < 0)
-    {
-        FATAL_ERROR("eventfd failed {}", errno);
-    }
+    Parsed.EventFd = eventfd(0, EFD_CLOEXEC);
+    THROW_LAST_ERROR_IF(!Parsed.EventFd);
 
     //
     // Set up the standard handles for the process.
     //
     //
 
-    for (Index = 0; Index < LX_INIT_STD_FD_COUNT; Index += 1)
+    for (unsigned short Index = 0; Index < LX_INIT_STD_FD_COUNT; Index += 1)
     {
-        if (CreateProcess->StdFdIds[Index] == LX_INIT_CREATE_PROCESS_USE_CONSOLE)
+        if (Message->StdFdIds[Index] != LX_INIT_CREATE_PROCESS_USE_CONSOLE)
         {
-            StdFd[Index] = TtyFd;
-        }
-        else
-        {
-            memset(&UnmarshalHandle, 0, sizeof(UnmarshalHandle));
-            UnmarshalHandle.Input.HandleId = CreateProcess->StdFdIds[Index];
+            LXBUS_IPC_MESSAGE_UNMARSHAL_HANDLE_PARAMETERS UnmarshalHandle{};
+            UnmarshalHandle.Input.HandleId = Message->StdFdIds[Index];
             Result = TEMP_FAILURE_RETRY(ioctl(MessageFd, LXBUS_IPC_MESSAGE_IOCTL_UNMARSHAL_HANDLE, &UnmarshalHandle));
-            if (Result < 0)
-            {
-                FATAL_ERROR("Failed to unmarshal handle {}", errno);
-            }
+            THROW_LAST_ERROR_IF(Result < 0);
 
-            StdFd[Index] = UnmarshalHandle.Output.FileDescriptor;
+            Parsed.StdFd[Index] = UnmarshalHandle.Output.FileDescriptor;
         }
     }
 
@@ -909,75 +876,38 @@ Return Value:
     // Unmarshal the fork token.
     //
 
-    memset(&UnmarshalForkToken, 0, sizeof(UnmarshalForkToken));
-    UnmarshalForkToken.Input.ForkTokenId = CreateProcess->ForkTokenId;
+    LXBUS_IPC_MESSAGE_UNMARSHAL_FORK_TOKEN_PARAMETERS UnmarshalForkToken{};
+    UnmarshalForkToken.Input.ForkTokenId = Message->ForkTokenId;
     Result = TEMP_FAILURE_RETRY(ioctl(MessageFd, LXBUS_IPC_MESSAGE_IOCTL_UNMARSHAL_FORK_TOKEN, &UnmarshalForkToken));
-    if (Result < 0)
-    {
-        FATAL_ERROR("Failed to unmarshal fork token {}", errno);
-    }
+    THROW_LAST_ERROR_IF(Result < 0);
 
     //
     // Unmarshal the ipc server.
     //
 
-    if (CreateProcess->IpcServerId != LXBUS_IPC_SERVER_ID_INVALID)
+    if (Message->IpcServerId != LXBUS_IPC_SERVER_ID_INVALID)
     {
-        memset(&UnmarshalServer, 0, sizeof(UnmarshalServer));
-        UnmarshalServer.Input.ServerId = CreateProcess->IpcServerId;
+        LXBUS_IPC_MESSAGE_UNMARSHAL_SERVER_PARAMETERS UnmarshalServer{};
+        UnmarshalServer.Input.ServerId = Message->IpcServerId;
         Result = TEMP_FAILURE_RETRY(ioctl(MessageFd, LXBUS_IPC_MESSAGE_IOCTL_UNMARSHAL_SERVER, &UnmarshalServer));
-        if (Result < 0)
-        {
-            FATAL_ERROR("Failed to unmarshal ipc server {}", errno);
-        }
+        THROW_LAST_ERROR_IF(Result < 0);
 
-        if (CreateProcessParsed->Common.AllowOOBE)
+        if (Parsed.Common.AllowOOBE)
         {
             wil::unique_fd LxBusFd{TEMP_FAILURE_RETRY(open(LXBUS_DEVICE_NAME, O_RDWR))};
-            if (!LxBusFd)
-            {
-                FATAL_ERROR("Failed to open LxBus device {}", errno);
-            }
+            THROW_LAST_ERROR_IF(!LxBusFd);
 
             LXBUS_CONNECT_SERVER_PARAMETERS ConnectParams{};
             ConnectParams.Input.Flags = LXBUS_IPC_CONNECT_FLAG_UNNAMED_SERVER;
             ConnectParams.Input.TimeoutMs = LXBUS_IPC_INFINITE_TIMEOUT;
-            int Result = TEMP_FAILURE_RETRY(ioctl(LxBusFd.get(), LXBUS_IOCTL_CONNECT_SERVER, &ConnectParams));
-            if (Result < 0)
-            {
-                FATAL_ERROR("Failed to connect to LxBus server {}", errno);
-            }
+            Result = TEMP_FAILURE_RETRY(ioctl(LxBusFd.get(), LXBUS_IOCTL_CONNECT_SERVER, &ConnectParams));
+            THROW_LAST_ERROR_IF(Result < 0);
 
-            CreateProcessParsed->ServiceFd = ConnectParams.Output.MessagePort;
+            Parsed.ServiceFd = ConnectParams.Output.MessagePort;
         }
     }
 
-    //
-    // Populate the input parameter.
-    //
-
-    CreateProcessParsed->EventFd = EventFd;
-    EventFd = -1;
-    memcpy(CreateProcessParsed->StdFd, StdFd, sizeof(StdFd));
-    memset(StdFd, -1, sizeof(StdFd));
-    CreateProcessParsed->TtyFd = TtyFd;
-    Result = 0;
-
-CreateProcessParseEnd:
-    if (EventFd != -1)
-    {
-        CLOSE(EventFd);
-    }
-
-    for (Index = 0; Index < LX_INIT_STD_FD_COUNT; Index += 1)
-    {
-        if ((StdFd[Index] != -1) && (StdFd[Index] != TtyFd))
-        {
-            CLOSE(StdFd[Index]);
-        }
-    }
-
-    return Result;
+    return Parsed;
 }
 
 int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config)
@@ -1088,76 +1018,7 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-void CreateProcessParseFree(PCREATE_PROCESS_PARSED CreateProcessParsed)
-
-/*++
-
-Routine Description:
-
-    This routine frees a parsed create process message.
-
-Arguments:
-
-    CreateProcessParsed - Supplies a parsed create process parameters to free.
-
-Return Value:
-
-    None.
-
---*/
-
-{
-    // TODO: Use unique_fds.
-
-    if (CreateProcessParsed->EventFd != -1)
-    {
-        CLOSE(CreateProcessParsed->EventFd);
-        CreateProcessParsed->EventFd = -1;
-    }
-
-    for (int StdFdIndex = 0; StdFdIndex < LX_INIT_STD_FD_COUNT; StdFdIndex += 1)
-    {
-        if ((CreateProcessParsed->StdFd[StdFdIndex] != -1) && (CreateProcessParsed->StdFd[StdFdIndex] != CreateProcessParsed->TtyFd))
-        {
-            CLOSE(CreateProcessParsed->StdFd[StdFdIndex]);
-            CreateProcessParsed->StdFd[StdFdIndex] = -1;
-        }
-    }
-
-    if (CreateProcessParsed->ServiceFd != -1)
-    {
-        CLOSE(CreateProcessParsed->ServiceFd);
-        CreateProcessParsed->ServiceFd = -1;
-    }
-}
-
-void CreateProcessParseInitialize(PCREATE_PROCESS_PARSED CreateProcessParsed)
-
-/*++
-
-Routine Description:
-
-    This routine initializes a parsed create process message.
-
-Arguments:
-
-    CreateProcessParsed - Supplies a parsed create process parameters to
-        initialize.
-
-Return Value:
-
-    None.
-
---*/
-
-{
-    memset(CreateProcessParsed, 0, sizeof(*CreateProcessParsed));
-    memset(CreateProcessParsed->StdFd, -1, sizeof(CreateProcessParsed->StdFd));
-    CreateProcessParsed->TtyFd = -1;
-    CreateProcessParsed->EventFd = -1;
-}
-
-int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED CreateProcessParsed, pid_t CreateProcessPid, int MessageFd)
+int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED Parsed, pid_t CreateProcessPid, int MessageFd)
 
 /*++
 
@@ -1167,9 +1028,11 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a message port file descriptor.
+    Parsed - Supplies a pointer to a create process parsed structure.
 
     CreateProcessPid - Supplies the pid of a newly created child process.
+
+    MessageFd - Supplies a message port file descriptor.
 
 Return Value:
 
@@ -1180,32 +1043,31 @@ Return Value:
 --*/
 
 {
-    ssize_t Bytes;
-    uint64_t EventFdData;
-    LXBUS_IPC_MESSAGE_MARSHAL_PROCESS_PARAMETERS MarshalProcess;
-    int Result;
+    auto terminateChild = wil::scope_exit([CreateProcessPid]() {
+        if (kill(CreateProcessPid, SIGKILL) < 0)
+        {
+            FATAL_ERROR("Failed to kill child process {}", errno);
+        }
+    });
 
     //
     // Marshal the pid of the new child process and send a message
     // indicating that the child was created.
     //
 
-    memset(&MarshalProcess, 0, sizeof(MarshalProcess));
+    LXBUS_IPC_MESSAGE_MARSHAL_PROCESS_PARAMETERS MarshalProcess{};
     MarshalProcess.Input.Process = CreateProcessPid;
-    Result = TEMP_FAILURE_RETRY(ioctl(MessageFd, LXBUS_IPC_MESSAGE_IOCTL_MARSHAL_PROCESS, &MarshalProcess));
-
-    if (Result < 0)
+    if (TEMP_FAILURE_RETRY(ioctl(MessageFd, LXBUS_IPC_MESSAGE_IOCTL_MARSHAL_PROCESS, &MarshalProcess)) < 0)
     {
         LOG_ERROR("Failed to marshal pid {}", errno);
-        goto CreateProcessReplyToServerExit;
+        return -1;
     }
 
-    Bytes = UtilWriteBuffer(MessageFd, &MarshalProcess.Output.ProcessId, sizeof(MarshalProcess.Output.ProcessId));
+    auto Bytes = UtilWriteBuffer(MessageFd, &MarshalProcess.Output.ProcessId, sizeof(MarshalProcess.Output.ProcessId));
     if (Bytes < 0)
     {
-        Result = -1;
         LOG_ERROR("Failed to write ProcessId {}", errno);
-        goto CreateProcessReplyToServerExit;
+        return -1;
     }
 
     //
@@ -1214,42 +1076,28 @@ Return Value:
     //
 
     Bytes = TEMP_FAILURE_RETRY(read(MessageFd, &MarshalProcess.Output.ProcessId, sizeof(MarshalProcess.Output.ProcessId)));
-
     if (Bytes != sizeof(MarshalProcess.Output.ProcessId))
     {
-        Result = -1;
         LOG_ERROR("Failed to read (size {}) ProcessId {}", Bytes, errno);
-        goto CreateProcessReplyToServerExit;
+        return -1;
     }
 
     if (MarshalProcess.Output.ProcessId == 0)
     {
-        Result = -1;
         LOG_ERROR("Server replied with failure");
-        goto CreateProcessReplyToServerExit;
+        return -1;
     }
 
-    EventFdData = 1;
-    Bytes = UtilWriteBuffer(CreateProcessParsed->EventFd, &EventFdData, sizeof(EventFdData));
+    uint64_t EventFdData = 1;
+    Bytes = UtilWriteBuffer(Parsed->EventFd.get(), &EventFdData, sizeof(EventFdData));
     if (Bytes < 0)
     {
-        Result = -1;
         LOG_ERROR("Failed to write EventFd {}", errno);
-        goto CreateProcessReplyToServerExit;
+        return -1;
     }
 
-    Result = 0;
-
-CreateProcessReplyToServerExit:
-    if (Result < 0)
-    {
-        if (kill(CreateProcessPid, SIGKILL) < 0)
-        {
-            FATAL_ERROR("Failed to kill child process {}", errno);
-        }
-    }
-
-    return Result;
+    terminateChild.release();
+    return 0;
 }
 
 int InitCreateSessionLeader(gsl::span<gsl::byte> Buffer, wsl::shared::SocketChannel& Channel, int LxBusFd, wsl::linux::WslDistributionConfig& Config)
@@ -1332,13 +1180,13 @@ try
         }
 
         SessionLeader = UtilCreateChildProcess(
-            "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() {
+            "SessionLeader", [SessionLeaderFd = std::move(SessionLeaderFd), TtyFd = std::move(TtyFd), &Channel, &Config]() mutable {
                 umask(Config.Umask);
                 Channel.Close();
 
                 THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
-                SessionLeaderEntry(SessionLeaderFd.get(), TtyFd.get(), Config);
+                SessionLeaderEntry(SessionLeaderFd.get(), std::move(TtyFd), Config);
             });
     }
     else
@@ -2909,7 +2757,7 @@ try
 }
 CATCH_LOG();
 
-int SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, int TtyFd, const wsl::linux::WslDistributionConfig& Config)
+void SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -2929,31 +2777,18 @@ Arguments:
 
 Return Value:
 
-    0 on success, -1 on failure.
+    None.
 
 --*/
 
 {
-    CREATE_PROCESS_PARSED CreateProcessParsed;
-    pid_t CreateProcessPid;
-    int Result;
-
     //
     // Parse the create process message buffer and create the new child process.
     //
 
-    CreateProcessParseInitialize(&CreateProcessParsed);
-    Result = CreateProcessParse(&CreateProcessParsed, Buffer, MessageFd, TtyFd, Config);
-    if (Result < 0)
-    {
-        FATAL_ERROR("CreateProcessParse failed");
-    }
-
-    CreateProcessPid = fork();
-    if (CreateProcessPid < 0)
-    {
-        FATAL_ERROR("fork failed for child process {}", errno);
-    }
+    CREATE_PROCESS_PARSED Parsed = CreateProcessParse(Buffer, MessageFd, std::move(TtyFd), Config);
+    auto CreateProcessPid = fork();
+    THROW_LAST_ERROR_IF(CreateProcessPid < 0);
 
     if (CreateProcessPid > 0)
     {
@@ -2967,21 +2802,12 @@ Return Value:
         }
 
         //
-        // If the fork was successful, reply with the new child pid.
+        // Reply with pid of the child process.
         //
 
-        Result = CreateProcessReplyToServer(&CreateProcessParsed, CreateProcessPid, MessageFd);
-        if (Result < 0)
-        {
-            FATAL_ERROR("CreateProcessReplyToServer failed");
-        }
+        THROW_LAST_ERROR_IF(CreateProcessReplyToServer(&Parsed, CreateProcessPid, MessageFd) < 0);
 
-        //
-        // Done.
-        //
-
-        Result = 0;
-        goto SessionLeaderCreateProcessEnd;
+        return;
     }
 
     //
@@ -2991,7 +2817,7 @@ Return Value:
     // If a separate foreground process group does not exist, create one here.
     //
 
-    Result = 0;
+    int Result = 0;
     if (g_SessionGroup != -1)
     {
         //
@@ -3007,11 +2833,7 @@ Return Value:
         // Create a new process group.
         //
 
-        Result = setpgid(0, 0);
-        if (Result < 0)
-        {
-            FATAL_ERROR("setpgid failed {}", errno);
-        }
+        THROW_LAST_ERROR_IF(setpgid(0, 0) < 0);
     }
 
     //
@@ -3032,8 +2854,7 @@ Return Value:
     //      stopping the process (waiting for SIGCONT to continue).
     //
 
-    Result = tcsetpgrp(CreateProcessParsed.TtyFd, getpgid(0));
-    if (Result < 0)
+    if (tcsetpgrp(Parsed.TtyFd.get(), getpgid(0)) < 0)
     {
         LOG_ERROR("tcsetpgrp failed {}", errno);
     }
@@ -3043,17 +2864,13 @@ Return Value:
     //
 
     //
-    // Resources are not released for the child process because it will call
-    // execv.
+    // Resources are not released for the child process because it will call execv.
     //
     // N.B. CreateProcess does not return.
     //
 
-    CreateProcess(&CreateProcessParsed, Config);
-
-SessionLeaderCreateProcessEnd:
-    CreateProcessParseFree(&CreateProcessParsed);
-    return Result;
+    CreateProcess(&Parsed, Config);
+    assert(false);
 }
 
 void SessionLeaderSigchldHandler(__attribute__((unused)) int Signal, __attribute__((unused)) siginfo_t* SigInfo, __attribute__((unused)) void* UContext)
@@ -3172,7 +2989,7 @@ Return Value:
     return;
 }
 
-void SessionLeaderEntry(int MessageFd, int TtyFd, const wsl::linux::WslDistributionConfig& Config)
+void SessionLeaderEntry(int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -3208,7 +3025,7 @@ Return Value:
         FATAL_ERROR("setsid failed {}", errno);
     }
 
-    if (TEMP_FAILURE_RETRY(ioctl(TtyFd, TIOCSCTTY, NULL)) < 0)
+    if (TEMP_FAILURE_RETRY(ioctl(TtyFd.get(), TIOCSCTTY, NULL)) < 0)
     {
         FATAL_ERROR("ioctl failed for TIOCSCTTY {}", errno);
     }
@@ -3245,22 +3062,16 @@ Return Value:
             FATAL_ERROR("Invalid message size {}", Message.size());
         }
 
-        switch (Header->MessageType)
+        if (Header->MessageType == LxInitMessageCreateProcess)
         {
-        case LxInitMessageCreateProcess:
-            if (SessionLeaderCreateProcess(Message, MessageFd, TtyFd, Config) < 0)
-            {
-                FATAL_ERROR("SessionLeaderCreateProcess failed");
-            }
-
-            break;
-
-        default:
+            SessionLeaderCreateProcess(Message, MessageFd, std::move(TtyFd), Config);
+        }
+        else
+        {
             FATAL_ERROR("Unexpected message {}", Header->MessageType);
         }
     }
 
-    CLOSE(MessageFd);
     FATAL_ERROR("Session leader not expected to exit");
     return;
 }
