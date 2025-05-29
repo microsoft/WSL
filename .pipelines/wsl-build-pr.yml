@@ -4,15 +4,15 @@ trigger:
     - master
     - release/*
 
-git:
-  fetchDepth: -1
-  fetchTags: true
-
 stages:
 - template: build-stage.yml@self
   parameters:
     isRelease: false
+    pool: 'wsl-build'
+    vsoOrg: shine-oss
+    vsoProject: wsl
 
 - template: test-stage.yml@self
   parameters:
     rs_prerelease_only: true
+    pool: server

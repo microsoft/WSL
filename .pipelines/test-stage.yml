@@ -3,12 +3,16 @@ parameters:
     type: boolean
     default: false
 
+  - name: pool
+    type: string
+    default: ''
+
   - name: versions
     type: object
     default:
       - wsl1
       - wsl2
-      
+
   - name: test_images
     type: object
     default:
@@ -20,7 +24,7 @@ parameters:
         image: 2022-datacenter-g2-2024-09-10
       - name: vb_release
         image: win10-22h2-ent-g2-2024-09-10
-      
+
       # TODO: ge_release
 
 stages:
@@ -35,3 +39,4 @@ stages:
               version: ${{ version }}
               image: "${{ image.image }}"
               run: ${{ or(not(parameters.rs_prerelease_only), eq(image.name, 'rs_prerelease')) }}
+              pool: "${{ parameters.pool }}"
