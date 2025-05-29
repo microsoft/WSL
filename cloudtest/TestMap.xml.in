@@ -5,7 +5,7 @@
     <Provider Type="PipelineArtifacts">
       <Properties>
         <Add Name="CloudTest.ProviderCustomName" Value="[drop]" />
-        <Add Name="PipelineArtifactBuildUrl" Value="https://microsoft.visualstudio.com/Microsoft.WSL/_build/results?buildId=${PIPELINE_BUILD_ID}"/>
+        <Add Name="PipelineArtifactBuildUrl" Value="https://${VSO_ORG}.visualstudio.com/${VSO_PROJECT}/_build/results?buildId=${PIPELINE_BUILD_ID}"/>
         <Add Name="PipelineArtifactName" Value="drop_wsl_build"/>
       </Properties>
     </Provider>
@@ -13,21 +13,21 @@
       <Properties>
         <Add Name="CloudTest.ProviderCustomName" Value="[test_distro]" />
         <!-- When updating the drops for this make sure the rentention is set to never expire -->
-        <Add Name="DropURL" Value="https://microsoft.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/WSL/${CLOUDTEST_TEST_DISTRO_DROP}"/>
+        <Add Name="DropURL" Value="https://${VSO_ORG}.artifacts.visualstudio.com/_apis/drop/drops/WSL/${CLOUDTEST_TEST_DISTRO_DROP}"/>
       </Properties>
     </Provider>
     <Provider Type="VSODrop">
       <Properties>
         <Add Name="CloudTest.ProviderCustomName" Value="[test_packages]" />
         <!-- When updating the drops for this make sure the rentention is set to never expire -->
-        <Add Name="DropURL" Value="https://microsoft.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/WSL/${CLOUDTEST_TEST_PACKAGES}"/>
+        <Add Name="DropURL" Value="https://${VSO_ORG}.artifacts.visualstudio.com/_apis/drop/drops/WSL/${CLOUDTEST_TEST_PACKAGES}"/>
       </Properties>
     </Provider>
     <Provider Type="VSODrop">
       <Properties>
         <Add Name="CloudTest.ProviderCustomName" Value="[dump_tool]" />
         <!-- When updating the drops for this make sure the rentention is set to never expire -->
-        <Add Name="DropURL" Value="https://microsoft.artifacts.visualstudio.com/DefaultCollection/_apis/drop/drops/WSL/${DUMPTOOL_DROP}"/>
+        <Add Name="DropURL" Value="https://${VSO_ORG}.artifacts.visualstudio.com/_apis/drop/drops/WSL/${DUMPTOOL_DROP}"/>
       </Properties>
     </Provider>
   </Providers>

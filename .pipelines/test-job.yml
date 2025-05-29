@@ -11,6 +11,10 @@ parameters:
   - name: run
     type: boolean
 
+  - name: pool
+    type: string
+    default: ''
+
 jobs:
   - job: test_${{ parameters.branch }}_${{ parameters.version }}
     displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
@@ -22,8 +26,11 @@ jobs:
         ob_artifactSuffix: '_test'
     timeoutInMinutes: 360
     cancelTimeoutInMinutes: 420
-    pool:
-      type: cloudtestagentless
+    ${{ if eq(parameters.pool, '') }}:
+      pool: {'type': 'cloudtestagentless'}
+
+    ${{ else }}:
+      pool: ${{ parameters.pool }}
     steps:
       - task: CloudTestServerBuildTask@2
         inputs:
