@@ -154,10 +154,12 @@ def report_status_on_pr(manifest: str):
         return output
 
     for line, text in errors.items():
-        print(f'::error file={manifest},line={line}::Error: {format_list(text).replace('\n', '%0A')}')
+        escaped = format_list(text).replace('\n', '%0A')
+        print(f'::error file={manifest},line={line}::Error: {escaped}')
 
     for line, text in warnings.items():
-        print(f'::warning file={manifest},line={line}::Warning: {format_list(text).replace('\n', '%0A')}')
+        escaped = format_list(text).replace('\n', '%0A')
+        print(f'::warning file={manifest},line={line}::Warning: {escaped}')
 
 
 def read_config_keys(config: configparser.ConfigParser) -> dict:

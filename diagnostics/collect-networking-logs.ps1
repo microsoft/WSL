@@ -244,7 +244,7 @@ try
           183  # Application 2
 
     $Key = $null
-    while (($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode) -and ($null -eq $tcpdumpProcess -or $tcpdumpProcess.HasExited -eq $false))
+    while ($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode)
     {
         if ([console]::KeyAvailable)
         {

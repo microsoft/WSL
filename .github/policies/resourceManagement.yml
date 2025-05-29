@@ -239,5 +239,25 @@ configuration:
       - addLabel:
           label: needs-author-feedback
       description: 
+    - if:
+      - payloadType: Issue_Comment
+      - commentContains:
+          pattern: '\/bsod?'
+          isRegex: True
+      - or:
+        - activitySenderHasPermission:
+            permission: Admin
+        - activitySenderHasPermission:
+            permission: Write
+      then:
+      - addReply:
+          reply: >-
+            Hello! Could you please provide a kernel dump to help us better diagnose your issue? 
+            To collect a kernel dump, follow [10) Reporting a Windows crash (BSOD)](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#10-reporting-a-windows-crash-bsod)
+
+            Thank you!
+      - addLabel:
+          label: needs-author-feedback
+      description:
 onFailure: 
 onSuccess: 

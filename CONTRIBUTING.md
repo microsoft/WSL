@@ -95,7 +95,7 @@ Please send this dump to: secure@microsoft.com .
 Make sure that the email body contains:
 
 - The GitHub issue number, if any
-- That this dump is destined to the WSL team
+- That this dump is intended for the WSL team
 
 ### 11) Reporting a WSL process crash
 
@@ -134,9 +134,9 @@ reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Repo
 
 To collect time travel debugging traces:
 
-1) [Install Windbg preview](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
+1) [Install WinDbg preview](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
 
-2) Open windbg preview as administrator by running `windbgx` in an elevated command prompt
+2) Open WinDbg preview as administrator by running `windbgx` in an elevated command prompt
 
 3) Navigate to `file` -> `Attach to process`
 
@@ -150,9 +150,9 @@ To collect time travel debugging traces:
 
 7) Reproduce the issue
 
-8) Go back to windbg and click `Stop and Debug`
+8) Go back to WinDbg and click `Stop and Debug`
 
-9) Once the trace is done collecting, click `Stop Debugging` and close Windbg
+9) Once the trace is done collecting, click `Stop Debugging` and close WinDbg
 
 10) Go to the folder where the trace was collected, and locate the .run file. It should look like: `wslservice*.run`
 
