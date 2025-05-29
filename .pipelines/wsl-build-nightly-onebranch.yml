@@ -44,6 +44,8 @@ extends:
       parameters:
         isRelease: false
         isNightly: true
+        vsoOrg: microsoft
+        vsoProject: Microsoft.WSL
 
     - template: test-stage.yml@self
       parameters:
