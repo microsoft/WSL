@@ -52,6 +52,8 @@ extends:
         isRelease: true
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
         traceLoggingConfig: $(ReleaseTraceLoggingConfig)
+        vsoOrg: microsoft
+        vsoProject: Microsoft.WSL
 
     - template: test-stage.yml@self
       parameters:
