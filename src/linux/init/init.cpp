@@ -315,8 +315,6 @@ ExecStart=/bin/sh -c '(echo -1 > {}/{}) ; (echo "{}" > {})' )",
                 auto overrideFolder = std::format("{}/systemd-binfmt.service.d", installPath);
                 THROW_LAST_ERROR_IF(UtilMkdirPath(overrideFolder.c_str(), 0755) < 0);
                 THROW_LAST_ERROR_IF(WriteToFile(std::format("{}/override.conf", overrideFolder).c_str(), systemdBinfmtContent.c_str()) < 0);
-
-                THROW_LAST_ERROR_IF(UtilMkdirPath(overrideFolder.c_str(), 0755) < 0);
             }
 
             // Install the override for binfmt-support.service.
@@ -324,8 +322,6 @@ ExecStart=/bin/sh -c '(echo -1 > {}/{}) ; (echo "{}" > {})' )",
                 auto overrideFolder = std::format("{}/binfmt-support.service.d", installPath);
                 THROW_LAST_ERROR_IF(UtilMkdirPath(overrideFolder.c_str(), 0755) < 0);
                 THROW_LAST_ERROR_IF(WriteToFile(std::format("{}/override.conf", overrideFolder).c_str(), systemdBinfmtContent.c_str()) < 0);
-
-                THROW_LAST_ERROR_IF(UtilMkdirPath(overrideFolder.c_str(), 0755) < 0);
             }
         }
 
