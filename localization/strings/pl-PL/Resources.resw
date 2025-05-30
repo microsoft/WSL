@@ -181,8 +181,8 @@ Zainstaluj przy użyciu &lt;Distro&gt; "wsl.exe {}".
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Eksportowanie dystrybucji nie powiodło się.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
-    <value>Trwa wykonywanie jednorazowego uaktualnienia systemu plików podsystemu Windows dla systemu Linux dla tej dystrybucji...</value>
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
+    <value>Performing one-time upgrade of the Windows Subsystem for Linux file system for this distribution...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
     <value>Nie można uruchomić, ponieważ inne wystąpienie jest uruchomione bez podniesionych uprawnień.  Wystąpienia z podwyższonym poziomem uprawnień i bez niego nie mogą działać jednocześnie.</value>
@@ -813,8 +813,8 @@ Aby uzyskać informacje, odwiedź stronę https://aka.ms/wslinstall</value>
     <value>Starsze rejestracje dystrybucji nie obsługują argumentu --version .</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
-    <value>Dystrybucja "{}" jest dostarczana przez manifest przesłonięcia.</value>
+  <data name="MessageDistributionOverridden" xml:space="preserve">
+    <value>The distribution "{}" is provided by an override manifest.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHashMismatch" xml:space="preserve">
@@ -923,8 +923,8 @@ Powrót do sieci NAT.</value>
     <value>Wtyczka „{}” wymaga nowszej wersji podsystemu WSL. Uruchom polecenie: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
-    <value>Ustawienie .wslconfig „{}” jest wyłączone przez zasady komputera.</value>
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
+    <value>The .wslconfig setting '{}' is disabled by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDebugShellDisabled" xml:space="preserve">
@@ -1212,7 +1212,7 @@ Zobacz instrukcje odzyskiwania: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Określ ścieżkę do dysku VHD, który będzie ładowany jako niestandardowa dystrybucja systemu, używana głównie do obsługi aplikacji graficznego interfejsu użytkownika w podsystemie WSL. [Dowiedz się więcej o dystrybucji systemu tutaj].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

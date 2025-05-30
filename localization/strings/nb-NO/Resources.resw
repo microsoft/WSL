@@ -181,8 +181,8 @@ Installer ved hjelp av wsl.exe {} &lt;Distro&gt;.
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Eksport av distribusjonen mislyktes.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
-    <value>Utfører engangsoppgradering av Windows-undersystem for Linux-filsystem for denne distribusjonen...</value>
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
+    <value>Performing one-time upgrade of the Windows Subsystem for Linux file system for this distribution...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
     <value>Kan ikke starte fordi en annen forekomst kjører opphøyd.  Forhøyede og uhøyde forekomster har ikke tillatelse til å kjøre samtidig.</value>
@@ -813,8 +813,8 @@ Hvis du vil ha mer informasjon, kan du gå til https://aka.ms/wslinstall</value>
     <value>Eldre distribusjonsregistreringer støtter ikke --version argumentet.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
-    <value>Distribusjonen {} leveres av et overstyringsmanifest.</value>
+  <data name="MessageDistributionOverridden" xml:space="preserve">
+    <value>The distribution "{}" is provided by an override manifest.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHashMismatch" xml:space="preserve">
@@ -923,8 +923,8 @@ Faller tilbake til NAT-nettverk.</value>
     <value>Programtillegget {} krever en nyere versjon av WSL. Kjør wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
-    <value>.wslconfig-innstillingen {} er deaktivert av datamaskinpolicyen.</value>
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
+    <value>The .wslconfig setting '{}' is disabled by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDebugShellDisabled" xml:space="preserve">
@@ -1212,7 +1212,7 @@ Se gjenopprettingsinstruksjoner om: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Angi en bane til en VHD som lastes inn som en egendefinert systemdeaktivering, først og fremst brukt til å drive GUI-apper i WSL. [Mer informasjon om systemdespsjoner her].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

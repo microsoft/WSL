@@ -181,8 +181,8 @@ Installeren met wsl.exe {} &lt;Distro&gt;.
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Het exporteren van de distributie is mislukt.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
-    <value>Eenmalige upgrade uitvoeren van het Windows-subsysteem voor Linux-bestandssysteem voor deze distributie...</value>
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
+    <value>Performing one-time upgrade of the Windows Subsystem for Linux file system for this distribution...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
     <value>Kan niet starten omdat een ander exemplaar zonder verhoogde bevoegdheden wordt uitgevoerd.  Instanties met verhoogde bevoegdheden en niet-verhoogde bevoegdheden mogen niet tegelijkertijd worden uitgevoerd.</value>
@@ -813,8 +813,8 @@ Ga naar https://aka.ms/wslinstall voor meer informatie</value>
     <value>Verouderde distributieregistraties ondersteunen het argument --version niet.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
-    <value>De distributie '{}' wordt geleverd door een onderdrukkingsmanifest.</value>
+  <data name="MessageDistributionOverridden" xml:space="preserve">
+    <value>The distribution "{}" is provided by an override manifest.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHashMismatch" xml:space="preserve">
@@ -923,8 +923,8 @@ Terugvallen op NAT-netwerken.</value>
     <value>Voor de invoegtoepassing {} is een nieuwere versie van WSL vereist. Uitvoeren: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
-    <value>De instelling .wslconfig '{}' is uitgeschakeld door het computerbeleid.</value>
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
+    <value>The .wslconfig setting '{}' is disabled by the computer policy.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDebugShellDisabled" xml:space="preserve">
@@ -1212,7 +1212,7 @@ Zie de herstelinstructies voor: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Geef een pad op naar een VHD die wordt geladen als een aangepaste systeemdistributie, die voornamelijk wordt gebruikt om GUI-apps in WSL aan te zetten. [Meer informatie over systeemdistributies hier].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
