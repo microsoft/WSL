@@ -5585,21 +5585,19 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(L"compressed.gz"); });
 
-        auto cd = std::filesystem::current_path();
-
         wsl::windows::common::SubProcess process{
-            nullptr,
-            std::format(L"cmd /c type \"C:\\Program Files\\WSL\\wsl.exe\" | wsl gzip > \"{}\\compressed.gz\"", cd.native()).c_str()};
+            nullptr, L"cmd /c type \"C:\\Program Files\\WSL\\wsl.exe\" | wsl gzip > compressed.gz"};
 
         VERIFY_ARE_EQUAL(process.Run(), 0L);
 
-        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"pwd && ls");
+        wil::unique_handle file{CreateFile(L"compressed.gz", GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
+        VERIFY_IS_TRUE(!!file);
 
-        LogInfo("Debug: %ls, %ls", out.c_str(), err.c_str());
+        wsl::windows::common::helpers::SetHandleInheritable(file.get());
 
         // Validate that the relay didn't get stuck, and that its output is correct.
-        auto [expandedHash, stderr1] = LxsstuLaunchWslAndCaptureOutput(L"cat compressed.gz | gzip -d -| md5sum -");
-        auto [expectedHash, stderr2] =
+        auto [expandedHash, _] = LxsstuLaunchWslAndCaptureOutput(L"gzip -d -| md5sum -", 0, file.get());
+        auto [expectedHash, __] =
             LxsstuLaunchWslAndCaptureOutput(L"cat \"$(wslpath 'C:\\Program Files\\WSL\\wsl.exe')\" |  md5sum - ");
 
         VERIFY_ARE_EQUAL(expandedHash, expectedHash);
