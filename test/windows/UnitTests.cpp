@@ -5487,7 +5487,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             VERIFY_ARE_EQUAL(std::format(L"{}\n", testDir), out);
 
             std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -a {}", testDir));
-            LogInfo("Output: %ls, %ls", out.c_str(), err.c_str());
             VERIFY_IS_TRUE(out.find(L"/mnt/") == 0);
         }
     }
