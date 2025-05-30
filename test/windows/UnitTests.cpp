@@ -5586,18 +5586,19 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(L"compressed.gz"); });
 
+        auto cd = std::filesystem::current_path();
+
         wsl::windows::common::SubProcess process{
-            nullptr, L"cmd /c type \"C:\\Program Files\\WSL\\wsl.exe\" | wsl gzip > compressed.gz"};
+            nullptr,
+            std::format(L"cmd /c type \"C:\\Program Files\\WSL\\wsl.exe\" | wsl gzip > \"{}\\compressed.gz\"", cd.native()).c_str()};
 
         VERIFY_ARE_EQUAL(process.Run(), 0L);
 
-        LxsstuLaunchWsl(L"pwd && ls");
         // Validate that the relay didn't get stuck, and that its output is correct.
         auto [expandedHash, stderr1] = LxsstuLaunchWslAndCaptureOutput(L"cat compressed.gz | gzip -d -| md5sum -");
         auto [expectedHash, stderr2] =
             LxsstuLaunchWslAndCaptureOutput(L"cat \"$(wslpath 'C:\\Program Files\\WSL\\wsl.exe')\" |  md5sum - ");
 
-        LogInfo("Stderr: %ls, %ls", stderr1.c_str(), stderr2.c_str());
         VERIFY_ARE_EQUAL(expandedHash, expectedHash);
     }
 
