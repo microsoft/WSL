@@ -1452,10 +1452,11 @@ Return Value:
 
     //
     // Increase the soft and hard limit for number of open file descriptors.
+    // N.B. the soft limit shouldn't be too high. See https://github.com/microsoft/WSL/issues/12985 .
     //
 
     rlimit Limit{};
-    Limit.rlim_cur = 1024 * 1024;
+    Limit.rlim_cur = 1024 * 10;
     Limit.rlim_max = 1024 * 1024;
     if (setrlimit(RLIMIT_NOFILE, &Limit) < 0)
     {
