@@ -5593,6 +5593,10 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         VERIFY_ARE_EQUAL(process.Run(), 0L);
 
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"pwd && ls");
+
+        LogInfo("Debug: %ls, %ls", out.c_str(), err.c_str());
+
         // Validate that the relay didn't get stuck, and that its output is correct.
         auto [expandedHash, stderr1] = LxsstuLaunchWslAndCaptureOutput(L"cat compressed.gz | gzip -d -| md5sum -");
         auto [expectedHash, stderr2] =
