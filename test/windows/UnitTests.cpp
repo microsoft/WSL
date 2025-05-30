@@ -5585,13 +5585,17 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(L"compressed.gz"); });
 
-        auto cd = std::filesystem::current_path();
+        {
+            wil::unique_handle file{CreateFile(L"compressed.gz", GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr)};
+            VERIFY_IS_TRUE(!!file);
 
-        wsl::windows::common::SubProcess process{
-            nullptr,
-            std::format(L"cmd /c type \"C:\\Program Files\\WSL\\wsl.exe\" | wsl gzip > \"{}\\compressed.gz\"", cd.native()).c_str()};
+            wsl::windows::common::SubProcess process{nullptr, L"cmd /c type \"C:\\Program Files\\WSL\\wsl.exe\" | wsl gzip"};
 
-        VERIFY_ARE_EQUAL(process.Run(), 0L);
+            wsl::windows::common::helpers::SetHandleInheritable(file.get());
+            process.SetStdHandles(nullptr, file.get(), nullptr);
+
+            VERIFY_ARE_EQUAL(process.Run(), 0L);
+        }
 
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"pwd && ls");
 
