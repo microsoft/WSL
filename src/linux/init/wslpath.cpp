@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file wslpath function definitions.
+    This file contains the function definitions for wslpath.
 
 --*/
 
@@ -63,7 +63,8 @@ Arguments:
 
 Return Value:
 
-    0 on success, <0 on failure.
+    The absolute path as a string.
+    Returns an empty string on failure.
 
 --*/
 
