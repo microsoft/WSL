@@ -5487,6 +5487,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             VERIFY_ARE_EQUAL(std::format(L"{}\n", testDir), out);
 
             std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -a {}", testDir));
+            LogInfo("Output: %ls, %ls", out.c_str(), err.c_str());
             VERIFY_IS_TRUE(out.find(L"/mnt/c") == 0);
         }
     }
@@ -5591,10 +5592,11 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(process.Run(), 0L);
 
         // Validate that the relay didn't get stuck, and that its output is correct.
-        auto [expandedHash, _] = LxsstuLaunchWslAndCaptureOutput(L"cat compressed.gz | gzip -d -| md5sum -");
-        auto [expectedHash, __] =
+        auto [expandedHash, stderr1] = LxsstuLaunchWslAndCaptureOutput(L"cat compressed.gz | gzip -d -| md5sum -");
+        auto [expectedHash, stderr2] =
             LxsstuLaunchWslAndCaptureOutput(L"cat \"$(wslpath 'C:\\Program Files\\WSL\\wsl.exe')\" |  md5sum - ");
 
+        LogInfo("Stderr: %ls, %ls", stderr1.c_str(), stderr2.c_str());
         VERIFY_ARE_EQUAL(expandedHash, expectedHash);
     }
 
