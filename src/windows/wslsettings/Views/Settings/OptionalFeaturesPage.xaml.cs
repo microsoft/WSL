@@ -40,7 +40,7 @@ public sealed partial class OptionalFeaturesPage : Page
             return;
         }
 
-        RuntimeHelper.TryMoveFocusPrevousControl(sender as Button);
+        RuntimeHelper.TryMoveFocusPreviousControl(sender as Button);
     }
 
     private void VMIdleTimeoutTextBox_TextChanged(object sender, TextChangedEventArgs e)

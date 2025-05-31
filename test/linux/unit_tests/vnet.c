@@ -139,7 +139,7 @@ static const LXT_VARIATION g_LxtVariations[] = {
     //{"Virtual Ethernet Pair namespace data check", VirtualEthernetPairNamespaceData},
 
     //
-    // Moving physical adpaters between namespaces is not currently supported
+    // Moving physical adapters between namespaces is not currently supported
     //
 
     //{"Physical device basic namespace check", PhysicalDeviceNamespace1},
@@ -675,7 +675,7 @@ int DeleteVirtualDeviceViaNetlink(const char* Name)
 
 Routine Description:
 
-    This routine removes a virtual device using the netlink RTM_DELLLINK
+    This routine removes a virtual device using the netlink RTM_DELLINK
     message.
 
 Arguments:

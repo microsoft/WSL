@@ -271,7 +271,7 @@ void LogMessageBuilder::AddRawValue(UINT64 value, int base)
     m_message += ConvertNumber(buffer, c_numberBufferSize, value, base);
 }
 
-// Adds an qid value without any separators or prefix.
+// Adds a qid value without any separators or prefix.
 void LogMessageBuilder::AddRawValue(const Qid& value)
 {
     m_message += "{";

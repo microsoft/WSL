@@ -442,7 +442,7 @@ void LxssInstance::_ConfigureFilesystem(_In_ ULONG Flags)
     // Part of this process will try to upgrade existing LxFs folders to
     // enable the per-directory case sensitivity flag. To allow easy detection
     // of already processed folders, and resumption in case the process is
-    // interrupted, directories are only marked case sensitive after their
+    // interrupted, directories are only marked case-sensitive after their
     // children are processed.
     //
     // Paths for LXSS instances look like so:
@@ -474,7 +474,7 @@ void LxssInstance::_ConfigureFilesystem(_In_ ULONG Flags)
     ensureDirectoryWithAttributes(LXSS_ROOTFS_DIRECTORY, LXSS_ROOTFS_PERMISSIONS);
 
     // If this is the legacy distribution, ensure that the additional LxFs
-    // directories exist and have the correct attributes. Otherwise ensure that
+    // directories exist and have the correct attributes. Otherwise, ensure that
     // the rootfs/mnt directory exists for DrvFs mounts.
     switch (m_configuration.Version)
     {

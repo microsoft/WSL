@@ -21,8 +21,8 @@ using wsl::windows::common::hcs::unique_hcn_endpoint;
 
 // This static list is used to keep of which endpoints are in use by other users.
 // It's needed because when we see an endpoint with the same ip address we want,
-// we have no way to differenciate between an endpoint that we previously used
-// that didn't get deleted, and an endpoint acitvely in use by another user.
+// we have no way to differentiate between an endpoint that we previously used
+// that didn't get deleted, and an endpoint actively in use by another user.
 static wil::srwlock g_endpointsInUseLock;
 static std::vector<GUID> g_endpointsInUse;
 

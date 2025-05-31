@@ -253,7 +253,7 @@ void WslService::ServiceStopped()
     // Tear down telemetry.
     WslTraceLoggingUninitialize();
 
-    // unitialize COM. This must be done here because this call can cause cleanups that will be fail
+    // uninitialize COM. This must be done here because this call can cause cleanups that will be fail
     // if the CRT is shutting down.
     m_coInit.reset();
 }
@@ -285,7 +285,7 @@ CATCH_LOG()
 void WslService::CheckForUpdates(_Inout_ PTP_CALLBACK_INSTANCE, _Inout_ PVOID Context, _Inout_ PTP_TIMER)
 try
 {
-    auto [version, _] = GetLatestGithubRelease(false);
+    auto [version, _] = GetLatestGitHubRelease(false);
     if (ParseWslPackageVersion(version) > ParseWslPackageVersion(TEXT(WSL_PACKAGE_VERSION)))
     {
         WSL_LOG("WSL Package update is available", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
@@ -294,7 +294,7 @@ try
         SetThreadpoolTimer(static_cast<WslService*>(Context)->m_updateCheckTimer.get(), nullptr, 0, 0);
 
         // Get current release date
-        std::wstring currentReleaseCreatedAtDate = GetGithubReleaseByTag(TEXT(WSL_PACKAGE_VERSION)).created_at;
+        std::wstring currentReleaseCreatedAtDate = GetGitHubReleaseByTag(TEXT(WSL_PACKAGE_VERSION)).created_at;
 
         std::tm tm = {};
         std::wstring dateTimeFormat = L"%Y-%m-%dT%H:%M:%SZ";

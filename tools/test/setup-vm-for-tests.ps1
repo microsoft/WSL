@@ -22,9 +22,9 @@
 .PARAMETER SkipEnableFeatures
     Skip enabling optional Windows features necessary for some tests.
 .PARAMETER RemoteFolder
-    Absolute Path to a folder on the the VM to copy requisite files to. Defaults to "C:\Package".
+    Absolute Path to a folder on the VM to copy requisite files to. Defaults to "C:\Package".
 .PARAMETER TaefFolder
-    Absolute Path to a folder on the the VM to copy taef binaries. Defaults to "C:\Taef".
+    Absolute Path to a folder on the VM to copy taef binaries. Defaults to "C:\Taef".
 .PARAMETER SkipDistro
     Skip copying over the distro.
 .PARAMETER TestDistroName

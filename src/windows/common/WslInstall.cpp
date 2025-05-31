@@ -145,7 +145,7 @@ try
             std::tie(installResult.Name, installResult.Id) =
                 InstallModernDistribution(*distro, version, localName, location, vhdSize, fixedVhd);
 
-            installResult.InstalledViaGithub = true;
+            installResult.InstalledViaGitHub = true;
         }
         else if (const auto* distro = std::get_if<Distribution>(&*installResult.Distribution))
         {
@@ -193,7 +193,7 @@ try
             }
 
             installResult.Name = distro->FriendlyName;
-            installResult.InstalledViaGithub = useGitHub;
+            installResult.InstalledViaGitHub = useGitHub;
         }
         else
         {

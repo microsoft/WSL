@@ -76,7 +76,7 @@ Abstract:
 #define LX_INIT_DEFAULT_ROUTE_V6_PREFIX LX_INIT_UNSPECIFIED_V6_ADDRESS "/0"
 
 //
-// The hard-coded link-local addressess used for communicating over the loopback to the host
+// The hard-coded link-local addresses used for communicating over the loopback to the host
 //
 #define LX_INIT_IPV4_LOOPBACK_GATEWAY_ADDRESS "169.254.73.152"
 #define LX_INIT_IPV6_LOOPBACK_GATEWAY_ADDRESS "fe80::500:4aef:feef:2aa2"
@@ -155,7 +155,7 @@ Abstract:
 //
 // Typical default DrvFs-specific 9p mount options.
 //
-// N.B. These are used to pre-populate virtiofs shares with default mount options.
+// N.B. These are used to prepopulate virtiofs shares with default mount options.
 //      These will match the default values used by the system distro, and will typically
 //      match the default uid / gid for the user distro. If the values do not match, a new
 //      virtiofs share will be created.
@@ -176,7 +176,7 @@ Abstract:
 #define LX_INIT_HVSOCKET_TIMEOUT_SECONDS (30)
 
 //
-// The data for begining a port listener.
+// The data for beginning a port listener.
 //
 
 #define LX_INIT_LOCALHOST_RELAY "localhost"

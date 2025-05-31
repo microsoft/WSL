@@ -67,7 +67,7 @@ void ClearSessionsAndBlockNewInstances()
         auto sessionsLock = g_sessionLock.lock_exclusive();
         sessions = std::move(g_sessions);
 
-        // This is required because the moved-from std::optional<T> isn't made empty, so this needs to be done explicitely.
+        // This is required because the moved-from std::optional<T> isn't made empty, so this needs to be done explicitly.
         g_sessions.reset();
     }
 

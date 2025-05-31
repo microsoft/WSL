@@ -1,4 +1,4 @@
-# This makefile is used to work from a linux environement and is not part of the OS build process.
+# This makefile is used to work from a linux environment and is not part of the OS build process.
 
 CXXFLAGS += -std=c++20 -Wall -Wextra -g3 -fPIC -I../inc
 LDFLAGS +=

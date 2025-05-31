@@ -515,7 +515,7 @@ const char* DataToWrite[] = {
     "<This is the first message> ",
     "<This is another message> ",
     "<Dumbledore is dead> ",
-    "<Harry Potter must not go back to Hogwards> ",
+    "<Harry Potter must not go back to Hogwarts> ",
     "<There must always be a stark in Winterfell>",
 };
 
@@ -1423,7 +1423,7 @@ int EpollVariation0(PLXT_ARGS Args)
     LxtCheckErrnoFailure(epoll_ctl(EpollFileDescriptor, EPOLL_CTL_ADD, FileDescriptor1, &EpollControlEvent), EEXIST);
 
     //
-    // Add the second file descriptor back in to the epoll.
+    // Add the second file descriptor back to the epoll.
     //
 
     EpollControlEvent.events = EPOLLOUT | EPOLLPRI;
@@ -1481,7 +1481,7 @@ int EpollVariation0(PLXT_ARGS Args)
         LXT_SYNCHRONIZATION_POINT();
 
         LXT_SYNCHRONIZATION_POINT();
-        LxtLogInfo("T2: Making data avilable for read...");
+        LxtLogInfo("T2: Making data available for read...");
         LxtCheckErrno((BytesReadWrite = write(Master, "\n", 1)));
 
         Result = LXT_RESULT_SUCCESS;

@@ -140,7 +140,7 @@ Scheduler::Unblocker Scheduler::Unblock() noexcept
 /// Try to claim queue ownership for the current thread. If this function
 /// returns true, then the caller must call RunAndRelease to process the queue.
 ///
-/// If fromKick, then the caller is the thread that was explictly kicked to
+/// If fromKick, then the caller is the thread that was explicitly kicked to
 /// process the queue. Otherwise, this is an IO completion or other
 /// opportunistic thread.
 bool Scheduler::Claim(bool fromKick) noexcept
