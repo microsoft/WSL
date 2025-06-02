@@ -3,6 +3,12 @@ trigger:
     include:
     - master
     - release/*
+    
+pr:
+  branches:
+    include:
+      - master
+      - release/*
 
 stages:
 - template: build-stage.yml@self
