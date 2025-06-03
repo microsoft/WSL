@@ -5860,6 +5860,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         {
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister empty-distro"); });
 
+            DistroFileChange conf(L"/etc/wsl.conf", false);
+            conf.SetContent(L"");
+
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
                 L"tar cf - /etc/wsl.conf | wsl.exe --install --from-file - --name empty-distro --no-launch "
                 L"--version 2");
