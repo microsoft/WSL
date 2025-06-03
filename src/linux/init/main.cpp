@@ -2620,7 +2620,7 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
 
     Message->ValidDistribution = false;
 
-    for (auto* path : {"/etc", "/bin/sh", "/etc/wsl-distribution.conf"})
+    for (auto* path : {"/etc", "/bin/sh"})
     {
         if (access(path, F_OK) >= 0)
         {
