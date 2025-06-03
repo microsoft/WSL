@@ -5854,6 +5854,19 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             // TODO: Uncomment once SetVersionDebug is removed from the tests .wslconfig.
             // VERIFY_ARE_EQUAL(err, L"");
         }
+
+        // Validate that tars containing /etc, but not /bin/sh are accepted.
+        if (LxsstuVmMode())
+        {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister empty-distro"); });
+
+            DistroFileChange conf(L"/etc/wsl.conf", false);
+            conf.SetContent(L"");
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+                L"tar cf - /etc/wsl.conf | wsl.exe --install --from-file - --name empty-distro --no-launch "
+                L"--version 2");
+        }
     }
 
     TEST_METHOD(ImportExportStdout)

@@ -2618,17 +2618,20 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
     THROW_LAST_ERROR_IF(chdir(ExtractedPath) < 0);
     THROW_LAST_ERROR_IF(chroot(".") < 0);
 
+    Message->ValidDistribution = false;
+
     for (auto* path : {"/etc", "/bin/sh"})
     {
-        if (access(path, F_OK) < 0)
+        if (access(path, F_OK) >= 0)
         {
-            LOG_ERROR("Failed to access {} {}", path, errno);
-            Message->ValidDistribution = false;
-            return;
+            Message->ValidDistribution = true;
         }
     }
 
-    Message->ValidDistribution = true;
+    if (!Message->ValidDistribution)
+    {
+        return;
+    }
 
     auto [flavor, version] = UtilReadFlavorAndVersion("/etc/os-release");
 
