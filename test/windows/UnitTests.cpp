@@ -5085,6 +5085,58 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 L"");
         }
 
+        // Validate that a distribution isn't downloaded if its name is already in use.
+        {
+            auto manifest = std::format(
+                R"({{
+    "ModernDistributions": {{
+        "debian": [
+            {{
+                "Name": "{}",
+                "FriendlyName": "DebianFriendlyName",
+                "Amd64Url": {{
+                    "Url": "file://doesnotexist",
+                    "Sha256": ""
+                }}
+            }},
+            {{
+                "Name": "dummy",
+                "FriendlyName": "dummy",
+                "Amd64Url": {{
+                    "Url": "file://doesnotexist",
+                    "Sha256": ""
+                }}
+            }}
+        ]
+    }}
+}})",
+                LXSS_DISTRO_NAME_TEST);
+
+            auto restore = SetManifest(manifest);
+
+            {
+                auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--install {}", LXSS_DISTRO_NAME_TEST_L), -1);
+
+                VERIFY_ARE_EQUAL(
+                    out,
+                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
+
+                VERIFY_ARE_EQUAL(err, L"");
+            }
+
+            {
+                auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--install dummy --name {}", LXSS_DISTRO_NAME_TEST_L), -1);
+
+                VERIFY_ARE_EQUAL(
+                    out,
+                    L"A distribution with the supplied name already exists. Use --name to chose a different name.\r\n"
+                    L"Error code: Wsl/InstallDistro/ERROR_ALREADY_EXISTS\r\n");
+
+                VERIFY_ARE_EQUAL(err, L"");
+            }
+        }
+
         // Validate handling of case where no default install distro is configured.
         {
             auto manifest =
