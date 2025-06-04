@@ -1016,7 +1016,7 @@ class UnitTests
             L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
-        validateOutput(commandLine.c_str(), L"This looks like a VHDX file. Use --vhd to import a VHDX instead of a tar.\r\n");
+        validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
 
         if (!LxsstuVmMode())
         {
@@ -1557,7 +1557,7 @@ Arguments for managing Windows Subsystem for Linux:
                 Move the distribution to a new location.
 
             --set-sparse, -s <true|false>
-                Set the vhdx of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user <Username>
                 Set the default user of the distribution.
@@ -1637,11 +1637,11 @@ Arguments for managing distributions in Windows Subsystem for Linux:
                 Specifies the version to use for the new distribution.
 
             --vhd
-                Specifies that the provided file is a .vhdx file, not a tar file.
-                This operation makes a copy of the .vhdx file at the specified install location.
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place <Distro> <FileName>
-        Imports the specified .vhdx file as a new distribution.
+        Imports the specified VHD file as a new distribution.
         This virtual hard disk must be formatted with the ext4 filesystem type.
 
     --list, -l [Options]
@@ -2896,8 +2896,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             WslKeepAlive keepAlive;
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --resize 1500GB", -1);
             VERIFY_ARE_EQUAL(
-                L"The operation could not be completed because the vhdx is currently in use. To force WSL to stop use: "
-                L"wsl.exe "
+                L"The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe "
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
@@ -6274,6 +6273,75 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"stat -c %a /init");
 
         VERIFY_ARE_EQUAL(out, L"755\n");
+    }
+
+    TEST_METHOD(ExportImportVhd)
+    {
+        WSL2_TEST_ONLY();
+
+        WslShutdown();
+
+        constexpr auto vhdPath = L"exported-test-distro.vhd";
+        constexpr auto vhdxPath = L"exported-test-distro.vhdx";
+        constexpr auto exportedVhdPath = L"exported-vhd.vhd";
+        constexpr auto newDistroName = L"imported-test-distro";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(vhdPath));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(vhdxPath));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(exportedVhdPath));
+            LxsstuLaunchWsl(std::format(L"--unregister {}", newDistroName));
+        });
+
+        // Attempt to export the distribution to a .vhd (should fail).
+        auto [out, err] =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdPath), -1);
+        VERIFY_ARE_EQUAL(
+            out, L"The specified file must have the .vhdx file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Export the distribution to a .vhdx.
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdxPath));
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Convert the .vhdx to .vhd.
+        LxsstuLaunchPowershellAndCaptureOutput(std::format(L"Convert-VHD -Path '{}' -DestinationPath '{}'", vhdxPath, vhdPath));
+
+        // Import a new distribution from the .vhd file.
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"--import {} {} {} --vhd", newDistroName, newDistroName, vhdPath));
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Export the newly imported distribution to another .vhd file.
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", newDistroName, exportedVhdPath));
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Attempt to export to a .vhdx (should fail).
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", newDistroName, vhdxPath), -1);
+        VERIFY_ARE_EQUAL(
+            out, L"The specified file must have the .vhd file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Attempt to import to a non VHD file.
+        auto tempFile = wsl::windows::common::filesystem::TempFile(
+            GENERIC_ALL, 0, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::None, L"txt");
+
+        auto deleteFile =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFile(tempFile.Path.c_str())); });
+
+        tempFile.Handle.reset();
+
+        constexpr auto negativeVariationDistro = L"negative-variation-distro";
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--import {} {} {} --vhd", negativeVariationDistro, negativeVariationDistro, tempFile.Path), -1);
+        VERIFY_ARE_EQUAL(
+            out,
+            L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
+            L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
     }
 
 }; // namespace UnitTests

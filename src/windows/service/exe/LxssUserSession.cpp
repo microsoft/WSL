@@ -927,7 +927,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     std::filesystem::path newVhdPath = Location;
     RETURN_HR_IF(E_INVALIDARG, newVhdPath.empty());
 
-    newVhdPath /= LXSS_VM_MODE_VHD_NAME;
+    newVhdPath /= distro.VhdFilePath.filename();
 
     auto impersonate = wil::CoImpersonateClient();
 
@@ -952,7 +952,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
 
     // Update the registry location
     registration.Write(Property::BasePath, Location);
-    registration.Write(Property::VhdFileName, LXSS_VM_MODE_VHD_NAME);
+    registration.Write(Property::VhdFileName, newVhdPath.filename().c_str());
 
     revert.release();
 
@@ -1077,8 +1077,26 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
         {
             if (WI_IsFlagSet(Flags, LXSS_EXPORT_DISTRO_FLAGS_VHD))
             {
+                if (GetFileType(FileHandle) != FILE_TYPE_DISK)
+                {
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageExportVhdInvalidArg());
+                }
+
                 const wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
                 auto runAsUser = wil::impersonate_token(userToken.get());
+
+                // Ensure the target file has the correct file extension.
+                std::wstring exportPath;
+                THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(FileHandle, exportPath));
+
+                const auto sourceFileExtension = configuration.VhdFilePath.extension().native();
+                const auto targetFileExtension = std::filesystem::path(std::move(exportPath)).extension().native();
+                if (!wsl::windows::common::string::IsPathComponentEqual(sourceFileExtension, targetFileExtension))
+                {
+                    THROW_HR_WITH_USER_ERROR(
+                        WSL_E_EXPORT_FAILED, wsl::shared::Localization::MessageRequiresFileExtension(sourceFileExtension.c_str()));
+                }
+
                 const wil::unique_hfile vhdFile(CreateFileW(
                     configuration.VhdFilePath.c_str(), GENERIC_READ, (FILE_SHARE_READ | FILE_SHARE_DELETE), nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 
@@ -1258,13 +1276,9 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
 
     s_ValidateDistroName(DistributionName);
 
-    // Return an error if the path is not absolute or does not end in the .vhdx file extension.
+    // Return an error if the path is not absolute or does not have a valid VHD file extension.
     const std::filesystem::path path{VhdPath};
-    RETURN_HR_IF(
-        E_INVALIDARG,
-        !path.is_absolute() ||
-            (!wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdFileExtension) &&
-             !wsl::windows::common::string::IsPathComponentEqual(path.extension().c_str(), wsl::windows::common::wslutil::c_vhdxFileExtension)));
+    RETURN_HR_IF(E_INVALIDARG, !path.is_absolute() || !wsl::windows::common::wslutil::IsVhdFile(path));
 
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
     std::lock_guard lock(m_instanceLock);
@@ -1448,6 +1462,30 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 wil::CreateDirectoryDeep(distributionPath.c_str());
             }
 
+            // If importing a vhd, determine if it is a .vhd or .vhdx.
+            std::wstring vhdName{LXSS_VM_MODE_VHD_NAME};
+            if (WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_VHD))
+            {
+                if (GetFileType(FileHandle) != FILE_TYPE_DISK)
+                {
+                    THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageImportVhdInvalidArg());
+                }
+
+                std::wstring pathBuffer;
+                THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(FileHandle, pathBuffer));
+
+                std::filesystem::path vhdPath{std::move(pathBuffer)};
+
+                if (!wsl::windows::common::wslutil::IsVhdFile(vhdPath))
+                {
+                    using namespace wsl::windows::common::wslutil;
+                    THROW_HR_WITH_USER_ERROR(
+                        WSL_E_IMPORT_FAILED, wsl::shared::Localization::MessageRequiresFileExtensions(c_vhdFileExtension, c_vhdxFileExtension));
+                }
+
+                vhdName = vhdPath.filename();
+            }
+
             registration = DistributionRegistration::Create(
                 lxssKey.get(),
                 DistributionId,
@@ -1457,7 +1495,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 flags,
                 LX_UID_ROOT,
                 PackageFamilyName,
-                LXSS_VM_MODE_VHD_NAME,
+                vhdName.c_str(),
                 WI_IsFlagClear(Flags, LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE));
 
             configuration = s_GetDistributionConfiguration(registration, DistributionName == nullptr);
