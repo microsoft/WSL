@@ -3383,7 +3383,7 @@ try
             const std::string KernelModulesList = wsl::shared::string::FromSpan(Buffer, EarlyConfig->KernelModulesListOffset);
             for (const auto& Module : wsl::shared::string::Split(KernelModulesList, ','))
             {
-                const char* Argv[] = {MODPROBE_PATH, Module.c_str()};
+                const char* Argv[] = {MODPROBE_PATH, Module.c_str(), nullptr};
                 int Status = -1;
                 auto result = UtilCreateProcessAndWait(MODPROBE_PATH, Argv, &Status);
                 if (result < 0)
