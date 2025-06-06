@@ -111,7 +111,7 @@ endif()
 # Optional target configuration
 
 if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
-    set(WSL_BUILD_WSL_SETTINGS true)
+    set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
 # Only generate the build configuration that CMake is configured for
