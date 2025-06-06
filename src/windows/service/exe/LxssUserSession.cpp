@@ -2621,6 +2621,25 @@ try
 }
 CATCH_LOG();
 
+// Strips the Win32 long-path prefix ("\\?\"  or  "\\?\UNC\")
+// so the result is a “normal” path that Windows Terminal
+// fragments (and most Win32 APIs) accept.
+static inline std::string SanitizeTerminalIconPath(const std::filesystem::path& p)
+{
+    std::string s = p.string();                  // UTF-8 from std::filesystem::path
+    constexpr std::string_view kPrefix{R"(\\?\)"};   // four chars
+    if (s.compare(0, kPrefix.size(), kPrefix) == 0)
+    {
+        s.erase(0, kPrefix.size());
+        // Special-case UNC:  \\?\UNC\Share\…  →  \\UNC\Share\…
+        if (s.rfind("UNC\\", 0) == 0)
+        {
+            s.erase(0, 3); // drop the trailing “UNC”
+        }
+    }
+    return s;
+}
+
 // N.B. This methods expects the caller to impersonate the user.
 void LxssUserSessionImpl::_CreateTerminalProfile(
     _In_ const std::string_view& Template,
@@ -2682,7 +2701,7 @@ try
 
         e["name"] = WideToMultiByte(Configuration.Name);
         e["guid"] = WideToMultiByte(distributionProfileId);
-        e["icon"] = IconPath.string();
+        e["icon"] = SanitizeTerminalIconPath(IconPath);
 
         // See https://github.com/microsoft/terminal/pull/18195. Supported in terminal >= 1.23
         e["pathTranslationStyle"] = "wsl";
