@@ -964,7 +964,7 @@ class UnitTests
             L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
-        validateOutput(commandLine.c_str(), L"This looks like a VHDX file. Use --vhd to import a VHDX instead of a tar.\r\n");
+        validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
 
         if (!LxsstuVmMode())
         {
@@ -1503,7 +1503,7 @@ Arguments for managing Windows Subsystem for Linux:
                 Move the distribution to a new location.
 
             --set-sparse, -s <true|false>
-                Set the vhdx of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user <Username>
                 Set the default user of the distribution.
@@ -1583,11 +1583,11 @@ Arguments for managing distributions in Windows Subsystem for Linux:
                 Specifies the version to use for the new distribution.
 
             --vhd
-                Specifies that the provided file is a .vhdx file, not a tar file.
-                This operation makes a copy of the .vhdx file at the specified install location.
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place <Distro> <FileName>
-        Imports the specified .vhdx file as a new distribution.
+        Imports the specified VHD file as a new distribution.
         This virtual hard disk must be formatted with the ext4 filesystem type.
 
     --list, -l [Options]
@@ -2802,7 +2802,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             WslKeepAlive keepAlive;
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --resize 1500GB", -1);
             VERIFY_ARE_EQUAL(
-                L"The operation could not be completed because the vhdx is currently in use. To force WSL to stop use: wsl.exe "
+                L"The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe "
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
