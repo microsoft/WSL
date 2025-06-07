@@ -147,7 +147,7 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
 
 // Attempts to establish a TCPv4 and a TCPv6 connection to a port on a host.
 // ipv6hostname is an optional parameter in case the IPv6 equivalent hostname is different.
-//     example: www.msftconnectest.com and ipv6.msftconnectest.com
+//     example: www.msftconnecttest.com and ipv6.msftconnecttest.com
 // This API is blocking/synchronous.
 inline ConnCheckResult CheckConnection(const char* hostname, const char* ipv6hostname, const char* port)
 {

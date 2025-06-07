@@ -281,7 +281,7 @@ class PolicyTest
         auto revert = SetPolicy(c_allowDebugShellUserSetting, 0);
         WslShutdown();
 
-        // Only testing the negative case since the debug shell is difficult to programatically exit.
+        // Only testing the negative case since the debug shell is difficult to programmatically exit.
 
         WslKeepAlive keepAlive;
         ValidateOutput(L"--debug-shell", L"The debug shell is disabled by the computer policy.\r\n", L"", 1);
@@ -378,7 +378,7 @@ class PolicyTest
             // Ensure the top-level disable WSL policy works.
             testPolicy(wsl::windows::policies::c_allowWSL, HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), restartService);
 
-            // Verfiy the disable inbox WSL policy does not block lifted.
+            // Verify the disable inbox WSL policy does not block lifted.
             testPolicy(wsl::windows::policies::c_allowInboxWSL, S_OK, restartService);
         }
 

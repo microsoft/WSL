@@ -183,8 +183,8 @@ class SimpleTests
             {nullptr, std::nullopt},
             {"", std::nullopt},
             {"2", std::nullopt},
-            {"tru", std::nullopt},
-            {"fals", std::nullopt},
+            {"true_", std::nullopt},
+            {"false_", std::nullopt},
         };
 
         for (const auto& [input, expected] : boolTests)

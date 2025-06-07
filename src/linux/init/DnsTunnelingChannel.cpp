@@ -103,7 +103,7 @@ void DnsTunnelingChannel::ReceiveLoop() noexcept
                 return;
             }
 
-            // Get the message type from the the message header
+            // Get the message type from the message header
             switch (message->MessageType)
             {
             case LxGnsMessageDnsTunneling:

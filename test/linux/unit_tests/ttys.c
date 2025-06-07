@@ -725,7 +725,7 @@ int TtysWriteReadTransfer(PLXT_ARGS Args, int FdRead, int FdWrite)
     SendBuffer = NULL;
 
     //
-    // Allocate a buffer with known data to transfer and a buffer to recieve
+    // Allocate a buffer with known data to transfer and a buffer to receive
     // the data.
     //
 

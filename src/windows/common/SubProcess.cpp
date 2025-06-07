@@ -166,7 +166,7 @@ wil::unique_handle SubProcess::Start()
     StartupInfo.StartupInfo.cb = sizeof(StartupInfo);
     StartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
 
-    // N.B. Passing a pseudoconsole requires all standard handlles to be null
+    // N.B. Passing a pseudoconsole requires all standard handles to be null
     if (m_pseudoConsole == nullptr)
     {
         StartupInfo.StartupInfo.hStdInput = ARGUMENT_PRESENT(m_stdIn) ? m_stdIn : GetStdHandle(STD_INPUT_HANDLE);

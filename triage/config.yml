@@ -5,7 +5,7 @@ logs_rules:
         # Logs are required for review from WSL team
         
         If this a feature request, please reply with '/feature'. If this is a question, reply with '/question'.
-        **Otherwise please attach logs by following the instructions below**, your issue will not be reviewed unless they are added. These logs will help us understand what is going on in your machine.
+        **Otherwise, please attach logs by following the instructions below**, your issue will not be reviewed unless they are added. These logs will help us understand what is going on in your machine.
         
         <details>
         
@@ -21,11 +21,12 @@ logs_rules:
         
         The script will output the path of the log file once done.
 
-        If this is a networking issue, please use [collect-networking-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-networking-logs.ps1), following the instructions [here](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#collect-wsl-logs-for-networking-issues)
+        If this is a networking issue, please use [collect-networking-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-networking-logs.ps1), following the instructions in [Collect WSL logs for networking issues](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#collect-wsl-logs-for-networking-issues)
         
-        Once completed please upload the output files to this Github issue.
+        Once completed please upload the output files to this GitHub issue.
          
-        [Click here for more info on logging](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method)
+        See [Collect WSL logs (recommended method)](https://github.com/microsoft/WSL/blob/master/CONTRIBUTING.md#8-collect-wsl-logs-recommended-method).
+        
         If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue and reply with '/emailed-logs'.
         </details>
         
@@ -386,7 +387,7 @@ actions:
         defaultVhdSize = <size> # (example: 1500GB)
         ```
         
-        Otherwise if you need to increase the size of an existing distribution, you can follow [these instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-expand-the-size-of-your-wsl-2-virtual-hard-disk).
+        Otherwise, if you need to increase the size of an existing distribution, you can follow [these instructions](https://learn.microsoft.com/en-us/windows/wsl/disk-space#how-to-expand-the-size-of-your-wsl-2-virtual-hard-disk).
 
     - when:
         condition:

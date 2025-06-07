@@ -20,4 +20,4 @@ When systemd is enabled, WSL tries synchronizes launching processes with systemd
 To improve compatibility with systemd, WSL creates various systemd configuration files during boot (under `/run`). These configurations files are used to:
 
 - Protect the WSL [binfmt interpret](interop.md) from being deleted by `systemd-binfmt.service`
-- Protect the X11 socket from being deleted by `systemd-tmpfiles.serviceè 
+- Protect the X11 socket from being deleted by `systemd-tmpfiles-setup.service`
