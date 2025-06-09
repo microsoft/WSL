@@ -294,7 +294,12 @@ std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessa
         // N.B. failures generating the hosts string are non-fatal.
         try
         {
-            windowsHosts = filesystem::GetWindowsHosts();
+
+            // Parse the Windows hosts file.
+            std::wstring SystemDirectory;
+            THROW_IF_FAILED(wil::GetSystemDirectoryW(SystemDirectory));
+
+            windowsHosts = filesystem::GetWindowsHosts(std::filesystem::path(std::move(SystemDirectory)) / L"drivers" / L"etc" / L"hosts");
         }
         CATCH_LOG()
     }
