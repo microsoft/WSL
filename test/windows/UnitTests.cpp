@@ -2294,7 +2294,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         WSL2_TEST_ONLY();
 
         // Create a 100MB vhd without a filesystem.
-        auto vhdPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>() + L"\\CorruptedTest.vhdx");
+        auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
+        auto vhdPath = distroPath / L"CorruptedTest.vhdx";
 
         VIRTUAL_STORAGE_TYPE storageType{};
         storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_VHDX;
@@ -2331,6 +2332,40 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 vhdPath.wstring()));
 
         vhd.reset();
+
+        // Create a broken distribution registration
+        {
+            const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
+            const auto distroKey =
+                wsl::windows::common::registry::CreateKey(userKey.get(), L"{baa405ef-1822-4bbe-84e2-30e4c6330d42}");
+
+            auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                wsl::windows::common::registry::DeleteKey(userKey.get(), L"{baa405ef-1822-4bbe-84e2-30e4c6330d42}");
+            });
+
+            wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"BasePath", distroPath.c_str());
+            wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"VhdFileName", L"CorruptedTest.vhdx");
+            wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"DistributionName", L"BrokenDistro");
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"DefaultUid", 0);
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
+
+            // Validate that starting the distribution fails with the correct error code.
+            validateOutput(
+                L"-d BrokenDistro echo ok",
+                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
+                L"Error code: Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED\r\n");
+
+            // Validate that trying to export the distribution fails with the correct error code.
+            validateOutput(
+                L"--export BrokenDistro dummy.tar",
+                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
+                L"Error code: Wsl/Service/WSL_E_DISK_CORRUPTED\r\n");
+
+            // Shutdown WSL to force the disk to detach.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0L);
+        }
 
         // Import a corrupted vhd.
         validateOutput(
