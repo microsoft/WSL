@@ -5939,6 +5939,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     TEST_METHOD(EtcHostsParsing)
     {
         constexpr auto inputFileName = L"test-etc-hosts.txt";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(inputFileName); });
+
         auto validate = [](const std::string& Input, const std::string& ExpectedOutput) {
             wil::unique_handle inputFile{CreateFile(inputFileName, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, 0, nullptr)};
 
@@ -5952,7 +5955,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         validate("127.0.0.1 microsoft.com", "127.0.0.1\tmicrosoft.com\n");
         validate("\xEF\xBB\xBF 127.0.0.1 microsoft.com", "127.0.0.1\tmicrosoft.com\n"); // Validate that BOM headers are ignored.
         validate("#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment", "");
-        validate("#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment\n127.0.0.1 wsl.dev", "127.0.0.1\twsl.dev\n");
+        validate(
+            "#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment\n127.0.0.1 wsl.dev", "127.0.0.1\twsl.dev\n");
     }
 
 }; // namespace UnitTests
