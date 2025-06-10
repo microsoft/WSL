@@ -2463,7 +2463,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
 
             // Validate that the icon is under the distribution folder.
-            VERIFY_IS_TRUE(iconLocation.find(basePath) != std::string::npos);
+            VERIFY_IS_TRUE(iconLocation.find(basePath) == 0);
         }
 
         return std::make_pair(json, profilePath);
@@ -3977,6 +3977,30 @@ VERSION_ID="Invalid|Format"
 
             CreateTarFromManifest(
                 L"[shortcut]\nicon = /icon.ico\n[oobe]\ndefaultName = test-default-name", L"distro-default-name-icon.tar");
+
+            //
+            // Validate that the distribution icon path is also correct when installing via wsl --import.
+            //
+
+            {
+                constexpr auto distroName = L"TestCustomLocation";
+
+                auto currentDirectory = std::filesystem::absolute(std::filesystem::current_path()).wstring();
+                for (const auto& location : {currentDirectory, std::wstring(L".")})
+                {
+                    auto cleanup = wil::scope_exit_log(
+                        WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", distroName)); });
+
+                    VERIFY_ARE_EQUAL(
+                        LxsstuLaunchWsl(
+                            std::format(L"--import {} \"{}\" {}", distroName, location, "distro-default-name-icon.tar")),
+                        0L);
+
+                    auto [json, profile_path] = ValidateDistributionTerminalProfile(distroName, false);
+                    VERIFY_ARE_EQUAL(
+                        json["profiles"][1]["icon"].get<std::string>(), (std::filesystem::absolute(".") / "shortcut.ico").string());
+                }
+            }
 
             InstallFromTar(L"distro-default-name-icon.tar");
             ValidateDistributionStarts(L"test-default-name");
