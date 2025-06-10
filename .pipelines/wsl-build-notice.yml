@@ -4,7 +4,7 @@ trigger:
     - master
 
 pool:
-  name: 'wsl-build'
+    vmImage: 'windows-latest'
 
 steps:
 - checkout : self

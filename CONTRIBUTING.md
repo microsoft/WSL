@@ -95,13 +95,13 @@ Please send this dump to: secure@microsoft.com .
 Make sure that the email body contains:
 
 - The Github issue number, if any
-- That this dump is destinated to the WSL team
+- That this dump is intended for the WSL team
 
 ### 11) Reporting a WSL process crash
 
 The easiest way to report a WSL process crash is by [collecting a user-mode crash dump](https://learn.microsoft.com/windows/win32/wer/collecting-user-mode-dumps).
 
-To collect dumps of all running WSL processe, please open a PowerShell prompt with admin privileges, navigate to a folder where you'd like to put your log files and run these commands: 
+To collect dumps of all running WSL processes, please open a PowerShell prompt with admin privileges, navigate to a folder where you'd like to put your log files and run these commands: 
 
 ```
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
@@ -134,9 +134,9 @@ reg.exe delete "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Repo
 
 To collect time travel debugging traces:
 
-1) [Install Windbg preview](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
+1) [Install WinDbg preview](https://apps.microsoft.com/store/detail/windbg-preview/9PGJGD53TN86?hl=en-us&gl=us&rtc=1)
 
-2) Open windbg preview as administrator by running `windbgx` in an elevated command prompt
+2) Open WinDbg preview as administrator by running `windbgx` in an elevated command prompt
 
 3) Navigate to `file` -> `Attach to process`
 
@@ -150,9 +150,9 @@ To collect time travel debugging traces:
 
 7) Reproduce the issue
 
-8) Go back to windbg and click `Stop and Debug`
+8) Go back to WinDbg and click `Stop and Debug`
 
-9) Once the trace is done collecting, click `Stop Debugging` and close Windbg
+9) Once the trace is done collecting, click `Stop Debugging` and close WinDbg
 
 10) Go to the folder where the trace was collected, and locate the .run file. It should look like: `wslservice*.run`
 

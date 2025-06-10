@@ -308,9 +308,19 @@ ExecStart=/bin/sh -c '(echo -1 > {}/{}) ; (echo "{}" > {})' )",
                 BINFMT_INTEROP_REGISTRATION_STRING(LX_INIT_BINFMT_NAME_LATE),
                 BINFMT_MISC_REGISTER_FILE);
 
-            auto overrideFolder = std::format("{}/systemd-binfmt.service.d", installPath);
-            THROW_LAST_ERROR_IF(UtilMkdirPath(overrideFolder.c_str(), 0755) < 0);
-            THROW_LAST_ERROR_IF(WriteToFile(std::format("{}/override.conf", overrideFolder).c_str(), systemdBinfmtContent.c_str()) < 0);
+            // Install the override for systemd-binfmt.service.
+            {
+                auto overrideFolder = std::format("{}/systemd-binfmt.service.d", installPath);
+                THROW_LAST_ERROR_IF(UtilMkdirPath(overrideFolder.c_str(), 0755) < 0);
+                THROW_LAST_ERROR_IF(WriteToFile(std::format("{}/override.conf", overrideFolder).c_str(), systemdBinfmtContent.c_str()) < 0);
+            }
+
+            // Install the override for binfmt-support.service.
+            {
+                auto overrideFolder = std::format("{}/binfmt-support.service.d", installPath);
+                THROW_LAST_ERROR_IF(UtilMkdirPath(overrideFolder.c_str(), 0755) < 0);
+                THROW_LAST_ERROR_IF(WriteToFile(std::format("{}/override.conf", overrideFolder).c_str(), systemdBinfmtContent.c_str()) < 0);
+            }
         }
 
         return 0;
