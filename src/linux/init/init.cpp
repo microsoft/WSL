@@ -74,10 +74,10 @@ typedef struct _CREATE_PROCESS_PARSED_COMMON
 typedef struct _CREATE_PROCESS_PARSED
 {
     CREATE_PROCESS_PARSED_COMMON Common;
-    int EventFd;
-    int StdFd[LX_INIT_STD_FD_COUNT];
-    int TtyFd;
-    int ServiceFd;
+    int EventFd = -1;
+    int StdFd[LX_INIT_STD_FD_COUNT] = {-1};
+    int TtyFd = -1;
+    int ServiceFd = -1;
 } CREATE_PROCESS_PARSED, *PCREATE_PROCESS_PARSED;
 
 struct sigaction g_SavedSignalActions[_NSIG];
@@ -109,8 +109,6 @@ int CreateProcessParse(PCREATE_PROCESS_PARSED CreateProcessParsed, gsl::span<gsl
 int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config);
 
 void CreateProcessParseFree(PCREATE_PROCESS_PARSED CreateProcessParsed);
-
-void CreateProcessParseInitialize(PCREATE_PROCESS_PARSED CreateProcessParsed);
 
 int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED CreateProcessParsed, pid_t CreateProcessPid, int MessageFd);
 
@@ -1050,32 +1048,6 @@ Return Value:
         CLOSE(CreateProcessParsed->ServiceFd);
         CreateProcessParsed->ServiceFd = -1;
     }
-}
-
-void CreateProcessParseInitialize(PCREATE_PROCESS_PARSED CreateProcessParsed)
-
-/*++
-
-Routine Description:
-
-    This routine initializes a parsed create process message.
-
-Arguments:
-
-    CreateProcessParsed - Supplies a parsed create process parameters to
-        initialize.
-
-Return Value:
-
-    None.
-
---*/
-
-{
-    memset(CreateProcessParsed, 0, sizeof(*CreateProcessParsed));
-    memset(CreateProcessParsed->StdFd, -1, sizeof(CreateProcessParsed->StdFd));
-    CreateProcessParsed->TtyFd = -1;
-    CreateProcessParsed->EventFd = -1;
 }
 
 int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED CreateProcessParsed, pid_t CreateProcessPid, int MessageFd)
@@ -2848,7 +2820,7 @@ Return Value:
 --*/
 
 {
-    CREATE_PROCESS_PARSED CreateProcessParsed;
+    CREATE_PROCESS_PARSED CreateProcessParsed{};
     pid_t CreateProcessPid;
     int Result;
 
@@ -2856,7 +2828,6 @@ Return Value:
     // Parse the create process message buffer and create the new child process.
     //
 
-    CreateProcessParseInitialize(&CreateProcessParsed);
     Result = CreateProcessParse(&CreateProcessParsed, Buffer, MessageFd, TtyFd, Config);
     if (Result < 0)
     {
