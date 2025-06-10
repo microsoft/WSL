@@ -881,7 +881,7 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesys
 
     // Discard any BOM header.
     int potentialHeader[] = {Stream.get(), Stream.get(), Stream.get()};
-    if (potentialHeader[0] != 0xEF || potentialHeader[1] !=  0xBB || potentialHeader[2] !=  0xBF)
+    if (potentialHeader[0] != 0xEF || potentialHeader[1] != 0xBB || potentialHeader[2] != 0xBF)
     {
         Stream.seekg(0); // Reset the position to beginning of the file if no BOM header is found.
     }

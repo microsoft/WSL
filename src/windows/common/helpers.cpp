@@ -299,7 +299,8 @@ std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessa
             std::wstring SystemDirectory;
             THROW_IF_FAILED(wil::GetSystemDirectoryW(SystemDirectory));
 
-            windowsHosts = filesystem::GetWindowsHosts(std::filesystem::path(std::move(SystemDirectory)) / L"drivers" / L"etc" / L"hosts");
+            windowsHosts =
+                filesystem::GetWindowsHosts(std::filesystem::path(std::move(SystemDirectory)) / L"drivers" / L"etc" / L"hosts");
         }
         CATCH_LOG()
     }
