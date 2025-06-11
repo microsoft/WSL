@@ -92,6 +92,8 @@ struct GuidLess
 
 typedef wil::unique_any_handle_null<decltype(&::ClosePseudoConsole), ::ClosePseudoConsole> unique_pseudo_console;
 
+using unique_environment_block = wil::unique_any<LPVOID, decltype(&DestroyEnvironmentBlock), DestroyEnvironmentBlock>;
+
 inline void DeleteProcThreadAttributeList(_In_ PPROC_THREAD_ATTRIBUTE_LIST AttributeList)
 {
     ::DeleteProcThreadAttributeList(AttributeList);
