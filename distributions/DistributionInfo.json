@@ -160,6 +160,34 @@
                 }
             }
         ],
+        "RockyLinux": [
+            {
+                "Name": "RockyLinux-9",
+                "FriendlyName": "Rocky Linux 9",
+                "Default": false,
+                "Amd64Url": {
+                    "Url": "https://dl.rockylinux.org/pub/rocky/9.6/images/x86_64/Rocky-9-WSL-Base-9.6-20250531.0.x86_64.wsl",
+                    "Sha256": "9ce7566838dbd4166942d8976c328e03ec05370d9f04006ec4327b61bf04131a"
+                },
+                "Arm64Url": {
+                    "Url": "https://dl.rockylinux.org/pub/rocky/9.6/images/aarch64/Rocky-9-WSL-Base-9.6-20250602.0.aarch64.wsl",
+                    "Sha256": "7ff27a7cddd781641b5990d15282f2a9631d5bbfd80afac6c598f10cd7739bfd"
+                }
+            },
+            {
+                "Name": "RockyLinux-10",
+                "FriendlyName": "Rocky Linux 10",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://dl.rockylinux.org/pub/rocky/10.0/images/x86_64/Rocky-10-WSL-Base-10.0-20250611.0.x86_64.wsl",
+                    "Sha256": "3e84270955361269d2abf53c89da98f17d91b55ff837412ef683a39602b590cb"
+                },
+                "Arm64Url": {
+                    "Url": "https://dl.rockylinux.org/pub/rocky/10.0/images/aarch64/Rocky-10-WSL-Base-10.0-20250611.0.aarch64.wsl",
+                    "Sha256": "c829c988d02fec874480968fe0dbd66b2db023454f183f0b8f13bb94c8bfb4de"
+                }
+            }
+        ],
         "archlinux": [
             {
                 "Name": "archlinux",
