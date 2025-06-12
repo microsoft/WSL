@@ -75,6 +75,8 @@ Abstract:
 
 static void ConfigApplyWindowsLibPath(const wsl::linux::WslDistributionConfig& Config);
 
+static bool CreateLoginSession(const wsl::linux::WslDistributionConfig& Config, const char* Username, uid_t Uid);
+
 class RemoveMountAndEnvironmentOnScopeExit
 {
 public:
@@ -414,37 +416,18 @@ try
             return;
         }
 
+        bool success = false;
+        auto sendResponse = wil::scope_exit([&]() { ResponseChannel.SendResultMessage<bool>(success); });
+
         if (!Config.BootInit || Config.InitPid.value_or(0) != getpid())
         {
             LOG_ERROR("Unexpected LxInitMessageCreateLoginSession message");
-            return;
         }
-
-        static std::mutex LoginSessionsLock;
-        static std::map<uid_t, int> LoginSessions;
-
-        // Keep track of login sessions that have been created.
-        LoginSessionsLock.lock();
-        auto Unlock = wil::scope_exit([&]() { LoginSessionsLock.unlock(); });
-        if (LoginSessions.contains(CreateSession->Uid))
+        else
         {
-            return;
+            success = CreateLoginSession(Config, CreateSession->Buffer, CreateSession->Uid);
         }
 
-        int LoginLeader;
-        const int Result = forkpty(&LoginLeader, nullptr, nullptr, nullptr);
-        if (Result < 0)
-        {
-            LOG_ERROR("forkpty failed {}", errno);
-            return;
-        }
-        else if (Result == 0)
-        {
-            Unlock.reset();
-            _exit(execl("/bin/login", "/bin/login", "-f", CreateSession->Buffer, nullptr));
-        }
-
-        LoginSessions.emplace(CreateSession->Uid, LoginLeader);
         break;
     }
 
@@ -884,12 +867,15 @@ try
     {
         try
         {
-            // Create the /run/user bind mount.
-            // This mount is required because systemd will mount a tmpfs on each /run/user/<uid> folder
-            // so /run/user need to be in the global mount namespace so both elevated and non elevated processes see it.
-            const auto UserMountTarget = Config.DrvFsPrefix + WSLG_SHARED_FOLDER "/run/user";
-            THROW_LAST_ERROR_IF(UtilMkdirPath(UserMountTarget.c_str(), 0755) < 0);
-            THROW_LAST_ERROR_IF(UtilMount(UserMountTarget.c_str(), RUN_FOLDER "/" USER_MOUNT_FOLDER, nullptr, MS_BIND, nullptr) < 0)
+            if (Config.GuiAppsEnabled)
+            {
+                // Create the /run/user bind mount.
+                // This mount is required because systemd will mount a tmpfs on each /run/user/<uid> folder
+                // so /run/user need to be in the global mount namespace so both elevated and non elevated processes see it.
+                const auto UserMountTarget = Config.DrvFsPrefix + WSLG_SHARED_FOLDER "/run/user";
+                THROW_LAST_ERROR_IF(UtilMkdirPath(UserMountTarget.c_str(), 0755) < 0);
+                THROW_LAST_ERROR_IF(UtilMount(UserMountTarget.c_str(), RUN_FOLDER "/" USER_MOUNT_FOLDER, nullptr, MS_BIND, nullptr) < 0)
+            }
         }
         CATCH_LOG();
     }
@@ -2670,3 +2656,96 @@ try
     }
 }
 CATCH_LOG()
+
+bool CreateLoginSession(const wsl::linux::WslDistributionConfig& Config, const char* Username, uid_t Uid)
+/*++
+
+Routine Description:
+
+    Create a systemd login session for the given user.
+
+Arguments:
+
+    Config - Supplies the WSL distribution configuration.
+
+    Username - Supplies session username.
+
+    Uid - Supplies the session UID.
+
+Return Value:
+
+    true on success, false on failure.
+
+--*/
+try
+{
+    static std::mutex LoginSessionsLock;
+    static std::map<uid_t, int> LoginSessions;
+
+    // Keep track of login sessions that have been created.
+    LoginSessionsLock.lock();
+    auto Unlock = wil::scope_exit([&]() { LoginSessionsLock.unlock(); });
+    if (LoginSessions.contains(Uid))
+    {
+        return true;
+    }
+
+    int LoginLeader;
+    const int Result = forkpty(&LoginLeader, nullptr, nullptr, nullptr);
+    if (Result < 0)
+    {
+        LOG_ERROR("forkpty failed {}", errno);
+        return false;
+    }
+    else if (Result == 0)
+    {
+        Unlock.reset();
+        _exit(execl("/bin/login", "/bin/login", "-f", Username, nullptr));
+    }
+
+    LoginSessions.emplace(Uid, LoginLeader);
+
+    //
+    // N.B. Init needs to not ignore SIGCHLD so it can wait for the child process.
+    //
+    signal(SIGCHLD, SIG_DFL);
+    auto restoreDisposition = wil::scope_exit([]() { signal(SIGCHLD, SIG_IGN); });
+
+    if (Config.BootInitTimeout > 0)
+    {
+        auto cmd = std::format("/usr/bin/systemctl is-active user@{}.service", Uid);
+        try
+        {
+            return wsl::shared::retry::RetryWithTimeout<bool>(
+                [&]() {
+                    std::string Output;
+                    auto exitCode = UtilExecCommandLine(cmd.c_str(), &Output, 0, false);
+                    if (exitCode == 0) // is-active returns 0 if the unit is active.
+                    {
+                        return true;
+                    }
+                    else if (Output == "failed\n")
+                    {
+                        LOG_ERROR("{} returned: {}", cmd, Output);
+                        return false;
+                    }
+
+                    THROW_ERRNO(EAGAIN);
+                },
+                std::chrono::milliseconds{250},
+                std::chrono::milliseconds{Config.BootInitTimeout});
+        }
+        catch (...)
+        {
+            LOG_ERROR("Timed out waiting for user session for uid={}", Uid);
+            return false;
+        }
+    }
+
+    return true;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return false;
+}

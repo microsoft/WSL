@@ -787,6 +787,9 @@ For information please visit https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Errors occurred during WSL startup</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Failed to start the systemd user session for '{}'. See journalctl for more details.</value>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>Open EventViewer</value>
   </data>

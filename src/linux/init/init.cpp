@@ -284,7 +284,9 @@ ExecStart=/bin/sh -c 'ln -sf "$WSLG_RUNTIME_DIR/wayland-0.lock" "$XDG_RUNTIME_DI
 ExecStart=/bin/sh -c 'ln -sf "$WSLG_RUNTIME_DIR/pulse/native" "$XDG_RUNTIME_DIR/pulse/native"'
 ExecStart=/bin/sh -c 'ln -sf "$WSLG_RUNTIME_DIR/pulse/pid" "$XDG_RUNTIME_DIR/pulse/pid"'
   )",
-            automountRoot, WSLG_SHARED_FOLDER, WAYLAND_RUNTIME_DIR);
+            automountRoot,
+            WSLG_SHARED_FOLDER,
+            WAYLAND_RUNTIME_DIR);
 
         InstallSystemdUnit(installPath, "wslg-session", unitContent.c_str());
 
@@ -322,7 +324,6 @@ int GenerateSystemdUnits(int Argc, char** Argv)
                 ConfigKey(wsl::linux::c_ConfigBootProtectBinfmtOption, protectBinfmt),
                 ConfigKey(wsl::linux::c_ConfigInteropEnabledOption, interopEnabled),
                 ConfigKey(wsl::linux::c_ConfigAutoMountRoot, automountRoot),
-
 
             };
             ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
@@ -679,7 +680,12 @@ try
         CreateSession->Gid = PasswordEntry->pw_gid;
         CreateSession.WriteString(PasswordEntry->pw_name);
 
-        InteropChannel.SendMessage<LX_INIT_CREATE_LOGIN_SESSION>(CreateSession.Span());
+        auto result = InteropChannel.Transaction<LX_INIT_CREATE_LOGIN_SESSION>(CreateSession.Span());
+
+        if (!result.Result)
+        {
+            fprintf(stderr, "wsl: %s\n", wsl::shared::Localization::MessageSystemdUserSessionFailed(PasswordEntry->pw_name).c_str());
+        }
 
         Common->Environment.AddVariable("DBUS_SESSION_BUS_ADDRESS", std::format("unix:path=/run/user/{}/bus", PasswordEntry->pw_uid));
         Common->Environment.AddVariable(XDG_RUNTIME_DIR_ENV, std::format("/run/user/{}/", PasswordEntry->pw_uid));
