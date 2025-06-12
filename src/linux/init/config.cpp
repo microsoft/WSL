@@ -867,15 +867,12 @@ try
     {
         try
         {
-            if (Config.GuiAppsEnabled)
-            {
-                // Create the /run/user bind mount.
-                // This mount is required because systemd will mount a tmpfs on each /run/user/<uid> folder
-                // so /run/user need to be in the global mount namespace so both elevated and non elevated processes see it.
-                const auto UserMountTarget = Config.DrvFsPrefix + WSLG_SHARED_FOLDER "/run/user";
-                THROW_LAST_ERROR_IF(UtilMkdirPath(UserMountTarget.c_str(), 0755) < 0);
-                THROW_LAST_ERROR_IF(UtilMount(UserMountTarget.c_str(), RUN_FOLDER "/" USER_MOUNT_FOLDER, nullptr, MS_BIND, nullptr) < 0)
-            }
+            // Create the /run/user bind mount.
+            // This mount is required because systemd will mount a tmpfs on each /run/user/<uid> folder
+            // so /run/user need to be in the global mount namespace so both elevated and non elevated processes see it.
+            const auto UserMountTarget = Config.DrvFsPrefix + WSLG_SHARED_FOLDER "/run/user";
+            THROW_LAST_ERROR_IF(UtilMkdirPath(UserMountTarget.c_str(), 0755) < 0);
+            THROW_LAST_ERROR_IF(UtilMount(UserMountTarget.c_str(), RUN_FOLDER "/" USER_MOUNT_FOLDER, nullptr, MS_BIND, nullptr) < 0)
         }
         CATCH_LOG();
     }
