@@ -25,12 +25,10 @@ WslCoreInstance::WslCoreInstance(
     _In_ ULONG DefaultUid,
     _In_ ULONG64 ClientLifetimeId,
     _In_ const std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>& DrvFsCallback,
-    _In_ ULONG FeatureFlags,
     _In_ DWORD SocketTimeout,
     _In_ int IdleTimeout,
     _Out_opt_ ULONG* ConnectPort) :
     LxssRunningInstance(IdleTimeout),
-    m_featureFlags(FeatureFlags),
     m_instanceId(InstanceId),
     m_runtimeId(RuntimeId),
     m_configuration(Configuration),
@@ -77,14 +75,6 @@ WslCoreInstance::WslCoreInstance(
         *ConnectPort = result.ConnectPort;
     }
 
-    // Set a flag if the rootfs folder is compressed.
-    //
-    // N.B. The system distro has an empty base path.
-    if (!m_configuration.BasePath.empty())
-    {
-        WI_SetFlagIf(m_featureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(m_configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
-    }
-
     // Copy immutable distribution data into the info structure.
     m_distributionInfo.Id = m_configuration.DistroId;
     m_distributionInfo.Name = m_configuration.Name.c_str();
@@ -104,10 +94,6 @@ WslCoreInstance::WslCoreInstance(
         systemDistroConfig.Flags = (LXSS_DISTRO_FLAGS_DEFAULT | LXSS_DISTRO_FLAGS_VM_MODE);
 
         // Allow interop requests from init (pid 1) and disable the 9p server.
-        ULONG systemDistroFeatureFlags = m_featureFlags;
-        WI_SetFlag(systemDistroFeatureFlags, LxInitFeatureDisable9pServer);
-        WI_SetFlag(systemDistroFeatureFlags, LxInitFeatureSystemDistro);
-
         // Create an instance for the system distro, this will fail if the distro has opted-out of
         // GUI applications via /etc/wsl.conf.
         try
@@ -123,7 +109,6 @@ WslCoreInstance::WslCoreInstance(
                 LX_UID_ROOT,
                 ClientLifetimeId,
                 DrvFsCallback,
-                systemDistroFeatureFlags,
                 m_socketTimeout,
                 IdleTimeout);
         }
@@ -394,7 +379,7 @@ void WslCoreInstance::Initialize()
 
     const auto timezone = wsl::windows::common::helpers::GetLinuxTimezone();
     auto config = wsl::windows::common::helpers::GenerateConfigurationMessage(
-        m_configuration.Name, fixedDrives, m_defaultUid, timezone, {}, m_featureFlags, drvfsMount);
+        m_configuration.Name, fixedDrives, m_defaultUid, timezone, {}, drvfsMount);
 
     m_initChannel->GetChannel().SendMessage<LX_INIT_CONFIGURATION_INFORMATION>(gsl::span(config));
 

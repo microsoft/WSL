@@ -239,6 +239,8 @@ Abstract:
 
 #define LX_INIT_WSL_GENERATOR "wsl-generator"
 
+#define LX_INIT_WSL_USER_GENERATOR "wsl-user-generator"
+
 //
 // WSL2-specific environment variables.
 //
@@ -907,7 +909,6 @@ typedef struct _LX_INIT_CONFIGURATION_INFORMATION
     unsigned int TimezoneOffset;
     unsigned int DrvFsVolumesBitmap;
     unsigned int DrvFsDefaultOwner;
-    unsigned int FeatureFlags;
     LX_INIT_DRVFS_MOUNT DrvfsMount;
     char Buffer[];
 
@@ -920,7 +921,6 @@ typedef struct _LX_INIT_CONFIGURATION_INFORMATION
         STRING_FIELD(TimezoneOffset),
         FIELD(DrvFsVolumesBitmap),
         FIELD(DrvFsDefaultOwner),
-        FIELD(FeatureFlags),
         FIELD(DrvfsMount));
 
 } LX_INIT_CONFIGURATION_INFORMATION, *PLX_INIT_CONFIGURATION_INFORMATION;
@@ -1138,6 +1138,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
     unsigned int UserProfileOffset;
     unsigned int Flags;
     unsigned int ConnectPort;
+    unsigned int FeatureFlags;
     char Buffer[];
 
     PRETTY_PRINT(
@@ -1151,7 +1152,8 @@ typedef struct _LX_MINI_INIT_MESSAGE
         STRING_FIELD(InstallPathOffset),
         STRING_FIELD(UserProfileOffset),
         FIELD(Flags),
-        FIELD(ConnectPort));
+        FIELD(ConnectPort),
+        FIELD(FeatureFlags));
 
 } LX_MINI_INIT_MESSAGE, *PLX_MINI_INIT_MESSAGE;
 

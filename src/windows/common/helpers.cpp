@@ -278,7 +278,6 @@ std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessa
     _In_ ULONG DefaultUid,
     _In_ const std::string& Timezone,
     _In_ const std::wstring& Plan9SocketPath,
-    _In_ ULONG FeatureFlags,
     _In_ LX_INIT_DRVFS_MOUNT DrvfsMount)
 {
     auto [hostName, domainName] = filesystem::GetHostAndDomainNames();
@@ -308,7 +307,6 @@ std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessa
     shared::MessageWriter<LX_INIT_CONFIGURATION_INFORMATION> message(LxInitMessageInitialize);
     message->DrvFsVolumesBitmap = FixedDrivesBitmap;
     message->DrvFsDefaultOwner = DefaultUid;
-    message->FeatureFlags = FeatureFlags;
     message->DrvfsMount = DrvfsMount;
     message.WriteString(message->HostnameOffset, hostName);
     message.WriteString(message->DomainnameOffset, domainName);

@@ -431,50 +431,6 @@ try
             return;
         }
 
-        // Symlink the content of the WSLG XDG runtime dir onto the user's runtime path and
-        // create a login session to initialize PAM for the user.
-        if (Config.GuiAppsEnabled)
-        {
-            auto* RuntimeDir = getenv(XDG_RUNTIME_DIR_ENV);
-            if (RuntimeDir)
-            {
-                // Create a tmpfs mount point for the user directory.
-                auto userFolder = std::format("/run/user/{}", CreateSession->Uid);
-                UtilMount("tmpfs", userFolder.c_str(), "tmpfs", (MS_NOSUID | MS_NODEV | MS_NOEXEC), "mode=755");
-
-                // Create the directory structure for wslg's symlinks.
-                for (const auto* e : {"/", "/dbus-1", "/dbus-1/service", "/pulse"})
-                {
-                    auto target = userFolder + e;
-                    UtilMkdir(target.c_str(), 0777);
-                    if (chown(target.c_str(), CreateSession->Uid, CreateSession->Gid) < 0)
-                    {
-                        LOG_ERROR("chown({}, {}, {}) failed {}", target, CreateSession->Uid, CreateSession->Gid, errno);
-                    }
-                }
-
-                // Create the actual symlinks.
-                for (const auto* e : {"wayland-0", "wayland-0.lock", "pulse/native", "pulse/pid"})
-                {
-                    auto link = std::format("{}/{}", userFolder, e);
-                    if (unlink(link.c_str()) < 0 && errno != ENOENT)
-                    {
-                        LOG_ERROR("unlink({}) failed {}", link, errno);
-                    }
-
-                    auto target = RuntimeDir + std::string("/") + e;
-                    if (symlink(target.c_str(), link.c_str()) < 0)
-                    {
-                        LOG_ERROR("symlink({}, {}) failed {}", target, link, errno);
-                    }
-                }
-            }
-            else
-            {
-                LOG_ERROR("getenv({}) failed {}", XDG_RUNTIME_DIR_ENV, errno);
-            }
-        }
-
         int LoginLeader;
         const int Result = forkpty(&LoginLeader, nullptr, nullptr, nullptr);
         if (Result < 0)
@@ -710,23 +666,6 @@ try
 
     const std::string ThreadName = std::format("{}({})", (Config.BootInit ? "init-systemd" : "init"), DistributionName);
     UtilSetThreadName(ThreadName.c_str());
-
-    //
-    // Store feature flags for future use.
-    //
-    // N.B. This is also stored in an environment variable so that mount.drvfs, when launched
-    //      through fstab mounting below, can use that. This is needed because mount.drvfs won't
-    //      be able to connect to init during this call. This environment variable is not present
-    //      for user-launched processes.
-    //
-
-    Config.FeatureFlags = Message->FeatureFlags;
-    char FeatureFlagsString[10];
-    snprintf(FeatureFlagsString, sizeof(FeatureFlagsString), "%x", Config.FeatureFlags.value());
-    if (setenv(WSL_FEATURE_FLAGS_ENV, FeatureFlagsString, 1) < 0)
-    {
-        LOG_ERROR("setenv failed {}", errno);
-    }
 
     //
     // Determine the default UID which can be specified in /etc/wsl.conf.

@@ -1681,6 +1681,7 @@ void LaunchInit(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
+    unsigned int FeatureFlags,
     std::optional<pid_t> DistroInitPid)
 
 /*++
@@ -1717,6 +1718,8 @@ Arguments:
     UserProfile - Supplies the Windows path for user profile of the VM owner.
         If this value is a non-empty string, it is passed to init as an
         environment variable.
+
+    FeatureFlags - Supplies the distribution features flags.
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
@@ -1826,6 +1829,8 @@ try
     AddEnvironmentVariable(LX_WSL2_INSTALL_PATH, InstallPath);
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
+    AddEnvironmentVariable(WSL_FEATURE_FLAGS_ENV, std::format("0x{:X}", FeatureFlags).c_str());
+
 
     if (DistroInitPid.has_value())
     {
@@ -1927,6 +1932,7 @@ void LaunchSystemDistro(
     const char* SharedMemoryRoot,
     const char* InstallPath,
     const char* UserProfile,
+    unsigned int FeatureFlags,
     pid_t DistroInitPid)
 
 /*++
@@ -1962,6 +1968,8 @@ Arguments:
         If this value is a non-empty string, it is passed to init as an
         environment variable.
 
+    FeaturesFlags - Supplies the distribution feature flags.
+
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
 Return Value:
@@ -1973,6 +1981,13 @@ Return Value:
 try
 {
     //
+    // Prepare the feature flags for the system distro.
+    //
+
+    WI_SetFlag(FeatureFlags, LxInitFeatureDisable9pServer);
+    WI_SetFlag(FeatureFlags, LxInitFeatureSystemDistro);
+
+    //
     // Create a writable layer on top of the read-only vhd.
     //
 
@@ -1982,7 +1997,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid);
+    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, FeatureFlags, DistroInitPid);
     _exit(1);
 }
 catch (...)
