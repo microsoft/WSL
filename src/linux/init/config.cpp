@@ -1034,23 +1034,17 @@ try
 
     if (Config.BootCommand.has_value())
     {
-        const int ChildPid =
-            UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
-                //
-                // Restore default signal dispositions for the child process.
-                //
+        UtilCreateChildProcess("BootCommand", [Command = Config.BootCommand.value(), SavedSignals = g_SavedSignalActions]() {
+            //
+            // Restore default signal dispositions for the child process.
+            //
 
-                THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
-                THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+            THROW_LAST_ERROR_IF(UtilSetSignalHandlers(SavedSignals, false) < 0);
+            THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
-                execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
-                LOG_ERROR("execl() failed, {}", errno);
-            });
-
-        if (ChildPid < 0)
-        {
-            LOG_ERROR("fork failed {}", errno);
-        }
+            execl("/bin/sh", "sh", "-c", Command.c_str(), nullptr);
+            LOG_ERROR("execl() failed, {}", errno);
+        });
     }
 
     return 0;
