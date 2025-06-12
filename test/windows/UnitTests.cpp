@@ -202,8 +202,6 @@ class UnitTests
     {
         WSL2_TEST_ONLY();
 
-        SKIP_TEST_UNSTABLE(); // TODO: Re-enable when this issue is solved in main.
-
         auto cleanup = wil::scope_exit([] {
             // clean up wsl.conf file
             const std::wstring disableSystemdCmd(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
@@ -218,8 +216,6 @@ class UnitTests
     TEST_METHOD(SystemdUser)
     {
         WSL2_TEST_ONLY();
-
-        SKIP_TEST_UNSTABLE(); // TODO: Re-enable when this issue is solved in main.
 
         // enable systemd before creating the user.
         // if not called first, the runtime directories needed for --user will not have been created

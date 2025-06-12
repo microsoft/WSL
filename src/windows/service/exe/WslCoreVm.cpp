@@ -1307,16 +1307,6 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
     message->DeviceId = lun;
     message->Flags = flags;
-    message->FeatureFlags = Configuration.Flags;
-
-    // Set a flag if the rootfs folder is compressed.
-    //
-    // N.B. The system distro has an empty base path.
-    if (!Configuration.BasePath.empty())
-    {
-        WI_SetFlagIf(message->FeatureFlags, LxInitFeatureRootfsCompressed, WI_IsFlagSet(GetFileAttributesW(Configuration.BasePath.c_str()), FILE_ATTRIBUTE_COMPRESSED));
-    }
-
     message.WriteString(message->FsTypeOffset, "ext4");
     message.WriteString(message->MountOptionsOffset, "discard,errors=remount-ro,data=ordered");
     message.WriteString(message->VmIdOffset, m_machineId);

@@ -64,6 +64,7 @@ public:
         _In_ ULONG DefaultUid,
         _In_ ULONG64 ClientLifetimeId,
         _In_ const std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>& DrvFsCallback,
+        _In_ ULONG FeatureFlags,
         _In_ DWORD SocketTimeout,
         _In_ int IdleTimeout,
         _Out_opt_ ULONG* ConnectPort = nullptr);
@@ -120,6 +121,7 @@ private:
     bool m_initialized = false;
     bool m_adminMountNamespaceCreated = false;
     bool m_nonAdminMountNamespaceCreated = false;
+    ULONG m_featureFlags{};
     GUID m_instanceId{};
     GUID m_runtimeId{};
     LXSS_DISTRO_CONFIGURATION m_configuration{};

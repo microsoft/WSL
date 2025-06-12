@@ -532,6 +532,11 @@ Return Value:
 
     wsl::linux::WslDistributionConfig Config{CONFIG_FILE};
 
+    if (getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr)
+    {
+        Config.GuiAppsEnabled = true;
+    }
+
     //
     // Initialize the static entries.
     //
@@ -666,6 +671,23 @@ try
 
     const std::string ThreadName = std::format("{}({})", (Config.BootInit ? "init-systemd" : "init"), DistributionName);
     UtilSetThreadName(ThreadName.c_str());
+
+    //
+    // Store feature flags for future use.
+    //
+    // N.B. This is also stored in an environment variable so that mount.drvfs, when launched
+    //      through fstab mounting below, can use that. This is needed because mount.drvfs won't
+    //      be able to connect to init during this call. This environment variable is not present
+    //      for user-launched processes.
+    //
+
+    Config.FeatureFlags = Message->FeatureFlags;
+    char FeatureFlagsString[10];
+    snprintf(FeatureFlagsString, sizeof(FeatureFlagsString), "%x", Config.FeatureFlags.value());
+    if (setenv(WSL_FEATURE_FLAGS_ENV, FeatureFlagsString, 1) < 0)
+    {
+        LOG_ERROR("setenv failed {}", errno);
+    }
 
     //
     // Determine the default UID which can be specified in /etc/wsl.conf.

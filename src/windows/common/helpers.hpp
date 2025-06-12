@@ -123,6 +123,7 @@ std::vector<gsl::byte> GenerateConfigurationMessage(
     _In_ ULONG DefaultUid = LX_UID_ROOT,
     _In_ const std::string& Timezone = {},
     _In_ const std::wstring& Plan9SocketPath = {},
+    _In_ ULONG FeatureFlags = 0,
     _In_ LX_INIT_DRVFS_MOUNT DrvfsMount = LxInitDrvfsMountElevated);
 
 std::vector<gsl::byte> GenerateTimezoneUpdateMessage(_In_ std::string_view Timezone);

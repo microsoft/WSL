@@ -2398,25 +2398,6 @@ Return Value:
     }
 
     //
-    // Store feature flags for future use.
-    //
-    // N.B. This is also stored in an environment variable so that mount.drvfs, when launched
-    //      through fstab mounting below, can use that. This is needed because mount.drvfs won't
-    //      be able to connect to init during this call. This environment variable is not present
-    //      for user-launched processes.
-    //
-
-    const auto featureFlags = getenv(WSL_FEATURE_FLAGS_ENV);
-    if (featureFlags == nullptr)
-    {
-        LOG_ERROR("WSL_FEATURE_FLAGS_ENV not set");
-    }
-    else
-    {
-        Config.FeatureFlags = std::stoul(featureFlags, nullptr, 16);
-    }
-
-    //
     // If the boot.systemd option is specified in /etc/wsl.conf, launch the distro init process as pid 1.
     // WSL init and session leaders continue as children of the distro init process.
     //
@@ -2875,7 +2856,6 @@ try
     THROW_LAST_ERROR_IF(UtilMkdirPath(folder, 0755) < 0);
     THROW_LAST_ERROR_IF(symlink("/init", std::format("{}/{}", folder, LX_INIT_WSL_GENERATOR).c_str()));
 
-    LOG_ERROR("Gui apps enabled {}", Config.GuiAppsEnabled)
     if (Config.GuiAppsEnabled)
     {
         constexpr auto folder = "/run/systemd/user-generators";
