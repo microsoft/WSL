@@ -1333,7 +1333,6 @@ try
     if (SessionLeader < 0)
     {
         Result = -1;
-        LOG_ERROR("fork failed for session leader {}", errno);
         goto InitCreateSessionLeaderExit;
     }
 
