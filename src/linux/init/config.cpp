@@ -75,6 +75,8 @@ Abstract:
 
 static void ConfigApplyWindowsLibPath(const wsl::linux::WslDistributionConfig& Config);
 
+static bool CreateLoginSession(const wsl::linux::WslDistributionConfig& Config, const char* Username, uid_t Uid);
+
 class RemoveMountAndEnvironmentOnScopeExit
 {
 public:
@@ -414,81 +416,18 @@ try
             return;
         }
 
+        bool success = false;
+        auto sendResponse = wil::scope_exit([&]() { ResponseChannel.SendResultMessage<bool>(success); });
+
         if (!Config.BootInit || Config.InitPid.value_or(0) != getpid())
         {
             LOG_ERROR("Unexpected LxInitMessageCreateLoginSession message");
-            return;
         }
-
-        static std::mutex LoginSessionsLock;
-        static std::map<uid_t, int> LoginSessions;
-
-        // Keep track of login sessions that have been created.
-        LoginSessionsLock.lock();
-        auto Unlock = wil::scope_exit([&]() { LoginSessionsLock.unlock(); });
-        if (LoginSessions.contains(CreateSession->Uid))
+        else
         {
-            return;
+            success = CreateLoginSession(Config, CreateSession->Buffer, CreateSession->Uid);
         }
 
-        // Symlink the content of the WSLG XDG runtime dir onto the user's runtime path and
-        // create a login session to initialize PAM for the user.
-        if (Config.GuiAppsEnabled)
-        {
-            auto* RuntimeDir = getenv(XDG_RUNTIME_DIR_ENV);
-            if (RuntimeDir)
-            {
-                // Create a tmpfs mount point for the user directory.
-                auto userFolder = std::format("/run/user/{}", CreateSession->Uid);
-                UtilMount("tmpfs", userFolder.c_str(), "tmpfs", (MS_NOSUID | MS_NODEV | MS_NOEXEC), "mode=755");
-
-                // Create the directory structure for wslg's symlinks.
-                for (const auto* e : {"/", "/dbus-1", "/dbus-1/service", "/pulse"})
-                {
-                    auto target = userFolder + e;
-                    UtilMkdir(target.c_str(), 0777);
-                    if (chown(target.c_str(), CreateSession->Uid, CreateSession->Gid) < 0)
-                    {
-                        LOG_ERROR("chown({}, {}, {}) failed {}", target, CreateSession->Uid, CreateSession->Gid, errno);
-                    }
-                }
-
-                // Create the actual symlinks.
-                for (const auto* e : {"wayland-0", "wayland-0.lock", "pulse/native", "pulse/pid"})
-                {
-                    auto link = std::format("{}/{}", userFolder, e);
-                    if (unlink(link.c_str()) < 0 && errno != ENOENT)
-                    {
-                        LOG_ERROR("unlink({}) failed {}", link, errno);
-                    }
-
-                    auto target = RuntimeDir + std::string("/") + e;
-                    if (symlink(target.c_str(), link.c_str()) < 0)
-                    {
-                        LOG_ERROR("symlink({}, {}) failed {}", target, link, errno);
-                    }
-                }
-            }
-            else
-            {
-                LOG_ERROR("getenv({}) failed {}", XDG_RUNTIME_DIR_ENV, errno);
-            }
-        }
-
-        int LoginLeader;
-        const int Result = forkpty(&LoginLeader, nullptr, nullptr, nullptr);
-        if (Result < 0)
-        {
-            LOG_ERROR("forkpty failed {}", errno);
-            return;
-        }
-        else if (Result == 0)
-        {
-            Unlock.reset();
-            _exit(execl("/bin/login", "/bin/login", "-f", CreateSession->Buffer, nullptr));
-        }
-
-        LoginSessions.emplace(CreateSession->Uid, LoginLeader);
         break;
     }
 
@@ -575,6 +514,11 @@ Return Value:
     //
 
     wsl::linux::WslDistributionConfig Config{CONFIG_FILE};
+
+    if (getenv(LX_WSL2_SYSTEM_DISTRO_SHARE_ENV) != nullptr)
+    {
+        Config.GuiAppsEnabled = true;
+    }
 
     //
     // Initialize the static entries.
@@ -2703,3 +2647,96 @@ try
     }
 }
 CATCH_LOG()
+
+bool CreateLoginSession(const wsl::linux::WslDistributionConfig& Config, const char* Username, uid_t Uid)
+/*++
+
+Routine Description:
+
+    Create a systemd login session for the given user.
+
+Arguments:
+
+    Config - Supplies the WSL distribution configuration.
+
+    Username - Supplies session username.
+
+    Uid - Supplies the session UID.
+
+Return Value:
+
+    true on success, false on failure.
+
+--*/
+try
+{
+    static std::mutex LoginSessionsLock;
+    static std::map<uid_t, int> LoginSessions;
+
+    // Keep track of login sessions that have been created.
+    LoginSessionsLock.lock();
+    auto Unlock = wil::scope_exit([&]() { LoginSessionsLock.unlock(); });
+    if (LoginSessions.contains(Uid))
+    {
+        return true;
+    }
+
+    int LoginLeader;
+    const int Result = forkpty(&LoginLeader, nullptr, nullptr, nullptr);
+    if (Result < 0)
+    {
+        LOG_ERROR("forkpty failed {}", errno);
+        return false;
+    }
+    else if (Result == 0)
+    {
+        Unlock.reset();
+        _exit(execl("/bin/login", "/bin/login", "-f", Username, nullptr));
+    }
+
+    LoginSessions.emplace(Uid, LoginLeader);
+
+    //
+    // N.B. Init needs to not ignore SIGCHLD so it can wait for the child process.
+    //
+    signal(SIGCHLD, SIG_DFL);
+    auto restoreDisposition = wil::scope_exit([]() { signal(SIGCHLD, SIG_IGN); });
+
+    if (Config.BootInitTimeout > 0)
+    {
+        auto cmd = std::format("/usr/bin/systemctl is-active user@{}.service", Uid);
+        try
+        {
+            return wsl::shared::retry::RetryWithTimeout<bool>(
+                [&]() {
+                    std::string Output;
+                    auto exitCode = UtilExecCommandLine(cmd.c_str(), &Output, 0, false);
+                    if (exitCode == 0) // is-active returns 0 if the unit is active.
+                    {
+                        return true;
+                    }
+                    else if (Output == "failed\n")
+                    {
+                        LOG_ERROR("{} returned: {}", cmd, Output);
+                        return false;
+                    }
+
+                    THROW_ERRNO(EAGAIN);
+                },
+                std::chrono::milliseconds{250},
+                std::chrono::milliseconds{Config.BootInitTimeout});
+        }
+        catch (...)
+        {
+            LOG_ERROR("Timed out waiting for user session for uid={}", Uid);
+            return false;
+        }
+    }
+
+    return true;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return false;
+}
