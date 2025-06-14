@@ -117,7 +117,7 @@ Return Value:
     LxtCheckErrno(BytesRead = recv(Fd, Buffer, sizeof(Buffer), 0));
     if (BytesRead != 0)
     {
-        LxtLogError("recv should return 0 bytes read, but it retured %d bytes", BytesRead);
+        LxtLogError("recv should return 0 bytes read, but it returned %d bytes", BytesRead);
 
         goto ErrorExit;
     }
@@ -158,7 +158,7 @@ Return Value:
     LxtCheckErrno(BytesRead = recv(Fd, Buffer, 0, 0));
     if (BytesRead != 0)
     {
-        LxtLogError("recv should return 0 bytes read, but it retured %d bytes", BytesRead);
+        LxtLogError("recv should return 0 bytes read, but it returned %d bytes", BytesRead);
 
         goto ErrorExit;
     }

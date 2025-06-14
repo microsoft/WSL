@@ -854,7 +854,7 @@ try
 
     if (WI_IsFlagSet(Config.FeatureFlags.value(), LxInitFeatureRootfsCompressed))
     {
-        LOG_WARNING("{} root file system is compressed, performance may be severly impacted.", DistributionName);
+        LOG_WARNING("{} root file system is compressed, performance may be severely impacted.", DistributionName);
     }
 
     //
@@ -1967,7 +1967,7 @@ try
     // Initialize the mount options.
     //
     // N.B. If the options weren't specified, ConfigDrvFsOptions will be an
-    //      emptry string. Since DrvFs ignores empty mount options, the extra
+    //      empty string. Since DrvFs ignores empty mount options, the extra
     //      comma on the end in that case is not a problem.
     //
 
@@ -2454,7 +2454,7 @@ Arguments:
 
 Return Value:
 
-    The file descriptor represending the mount namespace on soccess, -1 on failure.
+    The file descriptor representing the mount namespace on success, -1 on failure.
 
 --*/
 
@@ -2505,7 +2505,7 @@ try
     // Attempt to open the /etc/default/locale file. If the file does not exist
     // then the $LANG environment variable will not be updated.
     //
-    // N.B. This file is being opened by root. The only user-visable content
+    // N.B. This file is being opened by root. The only user-visible content
     //      will be the contents of the last line of the file that contains
     //      "LANG=".
     //

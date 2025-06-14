@@ -53,7 +53,7 @@ Interface GnsEngine::OpenAdapterImpl(const GUID& id)
         if (adapterId.has_value() && adapterId.value() == id)
         {
             interfaceName = e.path().filename().string();
-            // Special case _wlanxx interfaces: look for the the wlanxx version instead.
+            // Special case _wlanxx interfaces: look for the wlanxx version instead.
             if (interfaceName.compare(0, 5, "_wlan") == 0)
             {
                 continue;

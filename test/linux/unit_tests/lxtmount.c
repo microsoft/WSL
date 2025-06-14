@@ -546,7 +546,7 @@ int MountGetFileSystem(const char* Path, char* FsType, int FsTypeLength, char* O
 
 Description:
 
-    This routine gets the file sytem type of the mount containing the
+    This routine gets the file system type of the mount containing the
     specified path.
 
 Arguments:
@@ -678,7 +678,7 @@ int MountIsFileSystem(const char* Path, const char* FsType)
 
 Description:
 
-    This routine checks the file sytem type of the mount containing the
+    This routine checks the file system type of the mount containing the
     specified path.
 
 Arguments:

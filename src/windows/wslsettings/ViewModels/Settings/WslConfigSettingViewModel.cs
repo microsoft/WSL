@@ -32,7 +32,7 @@ namespace WslSettings.ViewModels.Settings
         {
             if (newValue == null || !regex.IsMatch(newValue))
             {
-                // Notify the property so it can revert back to its' previous value.
+                // Notify the property so it can revert back to its previous value.
                 OnPropertyChanged(propertyName);
                 return false;
             }

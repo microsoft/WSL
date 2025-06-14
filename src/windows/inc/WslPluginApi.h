@@ -67,7 +67,7 @@ struct WSLSessionInformation
 
 struct WSLDistributionInformation
 {
-    GUID Id; // Distribution ID, guaranteed to be the same accross reboots
+    GUID Id; // Distribution ID, guaranteed to be the same across reboots
     LPCWSTR Name;
     uint64_t PidNamespace;
     LPCWSTR PackageFamilyName; // Package family name, or NULL if none
@@ -78,7 +78,7 @@ struct WSLDistributionInformation
 
 struct WslOfflineDistributionInformation
 {
-    GUID Id; // Distribution ID, guaranteed to be the same accross reboots
+    GUID Id; // Distribution ID, guaranteed to be the same across reboots
     LPCWSTR Name;
     LPCWSTR PackageFamilyName; // Package family name, or NULL if none
     LPCWSTR Flavor;            // Type of distribution (ubuntu, debian, ...). Introduced in 2.4.4
@@ -120,7 +120,7 @@ typedef HRESULT (*WSLPluginAPI_OnDistributionStarted)(const struct WSLSessionInf
 // In this case, it's possible for this notification to be called multiple times for the same distribution.
 typedef HRESULT (*WSLPluginAPI_OnDistributionStopping)(const struct WSLSessionInformation* Session, const struct WSLDistributionInformation* Distribution);
 
-// Called when a distribution is registered or unregisteed.
+// Called when a distribution is registered or unregistered.
 // Returning failure will NOT cause the operation to fail.
 typedef HRESULT (*WSLPluginAPI_OnDistributionRegistered)(const struct WSLSessionInformation* Session, const struct WslOfflineDistributionInformation* Distribution);
 
