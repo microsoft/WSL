@@ -5269,6 +5269,46 @@ Error code: Wsl/InstallDistro/E_UNEXPECTED\r\n",
 Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 L"");
         }
+
+        // Validate that url parameters are correctly handled.
+        {
+            constexpr auto tarEndpoint = L"http://127.0.0.1:6667/";
+
+            UniqueWebServer fileServer(tarEndpoint, std::filesystem::path(g_testDistroPath));
+
+            wil::unique_handle tarHandle{CreateFile(g_testDistroPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)};
+            VERIFY_IS_TRUE(!!tarHandle);
+
+            auto manifest = std::format(
+                R"({{
+    "ModernDistributions": {{
+        "test": [
+            {{
+                "Name": "test-url-download",
+                "FriendlyName": "FriendlyName",
+                "Default": true,
+                "Amd64Url": {{
+                    "Url": "{}/distro.tar?foo=bar&key=value",
+                    "Sha256": "{}"
+                }}
+            }}
+        ]
+    }}}})",
+                tarEndpoint,
+                tarHash);
+
+            auto restore = SetManifest(manifest);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { UnregisterDistribution(L"test-url-download"); });
+
+            auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"--install --no-launch test-url-download");
+            VERIFY_ARE_EQUAL(
+                output,
+                L"Downloading: FriendlyName\r\nInstalling: FriendlyName\r\nDistribution successfully installed. It can be "
+                L"launched via 'wsl.exe -d test-url-download'\r\n");
+
+            VERIFY_ARE_EQUAL(error, L"");
+        }
     }
 
     TEST_METHOD(ModernInstallEndToEnd)
