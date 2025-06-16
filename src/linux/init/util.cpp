@@ -682,7 +682,7 @@ Return Value:
         // 2. In sometime we probably will replace most of these string constants
         // with std::string anyway.
         execv(File, const_cast<char* const*>(Argv));
-        LOG_ERROR("{} failed with {}", File, errno);
+        LOG_ERROR("execv({}) failed with {}", File, errno);
         exit(-1);
     }
 

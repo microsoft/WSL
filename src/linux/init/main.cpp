@@ -2618,17 +2618,20 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
     THROW_LAST_ERROR_IF(chdir(ExtractedPath) < 0);
     THROW_LAST_ERROR_IF(chroot(".") < 0);
 
+    Message->ValidDistribution = false;
+
     for (auto* path : {"/etc", "/bin/sh"})
     {
-        if (access(path, F_OK) < 0)
+        if (access(path, F_OK) >= 0)
         {
-            LOG_ERROR("Failed to access {} {}", path, errno);
-            Message->ValidDistribution = false;
-            return;
+            Message->ValidDistribution = true;
         }
     }
 
-    Message->ValidDistribution = true;
+    if (!Message->ValidDistribution)
+    {
+        return;
+    }
 
     auto [flavor, version] = UtilReadFlavorAndVersion("/etc/os-release");
 
@@ -3380,7 +3383,7 @@ try
             const std::string KernelModulesList = wsl::shared::string::FromSpan(Buffer, EarlyConfig->KernelModulesListOffset);
             for (const auto& Module : wsl::shared::string::Split(KernelModulesList, ','))
             {
-                const char* Argv[] = {MODPROBE_PATH, Module.c_str()};
+                const char* Argv[] = {MODPROBE_PATH, Module.c_str(), nullptr};
                 int Status = -1;
                 auto result = UtilCreateProcessAndWait(MODPROBE_PATH, Argv, &Status);
                 if (result < 0)
