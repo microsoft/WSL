@@ -36,6 +36,7 @@ constexpr auto c_ConfigPlan9EnabledOption = "fileServer.enabled";
 constexpr auto c_ConfigAppendGpuLibPathOption = "gpu.appendLibPath";
 constexpr auto c_ConfigGpuEnabledOption = "gpu.enabled";
 constexpr auto c_ConfigLinkOsLibsOption = "automount.ldconfig";
+constexpr auto c_ConfigAutoMountRoot = "automount.root";
 
 struct WslDistributionConfig
 {

@@ -170,6 +170,18 @@ int OverlayFsTestEntry(int Argc, char* Argv[])
     LxtCheckResult(LxtRunVariations(&Args, g_LxtVariations, LXT_COUNT_OF(g_LxtVariations)));
 
 ErrorExit:
+
+    char DeleteCmd[128];
+
+    for (int Index = 0; Index < LXT_COUNT_OF(g_OvFsTestDirs); ++Index)
+    {
+        sprintf(DeleteCmd, "rm -rf %s", g_OvFsTestDirs[Index]);
+        if (system(DeleteCmd) < 0)
+        {
+            LxtLogError("Failed to delete %s", g_OvFsTestDirs[Index]);
+        }
+    }
+
     LxtUninitialize();
     return !LXT_SUCCESS(Result);
 }

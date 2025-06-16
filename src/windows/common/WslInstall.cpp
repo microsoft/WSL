@@ -300,7 +300,7 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
     else
     {
         PrintMessage(Localization::MessageDownloading(distribution.FriendlyName.c_str()), stdout);
-        installPath = DownloadFile(downloadInfo->Url);
+        installPath = DownloadFile(downloadInfo->Url, distribution.Name + L".wsl");
         fileDownloaded = true;
     }
 

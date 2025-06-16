@@ -24,7 +24,7 @@ WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
 
     std::vector<ConfigKey> keys = {
         ConfigKey(c_ConfigAutoMountOption, AutoMount),
-        ConfigKey("automount.root", DrvFsPrefix),
+        ConfigKey(c_ConfigAutoMountRoot, DrvFsPrefix),
         ConfigKey("automount.options", DrvFsOptions),
         ConfigKey(c_ConfigMountFsTabOption, MountFsTab),
         ConfigKey(c_ConfigLinkOsLibsOption, LinkOsLibs),
