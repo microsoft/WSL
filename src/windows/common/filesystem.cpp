@@ -874,15 +874,17 @@ std::filesystem::path wsl::windows::common::filesystem::GetTempFolderPath(_In_ H
     return GetLocalAppDataPath(userToken) / L"temp";
 }
 
-std::string wsl::windows::common::filesystem::GetWindowsHosts()
+std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesystem::path& Path)
 {
-    // Parse the Windows hosts file.
-    std::wstring SystemDirectory;
-    THROW_IF_FAILED(wil::GetSystemDirectoryW(SystemDirectory));
-
-    auto Path = std::filesystem::path(std::move(SystemDirectory)) / L"drivers" / L"etc" / L"hosts";
     std::ifstream Stream(Path.c_str());
     THROW_HR_IF_MSG(E_FAIL, (Stream.bad() || !Stream.is_open()), "errno = %d", errno);
+
+    // Discard any BOM header.
+    int potentialHeader[] = {Stream.get(), Stream.get(), Stream.get()};
+    if (potentialHeader[0] != 0xEF || potentialHeader[1] != 0xBB || potentialHeader[2] != 0xBF)
+    {
+        Stream.seekg(0); // Reset the position to beginning of the file if no BOM header is found.
+    }
 
     std::string WindowsHosts;
     std::string Line;

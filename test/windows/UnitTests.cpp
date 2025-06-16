@@ -202,8 +202,6 @@ class UnitTests
     {
         WSL2_TEST_ONLY();
 
-        SKIP_TEST_UNSTABLE(); // TODO: Re-enable when this issue is solved in main.
-
         auto cleanup = wil::scope_exit([] {
             // clean up wsl.conf file
             const std::wstring disableSystemdCmd(LXSST_REMOVE_DISTRO_CONF_COMMAND_LINE);
@@ -219,8 +217,6 @@ class UnitTests
     {
         WSL2_TEST_ONLY();
 
-        SKIP_TEST_UNSTABLE(); // TODO: Re-enable when this issue is solved in main.
-
         // enable systemd before creating the user.
         // if not called first, the runtime directories needed for --user will not have been created
         auto cleanup = EnableSystemd();
@@ -231,45 +227,79 @@ class UnitTests
         CreateUser(LXSST_TEST_USERNAME, &TestUid, &TestGid);
         auto userCleanup = wil::scope_exit([]() { LxsstuLaunchWsl(L"userdel " LXSST_TEST_USERNAME); });
 
-        // verify that the user service is running
-        const std::wstring isServiceActiveCmd = std::format(L"-u {} systemctl is-active user@{}.service", LXSST_TEST_USERNAME, TestUid);
-        std::wstring out;
-        std::wstring err;
+        auto validateUserSesssion = [&]() {
+            // verify that the user service is running
+            const std::wstring isServiceActiveCmd =
+                std::format(L"-u {} systemctl is-active user@{}.service ; exit 0", LXSST_TEST_USERNAME, TestUid);
+            std::wstring out;
+            std::wstring err;
 
-        try
+            try
+            {
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(isServiceActiveCmd.data());
+            }
+            CATCH_LOG();
+
+            Trim(out);
+
+            if (out.compare(L"active") != 0)
+            {
+                LogError(
+                    "Unexpected output from systemd: %ls. Stderr: %ls, cmd: %ls", out.c_str(), err.c_str(), isServiceActiveCmd.c_str());
+                VERIFY_FAIL();
+            }
+
+            // Verify that /run/user/<uid> is a writable tmpfs mount visible in both mount namespaces.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"touch /run/user/" + std::to_wstring(TestUid) + L"/dummy-test-file"), 0u);
+            auto command = L"mount | grep -iF 'tmpfs on /run/user/" + std::to_wstring(TestUid) + L" type tmpfs (rw'";
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command), 0u);
+
+            const auto nonElevatedToken = GetNonElevatedToken();
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command, nullptr, nullptr, nullptr, nonElevatedToken.get()), 0u);
+        };
+
+        // Validate user sessions state with gui apps disabled.
         {
-            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(isServiceActiveCmd.data());
+            validateUserSesssion();
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
+            VERIFY_ARE_EQUAL(out, L"\n");
         }
-        CATCH_LOG();
 
-        Trim(out);
-
-        if (out.compare(L"active") != 0)
+        // Validate user sessions state with gui apps enabled.
         {
-            LogError("Unexpected output from systemd: %ls. Stderr: %ls, cmd: %ls", out.c_str(), err.c_str(), isServiceActiveCmd.c_str());
-            VERIFY_FAIL();
+            WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
+
+            validateUserSesssion();
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
+            VERIFY_ARE_EQUAL(out, L":0\n");
         }
 
-        // Verify that /run/user/<uid> is a writable tmpfs mount visible in both mount namespaces.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"touch /run/user/" + std::to_wstring(TestUid) + L"/dummy-test-file"), 0u);
-        auto command = L"mount | grep -iF 'tmpfs on /run/user/" + std::to_wstring(TestUid) + L" type tmpfs (rw'";
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command), 0u);
+        // Create a 'broken' /run/user and validate that the warning is correctly displayed.
+        {
+            TerminateDistribution();
 
-        const auto nonElevatedToken = GetNonElevatedToken();
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command, nullptr, nullptr, nullptr, nonElevatedToken.get()), 0u);
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"chmod 000 /run/user"), 0L);
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-u {} echo OK", LXSST_TEST_USERNAME));
+
+            VERIFY_ARE_EQUAL(out, L"OK\n");
+            VERIFY_ARE_EQUAL(
+                err, L"wsl: Failed to start the systemd user session for 'kerneltest'. See journalctl for more details.\n");
+        }
     }
 
     static bool IsSystemdRunning(const std::wstring& SystemdScope, int ExpectedExitCode = 0)
     {
         // run and check the output of systemctl --system
-        const std::wstring systemctlCmd(L"systemctl " + SystemdScope + L" is-system-running");
+        const auto systemctlCmd = std::format(L"systemctl '{}' is-system-running ; exit 0", SystemdScope);
         std::wstring out;
         std::wstring error;
 
         // capture the output of systemctl and trim for good measure
         try
         {
-            std::tie(out, error) = LxsstuLaunchWslAndCaptureOutput(systemctlCmd.data(), ExpectedExitCode);
+            std::tie(out, error) = LxsstuLaunchWslAndCaptureOutput(systemctlCmd.c_str(), ExpectedExitCode);
         }
         CATCH_LOG()
         Trim(out);
@@ -809,7 +839,8 @@ class UnitTests
             VERIFY_ARE_EQUAL(out, L"");
             VERIFY_ARE_EQUAL(
                 err,
-                L"Invalid command line argument: --invalid\nPlease use 'wslinfo --help' to get a list of supported arguments.\n");
+                L"Invalid command line argument: --invalid\nPlease use 'wslinfo --help' to get a list of supported "
+                L"arguments.\n");
         }
     }
 
@@ -1217,7 +1248,8 @@ class UnitTests
 
                 ValidateErrorMessage(
                     L"-d DummyBrokenDistro",
-                    L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path specified. ",
+                    L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
+                    L"specified. ",
                     L"Wsl/Service/CreateInstance/MountDisk/HCS/ERROR_PATH_NOT_FOUND");
 
                 // Purposefully set an incorrect value type to validate registry error handling.
@@ -1230,7 +1262,8 @@ class UnitTests
                 ValidateErrorMessage(
                     L"-d DummyBrokenDistro",
                     L"An error occurred accessing the registry. Path: '\\REGISTRY\\USER\\" + Sid +
-                        L"\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{baa405ef-1822-4bbe-84e2-30e4c6330d42}\\Version'."
+                        L"\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{baa405ef-1822-4bbe-84e2-30e4c6330d42}"
+                        L"\\Version'."
                         L" "
                         L"Error: Data of this type is not supported. ",
                     L"Wsl/Service/ReadDistroConfig/ERROR_UNSUPPORTED_TYPE",
@@ -2234,7 +2267,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Keys that are created by the optional component and the service.
         const std::vector<LPCWSTR> inboxKeys{
             L"SOFTWARE\\Classes\\CLSID\\{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}",
-            L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Desktop\\NameSpace\\{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}",
+            L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Desktop\\NameSpace\\{B2B4A4D1-2754-4140-A2EB-"
+            L"9A76D9D7CDC6}",
             L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\IdListAliasTranslations\\WSL",
             L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\IdListAliasTranslations\\WSLLegacy",
             L"SOFTWARE\\Classes\\Directory\\shell\\WSL",
@@ -2294,7 +2328,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         WSL2_TEST_ONLY();
 
         // Create a 100MB vhd without a filesystem.
-        auto vhdPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>() + L"\\CorruptedTest.vhdx");
+        auto distroPath = std::filesystem::weakly_canonical(wil::GetCurrentDirectoryW<std::wstring>());
+        auto vhdPath = distroPath / L"CorruptedTest.vhdx";
 
         VIRTUAL_STORAGE_TYPE storageType{};
         storageType.DeviceId = VIRTUAL_STORAGE_TYPE_DEVICE_VHDX;
@@ -2331,6 +2366,40 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                 vhdPath.wstring()));
 
         vhd.reset();
+
+        // Create a broken distribution registration
+        {
+            const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
+            const auto distroKey =
+                wsl::windows::common::registry::CreateKey(userKey.get(), L"{baa405ef-1822-4bbe-84e2-30e4c6330d42}");
+
+            auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+                wsl::windows::common::registry::DeleteKey(userKey.get(), L"{baa405ef-1822-4bbe-84e2-30e4c6330d42}");
+            });
+
+            wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"BasePath", distroPath.c_str());
+            wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"VhdFileName", L"CorruptedTest.vhdx");
+            wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"DistributionName", L"BrokenDistro");
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"DefaultUid", 0);
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
+            wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
+
+            // Validate that starting the distribution fails with the correct error code.
+            validateOutput(
+                L"-d BrokenDistro echo ok",
+                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
+                L"Error code: Wsl/Service/CreateInstance/WSL_E_DISK_CORRUPTED\r\n");
+
+            // Validate that trying to export the distribution fails with the correct error code.
+            validateOutput(
+                L"--export BrokenDistro dummy.tar",
+                L"The distribution failed to start because its virtual disk is corrupted.\r\n"
+                L"Error code: Wsl/Service/WSL_E_DISK_CORRUPTED\r\n");
+
+            // Shutdown WSL to force the disk to detach.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--shutdown"), 0L);
+        }
 
         // Import a corrupted vhd.
         validateOutput(
@@ -2463,7 +2532,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
 
             // Validate that the icon is under the distribution folder.
-            VERIFY_IS_TRUE(iconLocation.find(basePath) != std::string::npos);
+            VERIFY_IS_TRUE(iconLocation.find(basePath) == 0);
         }
 
         return std::make_pair(json, profilePath);
@@ -2747,7 +2816,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             VERIFY_ARE_EQUAL(
                 out,
-                L"The supplied install location is already in use.\r\nError code: Wsl/Service/MoveDistro/ERROR_FILE_EXISTS\r\n");
+                L"The supplied install location is already in use.\r\nError code: "
+                L"Wsl/Service/MoveDistro/ERROR_FILE_EXISTS\r\n");
             // Validate that the distribution still starts and that the vhd hasn't moved.
             validateDistro();
             VERIFY_IS_TRUE(std::filesystem::exists(std::format(L"{}\\ext4.vhdx", absolutePath)));
@@ -2802,7 +2872,8 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             WslKeepAlive keepAlive;
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --resize 1500GB", -1);
             VERIFY_ARE_EQUAL(
-                L"The operation could not be completed because the vhdx is currently in use. To force WSL to stop use: wsl.exe "
+                L"The operation could not be completed because the vhdx is currently in use. To force WSL to stop use: "
+                L"wsl.exe "
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
@@ -3365,8 +3436,8 @@ localhostForwarding=true
         }
 
         {
-            // This test verifies removal of a setting from the .wslconfig when a default value for the particular setting is set.
-            // This gives wsl control over the default value.
+            // This test verifies removal of a setting from the .wslconfig when a default value for the particular setting is
+            // set. This gives wsl control over the default value.
             std::wstring customWslConfigContentOut{
                 LR"(
 [wsl2]
@@ -3978,6 +4049,30 @@ VERSION_ID="Invalid|Format"
             CreateTarFromManifest(
                 L"[shortcut]\nicon = /icon.ico\n[oobe]\ndefaultName = test-default-name", L"distro-default-name-icon.tar");
 
+            //
+            // Validate that the distribution icon path is also correct when installing via wsl --import.
+            //
+
+            {
+                constexpr auto distroName = L"TestCustomLocation";
+
+                auto currentDirectory = std::filesystem::absolute(std::filesystem::current_path()).wstring();
+                for (const auto& location : {currentDirectory, std::wstring(L".")})
+                {
+                    auto cleanup = wil::scope_exit_log(
+                        WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(std::format(L"--unregister {}", distroName)); });
+
+                    VERIFY_ARE_EQUAL(
+                        LxsstuLaunchWsl(
+                            std::format(L"--import {} \"{}\" {}", distroName, location, "distro-default-name-icon.tar")),
+                        0L);
+
+                    auto [json, profile_path] = ValidateDistributionTerminalProfile(distroName, false);
+                    VERIFY_ARE_EQUAL(
+                        json["profiles"][1]["icon"].get<std::string>(), (std::filesystem::absolute(".") / "shortcut.ico").string());
+                }
+            }
+
             InstallFromTar(L"distro-default-name-icon.tar");
             ValidateDistributionStarts(L"test-default-name");
 
@@ -4458,7 +4553,8 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
                 std::format(L"--name {}", distroName).c_str(),
                 0,
                 nullptr,
-                L"wsl: Failed to parse terminal profile while registering distribution: [json.exception.parse_error.101] parse "
+                L"wsl: Failed to parse terminal profile while registering distribution: [json.exception.parse_error.101] "
+                L"parse "
                 L"error at line 1, column 1: syntax error while parsing value - invalid literal; last read: 'b'\r\n");
 
             ValidateDistributionStarts(distroName);
@@ -5172,6 +5268,46 @@ Error code: Wsl/InstallDistro/E_UNEXPECTED\r\n",
                 L"Invalid JSON document. Parse error: [json.exception.parse_error.101] parse error at line 1, column 1: syntax error while parsing value - invalid literal; last read: 'B'\r\n\
 Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 L"");
+        }
+
+        // Validate that url parameters are correctly handled.
+        {
+            constexpr auto tarEndpoint = L"http://127.0.0.1:6667/";
+
+            UniqueWebServer fileServer(tarEndpoint, std::filesystem::path(g_testDistroPath));
+
+            wil::unique_handle tarHandle{CreateFile(g_testDistroPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)};
+            VERIFY_IS_TRUE(!!tarHandle);
+
+            auto manifest = std::format(
+                R"({{
+    "ModernDistributions": {{
+        "test": [
+            {{
+                "Name": "test-url-download",
+                "FriendlyName": "FriendlyName",
+                "Default": true,
+                "Amd64Url": {{
+                    "Url": "{}/distro.tar?foo=bar&key=value",
+                    "Sha256": "{}"
+                }}
+            }}
+        ]
+    }}}})",
+                tarEndpoint,
+                tarHash);
+
+            auto restore = SetManifest(manifest);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { UnregisterDistribution(L"test-url-download"); });
+
+            auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"--install --no-launch test-url-download");
+            VERIFY_ARE_EQUAL(
+                output,
+                L"Downloading: FriendlyName\r\nInstalling: FriendlyName\r\nDistribution successfully installed. It can be "
+                L"launched via 'wsl.exe -d test-url-download'\r\n");
+
+            VERIFY_ARE_EQUAL(error, L"");
         }
     }
 
@@ -5934,6 +6070,29 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} echo ok", test_distro));
         VERIFY_ARE_EQUAL(out, L"ok\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(EtcHostsParsing)
+    {
+        constexpr auto inputFileName = L"test-etc-hosts.txt";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { DeleteFile(inputFileName); });
+
+        auto validate = [](const std::string& Input, const std::string& ExpectedOutput) {
+            wil::unique_handle inputFile{CreateFile(inputFileName, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, 0, nullptr)};
+
+            VERIFY_IS_TRUE(WriteFile(inputFile.get(), Input.c_str(), static_cast<DWORD>(Input.size()), nullptr, nullptr));
+
+            auto output = wsl::windows::common::filesystem::GetWindowsHosts(inputFileName);
+
+            VERIFY_ARE_EQUAL(ExpectedOutput, output);
+        };
+
+        validate("127.0.0.1 microsoft.com", "127.0.0.1\tmicrosoft.com\n");
+        validate("\xEF\xBB\xBF 127.0.0.1 microsoft.com", "127.0.0.1\tmicrosoft.com\n"); // Validate that BOM headers are ignored.
+        validate("#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment", "");
+        validate(
+            "#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment\n127.0.0.1 wsl.dev", "127.0.0.1\twsl.dev\n");
     }
 
 }; // namespace UnitTests
