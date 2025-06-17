@@ -793,6 +793,10 @@ Windows 업데이트를 통해 또는 다음을 통해 필요한 업데이트 �
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL을 시작하는 동안 오류가 발생했습니다.</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>'{}'에 대한 시스템 사용자 세션을 시작하지 못했습니다. 자세한 내용은 journalctl을 참조하십시오.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>EventViewer 열기</value>
   </data>

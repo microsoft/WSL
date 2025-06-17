@@ -793,6 +793,10 @@ Windows 版本： {}</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>在 WSL 設定期間發生錯誤</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>無法啟動 『{}』 的系統用戶會話。如需詳細數據，請參閱 journalctl。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>開啟 EventViewer</value>
   </data>

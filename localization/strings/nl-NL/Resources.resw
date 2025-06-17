@@ -787,6 +787,10 @@ Ga naar https://aka.ms/wslinstall voor meer informatie</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Er zijn fouten opgetreden tijdens het opstarten van WSL</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Kan de systeemgebruikerssessie voor {} niet starten. Zie journalctl voor meer informatie.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>EventViewer openen</value>
   </data>

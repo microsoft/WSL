@@ -787,6 +787,10 @@ Bilgi için lütfen şu adresi ziyaret https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL başlatılırken hatalar oluştu</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>'{}' için sistemli kullanıcı oturumu başlatılamadı. Daha fazla ayrıntı için journalctl'ye bakın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>EventViewer'ı aç</value>
   </data>
