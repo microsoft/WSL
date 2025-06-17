@@ -24,7 +24,7 @@ steps:
 - checkout : self
   persistCredentials: true
 
-- task: TouchdownBuildTask@4
+- task: TouchdownBuildTask@5
   displayName: Touchdown Build Localization
   inputs:
     environment: 'PRODEXT'
