@@ -2937,11 +2937,15 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
     CATCH_LOG()
 
     // If the basepath is empty, delete it.
-    if (std::filesystem::is_empty(Configuration.BasePath))
+    try
     {
-        LOG_IF_WIN32_BOOL_FALSE_MSG(
-            RemoveDirectory(Configuration.BasePath.c_str()), "Failed to delete %ls", Configuration.BasePath.c_str());
+        if (std::filesystem::is_empty(Configuration.BasePath))
+        {
+            LOG_IF_WIN32_BOOL_FALSE_MSG(
+                RemoveDirectory(Configuration.BasePath.c_str()), "Failed to delete %ls", Configuration.BasePath.c_str());
+        }
     }
+    CATCH_LOG();
 }
 
 _Requires_exclusive_lock_held_(m_instanceLock)
