@@ -60,7 +60,7 @@
             {
                 "Name": "SUSE-Linux-Enterprise-15-SP6",
                 "FriendlyName": "SUSE Linux Enterprise 15 SP6",
-                "Default": true,
+                "Default": false,
                 "Amd64Url": {
                     "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250618.0/SUSE-Linux-Enterprise-15-SP6-15.6.x86_64-23.23-Build23.23.wsl",
                     "Sha256": "0x8f1101972eab1e503993a183e34851920935988f2d5dd1574e336e470101e0e6"
