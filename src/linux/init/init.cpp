@@ -107,7 +107,7 @@ CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int Messag
 
 int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config);
 
-int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED CreateProcessParsed, pid_t CreateProcessPid, int MessageFd);
+int CreateProcessReplyToServer(PCREATE_PROCESS_PARSED Parsed, pid_t CreateProcessPid, int MessageFd);
 
 void CreateWslSystemdUnits(const wsl::linux::WslDistributionConfig& Config);
 
@@ -2778,7 +2778,6 @@ Return Value:
 --*/
 
 {
-
     //
     // Parse the create process message buffer and create the new child process.
     //
