@@ -181,7 +181,7 @@ Installare con 'wsl.exe {} &lt;Distro&gt;'.
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Esportazione della distribuzione non riuscita.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>Esecuzione dell'aggiornamento una tantum del file system del sottosistema Windows per Linux per questa distribuzione...
 </value>
   </data>
@@ -793,6 +793,10 @@ Per informazioni, visitare https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Si sono verificati errori durante l'avvio di WSL</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Non è stato possibile avviare la sessione utente di sistema per '{}'. Per ulteriori dettagli, vedere journalctl.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>Apri EventViewer</value>
   </data>
@@ -819,7 +823,7 @@ Per informazioni, visitare https://aka.ms/wslinstall</value>
     <value>Le registrazioni di distribuzione legacy non supportano --version argument.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>La distribuzione "{}" è fornita da un manifesto di override.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -929,8 +933,8 @@ Fallback alla rete NAT.</value>
     <value>Il plug-in '{}' richiede una versione più recente di WSL. Eseguire: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
-    <value>L'impostazione .wslconfig '{}' è disabilitata dai criteri del computer.</value>
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
+    <value>L'impostazione .wslconfig '{}' è disabilitata dal criterio del computer.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDebugShellDisabled" xml:space="preserve">
@@ -1218,7 +1222,7 @@ Vedere le istruzioni per il ripristino in: https://aka.ms/wsldiskmountrecovery</
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Specificare un percorso di un disco rigido virtuale che verrà caricato come distribuzione personalizzata del sistema, usato principalmente per l'alimentazione delle app GUI in WSL. [Altre informazioni sulle distribuzioni di sistema sono disponibili qui].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

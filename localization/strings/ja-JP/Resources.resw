@@ -181,7 +181,7 @@ WSL2 でディスクを強制的に停止してデタッチするには、'wsl.e
   <data name="MessageExportFailed" xml:space="preserve">
     <value>ディストリビューションのエクスポートに失敗しました。</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>このディストリビューションの Linux ファイル システム用 Windows サブシステムのワンタイム アップグレードを実行しています...
 </value>
   </data>
@@ -793,6 +793,10 @@ Windows Update または {} 経由で必要な更新プログラムをインス�
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL の起動中にエラーが発生しました</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>'{}' のシステム ユーザー セッションを開始できませんでした。詳細については journalctl を参照してください。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>EventViewer を開く</value>
   </data>
@@ -819,7 +823,7 @@ Windows Update または {} 経由で必要な更新プログラムをインス�
     <value>レガシディストリビューションの登録では、--version 引数はサポートされていません。</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>ディストリビューション "{}" はオーバーライド マニフェストによって提供されます。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -929,7 +933,7 @@ NAT ネットワークにフォールバックしています。</value>
     <value>プラグイン '{}' には、新しいバージョンの WSL が必要です。次を実行してください: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>.wslconfig 設定 '{}' はコンピューター ポリシーによって無効にされています。</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1218,7 +1222,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>カスタム システム ディストリビューションとして読み込む VHD へのパスを指定します。このパスは、主に WSL の GUI アプリを強化するために使用されます。[システム ディストリビューションの詳細については、こちらを参照してください]。</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

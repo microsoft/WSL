@@ -1107,12 +1107,16 @@ std::vector<BYTE> wsl::windows::common::wslutil::HashFile(HANDLE file, DWORD Alg
     std::vector<char> buffer(bufferSize);
 
     DWORD readBytes{};
-    while (ReadFile(file, buffer.data(), bufferSize, &readBytes, nullptr) && readBytes > 0)
+    while (true)
     {
+        THROW_IF_WIN32_BOOL_FALSE(ReadFile(file, buffer.data(), bufferSize, &readBytes, nullptr));
+        if (readBytes == 0)
+        {
+            break;
+        }
+
         THROW_IF_WIN32_BOOL_FALSE(CryptHashData(hash.get(), reinterpret_cast<const BYTE*>(buffer.data()), readBytes, 0));
     }
-
-    THROW_IF_WIN32_ERROR(GetLastError());
 
     std::vector<BYTE> fileHash(32);
     DWORD hashSize = static_cast<DWORD>(fileHash.size());

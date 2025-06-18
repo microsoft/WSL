@@ -181,8 +181,8 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Dağıtım dışarı aktarılamadı.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
-    <value>Bu dağıtım sistemi için Linux için Windows Alt Sistemi dosya sisteminin bir kez yükseltmesi gerçekleştiriliyor...</value>
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
+    <value>Bu dağıtım sistemi için Linux için Windows Alt Sistemi dosya sisteminin bir kez yükseltilemedi...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
     <value>Başka bir örnek yükseltilmeyen olarak çalıştığından başlatılamıyor.  Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
@@ -787,6 +787,10 @@ Bilgi için lütfen şu adresi ziyaret https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL başlatılırken hatalar oluştu</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>'{}' için sistemli kullanıcı oturumu başlatılamadı. Daha fazla ayrıntı için journalctl'ye bakın.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>EventViewer'ı aç</value>
   </data>
@@ -813,7 +817,7 @@ Bilgi için lütfen şu adresi ziyaret https://aka.ms/wslinstall</value>
     <value>Eski dağıtım kayıtları bağımsız değişken --version desteklemez.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>"{}" dağıtımı bir geçersiz kılma bildirimi tarafından sağlandı.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -923,7 +927,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>'{}' eklentisi daha yeni bir WSL sürümü gerektiriyor. Lütfen şu komutu çalıştırın: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>'{}' .wslconfig ayarı bilgisayar ilkesi tarafından devre dışı bırakıldı.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1212,7 +1216,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Öncelikle WSL'deki GUI uygulamalarına güç sağlamak için kullanılan özel bir sistem dağıtımı olarak yüklenecek bir VHD'ye giden yolu belirtin. [Buradan sistem dağıtımları hakkında daha fazla bilgi edinin].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

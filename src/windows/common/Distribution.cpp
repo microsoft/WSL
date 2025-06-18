@@ -285,7 +285,8 @@ void wsl::windows::common::distribution::LegacyInstallViaGithub(const Distributi
 
     wslutil::PrintMessage(Localization::MessageDownloading(distro.FriendlyName.c_str()), stdout);
 
-    const auto downloadPath = wslutil::DownloadFile(*downloadUrl);
+    // Note: The appx extensions is required for the installation to succeed.
+    const auto downloadPath = wslutil::DownloadFile(*downloadUrl, distro.Name + L".appx");
     auto deleteFile =
         wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(downloadPath.c_str())); });
 

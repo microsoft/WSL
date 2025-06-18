@@ -271,6 +271,15 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
     const std::optional<uint64_t>& vhdSize,
     const bool fixedVhd)
 {
+    wsl::windows::common::SvcComm service;
+
+    // Fail early if the distributions name is already in use.
+    auto result = wil::ResultFromException([&]() {
+        service.GetDistributionId(name.has_value() ? name->c_str() : distribution.Name.c_str(), LXSS_GET_DISTRO_ID_LIST_ALL);
+    });
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), SUCCEEDED(result));
+    LOG_HR_IF(result, result != WSL_E_DISTRO_NOT_FOUND);
 
     const auto downloadInfo = wsl::shared::Arm64 ? distribution.Arm64Url : distribution.Amd64Url;
     THROW_HR_IF(E_UNEXPECTED, !downloadInfo.has_value());
@@ -291,7 +300,7 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
     else
     {
         PrintMessage(Localization::MessageDownloading(distribution.FriendlyName.c_str()), stdout);
-        installPath = DownloadFile(downloadInfo->Url);
+        installPath = DownloadFile(downloadInfo->Url, distribution.Name + L".wsl");
         fileDownloaded = true;
     }
 
@@ -304,7 +313,6 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
 
     wsl::windows::common::HandleConsoleProgressBar progressBar(file.get(), Localization::MessageImportProgress());
 
-    wsl::windows::common::SvcComm service;
     auto [id, installedName] = service.RegisterDistribution(
         name.has_value() ? name->c_str() : distribution.Name.c_str(),
         version.value_or(LXSS_WSL_VERSION_DEFAULT),

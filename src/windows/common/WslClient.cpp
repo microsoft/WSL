@@ -323,27 +323,27 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     LPCWSTR name{};
-    LPCWSTR installPath{};
+    std::optional<std::wstring> installPath{};
     std::filesystem::path filePath;
     ULONG flags = LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE;
     DWORD version = LXSS_WSL_VERSION_DEFAULT;
 
     parser.AddPositionalArgument(name, 0);
-    parser.AddPositionalArgument(installPath, 1);
+    parser.AddPositionalArgument(AbsolutePath(installPath), 1);
     parser.AddPositionalArgument(filePath, 2);
     parser.AddArgument(WslVersion(version), WSL_IMPORT_ARG_VERSION);
     parser.AddArgument(SetFlag<ULONG, LXSS_IMPORT_DISTRO_FLAGS_VHD>{flags}, WSL_IMPORT_ARG_VHD);
 
     parser.Parse();
 
-    if (name == nullptr || installPath == nullptr || filePath.empty())
+    if (name == nullptr || !installPath.has_value() || filePath.empty())
     {
         THROW_HR(E_INVALIDARG);
     }
 
     // Ensure that the install path exists.
     bool directoryCreated = true;
-    if (!CreateDirectoryW(installPath, nullptr))
+    if (!CreateDirectoryW(installPath->c_str(), nullptr))
     {
         if (GetLastError() == ERROR_ALREADY_EXISTS)
         {
@@ -355,15 +355,12 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
         }
     }
 
-    auto directory_cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [directoryCreated, installPath]() {
+    auto directory_cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [directoryCreated, &installPath]() {
         if (directoryCreated)
         {
-            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(installPath));
+            LOG_IF_WIN32_BOOL_FALSE(RemoveDirectory(installPath->c_str()));
         }
     });
-
-    // Get the full path to the install location.
-    const auto installFullPath(wsl::windows::common::filesystem::GetFullPath(installPath));
 
     // Determine if the source of the tar file is stdin, or an on-disk file.
     wil::unique_hfile file;
@@ -408,7 +405,7 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     {
         wsl::windows::common::HandleConsoleProgressBar progressBar(fileHandle, Localization::MessageImportProgress());
         wsl::windows::common::SvcComm service;
-        service.RegisterDistribution(name, version, fileHandle, installFullPath.c_str(), flags);
+        service.RegisterDistribution(name, version, fileHandle, installPath->c_str(), flags);
     }
 
     directory_cleanup.release();

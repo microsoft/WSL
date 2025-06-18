@@ -41,7 +41,7 @@ def main(repo_path: str, token: str, committer: str, message: str, branch: str, 
             'title': message,
             'description': 'Automated change',
             'head': branch,
-            'base': 'main'
+            'base': 'master'
         }
 
         response = requests.post(f'https://api.github.com/repos/{REPO}/pulls', headers=headers, data=json.dumps(body), timeout=30)

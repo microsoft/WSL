@@ -181,7 +181,7 @@
   <data name="MessageExportFailed" xml:space="preserve">
     <value>导出分发失败。</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>为此分发实施适用于 Linux 的 Windows 子系统文件系统的一次性升级...
 </value>
   </data>
@@ -793,6 +793,10 @@ Windows: {}</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL 启动期间出错</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>无法启动“{}”的系统用户会话。有关详细信息，请参阅 journalctl。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>打开 EventViewer</value>
   </data>
@@ -819,7 +823,7 @@ Windows: {}</value>
     <value>旧分发注册不支持 --version 参数。</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>分发“{}”由替代清单提供。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -929,7 +933,7 @@ Windows: {}</value>
     <value>插件“{}”需要较新版本的 WSL。请运行： wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>计算机策略已禁用 .wslconfig 设置“{}”。</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1218,7 +1222,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>指定 VHD 的路径，该路径将作为自定义系统发行版加载，主要用于为 WSL 中的 GUI 应用提供电源。[在此处详细了解系统发行]。</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

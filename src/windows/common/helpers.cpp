@@ -92,8 +92,7 @@ public:
     [[nodiscard]] wil::unique_handle Launch(_In_opt_ HANDLE UserToken, _In_ bool HideWindow, _In_ bool CreateNoWindow = false) const
     {
         // If a user token was provided, create an environment block from the token.
-        using unique_environment_block = wil::unique_any<LPVOID, decltype(&DestroyEnvironmentBlock), DestroyEnvironmentBlock>;
-        unique_environment_block environmentBlock{nullptr};
+        wsl::windows::common::helpers::unique_environment_block environmentBlock{nullptr};
         if (ARGUMENT_PRESENT(UserToken))
         {
             THROW_LAST_ERROR_IF(!CreateEnvironmentBlock(&environmentBlock, UserToken, false));
@@ -294,7 +293,13 @@ std::vector<gsl::byte> wsl::windows::common::helpers::GenerateConfigurationMessa
         // N.B. failures generating the hosts string are non-fatal.
         try
         {
-            windowsHosts = filesystem::GetWindowsHosts();
+
+            // Parse the Windows hosts file.
+            std::wstring SystemDirectory;
+            THROW_IF_FAILED(wil::GetSystemDirectoryW(SystemDirectory));
+
+            windowsHosts =
+                filesystem::GetWindowsHosts(std::filesystem::path(std::move(SystemDirectory)) / L"drivers" / L"etc" / L"hosts");
         }
         CATCH_LOG()
     }
@@ -566,6 +571,12 @@ void wsl::windows::common::helpers::LaunchWslSettingsOOBE(_In_ HANDLE UserToken)
     wsl::windows::common::SubProcess process(wslSettingsExePath.c_str(), commandLine);
     process.SetToken(UserToken);
     process.SetShowWindow(SW_SHOW);
+
+    wsl::windows::common::helpers::unique_environment_block environmentBlock{nullptr};
+    THROW_LAST_ERROR_IF(!CreateEnvironmentBlock(&environmentBlock, UserToken, false));
+
+    process.SetEnvironment(environmentBlock.get());
+
     process.Start();
 }
 

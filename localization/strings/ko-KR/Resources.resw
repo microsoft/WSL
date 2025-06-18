@@ -181,7 +181,7 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
   <data name="MessageExportFailed" xml:space="preserve">
     <value>배포를 내보내지 못했습니다.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>이 배포에 대한 Linux용 Windows 하위 시스템 파일 시스템의 일회성 업그레이드를 수행하는 중...
 </value>
   </data>
@@ -793,6 +793,10 @@ Windows 업데이트를 통해 또는 다음을 통해 필요한 업데이트 �
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL을 시작하는 동안 오류가 발생했습니다.</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>'{}'에 대한 시스템 사용자 세션을 시작하지 못했습니다. 자세한 내용은 journalctl을 참조하십시오.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>EventViewer 열기</value>
   </data>
@@ -819,7 +823,7 @@ Windows 업데이트를 통해 또는 다음을 통해 필요한 업데이트 �
     <value>레거시 배포 등록은 --version 인수를 지원하지 않습니다.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>"{}" 배포는 재정의 매니페스트에서 제공합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -929,7 +933,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>플러그 인 '{}'에는 최신 버전의 WSL이 필요합니다. 다음을 실행하세요. wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>컴퓨터 정책에 따라 .wslconfig 설정 '{}'을(를) 사용할 수 없습니다.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1218,7 +1222,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>사용자 지정 시스템 배포판으로 로드되는 VHD의 경로를 지정합니다. 주로 WSL에서 GUI 앱을 제공하는 데 사용됩니다. [] 여기서 시스템 배포판에 대해 자세히 알아보세요.</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

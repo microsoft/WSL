@@ -181,7 +181,7 @@ Telepítés a wsl.exe {} &lt;Distro&gt; használatával.
   <data name="MessageExportFailed" xml:space="preserve">
     <value>A disztribúció exportálása nem sikerült.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>A disztribúció Linuxos Windows-alrendszer fájlrendszerének egyszeri frissítése...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
@@ -787,6 +787,10 @@ További információért látogasson el a https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Hiba történt a WSL indításakor</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Nem sikerült elindítani a(z) „{}” rendszer felhasználói munkamenetét. További részletekért tekintse meg a journalctl dokumentumot.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>Eseménynapló megnyitása</value>
   </data>
@@ -813,7 +817,7 @@ További információért látogasson el a https://aka.ms/wslinstall</value>
     <value>Az örökölt terjesztési regisztrációk nem támogatják a --version argumentumot.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>A(z) {} eloszlást egy felülbírálási jegyzék biztosítja.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -923,7 +927,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>A(z) {} beépülő modulhoz a WSL újabb verziója szükséges. Futtassa a következőt: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>A(z) {} .wslconfig beállítást letiltotta a számítógép-házirend.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1212,7 +1216,7 @@ Helyreállítási utasítások megtekintése a következőn: https://aka.ms/wsld
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Adja meg egy olyan VHD elérési útját, amely egyéni rendszer-disztribúcióként lesz betöltve, amelyet elsősorban a WSL grafikus felhasználói felületi alkalmazásaihoz használnak. [További információ a rendszer disztribúcióiról itt].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

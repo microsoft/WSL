@@ -181,7 +181,7 @@
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Не удалось экспортировать дистрибутив.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>Выполняется одноразовое обновление файловой системы подсистемы Windows для Linux для этого дистрибутива...
 
 </value>
@@ -794,6 +794,10 @@
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Произошли ошибки при запуске WSL</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Не удалось запустить сеанс системного пользователя для "{}". Дополнительные сведения см. в journalctl.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>Открыть EventViewer</value>
   </data>
@@ -820,7 +824,7 @@
     <value>Устаревшие регистрации дистрибутивов не поддерживают аргумент --version .</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>Распределение "{}" предоставляется манифестом переопределения.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -930,7 +934,7 @@
     <value>Подключаемого модуля "{}" требуется более новая версия WSL. Выполните: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>Параметр .wslconfig "{}" отключен политикой компьютера.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1219,7 +1223,7 @@ wsl.exe --manage &lt;имя_дистрибутива&gt; --set-sparse --allow-un
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Укажите путь к виртуальному жесткому диску, который будет загружаться как пользовательский системный дистрибутив, в основном используемый для работы приложений с графическим интерфейсом в WSL. [Подробнее о системных дистрибутивах можно узнать здесь].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

@@ -181,7 +181,7 @@ Nainstalovat pomocí souboru wsl.exe {} &lt;Distro&gt;.
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Export distribuce se nezdařil.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>Probíhá jednorázový upgrade systému souborů Subsystém Windows pro Linux pro tuto distribuci...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
@@ -787,6 +787,10 @@ Informace najdete na https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Při spouštění WSL došlo k chybám</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Nepodařilo se spustit systémovou relaci uživatele pro {}. Další podrobnosti najdete v seznamu deníků.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>Otevřít EventViewer</value>
   </data>
@@ -813,7 +817,7 @@ Informace najdete na https://aka.ms/wslinstall</value>
     <value>Starší registrace distribuce nepodporují argument --version .</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>Distribuce "{}" je poskytována manifestem přepsání.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -923,7 +927,7 @@ Návrat k sítím NAT.</value>
     <value>Modul plug-in {} vyžaduje novější verzi WSL. Spusťte prosím:  wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>Nastavení .wslconfig '{}' je zakázáno zásadami počítače.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1212,7 +1216,7 @@ Zobrazit pokyny pro obnovení: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Určete cestu k virtuálnímu pevnému disku, který se načte jako vlastní distribuce systému a primárně se použije používá k napájení aplikací s grafickým uživatelským rozhraním ve WSL. [Další informace o distribucích systému najdete tady].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>

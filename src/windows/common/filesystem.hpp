@@ -156,7 +156,7 @@ std::filesystem::path GetTempFilename();
 
 std::filesystem::path GetTempFolderPath(_In_ HANDLE userToken);
 
-std::string GetWindowsHosts();
+std::string GetWindowsHosts(const std::filesystem::path& Path);
 
 /// <summary>
 /// Opens a directory handle with read/execute, optionally also write, & full sharing. The path

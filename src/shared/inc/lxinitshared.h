@@ -239,6 +239,8 @@ Abstract:
 
 #define LX_INIT_WSL_GENERATOR "wsl-generator"
 
+#define LX_INIT_WSL_USER_GENERATOR "wsl-user-generator"
+
 //
 // WSL2-specific environment variables.
 //
@@ -681,6 +683,7 @@ typedef struct _LX_INIT_NETWORK_INFORMATION
 typedef struct _LX_INIT_CREATE_LOGIN_SESSION
 {
     static inline auto Type = LxInitMessageCreateLoginSession;
+    using TResponse = RESULT_MESSAGE<bool>;
 
     MESSAGE_HEADER Header;
     unsigned int Uid;

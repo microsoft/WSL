@@ -181,7 +181,7 @@ Installera med wsl.exe {} &lt;Distro&gt;.
   <data name="MessageExportFailed" xml:space="preserve">
     <value>Det gick inte att exportera distributionen.</value>
   </data>
-  <data name="MessageFsUpdgadeNeeded" xml:space="preserve">
+  <data name="MessageFsUpgradeNeeded" xml:space="preserve">
     <value>Utför en engångsuppgradering av Windows-undersystem för Linux-filsystemet för den här distributionen...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
@@ -787,6 +787,10 @@ Mer information finns på https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Fel uppstod vid WSL-start</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Det gick inte att starta systemanvändarsessionen för {}. Mer information finns i journalctl.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>Öppna EventViewer</value>
   </data>
@@ -813,7 +817,7 @@ Mer information finns på https://aka.ms/wslinstall</value>
     <value>Äldre distributionsregistreringar stöder inte argumentet --version .</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageDistributionOverriden" xml:space="preserve">
+  <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>Fördelningen "{}" tillhandahålls av ett åsidosättningsmanifest.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -923,7 +927,7 @@ Mer information finns på https://aka.ms/wslinstall</value>
     <value>Plugin-programmet {} kräver en nyare version av WSL. Kör: wsl.exe --update</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--update"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageSettingOverridenByPolicy" xml:space="preserve">
+  <data name="MessageSettingOverriddenByPolicy" xml:space="preserve">
     <value>.wslconfig-inställningen '{}' har inaktiverats av datorprincipen.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1212,7 +1216,7 @@ Se återställningsinstruktioner på: https://aka.ms/wsldiskmountrecovery</value
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
     <value>Ange en sökväg till en virtuell hårddisk som ska läsas in som en anpassad systemdistro, främst för att driva GUI-appar i WSL. [Läs mer om systemdistros här].</value>
-    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into an hyperlink in code, and the delimiters are removed</comment>
+    <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgsystemdistro</value>
