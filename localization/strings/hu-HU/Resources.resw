@@ -788,7 +788,7 @@ További információért látogasson el a https://aka.ms/wslinstall</value>
     <value>Hiba történt a WSL indításakor</value>
   </data>
   <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
-    <value>Failed to start the systemd user session for '{}'. See journalctl for more details.</value>
+    <value>Nem sikerült elindítani a(z) „{}” rendszer felhasználói munkamenetét. További részletekért tekintse meg a journalctl dokumentumot.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
