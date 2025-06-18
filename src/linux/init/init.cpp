@@ -77,7 +77,6 @@ typedef struct _CREATE_PROCESS_PARSED
     wil::unique_fd EventFd;
     wil::unique_fd StdFd[LX_INIT_STD_FD_COUNT];
     wil::unique_fd ServiceFd;
-    wil::unique_fd TtyFd;
 } CREATE_PROCESS_PARSED, *PCREATE_PROCESS_PARSED;
 
 struct sigaction g_SavedSignalActions[_NSIG];
@@ -100,11 +99,11 @@ constexpr passwd c_defaultPasswordEntry = {
 
 int CaptureCrash(int Argc, char** Argv);
 
-void CreateProcess(PCREATE_PROCESS_PARSED Parsed, const wsl::linux::WslDistributionConfig& Config);
+void CreateProcess(PCREATE_PROCESS_PARSED Parsed, int TtyFd, const wsl::linux::WslDistributionConfig& Config);
 
 void CreateProcessCommon(PCREATE_PROCESS_PARSED_COMMON Common, int TtyFd, int ServiceSocketFd, const wsl::linux::WslDistributionConfig&);
 
-CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd);
+CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, const wsl::linux::WslDistributionConfig& Config);
 
 int CreateProcessParseCommon(PCREATE_PROCESS_PARSED_COMMON Parsed, gsl::span<gsl::byte> Buffer, const wsl::linux::WslDistributionConfig& Config);
 
@@ -140,9 +139,9 @@ void HardenMirroredNetworkingSettingsAgainstSystemd();
 
 void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT>& Message, const char* ExtractedPath);
 
-void SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd);
+void SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, int TtyFd);
 
-void SessionLeaderEntry(int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config);
+void SessionLeaderEntry(int MessageFd, int TtyFd, const wsl::linux::WslDistributionConfig& Config);
 
 void SessionLeaderEntryUtilityVm(wsl::shared::SocketChannel& Channel, const wsl::linux::WslDistributionConfig& Config);
 
@@ -443,7 +442,7 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-void CreateProcess(PCREATE_PROCESS_PARSED Parsed, const wsl::linux::WslDistributionConfig& Config)
+void CreateProcess(PCREATE_PROCESS_PARSED Parsed, int TtyFd, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -479,7 +478,7 @@ Return Value:
         // If a standard file descriptor is not set, use the TTY file descriptor.
         //
 
-        if (dup2(Parsed->StdFd[StdFdIndex] ? Parsed->StdFd[StdFdIndex].get() : Parsed->TtyFd.get(), StdFdIndex) < 0)
+        if (dup2(Parsed->StdFd[StdFdIndex] ? Parsed->StdFd[StdFdIndex].get() : TtyFd, StdFdIndex) < 0)
         {
             FATAL_ERROR("dup2 failed {}", errno);
         }
@@ -501,7 +500,7 @@ Return Value:
     // Launch the process.
     //
 
-    CreateProcessCommon(&Parsed->Common, Parsed->TtyFd.get(), Parsed->ServiceFd.get(), Config);
+    CreateProcessCommon(&Parsed->Common, TtyFd, Parsed->ServiceFd.get(), Config);
     return;
 }
 
@@ -806,7 +805,7 @@ catch (...)
     FATAL_ERROR("Create process failed");
 }
 
-CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config)
+CREATE_PROCESS_PARSED CreateProcessParse(gsl::span<gsl::byte> Buffer, int MessageFd, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -819,8 +818,6 @@ Arguments:
     Buffer - Supplies the create process message.
 
     MessageFd - Supplies a message port file descriptor.
-
-    TtyFd - Supplies an optional Tty file descriptor to inherit from the parent.
 
     Config - Supplies the distribution configuration.
 
@@ -843,7 +840,6 @@ Return Value:
     //
 
     CREATE_PROCESS_PARSED Parsed{};
-    Parsed.TtyFd = std::move(TtyFd);
     int Result = CreateProcessParseCommon(&Parsed.Common, Buffer.subspan(offsetof(LX_INIT_CREATE_PROCESS, Common)), Config);
     THROW_ERRNO_IF(EINVAL, Result < 0);
 
@@ -1186,7 +1182,7 @@ try
 
                 THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
 
-                SessionLeaderEntry(SessionLeaderFd.get(), std::move(TtyFd), Config);
+                SessionLeaderEntry(SessionLeaderFd.get(), TtyFd.get(), Config);
             });
     }
     else
@@ -2757,7 +2753,7 @@ try
 }
 CATCH_LOG();
 
-void SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config)
+void SessionLeaderCreateProcess(gsl::span<gsl::byte> Buffer, int MessageFd, int TtyFd, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -2786,7 +2782,7 @@ Return Value:
     // Parse the create process message buffer and create the new child process.
     //
 
-    CREATE_PROCESS_PARSED Parsed = CreateProcessParse(Buffer, MessageFd, std::move(TtyFd), Config);
+    CREATE_PROCESS_PARSED Parsed = CreateProcessParse(Buffer, MessageFd, Config);
     auto CreateProcessPid = fork();
     THROW_LAST_ERROR_IF(CreateProcessPid < 0);
 
@@ -2854,7 +2850,7 @@ Return Value:
     //      stopping the process (waiting for SIGCONT to continue).
     //
 
-    if (tcsetpgrp(Parsed.TtyFd.get(), getpgid(0)) < 0)
+    if (tcsetpgrp(TtyFd, getpgid(0)) < 0)
     {
         LOG_ERROR("tcsetpgrp failed {}", errno);
     }
@@ -2869,8 +2865,8 @@ Return Value:
     // N.B. CreateProcess does not return.
     //
 
-    CreateProcess(&Parsed, Config);
-    assert(false);
+    CreateProcess(&Parsed, TtyFd, Config);
+    FATAL_ERROR("CreateProcess not expected to return");
 }
 
 void SessionLeaderSigchldHandler(__attribute__((unused)) int Signal, __attribute__((unused)) siginfo_t* SigInfo, __attribute__((unused)) void* UContext)
@@ -2989,7 +2985,7 @@ Return Value:
     return;
 }
 
-void SessionLeaderEntry(int MessageFd, wil::unique_fd&& TtyFd, const wsl::linux::WslDistributionConfig& Config)
+void SessionLeaderEntry(int MessageFd, int TtyFd, const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -3025,7 +3021,7 @@ Return Value:
         FATAL_ERROR("setsid failed {}", errno);
     }
 
-    if (TEMP_FAILURE_RETRY(ioctl(TtyFd.get(), TIOCSCTTY, NULL)) < 0)
+    if (TEMP_FAILURE_RETRY(ioctl(TtyFd, TIOCSCTTY, NULL)) < 0)
     {
         FATAL_ERROR("ioctl failed for TIOCSCTTY {}", errno);
     }
@@ -3064,7 +3060,7 @@ Return Value:
 
         if (Header->MessageType == LxInitMessageCreateProcess)
         {
-            SessionLeaderCreateProcess(Message, MessageFd, std::move(TtyFd), Config);
+            SessionLeaderCreateProcess(Message, MessageFd, TtyFd, Config);
         }
         else
         {
