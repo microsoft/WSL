@@ -940,10 +940,11 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     }
 
     // Move the VHD to the new location.
-    THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED));
+    THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(distro.VhdFilePath.c_str(), newVhdPath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH));
 
     auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING));
+        THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(
+            newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 
         // Write the location back to the original path in case the second registry write failed. Otherwise this is a no-op.
         registration.Write(Property::BasePath, distro.BasePath.c_str());
@@ -2936,11 +2937,15 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
     CATCH_LOG()
 
     // If the basepath is empty, delete it.
-    if (std::filesystem::is_empty(Configuration.BasePath))
+    try
     {
-        LOG_IF_WIN32_BOOL_FALSE_MSG(
-            RemoveDirectory(Configuration.BasePath.c_str()), "Failed to delete %ls", Configuration.BasePath.c_str());
+        if (std::filesystem::is_empty(Configuration.BasePath))
+        {
+            LOG_IF_WIN32_BOOL_FALSE_MSG(
+                RemoveDirectory(Configuration.BasePath.c_str()), "Failed to delete %ls", Configuration.BasePath.c_str());
+        }
     }
+    CATCH_LOG();
 }
 
 _Requires_exclusive_lock_held_(m_instanceLock)

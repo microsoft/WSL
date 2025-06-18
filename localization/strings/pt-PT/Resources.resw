@@ -787,6 +787,10 @@ Para obter informações, visite https://aka.ms/wslinstall</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>Ocorreram erros durante o arranque do WSL</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>Falha ao iniciar a sessão de utilizador do sistema para "{}". Consulte o journalctl para obter mais detalhes.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>Abrir o EventViewer</value>
   </data>

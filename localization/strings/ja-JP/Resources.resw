@@ -793,6 +793,10 @@ Windows Update または {} 経由で必要な更新プログラムをインス�
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL の起動中にエラーが発生しました</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>'{}' のシステム ユーザー セッションを開始できませんでした。詳細については journalctl を参照してください。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>EventViewer を開く</value>
   </data>
