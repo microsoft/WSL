@@ -6,6 +6,7 @@ import sys
 import re
 import os
 import backoff
+import functools
 from git import Repo
 from urllib.parse import urlparse
 
@@ -44,6 +45,12 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
         pr_description, pr_number = get_github_pr_message(github_token, e.message)
         if pr_description is not None:
             issues = issues.union(find_github_issues(pr_description))
+
+        if github_token is not None:
+            issues = filter_github_issues(issues, github_token)
+
+        if len(issues) > 1:
+            print(f'WARNING: found more than 1 github issues in message: {message}. Issues: {issues}', file=sys.stderr)
 
         message = e.message[:-1] if e.message.endswith('\n') else e.message
 
@@ -103,16 +110,35 @@ def get_previous_release(version: tuple) -> str:
     return '.'.join(str(e) for e in max(previous_versions))
 
 def find_github_issues(message: str):
+    # Look for urls first
     urls = [urlparse(e) for e in re.findall(r"https?://[^\s^\)]+", message)]
 
     issue_urls = [e for e in urls if e.hostname == 'github.com' and e.path.lower().startswith('/microsoft/wsl/issues/')]
 
     issues = set(['#' + e.path.split('/')[-1] for e in issue_urls])
 
-    if len(issues) > 1:
-        print(f'WARNING: found more than 1 github issues in message: {message}. Issues: {issues}', file=sys.stderr)
+    # Then add issue numbers
+    for e in re.findall(r"#\d+", message):
+        issues.add(e)
 
     return issues
+
+def filter_github_issues(issues: list, token: str) -> list:
+
+    @functools.cache
+    def is_pr(number: str):
+        headers = {
+                   'Accept': 'application/vnd.github+json',
+                   'Authorization': 'Bearer ' + token,
+                   'X-GitHub-Api-Version': '2022-11-28'
+                  }
+
+        response = requests.get(f'https://api.github.com/repos/microsoft/wsl/issues/{number}', timeout=30, headers=headers)
+        response.raise_for_status()
+
+        return response.json().get('pull_request') is not None
+
+    return [e for e in issues if not is_pr(e.replace('#', ''))]
 
 
 def get_change_list(version: str, previous: str, fetch: bool) -> list:
