@@ -1,0 +1,36 @@
+# Sample user configuration
+
+message(STATUS "Loading user configuration")
+
+# # Uncomment to enable development packages (smaller, faster to install)
+# # Note: system.vhd fails to mount if symlink / hardlink, so COPY is needed.
+# set(WSL_DEV_BINARY_PATH "C:/wsldev")
+# file(MAKE_DIRECTORY ${WSL_DEV_BINARY_PATH})
+# file(CREATE_LINK "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/kernel" "${WSL_DEV_BINARY_PATH}/kernel" SYMBOLIC)
+# file(COPY_FILE "${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd" "${WSL_DEV_BINARY_PATH}/system.vhd" ONLY_IF_DIFFERENT)
+# file(COPY_FILE "${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/modules.vhd" "${WSL_DEV_BINARY_PATH}/modules.vhd" ONLY_IF_DIFFERENT)
+# file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/msrdc.exe" "${WSL_DEV_BINARY_PATH}/msrdc.exe" SYMBOLIC)
+# file(CREATE_LINK "${WSLG_SOURCE_DIR}/wslg.rdp" "${WSL_DEV_BINARY_PATH}/wslg.rdp" SYMBOLIC)
+# file(CREATE_LINK "${WSLG_SOURCE_DIR}/wslg_desktop.rdp" "${WSL_DEV_BINARY_PATH}/wslg_desktop.rdp" SYMBOLIC)
+# file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdclientax.dll" "${WSL_DEV_BINARY_PATH}/rdclientax.dll" SYMBOLIC)
+# file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdpnanoTransport.dll" "${WSL_DEV_BINARY_PATH}/rdpnanoTransport.dll" SYMBOLIC)
+# file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" "${WSL_DEV_BINARY_PATH}/RdpWinStlHelper.dll" SYMBOLIC)
+# file(CREATE_LINK "${MSAL_SOURCE_DIR}/${TARGET_PLATFORM}/msal.wsl.proxy.exe" "${WSL_DEV_BINARY_PATH}/msal.wsl.proxy.exe" SYMBOLIC)
+# file(CREATE_LINK "${BIN}/wsldevicehost.dll" "${WSL_DEV_BINARY_PATH}/wsldevicehost.exe" SYMBOLIC)
+# file(CREATE_LINK "${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}" "${WSL_DEV_BINARY_PATH}/lib" SYMBOLIC)
+
+# foreach(LANG ${SUPPORTED_LANGS})
+#    file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/${LANG}" "${WSL_DEV_BINARY_PATH}/${LANG}" SYMBOLIC)
+# endforeach()
+
+# # Uncomment to skip building, packaging and installing wslsettings
+# set(WSL_BUILD_WSL_SETTINGS false)
+
+# # Uncomment to generate a "thin" MSI package which builds and installs faster
+# set(WSL_BUILD_THIN_PACKAGE true)
+
+# # Uncomment to install the package as part of the build
+# set(WSL_POST_BUILD_COMMAND "powershell;./tools/deploy/deploy-to-host.ps1")
+
+# # Uncomment to reduce the verbosity of the appx package build
+# set(WSL_SILENT_APPX_BUILD true)

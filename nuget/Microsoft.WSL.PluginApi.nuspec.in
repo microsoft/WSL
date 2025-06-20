@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.WSL.PluginApi</id>
+    <version>${WSL_NUGET_PACKAGE_VERSION}</version>
+    <authors>Microsoft</authors>
+    <projectUrl>https://github.com/microsoft/WSL</projectUrl>
+    <description>WSL Plugin Interface</description>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+    <icon>images\icon.png</icon>
+    <readme>docs\README.MD</readme>
+    <tags>WSL</tags>
+    <language>en-us</language>
+    <license type="expression">MIT</license>
+  </metadata>
+  <files>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\inc\WslPluginApi.h" target="build\native\include"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\Images\Square44x44Logo.altform-lightunplated_targetsize-256.png" target="images\icon.png"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\README.WslPluginApi.MD" target="docs\README.MD"/>
+  </files>
+</package>

@@ -1,0 +1,33 @@
+trigger:
+  branches:
+    include:
+    - master
+
+pool:
+    vmImage: 'windows-latest'
+
+steps:
+- checkout : self
+  persistCredentials: true
+
+- task: ComponentGovernanceComponentDetection@0
+  displayName: Component Detection
+
+- task: notice@0
+  displayName: Generate NOTICE file
+  inputs:
+    outputfile: $(System.DefaultWorkingDirectory)/NOTICE.txt
+    outputformat: text
+
+- task: PipAuthenticate@1
+  inputs:
+    artifactFeeds: 'wsl'
+
+- powershell: |
+            pip install --user -r tools/devops/requirements.txt
+            python tools/devops/create-change.py . "$env:token" "WSL notice"  "Notice change from build: $env:buildId" "user/notice/$env:buildId"
+
+  displayName: Create pull request
+  env:
+      token: $(GithubPRToken)
+      buildId: $(Build.BuildId)

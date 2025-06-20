@@ -2,7 +2,7 @@ name: Publish to Winget
 
 on:
   release:
-    types: [published]
+    types: [released]
 
 jobs:
   publish:
@@ -24,7 +24,7 @@ jobs:
           $wingetx64URL = $wingetRelevantAssetx64.browser_download_url
           $wingetARM64URL = $wingetRelevantAssetARM64.browser_download_url
 
-          $wingetPackage = "Microsoft.WSL"
+          $wingetPackageId = "Microsoft.WSL"
 
           & curl.exe -JLO https://aka.ms/wingetcreate/latest
-          & .\wingetcreate.exe update $wingetPackage -s -v $version -u "$wingetx64URL|x64" "$wingetARM64URL|arm64" -t "${{ secrets.WINGET_TOKEN }}"
+          & .\wingetcreate.exe update $wingetPackageId -s -v $version -u "$wingetx64URL|x64" "$wingetARM64URL|arm64" -t "${{ secrets.WINGET_TOKEN }}"

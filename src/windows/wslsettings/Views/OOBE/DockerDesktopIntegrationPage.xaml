@@ -1,0 +1,16 @@
+﻿<Page
+    x:Class="WslSettings.Views.OOBE.DockerDesktopIntegrationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:controls="using:WslSettings.Controls"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <controls:OOBEContent x:Uid="Settings_OOBEDockerDesktopIntegration" HeroImage="ms-appx:///Assets/SettingsOOBEDockerDesktopIntegration.png">
+        <controls:OOBEContent.PageContent>
+            <StackPanel Orientation="Vertical" Spacing="12">
+                <HyperlinkButton x:Uid="Settings_OOBEDockerDesktopIntegrationLink" Style="{StaticResource TextButtonStyle}"/>
+            </StackPanel>
+        </controls:OOBEContent.PageContent>
+    </controls:OOBEContent>
+</Page>

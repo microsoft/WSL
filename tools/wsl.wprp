@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<WindowsPerformanceRecorder Version="1">
+  <Profiles>
+    <EventCollector Id="Collector" Name="Collector">
+      <BufferSize Value="256"/>
+      <Buffers Value="1024"/>
+    </EventCollector>
+
+    <EventProvider Id="lxcore_kernel" Name="0CD1C309-0878-4515-83DB-749843B3F5C9"/>
+    <EventProvider Id="lxcore_user" Name="D90B9468-67F0-5B3B-42CC-82AC81FFD960"/>
+    <EventProvider Id="lxcore_service" Name="B99CDB5A-039C-5046-E672-1A0DE0A40211"/>
+    <EventProvider Id="vm_chipset" Name="de9ba731-7f33-4f44-98c9-6cac856b9f83"/>
+    <EventProvider Id="vmcompute_dll" Name="AF7FD3A7-B248-460C-A9F5-FEC39EF8468C"/>
+    <EventProvider Id="vmcompute" Name="17103E3F-3C6E-4677-BB17-3B267EB5BE57"/>
+    <EventProvider Id="vmmm" Name="6066F867-7CA1-4418-85FD-36E3F9C0600C"/>
+    <EventProvider Id="vmwp" Name="51DDFA29-D5C8-4803-BE4B-2ECB715570FE"/>
+    <EventProvider Id="9p" Name="e13c8d52-b153-571f-78c5-1d4098af2a1e"/>
+    <EventProvider Id="p9rdr" Name="bb1d36f0-e0e0-48cc-9493-fef0e3d0b28c" NonPagedMemory="true" Strict="true"/>
+    <EventProvider Id="mup" Name="20c46239-d059-4214-a11e-7d6769cbe020" />
+    <EventProvider Id="rfsmon" Name="51734B23-5B7E-4892-BA8E-45BC110B735C" />
+    <EventProvider Id="hyperv_storage" Name="c7ad62c6-5c99-5a1b-bbc4-0821ae5b765e" />
+    <EventProvider Id="hns" Name="0c885e0d-6eb6-476c-a048-2457eed3a5c1" />
+    <EventProvider Id="wsl_devicehost" Name="9d6c7b9e-2581-4d8a-b8c5-b90b4a17094a"/>
+    <EventProvider Id="vfpext" Name="9F2660EA-CFE7-428F-9850-AECA612619B0" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.AppDownload" Name="0BBE6221-EF09-4A3F-82EE-BE00DBB6A98A" /> 
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.Datastore" Name="42C60CEA-0FE7-4541-A86B-9E11F95BD9BF" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.PhoneProvisioner" Name="B876B1FC-C7F1-443E-9012-86677F7DE580" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Mobile.Provisioning.PPOEM" Name="7EDBED09-1FF7-4FEE-B8C3-5DB694420830" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.API" Name="82ADD491-01D7-4B85-9EAD-192C3CAACA23" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.CSP" Name="16E12400-A2D8-44B7-9479-004568EC7819" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Engine" Name="A6A847B7-4429-49AA-BBA6-2AD8C191AC8C" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Handlers" Name="0383D92C-2337-4F25-A0B5-A51767F04746" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Migration" Name="A0AF985E-83F9-4E1A-B658-338DCFE27893" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Operations" Name="7F99598F-B2C1-4371-9911-63DEE13B9EB1" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Platform" Name="B1F30020-8BC3-4888-BB1B-4DD681F24209" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Plugin.Engine" Name="55239D60-0EB6-495B-874E-15DE5D5F9A70" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.Plugin.RemovableMedia" Name="B55883E6-6C45-45C2-AB9D-800BB7B66B13" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.ProvTool" Name="2BF4B6BA-556E-4D05-8534-CAFEDF19FED8" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.CommandCsp" Name="00BB69FC-60BC-4502-9438-25608F375CCB" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch" Name="08FACCFA-125D-4ED6-B0B7-B4A1A912E693" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.EMPS.Enrollment" Name="E74EFD1A-B62D-4B83-AB00-66F4A166A2D3" />
+    <EventProvider Id="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment" Name="F9E3B648-9AF1-4DC3-9A8E-BF42C0FBCE9A" />
+
+    <Profile
+      Id="WSL.Verbose.File"
+      Name="WSL"
+      Description="Traces for all WSL components"
+      LoggingMode="File"
+      DetailLevel="Verbose"
+      >
+      <Collectors>
+        <EventCollectorId Value="Collector">
+          <EventProviders>
+            <EventProviderId Value="lxcore_kernel"/>
+            <EventProviderId Value="lxcore_user"/>
+            <EventProviderId Value="lxcore_service"/>
+            <EventProviderId Value="vm_chipset"/>
+            <EventProviderId Value="vmcompute_dll"/>
+            <EventProviderId Value="vmcompute"/>
+            <EventProviderId Value="vmmm"/>
+            <EventProviderId Value="vmwp"/>
+            <EventProviderId Value="9p"/>
+            <EventProviderId Value="p9rdr"/>
+            <EventProviderId Value="mup"/>
+            <EventProviderId Value="rfsmon"/>
+            <EventProviderId Value="hyperv_storage"/>
+            <EventProviderId Value="hns"/>
+            <EventProviderId Value="wsl_devicehost"/>
+            <EventProviderId Value="vfpext"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.AppDownload"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.Datastore"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PhoneProvisioner"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PPOEM"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CSP"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Engine"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Migration"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Platform"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Operations"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.Engine"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.RemovableMedia"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvTool"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Operations"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CommandCsp"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.EMPS.Enrollment"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment"/>
+          </EventProviders>
+        </EventCollectorId>
+      </Collectors>
+    </Profile>
+  </Profiles>
+</WindowsPerformanceRecorder>

@@ -127,6 +127,10 @@ mkdir -p $folder
 $logProfile = "$folder/wsl_networking.wprp"
 $networkingBashScript = "$folder/networking.sh"
 
+# Detect the super user first.
+# Actually it's not definite that the super user is named "root". Instead, a user with uid=0 is what we are looking for. See #11693.
+$superUser = & wsl.exe -- id -nu 0  # user name of the super user.
+
 # Copy/Download supporting files
 if (Test-Path "$PSScriptRoot/wsl_networking.wprp")
 {
@@ -158,7 +162,7 @@ if (Test-Path $wslconfig)
 }
 
 # Collect Linux & Windows network state before the repro
-& wsl.exe -u root -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_before.log
+& wsl.exe -u $superUser -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_before.log
 
 Collect-WindowsNetworkState "before_repro"
 
@@ -202,7 +206,7 @@ netsh wfp capture start file="$folder/wfpdiag.cab"
 $tcpdumpProcess = $null
 try
 {
-    $tcpdumpProcess = Start-Process wsl.exe -ArgumentList "-u root tcpdump -n -i any -e -vvv > $folder/tcpdump.log" -PassThru
+    $tcpdumpProcess = Start-Process wsl.exe -ArgumentList "-u $superUser tcpdump -n -i any -e -vvv > $folder/tcpdump.log" -PassThru
 }
 catch {}
 
@@ -240,7 +244,7 @@ try
           183  # Application 2
 
     $Key = $null
-    while (($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode) -and ($null -eq $tcpdumpProcess -or $tcpdumpProcess.HasExited -eq $false))
+    while ($Key -Eq $null -Or $Key.VirtualKeyCode -Eq $null -Or $KeysToIgnore -Contains $Key.VirtualKeyCode)
     {
         if ([console]::KeyAvailable)
         {
@@ -258,7 +262,7 @@ finally
 {
     try
     {
-        wsl.exe -u root killall tcpdump
+        wsl.exe -u $superUser killall tcpdump
         if ($tcpdumpProcess -ne $null)
         {
             Wait-Process -InputObject $tcpdumpProcess -Timeout 10
@@ -272,7 +276,7 @@ finally
 }
 
 # Collect Linux & Windows network state after the repro
-& wsl.exe -u root -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_after.log
+& wsl.exe -u $superUser -e $networkingBashScript 2>&1 > $folder/linux_network_configuration_after.log
 
 Collect-WindowsNetworkState "after_repro"
 

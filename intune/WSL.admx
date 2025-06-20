@@ -1,0 +1,175 @@
+<policyDefinitions revision="1.0" schemaVersion="1.0">
+  <policyNamespaces>
+    <target prefix="WSL" namespace="Microsoft.WSL" />
+    <using prefix="windows" namespace="Microsoft.Policies.Windows" />
+
+  </policyNamespaces>
+  <resources minRequiredRevision="0.1" fallbackCulture="en-US"/>
+  <categories>
+    <category name="WSL" displayName="$(string.WindowsSubsystemForLinux)"/>
+  </categories>
+  <policies>
+    <policy name="AllowWSL" class="Machine" displayName="$(string.AllowWSL)" explainText="$(string.AllowWSLExplain)" key="Software\Policies\WSL" valueName="AllowWSL">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="AllowInboxWSL" class="Machine" displayName="$(string.AllowInboxWSL)" explainText="$(string.AllowInboxWSLExplain)" key="Software\Policies\WSL" valueName="AllowInboxWSL">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+   <policy name="AllowWSL1" class="Machine" displayName="$(string.AllowWSL1)" explainText="$(string.AllowWSL1Explain)" key="Software\Policies\WSL" valueName="AllowWSL1">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+   <policy name="CustomKernelUserSettingConfigurable" class="Machine" displayName="$(string.CustomKernelUserSettingConfigurable)" explainText="$(string.CustomKernelExplain)" key="Software\Policies\WSL" valueName="AllowKernelUserSetting">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="CustomSystemDistroUserSettingConfigurable" class="Machine" displayName="$(string.CustomSystemDistroUserSettingConfigurable)" explainText="$(string.CustomSystemDistroExplain)" key="Software\Policies\WSL" valueName="AllowSystemDistroUserSetting">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="CustomKernelCommandLineUserSettingConfigurable" class="Machine" displayName="$(string.CustomKernelCommandLineUserSettingConfigurable)" explainText="$(string.CustomKernelCommandLineExplain)" key="Software\Policies\WSL" valueName="AllowKernelCommandLineUserSetting">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="AllowDebugShell" class="Machine" displayName="$(string.AllowDebugShell)" explainText="$(string.AllowDebugShellExplain)" key="Software\Policies\WSL" valueName="AllowDebugShell">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="NestedVirtualizationUserSettingConfigurable" class="Machine" displayName="$(string.NestedVirtualizationUserSettingConfigurable)" explainText="$(string.NestedVirtualizationExplain)" key="Software\Policies\WSL" valueName="AllowNestedVirtualization">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="KernelDebugUserSettingConfigurable" class="Machine" displayName="$(string.KernelDebugUserSettingConfigurable)" explainText="$(string.KernelDebugExplain)" key="Software\Policies\WSL" valueName="AllowKernelDebugUserSetting">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="CustomNetworkingUserSettingConfigurable" class="Machine" displayName="$(string.CustomNetworkingUserSettingConfigurable)" explainText="$(string.CustomNetworkingExplain)" key="Software\Policies\WSL" valueName="AllowNetworkingModeUserSetting">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="FirewallUserSettingConfigurable" class="Machine" displayName="$(string.FirewallUserSettingConfigurable)" explainText="$(string.FirewallExplain)" key="Software\Policies\WSL" valueName="AllowFirewallUserSetting">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="AllowDiskMount" class="Machine" displayName="$(string.AllowDiskMount)" explainText="$(string.AllowDiskMountExplain)" key="Software\Policies\WSL" valueName="AllowDiskMount">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <enabledValue>
+        <decimal value="1" />
+      </enabledValue>
+      <disabledValue>
+        <decimal value="0" />
+      </disabledValue>
+    </policy>
+
+    <policy name="DefaultNetworkingMode" class="Machine" displayName="$(string.DefaultNetworkingMode)" explainText="$(string.DefaultNetworkingModeExplain)" presentation="$(presentation.DefaultNetworkingMode)" key="Software\Policies\WSL" valueName="DefaultNetworkingMode">
+      <parentCategory ref="WSL" />
+      <supportedOn ref="windows:SUPPORTED_Windows10" />
+      <elements>
+        <enum id="DefaultNetworkingMode_Dropdown" valueName="DefaultNetworkingMode">
+          <item displayName="$(string.NetworkingModeNone)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.NetworkingModeNAT)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+          <!-- Bridged networking is intentionally left out because it requires additional configuration -->
+          <item displayName="$(string.NetworkingModeMirrored)">
+            <value>
+              <decimal value="3" />
+            </value>
+          </item>
+          <item displayName="$(string.NetworkingModeVirtioProxy)">
+            <value>
+              <decimal value="4" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+  </policies>
+</policyDefinitions>

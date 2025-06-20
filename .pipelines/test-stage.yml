@@ -1,0 +1,42 @@
+parameters:
+  - name: rs_prerelease_only
+    type: boolean
+    default: false
+
+  - name: pool
+    type: string
+    default: ''
+
+  - name: versions
+    type: object
+    default:
+      - wsl1
+      - wsl2
+
+  - name: test_images
+    type: object
+    default:
+      - name: rs_prerelease
+        image: rs_prerelease-2025-01-30
+      - name: ni_release
+        image: win11-23h2-ent-2024-11-18
+      - name: fe_release
+        image: 2022-datacenter-g2-2024-09-10
+      - name: vb_release
+        image: win10-22h2-ent-g2-2024-09-10
+
+      # TODO: ge_release
+
+stages:
+- stage: test
+  dependsOn: [build]
+  jobs:
+      - ${{ each version in parameters.versions }}:
+        - ${{ each image in parameters.test_images }}:
+          - template: test-job.yml@self
+            parameters:
+              branch: "${{ image.name }}"
+              version: ${{ version }}
+              image: "${{ image.image }}"
+              run: ${{ or(not(parameters.rs_prerelease_only), eq(image.name, 'rs_prerelease')) }}
+              pool: "${{ parameters.pool }}"

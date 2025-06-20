@@ -1,0 +1,120 @@
+parameters:
+- name: publishPackage
+  type: boolean
+  default: false
+
+- name: packageVersion
+  type: string
+  default: ''
+
+- name: bypassTests
+  type: boolean
+  default: false
+
+stages:
+  - stage: flight
+    ${{ if eq(parameters.bypassTests, true) }}:
+        dependsOn: [build]
+    ${{ else }}:
+        dependsOn: [test]
+
+    jobs:
+    - job: flight
+      displayName: 'Package and Flight WSL package'
+
+      dependsOn: [] # The stage handles this dependency
+      pool:
+        type: windows
+      variables:
+        AppId: 9P9TQF7MRM4R
+        FlightId: $(StoreBrokerFlightId)
+        StoreBrokerPath: $(Build.SourcesDirectory)\storebroker # location of StoreBroker information in the repo
+        StoreBrokerPayloadPath: $(Build.ArtifactStagingDirectory)\StoreBrokerPayload # location of package created for flight
+        WSL_PACKAGE_VERSION: $[ dependencies.build.outputs['version.WSL_PACKAGE_VERSION'] ]
+        ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+        ob_artifactBaseName: 'drop_wsl'
+        ob_artifactSuffix: '_flight'
+        ob_sdl_checkcflags_enabled : false # Disable the CFLAGS check since we're not actually building anything in this stage
+
+      steps:
+
+      # Source: https://learn.microsoft.com/azure/devops/pipelines/build/run-retention?view=azure-devops&tabs=powershell
+      - task: PowerShell@2
+        condition: and(succeeded(), not(canceled()))
+        displayName: Retain this build
+        inputs:
+          failOnStderr: true
+          targetType: 'inline'
+          script: |
+            $contentType = "application/json";
+            $headers = @{ Authorization = 'Bearer $(System.AccessToken)' };
+            $rawRequest = @{ daysValid = 365 * 2; definitionId = $(System.DefinitionId); ownerId = 'User:$(Build.RequestedForId)'; protectPipeline = $false; runId = $(Build.BuildId) };
+            $request = ConvertTo-Json @($rawRequest);
+            $uri = "$(System.CollectionUri)$(System.TeamProject)/_apis/build/retention/leases?api-version=6.0-preview.1";
+            Invoke-RestMethod -uri $uri -method POST -Headers $headers -ContentType $contentType -Body $request;
+
+      # Download the build drop
+      - task: DownloadPipelineArtifact@2
+        displayName: Download Bundle artifact
+        inputs:
+          artifact: "drop_wsl_build"
+          path: drop
+
+      # copy the appxupload folder to the storebroker folder
+      - powershell: |
+                    mkdir $(StoreBrokerPath)\appxpackage\
+                    Copy-Item -Path drop\appxupload\* -Destination $(StoreBrokerPath)\appxpackage\ -Recurse -Force
+        displayName: Copy AppxUpload artifact
+
+      # creates a submission package that is published to the store; containers store page information and the WSL appxupload
+      - task: MS-RDX-MRO.windows-store-publish-dev.package-task.store-package@3
+        displayName: 'Creating StoreBroker Payload'
+        inputs:
+          serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
+          sbConfigPath: $(StoreBrokerPath)\sbconfig.json
+          sourceFolder: $(StoreBrokerPath)\appxpackage\
+          contents: Microsoft.WSL_${{ parameters.packageVersion }}.0_x64_ARM64.appxupload
+          pdpPath: $(StoreBrokerPath)\PDPs\
+          pdpInclude: PDP.xml
+          pdpMediaPath: $(StoreBrokerPath)\Media\
+          outSBPackagePath: $(StoreBrokerPayloadPath)
+          outSBName: WindowsSubsystemForLinux
+
+      # copy the storebroker submission package to the drop folder so it can be used if needed
+      - powershell: |
+                    New-Item -ItemType Directory -Force -Path $(ob_outputDirectory)
+                    Copy-Item -Path $(StoreBrokerPayloadPath)\* -Destination $(ob_outputDirectory) -Recurse -Force
+                    Copy-Item -Path SBLog.txt -Destination $(ob_outputDirectory) -Force
+        displayName: Copy StoreBrokerPayload to drop
+
+      # submit the package flight to the WSL SelfHost Flight Group
+      - task: MS-RDX-MRO.windows-store-publish-dev.flight-task.store-flight@3
+        displayName: 'Flight StoreBroker Package to Partner Center - WSL SelfHost Flight Group'
+        condition: and(succeeded(), eq('${{ parameters.publishPackage }}', true))
+        inputs:
+          serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
+          appId: $(AppId)
+          flightId: $(FlightId)
+          inputMethod: JsonAndZip
+          jsonPath: $(StoreBrokerPayloadPath)\WindowsSubsystemForLinux.json
+          zipPath: $(StoreBrokerPayloadPath)\WindowsSubsystemForLinux.zip
+          force: true
+          skipPolling: true # skips polling Partner Centre/store API for the state of the package; skipping will mean that errors in the process will only show up in Partner Center
+          targetPublishMode: Immediate # on completion of this task, the package will be published to the WSL SelfHost flight once ceritified (no manual clicking of any buttons in Partner Center)
+          preserveSubmissionId: false
+          deletePackages: true
+          numberOfPackagesToKeep: 0
+
+      - task: PipAuthenticate@1
+        displayName: 'Pip Authenticate'
+        inputs:
+          artifactFeeds: 'wsl'
+
+      # Create a draft github release
+      - powershell: |
+                pip install --user -r tools/devops/requirements.txt
+                python tools/devops/create-release.py '${{ parameters.packageVersion }}' drop\bundle\Microsoft.WSL_${{ parameters.packageVersion }}.0_x64_ARM64.msixbundle drop\bundle\wsl.${{ parameters.packageVersion }}.0.arm64.msi drop\bundle\wsl.${{ parameters.packageVersion }}.0.x64.msi --no-fetch --github-token "$env:token" ${{ iif(parameters.publishPackage, '--publish', '--use-current-ref') }}
+
+        displayName: Create Github release
+        env:
+            token: $(GITHUB_RELEASE_TOKEN)

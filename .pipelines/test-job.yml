@@ -1,0 +1,49 @@
+parameters:
+  - name: branch
+    type: string
+
+  - name: version
+    type: string
+
+  - name: image
+    type: string
+
+  - name: run
+    type: boolean
+
+  - name: pool
+    type: string
+    default: ''
+
+jobs:
+  - job: test_${{ parameters.branch }}_${{ parameters.version }}
+    displayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
+    dependsOn: []
+    condition: and(succeeded(), eq('${{ parameters.run }}', true))
+    variables:
+        ob_outputDirectory: '$(Build.SourcesDirectory)\out'
+        ob_artifactBaseName: 'drop_wsl'
+        ob_artifactSuffix: '_test'
+    timeoutInMinutes: 360
+    cancelTimeoutInMinutes: 420
+    ${{ if eq(parameters.pool, '') }}:
+      pool: {'type': 'cloudtestagentless'}
+
+    ${{ else }}:
+      pool: ${{ parameters.pool }}
+    steps:
+      - task: CloudTestServerBuildTask@2
+        inputs:
+          DisplayName: "${{ parameters.version }} tests - ${{ parameters.branch }}"
+          connectedServiceName: "CloudTest-PROD"
+          cloudTestTenant: "wsl"
+          testMapLocation: 'testbin\x64\cloudtest\wsl-test-image-${{ parameters.image }}-${{ parameters.version}}\TestMap.xml'
+          pipelineArtifactName: "drop_wsl_build"
+          pipelineArtifactBuildUrl: '$(System.TaskDefinitionsUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)'
+          buildDropArtifactName: ""
+          timeoutInMinutes: 360
+          cancelTimeoutInMinutes: 420
+          TestTimeout: "0.05:00:00"
+          parserProperties: "worker:VsTestVersion=V150;session:HoldTrigger=Failure;VstsTestResultAttachmentUploadBehavior=Always"
+          notificationSubscribers: $(Build.RequestedForEmail)
+          scheduleBuildRequesterAlias: "lowdev"

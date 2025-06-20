@@ -1,0 +1,52 @@
+trigger: none
+
+schedules:
+# "0 8" = 8AM UTC = 12AM PST
+- cron: "0 8 * * *"
+  displayName: Nightly build
+  branches:
+    include: [master]
+  always: true
+
+variables:
+  WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
+  WindowsHostVersion: '1ESWindows2022'
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: OneBranch.Pipelines/GovernedTemplates
+      ref: refs/heads/main
+
+extends:
+  template: v2/Microsoft.NonOfficial.yml@templates
+  parameters:
+    platform:
+      name: "windows_undocked"
+    featureFlags:
+      EnableCDPxPAT: false
+      WindowsHostVersion: 1ESWindows2022
+    globalSdl:
+      credscan:
+        enabled: true
+      perStage:
+        credscan:
+          enabled: true
+      tsa:
+        enabled: false
+    git:
+      fetchDepth: -1
+      fetchTags: true
+
+    stages:
+    - template: build-stage.yml@self
+      parameters:
+        isRelease: false
+        isNightly: true
+        vsoOrg: microsoft
+        vsoProject: Microsoft.WSL
+
+    - template: test-stage.yml@self
+      parameters:
+        rs_prerelease_only: false

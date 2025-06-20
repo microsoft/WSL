@@ -1,0 +1,73 @@
+﻿<Page
+    x:Class="WslSettings.Views.Settings.DeveloperPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctControls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:controls="using:WslSettings.Controls"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <Grid Margin="{ThemeResource ContentPageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock x:Uid="Settings_DeveloperPageTitle" Style="{ThemeResource PageHeaderTextBlockStyle}" Margin="{StaticResource MediumSmallBottomMargin}" HorizontalAlignment="Left"/>
+        <TextBlock x:Uid="Settings_ErrorTryAgainLater" x:Name="Settings_ErrorTryAgainLater" Grid.Row="1" HorizontalAlignment="Left" AutomationProperties.LiveSetting="Assertive"
+            Visibility="{x:Bind ViewModel.ErrorVisibility, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+            Visibility="{x:Bind ViewModel.SettingsContentVisibility, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
+                <ctControls:SettingsCard x:Uid="Settings_DebugConsole">
+                    <ToggleSwitch x:Uid="Settings_DebugConsoleToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnDebugConsole, Mode=TwoWay}"/>
+                </ctControls:SettingsCard>
+                <ctControls:SettingsCard x:Uid="Settings_HWPerfCounters">
+                    <ToggleSwitch x:Uid="Settings_HWPerfCountersToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnHWPerfCounters, Mode=TwoWay}"/>
+                </ctControls:SettingsCard>
+                <ctControls:SettingsExpander x:Uid="Settings_CustomKernelPath">
+                    <TextBlock Style="{StaticResource TextBlockFilePathStyle}" Text="{x:Bind ViewModel.CustomKernelPath, Mode=OneWay}"/>
+                    <ctControls:SettingsExpander.Items>
+                        <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Uid="Settings_CustomKernelPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Text="{x:Bind ViewModel.CustomKernelPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
+                                <Button x:Uid="Settings_CustomKernelPathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Click="CustomKernelPath_Click"/>
+                            </StackPanel>
+                        </ctControls:SettingsCard>
+                    </ctControls:SettingsExpander.Items>
+                </ctControls:SettingsExpander>
+                <ctControls:SettingsExpander x:Uid="Settings_CustomKernelModulesPath">
+                    <TextBlock Style="{StaticResource TextBlockFilePathStyle}" Text="{x:Bind ViewModel.CustomKernelModulesPath, Mode=OneWay}"/>
+                    <ctControls:SettingsExpander.Items>
+                        <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Uid="Settings_CustomKernelModulesPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Text="{x:Bind ViewModel.CustomKernelModulesPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
+                                <Button x:Uid="Settings_CustomKernelModulesPathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Click="CustomKernelModulesPath_Click"/>
+                            </StackPanel>
+                        </ctControls:SettingsCard>
+                    </ctControls:SettingsExpander.Items>
+                </ctControls:SettingsExpander>
+                <ctControls:SettingsExpander x:Uid="Settings_CustomSystemDistroPath">
+                    <ctControls:SettingsExpander.Description>
+                        <controls:HyperlinkTextBlock x:Uid="Settings_CustomSystemDistroPathDescription"/>
+                    </ctControls:SettingsExpander.Description>
+                    <TextBlock Style="{StaticResource TextBlockFilePathStyle}" Text="{x:Bind ViewModel.CustomSystemDistroPath, Mode=OneWay}"/>
+                    <ctControls:SettingsExpander.Items>
+                        <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Uid="Settings_CustomSystemDistroPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Text="{x:Bind ViewModel.CustomSystemDistroPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
+                                <Button x:Uid="Settings_CustomSystemDistroPathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                    Click="CustomSystemDistroPath_Click"/>
+                            </StackPanel>
+                        </ctControls:SettingsCard>
+                    </ctControls:SettingsExpander.Items>
+                </ctControls:SettingsExpander>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -1,0 +1,35 @@
+name: Build documentation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  DeployDocs:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+        contents: read
+        pages: write
+        id-token: write
+    steps:
+      - name: Checkout actions
+        uses: actions/checkout@v4
+
+      - name: Install packages
+        run: pip install mkdocs-mermaid2-plugin mkdocs --break-system-packages
+        shell: bash
+
+      - name: Build documentation
+        run:  mkdocs build -f doc/mkdocs.yml
+        shell: bash
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc/site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

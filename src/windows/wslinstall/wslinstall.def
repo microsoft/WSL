@@ -1,0 +1,15 @@
+LIBRARY wslinstall
+
+EXPORTS
+    CleanExplorerState
+    CleanMsixState
+    DeprovisionMsix
+    WslValidateInstallation
+    InstallMsix
+    InstallMsixAsUser
+    RegisterLspCategories
+    RemoveMsixAsSystem
+    RemoveMsixAsUser
+    RemoveRegistryKeyProtections
+    UnregisterLspCategories
+    CalculateWslSettingsProtocolIds

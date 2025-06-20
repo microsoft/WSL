@@ -1,0 +1,397 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    wslservice.idl
+
+Abstract:
+
+    This file contains the COM object definitions used to talk with the WSL
+    service "WslService"
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+
+// Name of the inbox WSL service.
+cpp_quote("#define LXSS_INBOX_SERVICE_NAME L\"lxssmanager\"")
+
+// Legacy install registry key state key name.
+//
+// N.B. This registry key value is used to determine if a user has a pre-RS3
+//      install. This value should only be used to migrate installs to the new
+//      registration format.
+cpp_quote("#define LXSS_LEGACY_INSTALL_VALUE L\"State\"")
+cpp_quote("#define LXSS_LEGACY_INSTALL_NAME L\"Legacy\"")
+
+// Special GUIDs used to identify the legacy WSL distro and the system distro.
+cpp_quote("const GUID LXSS_LEGACY_DISTRO_GUID = {0x12345678, 0x1234, 0x5678, {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef}};")
+cpp_quote("const GUID WSL2_SYSTEM_DISTRO_GUID = {0x20170608, 0x0542, 0x2019, {0x07, 0x29, 0x00, 0x11, 0x20, 0x12, 0x02, 0x14}};")
+
+typedef enum _LxssDistributionState
+{
+    LxssDistributionStateInvalid = 0,
+    LxssDistributionStateInstalled,
+    LxssDistributionStateRunning,
+    LxssDistributionStateInstalling,
+    LxssDistributionStateUninstalling,
+    LxssDistributionStateConverting,
+    LxssDistributionStateExporting
+} LxssDistributionState;
+
+typedef
+enum _LxssHandleType {
+    LxssHandleConsole = 0,
+    LxssHandleInput,
+    LxssHandleOutput,
+} LxssHandleType;
+
+typedef
+enum _LxssExecutionContextFlags {
+    LxssExecutionContextFlagsNone = 0,
+    LxssExecutionContextFlagsEnableContextualizedErrors = 1,
+    LxssExecutionContextFlagsEnableUserWarnings = 2
+} LxssExecutionContextFlags;
+
+cpp_quote("#define LXSS_HANDLE_USE_CONSOLE 0")
+
+typedef
+struct _LXSS_HANDLE {
+    ULONG Handle;
+    LxssHandleType HandleType;
+} LXSS_HANDLE, *PLXSS_HANDLE;
+
+typedef
+struct _LXSS_STD_HANDLES {
+    LXSS_HANDLE StdIn;
+    LXSS_HANDLE StdOut;
+    LXSS_HANDLE StdErr;
+} LXSS_STD_HANDLES, *PLXSS_STD_HANDLES;
+
+typedef
+struct _LXSS_ENUMERATE_INFO {
+    GUID DistroGuid;
+    LxssDistributionState State;
+    ULONG Version;
+    ULONG Flags;
+    WCHAR DistroName[257];
+} LXSS_ENUMERATE_INFO, *PLXSS_ENUMERATE_INFO;
+
+typedef
+struct _LXSS_ERROR_INFO {
+    ULONG Flags;
+    ULONGLONG Context;
+    [string] LPWSTR Message;
+    [string] LPWSTR Warnings;
+    ULONG WarningsPipe;
+} LXSS_ERROR_INFO, *PLXSS_ERROR_INFO;
+
+cpp_quote("#define LXSS_DISTRO_VERSION_LEGACY 0")
+cpp_quote("#define LXSS_DISTRO_VERSION_1 1")
+cpp_quote("#define LXSS_DISTRO_VERSION_2 2")
+cpp_quote("#define LXSS_DISTRO_VERSION_CURRENT LXSS_DISTRO_VERSION_2")
+cpp_quote("#define LXSS_DISTRO_USES_WSL_FS(DistroVersion) (DistroVersion >= LXSS_DISTRO_VERSION_2)")
+
+cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=x86_64\0LANG=en_US.UTF-8\0PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games\0TERM=xterm-256color\0\"")
+
+cpp_quote("#define LXSS_DISTRO_DEFAULT_KERNEL_COMMAND_LINE \"BOOT_IMAGE=/kernel init=/init\"")
+
+cpp_quote("#define LXSS_DISTRO_FLAGS_ENABLE_INTEROP 0x1")
+cpp_quote("#define LXSS_DISTRO_FLAGS_APPEND_NT_PATH 0x2")
+cpp_quote("#define LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING 0x4")
+cpp_quote("#define LXSS_DISTRO_FLAGS_VM_MODE 0x8")
+cpp_quote("#define LXSS_DISTRO_FLAGS_WSLCORE_MODE 0x10")
+cpp_quote("#define LXSS_DISTRO_FLAGS_UNCHANGED 0xFFFFFFFE") // Not using ~0 since the inbox tests use that value to validate that invalid flags return an error.
+cpp_quote("#define LXSS_DISTRO_FLAGS_ALL (LXSS_DISTRO_FLAGS_ENABLE_INTEROP | LXSS_DISTRO_FLAGS_APPEND_NT_PATH | LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING | LXSS_DISTRO_FLAGS_VM_MODE| LXSS_DISTRO_FLAGS_WSLCORE_MODE)")
+cpp_quote("#define LXSS_DISTRO_FLAGS_DEFAULT (LXSS_DISTRO_FLAGS_ENABLE_INTEROP | LXSS_DISTRO_FLAGS_APPEND_NT_PATH | LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING)")
+
+cpp_quote("#define LXSS_ENUMERATE_FLAGS_DEFAULT 0x1")
+
+cpp_quote("#define LXSS_GET_DISTRO_ID_LIST_ALL 0x1")
+
+cpp_quote("#define LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE 0x1")
+cpp_quote("#define LXSS_CREATE_INSTANCE_FLAGS_OPEN_EXISTING 0x2")
+cpp_quote("#define LXSS_CREATE_INSTANCE_FLAGS_IGNORE_CLIENT 0x4")
+cpp_quote("#define LXSS_CREATE_INSTANCE_FLAGS_USE_SYSTEM_DISTRO 0x8")
+cpp_quote("#define LXSS_CREATE_INSTANCE_FLAGS_SHELL_LOGIN 0x10")
+cpp_quote("#define LXSS_CREATE_INSTANCE_FLAGS_ALL (LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE | LXSS_CREATE_INSTANCE_FLAGS_OPEN_EXISTING | LXSS_CREATE_INSTANCE_FLAGS_IGNORE_CLIENT | LXSS_CREATE_INSTANCE_FLAGS_USE_SYSTEM_DISTRO | LXSS_CREATE_INSTANCE_FLAGS_SHELL_LOGIN)")
+
+cpp_quote("#define LXSS_EXPORT_DISTRO_FLAGS_VHD 0x1")
+cpp_quote("#define LXSS_EXPORT_DISTRO_FLAGS_GZIP 0x2")
+cpp_quote("#define LXSS_EXPORT_DISTRO_FLAGS_XZIP 0x4")
+cpp_quote("#define LXSS_EXPORT_DISTRO_FLAGS_VERBOSE 0x8")
+cpp_quote("#define LXSS_EXPORT_DISTRO_FLAGS_ALL (LXSS_EXPORT_DISTRO_FLAGS_VHD | LXSS_EXPORT_DISTRO_FLAGS_GZIP | LXSS_EXPORT_DISTRO_FLAGS_XZIP | LXSS_EXPORT_DISTRO_FLAGS_VERBOSE)")
+
+cpp_quote("#define LXSS_IMPORT_DISTRO_FLAGS_VHD 0x1")
+cpp_quote("#define LXSS_IMPORT_DISTRO_FLAGS_CREATE_SHORTCUT 0x2")
+cpp_quote("#define LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE 0x4")
+cpp_quote("#define LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD 0x8")
+cpp_quote("#define LXSS_IMPORT_DISTRO_FLAGS_ALL (LXSS_IMPORT_DISTRO_FLAGS_VHD | LXSS_IMPORT_DISTRO_FLAGS_CREATE_SHORTCUT | LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE | LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD)")
+
+cpp_quote("#define LXSS_ATTACH_MOUNT_FLAGS_PASS_THROUGH 0x1")
+cpp_quote("#define LXSS_ATTACH_MOUNT_FLAGS_VHD 0x2")
+
+cpp_quote("#define LXSS_PLAN9_UNIX_SOCKET_A \"fsserver\"")
+cpp_quote("#define LXSS_PLAN9_UNIX_SOCKET L\"fsserver\"")
+
+cpp_quote("#define LXSS_VM_MODE_INITRD_NAME L\"initrd.img\"")
+cpp_quote("#define LXSS_VM_MODE_KERNEL_NAME L\"kernel\"")
+cpp_quote("#define LXSS_VM_MODE_VHD_NAME L\"ext4.vhdx\"")
+
+cpp_quote("#define LXSS_TOOLS_DIRECTORY L\"tools\"")
+
+cpp_quote("#define LXSS_REGISTRY_PATH L\"Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Lxss\"")
+cpp_quote("#define LXSS_DISK_MOUNTS_REGISTRY_PATH LXSS_REGISTRY_PATH L\"\\\\DiskMounts\"")
+cpp_quote("#define LXSS_WSL_DEFAULT_VERSION L\"DefaultVersion\"")
+cpp_quote("#define LXSS_NOTIFICATIONS_KEY L\"Notifications\"")
+cpp_quote("#define LXSS_NOTIFICATION_DRVFS_PERF_DISABLED L\"DrvFsPerfDisabled\"")
+cpp_quote("#define LXSS_WSL_VERSION_DEFAULT 0")
+cpp_quote("#define LXSS_WSL_VERSION_1 1")
+cpp_quote("#define LXSS_WSL_VERSION_2 2")
+
+cpp_quote("#define WSL_DISTRO_NAME L\"DistributionName\"")
+cpp_quote("#define LXSS_OOBE_COMPLETE_NAME L\"OOBEComplete\"")
+
+cpp_quote("const GUID CLSID_LxssUserSession = {0xa9b7a1b9, 0x0671, 0x405c, {0x95, 0xf1, 0xe0, 0x61, 0x2c, 0xb4, 0xce, 0x7e}};")
+cpp_quote("const GUID CLSID_LxssUserSessionInBox = {0x4f476546, 0xb412, 0x4579, {0xb6, 0x4c, 0x12, 0x3d, 0xf3, 0x31, 0xe3, 0xd6}};")
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce7e\") LxssUserSession;")
+cpp_quote("class DECLSPEC_UUID(\"4f476546-b412-4579-b64c-123df331e3d6\") LxssUserSessionInBox;")
+cpp_quote("#endif")
+
+[
+    uuid(38541BDC-F54F-4CEB-85D0-37F0F3D2617E),
+    pointer_default(unique),
+    object
+]
+interface ILxssUserSession : IUnknown
+{
+    //
+    // N.B. This function must be the first one in the interface, so that it can
+    //      be exposed privately to external callers without exposing the remaining
+    //      functions below it.
+    //
+
+    HRESULT CreateInstance(
+        [in, unique] LPCGUID DistroGuid,
+        [in] ULONG Flags,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT RegisterDistribution(
+        [in, unique] LPCWSTR DistributionName,
+        [in] ULONG Version,
+        [in, system_handle(sh_file)] HANDLE FileHandle,
+        [in, system_handle(sh_pipe)] HANDLE StderrHandle,
+        [in, unique] LPCWSTR TargetDirectory,
+        [in] ULONG Flags,
+        [in] ULONG64 VhdSize,
+        [in, unique] LPCWSTR PackageFamilyName,
+        [out] LPWSTR* InstalledDistributionName,
+        [in, out] LXSS_ERROR_INFO* Error,
+        [out, retval] GUID* pDistroGuid
+        );
+
+    HRESULT RegisterDistributionPipe(
+        [in, unique] LPCWSTR DistributionName,
+        [in] ULONG Version,
+        [in, system_handle(sh_pipe)] HANDLE PipeHandle,
+        [in, system_handle(sh_pipe)] HANDLE StderrHandle,
+        [in, unique] LPCWSTR TargetDirectory,
+        [in] ULONG Flags,
+        [in] ULONG64 VhdSize,
+        [in, unique] LPCWSTR PackageFamilyName,
+        [out] LPWSTR* InstalledDistributionName,
+        [in, out] LXSS_ERROR_INFO* Error,
+        [out, retval] GUID* pDistroGuid);
+
+    HRESULT GetDistributionId(
+        [in] LPCWSTR DistributionName,
+        [in] ULONG Flags,
+        [in, out] LXSS_ERROR_INFO* Error,
+        [out, retval] GUID* pDistroGuid);
+
+    HRESULT TerminateDistribution(
+        [in, unique] LPCGUID DistroGuid,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT UnregisterDistribution(
+        [in] LPCGUID DistroGuid,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT ConfigureDistribution(
+        [in, unique] LPCGUID DistroGuid,
+        [in] ULONG DefaultUid,
+        [in] ULONG Flags,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT GetDistributionConfiguration(
+        [in, unique] LPCGUID DistroGuid,
+        [out] LPWSTR* DistributionName,
+        [out] ULONG* Version,
+        [out] ULONG* DefaultUid,
+        [out] ULONG* DefaultEnvironmentCount,
+        [out, size_is(, *DefaultEnvironmentCount)] LPSTR** DefaultEnvironment,
+        [out] ULONG* Flags,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT GetDefaultDistribution(
+        [in, out] LXSS_ERROR_INFO* Error,
+        [out, retval] LPGUID pResultState);
+
+    HRESULT ResizeDistribution(
+        [in] LPCGUID DistroGuid,
+        [in, system_handle(sh_pipe)] HANDLE OutputHandle,
+        [in] ULONG64 NewSize,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT SetDefaultDistribution(
+        [in] LPCGUID DistroGuid,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT SetSparse(
+        [in] LPCGUID DistroGuid,
+        [in] BOOLEAN Sparse,
+        [in] BOOLEAN AllowUnsafe,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT EnumerateDistributions(
+        [out] ULONG *DistributionCount,
+        [out, size_is(, *DistributionCount)] LXSS_ENUMERATE_INFO **Distributions,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT CreateLxProcess(
+        [in, unique] LPCGUID DistroGuid,
+        [in, unique] LPCSTR Filename,
+        [in] ULONG CommandLineCount,
+        [in, unique, size_is(CommandLineCount)] LPCSTR* CommandLine,
+        [in, unique] LPCWSTR CurrentWorkingDirectory,
+        [in, unique] LPCWSTR NtPath,
+        [in, unique, size_is(NtEnvironmentLength)] WCHAR *NtEnvironment,
+        [in] ULONG NtEnvironmentLength,
+        [in, unique] LPCWSTR Username,
+        [in] SHORT Columns,
+        [in] SHORT Rows,
+        [in] ULONG ConsoleHandle,
+        [in] PLXSS_STD_HANDLES StdHandles,
+        [in] ULONG Flags,
+        [out] GUID* DistributionId,
+        [out] GUID* InstanceId,
+        [out, system_handle(sh_file)] HANDLE *ProcessHandle,
+        [out, system_handle(sh_file)] HANDLE *ServerHandle,
+        [out, system_handle(sh_socket)] HANDLE* StandardIn,
+        [out, system_handle(sh_socket)] HANDLE* StandardOut,
+        [out, system_handle(sh_socket)] HANDLE* StandardErr,
+        [out, system_handle(sh_socket)] HANDLE* CommunicationChannel,
+        [out, system_handle(sh_socket)] HANDLE* InteropSocket,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT SetVersion(
+        [in] LPCGUID DistroGuid,
+        [in] ULONG Version,
+        [in, system_handle(sh_pipe)] HANDLE StderrHandle,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT ExportDistribution(
+        [in, unique] LPCGUID DistroGuid,
+        [in, system_handle(sh_file)] HANDLE FileHandle,
+        [in, system_handle(sh_pipe)] HANDLE StderrHandle,
+        [in] ULONG Flags,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT ExportDistributionPipe(
+        [in, unique] LPCGUID DistroGuid,
+        [in, system_handle(sh_pipe)] HANDLE PipeHandle,
+        [in, system_handle(sh_pipe)] HANDLE StderrHandle,
+        [in] ULONG Flags,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT AttachDisk(
+        [in] LPCWSTR Disk,
+        [in] ULONG Flags,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT DetachDisk(
+        [in, unique] LPCWSTR Disk,
+        [out] int* Result,
+        [out] int* Step,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT MountDisk(
+        [in] LPCWSTR Disk,
+        [in] ULONG Flags,
+        [in] ULONG PartitionIndex,
+        [in, unique] LPCWSTR Name,
+        [in, unique] LPCWSTR Type,
+        [in, unique] LPCWSTR Options,
+        [out] int* Result,
+        [out] int* Step,
+        [out] LPWSTR* MountName,
+        [in, out] LXSS_ERROR_INFO* Error);
+
+    HRESULT Shutdown(
+        [in] BOOL Force);
+
+    HRESULT ImportDistributionInplace(
+        [in] LPCWSTR DistributionName,
+        [in] LPCWSTR VhdPath,
+        [in, out] LXSS_ERROR_INFO* Error,
+        [out, retval] GUID* pDistroGuid);
+
+    HRESULT MoveDistribution(
+        [in] LPCGUID DistroGuid,
+        [in] LPCWSTR DistributionName, 
+        [ in, out ] LXSS_ERROR_INFO * Error);
+};
+
+
+cpp_quote("// LXSS specific errors")
+cpp_quote("#define WSL_E_BASE (0x0300)")
+cpp_quote("#define WSL_E_DEFAULT_DISTRO_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 1) /* 0x80040301 */")
+cpp_quote("#define WSL_E_DISTRO_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 2) /* 0x80040302 */")
+cpp_quote("#define WSL_E_WSL1_NOT_SUPPORTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 3) /* 0x80040303 */")
+cpp_quote("#define WSL_E_VM_MODE_NOT_SUPPORTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 4) /* 0x80040304 */")
+cpp_quote("#define WSL_E_TOO_MANY_DISKS_ATTACHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 5) /* 0x80040305 */")
+cpp_quote("#define WSL_E_CONSOLE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 6) /* 0x80040306 */")
+cpp_quote("#define WSL_E_CUSTOM_KERNEL_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 7) /* 0x80040307 */")
+cpp_quote("#define WSL_E_USER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 8) /* 0x80040308 */")
+cpp_quote("#define WSL_E_INVALID_USAGE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 9) /* 0x80040309 */")
+cpp_quote("#define WSL_E_EXPORT_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0xa) /* 0x8004030a */")
+cpp_quote("#define WSL_E_IMPORT_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0xb) /* 0x8004030b */")
+cpp_quote("#define WSL_E_DISTRO_NOT_STOPPED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0xc) /* 0x8004030c */")
+cpp_quote("#define WSL_E_TTY_LIMIT MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0xd) /* 0x8004030d */")
+cpp_quote("#define WSL_E_CUSTOM_SYSTEM_DISTRO_ERROR MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0xe) /* 0x8004030e */")
+cpp_quote("#define WSL_E_LOWER_INTEGRITY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0xf) /* 0x8004030f */")
+cpp_quote("#define WSL_E_HIGHER_INTEGRITY MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x10) /* 0x80040310 */")
+cpp_quote("#define WSL_E_FS_UPGRADE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x11) /* 0x80040311 */")
+cpp_quote("#define WSL_E_USER_VHD_ALREADY_ATTACHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x12) /* 0x80040312 */")
+cpp_quote("#define WSL_E_VM_MODE_INVALID_STATE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x13) /* 0x80040313 */")
+cpp_quote("#define WSL_E_VM_MODE_MOUNT_NAME_ALREADY_EXISTS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x14) /* 0x80040314 */")
+cpp_quote("#define WSL_E_ELEVATION_NEEDED_TO_MOUNT_DISK MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x15) /* 0x80040315 */")
+cpp_quote("#define WSL_E_DISK_ALREADY_ATTACHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x18) /* 0x80040318 */")
+cpp_quote("#define WSL_E_DISK_ALREADY_MOUNTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x19) /* 0x80040319 */")
+cpp_quote("#define WSL_E_DISK_MOUNT_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x1A) /* 0x8004031A */")
+cpp_quote("#define WSL_E_DISK_UNMOUNT_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x1B) /* 0x8004031B */")
+cpp_quote("#define WSL_E_WSL2_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x1C) /* 0x8004031C */")
+cpp_quote("#define WSL_E_VM_MODE_INVALID_MOUNT_NAME MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x1D) /* 0x8004031D */")
+cpp_quote("#define WSL_E_GUI_APPLICATIONS_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x1E) /* 0x8004031E */")
+cpp_quote("#define WSL_E_DISTRO_ONLY_AVAILABLE_FROM_STORE MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x1F) /* 0x8004031F */")
+cpp_quote("#define WSL_E_WSL_MOUNT_NOT_SUPPORTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x20) /* 0x80040320 */")
+cpp_quote("#define WSL_E_WSL_OPTIONAL_COMPONENT_REQUIRED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x21) /* 0x80040321 */")
+cpp_quote("#define WSL_E_VMSWITCH_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x24) /* 0x80040324 */")
+cpp_quote("#define WSL_E_VMSWITCH_NOT_SET MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x25) /* 0x80040325 */")
+cpp_quote("#define WSL_E_NOT_A_LINUX_DISTRO MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x26) /* 0x80040326 */")
+cpp_quote("#define WSL_E_OS_NOT_SUPPORTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x27) /* 0x80040327 */")
+cpp_quote("#define WSL_E_INSTALL_PROCESS_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x28) /* 0x80040328 */")
+cpp_quote("#define WSL_E_INSTALL_COMPONENT_FAILED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x29) /* 0x80040329 */")
+cpp_quote("/* 0x8004032A is in use for WSL_E_PLUGIN_REQUIRES_UPDATE */")
+cpp_quote("#define WSL_E_DISK_MOUNT_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2B) /* 0x8004032B */")
+cpp_quote("#define WSL_E_WSL1_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2C) /* 0x8004032C */")
+cpp_quote("#define WSL_E_VIRTUAL_MACHINE_PLATFORM_REQUIRED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2D) /* 0x8004032D */")
+cpp_quote("#define WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2E) /* 0x8004032E */")
+cpp_quote("#define WSL_E_DISK_CORRUPTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x2F) /* 0x8004032F */")
+cpp_quote("#define WSL_E_DISTRIBUTION_NAME_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x30) /* 0x80040330 */")
+cpp_quote("#define WSL_E_INVALID_JSON MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x31) /* 0x80040331 */")
+cpp_quote("#define WSL_E_VM_CRASHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x32) /* 0x80040332 */")

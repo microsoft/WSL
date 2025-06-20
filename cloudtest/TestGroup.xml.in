@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestJobGroup EnableProcessJobObjectBreakaway="true">
+  <ResourceSpec>
+    <Resource SKU="Standard_D4_v3" Image="${image}"/>
+  </ResourceSpec>
+  <Setup TimeoutMins="30">
+    <BuildFiles>
+      <Copy Src="[drop]\bundle\Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle" Dest="[WorkingDirectory]" IsRecursive="false"/>
+      <Copy Src="[drop]\testbin\${TARGET_PLATFORM}\release\*" Dest="[WorkingDirectory]\" IsRecursive="true" Writable="true"/>
+      <Copy Src="[drop]\testbin\${TARGET_PLATFORM}\test_distro.tar.xz" Dest="[WorkingDirectory]" IsRecursive="false" Writable="true"/>
+      <Copy Src="[drop]\testbin\test-setup.ps1" Dest="[WorkingDirectory]\" IsRecursive="false" />
+      <Copy Src="[drop]\testbin\CloudTest-Setup.bat" Dest="[WorkingDirectory]\" IsRecursive="false" />
+      <Copy Src="[drop]\testbin\wsl.wprp" Dest="[WorkingDirectory]\" IsRecursive="false" />
+      <Copy Src="[drop]\testbin\unit_tests\*" Dest="[WorkingDirectory]\unit_tests" IsRecursive="true" Writable="true"/>
+      <Copy Src="[test_packages]\*" Dest="[WorkingDirectory]" IsRecursive="false" />
+      <Copy Src="[dump_tool]\DumpTool.exe" Dest="[WorkingDirectory]" IsRecursive="false" />
+    </BuildFiles>
+    <Scripts>
+      <Script Path="[WorkingDirectory]\CloudTest-Setup.bat" Args="[WorkingDirectory] [LoggingDirectory]" />
+    </Scripts>
+  </Setup>
+
+  <TestJob Name="CloudTest.Taef" TimeoutMins="240">
+    <Execution Type="TAEF" Path="[WorkingDirectory]\wsltests.dll" Args="/p:bugReportDirectory=[LoggingDirectory]\BugReportOutput /errorOnCrash /testmode:etwlogger /EtwLogger:WPRProfileFile=[WorkingDirectory]\wsl.wprp /EtwLogger:WPRProfile=WSL /EtwLogger:SavePoint=ExecutionComplete /EtwLogger:RecordingScope=Execution /p:SetupScript=.\test-setup.ps1 /p:Package=[WorkingDirectory]\Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle /p:Version=${version} /p:AllowUnsigned=${ALLOW_UNSIGNED_PACKAGE} /p:UnitTestsPath=[WorkingDirectory]\unit_tests /p:DistroPath=[WorkingDirectory]\test_distro.tar.xz /p:DistroName=test_distro /logOutput:High /p:RedirectStdout=[LoggingDirectory]\stdout.txt /p:RedirectStderr=[LoggingDirectory]\stderr.txt  /p:KernelLogs=[LoggingDirectory]\dmesg.txt /p:DumpFolder=[LoggingDirectory] /p:WerReport /p:LogDmesg /p:PipelineBuildId=${PIPELINE_BUILD_ID} /p:DumpTool=DumpTool.exe" />
+  </TestJob>
+</TestJobGroup>

@@ -1,0 +1,53 @@
+trigger:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - 'localization/strings/en-US/Resources.resw'
+
+# Schedule nightly build
+# Cron syntax: "mm HH DD MM DW" = minutes, hours, days, months, day of week (UTC time)
+schedules:
+# "0 8" = 8AM UTC = 12AM PST
+- cron: "0 8 * * *"
+  displayName: Nightly Touchdown Build Schedule
+  branches:
+    include:
+    - "master"
+  always: true
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+- checkout : self
+  persistCredentials: true
+
+- task: TouchdownBuildTask@5
+  displayName: Touchdown Build Localization
+  inputs:
+    environment: 'PRODEXT'
+    teamId: '38646'
+    authType: 'FederatedIdentity'
+    FederatedIdentityServiceConnection: 'Azure-Connection'
+    isPreview: false
+    resourceFilePath: |
+      localization\strings\en-US\Resources.resw;O:localization\strings\
+      storebroker\PDPs\en-us\PDP.xml;O:storebroker\PDPs\
+    localizationTarget: true
+    pseudoSetting: 'Excluded'
+    cultureMappingType: 'None'
+
+- task: PipAuthenticate@1
+  inputs:
+    artifactFeeds: 'wsl'
+
+- powershell: |
+            pip install --user -r tools/devops/requirements.txt
+            python tools/devops/create-change.py . "$env:token" "WSL localization"  "Localization change from build: $env:buildId" "user/localization/$env:buildId"
+
+  displayName: Create pull request
+  env:
+      token: $(GithubPRToken)
+      buildId: $(Build.BuildId)

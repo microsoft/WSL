@@ -1,0 +1,35 @@
+{
+    "version": 1,
+    "$schema": "https://json.schemastore.org/component-detection-manifest.json",
+    "registrations": [
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/microsoft/GSL",
+                    "commitHash": "0f6dbc9e2915ef5c16830f3fa3565738de2a9230"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/llvm/llvm-project",
+                    "commitHash": "d32170dbd5b0d54436537b6b75beaf44324e0c28"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "libarchive",
+                    "version": "3.7.7",
+                    "downloadUrl": "https://github.com/libarchive/libarchive/releases/download/v3.7.7/libarchive-3.7.7.tar.gz",
+                    "hash": "sha1:918692098b11db61aff23684ab04f375e4a68f69"
+                }
+            }
+        }
+    ]
+}

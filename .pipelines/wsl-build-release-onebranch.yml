@@ -1,0 +1,71 @@
+parameters:
+- name: bypassTests
+  displayName: 'Publish release even if tests fail'
+  type: boolean
+  default: false
+
+- name: testVersion
+  displayName: 'Test the release pipeline'
+  type: string
+  default: ''
+
+trigger:
+  tags:
+    include: ['*.*.*']
+
+variables:
+  WindowsContainerImage: "onebranch.azurecr.io/windows/ltsc2022/vse2022:latest"
+  WindowsHostVersion: '1ESWindows2022'
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: OneBranch.Pipelines/GovernedTemplates
+      ref: refs/heads/main
+
+extends:
+  template: v2/Microsoft.Official.yml@templates
+  parameters:
+    platform:
+      name: "windows_undocked"
+    featureFlags:
+      EnableCDPxPAT: false
+      WindowsHostVersion: 1ESWindows2022
+    globalSdl:
+      credscan:
+        enabled: true
+      perStage:
+        credscan:
+          enabled: true
+      tsa:
+        enabled: false
+      evidence:
+        enabled: false
+    git:
+      fetchDepth: -1
+      fetchTags: true
+
+    stages:
+    - template: build-stage.yml@self
+      parameters:
+        isRelease: true
+        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+        traceLoggingConfig: $(ReleaseTraceLoggingConfig)
+        vsoOrg: microsoft
+        vsoProject: Microsoft.WSL
+
+    - template: test-stage.yml@self
+      parameters:
+        rs_prerelease_only: false
+
+    - template: flight-stage.yml@self
+      parameters:
+        publishPackage: ${{ iif(eq(parameters.testVersion, ''), true, false) }}
+        packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+        bypassTests: ${{ parameters.bypassTests }}
+
+    - ${{ if eq(parameters.testVersion, '') }}:
+        - template: nuget-stage.yml@self
+          parameters:
+            isNightly: false

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  (c) 2006 Microsoft Corporation  -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="0.1" schemaVersion="0.1" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>WSL</displayName>
+  <description>Windows Subsystem for Linux</description>
+  <resources>
+    <stringTable>
+        <string id="WindowsSubsystemForLinux">Windows Subsystem For Linux</string>
+
+        <string id="AllowWSL">Allow the Windows Subsystem For Linux</string>
+        <string id="AllowWSLExplain">When set to disabled, this policy disables access to the Windows Subsystem For Linux for all users on the machine.</string>
+
+        <string id="AllowInboxWSL">Allow the Inbox version of the Windows Subsystem For Linux</string>
+        <string id="AllowInboxWSLExplain">When set to disabled, this policy disables the inbox version (optional component) of the Windows Subsystem For Linux. If this policy is disabled, only the store version of WSL can be used.</string>
+
+        <string id="AllowWSL1">Allow WSL1</string>
+        <string id="AllowWSL1Explain">When set to disabled, this policy disables WSL1. When disabled, only WSL2 distributions can be used.</string>
+
+        <string id="CustomKernelUserSettingConfigurable">Allow custom kernel configuration</string>
+        <string id="CustomKernelExplain">When set to disabled, this policy disables custom kernel configuration via .wslconfig (wsl2.kernel). This policy only applies to Store WSL.</string>
+
+        <string id="CustomSystemDistroUserSettingConfigurable">Allow custom system distribution configuration</string>
+        <string id="CustomSystemDistroExplain">When set to disabled, this policy disables custom system distribution configuration via .wslconfig (wsl2.systemDistro). This policy only applies to Store WSL.</string>
+
+        <string id="CustomKernelCommandLineUserSettingConfigurable">Allow kernel command line configuration</string>
+        <string id="CustomKernelCommandLineExplain">When set to disabled, this policy disables kernel command line configuration via .wslconfig (wsl2.kernelCommandLine). This policy only applies to Store WSL.</string>
+
+        <string id="AllowDebugShell">Allow the debug shell</string>
+        <string id="AllowDebugShellExplain">When set to disabled, this policy disables the debug shell (wsl.exe --debug-shell). This policy only applies to Store WSL.</string>
+
+        <string id="NestedVirtualizationUserSettingConfigurable">Allow nested virtualization</string>
+        <string id="NestedVirtualizationExplain">When set to disabled, this policy disables nested virtualization configuration via .wslconfig (wsl2.nestedVirtualization). This policy only applies to Store WSL.</string>
+
+        <string id="KernelDebugUserSettingConfigurable">Allow kernel debugging</string>
+        <string id="KernelDebugExplain">When set to disabled, this policy disables kernel kernel debugging configuration via .wslconfig (wsl2.kernelDebugPort). This policy only applies to Store WSL.</string>
+
+        <string id="CustomNetworkingUserSettingConfigurable">Allow custom networking configuration</string>
+        <string id="CustomNetworkingExplain">When set to disabled, this policy disables custom networking configuration via .wslconfig (wsl2.networkingmode). This policy only applies to Store WSL.</string>
+
+        <string id="FirewallUserSettingConfigurable">Allow user setting firewall configuration</string>
+        <string id="FirewallExplain">When set to disabled, this policy disables firewall configuration via .wslconfig (wsl2.firewall). This policy only applies to Store WSL.</string>
+
+        <string id="AllowDiskMount">Allow passthrough disk mount</string>
+        <string id="AllowDiskMountExplain">When set to disabled, this policy disables passthrough disk mounting in WSL2 (wsl.exe --mount). This policy only applies to Store WSL.</string>
+
+        <string id="DefaultNetworkingMode">Configure default networking mode</string>
+        <string id="DefaultNetworkingModeExplain">This policy specifies the default networking mode to be used for WSL2.</string>
+        <string id="NetworkingModeNone">None</string>
+        <string id="NetworkingModeNAT">NAT</string>
+        <string id="NetworkingModeMirrored">Mirrored</string>
+        <string id="NetworkingModeVirtioProxy">VirtioProxy</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="DefaultNetworkingMode">
+        <dropdownList refId="DefaultNetworkingMode_Dropdown" noSort="true" defaultItem="1">Default Networking Mode</dropdownList>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

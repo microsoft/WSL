@@ -1,0 +1,11 @@
+<Project>
+   <PropertyGroup>
+      <UseMultiToolTask>true</UseMultiToolTask>
+      <EnforceProcessCountAcrossBuilds>true</EnforceProcessCountAcrossBuilds>
+   </PropertyGroup>
+   <ItemDefinitionGroup>
+      <CustomBuild>
+         <BuildInParallel>true</BuildInParallel>
+      </CustomBuild>
+   </ItemDefinitionGroup>
+</Project>

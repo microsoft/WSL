@@ -1,0 +1,169 @@
+﻿<Page
+    x:Class="WslSettings.Views.Settings.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:animations="using:CommunityToolkit.WinUI.Animations"
+    xmlns:helpers="using:WslSettings.Helpers"
+    xmlns:behaviors="using:WslSettings.Behaviors"
+    xmlns:i="using:Microsoft.Xaml.Interactivity"
+    Loaded="OnLoaded">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Button
+            x:Name="PaneToggleBtn"
+            Width="48"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Center"
+            Click="PaneToggleBtn_Click"
+            Style="{StaticResource PaneToggleButtonStyle}" />
+        <Grid Grid.Row="0"
+              x:Name="AppTitleBar"
+              Margin="16,0"
+              Canvas.ZIndex="1"
+              Height="{Binding ElementName=NavigationViewControl, Path=CompactPaneLength}"
+              IsHitTestVisible="True"
+              VerticalAlignment="Top"
+              HorizontalAlignment="Stretch">
+            <animations:Implicit.Animations>
+                <animations:OffsetAnimation Duration="0:0:0.3" />
+            </animations:Implicit.Animations>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Image Grid.Column="0"
+                   Source="/Assets/wsl.ico"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Left"
+                   Width="16"
+                   Height="16" />
+            <TextBlock Grid.Column="1"
+                       x:Name="AppTitleBarText"
+                       VerticalAlignment="Center"
+                       TextWrapping="NoWrap"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Margin="16,0,0,0"/>
+        </Grid>
+        <NavigationView
+            x:Name="NavigationViewControl"
+            Grid.Row="1"
+            Canvas.ZIndex="0"
+            CompactModeThresholdWidth="1007"
+            DisplayModeChanged="NavigationViewControl_DisplayModeChanged"
+            ExpandedModeThresholdWidth="1007"
+            Header="{x:Bind ((ContentControl)ViewModel.Selected).Content, Mode=OneWay}"
+            IsBackButtonVisible="Collapsed"
+            IsBackEnabled="{x:Bind ViewModel.IsBackEnabled, Mode=OneWay}"
+            IsPaneToggleButtonVisible="False"
+            IsSettingsVisible="False"
+            ItemInvoked="NavigationViewControl_ItemInvoked"
+            SelectedItem="{x:Bind ViewModel.Selected, Mode=OneWay}">
+            <NavigationView.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="{StaticResource NavigationViewExpandedPaneBackground}" />
+                            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="{StaticResource NavigationViewExpandedPaneBackground}" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="{StaticResource NavigationViewExpandedPaneBackground}" />
+                            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="{StaticResource NavigationViewExpandedPaneBackground}" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="HighContrast">
+                            <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                            <SolidColorBrush x:Key="NavigationViewContentBackground" Color="{ThemeResource SystemColorWindowColor}" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+            </NavigationView.Resources>
+            <NavigationView.MenuItems>
+                <!--
+                TODO: Update item titles by updating <x:Uid>.Content entries in Strings/en-us/Resources.resw.
+                https://docs.microsoft.com/windows/uwp/app-resources/localize-strings-ui-manifest#refer-to-a-string-resource-identifier-from-xaml
+            
+                TODO: Update item icons by updating FontIcon.Glyph properties.
+                https://docs.microsoft.com/windows/apps/design/style/segoe-fluent-icons-font#icon-list
+                -->
+                <NavigationViewItem x:Uid="Settings_Shell_MemAndProc" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.Settings.MemAndProcViewModel">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xe950;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Uid="Settings_Shell_FileSystem" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.Settings.FileSystemViewModel">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xf12b;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Uid="Settings_Shell_Networking" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.Settings.NetworkingViewModel">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xe88a;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Uid="Settings_Shell_OptionalFeatures" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.Settings.OptionalFeaturesViewModel">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xe713;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Uid="Settings_Shell_Developer" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.Settings.DeveloperViewModel">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xe943;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <!--
+                TODO: Update item titles by updating <x:Uid>.Content entries in Strings/en-us/Resources.resw.
+                https://docs.microsoft.com/windows/uwp/app-resources/localize-strings-ui-manifest#refer-to-a-string-resource-identifier-from-xaml
+            
+                TODO: Update item icons by updating FontIcon.Glyph properties.
+                https://docs.microsoft.com/windows/apps/design/style/segoe-fluent-icons-font#icon-list
+                -->
+                <NavigationViewItem x:Uid="Settings_Shell_LaunchWSL" Tag="LaunchWSL" SelectsOnInvoked="False">
+                    <NavigationViewItem.Icon>
+                        <BitmapIcon ShowAsMonochrome="False" UriSource="/Assets/wsl.ico" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Uid="Settings_Shell_OOBE" Tag="OOBE" SelectsOnInvoked="False">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xf133;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Uid="Settings_Shell_About" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.Settings.AboutViewModel">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xe946;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+            <NavigationView.HeaderTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <TextBlock
+                            Text="{Binding}"
+                            Style="{ThemeResource TitleTextBlockStyle}" />
+                    </Grid>
+                </DataTemplate>
+            </NavigationView.HeaderTemplate>
+            <i:Interaction.Behaviors>
+                <behaviors:NavigationViewHeaderBehavior
+                    DefaultHeader="{x:Bind ((ContentControl)ViewModel.Selected).Content, Mode=OneWay}">
+                    <behaviors:NavigationViewHeaderBehavior.DefaultHeaderTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <TextBlock
+                                    Text="{Binding}"
+                                    Style="{ThemeResource TitleTextBlockStyle}" />
+                            </Grid>
+                        </DataTemplate>
+                    </behaviors:NavigationViewHeaderBehavior.DefaultHeaderTemplate>
+                </behaviors:NavigationViewHeaderBehavior>
+            </i:Interaction.Behaviors>
+            <Grid>
+                <Frame x:Name="NavigationFrame" />
+            </Grid>
+        </NavigationView>
+    </Grid>
+</Page>
