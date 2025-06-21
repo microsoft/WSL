@@ -43,6 +43,12 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
     if not auto_release_notes:
         for e in get_change_list(None if use_current_ref else version, previous, not no_fetch):
 
+            # Detect attached github issues
+            issues = find_github_issues(e.message)
+            pr_description, pr_number = get_github_pr_message(github_token, e.message)
+            if pr_description is not None:
+                issues = issues.union(find_github_issues(pr_description))
+
             if github_token is not None:
                 issues = filter_github_issues(issues, github_token)
 
