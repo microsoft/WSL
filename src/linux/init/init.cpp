@@ -278,6 +278,7 @@ ExecStart=/bin/sh -c 'ln -sf "$WSLG_RUNTIME_DIR/wayland-0" "$XDG_RUNTIME_DIR/way
 ExecStart=/bin/sh -c 'ln -sf "$WSLG_RUNTIME_DIR/wayland-0.lock" "$XDG_RUNTIME_DIR/wayland-0.lock"'
 ExecStart=/bin/sh -c 'ln -sf "$WSLG_RUNTIME_DIR/pulse/native" "$XDG_RUNTIME_DIR/pulse/native"'
 ExecStart=/bin/sh -c 'ln -sf "$WSLG_RUNTIME_DIR/pulse/pid" "$XDG_RUNTIME_DIR/pulse/pid"'
+ExecStart=/bin/sh -c 'timeout 30 sh -c "while [ ! -S \"$XDG_RUNTIME_DIR/bus\" ]; do sleep 0.1; done" || true'
   )",
             automountRoot,
             WSLG_SHARED_FOLDER,
