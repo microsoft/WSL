@@ -21,7 +21,7 @@ namespace p9fs {
 // the message if all dynamic content is omitted. In the case of strings, the
 // size of the two-byte length field is included, but the string length itself
 // is not. The omitted components are listed with each message type, and the
-// caller is responsible for adding the the right values if necessary.
+// caller is responsible for adding the right values if necessary.
 constexpr UINT32 GetMessageSize(MessageType messageType)
 {
     switch (messageType)

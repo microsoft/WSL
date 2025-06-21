@@ -112,8 +112,8 @@ int PipeZeroByteRead(PLXT_ARGS Args);
 static const LXT_VARIATION g_LxtVariations[] = {
     {"Pipe0", PipeVariation0},
     {"Pipe1", PipeVariation1},
-    {"Pipe reader hanup", PipeReaderHangup},
-    {"Pipe writer hanup", PipeWriterHangup},
+    {"Pipe reader hangup", PipeReaderHangup},
+    {"Pipe writer hangup", PipeWriterHangup},
     {"Pipe ioctls", PipeVariationIoctl},
     {"Pipe - epoll", PipeEpoll},
     {"Pipe - Fifo", PipeFifo},
@@ -1983,7 +1983,7 @@ Return Value:
     LxtCheckErrnoFailure(fcntl(Pipes[1], F_SETPIPE_SZ, sizeof(Buffer) - 1), EBUSY);
 
     //
-    // Try to increase the buffer from an unprivlided thread.
+    // Try to increase the buffer from an unprivileged thread.
     //
 
     LxtCheckErrno(ChildPid = fork());

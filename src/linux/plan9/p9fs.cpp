@@ -105,7 +105,7 @@ Expected<std::shared_ptr<const IRoot>> ShareList::MakeRoot(std::string_view anam
     {
         // The server is not running as root, which won't work.
         // N.B. It's possible to make this work as long as the server has CAP_SETUID, but that
-        //      is currrently not needed.
+        //      is currently not needed.
         return LxError{LX_EPERM};
     }
 

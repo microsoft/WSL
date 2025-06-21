@@ -152,7 +152,7 @@ int TimerFdBasic(PLXT_ARGS Args)
     }
 
     //
-    // Set timer fd to exipre at one second interval.
+    // Set timer fd to expire at one second interval.
     //
 
     Flags = 0;
@@ -196,7 +196,7 @@ int TimerFdBasic(PLXT_ARGS Args)
 
     //
     // Loop three times. In each iteration increase the wait time by one seconds.
-    // this should increase the expiration count by one in each interation.
+    // this should increase the expiration count by one in each iteration.
     //
 
     for (LoopIndex = 1; LoopIndex <= LXT_BASIC_TEST_LOOP_COUNT; LoopIndex += 1)

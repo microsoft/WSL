@@ -15,13 +15,13 @@ Abstract:
 #pragma once
 
 //
-// Name of the WSL binfmt_misc intrepreter.
+// Name of the WSL binfmt_misc interpreter.
 //
 
 #define LX_INIT_BINFMT_NAME "WSLInterop"
 
 //
-// Name of the WSL 'late' binfmt_misc intrepreter.
+// Name of the WSL 'late' binfmt_misc interpreter.
 // This name is used by the wsl-binfmt systemd unit which
 // registers the interpreter a second time after systemd-binfmt to make sure
 // that wsl's interpreter is always registered last.

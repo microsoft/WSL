@@ -719,7 +719,7 @@ try
         E_INVALIDARG,
         ((DefaultUid == LX_UID_INVALID) || (Flags != LXSS_DISTRO_FLAGS_UNCHANGED && WI_IsAnyFlagSet(Flags, ~LXSS_DISTRO_FLAGS_ALL))));
 
-    // If the configuration is changed, terminate the distribuiton so the new settings will take effect.
+    // If the configuration is changed, terminate the distribution so the new settings will take effect.
     bool modified = false;
     if (DefaultUid != distribution.Read(Property::DefaultUid))
     {
@@ -946,7 +946,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
         THROW_IF_WIN32_BOOL_FALSE(MoveFileEx(
             newVhdPath.c_str(), distro.VhdFilePath.c_str(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH));
 
-        // Write the location back to the original path in case the second registry write failed. Otherwise this is a no-op.
+        // Write the location back to the original path in case the second registry write failed. Otherwise, this is a no-op.
         registration.Write(Property::BasePath, distro.BasePath.c_str());
     });
 
@@ -1186,7 +1186,7 @@ try
     *Version = configuration.Version;
     *DefaultUid = registration.Read(Property::DefaultUid);
     *Flags = configuration.Flags;
-    const auto defaultEnvironment = registration.Read(Property::DefaultEnvironmnent);
+    const auto defaultEnvironment = registration.Read(Property::DefaultEnvironment);
     *DefaultEnvironmentCount = gsl::narrow_cast<ULONG>(defaultEnvironment.size());
     auto environment(wil::make_unique_cotaskmem<LPSTR[]>(defaultEnvironment.size()));
     for (size_t index = 0; index < defaultEnvironment.size(); index += 1)
@@ -1379,12 +1379,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
         // Determine the filesystem version. If WslFs is not enabled, downgrade
         // the version.
-        ULONG FilesytemVersion = LXSS_DISTRO_VERSION_CURRENT;
+        ULONG FilesystemVersion = LXSS_DISTRO_VERSION_CURRENT;
         if (wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, WSL_NEW_DISTRO_LXFS, 0) != 0)
         {
-            if (LXSS_DISTRO_USES_WSL_FS(FilesytemVersion) != FALSE)
+            if (LXSS_DISTRO_USES_WSL_FS(FilesystemVersion) != FALSE)
             {
-                FilesytemVersion = LXSS_DISTRO_VERSION_1;
+                FilesystemVersion = LXSS_DISTRO_VERSION_1;
             }
         }
 
@@ -1452,7 +1452,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 lxssKey.get(),
                 DistributionId,
                 DistributionName,
-                FilesytemVersion,
+                FilesystemVersion,
                 distributionPath.c_str(),
                 flags,
                 LX_UID_ROOT,
@@ -1571,7 +1571,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 THROW_HR_IF(WSL_E_IMPORT_FAILED, exitStatus != 0);
             }
 
-            // Invoke the init binary with the option to export the distribuiton information via stdout.
+            // Invoke the init binary with the option to export the distribution information via stdout.
             {
                 std::pair<wil::unique_handle, wil::unique_handle> input;
                 THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&input.first, &input.second, nullptr, 0));
@@ -1929,7 +1929,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
                 commandLine += " -v";
             }
 
-            // Run the bsdtar elf binary expand the the tar file using the socket as stdin.
+            // Run the bsdtar elf binary expand the tar file using the socket as stdin.
             commandLine += " -C " LXSS_ROOTFS_MOUNT LXSS_BSDTAR_EXTRACT_ARGS;
             auto elfContext = _RunElfBinary(
                 commandLine.c_str(),
@@ -2097,7 +2097,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceT
             WI_ASSERT(!PreventNewInstances || !m_disableNewInstanceCreation);
 
             // This is used when the session is being deleted.
-            // This is in place to prevent a CreateInstace() call from succeeding
+            // This is in place to prevent a CreateInstance() call from succeeding
             // after the session is shut down since this would mean that the destructor,
             // which could run on that thread (if the session already dropped its LxssUserSessionImpl reference)
             // would have to do all the cleanup work.
@@ -2566,7 +2566,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
     if (instance->GetIdleTimeout() >= 0)
     {
         // Register a client termination callback with the lifetime manager. If the
-        // ignore client callback flag is specifed and there are no other clients,
+        // ignore client callback flag is specified and there are no other clients,
         // the timer is immediately queued.
         wil::unique_handle currentProcess{};
         if (WI_IsFlagClear(Flags, LXSS_CREATE_INSTANCE_FLAGS_IGNORE_CLIENT))
@@ -2766,7 +2766,7 @@ void LxssUserSessionImpl::_CreateVm()
 
         m_vmId.store(vmId);
 
-        // Create the utiliy VM and register for callbacks.
+        // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
 
         m_utilityVm->GetRuntimeId();
@@ -3661,8 +3661,8 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
 void LxssUserSessionImpl::_ValidateDistributionNameAndPathNotInUse(
     _In_ HKEY LxssKey, _In_opt_ LPCWSTR Path, _In_opt_ LPCWSTR Name, const std::optional<GUID>& Exclude)
 {
-    // Use the cannonical path to compare distribution registration paths.
-    // The cannonical path allows us to compare paths regardless of symlinks.
+    // Use the canonical path to compare distribution registration paths.
+    // The canonical path allows us to compare paths regardless of symlinks.
     //
     // Even with this, it's theoretically possible to use different drive mounts to have two paths
     // that will point to the same underlying folder. To catch this, we'd need to use BY_HANDLE_FILE_INFORMATION and compare file & volume indexes.
@@ -3939,12 +3939,12 @@ CreateLxProcessContext LxssUserSessionImpl::s_GetCreateProcessContext(_In_ const
         const auto registration = DistributionRegistration::Open(lxssKey.get(), DistroGuid);
 
         context.Flags = registration.Read(Property::Flags);
-        context.DefaultEnvironment = registration.Read(Property::DefaultEnvironmnent);
+        context.DefaultEnvironment = registration.Read(Property::DefaultEnvironment);
     }
     else
     {
         context.Flags = DistributionRegistration::ApplyGlobalFlagsOverride(LXSS_DISTRO_FLAGS_DEFAULT | LXSS_DISTRO_FLAGS_VM_MODE);
-        context.DefaultEnvironment = Property::DefaultEnvironmnent.DefaultValue;
+        context.DefaultEnvironment = Property::DefaultEnvironment.DefaultValue;
     }
 
     context.UserToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
