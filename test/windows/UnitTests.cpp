@@ -6119,5 +6119,16 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(err, L"");
     }
 
+    // Validate that calling the binfmt interpreter with tty fd's but not controlling terminal doesn't display a warning.
+    // See https://github.com/microsoft/WSL/issues/13173.
+    TEST_METHOD(SetSidNoWarning)
+    {
+        auto [out, err] =
+            LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
+
+        VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests
