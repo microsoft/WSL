@@ -678,12 +678,19 @@ Return Value:
 
     //
     // Ensure that stdin represents the foreground process group.
+    // N.B. It's possible that standard file descriptors point to tty while the process
+    // has no controlling terminal (in case its parent called setsid() without opening a new terminal for instance).
+    // See https://github.com/microsoft/WSL/issues/13173.
     //
 
     auto processGroup = tcgetpgrp(0);
     if (processGroup < 0)
     {
-        LOG_STDERR("tcgetpgrp failed");
+        if (errno != ENOTTY)
+        {
+            LOG_STDERR("tcgetpgrp failed");
+        }
+
         return;
     }
 
