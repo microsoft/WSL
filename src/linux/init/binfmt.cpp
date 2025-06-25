@@ -785,7 +785,7 @@ Arguments:
 
     MessageType - Supplies the message type.
 
-    Argc - Supplies the command line agrument count.
+    Argc - Supplies the command line argument count.
 
     Argv - Supplies the command line arguments.
 

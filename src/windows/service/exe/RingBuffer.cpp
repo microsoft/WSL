@@ -101,7 +101,7 @@ std::vector<std::string> RingBuffer::GetLastDelimitedStrings(char Delimiter, siz
         {
             if (!partial.empty())
             {
-                // The debug CRT will fasttail if begin[size] is accessed
+                // The debug CRT will fastfail if begin[size] is accessed
                 // But in this case it's not a problem because begin.size() - i would be == 0
                 std::string partial_begin{&begin.data()[i], begin.size() - i};
                 results.emplace(results.begin(), partial_begin + partial);

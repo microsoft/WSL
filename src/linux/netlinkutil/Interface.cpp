@@ -73,7 +73,7 @@ void Interface::ChangeAddress(const Address& address, const std::optional<Addres
     }
 }
 
-// TMessage must be drived from AddressMessage or one of its children
+// TMessage must be derived from AddressMessage or one of its children
 template <typename TAddr, typename TMessage>
 void Interface::ChangeAddressImpl(const Address& address, const std::optional<Address>& broadcastAddress, Operation operation)
 {

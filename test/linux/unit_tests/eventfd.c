@@ -80,7 +80,7 @@ int EventFdVariationReadWrite(PLXT_ARGS Args)
     LXT_SYNCHRONIZATION_POINT_START();
 
     //
-    // FIXME: Add 0 varaition
+    // FIXME: Add 0 variation
     //
 
     //
