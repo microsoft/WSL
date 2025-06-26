@@ -334,11 +334,12 @@ try
 
             double MemoryLow = 1024 * 1024 * 1024;
             double MemoryHigh = 1.1 * 1024.0 * 1024.0 * 1024.0;
-            const int IdleThreshold = get_nprocs(); // Change math to adjust if sysconf(_SC_CLK_TCK) != 100? Is 1%
+            long long int const CPUPercentPersec = get_nprocs() * sysconf(_SC_CLK_TCK) / 100;
+            long long int const IdleThreshold = CPUPercentPersec * 1;    // 1% at 1 sec
             long long int Start, Stop = 0;
             auto constexpr SleepDuration = std::chrono::seconds(30);
             size_t ReclaimIndex = 0;
-            long long int const ReclaimThreshold = (get_nprocs() * sysconf(_SC_CLK_TCK) * SleepDuration / std::chrono::seconds(1)) / 200; // 0.5%
+            long long int const ReclaimThreshold = CPUPercentPersec * (SleepDuration / std::chrono::seconds(1)) / 2; // 0.5% at 30s
             long long int ReclaimWindow[20] = {}; // 10 minutes
             long long int ReclaimWindowLength = COUNT_OF(ReclaimWindow);
             bool ReclaimIdling;
@@ -395,8 +396,37 @@ try
                             {
                                 double MemoryTargetSize = MemorySize * 0.97;
                                 std::string MemoryToFree = std::to_string(size_t(MemorySize - MemoryTargetSize));
-                                // EAGAIN Means that it attempted, but was unable to evict sufficient pages.
-                                THROW_LAST_ERROR_IF(WriteToFile(RECLAIM_PATH, MemoryToFree.c_str()) < 0 && errno != EAGAIN);
+                                
+                                std::mutex ReclaimerMutex;
+                                std::condition_variable ReclaimerCv;
+                                int WriteStatus = -INT_MAX;
+
+                                std::unique_lock<std::mutex> ParentLock(ReclaimerMutex);
+
+                                std::thread Reclaimer([&]() {
+                                    std::lock_guard<std::mutex> ChildLock(ReclaimerMutex);
+
+                                    WriteStatus = WriteToFile(RECLAIM_PATH, MemoryToFree.c_str());
+                                    if (WriteStatus < 0) {
+                                        WriteStatus = -errno;
+                                    }
+                                    ReclaimerCv.notify_one();
+                                });
+
+                                if (!ReclaimerCv.wait_for(ParentLock, std::chrono::milliseconds(125), [&]{
+                                    return WriteStatus != -INT_MAX;
+                                }) {
+                                    pthread_kill(Reclaimer.native_handle(), SIGINT);
+                                }
+                                Reclaimer.join();
+
+                                if (WriteStatus < 0)
+                                {
+                                    errno = -WriteStatus;
+                                    // EAGAIN means that it attempted, but was unable to evict sufficient pages.
+                                    // EINTR means it got hit by a signal, which was probably us.
+                                    THROW_LAST_ERROR_IF(errno != EAGAIN && errno != EINTR);
+                                }
 
                                 if (MemoryTargetSize < MemoryLow)
                                 {
