@@ -44,4 +44,15 @@ class LSWTests
         VERIFY_ARE_EQUAL(version.Minor, WSL_PACKAGE_VERSION_MINOR);
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
+
+    TEST_METHOD(CreateVmSmokeTest)
+    {
+        auto coinit = wil::CoInitializeEx();
+        wil::com_ptr<ILSWVirtualMachine> vm;
+
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        VERIFY_SUCCEEDED(CreateVm(&settings, &vm));
+
+        VERIFY_SUCCEEDED(vm->GetState());
+    }
 };

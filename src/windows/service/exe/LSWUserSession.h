@@ -4,9 +4,14 @@ namespace wsl::windows::service::lsw {
 class LSWUserSessionImpl
 {
 public:
-    LSWUserSessionImpl(HANDLE Token);
+    LSWUserSessionImpl(HANDLE Token, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo);
+    LSWUserSessionImpl(LSWUserSessionImpl&&) = default;
+    LSWUserSessionImpl& operator=(LSWUserSessionImpl&&) = default;
 
     PSID GetUserSid() const;
+
+private:
+    wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 };
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") LSWUserSession

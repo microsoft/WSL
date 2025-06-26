@@ -26,6 +26,17 @@ try
 }
 CATCH_RETURN();
 
+HRESULT CreateVm(const VIRTUAL_MACHINE_SETTINGS* Settings, ILSWVirtualMachine** VirtualMachine)
+try
+{
+    wil::com_ptr<ILSWUserSession> session;
+
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(LSWUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
+
+    return session->CreateVirtualMachine(Settings, VirtualMachine);
+}
+CATCH_RETURN();
+
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {
     wil::DLLMain(Instance, Reason, Reserved);

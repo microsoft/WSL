@@ -7,7 +7,6 @@ using wsl::windows::service::lsw::LSWUSerSessionFactory;
 
 CoCreatableClassWithFactory(LSWUserSession, LSWUSerSessionFactory);
 
-
 HRESULT LSWUSerSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
 {
     RETURN_HR_IF_NULL(E_POINTER, ppCreated);
@@ -26,7 +25,7 @@ HRESULT LSWUSerSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REF
         DWORD length = 0;
         THROW_IF_WIN32_BOOL_FALSE(::GetTokenInformation(userToken.get(), TokenSessionId, &sessionId, sizeof(sessionId), &length));
 
-        const auto tokenInfo = wil::get_token_information<TOKEN_USER>(userToken.get());
+        auto tokenInfo = wil::get_token_information<TOKEN_USER>(userToken.get());
 
         static std::mutex mutex;
         static std::vector<std::shared_ptr<LSWUserSessionImpl>> sessions;
@@ -38,10 +37,10 @@ HRESULT LSWUSerSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REF
 
         if (session == sessions.end())
         {
-            session = sessions.insert(sessions.end(), std::make_shared<LSWUserSessionImpl>(userToken.get()));
+            session = sessions.insert(sessions.end(), std::make_shared<LSWUserSessionImpl>(userToken.get(), std::move(tokenInfo)));
         }
 
-        auto comInstance = wil::MakeOrThrow<LSWUserSession>(std::weak_ptr<LSWUserSessionImpl>(*session));;
+        auto comInstance = wil::MakeOrThrow<LSWUserSession>(std::weak_ptr<LSWUserSessionImpl>(*session));
 
         THROW_IF_FAILED(comInstance.CopyTo(riid, ppCreated));
     }

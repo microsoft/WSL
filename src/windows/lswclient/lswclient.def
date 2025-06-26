@@ -2,3 +2,4 @@ LIBRARY lswclient
 
 EXPORTS
     GetWslVersion
+    CreateVm
