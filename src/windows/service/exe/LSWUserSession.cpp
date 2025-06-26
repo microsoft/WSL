@@ -30,8 +30,10 @@ HRESULT wsl::windows::service::lsw::LSWUserSession::GetVersion(_Out_ WSL_VERSION
 HRESULT wsl::windows::service::lsw::LSWUserSession::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, ILSWVirtualMachine** VirtualMachine)
 try
 {
-    auto impersonate = wil::CoImpersonateClient();
-    auto vm = wil::MakeOrThrow<LSWVirtualMachine>();
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    auto vm = wil::MakeOrThrow<LSWVirtualMachine>(*Settings, session->GetUserSid());;
     THROW_IF_FAILED(vm.CopyTo(__uuidof(ILSWVirtualMachine), (void**)VirtualMachine));
     return S_OK;
 }

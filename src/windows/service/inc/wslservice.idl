@@ -423,6 +423,7 @@ typedef
 struct _VIRTUAL_MACHINE_SETTINGS {
     LPCWSTR DisplayName;
     ULONG MemoryMb;
+    ULONG CpuCount;
 } VIRTUAL_MACHINE_SETTINGS;
 
 

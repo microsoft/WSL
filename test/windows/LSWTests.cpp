@@ -24,7 +24,6 @@ class LSWTests
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
-
         return true;
     }
 
@@ -54,5 +53,7 @@ class LSWTests
         VERIFY_SUCCEEDED(CreateVm(&settings, &vm));
 
         VERIFY_SUCCEEDED(vm->GetState());
+
+        system("pause");
     }
 };
