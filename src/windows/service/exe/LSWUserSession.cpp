@@ -35,6 +35,8 @@ try
 
     auto vm = wil::MakeOrThrow<LSWVirtualMachine>(*Settings, session->GetUserSid());;
     THROW_IF_FAILED(vm.CopyTo(__uuidof(ILSWVirtualMachine), (void**)VirtualMachine));
+
+    vm->Start();
     return S_OK;
 }
 CATCH_RETURN();

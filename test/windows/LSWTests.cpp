@@ -50,6 +50,9 @@ class LSWTests
         wil::com_ptr<ILSWVirtualMachine> vm;
 
         VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.MemoryMb = 1024;
         VERIFY_SUCCEEDED(CreateVm(&settings, &vm));
 
         VERIFY_SUCCEEDED(vm->GetState());
