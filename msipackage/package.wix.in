@@ -131,6 +131,13 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8760}">
+                    <RegistryValue Value="ILSWUserSession" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}">
                     <RegistryValue Value="PSFactoryBuffer" Type="string" />
                 </RegistryKey>
@@ -152,6 +159,21 @@
                 <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce7e}">
                     <RegistryValue Name="AppId" Value="{370121D2-AA7E-4608-A86D-0BBAB9DA1A60}" Type="string" />
                     <RegistryValue Value="LxssUserSession" Type="string" />
+                </RegistryKey>
+
+                <!-- ILSWUserSession -->
+                <RegistryKey Root="HKCR" Key="AppID\{370121D2-AA7E-4608-A86D-0BBAB9DA1A61}">
+
+                    <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
+                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="LocalService" Value="WSLService" Type="string" />
+                </RegistryKey>
+
+                <!-- LSWUserSession -->
+                <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
+                    <RegistryValue Name="AppId" Value="{370121D2-AA7E-4608-A86D-0BBAB9DA1A61}" Type="string" />
+                    <RegistryValue Value="LSWUserSession" Type="string" />
                 </RegistryKey>
 
                 <!-- Notification server -->

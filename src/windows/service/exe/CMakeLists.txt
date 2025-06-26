@@ -34,6 +34,8 @@ set(SOURCES
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
     VirtioNetworking.cpp
+    LSWUserSession.cpp
+    LSWUserSessionFactory.cpp
     main.rc
     ${CMAKE_CURRENT_BINARY_DIR}/../mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wsleventschema.rc
     application.manifest)
@@ -75,7 +77,9 @@ set(HEADERS
     WslCoreNetworkEndpointSettings.h
     DnsResolver.h
     WslCoreTcpIpStateTracking.h
-    WslCoreVm.h)
+    WslCoreVm.h
+    LSWUserSession.h
+    LSWUserSessionFactory.h)
 
 add_executable(wslservice ${SOURCES} ${HEADERS})
 add_dependencies(wslservice wslserviceidl wslservicemc)

@@ -160,6 +160,8 @@ cpp_quote("const GUID CLSID_LxssUserSessionInBox = {0x4f476546, 0xb412, 0x4579, 
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce7e\") LxssUserSession;")
 cpp_quote("class DECLSPEC_UUID(\"4f476546-b412-4579-b64c-123df331e3d6\") LxssUserSessionInBox;")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") LSWUserSession;")
+
 cpp_quote("#endif")
 
 [
@@ -395,3 +397,42 @@ cpp_quote("#define WSL_E_DISK_CORRUPTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_IT
 cpp_quote("#define WSL_E_DISTRIBUTION_NAME_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x30) /* 0x80040330 */")
 cpp_quote("#define WSL_E_INVALID_JSON MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x31) /* 0x80040331 */")
 cpp_quote("#define WSL_E_VM_CRASHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x32) /* 0x80040332 */")
+
+
+typedef
+struct _WSL_VERSION {
+    ULONG Major;
+    ULONG Minor;
+    ULONG Revision;
+} WSL_VERSION;
+
+
+
+[
+    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
+    pointer_default(unique),
+    object
+]
+interface ILSWVirtualMachine : IUnknown
+{
+    HRESULT GetState();
+}
+
+
+typedef
+struct _VIRTUAL_MACHINE_SETTINGS {
+    LPCWSTR DisplayName;
+    ULONG MemoryMb;
+} VIRTUAL_MACHINE_SETTINGS;
+
+
+[
+    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
+    pointer_default(unique),
+    object
+]
+interface ILSWUserSession : IUnknown
+{
+    HRESULT GetVersion([out] WSL_VERSION* Error);
+    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]ILSWVirtualMachine** VirtualMachine);
+}

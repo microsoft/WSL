@@ -1,0 +1,4 @@
+LIBRARY lswclient
+
+EXPORTS
+    GetWslVersion
