@@ -53,6 +53,7 @@ class LSWTests
         settings.CpuCount = 4;
         settings.DisplayName = L"LSW";
         settings.MemoryMb = 1024;
+        settings.BootTimeoutMs = 60 * 1000;
         VERIFY_SUCCEEDED(CreateVm(&settings, &vm));
 
         VERIFY_SUCCEEDED(vm->GetState());

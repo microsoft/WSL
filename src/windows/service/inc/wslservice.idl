@@ -424,6 +424,7 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     LPCWSTR DisplayName;
     ULONG MemoryMb;
     ULONG CpuCount;
+    ULONG BootTimeoutMs;
 } VIRTUAL_MACHINE_SETTINGS;
 
 

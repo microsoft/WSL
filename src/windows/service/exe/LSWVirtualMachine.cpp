@@ -6,6 +6,8 @@ using helpers::WindowsBuildNumbers;
 using helpers::WindowsVersion;
 using wsl::windows::service::lsw::LSWVirtualMachine;
 
+#define VIRTIO_SERIAL_CONSOLE_COBALT_RELEASE_UBR 40 // TODO: factor
+
 LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid) :
     m_settings(Settings), m_userSid(UserSid)
 {
@@ -70,7 +72,7 @@ void LSWVirtualMachine::Start()
     }*/
 
     // Initialize kernel command line.
-    std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSL_ROOT_INIT_ENV) L"=1 panic=-1";
+    std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(LSW_ROOT_INIT_ENV) L"=1 panic=-1";
 
     // Set number of processors.
     kernelCmdLine += std::format(L" nr_cpus={}", m_settings.CpuCount);
@@ -78,48 +80,26 @@ void LSWVirtualMachine::Start()
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
-    /*if (IsVirtioSerialConsoleSupported())
+    // TODO: check for virtio serial support
+    m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true);
+
+    if (true) // early boot logging
     {
-        vmSettings.Devices.VirtioSerial.emplace();
+        kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
+        vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
     }
 
-    if (m_dmesgCollector)
-    {
-        if (m_vmConfig.EnableEarlyBootLogging)
-        {
-            // Capture using the very slow legacy serial port up until the point that the virtio device is started.
-            if constexpr (!wsl::shared::Arm64)
-            {
-                kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
-            }
-            else
-            {
-                kernelCmdLine += L" earlycon=pl011,0xeffec000,115200";
-            }
+    vmSettings.Devices.VirtioSerial.emplace();
 
-            vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
-        }
+    // TODO: support early boot logging
 
-        // The primary "console" will be a virtio serial device.
-        kernelCmdLine += L" console=hvc0 debug";
-        hcs::VirtioSerialPort virtioPort{};
-        virtioPort.Name = L"hvc0";
-        virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
-        virtioPort.ConsoleSupport = true;
-        vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
-    }
-    else if (m_vmConfig.EnableDebugConsole)
-    {
-        // If a debug console was requested, add required kernel command line options.
-        if constexpr (!wsl::shared::Arm64)
-        {
-            kernelCmdLine += L" console=ttyS0,115200 debug";
-        }
-        else
-        {
-            kernelCmdLine += L" console=ttyAMA0 debug";
-        }
-    }*/
+    // The primary "console" will be a virtio serial device.
+    kernelCmdLine += L" console=hvc0 debug";
+    hcs::VirtioSerialPort virtioPort{};
+    virtioPort.Name = L"hvc0";
+    virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
+    virtioPort.ConsoleSupport = true;
+    vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
 
     // Set up boot params.
     //
@@ -141,7 +121,7 @@ void LSWVirtualMachine::Start()
         THROW_HR(E_NOTIMPL);
         auto bootThis = hcs::UefiBootEntry{};
         bootThis.DeviceType = hcs::UefiBootDevice::VmbFs;
-        //bootThis.VmbFsRootPath = m_rootFsPath.c_str();
+        // bootThis.VmbFsRootPath = m_rootFsPath.c_str();
         bootThis.DevicePath = L"\\" LXSS_VM_MODE_KERNEL_NAME;
         bootThis.OptionalData = kernelCmdLine;
         hcs::Uefi uefiSettings{};
@@ -164,15 +144,31 @@ void LSWVirtualMachine::Start()
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
 
-    // N.B. Plan9 device is always added during serialization
-
     systemSettings.VirtualMachine = std::move(vmSettings);
-    auto json =  wsl::shared::ToJsonW(systemSettings);
+    auto json = wsl::shared::ToJsonW(systemSettings);
 
     WSL_LOG("CreateLSWVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
 
-    auto idString = wsl::shared::string::GuidToString<wchar_t>(m_vmId);
+    auto idString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_computeSystem = hcs::CreateComputeSystem(idString.c_str(), json.c_str());
+
+    m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
+    WI_ASSERT(IsEqualGUID(m_vmId, m_runtimeId));
+
+    wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
+
+    // TODO: termination callback
+    wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
+
+    // Create a socket listening for connections from mini_init.
+    auto listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
+    auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
+    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
+}
+
+void CALLBACK LSWVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
+{
+    WSL_LOG("LSWVmExited", TraceLoggingValue(Event->EventData, "details"));
 }
 
 HRESULT LSWVirtualMachine::GetState()

@@ -187,6 +187,8 @@ Abstract:
 
 #define WSL_ROOT_INIT_ENV "WSL_ROOT_INIT"
 
+#define LSW_ROOT_INIT_ENV "LSW_ROOT_INIT"
+
 #define WSL_SOCKET_LOG_ENV "WSL_SOCKET_LOG"
 
 #define WSL_ENABLE_CRASH_DUMP_ENV "WSL_ENABLE_CRASH_DUMP"
@@ -356,7 +358,10 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageResultBool,
     LxMessageResultInt32,
     LxMessageResultUint32,
-    LxMessageResultUint8
+    LxMessageResultUint8,
+    LxMessageLSWMount,
+    LxMessageLSWMountResult,
+    LxMessageLSWError,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -445,6 +450,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageResultUint32)
         X(LxMiniInitTelemetryMessage)
         X(LxMessageResultUint8)
+        X(LxMessageLSWMount)
+        X(LxMessageLSWMountResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1463,6 +1470,41 @@ typedef struct _LX_MINI_INIT_CREATE_INSTANCE_RESULT
 
     PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(FailureStep), FIELD(Pid), FIELD(ConnectPort), STRING_FIELD(WarningsOffset));
 } LX_MINI_INIT_CREATE_INSTANCE_RESULT, *P_LX_MINI_INIT_CREATE_INSTANCE_RESULT;
+
+struct LSW_ERROR
+{
+    static inline auto Type = LxMessageLSWError;
+    MESSAGE_HEADER Header;
+    int Errno;
+    PRETTY_PRINT(FIELD(Header), FIELD(Errno));
+};
+
+struct LSW_MOUNT_RESULT
+{
+    static inline auto Type = LxMessageLSWMount;
+    MESSAGE_HEADER Header;
+    int Result;
+    int Step; // TODO: enum
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Step));
+
+};
+
+struct LSW_MOUNT_REQUEST
+{
+    static inline auto Type = LxMessageLSWMount;
+    using TResponse = LSW_MOUNT_RESULT;
+
+    MESSAGE_HEADER Header;
+    unsigned int SourceIndex;
+    unsigned int DestinationIndex;
+    unsigned int ScsiLun;
+    // TODO: flags
+
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(SourceIndex), FIELD(DestinationIndex), FIELD(ScsiLun));
+};
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT
 {
