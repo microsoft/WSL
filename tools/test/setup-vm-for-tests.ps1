@@ -27,8 +27,6 @@
     Absolute Path to a folder on the the VM to copy taef binaries. Defaults to "C:\Taef".
 .PARAMETER SkipDistro
     Skip copying over the distro.
-.PARAMETER TestDistroName
-    Name of test distro filename to be appended to the path. Auto filled if left empty.
 .PARAMETER TestDistroPath
     Path to the distro image to import and use for testing, if needed. Auto filled if left empty.
 #>
@@ -48,7 +46,6 @@ param (
     [string]$RemoteFolder = "C:\Package",
     [string]$TaefFolder = "C:\Taef",
     [switch]$SkipDistro,
-    [string]$TestDistroName,
     [string]$TestDistroPath
 )
 
@@ -96,13 +93,9 @@ $Platform = switch ($Arch) {
     default { throw "Architecture $Arch unknown" }
 }
 
-if ([string]::IsNullOrEmpty($TestDistroName)) {
-    # Be kind, rewind, update for amd64 and arm64!
-    $TestDistroName = "debian_1.12.8.0.tar.xz"
-}
-
 if ([string]::IsNullOrEmpty($TestDistroPath)) {
-    $TestDistroPath = "\\sesdfs.corp.microsoft.com\1windows\TestContent\CORE\Base\HYP\LOW\lxss\$Arch\distros\$TestDistroName"
+    $TestDistroVersion = (Select-Xml -Path "$PSScriptRoot\..\..\packages.config" -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
+    $TestDistroPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz"
 }
 
 if ([string]::IsNullOrEmpty($ArtifactFolder)) {

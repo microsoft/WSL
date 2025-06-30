@@ -6095,5 +6095,40 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             "#Comment 127.0.0.1 microsoft.com windows.microsoft.com\n#AnotherComment\n127.0.0.1 wsl.dev", "127.0.0.1\twsl.dev\n");
     }
 
+    // Validate that a distribution can be unregistered even if its BasePath doesn't exist.
+    // See https://github.com/microsoft/WSL/issues/13004
+    TEST_METHOD(BrokenDistroUnregister)
+    {
+        const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
+        const auto distroKey = wsl::windows::common::registry::CreateKey(userKey.get(), L"{baa405ef-1822-4bbe-84e2-30e4c6330d42}");
+
+        auto revert = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            wsl::windows::common::registry::DeleteKey(userKey.get(), L"{baa405ef-1822-4bbe-84e2-30e4c6330d42}");
+        });
+
+        wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"BasePath", L"C:\\DoesNotExit");
+        wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"DistributionName", L"DummyBrokenDistro");
+        wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"DefaultUid", 0);
+        wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Version", LXSS_DISTRO_VERSION_2);
+        wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"State", LxssDistributionStateInstalled);
+        wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, L"Flags", LXSS_DISTRO_FLAGS_VM_MODE);
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--unregister DummyBrokenDistro");
+
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    // Validate that calling the binfmt interpreter with tty fd's but not controlling terminal doesn't display a warning.
+    // See https://github.com/microsoft/WSL/issues/13173.
+    TEST_METHOD(SetSidNoWarning)
+    {
+        auto [out, err] =
+            LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
+
+        VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests

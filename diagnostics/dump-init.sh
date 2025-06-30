@@ -3,35 +3,71 @@
 set -ue
 
 if [ $(whoami) != "root" ]; then
-  echo "This script must be run as root in the system distro (via wsl.exe -u root --system)"
+  echo "This script must be run as root in the debug shell (via wsl.exe -u root --debug-shell)"
   exit 1
 fi
 
-ts=$(date +%F_%H-%M-%S)
-target="/mnt/c/wsl-init-dump-$ts"
+dmesg
 
-mkdir -p "$target"
+# Try to install gdb
 
-tdnf install -y gdb
+if [ "${dump:-0}" == 1 ]; then
+    tdnf install -y gdb || true
+fi
 
-bash -c "cd $target && gcore -a \$(pgrep init)"
+declare -a pids_to_dump
 
-stack_log="$target/stacks.txt"
-fd_log="$target/fd.txt"
-for pid in $(pgrep init); do
-  echo -e "\nProcess: $pid" >> "$stack_log"
-  echo -e "\nProcess: $pid" >> "$fd_log"
+for proc in /proc/[0-9]*; do
+  read -a stats < "$proc/stat" # Skip kernel threads to make the output easier to read
+  flags=${stats[8]}
+
+  if (( ("$flags" & 0x00200000) == 0x00200000 )); then
+    continue
+  fi
+
+  pid=$(basename "$proc")
+
+  if [ "${dump:-0}" == 1 ]; then
+    pids_to_dump+=("$pid")
+  fi
+
+  parent=$(ps -o ppid= -p "$pid")
+
+  echo -e "\nProcess: $pid (parent: $parent) "
+  echo -en "cmd: "
+  cat "/proc/$pid/cmdline" || true
+  echo -e "\nstat: "
+  cat "/proc/$pid/stat" || true
+
   for tid in $(ls "/proc/$pid/task" || true); do
-    echo "tid: $tid" >> "$stack_log"
-    cat "/proc/$pid/task/$tid/stack" >> "$stack_log" || true
+    echo -n "tid: $tid - "
+    cat "/proc/$pid/task/$tid/comm" || true
+    cat "/proc/$pid/task/$tid/stack" || true
   done
 
-  ls -la "/proc/$pid/fd" >> "$fd_log" || true
+  echo "fds: "
+  ls -la "/proc/$pid/fd" || true
 done
 
+for pid in "${pids_to_dump[@]}" ; do
+   name=$(ps -p "$pid" -o comm=)
+   if [[ "$name" =~ ^(bash|login)$ ]]; then
+     echo "Skipping dump for process: $name"
+     continue
+   fi
 
-ss -lap --vsock > "/$target/sockets.txt"
-dmesg > "/$target/dmesg.txt"
-cat /proc/meminfo > "/$target/meminfo.txt"
+   echo "Dumping process: $name ($pid) "
+   if gcore -a -o core "$pid" ; then
+     if ! /wsl-capture-crash 0 "$name" "$pid" 0 < "core.$pid" ; then
+         echo "Failed to dump process $pid"
+     fi
 
-echo "Logs and dumps written in $target"
+     rm "core.$pid"
+   fi
+done
+
+echo "hvsockets: "
+ss -lap --vsock
+
+echo "meminfo: "
+cat /proc/meminfo

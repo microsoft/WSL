@@ -793,6 +793,10 @@ Windows: {}</value>
   <data name="MessageWarningDuringStartup" xml:space="preserve">
     <value>WSL 启动期间出错</value>
   </data>
+  <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
+    <value>无法启动“{}”的系统用户会话。有关详细信息，请参阅 journalctl。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>打开 EventViewer</value>
   </data>

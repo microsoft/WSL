@@ -93,7 +93,6 @@ public:
     InteropServer(InteropServer&& other) noexcept :
         m_InteropSocketPath(std::move(other.m_InteropSocketPath)), m_InteropSocket(std::move(other.m_InteropSocket))
     {
-        memset(&other.m_InteropSocketPath, 0, sizeof(other.m_InteropSocketPath));
     }
 
     int Create();

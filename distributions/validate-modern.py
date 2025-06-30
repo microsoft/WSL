@@ -10,6 +10,7 @@ import magic
 import os.path
 import git
 import re
+import sys
 from github import Github
 
 
@@ -129,9 +130,11 @@ def main(manifest: str, tar: str, compare_with_branch: str, repo_path: str, arm6
 
                 default_entries = sum(1 for e in versions if 'Default' in e and e['Default']())
                 if default_entries != 1:
-                    error(e, 'Found no default distribution' if default_entries == 0 else 'Found multiple default distributions')
+                    error(e, f'Found no default distribution for "{flavor}"' if default_entries == 0 else f'Found multiple default distributions for "{flavor}"')
 
             report_status_on_pr(manifest)
+
+            sys.exit(1 if errors else 0)
 
     except:
         if debug:
