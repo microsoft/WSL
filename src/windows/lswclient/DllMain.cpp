@@ -33,7 +33,21 @@ try
 
     THROW_IF_FAILED(CoCreateInstance(__uuidof(LSWUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
 
-    return session->CreateVirtualMachine(Settings, VirtualMachine);
+    THROW_IF_FAILED(session->CreateVirtualMachine(Settings, VirtualMachine));
+
+    wil::com_ptr_nothrow<IClientSecurity> clientSecurity;
+    THROW_IF_FAILED((*VirtualMachine)->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
+
+    // Get the current proxy blanket settings.
+    DWORD authnSvc, authzSvc, authnLvl, capabilites;
+    THROW_IF_FAILED(clientSecurity->QueryBlanket(*VirtualMachine, &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilites));
+
+    // Make sure that dynamic cloaking is used.
+    WI_ClearFlag(capabilites, EOAC_STATIC_CLOAKING);
+    WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
+    THROW_IF_FAILED(clientSecurity->SetBlanket(*VirtualMachine, authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
+
+    return S_OK;
 }
 CATCH_RETURN();
 

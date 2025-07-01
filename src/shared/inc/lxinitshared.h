@@ -362,6 +362,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLSWMount,
     LxMessageLSWMountResult,
     LxMessageLSWError,
+    LxMessageLswGetDisk,
+    LxMessageLswGetDiskResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -452,6 +454,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageResultUint8)
         X(LxMessageLSWMount)
         X(LxMessageLSWMountResult)
+        X(LxMessageLswGetDisk)
+        X(LxMessageLswGetDiskResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1479,31 +1483,51 @@ struct LSW_ERROR
     PRETTY_PRINT(FIELD(Header), FIELD(Errno));
 };
 
+struct LSW_GET_DISK_RESULT
+{
+    static inline auto Type = LxMessageLswGetDiskResult;
+    MESSAGE_HEADER Header;
+    unsigned int Result;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Buffer));
+};
+
+struct LSW_GET_DISK
+{
+    static inline auto Type = LxMessageLswGetDisk;
+    using TResponse = LSW_GET_DISK_RESULT;
+
+    MESSAGE_HEADER Header;
+    unsigned int ScsiLun;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+};
+
 struct LSW_MOUNT_RESULT
 {
     static inline auto Type = LxMessageLSWMount;
     MESSAGE_HEADER Header;
     int Result;
-    int Step; // TODO: enum
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Step));
-
+    PRETTY_PRINT(FIELD(Header), FIELD(Result));
 };
 
-struct LSW_MOUNT_REQUEST
+struct LSW_MOUNT
 {
     static inline auto Type = LxMessageLSWMount;
     using TResponse = LSW_MOUNT_RESULT;
 
     MESSAGE_HEADER Header;
+    bool Chroot;
     unsigned int SourceIndex;
     unsigned int DestinationIndex;
-    unsigned int ScsiLun;
-    // TODO: flags
+    unsigned int TypeIndex;
+    unsigned int OptionsIndex;
 
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(SourceIndex), FIELD(DestinationIndex), FIELD(ScsiLun));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

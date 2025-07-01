@@ -58,6 +58,13 @@ class LSWTests
 
         VERIFY_SUCCEEDED(vm->GetState());
 
+        auto systemdDistroDiskPath = LR"(D:\wsldev\system.vhd)";
+
+        wil::unique_cotaskmem_ansistring device;
+        VERIFY_SUCCEEDED(vm->AttachDisk(systemdDistroDiskPath, false, &device));
+
+        VERIFY_SUCCEEDED(vm->Mount(device.get(), L"/mnt", L"ext4", L"ro"));
+
         system("pause");
     }
 };

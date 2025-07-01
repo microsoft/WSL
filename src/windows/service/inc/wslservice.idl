@@ -408,6 +408,7 @@ struct _WSL_VERSION {
 
 
 
+
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
     pointer_default(unique),
@@ -416,6 +417,8 @@ struct _WSL_VERSION {
 interface ILSWVirtualMachine : IUnknown
 {
     HRESULT GetState();
+    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device);
+    HRESULT Mount([in] LPCSTR Source, [in] LPCWSTR Target, [in] LPCWSTR Type, [in] LPCWSTR Options); 
 }
 
 

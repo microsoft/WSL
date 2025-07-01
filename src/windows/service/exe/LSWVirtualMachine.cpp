@@ -149,19 +149,18 @@ void LSWVirtualMachine::Start()
 
     WSL_LOG("CreateLSWVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
 
-    auto idString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
-    m_computeSystem = hcs::CreateComputeSystem(idString.c_str(), json.c_str());
+    m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+    m_computeSystem = hcs::CreateComputeSystem(m_vmIdString.c_str(), json.c_str());
 
-    m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
-    WI_ASSERT(IsEqualGUID(m_vmId, m_runtimeId));
+    auto runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
+    WI_ASSERT(IsEqualGUID(m_vmId, runtimeId));
 
     wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
 
-    // TODO: termination callback
     wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
 
     // Create a socket listening for connections from mini_init.
-    auto listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
+    auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
     auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
     m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
 }
@@ -175,3 +174,86 @@ HRESULT LSWVirtualMachine::GetState()
 {
     return S_OK;
 }
+
+HRESULT LSWVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)
+try
+{
+    *Device = nullptr;
+    auto result = wil::ResultFromException([&]() {
+        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        auto runAsUser = wil::impersonate_token(userToken.get());
+
+        wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
+
+        std::lock_guard lock{m_lock};
+
+        ULONG lun = 0;
+        while (m_attachedDisks.find(lun) != m_attachedDisks.end())
+        {
+            lun++;
+        }
+
+        wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly);
+
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [&]() { wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), lun); });
+
+        LSW_GET_DISK message{};
+        message.Header.MessageSize = sizeof(message);
+        message.Header.MessageType = LSW_GET_DISK::Type;
+        message.ScsiLun = lun;
+        const auto& response = m_initChannel.Transaction(message);
+
+        THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to attach disk, init returned: %lu", response.Result);
+
+        cleanup.release();
+        m_attachedDisks.emplace(lun, AttachedDisk{Path, response.Buffer});
+
+        *Device = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(response.Buffer).release();
+    });
+
+    WSL_LOG(
+        "LSWAttachDisk",
+        TraceLoggingValue(Path, "Path"),
+        TraceLoggingValue(ReadOnly, "ReadOnly"),
+        TraceLoggingValue(*Device == nullptr ? "<null>" : *Device, "Device"),
+        TraceLoggingValue(result, "Result"));
+
+    return result;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCWSTR Target, _In_ LPCWSTR Type, _In_ LPCWSTR Options)
+try
+{
+    wsl::shared::MessageWriter<LSW_MOUNT> message;
+
+    auto optionalAdd = [&](auto value, unsigned int& index) {
+        if (Source != nullptr)
+        {
+            message.WriteString(index, value);
+        }
+    };
+
+    optionalAdd(Source, message->SourceIndex);
+    optionalAdd(Target, message->DestinationIndex);
+    optionalAdd(Type, message->TypeIndex);
+    optionalAdd(Options, message->OptionsIndex);
+
+    std::lock_guard lock{m_lock};
+
+    const auto& response = m_initChannel.Transaction<LSW_MOUNT>(message.Span());
+
+    WSL_LOG(
+        "LSWMount",
+        TraceLoggingValue(Source == nullptr ? "<null>" : Source, "Source"),
+        TraceLoggingValue(Target == nullptr ? L"<null>" : Target, "Target"),
+        TraceLoggingValue(Type == nullptr ? L"<null>" : Type, "Type"),
+        TraceLoggingValue(Options == nullptr ? L"<null>" : Options, "Options"),
+        TraceLoggingValue(response.Result, "Result"));
+
+    // TODO: better error
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+    return S_OK;
+}
+CATCH_RETURN();

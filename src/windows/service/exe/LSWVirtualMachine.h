@@ -14,16 +14,21 @@ public:
     void Start();
 
     IFACEMETHOD(GetState()) override;
+    IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)) override;
+    IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCWSTR Target, _In_ LPCWSTR Type, _In_ LPCWSTR Options)) override;
 
 private:
-
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
 
-
+    struct AttachedDisk
+    {
+        std::filesystem::path Path;
+        std::string Device;
+    };
 
     VIRTUAL_MACHINE_SETTINGS m_settings;
     GUID m_vmId{};
-    GUID m_runtimeId{};
+    std::wstring m_vmIdString;
     wsl::windows::common::helpers::WindowsVersion m_windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
     int m_coldDiscardShiftSize{};
     PSID m_userSid{};
@@ -34,5 +39,8 @@ private:
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
 
     wsl::shared::SocketChannel m_initChannel;
+
+    std::map<ULONG, AttachedDisk> m_attachedDisks;
+    std::mutex m_lock;
 };
 } // namespace wsl::windows::service::lsw

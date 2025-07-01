@@ -1,7 +1,10 @@
 #include "util.h"
 #include "SocketChannel.h"
+#include "message.h"
 #include <utmp.h>
 #include <sys/wait.h>
+#include <sys/mount.h>
+#include "mountutilcpp.h"
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
 
@@ -11,20 +14,75 @@ extern std::vector<unsigned int> ListScsiDisks();
 
 extern int DetachScsiDisk(unsigned int Lun);
 
+extern std::string GetLunDeviceName(unsigned int Lun);
+
 extern int g_LogFd;
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT_REQUEST& message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    LOG_ERROR("Received mount message: {}", message.ScsiLun);
+    wsl::shared::MessageWriter<LSW_GET_DISK_RESULT> writer;
 
-    LSW_MOUNT_RESULT result{};
-    result.Header.MessageType = LSW_MOUNT_RESULT::Type;
-    result.Header.MessageSize = sizeof(result);
-    Channel.SendMessage<LSW_MOUNT_RESULT>(result);
+    try
+    {
+        auto deviceName = GetLunDeviceName(Message.ScsiLun);
+
+        writer->Result = 0;
+        writer.WriteString("/dev/" + deviceName);
+    }
+    catch (...)
+    {
+        writer->Result = wil::ResultFromCaughtException();
+    }
+
+    Channel.SendMessage<LSW_GET_DISK::TResponse>(writer.Span());
 }
 
-template <typename TMessage>
-bool CallMessageHandler(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    LSW_MOUNT_RESULT response{};
+    response.Header.MessageType = LSW_MOUNT_RESULT::Type;
+    response.Header.MessageSize = sizeof(response);
+
+    try
+    {
+        auto readField = [&](unsigned int index) -> const char* {
+            if (index > 0)
+            {
+                return wsl::shared::string::FromSpan(Buffer, index);
+            }
+
+            return nullptr;
+        };
+
+        mountutil::ParsedOptions options;
+        if (Message.OptionsIndex > 0)
+        {
+            options = mountutil::MountParseFlags(wsl::shared::string::FromSpan(Buffer, Message.OptionsIndex));
+        }
+
+        const char* source = readField(Message.SourceIndex);
+        const char* target = readField(Message.DestinationIndex);
+        THROW_LAST_ERROR_IF(UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str()) < 0);
+
+        if (Message.Chroot)
+        {
+            THROW_LAST_ERROR_IF(chdir(target) < 0);
+            THROW_LAST_ERROR_IF(mount(".", "/", nullptr, MS_MOVE, nullptr) < 0);
+            THROW_LAST_ERROR_IF(chroot("."));
+        }
+
+        response.Result = 0;
+    }
+    catch (...)
+    {
+        response.Result = wil::ResultFromCaughtException();
+    }
+
+    Channel.SendMessage<LSW_MOUNT_RESULT>(response);
+}
+
+template <typename TMessage, typename... Args>
+void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
 {
     if (TMessage::Type == Type)
     {
@@ -37,30 +95,19 @@ bool CallMessageHandler(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Typ
         const auto Message = gslhelpers::try_get_struct<TMessage>(Buffer);
         HandleMessageImpl(Channel, *Message, Buffer);
 
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
-{
-    LOG_ERROR("Received unknown message type: {}", Type);
-    THROW_ERRNO(EINVAL);
-}
-
-template <typename TMessage, typename... Args>
-void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
-{
-    if (CallMessageHandler<TMessage>(Channel, Type, Buffer))
-    {
         return;
     }
     else
     {
-        HandleMessage<TMessage>(Channel, Type, Buffer);
+        if constexpr (sizeof...(Args) > 0)
+        {
+            HandleMessage<Args...>(Channel, Type, Buffer);
+        }
+        else
+        {
+            LOG_ERROR("Received unknown message type: {}", Type);
+            THROW_ERRNO(EINVAL);
+        }
     }
 }
 
@@ -68,10 +115,12 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_MOUNT_REQUEST>(Channel, Type, Buffer);
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT>(Channel, Type, Buffer);
     }
     catch (...)
     {
+        LOG_ERROR("Caught");
+
         LOG_CAUGHT_EXCEPTION();
 
         // TODO: error message
@@ -91,6 +140,16 @@ int LswEntryPoint(int Argc, char* Argv[])
         FATAL_ERROR("Failed to mount /dev");
     }
 
+    if (UtilMount(nullptr, "/proc", "proc", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, "/sys", "sysfs", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
     //
     // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
     //
@@ -108,6 +167,24 @@ int LswEntryPoint(int Argc, char* Argv[])
 
         close(g_LogFd);
         g_LogFd = 3;
+    }
+
+    //
+    // Enable logging when processes receive fatal signals.
+    //
+
+    if (WriteToFile("/proc/sys/kernel/print-fatal-signals", "1\n") < 0)
+    {
+        return -1;
+    }
+
+    //
+    // Disable rate limiting of user writes to dmesg.
+    //
+
+    if (WriteToFile("/proc/sys/kernel/printk_devkmsg", "on\n") < 0)
+    {
+        return -1;
     }
 
     LOG_INFO("Init starting");
@@ -178,17 +255,20 @@ int LswEntryPoint(int Argc, char* Argv[])
     {
         FATAL_ERROR("Failed to connect to host hvsocket");
     }
-
-    while (true)
+    try
     {
-        auto [Message, Range] = channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
-        if (Message == nullptr)
+        while (true)
         {
-            break; // Socket was closed, exit
-        }
+            auto [Message, Range] = channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+            if (Message == nullptr)
+            {
+                break; // Socket was closed, exit
+            }
 
-        ProcessMessage(channel, Message->MessageType, Range);
+            ProcessMessage(channel, Message->MessageType, Range);
+        }
     }
+    CATCH_LOG();
 
     LOG_INFO("Init exiting");
 
