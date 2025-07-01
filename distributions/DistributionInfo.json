@@ -166,8 +166,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.06.01.129180/archlinux-2025.06.01.129180.wsl",
-                    "Sha256": "97fe3d6c82d4a680d559e70e254797894aaa1b844a168c9f22806f41ddbe63c0"
+                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.07.01.132764/archlinux-2025.07.01.132764.wsl",
+                    "Sha256": "c23cebe8e9fbcf467526216506d322cce7fd4932c70199309b984e86ab1160ec"
                 }
             }
         ],
