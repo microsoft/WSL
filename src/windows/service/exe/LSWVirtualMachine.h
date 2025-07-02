@@ -16,6 +16,8 @@ public:
     IFACEMETHOD(GetState()) override;
     IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCWSTR Target, _In_ LPCWSTR Type, _In_ LPCWSTR Options)) override;
+    IFACEMETHOD(CreateLinuxProcess(_In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
+
 
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);

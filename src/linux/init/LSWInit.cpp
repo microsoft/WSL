@@ -66,19 +66,101 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
 
         if (Message.Chroot)
         {
-            THROW_LAST_ERROR_IF(chdir(target) < 0);
-            THROW_LAST_ERROR_IF(mount(".", "/", nullptr, MS_MOVE, nullptr) < 0);
-            THROW_LAST_ERROR_IF(chroot("."));
+            THROW_LAST_ERROR_IF(chdir(target));
+            THROW_LAST_ERROR_IF(chroot(".")); // TODO: pivot_root
         }
 
+        for (const auto& entry : std::filesystem::directory_iterator("/"))
+        {
+            LOG_INFO("File: {}", entry.path().string());
+        }
         response.Result = 0;
     }
     catch (...)
     {
+        LOG_CAUGHT_EXCEPTION();
         response.Result = wil::ResultFromCaughtException();
     }
 
     Channel.SendMessage<LSW_MOUNT_RESULT>(response);
+}
+
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CREATE_PROCESS& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    sockaddr_vm SocketAddress{};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 3)};
+    THROW_LAST_ERROR_IF(!ListenSocket);
+
+    Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
+
+    LSW_CREATE_PROCESS_RESPONSE Result{};
+    Result.Header.MessageSize = sizeof(Result);
+    Result.Header.MessageType = LSW_CREATE_PROCESS_RESPONSE::Type;
+    Result.Result = EINVAL;
+
+    auto sendExecResult = wil::scope_exit([&]() { Channel.SendMessage(Result); });
+
+    std::vector<int> fds{12, 1, 5};
+    auto Executable = wsl::shared::string::FromSpan(Buffer, Message.ExecutableIndex);
+    auto ArgumentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.CommandLineIndex);
+    ArgumentArray.push_back(nullptr);
+
+    for (const auto &e: ArgumentArray)
+    {
+        LOG_INFO("Arg: {}", e ? e : "<null>");
+    }
+
+    auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
+
+    const int ChildPid = UtilCreateChildProcess("CreateChildProcess", [&]() {
+        try
+        {
+            for (const auto& e : fds)
+            {
+                auto socket = UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS);
+                THROW_LAST_ERROR_IF(dup2(socket, e) < 0);
+            }
+
+            execv(Executable, (char* const*)(ArgumentArray.data()));
+
+            // If this point is reached, an error needs to be reported back since execv() failed.
+            THROW_LAST_ERROR();
+        }
+        catch (...)
+        {
+            auto error = wil::ResultFromCaughtException();
+            LOG_ERROR("Command execution failed: {}", errno);
+
+            if (write(ControlPipe.write().get(), &error, sizeof(error)) != sizeof(error))
+            {
+                LOG_ERROR("Failed to write command execution status: {}", errno);
+            }
+        }
+    });
+
+    THROW_LAST_ERROR_IF(ChildPid < 0);
+    ControlPipe.write().reset();
+
+    int execResult = -1;
+    int readResult = TEMP_FAILURE_RETRY(read(ControlPipe.read().get(), &execResult, sizeof(execResult)));
+    THROW_LAST_ERROR_IF(readResult < 0);
+
+    // If the pipe closed without data, then exec() was successful
+    if (readResult == 0)
+    {
+        Result.Result = 0;
+        Result.Pid = ChildPid;
+    }
+    else if (readResult == sizeof(execResult))
+    {
+        // Otherwise return the error code to the service
+        Result.Result = abs(execResult);
+    }
+    else
+    {
+        LOG_ERROR("Failed to read from pipe, {}, {}", errno, execResult);
+        Result.Result = EINVAL;
+    }
 }
 
 template <typename TMessage, typename... Args>
@@ -115,7 +197,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT>(Channel, Type, Buffer);
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_CREATE_PROCESS>(Channel, Type, Buffer);
     }
     catch (...)
     {

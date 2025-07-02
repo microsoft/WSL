@@ -364,6 +364,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLSWError,
     LxMessageLswGetDisk,
     LxMessageLswGetDiskResult,
+    LxMessageLswCreateProcess,
+    LxMessageLswCreateProcessResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -456,6 +458,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLSWMountResult)
         X(LxMessageLswGetDisk)
         X(LxMessageLswGetDiskResult)
+        X(LxMessageLswCreateProcess)
+        X(LxMessageLswCreateProcessResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1528,6 +1532,39 @@ struct LSW_MOUNT
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
+};
+
+struct LSW_CREATE_PROCESS_RESPONSE
+{
+    static inline auto Type = LxMessageLswCreateProcessResult;
+    MESSAGE_HEADER Header;
+    int Result;
+    std::uint64_t Pid;
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(Result));
+};
+
+struct LSW_CREATE_PROCESS
+{
+    static inline auto Type = LxMessageLswCreateProcess;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+    MESSAGE_HEADER Header;
+
+    unsigned int ExecutableIndex;
+    unsigned int CommandLineIndex;
+    unsigned int EnvironmentIndex;
+    unsigned int CurrentDirectoryIndex;
+    unsigned int FdIndex;
+
+    char Buffer[];
+
+    PRETTY_PRINT(
+        FIELD(Header),
+        STRING_FIELD(ExecutableIndex),
+        STRING_FIELD(CurrentDirectoryIndex),
+        FIELD(FdIndex),
+        STRING_ARRAY_FIELD(CommandLineIndex),
+        STRING_ARRAY_FIELD(EnvironmentIndex));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

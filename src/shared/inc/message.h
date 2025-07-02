@@ -93,6 +93,13 @@ public:
         gsl::copy(Span, InsertBuffer(Span.size()));
     }
 
+    template <typename T>
+    gsl::span<T> InsertArray(unsigned int& Index, unsigned int& SizeInMessage, unsigned int ArraySize)
+    {
+        SizeInMessage = ArraySize;
+        return InsertBuffer(Index, ArraySize * sizeof(T));
+    }
+
     gsl::span<std::byte> InsertBuffer(unsigned int& Index, size_t BufferSize, unsigned int& Size)
     {
         Size = BufferSize;
@@ -138,6 +145,33 @@ public:
     void WriteString(unsigned int& Index, const wchar_t* String)
     {
         WriteString(Index, wsl::shared::string::WideToMultiByte(String));
+    }
+
+    // TODO: This design doesn't allow empty strings
+    void WriteStringArray(unsigned int& Index, const char** String, size_t Count)
+    {
+        size_t totalSize = 1; // 1 char for the additional \0
+        for (size_t i = 0; i < Count; i++)
+        {
+            auto size = strlen(String[i]);
+            assert(size > 0);
+
+            totalSize += size + 1;
+        }
+
+        auto span = InsertBuffer(Index, totalSize);
+
+        auto it = span.begin();
+        for (size_t i = 0; i < Count; i++)
+        {
+            auto size = strlen(String[i]) + 1;
+            it = std::copy(
+                reinterpret_cast<const std::byte*>(String[i]), reinterpret_cast<const std::byte*>(String[i] + size), it);
+        }
+        *it = static_cast<std::byte>('\0');
+        it++;
+
+        assert(it == span.end());
     }
 
     gsl::span<std::byte> Span()

@@ -47,6 +47,9 @@ class LSWTests
     TEST_METHOD(CreateVmSmokeTest)
     {
         auto coinit = wil::CoInitializeEx();
+        WSADATA Data;
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
+
         wil::com_ptr<ILSWVirtualMachine> vm;
 
         VIRTUAL_MACHINE_SETTINGS settings{};
@@ -65,6 +68,29 @@ class LSWTests
 
         VERIFY_SUCCEEDED(vm->Mount(device.get(), L"/mnt", L"ext4", L"ro"));
 
+        std::vector<const char*> commandLine{"/bin/sh", "-c", "echo foo"};
+        LSW_CREATE_PROCESS_OPTIONS options{};
+        options.Executable = "/bin/sh";
+        options.CommandLineCount = 3;
+        options.CommandLine = commandLine.data();
+        options.EnvironmnentCount = 0;
+
+        LSW_CREATE_PROCESS_RESULT result;
+
+        VERIFY_SUCCEEDED(vm->CreateLinuxProcess(&options, &result));
+
+        VERIFY_ARE_EQUAL(result.Errno, 0);
+
+        std::vector<char> buffer(100);
+
+        DWORD bytes{};
+        if (!ReadFile(result.Fds[1].Handle, buffer.data(), (DWORD)buffer.size(), &bytes, nullptr))
+        {
+            LogError("ReadFile: %lu, handle: 0x%x", GetLastError(), result.Fds[1].Handle);
+            VERIFY_FAIL();
+        }
+
+        VERIFY_ARE_EQUAL(buffer.data(), std::string("foo\n"));
         system("pause");
     }
 };

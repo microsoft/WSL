@@ -239,6 +239,7 @@ try
     optionalAdd(Target, message->DestinationIndex);
     optionalAdd(Type, message->TypeIndex);
     optionalAdd(Options, message->OptionsIndex);
+    message->Chroot = true; // TODO: proper API
 
     std::lock_guard lock{m_lock};
 
@@ -254,6 +255,44 @@ try
 
     // TODO: better error
     THROW_HR_IF(E_FAIL, response.Result != 0);
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::CreateLinuxProcess(_In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
+try
+{
+    wsl::shared::MessageWriter<LSW_CREATE_PROCESS> Message;
+
+    Message.WriteString(Message->ExecutableIndex, Options->Executable);
+    Message.WriteString(Message->CurrentDirectoryIndex, Options->CurrentDirectory ? Options->CurrentDirectory : "/");
+    Message.WriteStringArray(Message->CommandLineIndex, Options->CommandLine, Options->CommandLineCount);
+    Message.WriteStringArray(Message->EnvironmentIndex, Options->Environmnent, Options->EnvironmnentCount);
+
+    std::lock_guard lock{m_lock};
+    const auto& port = m_initChannel.Transaction<LSW_CREATE_PROCESS>(Message.Span());
+
+    std::vector<wil::unique_socket> sockets(3);
+
+    for (auto& e : sockets)
+    {
+        e = wsl::windows::common::hvsocket::Connect(m_vmId, port.Result);
+    }
+
+    const auto& response = m_initChannel.ReceiveMessage<LSW_CREATE_PROCESS_RESPONSE>();
+
+    Result->Errno = response.Result;
+    Result->Pid = response.Pid;
+
+    Result->FdCount = static_cast<ULONG>(sockets.size());
+    Result->Fds = wil::make_unique_cotaskmem<LSW_PROCESS_FD[]>(Result->FdCount).release();
+
+    for (size_t i = 0; i < Result->FdCount; i++)
+    {
+        Result->Fds[i].Fd = i;
+        Result->Fds[i].Handle = (HANDLE)sockets[i].release();
+    }
+
     return S_OK;
 }
 CATCH_RETURN();

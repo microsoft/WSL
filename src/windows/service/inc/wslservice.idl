@@ -407,7 +407,32 @@ struct _WSL_VERSION {
 } WSL_VERSION;
 
 
+typedef [system_handle(sh_socket)] HANDLE HVSOCKET_HANDLE;
 
+
+typedef
+struct _LSW_CREATE_PROCESS_OPTIONS {
+    [string] LPCSTR Executable;
+    ULONG CommandLineCount;
+    [unique, size_is(CommandLineCount)] LPCSTR* CommandLine;
+    ULONG EnvironmnentCount;
+    [unique, size_is(EnvironmnentCount)] LPCSTR* Environmnent;
+    [unique] LPSTR CurrentDirectory;
+} LSW_CREATE_PROCESS_OPTIONS;
+
+typedef struct _LSW_PROCESS_FD
+{
+    ULONGLONG Fd;
+    HVSOCKET_HANDLE Handle;
+} LSW_PROCESS_FD;
+
+typedef
+struct _LSW_CREATE_PROCESS_RESULT {
+   int Errno;
+   ULONGLONG Pid;
+   ULONG FdCount;
+   [unique, size_is(FdCount)] LSW_PROCESS_FD* Fds;
+} LSW_CREATE_PROCESS_RESULT;
 
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
@@ -419,6 +444,7 @@ interface ILSWVirtualMachine : IUnknown
     HRESULT GetState();
     HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device);
     HRESULT Mount([in] LPCSTR Source, [in] LPCWSTR Target, [in] LPCWSTR Type, [in] LPCWSTR Options); 
+    HRESULT CreateLinuxProcess([in] const LSW_CREATE_PROCESS_OPTIONS* Options, [out] LSW_CREATE_PROCESS_RESULT* Result);
 }
 
 
