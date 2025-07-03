@@ -845,14 +845,17 @@ class UnitTests
 
         if (LxsstuVmMode())
         {
-            // Get the VM ID from the distro and validate that it not null.
-            auto [vmId, vmIdErr] = LxsstuLaunchWslAndCaptureOutput(L"env | grep 'WSL2_VM_ID' | awk -F= '{print $2}'");
-            VERIFY_ARE_NOT_EQUAL(vmId, L"");
-
-            // Ensure that the response from wslinfo matches the VM id from the distros environment
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id");
-            VERIFY_ARE_EQUAL(out, std::format(L"{}", vmId));
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
             VERIFY_ARE_EQUAL(err, L"");
+            if (LxsstuVmMode())
+            {
+                const auto vmId = wsl::shared::string::ToGuid(out);
+                VERIFY_IS_TRUE(vmId.has_value());
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(out, L"wsl1");
+            }
         }
     }
 

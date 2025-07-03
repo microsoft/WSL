@@ -2239,11 +2239,18 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_READ_ONLY_ENV);
     }
 
-    const auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
+    auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
     if (Value != nullptr)
     {
         Config.NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(std::atoi(Value));
         unsetenv(LX_WSL2_NETWORKING_MODE_ENV);
+    }
+
+    Value = getenv(LX_WSL2_VM_ID_ENV);
+    if (Value != nullptr)
+    {
+        Config.VmId = Value;
+        unsetenv(LX_WSL2_VM_ID_ENV);
     }
 
     //

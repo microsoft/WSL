@@ -149,19 +149,21 @@ Return Value:
     }
     else if (Mode.value() == WslInfoMode::VMId)
     {
-        auto value = UtilGetEnvironmentVariable(LX_WSL2_VM_ID_ENV);
-        if (value.empty())
+        if (UtilIsUtilityVm())
         {
-            std::cerr << Localization::MessageNoValueFound() << "\n";
-            return 1;
-        }
+            auto vmId = UtilGetVmId();
+            if (vmId.empty())
+            {
+                std::cerr << Localization::MessageNoValueFound() << "\n";
+                return 1;
+            }
 
-        std::cout << value;
-    }
-    else
-    {
-        assert(false && "Unknown WslInfoMode");
-        return 1;
+            std::cout << vmId;
+        }
+        else
+        {
+            std::cout << "wsl1";
+        }
     }
 
     if (!noNewLine)

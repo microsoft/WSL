@@ -79,6 +79,7 @@ struct WslDistributionConfig
     bool GuiAppsEnabled = false;
     std::optional<int> FeatureFlags = 0;
     std::optional<LX_MINI_INIT_NETWORKING_MODE> NetworkingMode = LxMiniInitNetworkingModeNone;
+    std::optional<std::string> VmId;
 
     //
     // Global state for boot state. The socket is used to delay-start the distro init process

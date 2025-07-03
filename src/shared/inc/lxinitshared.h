@@ -304,6 +304,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxInitMessageCreateLoginSession,
     LxInitMessageStopPlan9Server,
     LxInitMessageQueryNetworkingMode,
+    LxInitMessageQueryVmId,
     LxInitCreateProcess,
     LxInitOobeResult,
     LxMiniInitMessageLaunchInit,
@@ -1495,6 +1496,16 @@ typedef struct _LX_INIT_OOBE_RESULT
 
     PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(DefaultUid));
 } LX_INIT_OOBE_RESULT, *PLX_INIT_OOBE_RESULT;
+
+typedef struct _LX_INIT_QUERY_VM_ID
+{
+    static inline auto Type = LxInitMessageQueryVmId;
+
+    MESSAGE_HEADER Header;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
+} LX_INIT_QUERY_VM_ID, *PLX_INIT_QUERY_VM_ID;
 
 template <>
 struct std::formatter<LX_MESSAGE_TYPE, char>
