@@ -68,17 +68,19 @@ class LSWTests
         MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", true};
         VERIFY_SUCCEEDED(Mount((LSWVirtualMachineHandle*)vm, &mountSettings));
 
-        std::vector<const char*> commandLine{"/bin/sh", "-c", "echo foo", nullptr};
+        std::vector<const char*> commandLine{"/bin/sh", "-c", "echo $foo", nullptr};
 
         std::vector<ProcessFileDescriptorSettings> fds(3);
         fds[0].Number = 0;
         fds[1].Number = 1;
         fds[2].Number = 2;
 
+        std::vector<const char*> env{"foo=bar", nullptr};
         CreateProcessSettings createProcessSettings{};
         createProcessSettings.Executable = "/bin/sh";
         createProcessSettings.Arguments = commandLine.data();
         createProcessSettings.FileDescriptors = fds.data();
+        createProcessSettings.Environment = env.data();
 
         LinuxProcess process;
         VERIFY_SUCCEEDED(CreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &process));

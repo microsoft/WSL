@@ -105,9 +105,13 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CREATE_PRO
     auto ArgumentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.CommandLineIndex);
     ArgumentArray.push_back(nullptr);
 
-    for (const auto &e: ArgumentArray)
+
+    auto EnvironmentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.EnvironmentIndex);
+    EnvironmentArray.push_back(nullptr);
+
+    for (const auto e: EnvironmentArray)
     {
-        LOG_INFO("Arg: {}", e ? e : "<null>");
+        LOG_ERROR("Env: {}", e != nullptr ? e : "null");
     }
 
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
@@ -121,7 +125,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CREATE_PRO
                 THROW_LAST_ERROR_IF(dup2(socket, e) < 0);
             }
 
-            execv(Executable, (char* const*)(ArgumentArray.data()));
+            execve(Executable, (char* const*)(ArgumentArray.data()), (char* const*)(EnvironmentArray.data()));
 
             // If this point is reached, an error needs to be reported back since execv() failed.
             THROW_LAST_ERROR();
