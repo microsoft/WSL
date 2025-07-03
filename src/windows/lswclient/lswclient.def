@@ -2,4 +2,7 @@ LIBRARY lswclient
 
 EXPORTS
     GetWslVersion
-    CreateVm
+    CreateVirualMachine
+    AttachDisk
+    Mount
+    CreateLinuxProcess

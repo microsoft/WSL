@@ -223,7 +223,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCWSTR Target, _In_ LPCWSTR Type, _In_ LPCWSTR Options)
+HRESULT LSWVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ BOOL Chroot)
 try
 {
     wsl::shared::MessageWriter<LSW_MOUNT> message;
@@ -239,7 +239,7 @@ try
     optionalAdd(Target, message->DestinationIndex);
     optionalAdd(Type, message->TypeIndex);
     optionalAdd(Options, message->OptionsIndex);
-    message->Chroot = true; // TODO: proper API
+    message->Chroot = Chroot; // TODO: proper API
 
     std::lock_guard lock{m_lock};
 
@@ -248,9 +248,10 @@ try
     WSL_LOG(
         "LSWMount",
         TraceLoggingValue(Source == nullptr ? "<null>" : Source, "Source"),
-        TraceLoggingValue(Target == nullptr ? L"<null>" : Target, "Target"),
-        TraceLoggingValue(Type == nullptr ? L"<null>" : Type, "Type"),
-        TraceLoggingValue(Options == nullptr ? L"<null>" : Options, "Options"),
+        TraceLoggingValue(Target == nullptr ? "<null>" : Target, "Target"),
+        TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
+        TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
+        TraceLoggingValue(Chroot, "Options"),
         TraceLoggingValue(response.Result, "Result"));
 
     // TODO: better error
@@ -259,7 +260,8 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::CreateLinuxProcess(_In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
+HRESULT LSWVirtualMachine::CreateLinuxProcess(
+    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG* FdCount, LSW_PROCESS_FD** Fds, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
 {
     wsl::shared::MessageWriter<LSW_CREATE_PROCESS> Message;
@@ -284,13 +286,12 @@ try
     Result->Errno = response.Result;
     Result->Pid = response.Pid;
 
-    Result->FdCount = static_cast<ULONG>(sockets.size());
-    Result->Fds = wil::make_unique_cotaskmem<LSW_PROCESS_FD[]>(Result->FdCount).release();
+    *Fds = wil::make_unique_cotaskmem<LSW_PROCESS_FD[]>(sockets.size()).release();
+    *FdCount = static_cast<ULONG>(sockets.size());
 
-    for (size_t i = 0; i < Result->FdCount; i++)
+    for (size_t i = 0; i < sockets.size(); i++)
     {
-        Result->Fds[i].Fd = i;
-        Result->Fds[i].Handle = (HANDLE)sockets[i].release();
+        (*Fds)[i].Handle = (HANDLE)sockets[i].release();
     }
 
     return S_OK;

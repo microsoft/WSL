@@ -50,43 +50,47 @@ class LSWTests
         WSADATA Data;
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
 
-        wil::com_ptr<ILSWVirtualMachine> vm;
-
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
+        void* vm{};
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
-        settings.MemoryMb = 1024;
-        settings.BootTimeoutMs = 60 * 1000;
-        VERIFY_SUCCEEDED(CreateVm(&settings, &vm));
-
-        VERIFY_SUCCEEDED(vm->GetState());
+        settings.Memory.MemoryMb = 1024;
+        settings.Options.BootTimeoutMs = 30000;
+        VERIFY_SUCCEEDED(CreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
 
         auto systemdDistroDiskPath = LR"(D:\wsldev\system.vhd)";
 
-        wil::unique_cotaskmem_ansistring device;
-        VERIFY_SUCCEEDED(vm->AttachDisk(systemdDistroDiskPath, false, &device));
+        DiskAttachSettings attachSettings{systemdDistroDiskPath, false};
+        AttachedDiskInformation attachedDisk;
+        
+        VERIFY_SUCCEEDED(AttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));
 
-        VERIFY_SUCCEEDED(vm->Mount(device.get(), L"/mnt", L"ext4", L"ro"));
+        MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", true};
+        VERIFY_SUCCEEDED(Mount((LSWVirtualMachineHandle*)vm, &mountSettings));
 
-        std::vector<const char*> commandLine{"/bin/sh", "-c", "echo foo"};
-        LSW_CREATE_PROCESS_OPTIONS options{};
-        options.Executable = "/bin/sh";
-        options.CommandLineCount = 3;
-        options.CommandLine = commandLine.data();
-        options.EnvironmnentCount = 0;
+        std::vector<const char*> commandLine{"/bin/sh", "-c", "echo foo", nullptr};
 
-        LSW_CREATE_PROCESS_RESULT result;
+        std::vector<ProcessFileDescriptorSettings> fds(3);
+        fds[0].Number = 0;
+        fds[1].Number = 1;
+        fds[2].Number = 2;
 
-        VERIFY_SUCCEEDED(vm->CreateLinuxProcess(&options, &result));
+        CreateProcessSettings createProcessSettings{};
+        createProcessSettings.Executable = "/bin/sh";
+        createProcessSettings.Arguments = commandLine.data();
+        createProcessSettings.FileDescriptors = fds.data();
 
-        VERIFY_ARE_EQUAL(result.Errno, 0);
+        LinuxProcess process;
+        VERIFY_SUCCEEDED(CreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &process));
+
+        LogInfo("pid: %lu", process.Pid);
 
         std::vector<char> buffer(100);
 
         DWORD bytes{};
-        if (!ReadFile(result.Fds[1].Handle, buffer.data(), (DWORD)buffer.size(), &bytes, nullptr))
+        if (!ReadFile(createProcessSettings.FileDescriptors[1].Handle, buffer.data(), (DWORD)buffer.size(), &bytes, nullptr))
         {
-            LogError("ReadFile: %lu, handle: 0x%x", GetLastError(), result.Fds[1].Handle);
+            LogError("ReadFile: %lu, handle: 0x%x", GetLastError(), createProcessSettings.FileDescriptors[1].Handle);
             VERIFY_FAIL();
         }
 
