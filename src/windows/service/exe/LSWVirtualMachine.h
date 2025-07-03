@@ -16,7 +16,7 @@ public:
     IFACEMETHOD(GetState()) override;
     IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ BOOL Chroot)) override;
-    IFACEMETHOD(CreateLinuxProcess(_In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _Out_ ULONG*FdCount, _Out_ LSW_PROCESS_FD** Fd, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
+    IFACEMETHOD(CreateLinuxProcess(_In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
 
 
 private:

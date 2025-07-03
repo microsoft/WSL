@@ -261,7 +261,7 @@ try
 CATCH_RETURN();
 
 HRESULT LSWVirtualMachine::CreateLinuxProcess(
-    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG* FdCount, LSW_PROCESS_FD** Fds, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
+    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
 {
     wsl::shared::MessageWriter<LSW_CREATE_PROCESS> Message;
@@ -274,7 +274,7 @@ try
     std::lock_guard lock{m_lock};
     const auto& port = m_initChannel.Transaction<LSW_CREATE_PROCESS>(Message.Span());
 
-    std::vector<wil::unique_socket> sockets(3);
+    std::vector<wil::unique_socket> sockets(FdCount);
 
     for (auto& e : sockets)
     {
@@ -286,12 +286,9 @@ try
     Result->Errno = response.Result;
     Result->Pid = response.Pid;
 
-    *Fds = wil::make_unique_cotaskmem<LSW_PROCESS_FD[]>(sockets.size()).release();
-    *FdCount = static_cast<ULONG>(sockets.size());
-
     for (size_t i = 0; i < sockets.size(); i++)
     {
-        (*Fds)[i].Handle = (HANDLE)sockets[i].release();
+        Handles[i] = (HANDLE)sockets[i].release();
     }
 
     return S_OK;

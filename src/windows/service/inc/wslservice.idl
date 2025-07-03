@@ -424,15 +424,12 @@ typedef struct _LSW_PROCESS_FD
 {
     ULONGLONG Fd;
     BOOL Tty;
-    HVSOCKET_HANDLE Handle;
 } LSW_PROCESS_FD;
 
 typedef
 struct _LSW_CREATE_PROCESS_RESULT {
    int Errno;
    ULONGLONG Pid;
-   ULONG FdCount;
-   [unique, size_is(FdCount)] LSW_PROCESS_FD* Fds;
 } LSW_CREATE_PROCESS_RESULT;
 
 [
@@ -445,7 +442,7 @@ interface ILSWVirtualMachine : IUnknown
     HRESULT GetState();
     HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device);
     HRESULT Mount([in] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] BOOL Chroot); 
-    HRESULT CreateLinuxProcess([in] const LSW_CREATE_PROCESS_OPTIONS* Options, [out] ULONG* FdCount, [out, size_is(,*FdCount)] LSW_PROCESS_FD** Fds, [out] LSW_CREATE_PROCESS_RESULT* Result);
+    HRESULT CreateLinuxProcess([in] const LSW_CREATE_PROCESS_OPTIONS* Options, [in] ULONG FdCount, [in, unique, size_is(FdCount)] LSW_PROCESS_FD* Fds, [out, size_is(FdCount)] HVSOCKET_HANDLE* Handles, [out] LSW_CREATE_PROCESS_RESULT* Result);
 }
 
 

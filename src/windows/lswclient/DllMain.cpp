@@ -110,19 +110,22 @@ HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, CreateProces
     options.EnvironmnentCount = Count(options.Environmnent);
     options.CurrentDirectory = UserSettings->CurrentDirectory;
 
-    static_assert(sizeof(LSW_PROCESS_FD) == sizeof(ProcessFileDescriptorSettings));
-
     LSW_CREATE_PROCESS_RESULT result{};
 
-    wil::unique_cotaskmem_array_ptr<LSW_PROCESS_FD> fds;
+    std::vector<LSW_PROCESS_FD> inputFd(UserSettings->FdCount);
+    for (size_t i = 0; i < UserSettings->FdCount; i++)
+    {
+        inputFd[i] = {UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Tty};
+    }
 
-    RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->CreateLinuxProcess(&options, fds.size_address<ULONG>(), &fds, &result));
+    std::vector<HANDLE> fds(UserSettings->FdCount);
 
+    RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+                         ->CreateLinuxProcess(&options, UserSettings->FdCount, inputFd.data(), fds.data(), &result));
 
-    assert(fds.size() == 3);
     for (size_t i = 0; i < fds.size(); i++)
     {
-        UserSettings->FileDescriptors[i].Handle = fds[i].Handle;
+        UserSettings->FileDescriptors[i].Handle = fds[i];
     }
 
     return S_OK;

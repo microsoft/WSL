@@ -70,10 +70,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
             THROW_LAST_ERROR_IF(chroot(".")); // TODO: pivot_root
         }
 
-        for (const auto& entry : std::filesystem::directory_iterator("/"))
-        {
-            LOG_INFO("File: {}", entry.path().string());
-        }
         response.Result = 0;
     }
     catch (...)
@@ -108,11 +104,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CREATE_PRO
 
     auto EnvironmentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.EnvironmentIndex);
     EnvironmentArray.push_back(nullptr);
-
-    for (const auto e: EnvironmentArray)
-    {
-        LOG_ERROR("Env: {}", e != nullptr ? e : "null");
-    }
 
     auto ControlPipe = wil::unique_pipe::create(O_CLOEXEC);
 

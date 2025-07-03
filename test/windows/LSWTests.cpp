@@ -81,6 +81,7 @@ class LSWTests
         createProcessSettings.Arguments = commandLine.data();
         createProcessSettings.FileDescriptors = fds.data();
         createProcessSettings.Environment = env.data();
+        createProcessSettings.FdCount = 3;
 
         LinuxProcess process;
         VERIFY_SUCCEEDED(CreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &process));

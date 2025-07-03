@@ -73,6 +73,7 @@ struct CreateProcessSettings
     char const** Arguments;
     char const** Environment;
     const char* CurrentDirectory;
+    uint32_t FdCount;
     struct ProcessFileDescriptorSettings* FileDescriptors;
 };
 
