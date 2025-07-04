@@ -314,20 +314,24 @@ Aktivér den valgfrie komponent "Windows-undersystem til Linux" for at bruge WSL
     <value>Denne handling understøttes kun af WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Brug:
+    <value>Usage:
     --networking-mode
-       Vis aktuel netværkstilstand.
+       Display current networking mode.
 
     --msal-proxy-path
-        Vis stien til MSAL-proxyprogrammet.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Vis versionen af WSL-pakken.
+        Display the version of the WSL package.
 
     -n
-        Udskriv ikke en ny linje.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

@@ -320,20 +320,24 @@ WSL1을 사용하려면 "Windows Subsystem for Linux” 선택적 구성 요소�
     <value>이 작업은 WSL2에서만 지원됩니다.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>사용량: 
+    <value>Usage:
     --networking-mode
-       현재 네트워킹 모드를 표시합니다.
+       Display current networking mode.
 
     --msal-proxy-path
-        MSAL 프록시 애플리케이션의 경로를 표시합니다.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        WSL 패키지의 버전을 표시합니다.
+        Display the version of the WSL package.
 
     -n
-        줄 바꿈을 인쇄하지 마세요.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

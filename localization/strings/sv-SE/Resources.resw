@@ -314,20 +314,24 @@ Aktivera den valfria komponenten "Windows-undersystem för Linux" för att anvä
     <value>Den här åtgärden stöds bara av WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Användning:
+    <value>Usage:
     --networking-mode
-       Visa aktuellt nätverksläge.
+       Display current networking mode.
 
     --msal-proxy-path
-        Visa sökvägen till MSAL-proxyprogrammet.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Visa WSL-paketets version.
+        Display the version of the WSL package.
 
     -n
-        Skriv inte ut en ny rad.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

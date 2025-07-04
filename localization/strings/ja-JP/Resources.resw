@@ -320,20 +320,24 @@ WSL1 を使用するには、"Linux 用 Windows サブシステム" オプショ
     <value>この操作は WSL2 でのみサポートされています。</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>使用法: 
+    <value>Usage:
     --networking-mode
-       現在のネットワーク モードを表示します。
+       Display current networking mode.
 
     --msal-proxy-path
-        MSAL プロキシ アプリケーションへのパスを表示します。
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        WSL パッケージのバージョンを表示します。
+        Display the version of the WSL package.
 
     -n
-        改行を出力しません。</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

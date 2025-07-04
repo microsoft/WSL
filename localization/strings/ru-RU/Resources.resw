@@ -321,20 +321,24 @@
     <value>Эта операция поддерживается только в WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Использование:
+    <value>Usage:
     --networking-mode
-       Отображение текущего сетевого режима.
+       Display current networking mode.
 
     --msal-proxy-path
-        Отображение пути к прокси-приложению MSAL.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Отображение версии пакета WSL.
+        Display the version of the WSL package.
 
     -n
-        Не печатать новую строку.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
