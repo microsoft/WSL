@@ -320,20 +320,24 @@
     <value>只有 WSL2 支援此作業。</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>使用方式: 
+    <value>Usage:
     --networking-mode
-       顯示當前的網路模式。
+       Display current networking mode.
 
     --msal-proxy-path
-        顯示 MSAL Proxy 應用程式的路徑。
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        顯示 WSL 套件的版本。
+        Display the version of the WSL package.
 
     -n
-        不要列印新行。</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

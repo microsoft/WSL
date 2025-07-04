@@ -314,20 +314,24 @@ Ative o componente opcional "Subsistema Windows para Linux" para utilizar o WSL1
     <value>Esta operação só é suportada pelo WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Utilização:
+    <value>Usage:
     --networking-mode
-       Exibir o modo de rede atual.
+       Display current networking mode.
 
     --msal-proxy-path
-        Exibir o caminho para a aplicação de proxy MSAL.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Exibir a versão do pacote WSL.
+        Display the version of the WSL package.
 
     -n
-        Não imprimir uma nova linha.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

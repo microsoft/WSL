@@ -314,20 +314,24 @@ Schakel het optionele onderdeel 'Windows Subsystem for Linux' in om WSL1 te gebr
     <value>Deze bewerking wordt alleen ondersteund door WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Gebruik:
+    <value>Usage:
     --networking-mode
-       Huidige netwerkmodus weergeven.
+       Display current networking mode.
 
     --msal-proxy-path
-        Geef het pad naar de MSAL-proxytoepassing weer.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        De versie van het WSL-pakket weergeven.
+        Display the version of the WSL package.
 
     -n
-        Druk geen nieuwe regel af.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

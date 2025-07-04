@@ -321,20 +321,24 @@ Para obter informações, visite https://aka.ms/enablevirtualization</value>
     <value>Esta operação só é compatível com WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Uso:
+    <value>Usage:
     --networking-mode
-       Exibir modo de rede atual.
+       Display current networking mode.
 
     --msal-proxy-path
-        Exibir o caminho para o aplicativo proxy MSAL.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Exibir a versão do pacote WSL.
+        Display the version of the WSL package.
 
     -n
-        Não imprimir uma nova linha.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

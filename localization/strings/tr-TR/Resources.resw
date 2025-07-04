@@ -314,20 +314,24 @@ Lütfen WSL1'i kullanmak için "Windows Subsystem for Linux" isteğe bağlı bil
     <value>Bu işlem yalnızca WSL2 tarafından desteklenir.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Kullanım:
+    <value>Usage:
     --networking-mode
-       Geçerli ağ modunu görüntüle.
+       Display current networking mode.
 
     --msal-proxy-path
-        MSAL ara sunucu uygulamasının yolunu görüntüle.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        WSL paketinin sürümünü görüntüle.
+        Display the version of the WSL package.
 
     -n
-        Yeni bir satır yazdırma.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
