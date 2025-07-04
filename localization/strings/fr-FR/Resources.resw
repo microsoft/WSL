@@ -321,20 +321,24 @@ Veuillez activer le composant facultatif « Windows Subsystem for Linux » pou
     <value>Cette opération est uniquement prise en charge par WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Utilisation : 
+    <value>Usage:
     --networking-mode
-       Afficher le mode réseau actuel.
+       Display current networking mode.
 
     --msal-proxy-path
-        Affichez le chemin d’accès à l’application proxy MSAL.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Affichez la version du package WSL.
+        Display the version of the WSL package.
 
     -n
-        N’imprimez pas de saut de ligne.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

@@ -314,20 +314,24 @@ Ota valinnainen Windows-alijärjestelmä Linuxille -osa käyttöön, jotta voit 
     <value>Vain WSL2 tukee tätä toimintoa.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Käyttö:
+    <value>Usage:
     --networking-mode
-       Näytä nykyinen verkkotila.
+       Display current networking mode.
 
     --msal-proxy-path
-        Näytä MSAL-välityspalvelinsovelluksen polku.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Näytä WSL-paketin versio.
+        Display the version of the WSL package.
 
     -n
-        Älä tulosta uutta riviä.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
