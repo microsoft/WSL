@@ -842,6 +842,18 @@ class UnitTests
                 L"Invalid command line argument: --invalid\nPlease use 'wslinfo --help' to get a list of supported "
                 L"arguments.\n");
         }
+
+        if (LxsstuVmMode())
+        {
+            // Get the VM ID from the distro and validate that it not null.
+            auto [vmId, vmIdErr] = LxsstuLaunchWslAndCaptureOutput(L"env | grep 'WSL2_VM_ID' | awk -F= '{print $2}'");
+            VERIFY_ARE_NOT_EQUAL(vmId, L"");
+
+            // Ensure that the response from wslinfo matches the VM id from the distros environment
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id");
+            VERIFY_ARE_EQUAL(out, std::format(L"{}", vmId));
+            VERIFY_ARE_EQUAL(err, L"");
+        }
     }
 
     TEST_METHOD(WslPath)
