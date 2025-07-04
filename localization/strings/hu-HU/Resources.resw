@@ -314,20 +314,24 @@ A WSL1 használatához engedélyezze a Linuxos Windows-alrendszer választható 
     <value>Ezt a műveletet csak a WSL2 támogatja.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Használat:
+    <value>Usage:
     --networking-mode
-       Az aktuális hálózati mód megjelenítése.
+       Display current networking mode.
 
     --msal-proxy-path
-        Az MSAL proxyalkalmazás elérési útjának megjelenítése.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        A WSL-csomag verziójának megjelenítése.
+        Display the version of the WSL package.
 
     -n
-        Ne nyomtasson új sort.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

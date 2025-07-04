@@ -314,20 +314,24 @@ Pokud chcete používat WSL1, povolte prosím volitelnou komponentu Subsystém W
     <value>Tuto operaci podporuje jenom WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Využití:
+    <value>Usage:
     --networking-mode
-       Zobrazení aktuálního síťového režimu.
+       Display current networking mode.
 
     --msal-proxy-path
-        Zobrazení cesty k aplikaci proxy MSAL.
+        Display the path to the MSAL proxy application.
+
+    --vm-id
+        Display the WSL VM ID.
 
     --version
-        Zobrazí verzi balíčku WSL.
+        Display the version of the WSL package.
 
     -n
-        Netisknout nový řádek.</value>
+        Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

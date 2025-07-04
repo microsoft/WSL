@@ -328,6 +328,9 @@
     --msal-proxy-path
         Отображение пути к прокси-приложению MSAL.
 
+    --vm-id
+        Отображение ИД виртуальной машины WSL.
+
     --version
         Отображение версии пакета WSL.
 
@@ -335,6 +338,7 @@
         Не печатать новую строку.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

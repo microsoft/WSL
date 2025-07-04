@@ -327,6 +327,9 @@
     --msal-proxy-path
         显示 MSAL 代理应用程序的路径。
 
+    --vm-id
+        显示 WSL VM ID。
+
     --version
         显示 WSL 包的版本。
 
@@ -334,6 +337,7 @@
         不要打印换行符。</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
