@@ -34,7 +34,7 @@ static constexpr bool EscapeNtfsLegalAnsiCharacterArray[128] = {
     false, // 0x06 ^F
     false, // 0x07 ^G
     false, // 0x08 ^H
-    false, // 0x09 ^I
+    true,  // 0x09 ^I (tab)
     false, // 0x0A ^J
     false, // 0x0B ^K
     false, // 0x0C ^L

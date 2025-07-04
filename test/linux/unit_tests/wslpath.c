@@ -36,6 +36,9 @@ Abstract:
 #define WSLPATH_ESCAPE_LX_DIR "/data/" WSLPATH_ESCAPE_NAME
 #define WSLPATH_ESCAPE_LX_DIR_WIN WSLPATH_DISTRO_PREFIX "\\data\\" WSLPATH_ESCAPE_NAME_ESCAPED
 #define WSLPATH_MOUNT_POINT "/data/wslpath_mount"
+#define WSLPATH_TAB_NAME "test_dir_with\ttab"
+#define WSLPATH_TAB_DIR "/tmp/" WSLPATH_TAB_NAME
+#define WSLPATH_TAB_DIR_WIN WSLPATH_DISTRO_PREFIX "\\tmp\\" WSLPATH_TAB_NAME
 
 LXT_VARIATION_HANDLER WslPathTestDrvFsEscaped;
 
@@ -53,6 +56,8 @@ LXT_VARIATION_HANDLER WslPathTestLxFromWinPath;
 
 LXT_VARIATION_HANDLER WslPathTestLxToWinPath;
 
+LXT_VARIATION_HANDLER WslPathTestTabCharacters;
+
 static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Windows to DrvFs", WslPathTestDrvFsFromWinPath},
     {"WslPath - DrvFs to Windows", WslPathTestDrvFsToWinPath},
@@ -61,6 +66,7 @@ static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - \\\\wsl.localhost to Linux", WslPathTestLxFromWinPath},
     {"WslPath - Linux to \\\\wsl.localhost", WslPathTestLxToWinPath},
     {"WslPath - \\\\wsl.localhost escaped characters", WslPathTestLxEscaped},
+    {"WslPath - Tab characters", WslPathTestTabCharacters},
     {"WslPath - Invalid mountinfo line", WslPathTestInvalidMountInfo},
 };
 
@@ -399,5 +405,41 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("/proc/1/", WSLPATH_DISTRO_PREFIX "\\proc\\1\\", false));
 
 ErrorExit:
+    return Result;
+}
+
+int WslPathTestTabCharacters(PLXT_ARGS Args)
+
+/*++
+
+Description:
+
+    This routine tests wslpath on paths with tab characters.
+
+Arguments:
+
+    Args - Supplies the command line arguments.
+
+Return Value:
+
+    Returns 0 on success, -1 on failure.
+
+--*/
+
+{
+
+    int Result;
+
+    // Create a directory with tab character in name
+    LxtCheckErrno(mkdir(WSLPATH_TAB_DIR, 0777));
+    
+    // Test Linux to Windows translation - tab should not be escaped
+    LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_TAB_DIR, WSLPATH_TAB_DIR_WIN, false));
+    
+    // Test Windows to Linux translation - tab should be preserved
+    LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_TAB_DIR_WIN, WSLPATH_TAB_DIR, true));
+
+ErrorExit:
+    rmdir(WSLPATH_TAB_DIR);
     return Result;
 }
