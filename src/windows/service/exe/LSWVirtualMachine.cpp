@@ -260,10 +260,48 @@ try
 }
 CATCH_RETURN();
 
+std::pair<int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork()
+{
+    uint32_t port{};
+    int32_t pid{};
+    {
+        std::lock_guard lock{m_lock};
+        const auto& response = m_initChannel.Transaction<LSW_FORK>();
+        port = response.Port;
+        pid = response.Pid;
+    }
+
+    THROW_HR_IF_MSG(E_FAIL, pid <= 0, "fork() returned %i", pid);
+
+    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port);
+
+    // TODO: pid in channel name
+    return std::make_pair(pid, wsl::shared::SocketChannel{std::move(socket), "ForkedChannel"});
+}
+
+wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
+{
+    LSW_CONNECT message{};
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = LSW_CONNECT::Type;
+    message.Fd = Fd;
+    const auto& response = Channel.Transaction(message);
+
+    return wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
+}
+
 HRESULT LSWVirtualMachine::CreateLinuxProcess(
     _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
 {
+    auto [pid, subChannel] = Fork();
+
+    std::vector<wil::unique_socket> sockets(FdCount);
+    for (size_t i = 0; i < FdCount; i++)
+    {
+        sockets[i] = ConnectSocket(subChannel, static_cast<int32_t>(Fds[i].Fd));
+    }
+
     wsl::shared::MessageWriter<LSW_CREATE_PROCESS> Message;
 
     Message.WriteString(Message->ExecutableIndex, Options->Executable);
@@ -271,20 +309,19 @@ try
     Message.WriteStringArray(Message->CommandLineIndex, Options->CommandLine, Options->CommandLineCount);
     Message.WriteStringArray(Message->EnvironmentIndex, Options->Environmnent, Options->EnvironmnentCount);
 
-    std::lock_guard lock{m_lock};
-    const auto& port = m_initChannel.Transaction<LSW_CREATE_PROCESS>(Message.Span());
+    subChannel.SendMessage<LSW_CREATE_PROCESS>(Message.Span());
 
-    std::vector<wil::unique_socket> sockets(FdCount);
+    auto [response, span] = subChannel.ReceiveMessageOrClosed<LSW_CREATE_PROCESS_RESPONSE>();
 
-    for (auto& e : sockets)
+    if (response != nullptr)
     {
-        e = wsl::windows::common::hvsocket::Connect(m_vmId, port.Result);
+        Result->Errno = response->Result;
     }
-
-    const auto& response = m_initChannel.ReceiveMessage<LSW_CREATE_PROCESS_RESPONSE>();
-
-    Result->Errno = response.Result;
-    Result->Pid = response.Pid;
+    else
+    {
+        Result->Errno = 0;
+        Result->Pid = pid;
+    }
 
     for (size_t i = 0; i < sockets.size(); i++)
     {

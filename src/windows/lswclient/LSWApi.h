@@ -62,7 +62,7 @@ HRESULT Mount(LSWVirtualMachineHandle* VirtualMachine, const struct MountSetting
 
 struct ProcessFileDescriptorSettings
 {
-    uint64_t Number;
+    uint32_t Number;
     BOOL Tty;
     HANDLE Handle;
 };
@@ -79,11 +79,27 @@ struct CreateProcessSettings
 
 struct LinuxProcess
 {
-    uint64_t Pid;
+    int32_t Pid;
     HANDLE* FileDescriptors;
 };
 
 HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, struct CreateProcessSettings* Settings, struct LinuxProcess* Process);
+
+enum ProcessState
+{
+    ProcessStateUnknown,
+    ProcessStateRunning,
+    ProcessStateExited,
+    ProcessStateSignaled
+};
+
+struct WaitResult
+{
+    ProcessState State;
+    int Code; // Signal number or exit code
+};
+
+HRESULT WaitPid(int32_t Pid, uint64_t TimeoutMs, struct WaitResult& Result);
 
 #ifdef __cplusplus
 }

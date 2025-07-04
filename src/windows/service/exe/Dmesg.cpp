@@ -61,13 +61,13 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
 
     THROW_LAST_ERROR_IF(!pipe);
 
-    auto workerThread = std::thread([Self = shared_from_this(), Source, Pipe = std::move(pipe)]() {
+    auto workerThread = std::thread([this, Source, Pipe = std::move(pipe)]() {
         try
         {
             wsl::windows::common::wslutil::SetThreadDescription(L"Dmesg");
 
             // When the pipe connects, start reading data.
-            wsl::windows::common::helpers::ConnectPipe(Pipe.get(), INFINITE, Self->m_exitEvents);
+            wsl::windows::common::helpers::ConnectPipe(Pipe.get(), INFINITE, m_exitEvents);
 
             std::vector<char> buffer(LX_RELAY_BUFFER_SIZE);
             const auto allBuffer = gsl::make_span(buffer);
@@ -78,7 +78,7 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
             {
                 overlappedEvent.ResetEvent();
                 const auto bytesRead = wsl::windows::common::relay::InterruptableRead(
-                    Pipe.get(), gslhelpers::convert_span<gsl::byte>(allBuffer), Self->m_exitEvents, &overlapped);
+                    Pipe.get(), gslhelpers::convert_span<gsl::byte>(allBuffer), m_exitEvents, &overlapped);
 
                 if (bytesRead == 0)
                 {
@@ -86,7 +86,7 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
                 }
 
                 auto validBuffer = allBuffer.subspan(0, bytesRead);
-                Self->ProcessInput(Source, validBuffer);
+                ProcessInput(Source, validBuffer);
             }
         }
         CATCH_LOG()

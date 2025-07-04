@@ -22,6 +22,9 @@ public:
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
 
+    std::pair<int32_t, wsl::shared::SocketChannel> Fork();
+    wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
+
     struct AttachedDisk
     {
         std::filesystem::path Path;

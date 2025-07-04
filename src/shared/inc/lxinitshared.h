@@ -366,6 +366,10 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLswGetDiskResult,
     LxMessageLswCreateProcess,
     LxMessageLswCreateProcessResult,
+    LxMessageLswCreateProcessFork,
+    LxMessageLswCreateProcessForkResult,
+    LxMessageLswCreateProcessConnect,
+    LxMessageLswCreateProcessWaitPid,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -460,6 +464,10 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLswGetDiskResult)
         X(LxMessageLswCreateProcess)
         X(LxMessageLswCreateProcessResult)
+        X(LxMessageLswCreateProcessFork)
+        X(LxMessageLswCreateProcessForkResult)
+        X(LxMessageLswCreateProcessConnect)
+        X(LxMessageLswCreateProcessWaitPid)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1565,6 +1573,50 @@ struct LSW_CREATE_PROCESS
         FIELD(FdIndex),
         STRING_ARRAY_FIELD(CommandLineIndex),
         STRING_ARRAY_FIELD(EnvironmentIndex));
+};
+
+struct LSW_FORK_RESULT
+{
+    static inline auto Type = LxMessageLswCreateProcessForkResult;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    MESSAGE_HEADER Header;
+    uint32_t Port;
+    int32_t Pid;
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Port));
+};
+
+struct LSW_FORK
+{
+    static inline auto Type = LxMessageLswCreateProcessFork;
+    using TResponse = LSW_FORK_RESULT;
+
+    MESSAGE_HEADER Header;
+    bool Thread;
+    PRETTY_PRINT(FIELD(Header));
+};
+
+struct LSW_CONNECT
+{
+    static inline auto Type = LxMessageLswCreateProcessConnect;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    MESSAGE_HEADER Header;
+    int32_t Fd; // TODO: multiple at once
+    PRETTY_PRINT(FIELD(Header), FIELD(Fd));
+};
+
+struct LSW_WAITPID
+{
+    static inline auto Type = LxMessageLswCreateProcessWaitPid;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    MESSAGE_HEADER Header;
+    int32_t Pid;
+    uint32_t TimeoutMs;
+    int32_t Errno;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT
