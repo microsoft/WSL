@@ -321,6 +321,9 @@ Pokud chcete používat WSL1, povolte prosím volitelnou komponentu Subsystém W
     --msal-proxy-path
         Zobrazení cesty k aplikaci proxy MSAL.
 
+    --vm-id
+        Zobrazí ID virtuálního počítače WSL.
+
     --version
         Zobrazí verzi balíčku WSL.
 
@@ -328,6 +331,7 @@ Pokud chcete používat WSL1, povolte prosím volitelnou komponentu Subsystém W
         Netisknout nový řádek.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

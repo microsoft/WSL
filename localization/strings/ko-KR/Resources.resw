@@ -327,13 +327,17 @@ WSL1을 사용하려면 "Windows Subsystem for Linux” 선택적 구성 요소�
     --msal-proxy-path
         MSAL 프록시 애플리케이션의 경로를 표시합니다.
 
+    --vm-id
+        WSL VM ID를 표시합니다.
+
     --version
         WSL 패키지의 버전을 표시합니다.
 
     -n
-        줄 바꿈을 인쇄하지 마세요.</value>
+        줄 바꿈하지 마세요.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

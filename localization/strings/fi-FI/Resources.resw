@@ -321,6 +321,9 @@ Ota valinnainen Windows-alijärjestelmä Linuxille -osa käyttöön, jotta voit 
     --msal-proxy-path
         Näytä MSAL-välityspalvelinsovelluksen polku.
 
+    --vm-id
+        Näytä WSL-näennäiskoneen tunnus.
+
     --version
         Näytä WSL-paketin versio.
 
@@ -328,6 +331,7 @@ Ota valinnainen Windows-alijärjestelmä Linuxille -osa käyttöön, jotta voit 
         Älä tulosta uutta riviä.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
