@@ -321,6 +321,9 @@ A WSL1 használatához engedélyezze a Linuxos Windows-alrendszer választható 
     --msal-proxy-path
         Az MSAL proxyalkalmazás elérési útjának megjelenítése.
 
+    --vm-id
+        A WSL VM-azonosítójának megjelenítése.
+
     --version
         A WSL-csomag verziójának megjelenítése.
 
@@ -328,6 +331,7 @@ A WSL1 használatához engedélyezze a Linuxos Windows-alrendszer választható 
         Ne nyomtasson új sort.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

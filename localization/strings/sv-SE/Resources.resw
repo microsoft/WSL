@@ -321,6 +321,9 @@ Aktivera den valfria komponenten "Windows-undersystem för Linux" för att anvä
     --msal-proxy-path
         Visa sökvägen till MSAL-proxyprogrammet.
 
+    --vm-id
+        Visa ID för virtuell WSL-dator.
+
     --version
         Visa WSL-paketets version.
 
@@ -328,6 +331,7 @@ Aktivera den valfria komponenten "Windows-undersystem för Linux" för att anvä
         Skriv inte ut en ny rad.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
