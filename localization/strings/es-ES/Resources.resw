@@ -327,13 +327,17 @@ Habilita el componente opcional "Subsistema de Windows para Linux" para usar WSL
     --msal-proxy-path
         Muestra la ruta de acceso a la aplicación proxy MSAL.
 
+    --vm-id
+        Muestra el ID de la máquina virtual de WSL.
+
     --version
-        Muestra la versión del paquete WSL.
+        Muestra la versión del paquete de WSL.
 
     -n
         No imprima una nueva línea.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

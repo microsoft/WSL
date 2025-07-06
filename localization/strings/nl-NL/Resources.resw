@@ -321,6 +321,9 @@ Schakel het optionele onderdeel 'Windows Subsystem for Linux' in om WSL1 te gebr
     --msal-proxy-path
         Geef het pad naar de MSAL-proxytoepassing weer.
 
+    --vm-id
+        Geef de WSL VM-id weer.
+
     --version
         De versie van het WSL-pakket weergeven.
 
@@ -328,6 +331,7 @@ Schakel het optionele onderdeel 'Windows Subsystem for Linux' in om WSL1 te gebr
         Druk geen nieuwe regel af.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
