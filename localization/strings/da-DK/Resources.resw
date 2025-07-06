@@ -321,6 +321,9 @@ Aktivér den valgfrie komponent "Windows-undersystem til Linux" for at bruge WSL
     --msal-proxy-path
         Vis stien til MSAL-proxyprogrammet.
 
+    --vm-id
+        Vis WSL VM ID.
+
     --version
         Vis versionen af WSL-pakken.
 
@@ -328,6 +331,7 @@ Aktivér den valgfrie komponent "Windows-undersystem til Linux" for at bruge WSL
         Udskriv ikke en ny linje.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
