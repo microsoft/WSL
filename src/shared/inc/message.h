@@ -165,8 +165,7 @@ public:
         for (size_t i = 0; i < Count; i++)
         {
             auto size = strlen(String[i]) + 1;
-            it = std::copy(
-                reinterpret_cast<const std::byte*>(String[i]), reinterpret_cast<const std::byte*>(String[i] + size), it);
+            it = std::copy(reinterpret_cast<const std::byte*>(String[i]), reinterpret_cast<const std::byte*>(String[i] + size), it);
         }
         *it = static_cast<std::byte>('\0');
         it++;

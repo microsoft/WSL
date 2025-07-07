@@ -151,7 +151,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_EXEC& Mess
 
     execve(Executable, (char* const*)(ArgumentArray.data()), (char* const*)(EnvironmentArray.data()));
 
-    // Only reached if exec() fails 
+    // Only reached if exec() fails
     Channel.SendResultMessage<int32_t>(errno);
 }
 
@@ -185,7 +185,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& M
     {
         response.State = LSWProcessStateRunning;
         response.Errno = 0;
-        return; 
+        return;
     }
 
     if (WI_IsFlagSet(pollResult.revents, POLLIN))
@@ -204,7 +204,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& M
         response.State = childState.si_code == CLD_EXITED ? LSWProcessStateExited : LSWProcessStateSignaled;
         return;
     }
-
 
     LOG_ERROR("Poll returned an unexpected error state on fd: {} for pid: ", process.get(), Message.Pid);
 }

@@ -369,6 +369,5 @@ try
 
     RETURN_HR_IF(E_FAIL, response.Result != 0);
     return S_OK;
-
 }
 CATCH_RETURN();

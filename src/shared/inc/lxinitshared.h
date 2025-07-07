@@ -274,7 +274,12 @@ Abstract:
 #define INIT_NETLINK_FD_ARG "--netlink-fd"
 #define INIT_PORT_TRACKER_LOCALHOST_RELAY "--localhost-relay"
 
-#define DECLARE_MESSAGE_CTOR(Name) Name() {Header.MessageSize = sizeof(Name); Header.MessageType = Name::Type;}
+#define DECLARE_MESSAGE_CTOR(Name) \
+    Name() \
+    { \
+        Header.MessageSize = sizeof(Name); \
+        Header.MessageType = Name::Type; \
+    }
 
 //
 // The types of messages that can be sent to init and mini init.
@@ -1607,7 +1612,6 @@ struct LSW_CONNECT
     using TResponse = RESULT_MESSAGE<uint32_t>;
     DECLARE_MESSAGE_CTOR(LSW_CONNECT);
 
-
     MESSAGE_HEADER Header;
     int32_t Fd = -1; // TODO: multiple at once
     PRETTY_PRINT(FIELD(Header), FIELD(Fd));
@@ -1642,7 +1646,7 @@ struct LSW_WAITPID
     DECLARE_MESSAGE_CTOR(LSW_WAITPID);
 
     MESSAGE_HEADER Header;
-    int32_t Pid =  -1;
+    int32_t Pid = -1;
     uint64_t TimeoutMs = 0;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(TimeoutMs));
@@ -1656,7 +1660,7 @@ struct LSW_SIGNAL
     DECLARE_MESSAGE_CTOR(LSW_SIGNAL);
 
     MESSAGE_HEADER Header;
-    int32_t Pid =  -1;
+    int32_t Pid = -1;
     int32_t Signal = -1;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Signal));

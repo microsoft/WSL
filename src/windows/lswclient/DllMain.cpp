@@ -62,7 +62,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT AttachDisk(LSWVirtualMachineHandle* VirtualMachine, const DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk)
+HRESULT AttachDisk(LSWVirtualMachineHandle VirtualMachine, const DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk)
 {
     wil::unique_cotaskmem_ansistring device;
     RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->AttachDisk(Settings->WindowsPath, Settings->ReadOnly, &device));
@@ -76,13 +76,13 @@ HRESULT AttachDisk(LSWVirtualMachineHandle* VirtualMachine, const DiskAttachSett
     return S_OK;
 }
 
-HRESULT Mount(LSWVirtualMachineHandle* VirtualMachine, const MountSettings* Settings)
+HRESULT Mount(LSWVirtualMachineHandle VirtualMachine, const MountSettings* Settings)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
         ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Chroot);
 }
 
-HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, CreateProcessSettings* UserSettings, int32_t* Pid)
+HRESULT CreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProcessSettings* UserSettings, int32_t* Pid)
 {
     LSW_CREATE_PROCESS_OPTIONS options{};
 
@@ -133,7 +133,7 @@ HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, CreateProces
     return S_OK;
 }
 
-HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WaitResult* Result)
+HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WaitResult* Result)
 {
     static_assert(ProcessStateUnknown == LSWProcessStateUnknown);
     static_assert(ProcessStateRunning == LSWProcessStateRunning);
@@ -146,7 +146,7 @@ HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, int32_t Pid
         ->WaitPid(Pid, TimeoutMs, reinterpret_cast<ULONG*>(&Result->State), &Result->Code);
 }
 
-HRESULT SignalLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, int32_t Pid, int32_t Signal)
+HRESULT SignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Signal(Pid, Signal);
 }

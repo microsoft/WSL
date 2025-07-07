@@ -50,7 +50,7 @@ class LSWTests
         WSADATA Data;
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
 
-        void* vm{};
+        LSWVirtualMachineHandle vm{};
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
@@ -58,9 +58,15 @@ class LSWTests
         settings.Options.BootTimeoutMs = 30000;
         VERIFY_SUCCEEDED(CreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
 
-        auto systemdDistroDiskPath = LR"(D:\wsldev\system.vhd)";
+#ifdef WSL_SYSTEM_DISTRO_PATH
 
-        DiskAttachSettings attachSettings{systemdDistroDiskPath, true};
+        std::wstring systemdDistroDiskPath = TEXT(WSL_SYSTEM_DISTRO_PATH);
+#else
+
+        auto systemdDistroDiskPath = std::format(L"{}/system.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
+#endif
+
+        DiskAttachSettings attachSettings{systemdDistroDiskPath.c_str(), true};
         AttachedDiskInformation attachedDisk;
 
         VERIFY_SUCCEEDED(AttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));

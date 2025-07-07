@@ -31,9 +31,9 @@ struct VirtualMachineSettings
     struct Options Options;
 };
 
-typedef HANDLE LSWVirtualMachineHandle;
+typedef void* LSWVirtualMachineHandle;
 
-HRESULT CreateVirualMachine(const struct VirtualMachineSettings* Settings, struct LSWVirtualMachineHandle* VirtualMachine);
+HRESULT CreateVirualMachine(const struct VirtualMachineSettings* Settings, LSWVirtualMachineHandle* VirtualMachine);
 
 struct DiskAttachSettings
 {
@@ -47,7 +47,7 @@ struct AttachedDiskInformation
     char Device[10];
 };
 
-HRESULT AttachDisk(LSWVirtualMachineHandle* VirtualMachine, const struct DiskAttachSettings* Settings, struct AttachedDiskInformation* AttachedDisk);
+HRESULT AttachDisk(LSWVirtualMachineHandle VirtualMachine, const struct DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk);
 
 struct MountSettings
 {
@@ -58,7 +58,7 @@ struct MountSettings
     BOOL Chroot;
 };
 
-HRESULT Mount(LSWVirtualMachineHandle* VirtualMachine, const struct MountSettings* Settings);
+HRESULT Mount(LSWVirtualMachineHandle VirtualMachine, const struct MountSettings* Settings);
 
 struct ProcessFileDescriptorSettings
 {
@@ -77,7 +77,7 @@ struct CreateProcessSettings
     struct ProcessFileDescriptorSettings* FileDescriptors;
 };
 
-HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, struct CreateProcessSettings* Settings, int32_t* Pid);
+HRESULT CreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, struct CreateProcessSettings* Settings, int32_t* Pid);
 
 enum ProcessState
 {
@@ -93,9 +93,9 @@ struct WaitResult
     int32_t Code; // Signal number or exit code
 };
 
-HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WaitResult* Result);
+HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WaitResult* Result);
 
-HRESULT SignalLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, int32_t Pid, int32_t Signal);
+HRESULT SignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal);
 
 #ifdef __cplusplus
 }
