@@ -347,7 +347,7 @@ try
     message.TimeoutMs = TimeoutMs;
 
     const auto& response = subChannel.Transaction(message);
-    
+
     THROW_HR_IF(E_FAIL, response.State == LSWProcessStateUnknown);
 
     *State = response.State;
@@ -365,7 +365,7 @@ try
     LSW_SIGNAL message;
     message.Pid = Pid;
     message.Signal = Signal;
-    const auto & response = m_initChannel.Transaction(message);
+    const auto& response = m_initChannel.Transaction(message);
 
     RETURN_HR_IF(E_FAIL, response.Result != 0);
     return S_OK;
