@@ -260,13 +260,17 @@ try
 }
 CATCH_RETURN();
 
-std::pair<int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork()
+std::pair<int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(bool thread)
 {
     uint32_t port{};
     int32_t pid{};
     {
         std::lock_guard lock{m_lock};
-        const auto& response = m_initChannel.Transaction<LSW_FORK>();
+        LSW_FORK message;
+        message.Header.MessageSize = sizeof(message);
+        message.Header.MessageType = LSW_FORK::Type;
+        message.Thread = thread;
+        const auto& response = m_initChannel.Transaction(message);
         port = response.Port;
         pid = response.Pid;
     }
@@ -294,7 +298,7 @@ HRESULT LSWVirtualMachine::CreateLinuxProcess(
     _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
 {
-    auto [pid, subChannel] = Fork();
+    auto [pid, subChannel] = Fork(false);
 
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
@@ -302,20 +306,21 @@ try
         sockets[i] = ConnectSocket(subChannel, static_cast<int32_t>(Fds[i].Fd));
     }
 
-    wsl::shared::MessageWriter<LSW_CREATE_PROCESS> Message;
+    wsl::shared::MessageWriter<LSW_EXEC> Message;
 
     Message.WriteString(Message->ExecutableIndex, Options->Executable);
     Message.WriteString(Message->CurrentDirectoryIndex, Options->CurrentDirectory ? Options->CurrentDirectory : "/");
     Message.WriteStringArray(Message->CommandLineIndex, Options->CommandLine, Options->CommandLineCount);
     Message.WriteStringArray(Message->EnvironmentIndex, Options->Environmnent, Options->EnvironmnentCount);
 
-    subChannel.SendMessage<LSW_CREATE_PROCESS>(Message.Span());
+    subChannel.SendMessage<LSW_EXEC>(Message.Span());
 
-    auto [response, span] = subChannel.ReceiveMessageOrClosed<LSW_CREATE_PROCESS_RESPONSE>();
+    auto [response, span] = subChannel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
 
     if (response != nullptr)
     {
         Result->Errno = response->Result;
+        return E_FAIL;
     }
     else
     {
@@ -329,5 +334,41 @@ try
     }
 
     return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::WaitPid(LONG Pid, ULONGLONG TimeoutMs, ULONG* State, int* Code)
+try
+{
+    auto [pid, subChannel] = Fork(true);
+
+    LSW_WAITPID message{};
+    message.Pid = Pid;
+    message.TimeoutMs = TimeoutMs;
+
+    const auto& response = subChannel.Transaction(message);
+    
+    THROW_HR_IF(E_FAIL, response.State == LSWProcessStateUnknown);
+
+    *State = response.State;
+    *Code = response.Code;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    LSW_SIGNAL message;
+    message.Pid = Pid;
+    message.Signal = Signal;
+    const auto & response = m_initChannel.Transaction(message);
+
+    RETURN_HR_IF(E_FAIL, response.Result != 0);
+    return S_OK;
+
 }
 CATCH_RETURN();

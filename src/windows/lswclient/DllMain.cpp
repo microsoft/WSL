@@ -82,7 +82,7 @@ HRESULT Mount(LSWVirtualMachineHandle* VirtualMachine, const MountSettings* Sett
         ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Chroot);
 }
 
-HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, CreateProcessSettings* UserSettings, LinuxProcess* Process)
+HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, CreateProcessSettings* UserSettings, int32_t* Pid)
 {
     LSW_CREATE_PROCESS_OPTIONS options{};
 
@@ -128,7 +128,27 @@ HRESULT CreateLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, CreateProces
         UserSettings->FileDescriptors[i].Handle = fds[i];
     }
 
+    *Pid = result.Pid;
+
     return S_OK;
+}
+
+HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WaitResult* Result)
+{
+    static_assert(ProcessStateUnknown == LSWProcessStateUnknown);
+    static_assert(ProcessStateRunning == LSWProcessStateRunning);
+    static_assert(ProcessStateExited == LSWProcessStateExited);
+    static_assert(ProcessStateSignaled == LSWProcessStateSignaled);
+    static_assert(sizeof(ProcessState) == sizeof(LSWProcessState));
+    static_assert(sizeof(ProcessState) == sizeof(ULONG));
+
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+        ->WaitPid(Pid, TimeoutMs, reinterpret_cast<ULONG*>(&Result->State), &Result->Code);
+}
+
+HRESULT SignalLinuxProcess(LSWVirtualMachineHandle* VirtualMachine, int32_t Pid, int32_t Signal)
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Signal(Pid, Signal);
 }
 
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)

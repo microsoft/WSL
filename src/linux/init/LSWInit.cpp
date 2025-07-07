@@ -4,6 +4,7 @@
 #include <utmp.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
+#include <sys/syscall.h>
 #include "mountutilcpp.h"
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
@@ -58,24 +59,39 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false)};
     THROW_LAST_ERROR_IF(!ListenSocket);
-    auto child = UtilCreateChildProcess("CreateChildProcess", [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel]() {
-        // Closed parent channel
 
-        Channel.Close();
+    LSW_FORK_RESULT Response{};
+    Response.Header.MessageSize = sizeof(Response);
+    Response.Header.MessageType = LSW_FORK_RESULT::Type;
+    Response.Port = SocketAddress.svm_port;
+
+    auto childLogic = [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel, &Message]() {
+        // Close parent channel
+
+        if (!Message.Thread)
+        {
+            Channel.Close();
+        }
 
         wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
         THROW_LAST_ERROR_IF(!ProcessSocket);
 
         auto subChannel = wsl::shared::SocketChannel{std::move(ProcessSocket), "ForkedChannel"};
         ProcessMessages(subChannel);
-        exit(0);
-    }, Message.Thread ? std::optional<int>(CLONE_THREAD) : std::optional<int>());
+    };
 
-    LSW_FORK_RESULT Response{};
-    Response.Header.MessageSize = sizeof(Response);
-    Response.Header.MessageType = LSW_FORK_RESULT::Type;
-    Response.Pid = child;
-    Response.Port = SocketAddress.svm_port;
+    if (Message.Thread)
+    {
+        std::thread thread{std::move(childLogic)};
+        Response.Pid = 1; // TODO: get pid
+
+        thread.detach();
+    }
+    else
+    {
+
+        Response.Pid = UtilCreateChildProcess("CreateChildProcess", std::move(childLogic));
+    }
 
     Channel.SendMessage(Response);
 }
@@ -124,7 +140,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
     Channel.SendMessage<LSW_MOUNT_RESULT>(response);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CREATE_PROCESS& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_EXEC& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto Executable = wsl::shared::string::FromSpan(Buffer, Message.ExecutableIndex);
     auto ArgumentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.CommandLineIndex);
@@ -133,30 +149,70 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CREATE_PRO
     auto EnvironmentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.EnvironmentIndex);
     EnvironmentArray.push_back(nullptr);
 
-    auto result = execve(Executable, (char* const*)(ArgumentArray.data()), (char* const*)(EnvironmentArray.data()));
+    execve(Executable, (char* const*)(ArgumentArray.data()), (char* const*)(EnvironmentArray.data()));
 
-    LSW_CREATE_PROCESS_RESPONSE Result{};
-    Result.Header.MessageSize = sizeof(Result);
-    Result.Header.MessageType = LSW_CREATE_PROCESS_RESPONSE::Type;
-    Result.Result = result;
-
-    Channel.SendMessage(Result);
+    // Only reached if exec() fails 
+    Channel.SendResultMessage<int32_t>(errno);
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    LSW_WAITPID response;
-    response.Header.MessageSize = sizeof(response);
-    response.Header.MessageType = LSW_WAITPID::Type;
-    response.Errno = EINVAL;
+    LSW_WAITPID_RESULT response{};
+    response.State = LSWProcessStateUnknown;
 
-    /*wil::unique_fd process = pidfd_open(Message.Pid, 0);
+    auto sendResponse = wil::scope_exit([&]() { Channel.SendMessage(response); });
+
+    wil::unique_fd process = syscall(SYS_pidfd_open, Message.Pid, 0);
     if (!process)
     {
+        LOG_ERROR("pidfd_open({}) failed, {}", Message.Pid, errno);
         response.Errno = errno;
         return;
-    }*/
-    //int result = TEMP_FAILURE_RETRY(waitpid(Message.Pid));
+    }
+
+    pollfd pollResult{};
+    pollResult.fd = process.get();
+    pollResult.events = POLLIN | POLLERR;
+
+    int result = poll(&pollResult, 1, Message.TimeoutMs);
+    if (result < 0)
+    {
+        LOG_ERROR("poll failed {}", errno);
+        response.Errno = errno;
+        return;
+    }
+    else if (result == 0) // Timed out
+    {
+        response.State = LSWProcessStateRunning;
+        response.Errno = 0;
+        return; 
+    }
+
+    if (WI_IsFlagSet(pollResult.revents, POLLIN))
+    {
+        siginfo_t childState{};
+        auto result = waitid(P_PIDFD, process.get(), &childState, WEXITED);
+        if (result < 0)
+        {
+            LOG_ERROR("waitid({}) failed, {}", process.get(), errno);
+            response.Errno = errno;
+            return;
+        }
+
+        response.Code = childState.si_status;
+        response.Errno = 0;
+        response.State = childState.si_code == CLD_EXITED ? LSWProcessStateExited : LSWProcessStateSignaled;
+        return;
+    }
+
+
+    LOG_ERROR("Poll returned an unexpected error state on fd: {} for pid: ", process.get(), Message.Pid);
+}
+
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    auto result = kill(Message.Pid, Message.Signal);
+    Channel.SendResultMessage(result < 0 ? errno : 0);
 }
 
 template <typename TMessage, typename... Args>
@@ -193,7 +249,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_CREATE_PROCESS, LSW_FORK, LSW_CONNECT>(Channel, Type, Buffer);
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL>(Channel, Type, Buffer);
     }
     catch (...)
     {

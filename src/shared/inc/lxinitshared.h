@@ -274,6 +274,8 @@ Abstract:
 #define INIT_NETLINK_FD_ARG "--netlink-fd"
 #define INIT_PORT_TRACKER_LOCALHOST_RELAY "--localhost-relay"
 
+#define DECLARE_MESSAGE_CTOR(Name) Name() {Header.MessageSize = sizeof(Name); Header.MessageType = Name::Type;}
+
 //
 // The types of messages that can be sent to init and mini init.
 //
@@ -364,12 +366,13 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLSWError,
     LxMessageLswGetDisk,
     LxMessageLswGetDiskResult,
-    LxMessageLswCreateProcess,
-    LxMessageLswCreateProcessResult,
-    LxMessageLswCreateProcessFork,
-    LxMessageLswCreateProcessForkResult,
-    LxMessageLswCreateProcessConnect,
-    LxMessageLswCreateProcessWaitPid,
+    LxMessageLswExec,
+    LxMessageLswFork,
+    LxMessageLswForkResult,
+    LxMessageLswConnect,
+    LxMessageLswWaitPid,
+    LxMessageLswWaitPidResponse,
+    LxMessageLswSignal,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -462,13 +465,13 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLSWMountResult)
         X(LxMessageLswGetDisk)
         X(LxMessageLswGetDiskResult)
-        X(LxMessageLswCreateProcess)
-        X(LxMessageLswCreateProcessResult)
-        X(LxMessageLswCreateProcessFork)
-        X(LxMessageLswCreateProcessForkResult)
-        X(LxMessageLswCreateProcessConnect)
-        X(LxMessageLswCreateProcessWaitPid)
-
+        X(LxMessageLswExec)
+        X(LxMessageLswFork)
+        X(LxMessageLswForkResult)
+        X(LxMessageLswConnect)
+        X(LxMessageLswWaitPid)
+        X(LxMessageLswWaitPidResponse)
+        X(LxMessageLswSignal)
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1498,6 +1501,9 @@ struct LSW_ERROR
 struct LSW_GET_DISK_RESULT
 {
     static inline auto Type = LxMessageLswGetDiskResult;
+
+    DECLARE_MESSAGE_CTOR(LSW_GET_DISK_RESULT);
+
     MESSAGE_HEADER Header;
     unsigned int Result;
     char Buffer[];
@@ -1509,6 +1515,8 @@ struct LSW_GET_DISK
 {
     static inline auto Type = LxMessageLswGetDisk;
     using TResponse = LSW_GET_DISK_RESULT;
+
+    DECLARE_MESSAGE_CTOR(LSW_GET_DISK);
 
     MESSAGE_HEADER Header;
     unsigned int ScsiLun;
@@ -1530,6 +1538,8 @@ struct LSW_MOUNT
     static inline auto Type = LxMessageLSWMount;
     using TResponse = LSW_MOUNT_RESULT;
 
+    DECLARE_MESSAGE_CTOR(LSW_MOUNT);
+
     MESSAGE_HEADER Header;
     bool Chroot;
     unsigned int SourceIndex;
@@ -1542,27 +1552,19 @@ struct LSW_MOUNT
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
 };
 
-struct LSW_CREATE_PROCESS_RESPONSE
+struct LSW_EXEC
 {
-    static inline auto Type = LxMessageLswCreateProcessResult;
-    MESSAGE_HEADER Header;
-    int Result;
-    std::uint64_t Pid;
-
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(Result));
-};
-
-struct LSW_CREATE_PROCESS
-{
-    static inline auto Type = LxMessageLswCreateProcess;
+    static inline auto Type = LxMessageLswExec;
     using TResponse = RESULT_MESSAGE<uint32_t>;
-    MESSAGE_HEADER Header;
 
-    unsigned int ExecutableIndex;
-    unsigned int CommandLineIndex;
-    unsigned int EnvironmentIndex;
-    unsigned int CurrentDirectoryIndex;
-    unsigned int FdIndex;
+    DECLARE_MESSAGE_CTOR(LSW_EXEC);
+
+    MESSAGE_HEADER Header;
+    unsigned int ExecutableIndex = 0;
+    unsigned int CommandLineIndex = 0;
+    unsigned int EnvironmentIndex = 0;
+    unsigned int CurrentDirectoryIndex = 0;
+    unsigned int FdIndex = 0;
 
     char Buffer[];
 
@@ -1574,49 +1576,90 @@ struct LSW_CREATE_PROCESS
         STRING_ARRAY_FIELD(CommandLineIndex),
         STRING_ARRAY_FIELD(EnvironmentIndex));
 };
-
 struct LSW_FORK_RESULT
 {
-    static inline auto Type = LxMessageLswCreateProcessForkResult;
+    static inline auto Type = LxMessageLswForkResult;
     using TResponse = RESULT_MESSAGE<uint32_t>;
 
+    DECLARE_MESSAGE_CTOR(LSW_FORK_RESULT)
+
     MESSAGE_HEADER Header;
-    uint32_t Port;
-    int32_t Pid;
+    uint32_t Port = 0;
+    int32_t Pid = -1;
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Port));
 };
 
 struct LSW_FORK
 {
-    static inline auto Type = LxMessageLswCreateProcessFork;
+    static inline auto Type = LxMessageLswFork;
     using TResponse = LSW_FORK_RESULT;
 
+    DECLARE_MESSAGE_CTOR(LSW_FORK);
+
     MESSAGE_HEADER Header;
-    bool Thread;
-    PRETTY_PRINT(FIELD(Header));
+    bool Thread = false;
+    PRETTY_PRINT(FIELD(Header), FIELD(Thread));
 };
 
 struct LSW_CONNECT
 {
-    static inline auto Type = LxMessageLswCreateProcessConnect;
+    static inline auto Type = LxMessageLswConnect;
     using TResponse = RESULT_MESSAGE<uint32_t>;
+    DECLARE_MESSAGE_CTOR(LSW_CONNECT);
+
 
     MESSAGE_HEADER Header;
-    int32_t Fd; // TODO: multiple at once
+    int32_t Fd = -1; // TODO: multiple at once
     PRETTY_PRINT(FIELD(Header), FIELD(Fd));
+};
+
+enum LSWProcessState
+{
+    LSWProcessStateUnknown,
+    LSWProcessStateRunning,
+    LSWProcessStateExited,
+    LSWProcessStateSignaled
+};
+
+struct LSW_WAITPID_RESULT
+{
+    static inline auto Type = LxMessageLswWaitPidResponse;
+
+    DECLARE_MESSAGE_CTOR(LSW_WAITPID_RESULT);
+
+    MESSAGE_HEADER Header;
+    LSWProcessState State = LSWProcessStateUnknown;
+    int32_t Code = -1;
+    int32_t Errno = -1;
+    PRETTY_PRINT(FIELD(Header), FIELD(State), FIELD(Code), FIELD(Errno));
 };
 
 struct LSW_WAITPID
 {
-    static inline auto Type = LxMessageLswCreateProcessWaitPid;
-    using TResponse = RESULT_MESSAGE<uint32_t>;
+    static inline auto Type = LxMessageLswWaitPid;
+    using TResponse = LSW_WAITPID_RESULT;
+
+    DECLARE_MESSAGE_CTOR(LSW_WAITPID);
 
     MESSAGE_HEADER Header;
-    int32_t Pid;
-    uint32_t TimeoutMs;
-    int32_t Errno;
+    int32_t Pid =  -1;
+    uint64_t TimeoutMs = 0;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Pid));
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(TimeoutMs));
+};
+
+struct LSW_SIGNAL
+{
+    static inline auto Type = LxMessageLswSignal;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_SIGNAL);
+
+    MESSAGE_HEADER Header;
+    int32_t Pid =  -1;
+    int32_t Signal = -1;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Signal));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT
