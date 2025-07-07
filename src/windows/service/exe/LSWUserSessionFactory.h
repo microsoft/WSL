@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWUserSessionFactory.h
+
+Abstract:
+
+    TODO
+
+--*/
 #pragma once
 #include <wil/resource.h>
 

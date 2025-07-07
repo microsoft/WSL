@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWVirtualMachine.h
+
+Abstract:
+
+    TODO
+
+--*/
 #pragma once
 #include "wslservice.h"
 #include "hcs.hpp"

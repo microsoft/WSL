@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWUserSession.h
+
+Abstract:
+
+    TODO
+
+--*/
 #pragma once
 
 namespace wsl::windows::service::lsw {

@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWApi.h
+
+Abstract:
+
+    TODO
+
+--*/
 #pragma once
 
 #include <windows.h>

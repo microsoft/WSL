@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWInit.cpp
+
+Abstract:
+
+    TODO
+
+--*/
 #include "util.h"
 #include "SocketChannel.h"
 #include "message.h"

@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWUserSessionFactory.cpp
+
+Abstract:
+
+    TODO
+
+--*/
 #include "precomp.h"
 
 #include "LSWUserSessionFactory.h"

@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWUserSession.cpp
+
+Abstract:
+
+    TODO
+
+--*/
 #include "LSWUserSession.h"
 #include "LSWVirtualMachine.h"
 

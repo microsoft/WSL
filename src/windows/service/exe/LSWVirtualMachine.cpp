@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LSWVirtualMachine.cpp
+
+Abstract:
+
+    TODO
+
+--*/
 #include "LSWVirtualMachine.h"
 #include "hcs_schema.h"
 
