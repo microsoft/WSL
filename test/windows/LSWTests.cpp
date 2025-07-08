@@ -21,9 +21,13 @@ using namespace wsl::windows::common::registry;
 class LSWTests
 {
     WSL_TEST_CLASS(LSWTests)
+    wil::unique_couninitialize_call coinit = wil::CoInitializeEx();
+    WSADATA Data;
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
+
         return true;
     }
 
@@ -44,11 +48,12 @@ class LSWTests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
+    TEST_METHOD(CustomDmesgOutput)
+    {
+    }
+
     TEST_METHOD(CreateVmSmokeTest)
     {
-        auto coinit = wil::CoInitializeEx();
-        WSADATA Data;
-        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
 
         LSWVirtualMachineHandle vm{};
         VirtualMachineSettings settings{};

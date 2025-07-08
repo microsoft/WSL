@@ -15,8 +15,13 @@ Abstract:
 #include "precomp.h"
 #include "Dmesg.h"
 
-DmesgCollector::DmesgCollector(GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName) :
-    m_com1PipeName(Com1PipeName), m_runtimeId(VmId), m_debugConsole(EnableDebugConsole), m_telemetry(EnableTelemetry)
+DmesgCollector::DmesgCollector(
+    GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle) :
+    m_com1PipeName(Com1PipeName),
+    m_runtimeId(VmId),
+    m_debugConsole(EnableDebugConsole),
+    m_telemetry(EnableTelemetry),
+    m_outputHandle(std::move(OutputHandle))
 {
     m_exitEvent.reset(wsl::windows::common::helpers::DuplicateHandle(ExitEvent.get()));
     m_overlappedEvent.create(wil::EventOptions::ManualReset);
@@ -40,10 +45,16 @@ DmesgCollector::~DmesgCollector()
 }
 
 std::shared_ptr<DmesgCollector> DmesgCollector::Create(
-    GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, bool EnableEarlyBootConsole)
+    GUID VmId,
+    const wil::unique_event& ExitEvent,
+    bool EnableTelemetry,
+    bool EnableDebugConsole,
+    const std::wstring& Com1PipeName,
+    bool EnableEarlyBootConsole,
+    wil::unique_handle&& OutputHandle)
 {
-    auto dmesgCollector =
-        std::shared_ptr<DmesgCollector>(new DmesgCollector(VmId, ExitEvent, EnableTelemetry, EnableDebugConsole, Com1PipeName));
+    auto dmesgCollector = std::shared_ptr<DmesgCollector>(
+        new DmesgCollector(VmId, ExitEvent, EnableTelemetry, EnableDebugConsole, Com1PipeName, std::move(OutputHandle)));
 
     if (FAILED(dmesgCollector->Start(EnableEarlyBootConsole)))
     {
@@ -141,6 +152,16 @@ void DmesgCollector::ProcessInput(InputSource Source, const gsl::span<char>& Inp
     if (sendToComPipe)
     {
         WriteToCom1(Input);
+    }
+
+    if (m_outputHandle != nullptr)
+    {
+        m_overlappedEvent.ResetEvent();
+        if (wsl::windows::common::relay::InterruptableWrite(
+                m_outputHandle.get(), gslhelpers::convert_span<gsl::byte>(Input), m_exitEvents, &m_overlapped) == 0)
+        {
+            m_outputHandle = nullptr;
+        }
     }
 }
 

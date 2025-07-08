@@ -454,6 +454,7 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     ULONGLONG MemoryMb;
     ULONG CpuCount;
     ULONG BootTimeoutMs;
+    ULONG DmesgOutput;
 } VIRTUAL_MACHINE_SETTINGS;
 
 

@@ -94,7 +94,15 @@ void LSWVirtualMachine::Start()
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
     // TODO: check for virtio serial support
-    m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true);
+
+    wil::unique_handle dmesgOutput;
+
+    if (m_settings.DmesgOutput != 0)
+    {
+        dmesgOutput.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(m_settings.DmesgOutput)));
+    }
+
+    m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true, std::move(dmesgOutput));
 
     if (true) // early boot logging
     {
@@ -119,12 +127,19 @@ void LSWVirtualMachine::Start()
     // N.B. Linux kernel direct boot is not yet supported on ARM64.
 
     auto basePath = wslutil::GetBasePath();
-    auto kernelPath = LR"(D:\wsldev\kernel)";
+
+#ifdef WSL_KERNEL_PATH
+
+    auto kernelPath = std::filesystem::path(WSL_KERNEL_PATH);
+
+#else
+    auto kernelPath = std::filesystem::path(basePath) / L"tools" / LXSS_VM_MODE_KERNEL_NAME;
+#endif
 
     if constexpr (!wsl::shared::Arm64)
     {
         vmSettings.Chipset.LinuxKernelDirect.emplace();
-        vmSettings.Chipset.LinuxKernelDirect->KernelFilePath = kernelPath;
+        vmSettings.Chipset.LinuxKernelDirect->KernelFilePath = kernelPath.wstring();
         vmSettings.Chipset.LinuxKernelDirect->InitRdPath = (basePath / L"tools" / LXSS_VM_MODE_INITRD_NAME).c_str();
         vmSettings.Chipset.LinuxKernelDirect->KernelCmdLine = kernelCmdLine;
     }
