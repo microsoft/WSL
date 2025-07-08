@@ -290,6 +290,26 @@
             "PackageFamilyName": "3810OracleAmericaInc.62074632F71C9_dm28ctvqnhe9g"
         },
         {
+            "Name": "OracleLinux_8_10",
+            "FriendlyName": "Oracle Linux 8.10",
+            "StoreAppId": "9MVFWTCT78ZN",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_8.10-250708.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "3810OracleAmericaInc.OracleLinux8.10_dm28ctvqnhe9g"
+        },
+        {
+            "Name": "OracleLinux_9_5",
+            "FriendlyName": "Oracle Linux 9.5",
+            "StoreAppId": "9NL3F53JZ3HX",
+            "Amd64": true,
+            "Arm64": false,
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_9.5-250708.Appx",
+            "Arm64PackageUrl": null,
+            "PackageFamilyName": "3810OracleAmericaInc.OracleLinux9.5_dm28ctvqnhe9g"
+        },
+        {
             "Name": "openSUSE-Leap-15.6",
             "FriendlyName": "openSUSE Leap 15.6",
             "StoreAppId": "9PDTJHBQRQPF",
