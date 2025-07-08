@@ -34,7 +34,13 @@ public:
     }
 
     static std::shared_ptr<DmesgCollector> Create(
-        GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, bool EnableEarlyBootConsole, wil::unique_handle&& OutputHandle);
+        GUID VmId,
+        const wil::unique_event& ExitEvent,
+        bool EnableTelemetry,
+        bool EnableDebugConsole,
+        const std::wstring& Com1PipeName,
+        bool EnableEarlyBootConsole,
+        wil::unique_handle&& OutputHandle);
 
 private:
     enum InputSource
@@ -43,7 +49,13 @@ private:
         DmesgCollectorConsole
     };
 
-    DmesgCollector(GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName, wil::unique_handle&& OutputHandle = {});
+    DmesgCollector(
+        GUID VmId,
+        const wil::unique_event& ExitEvent,
+        bool EnableTelemetry,
+        bool EnableDebugConsole,
+        const std::wstring& Com1PipeName,
+        wil::unique_handle&& OutputHandle = {});
 
     HRESULT Start(bool EnableEarlyBootConsole);
     std::pair<std::wstring, std::thread> StartDmesgThread(InputSource Source);
