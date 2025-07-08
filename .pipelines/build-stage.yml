@@ -377,6 +377,7 @@ stages:
 
                 Move-Item -Path "bin\$arch\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\wsltests.dll"
                 Move-Item -Path "bin\$arch\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\testplugin.dll"
+                Move-Item -Path "bin\$arch\release\lswclient.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\lswclient.dll"
                 Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\$arch" -Destination "$(ob_outputDirectory)\testbin\$arch\release\taef"
               }
 
