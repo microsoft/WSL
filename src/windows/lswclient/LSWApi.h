@@ -19,7 +19,7 @@ Abstract:
 extern "C" {
 #endif
 
-HRESULT GetWslVersion(WSL_VERSION* Version);
+HRESULT WslGetVersion(WSL_VERSION* Version);
 
 struct Memory
 {
@@ -47,7 +47,7 @@ struct VirtualMachineSettings
 
 typedef void* LSWVirtualMachineHandle;
 
-HRESULT CreateVirualMachine(const struct VirtualMachineSettings* Settings, LSWVirtualMachineHandle* VirtualMachine);
+HRESULT WslCreateVirualMachine(const struct VirtualMachineSettings* Settings, LSWVirtualMachineHandle* VirtualMachine);
 
 struct DiskAttachSettings
 {
@@ -61,7 +61,7 @@ struct AttachedDiskInformation
     char Device[10];
 };
 
-HRESULT AttachDisk(LSWVirtualMachineHandle VirtualMachine, const struct DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk);
+HRESULT WslAttachDisk(LSWVirtualMachineHandle VirtualMachine, const struct DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk);
 
 struct MountSettings
 {
@@ -72,7 +72,7 @@ struct MountSettings
     BOOL Chroot;
 };
 
-HRESULT Mount(LSWVirtualMachineHandle VirtualMachine, const struct MountSettings* Settings);
+HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const struct MountSettings* Settings);
 
 struct ProcessFileDescriptorSettings
 {
@@ -91,7 +91,7 @@ struct CreateProcessSettings
     struct ProcessFileDescriptorSettings* FileDescriptors;
 };
 
-HRESULT CreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, struct CreateProcessSettings* Settings, int32_t* Pid);
+HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, struct CreateProcessSettings* Settings, int32_t* Pid);
 
 enum ProcessState
 {
@@ -107,9 +107,13 @@ struct WaitResult
     int32_t Code; // Signal number or exit code
 };
 
-HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WaitResult* Result);
+HRESULT WslWaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WaitResult* Result);
 
-HRESULT SignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal);
+HRESULT WslSignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal);
+
+HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs);
+
+void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine);
 
 #ifdef __cplusplus
 }

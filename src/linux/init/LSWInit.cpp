@@ -123,7 +123,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
                 return wsl::shared::string::FromSpan(Buffer, index);
             }
 
-            return nullptr;
+            return "";
         };
 
         mountutil::ParsedOptions options;
@@ -276,9 +276,9 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
     while (true)
     {
         auto [Message, Range] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
-        if (Message == nullptr)
+        if (Message == nullptr || Message->MessageType == LxMessageLswShutdown)
         {
-            break; // Socket was closed, exit
+            break;
         }
 
         ProcessMessage(Channel, Message->MessageType, Range);

@@ -3860,7 +3860,6 @@ int WslEntryPoint(int Argc, char* Argv[]);
 extern int LswEntryPoint(int Argc, char* Argv[]);
 int main(int Argc, char* Argv[])
 {
-    LOG_ERROR("Init!");
     std::vector<gsl::byte> Buffer;
     ssize_t BytesRead;
     VmConfiguration Config{};

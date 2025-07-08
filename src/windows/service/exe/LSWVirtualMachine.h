@@ -23,19 +23,21 @@ class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") LSWVirtualMachine
 {
 public:
     LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid);
+    ~LSWVirtualMachine();
 
     void Start();
 
-    IFACEMETHOD(GetState()) override;
     IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ BOOL Chroot)) override;
     IFACEMETHOD(CreateLinuxProcess(
         _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
+    IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
 
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
+    void OnExit(_In_ const HCS_EVENT* Event);
 
     std::pair<int32_t, wsl::shared::SocketChannel> Fork(bool thread);
     wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
@@ -51,6 +53,7 @@ private:
     std::wstring m_vmIdString;
     wsl::windows::common::helpers::WindowsVersion m_windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
     int m_coldDiscardShiftSize{};
+    bool m_running = false;
     PSID m_userSid{};
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;

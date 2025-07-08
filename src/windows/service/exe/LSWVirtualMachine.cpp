@@ -27,6 +27,39 @@ LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, P
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
 }
 
+LSWVirtualMachine::~LSWVirtualMachine()
+{
+    WSL_LOG("LswTerminateVmStart", TraceLoggingValue(m_running, "running"));
+    m_vmTerminatingEvent.SetEvent();
+
+    m_initChannel.Close();
+
+    bool forceTerminate = false;
+    // Wait up to 5 seconds for the VM to terminate.
+    if (!m_vmExitEvent.wait(5000))
+    {
+        forceTerminate = true;
+        try
+        {
+            wsl::windows::common::hcs::TerminateComputeSystem(m_computeSystem.get());
+        }
+        CATCH_LOG()
+    }
+
+    WSL_LOG("LswTerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
+
+    m_computeSystem.reset();
+
+    for (const auto& e : m_attachedDisks)
+    {
+        try
+        {
+            wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str());
+        }
+        CATCH_LOG()
+    }
+}
+
 void LSWVirtualMachine::Start()
 {
     hcs::ComputeSystem systemSettings{};
@@ -195,12 +228,14 @@ void LSWVirtualMachine::Start()
 
 void CALLBACK LSWVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
 {
-    WSL_LOG("LSWVmExited", TraceLoggingValue(Event->EventData, "details"));
+    reinterpret_cast<LSWVirtualMachine*>(Context)->OnExit(Event);
 }
 
-HRESULT LSWVirtualMachine::GetState()
+void LSWVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 {
-    return S_OK;
+    WSL_LOG("LSWVmExited", TraceLoggingValue(Event->EventData, "details"));
+
+    m_vmExitEvent.SetEvent();
 }
 
 HRESULT LSWVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)
@@ -214,6 +249,7 @@ try
         wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
 
         std::lock_guard lock{m_lock};
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
         ULONG lun = 0;
         while (m_attachedDisks.find(lun) != m_attachedDisks.end())
@@ -257,7 +293,7 @@ try
     wsl::shared::MessageWriter<LSW_MOUNT> message;
 
     auto optionalAdd = [&](auto value, unsigned int& index) {
-        if (Source != nullptr)
+        if (value != nullptr)
         {
             message.WriteString(index, value);
         }
@@ -270,6 +306,7 @@ try
     message->Chroot = Chroot; // TODO: proper API
 
     std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
     const auto& response = m_initChannel.Transaction<LSW_MOUNT>(message.Span());
 
@@ -294,6 +331,8 @@ std::pair<int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(bool thre
     int32_t pid{};
     {
         std::lock_guard lock{m_lock};
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+
         LSW_FORK message;
         message.Header.MessageSize = sizeof(message);
         message.Header.MessageType = LSW_FORK::Type;
@@ -385,10 +424,29 @@ try
 }
 CATCH_RETURN();
 
+HRESULT LSWVirtualMachine::Shutdown(ULONGLONG TimeoutMs)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+
+    LSW_SHUTDOWN message{};
+    m_initChannel.SendMessage(message);
+    auto response = m_initChannel.ReceiveMessageOrClosed<MESSAGE_HEADER>(static_cast<wsl::shared::TTimeout>(TimeoutMs));
+
+    RETURN_HR_IF(E_UNEXPECTED, response.first != nullptr);
+
+    m_running = false;
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT LSWVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
 try
 {
     std::lock_guard lock(m_lock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
     LSW_SIGNAL message;
     message.Pid = Pid;

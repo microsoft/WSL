@@ -1,10 +1,12 @@
 LIBRARY lswclient
 
 EXPORTS
-    GetWslVersion
-    CreateVirualMachine
-    AttachDisk
-    Mount
-    CreateLinuxProcess
-    WaitForLinuxProcess
-    SignalLinuxProcess
+    WslGetVersion
+    WslCreateVirualMachine
+    WslAttachDisk
+    WslMount
+    WslCreateLinuxProcess
+    WslWaitForLinuxProcess
+    WslSignalLinuxProcess
+    WslReleaseVirtualMachine
+    WslShutdownVirtualMachine

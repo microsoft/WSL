@@ -16,7 +16,7 @@ Abstract:
 #include "wslservice.h"
 #include "LSWApi.h"
 
-HRESULT GetWslVersion(WSL_VERSION* Version)
+HRESULT WslGetVersion(WSL_VERSION* Version)
 try
 {
     wil::com_ptr<ILSWUserSession> session;
@@ -27,7 +27,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT CreateVirualMachine(const VirtualMachineSettings* UserSettings, LSWVirtualMachineHandle* VirtualMachine)
+HRESULT WslCreateVirualMachine(const VirtualMachineSettings* UserSettings, LSWVirtualMachineHandle* VirtualMachine)
 try
 {
     wil::com_ptr<ILSWUserSession> session;
@@ -63,7 +63,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT AttachDisk(LSWVirtualMachineHandle VirtualMachine, const DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk)
+HRESULT WslAttachDisk(LSWVirtualMachineHandle VirtualMachine, const DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk)
 {
     wil::unique_cotaskmem_ansistring device;
     RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->AttachDisk(Settings->WindowsPath, Settings->ReadOnly, &device));
@@ -77,13 +77,13 @@ HRESULT AttachDisk(LSWVirtualMachineHandle VirtualMachine, const DiskAttachSetti
     return S_OK;
 }
 
-HRESULT Mount(LSWVirtualMachineHandle VirtualMachine, const MountSettings* Settings)
+HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const MountSettings* Settings)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
         ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Chroot);
 }
 
-HRESULT CreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProcessSettings* UserSettings, int32_t* Pid)
+HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProcessSettings* UserSettings, int32_t* Pid)
 {
     LSW_CREATE_PROCESS_OPTIONS options{};
 
@@ -134,7 +134,7 @@ HRESULT CreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProcess
     return S_OK;
 }
 
-HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WaitResult* Result)
+HRESULT WslWaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WaitResult* Result)
 {
     static_assert(ProcessStateUnknown == LSWProcessStateUnknown);
     static_assert(ProcessStateRunning == LSWProcessStateRunning);
@@ -147,9 +147,19 @@ HRESULT WaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid,
         ->WaitPid(Pid, TimeoutMs, reinterpret_cast<ULONG*>(&Result->State), &Result->Code);
 }
 
-HRESULT SignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal)
+HRESULT WslSignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Signal(Pid, Signal);
+}
+
+HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs)
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Shutdown(TimeoutMs);
+}
+
+void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine)
+{
+    reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Release();
 }
 
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)

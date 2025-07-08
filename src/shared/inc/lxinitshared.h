@@ -378,6 +378,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLswWaitPid,
     LxMessageLswWaitPidResponse,
     LxMessageLswSignal,
+    LxMessageLswShutdown
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -477,6 +478,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLswWaitPid)
         X(LxMessageLswWaitPidResponse)
         X(LxMessageLswSignal)
+        X(LxMessageLswShutdown)
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1531,7 +1533,7 @@ struct LSW_GET_DISK
 
 struct LSW_MOUNT_RESULT
 {
-    static inline auto Type = LxMessageLSWMount;
+    static inline auto Type = LxMessageLSWMountResult;
     MESSAGE_HEADER Header;
     int Result;
 
@@ -1664,6 +1666,17 @@ struct LSW_SIGNAL
     int32_t Signal = -1;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Signal));
+};
+
+struct LSW_SHUTDOWN
+{
+    static inline auto Type = LxMessageLswShutdown;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_SHUTDOWN);
+    MESSAGE_HEADER Header;
+
+    PRETTY_PRINT(FIELD(Header));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

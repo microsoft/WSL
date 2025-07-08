@@ -41,7 +41,7 @@ class LSWTests
         auto coinit = wil::CoInitializeEx();
         WSL_VERSION version{};
 
-        VERIFY_SUCCEEDED(GetWslVersion(&version));
+        VERIFY_SUCCEEDED(WslGetVersion(&version));
 
         VERIFY_ARE_EQUAL(version.Major, WSL_PACKAGE_VERSION_MAJOR);
         VERIFY_ARE_EQUAL(version.Minor, WSL_PACKAGE_VERSION_MINOR);
@@ -68,10 +68,10 @@ class LSWTests
         createProcessSettings.FdCount = 3;
 
         int pid = -1;
-        VERIFY_SUCCEEDED(CreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &pid));
+        VERIFY_SUCCEEDED(WslCreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &pid));
 
         WaitResult result{};
-        VERIFY_SUCCEEDED(WaitForLinuxProcess((LSWVirtualMachineHandle*)vm, pid, 1000, &result));
+        VERIFY_SUCCEEDED(WslWaitForLinuxProcess((LSWVirtualMachineHandle*)vm, pid, 1000, &result));
         VERIFY_ARE_EQUAL(result.State, ProcessStateExited);
         return result.Code;
     }
@@ -114,9 +114,15 @@ class LSWTests
         };
 
         std::thread thread(readDmesg);
-        thread.detach();
+        auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            WslReleaseVirtualMachine(vm);
+            if (thread.joinable())
+            {
+                thread.join();
+            }
+        });
 
-        VERIFY_SUCCEEDED(CreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
+        VERIFY_SUCCEEDED(WslCreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
         write.reset();
 
 #ifdef WSL_SYSTEM_DISTRO_PATH
@@ -130,20 +136,30 @@ class LSWTests
         DiskAttachSettings attachSettings{systemdDistroDiskPath.c_str(), true};
         AttachedDiskInformation attachedDisk;
 
-        VERIFY_SUCCEEDED(AttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));
+        VERIFY_SUCCEEDED(WslAttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));
 
         MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", true};
-        VERIFY_SUCCEEDED(Mount((LSWVirtualMachineHandle*)vm, &mountSettings));
+        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &mountSettings));
 
-        std::vector<const char*> cmd = {"/bin/bash", "-c", "echo ok"};
+        MountSettings devmountSettings{nullptr, "/dev", "devtmpfs", "", false};
+        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &devmountSettings));
+
+        MountSettings sysmountSettings{nullptr, "/sys", "sysfs", "", false};
+        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &sysmountSettings));
+
+        MountSettings procmountSettings{nullptr, "/proc", "proc", "", false};
+        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &procmountSettings));
+
+        std::vector<const char*> cmd = {"/bin/bash", "-c", "echo DmesgTest > /dev/kmsg"};
         VERIFY_ARE_EQUAL(RunCommand(vm, cmd), 0);
-        LogInfo("Content: %hs", dmesgContent.data());
+
+        VERIFY_ARE_EQUAL(WslShutdownVirtualMachine(vm, 30 * 1000), S_OK);
+        detach.reset();
 
         auto contentString = std::string(dmesgContent.begin(), dmesgContent.end());
 
         VERIFY_ARE_NOT_EQUAL(contentString.find("Run /init as init process"), std::string::npos);
-
-        // TODO: stop VM and synchronize
+        VERIFY_ARE_NOT_EQUAL(contentString.find("DmesgTest"), std::string::npos);
     }
 
     TEST_METHOD(CreateVmSmokeTest)
@@ -155,7 +171,7 @@ class LSWTests
         settings.DisplayName = L"LSW";
         settings.Memory.MemoryMb = 1024;
         settings.Options.BootTimeoutMs = 30000;
-        VERIFY_SUCCEEDED(CreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
+        VERIFY_SUCCEEDED(WslCreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
 
 #ifdef WSL_SYSTEM_DISTRO_PATH
 
@@ -168,10 +184,10 @@ class LSWTests
         DiskAttachSettings attachSettings{systemdDistroDiskPath.c_str(), true};
         AttachedDiskInformation attachedDisk;
 
-        VERIFY_SUCCEEDED(AttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));
+        VERIFY_SUCCEEDED(WslAttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));
 
         MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", true};
-        VERIFY_SUCCEEDED(Mount((LSWVirtualMachineHandle*)vm, &mountSettings));
+        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &mountSettings));
 
         // Create a process and wait for it to exit
         {
@@ -191,7 +207,7 @@ class LSWTests
             createProcessSettings.FdCount = 3;
 
             int pid = -1;
-            VERIFY_SUCCEEDED(CreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &pid));
+            VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
 
             LogInfo("pid: %lu", pid);
 
@@ -207,7 +223,7 @@ class LSWTests
             VERIFY_ARE_EQUAL(buffer.data(), std::string("foo\n"));
 
             WaitResult result{};
-            VERIFY_SUCCEEDED(WaitForLinuxProcess((LSWVirtualMachineHandle*)vm, pid, 1000, &result));
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
             VERIFY_ARE_EQUAL(result.State, ProcessStateExited);
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
@@ -229,19 +245,19 @@ class LSWTests
             createProcessSettings.FdCount = 3;
 
             int pid = -1;
-            VERIFY_SUCCEEDED(CreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &pid));
+            VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
 
             // Verify that the process is in a running state
             WaitResult result{};
-            VERIFY_SUCCEEDED(WaitForLinuxProcess((LSWVirtualMachineHandle*)vm, pid, 1000, &result));
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
             VERIFY_ARE_EQUAL(result.State, ProcessStateRunning);
 
             // Verify that it can be killed.
-            VERIFY_SUCCEEDED(SignalLinuxProcess((LSWVirtualMachineHandle*)vm, pid, 9));
+            VERIFY_SUCCEEDED(WslSignalLinuxProcess(vm, pid, 9));
 
             // Verify that the process is in a running state
 
-            VERIFY_SUCCEEDED(WaitForLinuxProcess((LSWVirtualMachineHandle*)vm, pid, 1000, &result));
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
             VERIFY_ARE_EQUAL(result.State, ProcessStateSignaled);
             VERIFY_ARE_EQUAL(result.Code, 9);
         }
@@ -263,11 +279,13 @@ class LSWTests
             createProcessSettings.FdCount = 3;
 
             int pid = -1;
-            VERIFY_ARE_EQUAL(CreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &pid), E_FAIL);
+            VERIFY_ARE_EQUAL(WslCreateLinuxProcess(vm, &createProcessSettings, &pid), E_FAIL);
 
             WaitResult result{};
-            VERIFY_ARE_EQUAL(WaitForLinuxProcess((LSWVirtualMachineHandle*)vm, 1234, 1000, &result), E_FAIL);
+            VERIFY_ARE_EQUAL(WslWaitForLinuxProcess(vm, 1234, 1000, &result), E_FAIL);
             VERIFY_ARE_EQUAL(result.State, ProcessStateUnknown);
         }
+
+        WslReleaseVirtualMachine(vm);
     }
 };
