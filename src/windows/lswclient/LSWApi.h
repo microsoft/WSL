@@ -39,9 +39,9 @@ struct Options
 
 struct VirtualMachineSettings
 {
-    LPCWSTR DisplayName; // Not implemented yet
+    LPCWSTR DisplayName;  // Not implemented yet
     struct Memory Memory; // Not implemented yet
-    struct CPU CPU; // Not implemented yet
+    struct CPU CPU;       // Not implemented yet
     struct Options Options;
 };
 
