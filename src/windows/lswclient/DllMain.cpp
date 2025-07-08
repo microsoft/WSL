@@ -41,6 +41,7 @@ try
     settings.MemoryMb = UserSettings->Memory.MemoryMb;
     settings.CpuCount = UserSettings->CPU.CpuCount;
     settings.BootTimeoutMs = UserSettings->Options.BootTimeoutMs;
+    settings.DmesgOutput = HandleToULong(UserSettings->Options.Dmesg);
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
 

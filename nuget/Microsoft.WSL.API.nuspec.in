@@ -15,9 +15,9 @@
   </metadata>
   <files>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\lswclient\LSWApi.h" target="include"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\lswclient.lib" target="lib\x64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\lswclient.dll" target="lib\x64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\lswclient.lib" target="lib\arm64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\lswclient.dll" target="lib\arm64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\lswclient.lib" target="lib\x64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\lswclient.dll" target="lib\x64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\lswclient.lib" target="lib\arm64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\lswclient.dll" target="lib\arm64"/>
   </files>
 </package>

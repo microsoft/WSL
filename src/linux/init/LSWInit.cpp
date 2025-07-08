@@ -345,8 +345,6 @@ int LswEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
-    LOG_INFO("Init starting");
-
     //
     // Ensure /dev/console is present and set as the controlling terminal.
     // If opening /dev/console times out, stdout and stderr to the logging file descriptor.

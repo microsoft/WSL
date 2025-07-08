@@ -34,13 +34,14 @@ struct CPU
 struct Options
 {
     uint32_t BootTimeoutMs;
+    HANDLE Dmesg;
 };
 
 struct VirtualMachineSettings
 {
-    LPCWSTR DisplayName;
-    struct Memory Memory;
-    struct CPU CPU;
+    LPCWSTR DisplayName; // Not implemented yet
+    struct Memory Memory; // Not implemented yet
+    struct CPU CPU; // Not implemented yet
     struct Options Options;
 };
 
@@ -76,7 +77,7 @@ HRESULT Mount(LSWVirtualMachineHandle VirtualMachine, const struct MountSettings
 struct ProcessFileDescriptorSettings
 {
     uint32_t Number;
-    BOOL Tty;
+    BOOL Tty; // Not implemented yet
     HANDLE Handle;
 };
 
