@@ -34,6 +34,7 @@ public:
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
+    IFACEMETHOD(RegisterCallback(_In_ ITerminationCallback* callback)) override;
 
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
@@ -60,6 +61,7 @@ private:
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::com_ptr<ITerminationCallback> m_terminationCallback;
 
     wsl::shared::SocketChannel m_initChannel;
 

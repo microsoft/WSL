@@ -13,6 +13,7 @@ Abstract:
 --*/
 #include "LSWVirtualMachine.h"
 #include "hcs_schema.h"
+#include "LSWApi.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -228,14 +229,35 @@ void LSWVirtualMachine::Start()
 
 void CALLBACK LSWVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
 {
-    reinterpret_cast<LSWVirtualMachine*>(Context)->OnExit(Event);
+    if (Event->Type == HcsEventSystemExited || Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
+    {
+        reinterpret_cast<LSWVirtualMachine*>(Context)->OnExit(Event);
+    }
 }
 
 void LSWVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 {
-    WSL_LOG("LSWVmExited", TraceLoggingValue(Event->EventData, "details"));
+    WSL_LOG(
+        "LSWVmExited", TraceLoggingValue(Event->EventData, "details"), TraceLoggingValue(static_cast<int>(Event->Type), "type"));
 
     m_vmExitEvent.SetEvent();
+
+    std::lock_guard lock(m_lock);
+    if (m_terminationCallback)
+    {
+        // TODO: parse json and give a better error.
+        VirtualMachineTerminationReason reason = VirtualMachineTerminationReasonUnknown;
+        if (Event->Type == HcsEventSystemExited)
+        {
+            reason = VirtualMachineTerminationReasonShutdown;
+        }
+        else if (Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
+        {
+            reason = VirtualMachineTerminationReasonCrashed;
+        }
+
+        LOG_IF_FAILED(m_terminationCallback->OnTermination(static_cast<ULONG>(reason), Event->EventData));
+    }
 }
 
 HRESULT LSWVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)
@@ -454,6 +476,20 @@ try
     const auto& response = m_initChannel.Transaction(message);
 
     RETURN_HR_IF(E_FAIL, response.Result != 0);
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::RegisterCallback(ITerminationCallback* callback)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    THROW_HR_IF(E_INVALIDARG, m_terminationCallback);
+
+    // N.B. this calls AddRef() on the callback
+    m_terminationCallback = callback;
+
     return S_OK;
 }
 CATCH_RETURN();

@@ -47,7 +47,7 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     auto vm = wil::MakeOrThrow<LSWVirtualMachine>(*Settings, session->GetUserSid());
-    ;
+
     THROW_IF_FAILED(vm.CopyTo(__uuidof(ILSWVirtualMachine), (void**)VirtualMachine));
 
     vm->Start();

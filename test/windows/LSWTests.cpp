@@ -68,19 +68,51 @@ class LSWTests
         createProcessSettings.FdCount = 3;
 
         int pid = -1;
-        VERIFY_SUCCEEDED(WslCreateLinuxProcess((LSWVirtualMachineHandle*)vm, &createProcessSettings, &pid));
+        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
 
         WaitResult result{};
-        VERIFY_SUCCEEDED(WslWaitForLinuxProcess((LSWVirtualMachineHandle*)vm, pid, 1000, &result));
+        VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
         VERIFY_ARE_EQUAL(result.State, ProcessStateExited);
         return result.Code;
+    }
+
+    LSWVirtualMachineHandle CreateVm(const VirtualMachineSettings* settings)
+    {
+        LSWVirtualMachineHandle vm{};
+        VERIFY_SUCCEEDED(WslCreateVirualMachine(settings, (LSWVirtualMachineHandle*)&vm));
+
+#ifdef WSL_SYSTEM_DISTRO_PATH
+
+        std::wstring systemdDistroDiskPath = TEXT(WSL_SYSTEM_DISTRO_PATH);
+#else
+
+        auto systemdDistroDiskPath = std::format(L"{}/system.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
+#endif
+
+        DiskAttachSettings attachSettings{systemdDistroDiskPath.c_str(), true};
+        AttachedDiskInformation attachedDisk;
+
+        VERIFY_SUCCEEDED(WslAttachDisk(vm, &attachSettings, &attachedDisk));
+
+        MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", true};
+        VERIFY_SUCCEEDED(WslMount(vm, &mountSettings));
+
+        MountSettings devmountSettings{nullptr, "/dev", "devtmpfs", "", false};
+        VERIFY_SUCCEEDED(WslMount(vm, &devmountSettings));
+
+        MountSettings sysmountSettings{nullptr, "/sys", "sysfs", "", false};
+        VERIFY_SUCCEEDED(WslMount(vm, &sysmountSettings));
+
+        MountSettings procmountSettings{nullptr, "/proc", "proc", "", false};
+        VERIFY_SUCCEEDED(WslMount(vm, &procmountSettings));
+
+        return vm;
     }
 
     TEST_METHOD(CustomDmesgOutput)
     {
         auto [read, write] = CreateSubprocessPipe(false, false);
 
-        LSWVirtualMachineHandle vm{};
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
@@ -114,6 +146,9 @@ class LSWTests
         };
 
         std::thread thread(readDmesg);
+        auto vm = CreateVm(&settings);
+        write.reset();
+
         auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             WslReleaseVirtualMachine(vm);
             if (thread.joinable())
@@ -121,34 +156,6 @@ class LSWTests
                 thread.join();
             }
         });
-
-        VERIFY_SUCCEEDED(WslCreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
-        write.reset();
-
-#ifdef WSL_SYSTEM_DISTRO_PATH
-
-        std::wstring systemdDistroDiskPath = TEXT(WSL_SYSTEM_DISTRO_PATH);
-#else
-
-        auto systemdDistroDiskPath = std::format(L"{}/system.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
-#endif
-
-        DiskAttachSettings attachSettings{systemdDistroDiskPath.c_str(), true};
-        AttachedDiskInformation attachedDisk;
-
-        VERIFY_SUCCEEDED(WslAttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));
-
-        MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", true};
-        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &mountSettings));
-
-        MountSettings devmountSettings{nullptr, "/dev", "devtmpfs", "", false};
-        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &devmountSettings));
-
-        MountSettings sysmountSettings{nullptr, "/sys", "sysfs", "", false};
-        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &sysmountSettings));
-
-        MountSettings procmountSettings{nullptr, "/proc", "proc", "", false};
-        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &procmountSettings));
 
         std::vector<const char*> cmd = {"/bin/bash", "-c", "echo DmesgTest > /dev/kmsg"};
         VERIFY_ARE_EQUAL(RunCommand(vm, cmd), 0);
@@ -162,32 +169,48 @@ class LSWTests
         VERIFY_ARE_NOT_EQUAL(contentString.find("DmesgTest"), std::string::npos);
     }
 
-    TEST_METHOD(CreateVmSmokeTest)
+    TEST_METHOD(TerminationCallback)
     {
+        std::promise<std::pair<VirtualMachineTerminationReason, std::wstring>> callbackInfo;
 
-        LSWVirtualMachineHandle vm{};
+        auto callback = [](void* context, VirtualMachineTerminationReason reason, LPCWSTR details) -> HRESULT {
+            auto* future = reinterpret_cast<std::promise<std::pair<VirtualMachineTerminationReason, std::wstring>>*>(context);
+
+            future->set_value(std::make_pair(reason, details));
+
+            return S_OK;
+        };
+
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
         settings.Memory.MemoryMb = 1024;
         settings.Options.BootTimeoutMs = 30000;
-        VERIFY_SUCCEEDED(WslCreateVirualMachine(&settings, (LSWVirtualMachineHandle*)&vm));
+        settings.Options.TerminationCallback = callback;
+        settings.Options.TerminationContext = &callbackInfo;
 
-#ifdef WSL_SYSTEM_DISTRO_PATH
+        auto vm = CreateVm(&settings);
 
-        std::wstring systemdDistroDiskPath = TEXT(WSL_SYSTEM_DISTRO_PATH);
-#else
+        VERIFY_SUCCEEDED(WslShutdownVirtualMachine(vm, 30 * 1000));
 
-        auto systemdDistroDiskPath = std::format(L"{}/system.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
-#endif
+        auto future = callbackInfo.get_future();
+        auto result = future.wait_for(std::chrono::seconds(10));
+        auto [reason, details] = future.get();
+        VERIFY_ARE_EQUAL(reason, VirtualMachineTerminationReasonShutdown);
+        VERIFY_ARE_NOT_EQUAL(details, L"");
 
-        DiskAttachSettings attachSettings{systemdDistroDiskPath.c_str(), true};
-        AttachedDiskInformation attachedDisk;
+        WslReleaseVirtualMachine(vm);
+    }
 
-        VERIFY_SUCCEEDED(WslAttachDisk((LSWVirtualMachineHandle*)vm, &attachSettings, &attachedDisk));
+    TEST_METHOD(CreateVmSmokeTest)
+    {
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 1024;
+        settings.Options.BootTimeoutMs = 30000;
 
-        MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", true};
-        VERIFY_SUCCEEDED(WslMount((LSWVirtualMachineHandle*)vm, &mountSettings));
+        auto vm = CreateVm(&settings);
 
         // Create a process and wait for it to exit
         {

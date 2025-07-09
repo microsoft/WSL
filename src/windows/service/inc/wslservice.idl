@@ -432,6 +432,17 @@ struct _LSW_CREATE_PROCESS_RESULT {
    int Pid;
 } LSW_CREATE_PROCESS_RESULT;
 
+
+[
+    uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
+    pointer_default(unique),
+    object
+]
+interface ITerminationCallback : IUnknown
+{
+    HRESULT OnTermination(ULONG Reason, LPCWSTR Details);
+};
+
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
     pointer_default(unique),
@@ -445,8 +456,8 @@ interface ILSWVirtualMachine : IUnknown
     HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
     HRESULT Signal([in] LONG Pid, [in] int Signal);
     HRESULT Shutdown([in] ULONGLONG TimeoutMs);
+    HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
 }
-
 
 typedef
 struct _VIRTUAL_MACHINE_SETTINGS {

@@ -83,6 +83,8 @@ set(HEADERS
     LSWUserSessionFactory.h
     LSWVirtualMachine.h)
 
+include_directories(${CMAKE_SOURCE_DIR}/src/windows/lswclient)
+
 add_executable(wslservice ${SOURCES} ${HEADERS})
 add_dependencies(wslservice wslserviceidl wslservicemc)
 add_compile_definitions(__WRL_CLASSIC_COM__)

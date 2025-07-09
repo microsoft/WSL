@@ -16,6 +16,25 @@ Abstract:
 #include "wslservice.h"
 #include "LSWApi.h"
 
+class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
+{
+
+public:
+    CallbackInstance(VirtualMachineTerminationCallback callback, void* context) : m_callback(callback), m_context(context)
+    {
+    }
+
+    HRESULT OnTermination(ULONG Reason, LPCWSTR Details) override
+    {
+        return m_callback(m_context, static_cast<VirtualMachineTerminationReason>(Reason), Details);
+    }
+
+private:
+    VirtualMachineTerminationCallback m_callback = nullptr;
+    void* m_context = nullptr;
+};
+
 HRESULT WslGetVersion(WSL_VERSION* Version)
 try
 {
@@ -57,6 +76,17 @@ try
     WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
     THROW_IF_FAILED(clientSecurity->SetBlanket(
         virtualMachineInstance.get(), authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
+
+    // Register termination callback, if specified
+    if (UserSettings->Options.TerminationCallback != nullptr)
+    {
+        auto callbackInstance =
+            wil::MakeOrThrow<CallbackInstance>(UserSettings->Options.TerminationCallback, UserSettings->Options.TerminationContext);
+
+        THROW_IF_FAILED(virtualMachineInstance->RegisterCallback(callbackInstance.Get()));
+
+        // Callback instance is now owned by the service.
+    }
 
     *reinterpret_cast<ILSWVirtualMachine**>(VirtualMachine) = virtualMachineInstance.detach();
     return S_OK;

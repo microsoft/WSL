@@ -31,10 +31,21 @@ struct CPU
     uint32_t CpuCount;
 };
 
+enum VirtualMachineTerminationReason
+{
+    VirtualMachineTerminationReasonUnknown,
+    VirtualMachineTerminationReasonShutdown,
+    VirtualMachineTerminationReasonCrashed,
+};
+
+typedef HRESULT (*VirtualMachineTerminationCallback)(void*, VirtualMachineTerminationReason, LPCWSTR);
+
 struct Options
 {
     uint32_t BootTimeoutMs;
     HANDLE Dmesg;
+    VirtualMachineTerminationCallback TerminationCallback;
+    void* TerminationContext;
 };
 
 struct VirtualMachineSettings
