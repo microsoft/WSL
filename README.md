@@ -46,4 +46,37 @@ This project may contain trademarks or logos for projects, products, or services
 
 The application logs basic diagnostic data (telemetry). For more information on privacy and what we collect, see our [data and privacy documentation](DATA_AND_PRIVACY.md).
 
+## Closing:
+
+Issues may be closed by the original poster at any time.  We will close issues if:
+- The issue is not a bug or feature request
+- The issue has been addressed
+- The issue is a duplicate of another issue
+- Discussions or questions that have ran their course
+
+### Microsoft Links:
+
+- [Microsoft Docs](https://docs.microsoft.com/en-us/windows/wsl/about)
+- [Release Notes](https://docs.microsoft.com/en-us/windows/wsl/release-notes)
+- [WSL Blog](https://blogs.msdn.microsoft.com/wsl) (Historical)
+- [Command Line Blog](https://blogs.msdn.microsoft.com/commandline/) (Active)
+
+### Community Links:
+
+- Stack Overflow: https://stackoverflow.com/questions/tagged/wsl
+- Ask Ubuntu: https://askubuntu.com/questions/tagged/wsl
+- reddit: https://www.reddit.com/r/bashonubuntuonwindows
+- List of programs that work and don't work
+    - https://github.com/ethanhs/WSL-Programs
+    - https://github.com/davatron5000/can-i-subsystem-it
+- Awesome WSL: https://github.com/sirredbeard/Awesome-WSL
+- Tips and guides for new bash users: https://github.com/abergs/ubuntuonwindows
+- WSL Utilities (WSLU): https://github.com/wslutilities/wslu
+
+### Troubleshooting:
+
+Common troubleshooting issues and solutions are available on our [MSDN documentation](https://msdn.microsoft.com/en-us/commandline/wsl/troubleshooting).
+''  
 The software may collect information about you and your use of the software and send it to Microsoft. Microsoft may use this information to provide services and improve our products and services. You may turn off the telemetry as described in the repository. There are also some features in the software that may enable you and Microsoft to collect data from users of your applications. If you use these features, you must comply with applicable law, including providing appropriate notices to users of your applications together with a copy of Microsoft’s privacy statement. Our privacy statement is located at https://go.microsoft.com/fwlink/?LinkID=824704. You can learn more about data collection and use in the help documentation and our privacy statement. Your use of the software operates as your consent to these practices.
+
+''  
