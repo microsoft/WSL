@@ -349,9 +349,13 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ BOOL Chroot)
+HRESULT LSWVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)
 try
 {
+    static_assert(MountFlagsNone == LSW_MOUNT::None);
+    static_assert(MountFlagsChroot == LSW_MOUNT::Chroot);
+    static_assert(MountFlagsWriteableOverlayFs == LSW_MOUNT::OverlayFs);
+
     wsl::shared::MessageWriter<LSW_MOUNT> message;
 
     auto optionalAdd = [&](auto value, unsigned int& index) {
@@ -365,7 +369,7 @@ try
     optionalAdd(Target, message->DestinationIndex);
     optionalAdd(Type, message->TypeIndex);
     optionalAdd(Options, message->OptionsIndex);
-    message->Chroot = Chroot; // TODO: proper API
+    message->Flags = Flags;
 
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
@@ -378,7 +382,7 @@ try
         TraceLoggingValue(Target == nullptr ? "<null>" : Target, "Target"),
         TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
         TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
-        TraceLoggingValue(Chroot, "Options"),
+        TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
     // TODO: better error

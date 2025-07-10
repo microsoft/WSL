@@ -1550,11 +1550,18 @@ struct LSW_MOUNT
     DECLARE_MESSAGE_CTOR(LSW_MOUNT);
 
     MESSAGE_HEADER Header;
-    bool Chroot;
     unsigned int SourceIndex;
     unsigned int DestinationIndex;
     unsigned int TypeIndex;
     unsigned int OptionsIndex;
+    unsigned int Flags;
+
+    enum ForkType : uint8_t
+    {
+        None,
+        Chroot = 1,
+        OverlayFs = 2,
+    };
 
     char Buffer[];
 

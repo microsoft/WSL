@@ -35,6 +35,7 @@ extern int DetachScsiDisk(unsigned int Lun);
 extern std::string GetLunDeviceName(unsigned int Lun);
 
 void ProcessMessages(wsl::shared::SocketChannel& Channel);
+int MountInit(const char* Target);
 
 extern int g_LogFd;
 
@@ -299,10 +300,21 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
         const char* target = readField(Message.DestinationIndex);
         THROW_LAST_ERROR_IF(UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str()) < 0);
 
-        if (Message.Chroot)
+        std::optional<std::string> overlayTarget;
+        if (WI_IsFlagSet(Message.Flags, LSW_MOUNT::OverlayFs))
+        {
+            overlayTarget.emplace(target + std::string("-rw"));
+            THROW_LAST_ERROR_IF(UtilMountOverlayFs(overlayTarget->c_str(), target));
+
+            target = overlayTarget->c_str();
+
+            THROW_LAST_ERROR_IF(MountInit((overlayTarget.value() + "/wsl-init").c_str()) < 0); // Required to call /gns later
+        }
+
+        if (WI_IsFlagSet(Message.Flags, LSW_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(chdir(target));
-            THROW_LAST_ERROR_IF(chroot(".")); // TODO: pivot_root
+            THROW_LAST_ERROR_IF(chroot("."));
         }
 
         response.Result = 0;

@@ -97,13 +97,20 @@ struct AttachedDiskInformation
 
 HRESULT WslAttachDisk(LSWVirtualMachineHandle VirtualMachine, const struct DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk);
 
+enum MountFlags
+{
+    MountFlagsNone = 0,
+    MountFlagsChroot = 1,
+    MountFlagsWriteableOverlayFs = 2,
+};
+
 struct MountSettings
 {
     const char* Device;
     const char* Target;
     const char* Type;
     const char* Options;
-    BOOL Chroot;
+    uint32_t Flags;
 };
 
 HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const struct MountSettings* Settings);

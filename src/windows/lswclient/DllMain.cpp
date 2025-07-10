@@ -114,7 +114,7 @@ HRESULT WslAttachDisk(LSWVirtualMachineHandle VirtualMachine, const DiskAttachSe
 HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const MountSettings* Settings)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
-        ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Chroot);
+        ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Flags);
 }
 
 HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProcessSettings* UserSettings, int32_t* Pid)
