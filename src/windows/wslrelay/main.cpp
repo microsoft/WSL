@@ -38,6 +38,8 @@ try
     wslrelay::RelayMode mode{wslrelay::RelayMode::Invalid};
     wil::unique_handle pipe{};
     wil::unique_handle exitEvent{};
+    wil::unique_handle terminalInputHandle{};
+    wil::unique_handle terminalOutputHandle{};
     int port{};
     GUID vmId{};
     bool disableTelemetry = !wsl::shared::OfficialBuild;
@@ -50,6 +52,8 @@ try
     parser.AddArgument(Handle{exitEvent}, wslrelay::exit_event_option);
     parser.AddArgument(Integer{port}, wslrelay::port_option);
     parser.AddArgument(disableTelemetry, wslrelay::disable_telemetry_option);
+    parser.AddArgument(Handle{terminalInputHandle}, wslrelay::input_option);
+    parser.AddArgument(Handle{terminalOutputHandle}, wslrelay::output_option);
     parser.Parse();
 
     // Initialize logging.
@@ -121,6 +125,30 @@ try
         // Begin the relay.
         wsl::windows::common::relay::BidirectionalRelay(
             reinterpret_cast<HANDLE>(socket.get()), pipe.get(), 0x1000, wsl::windows::common::relay::RelayFlags::LeftIsSocket);
+
+        break;
+    }
+
+    case wslrelay::RelayMode::InteractiveConsoleRelay:
+    {
+        THROW_HR_IF(E_INVALIDARG, !terminalInputHandle || !terminalOutputHandle);
+
+        // Create a thread to realy stdin to the pipe.
+        wsl::windows::common::SvcCommIo Io;
+        auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
+        std::thread inputThread([&]() {
+            wsl::windows::common::RelayStandardInput(GetStdHandle(STD_INPUT_HANDLE), terminalInputHandle.get(), {}, exitEvent.get(), &Io);
+        });
+
+        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            exitEvent.SetEvent();
+            inputThread.join();
+        });
+
+        // Relay the contents of the pipe to stdout.
+        wsl::windows::common::relay::InterruptableRelay(terminalOutputHandle.get(), GetStdHandle(STD_OUTPUT_HANDLE));
+
+        // TODO: watch process exit code.
 
         break;
     }

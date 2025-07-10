@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "wslservice.h"
 #include "LSWApi.h"
+#include "wslrelay.h"
 
 class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
@@ -146,7 +147,7 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
     std::vector<LSW_PROCESS_FD> inputFd(UserSettings->FdCount);
     for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
-        inputFd[i] = {UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Tty};
+        inputFd[i] = {UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Type};
     }
 
     std::vector<HANDLE> fds(UserSettings->FdCount);
@@ -191,6 +192,32 @@ void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine)
 {
     reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Release();
 }
+
+HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process)
+try
+{
+    wsl::windows::common::helpers::SetHandleInheritable(Input);
+    wsl::windows::common::helpers::SetHandleInheritable(Output);
+
+    auto basePath = wsl::windows::common::wslutil::GetMsiPackagePath();
+    THROW_HR_IF(E_UNEXPECTED, !basePath.has_value());
+
+    auto commandLine = std::format(
+        L"{}/wslrelay.exe --mode {} --input {} --output {}",
+        basePath.value(),
+        static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
+        HandleToULong(Input),
+        HandleToUlong(Output));
+
+    wsl::windows::common::SubProcess process{nullptr, commandLine.c_str()};
+    process.InheritHandle(Input);
+    process.InheritHandle(Output);
+    process.SetFlags(CREATE_NEW_CONSOLE);
+    *Process = process.Start().release();
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {

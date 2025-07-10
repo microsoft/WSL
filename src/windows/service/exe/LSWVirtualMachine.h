@@ -13,6 +13,7 @@ Abstract:
 --*/
 #pragma once
 #include "wslservice.h"
+#include "INetworkingEngine.h"
 #include "hcs.hpp"
 #include "Dmesg.h"
 
@@ -38,9 +39,15 @@ public:
 
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
+    static bool ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdCount, const LSW_PROCESS_FD** TtyInput, const LSW_PROCESS_FD** TtyOutput);
+
+    void ConfigureNetworking();
     void OnExit(_In_ const HCS_EVENT* Event);
 
-    std::pair<int32_t, wsl::shared::SocketChannel> Fork(bool thread);
+    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum LSW_FORK::ForkType Type);
+    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(wsl::shared::SocketChannel& Channel, enum LSW_FORK::ForkType Type);
+    int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
+
     wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
 
     struct AttachedDisk
@@ -62,6 +69,7 @@ private:
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
     wil::com_ptr<ITerminationCallback> m_terminationCallback;
+    std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
     wsl::shared::SocketChannel m_initChannel;
 

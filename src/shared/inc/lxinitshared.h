@@ -378,7 +378,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLswWaitPid,
     LxMessageLswWaitPidResponse,
     LxMessageLswSignal,
-    LxMessageLswShutdown
+    LxMessageLswShutdown,
+    LxMessageLswRelayTty
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -479,6 +480,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLswWaitPidResponse)
         X(LxMessageLswSignal)
         X(LxMessageLswShutdown)
+        X(LxMessageLswRelayTty)
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1593,7 +1595,8 @@ struct LSW_FORK_RESULT
     MESSAGE_HEADER Header;
     uint32_t Port = 0;
     int32_t Pid = -1;
-    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Port));
+    int32_t PtyMasterFd = -1;
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Port), FIELD(PtyMasterFd));
 };
 
 struct LSW_FORK
@@ -1601,11 +1604,36 @@ struct LSW_FORK
     static inline auto Type = LxMessageLswFork;
     using TResponse = LSW_FORK_RESULT;
 
+    enum ForkType : uint8_t
+    {
+        Invalid,
+        Process,
+        Thread,
+        Pty
+    };
+
     DECLARE_MESSAGE_CTOR(LSW_FORK);
 
     MESSAGE_HEADER Header;
-    bool Thread = false;
-    PRETTY_PRINT(FIELD(Header), FIELD(Thread));
+    ForkType ForkType = Invalid;
+    uint16_t TtyColumns = 0;
+    uint16_t TtyRows = 0;
+    PRETTY_PRINT(FIELD(Header), FIELD(ForkType), FIELD(TtyColumns), FIELD(TtyRows));
+};
+
+struct LSW_TTY_RELAY
+{
+    static inline auto Type = LxMessageLswRelayTty;
+    using TResponse = LSW_FORK_RESULT;
+
+    DECLARE_MESSAGE_CTOR(LSW_TTY_RELAY);
+
+    MESSAGE_HEADER Header;
+    int32_t TtyMaster;
+    int32_t TtyInput;
+    int32_t TtyOutput;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput));
 };
 
 struct LSW_CONNECT
