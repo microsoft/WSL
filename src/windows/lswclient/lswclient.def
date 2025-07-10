@@ -10,3 +10,5 @@ EXPORTS
     WslSignalLinuxProcess
     WslReleaseVirtualMachine
     WslShutdownVirtualMachine
+    WslLaunchInteractiveTerminal
+    WslLaunchDebugShell

@@ -422,8 +422,8 @@ struct _LSW_CREATE_PROCESS_OPTIONS {
 
 typedef struct _LSW_PROCESS_FD
 {
-    ULONGLONG Fd;
-    BOOL Tty;
+    LONG Fd;
+    int Type;
 } LSW_PROCESS_FD;
 
 typedef
@@ -457,6 +457,7 @@ interface ILSWVirtualMachine : IUnknown
     HRESULT Signal([in] LONG Pid, [in] int Signal);
     HRESULT Shutdown([in] ULONGLONG TimeoutMs);
     HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
+    HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
 }
 
 typedef
@@ -466,6 +467,9 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     ULONG CpuCount;
     ULONG BootTimeoutMs;
     ULONG DmesgOutput;
+    ULONG NetworkingMode;
+    BOOL EnableDnsTunneling;
+    BOOL EnableDebugShell;
 } VIRTUAL_MACHINE_SETTINGS;
 
 

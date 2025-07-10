@@ -18,6 +18,10 @@ Abstract:
 #include <sys/wait.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
+#include <sys/epoll.h>
+#include <sys/prctl.h>
+
+#include <pty.h>
 #include "mountutilcpp.h"
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
@@ -67,10 +71,131 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& M
     THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
 }
 
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
+{
+    THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
+
+    pollfd pollDescriptors[2];
+
+    pollDescriptors[0].fd = Message.TtyInput;
+    pollDescriptors[0].events = POLLIN;
+    pollDescriptors[1].fd = Message.TtyMaster;
+    pollDescriptors[1].events = POLLIN;
+
+    std::vector<gsl::byte> pendingStdin;
+    std::vector<gsl::byte> buffer;
+
+    Channel.Close();
+
+    LOG_ERROR("Tty relay running");
+
+    while (true)
+    {
+        int bytesWritten = 0;
+        auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), pendingStdin.empty() ? -1 : 100);
+        if (!pendingStdin.empty())
+        {
+            bytesWritten = write(Message.TtyMaster, pendingStdin.data(), pendingStdin.size());
+            if (bytesWritten < 0)
+            {
+                if (errno != EAGAIN && errno != EWOULDBLOCK)
+                {
+                    LOG_ERROR("delayed stdin write failed {}", errno);
+                }
+                else if (bytesWritten <= pendingStdin.size()) // Partial or complete write
+                {
+                    pendingStdin.erase(pendingStdin.begin(), pendingStdin.begin() + bytesWritten);
+                }
+                else
+                {
+                    LOG_ERROR("Unexpected write result {}, pending={}", bytesWritten, pendingStdin.size());
+                }
+            }
+        }
+
+        if (result < 0)
+        {
+            LOG_ERROR("poll failed {}", errno);
+            break;
+        }
+
+        // Relay stdin.
+        if (pollDescriptors[0].revents & (POLLIN | POLLHUP | POLLERR) && pendingStdin.empty())
+        {
+            auto bytesRead = UtilReadBuffer(pollDescriptors[0].fd, buffer);
+            if (bytesRead < 0)
+            {
+                LOG_ERROR("read failed {}", errno);
+                break;
+            }
+            else if (bytesRead == 0)
+            { // Stdin has been closed.
+                pollDescriptors[0].fd = -1;
+
+                CLOSE(Message.TtyMaster);
+            }
+            else
+            {
+                bytesWritten = write(Message.TtyMaster, buffer.data(), bytesRead);
+                LOG_ERROR("Write {} bytes on stdin", bytesWritten);
+                if (bytesWritten < 0)
+                {
+                    //
+                    // If writing on stdin's pipe would block, mark the write as pending an continue.
+                    // This is required blocking on the write() could lead to a deadlock if the child process
+                    // is blocking trying to write on stderr / stdout while the relay tries to write stdin.
+                    //
+
+                    if (errno == EWOULDBLOCK || errno == EAGAIN)
+                    {
+                        assert(pendingStdin.empty());
+                        pendingStdin.assign(buffer.begin(), buffer.begin() + bytesRead);
+                    }
+                    else
+                    {
+                        LOG_ERROR("write failed {}", errno);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Relay stdout & stderr
+        if (pollDescriptors[1].revents & (POLLIN | POLLHUP | POLLERR))
+        {
+            auto bytesRead = UtilReadBuffer(pollDescriptors[1].fd, buffer);
+            if (bytesRead <= 0)
+            {
+                if (bytesRead < 0 && errno != EIO)
+                {
+                    LOG_ERROR("read failed {} {}", bytesRead, errno);
+                }
+
+                // The tty has been closed, stop relaying.
+                UtilSocketShutdown(pollDescriptors[1].fd, SHUT_WR);
+                pollDescriptors[1].fd = -1;
+                break;
+            }
+
+            LOG_ERROR("Relayed {} to stdout", bytesRead);
+
+            bytesWritten = UtilWriteBuffer(Message.TtyOutput, buffer.data(), bytesRead);
+            if (bytesWritten < 0)
+            {
+                LOG_ERROR("write failed {}", errno);
+                UtilSocketShutdown(pollDescriptors[1].fd, SHUT_WR);
+                pollDescriptors[1].fd = -1;
+            }
+        }
+    }
+
+    LOG_ERROR("Tty relay exiting");
+}
+
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
-    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false)};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
     LSW_FORK_RESULT Response{};
@@ -78,34 +203,80 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
     Response.Header.MessageType = LSW_FORK_RESULT::Type;
     Response.Port = SocketAddress.svm_port;
 
-    auto childLogic = [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel, &Message]() {
-        // Close parent channel
+    std::promise<pid_t> childPid;
 
-        if (!Message.Thread)
+    {
+        auto childLogic = [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel, &Message, &childPid]() mutable {
+            // Close parent channel
+            if (Message.ForkType == LSW_FORK::Process || Message.ForkType == LSW_FORK::Pty)
+            {
+                Channel.Close();
+            }
+
+            childPid.set_value(getpid());
+
+            wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
+            THROW_LAST_ERROR_IF(!ProcessSocket);
+
+            ListenSocket.reset();
+
+            auto subChannel = wsl::shared::SocketChannel{std::move(ProcessSocket), "ForkedChannel"};
+            ProcessMessages(subChannel);
+        };
+
+        if (Message.ForkType == LSW_FORK::Thread)
         {
-            Channel.Close();
+            std::thread thread{std::move(childLogic)};
+            thread.detach();
+
+            Response.Pid = childPid.get_future().get();
         }
+        else if (Message.ForkType == LSW_FORK::Process)
+        {
+            Response.Pid = UtilCreateChildProcess("CreateChildProcess", std::move(childLogic));
+        }
+        else if (Message.ForkType == LSW_FORK::Pty)
+        {
+            THROW_LAST_ERROR_IF(prctl(PR_SET_CHILD_SUBREAPER, 1) < 0);
 
-        wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
-        THROW_LAST_ERROR_IF(!ProcessSocket);
+            winsize ttySize{};
+            ttySize.ws_col = Message.TtyColumns;
+            ttySize.ws_row = Message.TtyRows;
 
-        auto subChannel = wsl::shared::SocketChannel{std::move(ProcessSocket), "ForkedChannel"};
-        ProcessMessages(subChannel);
-    };
+            wil::unique_fd ttyMaster;
 
-    if (Message.Thread)
-    {
-        std::thread thread{std::move(childLogic)};
-        Response.Pid = 1; // TODO: get pid
+            auto result = forkpty(ttyMaster.addressof(), nullptr, nullptr, nullptr);
+            // auto result = fork();
+            THROW_ERRNO_IF(errno, result < 0);
 
-        thread.detach();
+            if (result == 0) // Child
+            {
+                sigset_t SignalMask;
+                sigemptyset(&SignalMask);
+                // std::this_thread::sleep_for(std::chrono::seconds(5));
+
+                try
+                {
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
+                    childLogic();
+                }
+                CATCH_LOG();
+
+                LOG_ERROR("Child logic exiting");
+                exit(0);
+            }
+
+            Response.PtyMasterFd = ttyMaster.release();
+            Response.Pid = result;
+        }
+        else
+        {
+            LOG_ERROR("Unexpected fork type: {}", Message.Type);
+            THROW_ERRNO(EINVAL);
+        }
     }
-    else
-    {
 
-        Response.Pid = UtilCreateChildProcess("CreateChildProcess", std::move(childLogic));
-    }
-
+    ListenSocket.reset();
     Channel.SendMessage(Response);
 }
 
@@ -261,7 +432,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL>(Channel, Type, Buffer);
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY>(Channel, Type, Buffer);
     }
     catch (...)
     {
@@ -283,6 +454,8 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
 
         ProcessMessage(Channel, Message->MessageType, Range);
     }
+
+    LOG_INFO("Process {} exiting", getpid());
 }
 
 int LswEntryPoint(int Argc, char* Argv[])
@@ -327,11 +500,25 @@ int LswEntryPoint(int Argc, char* Argv[])
         g_LogFd = 3;
     }
 
+    rlimit Limit{};
+    Limit.rlim_cur = 0x4000000;
+    Limit.rlim_max = 0x4000000;
+    if (setrlimit(RLIMIT_MEMLOCK, &Limit) < 0)
+    {
+        LOG_ERROR("setrlimit(RLIMIT_MEMLOCK) failed {}", errno);
+        return -1;
+    }
+
     //
     // Enable logging when processes receive fatal signals.
     //
 
     if (WriteToFile("/proc/sys/kernel/print-fatal-signals", "1\n") < 0)
+    {
+        return -1;
+    }
+
+    if (WriteToFile("/proc/sys/kernel/print-fatal-signals", "0\n") < 0)
     {
         return -1;
     }
@@ -345,11 +532,13 @@ int LswEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
+    THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, true) < 0);
+
     //
     // Ensure /dev/console is present and set as the controlling terminal.
     // If opening /dev/console times out, stdout and stderr to the logging file descriptor.
     //
-    wil::unique_fd ConsoleFd{};
+    /*wil::unique_fd ConsoleFd{};
 
     try
     {
@@ -374,7 +563,7 @@ int LswEntryPoint(int Argc, char* Argv[])
         {
             LOG_ERROR("dup2 failed {}", errno);
         }
-    }
+    }*/
 
     //
     // Open /dev/null for stdin.

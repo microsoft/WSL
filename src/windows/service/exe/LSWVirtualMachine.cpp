@@ -26,6 +26,20 @@ LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, P
     m_settings(Settings), m_userSid(UserSid)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
+
+    if (Settings.EnableDebugShell)
+    {
+        m_debugShellPipe = wsl::windows::common::wslutil::GetDebugShellPipeName(m_userSid) + m_settings.DisplayName;
+    }
+}
+
+HRESULT LSWVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
+{
+    RETURN_HR_IF(E_INVALIDARG, m_debugShellPipe.empty());
+
+    *pipePath = wil::make_unique_string<wil::unique_cotaskmem_string>(m_debugShellPipe.c_str()).release();
+
+    return S_OK;
 }
 
 LSWVirtualMachine::~LSWVirtualMachine()
@@ -138,7 +152,7 @@ void LSWVirtualMachine::Start()
 
     m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true, std::move(dmesgOutput));
 
-    if (true) // early boot logging
+    if (false) // early boot logging
     {
         kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
         vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
@@ -149,12 +163,25 @@ void LSWVirtualMachine::Start()
     // TODO: support early boot logging
 
     // The primary "console" will be a virtio serial device.
-    kernelCmdLine += L" console=hvc0 debug";
-    hcs::VirtioSerialPort virtioPort{};
-    virtioPort.Name = L"hvc0";
-    virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
-    virtioPort.ConsoleSupport = true;
-    vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
+
+    if (true)
+    {
+        kernelCmdLine += L" console=hvc0 debug";
+        hcs::VirtioSerialPort virtioPort{};
+        virtioPort.Name = L"hvc0";
+        virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
+        virtioPort.ConsoleSupport = true;
+        vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
+    }
+
+    if (!m_debugShellPipe.empty())
+    {
+        hcs::VirtioSerialPort virtioPort;
+        virtioPort.Name = L"hvc1";
+        virtioPort.NamedPipe = m_debugShellPipe;
+        virtioPort.ConsoleSupport = true;
+        vmSettings.Devices.VirtioSerial->Ports["1"] = std::move(virtioPort);
+    }
 
     // Set up boot params.
     //
@@ -225,6 +252,19 @@ void LSWVirtualMachine::Start()
     auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
     auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
     m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
+}
+
+void LSWVirtualMachine::ConfigureNetworking()
+{
+    if (m_settings.NetworkingMode == NetworkingModeNone)
+    {
+        return;
+    }
+
+    if (m_settings.NetworkingMode == NetworkingModeNAT)
+    {
+        // TODO
+    }
 }
 
 void CALLBACK LSWVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
@@ -347,29 +387,36 @@ try
 }
 CATCH_RETURN();
 
-std::pair<int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(bool thread)
+std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(enum LSW_FORK::ForkType Type)
+{
+    std::lock_guard lock{m_lock};
+    return Fork(m_initChannel, Type);
+}
+
+std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(wsl::shared::SocketChannel& Channel, enum LSW_FORK::ForkType Type)
 {
     uint32_t port{};
     int32_t pid{};
+    int32_t ptyMaster{};
     {
-        std::lock_guard lock{m_lock};
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
         LSW_FORK message;
-        message.Header.MessageSize = sizeof(message);
-        message.Header.MessageType = LSW_FORK::Type;
-        message.Thread = thread;
-        const auto& response = m_initChannel.Transaction(message);
+        message.ForkType = Type;
+        message.TtyColumns = 80;
+        message.TtyRows = 80;
+        const auto& response = Channel.Transaction(message);
         port = response.Port;
         pid = response.Pid;
+        ptyMaster = response.PtyMasterFd;
     }
 
     THROW_HR_IF_MSG(E_FAIL, pid <= 0, "fork() returned %i", pid);
 
-    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port);
+    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmExitEvent.get(), m_settings.BootTimeoutMs);
 
     // TODO: pid in channel name
-    return std::make_pair(pid, wsl::shared::SocketChannel{std::move(socket), "ForkedChannel"});
+    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), "ForkedChannel"});
 }
 
 wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
@@ -387,12 +434,16 @@ HRESULT LSWVirtualMachine::CreateLinuxProcess(
     _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
 {
-    auto [pid, subChannel] = Fork(false);
+    // Check if this is a tty or not
+    const LSW_PROCESS_FD* ttyInput = nullptr;
+    const LSW_PROCESS_FD* ttyOutput = nullptr;
+    auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput);
+    auto [pid, _, childChannel] = Fork(LSW_FORK::Process);
 
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
-        sockets[i] = ConnectSocket(subChannel, static_cast<int32_t>(Fds[i].Fd));
+        sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
     }
 
     wsl::shared::MessageWriter<LSW_EXEC> Message;
@@ -402,20 +453,46 @@ try
     Message.WriteStringArray(Message->CommandLineIndex, Options->CommandLine, Options->CommandLineCount);
     Message.WriteStringArray(Message->EnvironmentIndex, Options->Environmnent, Options->EnvironmnentCount);
 
-    subChannel.SendMessage<LSW_EXEC>(Message.Span());
-
-    auto [response, span] = subChannel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
-
-    if (response != nullptr)
+    // If this is an interactive tty, we need a relay process
+    if (interactiveTty)
     {
-        Result->Errno = response->Result;
-        return E_FAIL;
+        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, LSW_FORK::Pty);
+        LSW_TTY_RELAY relayMessage;
+        relayMessage.TtyMaster = ptyMaster;
+        relayMessage.TtyInput = ttyInput->Fd;
+        relayMessage.TtyOutput = ttyOutput->Fd;
+        childChannel.SendMessage(relayMessage);
+
+        auto result = ExpectClosedChannelOrError(childChannel);
+        if (result != 0)
+        {
+            Result->Errno = result;
+            return E_FAIL;
+        }
+
+        grandChildChannel.SendMessage<LSW_EXEC>(Message.Span());
+        result = ExpectClosedChannelOrError(grandChildChannel);
+        if (result != 0)
+        {
+            Result->Errno = result;
+            return E_FAIL;
+        }
+
+        pid = grandChildPid;
     }
     else
     {
-        Result->Errno = 0;
-        Result->Pid = pid;
+        childChannel.SendMessage<LSW_EXEC>(Message.Span());
+        auto result = ExpectClosedChannelOrError(childChannel);
+        if (result != 0)
+        {
+            Result->Errno = result;
+            return E_FAIL;
+        }
     }
+
+    Result->Errno = 0;
+    Result->Pid = pid;
 
     for (size_t i = 0; i < sockets.size(); i++)
     {
@@ -426,10 +503,23 @@ try
 }
 CATCH_RETURN();
 
+int32_t LSWVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
+{
+    auto [response, span] = Channel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
+    if (response != nullptr)
+    {
+        return response->Result;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 HRESULT LSWVirtualMachine::WaitPid(LONG Pid, ULONGLONG TimeoutMs, ULONG* State, int* Code)
 try
 {
-    auto [pid, subChannel] = Fork(true);
+    auto [pid, _, subChannel] = Fork(LSW_FORK::Thread);
 
     LSW_WAITPID message{};
     message.Pid = Pid;
@@ -493,3 +583,32 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+bool LSWVirtualMachine::ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdCount, const LSW_PROCESS_FD** TtyInput, const LSW_PROCESS_FD** TtyOutput)
+{
+    bool foundNonTtyFd = false;
+
+    for (ULONG i = 0; i < FdCount; i++)
+    {
+        if (Fds[i].Type == TerminalInput)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, *TtyInput != nullptr, "Only one TtyInput fd can be passed. Index=%lu", i);
+
+            *TtyInput = &Fds[i];
+        }
+        else if (Fds[i].Type == TerminalOutput)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, *TtyOutput != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
+            *TtyOutput = &Fds[i];
+        }
+        else
+        {
+            foundNonTtyFd = true;
+        }
+    }
+
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, foundNonTtyFd && (*TtyOutput != nullptr || *TtyInput != nullptr), "Found mixed tty & non tty fds");
+
+    return !foundNonTtyFd && FdCount > 0;
+}

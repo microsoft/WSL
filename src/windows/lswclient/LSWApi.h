@@ -47,7 +47,7 @@ enum VirtualMachineTerminationReason
     VirtualMachineTerminationReasonCrashed,
 };
 
-typedef HRESULT (*VirtualMachineTerminationCallback)(void*, VirtualMachineTerminationReason, LPCWSTR);
+typedef HRESULT (*VirtualMachineTerminationCallback)(void*, enum VirtualMachineTerminationReason, LPCWSTR);
 
 struct Options
 {
@@ -55,6 +55,19 @@ struct Options
     HANDLE Dmesg;
     VirtualMachineTerminationCallback TerminationCallback;
     void* TerminationContext;
+    bool EnableDebugShell;
+};
+
+enum NetworkingMode
+{
+    NetworkingModeNone,
+    NetworkingModeNAT
+};
+
+struct Networking
+{
+    enum NetworkingMode Mode;
+    bool DnsTunneling;
 };
 
 struct VirtualMachineSettings
@@ -63,6 +76,7 @@ struct VirtualMachineSettings
     struct Memory Memory; // Not implemented yet
     struct CPU CPU;       // Not implemented yet
     struct Options Options;
+    struct Networking Networking; // Not implemented yet
 };
 
 typedef void* LSWVirtualMachineHandle;
@@ -94,10 +108,17 @@ struct MountSettings
 
 HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const struct MountSettings* Settings);
 
+enum FileDescriptorType
+{
+    Default,
+    TerminalInput,
+    TerminalOutput
+};
+
 struct ProcessFileDescriptorSettings
 {
-    uint32_t Number;
-    BOOL Tty; // Not implemented yet
+    int32_t Number;
+    enum FileDescriptorType Type; // Not implemented yet
     HANDLE Handle;
 };
 
@@ -127,6 +148,8 @@ struct WaitResult
     int32_t Code; // Signal number or exit code
 };
 
+HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process);
+
 HRESULT WslWaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WaitResult* Result);
 
 HRESULT WslSignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal);
@@ -134,6 +157,9 @@ HRESULT WslSignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pi
 HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs);
 
 void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine);
+
+HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process);
+
 
 #ifdef __cplusplus
 }

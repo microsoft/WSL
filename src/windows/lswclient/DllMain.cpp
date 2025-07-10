@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "wslservice.h"
 #include "LSWApi.h"
+#include "wslrelay.h"
 
 class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
@@ -63,6 +64,7 @@ try
     settings.CpuCount = UserSettings->CPU.CpuCount;
     settings.BootTimeoutMs = UserSettings->Options.BootTimeoutMs;
     settings.DmesgOutput = HandleToULong(UserSettings->Options.Dmesg);
+    settings.EnableDebugShell = UserSettings->Options.EnableDebugShell;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
 
@@ -148,15 +150,19 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
     std::vector<LSW_PROCESS_FD> inputFd(UserSettings->FdCount);
     for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
-        inputFd[i] = {UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Tty};
+        inputFd[i] = {UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Type};
     }
 
     std::vector<HANDLE> fds(UserSettings->FdCount);
+    if (fds.empty())
+    {
+        fds.resize(1); // COM doesn't like null pointers.
+    }
 
     RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
                          ->CreateLinuxProcess(&options, UserSettings->FdCount, inputFd.data(), fds.data(), &result));
 
-    for (size_t i = 0; i < fds.size(); i++)
+    for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
         UserSettings->FileDescriptors[i].Handle = fds[i];
     }
@@ -193,6 +199,68 @@ void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine)
 {
     reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Release();
 }
+
+HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process)
+try
+{
+    wsl::windows::common::helpers::SetHandleInheritable(Input);
+    wsl::windows::common::helpers::SetHandleInheritable(Output);
+
+    auto basePath = wsl::windows::common::wslutil::GetMsiPackagePath();
+    THROW_HR_IF(E_UNEXPECTED, !basePath.has_value());
+
+    auto commandLine = std::format(
+        L"{}/wslrelay.exe --mode {} --input {} --output {}",
+        basePath.value(),
+        static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
+        HandleToULong(Input),
+        HandleToUlong(Output));
+
+    WSL_LOG("LaunchWslRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));
+
+    wsl::windows::common::SubProcess process{nullptr, commandLine.c_str()};
+    process.InheritHandle(Input);
+    process.InheritHandle(Output);
+    process.SetFlags(CREATE_NEW_CONSOLE);
+    process.SetShowWindow(SW_SHOW);
+    *Process = process.Start().release();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process)
+try
+{
+    wil::unique_cotaskmem_string pipePath;
+    THROW_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->GetDebugShellPipe(&pipePath));
+
+    wil::unique_hfile pipe{CreateFileW(pipePath.get(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr)};
+    THROW_LAST_ERROR_IF(!pipe);
+
+    wsl::windows::common::helpers::SetHandleInheritable(pipe.get());
+
+     auto basePath = wsl::windows::common::wslutil::GetMsiPackagePath();
+    THROW_HR_IF(E_UNEXPECTED, !basePath.has_value());
+    auto commandLine = std::format(
+        L"\"{}\\wslrelay.exe\" --mode {} --input {} --output {}",
+        basePath.value(),
+        static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
+        HandleToULong(pipe.get()),
+        HandleToUlong(pipe.get()));
+
+    WSL_LOG("LaunchDebugShellRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));
+
+    wsl::windows::common::SubProcess process{nullptr, commandLine.c_str()};
+    process.InheritHandle(pipe.get());
+    process.SetFlags(0);
+    process.SetShowWindow(SW_SHOW);
+
+    *Process = process.Start().release();
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {

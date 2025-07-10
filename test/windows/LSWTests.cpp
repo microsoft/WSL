@@ -106,6 +106,9 @@ class LSWTests
         MountSettings procmountSettings{nullptr, "/proc", "proc", "", false};
         VERIFY_SUCCEEDED(WslMount(vm, &procmountSettings));
 
+        MountSettings ptsMountSettings{nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", false};
+        VERIFY_SUCCEEDED(WslMount(vm, &ptsMountSettings));
+
         return vm;
     }
 
@@ -310,5 +313,56 @@ class LSWTests
         }
 
         WslReleaseVirtualMachine(vm);
+    }
+
+    TEST_METHOD(InteractiveShell)
+    {
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 60 *1000;
+        settings.Options.EnableDebugShell = true;
+
+        auto vm = CreateVm(&settings);
+
+        std::vector<const char*> cmd = {"/usr/bin/setsid", "/sbin/agetty", "-w", "-L", "hvc1", "-a", "root", nullptr};
+
+        CreateProcessSettings options{};
+        options.Executable = "/usr/bin/setsid";
+        options.Arguments = cmd.data();
+        options.FdCount = 0;
+
+        int pid = -1;
+        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &options, &pid));
+
+        wil::unique_handle processs;
+        VERIFY_SUCCEEDED(WslLaunchDebugShell(vm, &processs));
+
+        std::vector<const char*> commandLine{"/bin/sh", nullptr};
+
+        std::vector<ProcessFileDescriptorSettings> fds(2);
+        fds[0].Number = 0;
+        fds[0].Type = TerminalInput;
+        fds[1].Number = 1;
+        fds[1].Type = TerminalOutput;
+
+        std::vector<const char*> env{"bar=foo", nullptr};
+        CreateProcessSettings createProcessSettings{};
+        createProcessSettings.Executable = "/bin/sh";
+        createProcessSettings.Arguments = commandLine.data();
+        createProcessSettings.FileDescriptors = fds.data();
+        createProcessSettings.Environment = env.data();
+        createProcessSettings.FdCount = static_cast<ULONG>(fds.size());
+
+        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
+
+        wil::unique_handle process;
+
+        VERIFY_SUCCEEDED(WslLaunchInteractiveTerminal(
+            createProcessSettings.FileDescriptors[0].Handle, createProcessSettings.FileDescriptors[1].Handle, &process));
+
+        WaitForSingleObject(process.get(), INFINITE);
+        system("pause");
     }
 };
