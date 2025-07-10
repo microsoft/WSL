@@ -160,7 +160,6 @@ void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine);
 
 HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process); // Used for development, might remove
 
-
 #ifdef __cplusplus
 }
 #endif

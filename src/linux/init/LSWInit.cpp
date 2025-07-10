@@ -524,7 +524,7 @@ int LswEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
-    THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, true) < 0);
+    THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
     //
     // Ensure /dev/console is present and set as the controlling terminal.
