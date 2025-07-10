@@ -131,6 +131,8 @@ try
 
     case wslrelay::RelayMode::InteractiveConsoleRelay:
     {
+        AllocConsole();
+
         THROW_HR_IF(E_INVALIDARG, !terminalInputHandle || !terminalOutputHandle);
 
         // Create a thread to realy stdin to the pipe.
@@ -162,5 +164,6 @@ try
 catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
+    system("pause");
     return 1;
 }

@@ -46,6 +46,7 @@ struct Options
     HANDLE Dmesg;
     VirtualMachineTerminationCallback TerminationCallback;
     void* TerminationContext;
+    bool EnableDebugShell;
 };
 
 enum NetworkingMode
@@ -147,6 +148,9 @@ HRESULT WslSignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pi
 HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs);
 
 void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine);
+
+HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process);
+
 
 #ifdef __cplusplus
 }

@@ -19,6 +19,7 @@ Abstract:
 #include <sys/mount.h>
 #include <sys/syscall.h>
 #include <sys/epoll.h>
+#include <sys/prctl.h>
 
 #include <pty.h>
 #include "mountutilcpp.h"
@@ -72,7 +73,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& M
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
 {
-    // THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
+    THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
 
     pollfd pollDescriptors[2];
 
@@ -85,6 +86,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
     std::vector<gsl::byte> buffer;
 
     Channel.Close();
+
+    LOG_ERROR("Tty relay running");
 
     while (true)
     {
@@ -134,6 +137,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
             else
             {
                 bytesWritten = write(Message.TtyMaster, buffer.data(), bytesRead);
+                LOG_ERROR("Write {} bytes on stdin", bytesWritten);
                 if (bytesWritten < 0)
                 {
                     //
@@ -173,7 +177,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
                 break;
             }
 
-            bytesWritten = UtilWriteBuffer(Message.TtyInput, buffer.data(), bytesRead);
+            LOG_ERROR("Relayed {} to stdout", bytesRead);
+
+            bytesWritten = UtilWriteBuffer(Message.TtyOutput, buffer.data(), bytesRead);
             if (bytesWritten < 0)
             {
                 LOG_ERROR("write failed {}", errno);
@@ -182,6 +188,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
             }
         }
     }
+
+    LOG_ERROR("Tty relay exiting");
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Message, const gsl::span<gsl::byte>& Buffer)
@@ -198,29 +206,19 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
     std::promise<pid_t> childPid;
 
     {
-        auto childLogic = [ListenSocket = std::move(ListenSocket), SocketAddress, &Channel, &Message, &childPid]() mutable {
+        auto childLogic = [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel, &Message, &childPid]() mutable {
             // Close parent channel
-            LOG_ERROR("In lambda");
-            LOG_ERROR("In lambda2");
-            LOG_ERROR("In lambda3");
-            LOG_ERROR("In lambda4");
-            LOG_ERROR("In lambda5");
-
             if (Message.ForkType == LSW_FORK::Process || Message.ForkType == LSW_FORK::Pty)
             {
                 Channel.Close();
             }
-            LOG_ERROR("In lambda6");
 
             childPid.set_value(getpid());
 
-            LOG_ERROR("PreConnect:");
             wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
             THROW_LAST_ERROR_IF(!ProcessSocket);
 
             ListenSocket.reset();
-
-            LOG_ERROR("PostConnect:");
 
             auto subChannel = wsl::shared::SocketChannel{std::move(ProcessSocket), "ForkedChannel"};
             ProcessMessages(subChannel);
@@ -239,10 +237,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
         }
         else if (Message.ForkType == LSW_FORK::Pty)
         {
-            if (WriteToFile("/proc/sys/kernel/printk_devkmsg", "on\n") < 0)
-            {
-                LOG_ERROR("Failed to write to proc");
-            }
+            THROW_LAST_ERROR_IF(prctl(PR_SET_CHILD_SUBREAPER, 1) < 0);
 
             winsize ttySize{};
             ttySize.ws_col = Message.TtyColumns;
@@ -250,10 +245,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
 
             wil::unique_fd ttyMaster;
 
-            auto result = forkpty(ttyMaster.addressof(), nullptr, nullptr, &ttySize);
-            LOG_ERROR("forkpty: {}", result);
+            auto result = forkpty(ttyMaster.addressof(), nullptr, nullptr, nullptr);
+            // auto result = fork();
             THROW_ERRNO_IF(errno, result < 0);
-            LOG_ERROR("forkpty(aftererrno): {}", result);
 
             if (result == 0) // Child
             {
@@ -261,18 +255,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
                 sigemptyset(&SignalMask);
                 // std::this_thread::sleep_for(std::chrono::seconds(5));
 
-                LOG_ERROR("Before logging");
-                InitializeLogging(false);
-                LOG_ERROR("Signals: {}", sigprocmask(SIG_SETMASK, &SignalMask, nullptr));
-
-                LOG_ERROR("Child logic running, pid: {}, logFd: {}", getpid(), g_LogFd);
                 try
                 {
-                    LOG_ERROR("About to call lambda", getpid());
                     std::this_thread::sleep_for(std::chrono::seconds(5));
-
-                    write(2, "FOO\n", 4);
-                    *(int*)0x12 = 1;
                     childLogic();
                 }
                 CATCH_LOG();
@@ -280,12 +265,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
                 LOG_ERROR("Child logic exiting");
                 exit(0);
             }
-            else
-            {
-                LOG_ERROR("forkpty(afteblock): {}", result);
-            }
 
-            Response.PtyMasterFd = ttyMaster.get();
+            Response.PtyMasterFd = ttyMaster.release();
             Response.Pid = result;
         }
         else
@@ -519,6 +500,15 @@ int LswEntryPoint(int Argc, char* Argv[])
         g_LogFd = 3;
     }
 
+    rlimit Limit{};
+    Limit.rlim_cur = 0x4000000;
+    Limit.rlim_max = 0x4000000;
+    if (setrlimit(RLIMIT_MEMLOCK, &Limit) < 0)
+    {
+        LOG_ERROR("setrlimit(RLIMIT_MEMLOCK) failed {}", errno);
+        return -1;
+    }
+
     //
     // Enable logging when processes receive fatal signals.
     //
@@ -528,7 +518,7 @@ int LswEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
-    if (WriteToFile(PROCFS_PATH "/sys/kernel/dmesg_restrict", "0\n") < 0)
+    if (WriteToFile("/proc/sys/kernel/print-fatal-signals", "0\n") < 0)
     {
         return -1;
     }
@@ -542,11 +532,13 @@ int LswEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
+    THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, true) < 0);
+
     //
     // Ensure /dev/console is present and set as the controlling terminal.
     // If opening /dev/console times out, stdout and stderr to the logging file descriptor.
     //
-    wil::unique_fd ConsoleFd{};
+    /*wil::unique_fd ConsoleFd{};
 
     try
     {
@@ -571,7 +563,7 @@ int LswEntryPoint(int Argc, char* Argv[])
         {
             LOG_ERROR("dup2 failed {}", errno);
         }
-    }
+    }*/
 
     //
     // Open /dev/null for stdin.

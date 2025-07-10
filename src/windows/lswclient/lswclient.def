@@ -11,3 +11,4 @@ EXPORTS
     WslReleaseVirtualMachine
     WslShutdownVirtualMachine
     WslLaunchInteractiveTerminal
+    WslLaunchDebugShell

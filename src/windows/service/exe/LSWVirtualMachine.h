@@ -36,6 +36,7 @@ public:
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
     IFACEMETHOD(RegisterCallback(_In_ ITerminationCallback* callback)) override;
+    IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
 
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
@@ -63,6 +64,7 @@ private:
     int m_coldDiscardShiftSize{};
     bool m_running = false;
     PSID m_userSid{};
+    std::wstring m_debugShellPipe;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;

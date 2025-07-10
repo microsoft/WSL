@@ -26,6 +26,20 @@ LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, P
     m_settings(Settings), m_userSid(UserSid)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
+
+    if (Settings.EnableDebugShell)
+    {
+        m_debugShellPipe = wsl::windows::common::wslutil::GetDebugShellPipeName(m_userSid) + m_settings.DisplayName;
+    }
+}
+
+HRESULT LSWVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
+{
+    RETURN_HR_IF(E_INVALIDARG, m_debugShellPipe.empty());
+
+    *pipePath = wil::make_unique_string<wil::unique_cotaskmem_string>(m_debugShellPipe.c_str()).release();
+
+    return S_OK;
 }
 
 LSWVirtualMachine::~LSWVirtualMachine()
@@ -149,12 +163,25 @@ void LSWVirtualMachine::Start()
     // TODO: support early boot logging
 
     // The primary "console" will be a virtio serial device.
-    kernelCmdLine += L" console=hvc0 debug";
-    hcs::VirtioSerialPort virtioPort{};
-    virtioPort.Name = L"hvc0";
-    virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
-    virtioPort.ConsoleSupport = true;
-    vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
+
+    if (true)
+    {
+        kernelCmdLine += L" console=hvc0 debug";
+        hcs::VirtioSerialPort virtioPort{};
+        virtioPort.Name = L"hvc0";
+        virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
+        virtioPort.ConsoleSupport = true;
+        vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
+    }
+
+    if (!m_debugShellPipe.empty())
+    {
+        hcs::VirtioSerialPort virtioPort;
+        virtioPort.Name = L"hvc1";
+        virtioPort.NamedPipe = m_debugShellPipe;
+        virtioPort.ConsoleSupport = true;
+        vmSettings.Devices.VirtioSerial->Ports["1"] = std::move(virtioPort);
+    }
 
     // Set up boot params.
     //
@@ -386,7 +413,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork
 
     THROW_HR_IF_MSG(E_FAIL, pid <= 0, "fork() returned %i", pid);
 
-    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port);
+    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmExitEvent.get(), m_settings.BootTimeoutMs);
 
     // TODO: pid in channel name
     return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), "ForkedChannel"});
@@ -583,5 +610,5 @@ bool LSWVirtualMachine::ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdC
     THROW_HR_IF_MSG(
         E_INVALIDARG, foundNonTtyFd && (*TtyOutput != nullptr || *TtyInput != nullptr), "Found mixed tty & non tty fds");
 
-    return !foundNonTtyFd;
+    return !foundNonTtyFd && FdCount > 0;
 }

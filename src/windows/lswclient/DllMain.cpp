@@ -62,6 +62,7 @@ try
     settings.CpuCount = UserSettings->CPU.CpuCount;
     settings.BootTimeoutMs = UserSettings->Options.BootTimeoutMs;
     settings.DmesgOutput = HandleToULong(UserSettings->Options.Dmesg);
+    settings.EnableDebugShell = UserSettings->Options.EnableDebugShell;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
 
@@ -151,11 +152,15 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
     }
 
     std::vector<HANDLE> fds(UserSettings->FdCount);
+    if (fds.empty())
+    {
+        fds.resize(1); // COM doesn't like null pointers.
+    }
 
     RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
                          ->CreateLinuxProcess(&options, UserSettings->FdCount, inputFd.data(), fds.data(), &result));
 
-    for (size_t i = 0; i < fds.size(); i++)
+    for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
         UserSettings->FileDescriptors[i].Handle = fds[i];
     }
@@ -209,10 +214,46 @@ try
         HandleToULong(Input),
         HandleToUlong(Output));
 
+    WSL_LOG("LaunchWslRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));
+
     wsl::windows::common::SubProcess process{nullptr, commandLine.c_str()};
     process.InheritHandle(Input);
     process.InheritHandle(Output);
     process.SetFlags(CREATE_NEW_CONSOLE);
+    process.SetShowWindow(SW_SHOW);
+    *Process = process.Start().release();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process)
+try
+{
+    wil::unique_cotaskmem_string pipePath;
+    THROW_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->GetDebugShellPipe(&pipePath));
+
+    wil::unique_hfile pipe{CreateFileW(pipePath.get(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr)};
+    THROW_LAST_ERROR_IF(!pipe);
+
+    wsl::windows::common::helpers::SetHandleInheritable(pipe.get());
+
+     auto basePath = wsl::windows::common::wslutil::GetMsiPackagePath();
+    THROW_HR_IF(E_UNEXPECTED, !basePath.has_value());
+    auto commandLine = std::format(
+        L"\"{}\\wslrelay.exe\" --mode {} --input {} --output {}",
+        basePath.value(),
+        static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
+        HandleToULong(pipe.get()),
+        HandleToUlong(pipe.get()));
+
+    WSL_LOG("LaunchDebugShellRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));
+
+    wsl::windows::common::SubProcess process{nullptr, commandLine.c_str()};
+    process.InheritHandle(pipe.get());
+    process.SetFlags(0);
+    process.SetShowWindow(SW_SHOW);
+
     *Process = process.Start().release();
 
     return S_OK;

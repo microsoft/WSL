@@ -321,9 +321,23 @@ class LSWTests
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
         settings.Memory.MemoryMb = 2048;
-        settings.Options.BootTimeoutMs = 30000;
+        settings.Options.BootTimeoutMs = 60 *1000;
+        settings.Options.EnableDebugShell = true;
 
         auto vm = CreateVm(&settings);
+
+        std::vector<const char*> cmd = {"/usr/bin/setsid", "/sbin/agetty", "-w", "-L", "hvc1", "-a", "root", nullptr};
+
+        CreateProcessSettings options{};
+        options.Executable = "/usr/bin/setsid";
+        options.Arguments = cmd.data();
+        options.FdCount = 0;
+
+        int pid = -1;
+        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &options, &pid));
+
+        wil::unique_handle processs;
+        VERIFY_SUCCEEDED(WslLaunchDebugShell(vm, &processs));
 
         std::vector<const char*> commandLine{"/bin/sh", nullptr};
 
@@ -341,7 +355,6 @@ class LSWTests
         createProcessSettings.Environment = env.data();
         createProcessSettings.FdCount = static_cast<ULONG>(fds.size());
 
-        int pid = -1;
         VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
 
         wil::unique_handle process;
@@ -349,6 +362,7 @@ class LSWTests
         VERIFY_SUCCEEDED(WslLaunchInteractiveTerminal(
             createProcessSettings.FileDescriptors[0].Handle, createProcessSettings.FileDescriptors[1].Handle, &process));
 
+        WaitForSingleObject(process.get(), INFINITE);
         system("pause");
     }
 };
