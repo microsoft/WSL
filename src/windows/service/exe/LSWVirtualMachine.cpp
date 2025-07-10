@@ -14,6 +14,7 @@ Abstract:
 #include "LSWVirtualMachine.h"
 #include "hcs_schema.h"
 #include "LSWApi.h"
+#include "NatNetworking.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -252,6 +253,8 @@ void LSWVirtualMachine::Start()
     auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
     auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
     m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
+
+    ConfigureNetworking();
 }
 
 void LSWVirtualMachine::ConfigureNetworking()
@@ -260,10 +263,39 @@ void LSWVirtualMachine::ConfigureNetworking()
     {
         return;
     }
-
-    if (m_settings.NetworkingMode == NetworkingModeNAT)
+    else if (m_settings.NetworkingMode == NetworkingModeNAT)
     {
-        // TODO
+        // Launch GNS
+
+        LSW_PROCESS_FD fds[2];
+        fds[0].Fd = 3;
+        fds[0].Type = FileDescriptorType::Default;
+
+        std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "3"};
+        LSW_CREATE_PROCESS_OPTIONS options{};
+        options.Executable = "/init";
+        options.CommandLine = cmd.data();
+        options.CommandLineCount = static_cast<ULONG>(cmd.size());
+
+        std::vector<HANDLE> socketHandles(2);
+
+        LSW_CREATE_PROCESS_RESULT result{};
+        THROW_IF_FAILED(CreateLinuxProcess(&options, 1, fds, socketHandles.data(), &result));
+
+        wil::unique_socket gnsSocket{(SOCKET)socketHandles[0]};
+
+        // TODO: refactor this to avoid using wsl config
+        static wsl::core::Config config(nullptr);
+
+        // TODO: DNS Tunneling support
+        m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
+            m_computeSystem.get(), wsl::core::NatNetworking::CreateNetwork(config), std::move(gnsSocket), config, wil::unique_socket{});
+
+        m_networkEngine->Initialize();
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %lu", m_settings.NetworkingMode);
     }
 }
 

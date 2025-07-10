@@ -65,6 +65,8 @@ try
     settings.BootTimeoutMs = UserSettings->Options.BootTimeoutMs;
     settings.DmesgOutput = HandleToULong(UserSettings->Options.Dmesg);
     settings.EnableDebugShell = UserSettings->Options.EnableDebugShell;
+    settings.NetworkingMode = UserSettings->Networking.Mode;
+    settings.EnableDnsTunneling = UserSettings->Networking.DnsTunneling;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
 
@@ -240,7 +242,7 @@ try
 
     wsl::windows::common::helpers::SetHandleInheritable(pipe.get());
 
-     auto basePath = wsl::windows::common::wslutil::GetMsiPackagePath();
+    auto basePath = wsl::windows::common::wslutil::GetMsiPackagePath();
     THROW_HR_IF(E_UNEXPECTED, !basePath.has_value());
     auto commandLine = std::format(
         L"\"{}\\wslrelay.exe\" --mode {} --input {} --output {}",

@@ -20,9 +20,12 @@ Abstract:
 #include <sys/syscall.h>
 #include <sys/epoll.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include <pty.h>
 #include "mountutilcpp.h"
+#include <filesystem>
 
 extern int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback) noexcept;
 
@@ -36,6 +39,8 @@ extern std::string GetLunDeviceName(unsigned int Lun);
 
 void ProcessMessages(wsl::shared::SocketChannel& Channel);
 int MountInit(const char* Target);
+
+extern int EnableInterface(int Socket, const char* Name);
 
 extern int g_LogFd;
 
@@ -309,6 +314,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
             target = overlayTarget->c_str();
 
             THROW_LAST_ERROR_IF(MountInit((overlayTarget.value() + "/wsl-init").c_str()) < 0); // Required to call /gns later
+
+            // If it exists, mount /etc/resolv.conf
+            if (std::filesystem::exists("/etc/resolv.conf"))
+            {
+                THROW_LAST_ERROR_IF(UtilMountFile("/etc/resolv.conf", (overlayTarget.value() + "/etc/resolv.conf").c_str()) < 0);
+            }
         }
 
         if (WI_IsFlagSet(Message.Flags, LSW_MOUNT::Chroot))
@@ -542,7 +553,7 @@ int LswEntryPoint(int Argc, char* Argv[])
     // Ensure /dev/console is present and set as the controlling terminal.
     // If opening /dev/console times out, stdout and stderr to the logging file descriptor.
     //
-    /*wil::unique_fd ConsoleFd{};
+    wil::unique_fd ConsoleFd{};
 
     try
     {
@@ -567,7 +578,7 @@ int LswEntryPoint(int Argc, char* Argv[])
         {
             LOG_ERROR("dup2 failed {}", errno);
         }
-    }*/
+    }
 
     //
     // Open /dev/null for stdin.
@@ -593,6 +604,22 @@ int LswEntryPoint(int Argc, char* Argv[])
                 return -1;
             }
         }
+    }
+
+    //
+    // Enable the loopback interface.
+    //
+
+    wil::unique_fd Fd{socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)};
+    if (!Fd)
+    {
+        LOG_ERROR("socket failed {}", errno);
+        return -1;
+    }
+
+    if (EnableInterface(Fd.get(), "lo") < 0)
+    {
+        return -1;
     }
 
     //

@@ -18,7 +18,6 @@ Abstract:
 #include "hvsocket.hpp"
 #pragma hdrstop
 
-
 namespace {
 void InitializeSocketAddress(_In_ const GUID& VmId, _In_ unsigned long Port, _Out_ PSOCKADDR_HV Address)
 {
@@ -74,7 +73,9 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(_In_ const GUID& VmId
     }
 
     THROW_LAST_ERROR_IF_MSG(
-        setsockopt(Socket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECT_TIMEOUT, reinterpret_cast<char*>(&Timeout), sizeof(Timeout)) == SOCKET_ERROR, "Timeout: %lu", Timeout);
+        setsockopt(Socket.get(), HV_PROTOCOL_RAW, HVSOCKET_CONNECT_TIMEOUT, reinterpret_cast<char*>(&Timeout), sizeof(Timeout)) == SOCKET_ERROR,
+        "Timeout: %lu",
+        Timeout);
 
     SOCKADDR_HV Addr;
     InitializeWildcardSocketAddress(&Addr);

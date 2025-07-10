@@ -48,12 +48,12 @@ class LSWTests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
-    int RunCommand(LSWVirtualMachineHandle vm, std::vector<const char*>& command)
+    int RunCommand(LSWVirtualMachineHandle vm, const std::vector<const char*>& command)
     {
-
-        if (command.back() != nullptr)
+        auto copiedCommand = command;
+        if (copiedCommand.back() != nullptr)
         {
-            command.push_back(nullptr);
+            copiedCommand.push_back(nullptr);
         }
 
         std::vector<ProcessFileDescriptorSettings> fds(3);
@@ -62,8 +62,8 @@ class LSWTests
         fds[2].Number = 2;
 
         CreateProcessSettings createProcessSettings{};
-        createProcessSettings.Executable = command[0];
-        createProcessSettings.Arguments = command.data();
+        createProcessSettings.Executable = copiedCommand[0];
+        createProcessSettings.Arguments = copiedCommand.data();
         createProcessSettings.FileDescriptors = fds.data();
         createProcessSettings.FdCount = 3;
 
@@ -321,8 +321,9 @@ class LSWTests
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
         settings.Memory.MemoryMb = 2048;
-        settings.Options.BootTimeoutMs = 60 * 1000;
+        settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Options.EnableDebugShell = true;
+        settings.Networking.Mode = NetworkingModeNone;
 
         auto vm = CreateVm(&settings);
 
@@ -339,7 +340,7 @@ class LSWTests
         wil::unique_handle processs;
         VERIFY_SUCCEEDED(WslLaunchDebugShell(vm, &processs));*/
 
-        std::vector<const char*> commandLine{"/bin/bash", nullptr};
+        std::vector<const char*> commandLine{"/bin/sh", nullptr};
 
         std::vector<ProcessFileDescriptorSettings> fds(2);
         fds[0].Number = 0;
@@ -348,7 +349,7 @@ class LSWTests
         fds[1].Type = TerminalOutput;
 
         CreateProcessSettings createProcessSettings{};
-        createProcessSettings.Executable = "/bin/bash";
+        createProcessSettings.Executable = "/bin/sh";
         createProcessSettings.Arguments = commandLine.data();
         createProcessSettings.FileDescriptors = fds.data();
         createProcessSettings.FdCount = static_cast<ULONG>(fds.size());
@@ -368,7 +369,6 @@ class LSWTests
                     createProcessSettings.FileDescriptors[1].Handle, buffer.data() + offset, static_cast<DWORD>(buffer.size() - offset), &bytesRead, nullptr));
 
                 offset += bytesRead;
-                LogInfo("Offset: %lu", offset);
             }
 
             buffer.resize(offset);
@@ -381,11 +381,9 @@ class LSWTests
         };
 
         // Expect the shell prompt to be displayed
-       // validateTtyOutput("sh-5.1#");
-
-//        writeTty("echo OK\n");
-
-        //validateTtyOutput(" echo OK\r\nOK");
+        validateTtyOutput("sh-5.1#");
+        writeTty("echo OK\n");
+        validateTtyOutput(" echo OK\r\nOK");
 
         // Validate that the interactive process successfully starts
         wil::unique_handle process;
@@ -393,8 +391,31 @@ class LSWTests
             createProcessSettings.FileDescriptors[0].Handle, createProcessSettings.FileDescriptors[1].Handle, &process));
 
         // Exit the shell
-        //writeTty("exit\n");
-
+        writeTty("exit\n");
         VERIFY_ARE_EQUAL(WaitForSingleObject(process.get(), 30 * 1000), WAIT_OBJECT_0);
+    }
+
+    TEST_METHOD(NATNetworking)
+    {
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = NetworkingModeNAT;
+
+        auto vm = CreateVm(&settings);
+
+        // Validate that eth0 has an ip address
+        VERIFY_ARE_EQUAL(
+            RunCommand(
+                vm,
+                {"/bin/bash",
+                 "-c",
+                 "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"}),
+            0);
+
+        // Verify that /etc/resolv.conf is configured
+        VERIFY_ARE_EQUAL(RunCommand(vm, {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
     }
 };

@@ -28,7 +28,7 @@ struct WSL_VERSION_INFORMATION
     uint32_t Revision;
 };
 
-HRESULT WslGetVersion(WSL_VERSION_INFORMATION* Version);
+HRESULT WslGetVersion(struct WSL_VERSION_INFORMATION* Version);
 
 struct Memory
 {
@@ -67,7 +67,7 @@ enum NetworkingMode
 struct Networking
 {
     enum NetworkingMode Mode;
-    bool DnsTunneling;
+    bool DnsTunneling; // Not implemented yet.
 };
 
 struct VirtualMachineSettings
@@ -76,7 +76,7 @@ struct VirtualMachineSettings
     struct Memory Memory; // Not implemented yet
     struct CPU CPU;       // Not implemented yet
     struct Options Options;
-    struct Networking Networking; // Not implemented yet
+    struct Networking Networking;
 };
 
 typedef void* LSWVirtualMachineHandle;
