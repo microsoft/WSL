@@ -298,6 +298,11 @@ public:
         return m_socket.get();
     }
 
+    bool Connected() const
+    {
+        return m_socket.get() >= 0;
+    }
+
     void IgnoreSequenceNumbers()
     {
         m_ignore_sequence = true;

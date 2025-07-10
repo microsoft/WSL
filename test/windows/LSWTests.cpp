@@ -321,12 +321,12 @@ class LSWTests
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
         settings.Memory.MemoryMb = 2048;
-        settings.Options.BootTimeoutMs = 60 *1000;
+        settings.Options.BootTimeoutMs = 60 * 1000;
         settings.Options.EnableDebugShell = true;
 
         auto vm = CreateVm(&settings);
 
-        std::vector<const char*> cmd = {"/usr/bin/setsid", "/sbin/agetty", "-w", "-L", "hvc1", "-a", "root", nullptr};
+        /*std::vector<const char*> cmd = {"/usr/bin/setsid", "/sbin/agetty", "-w", "-L", "hvc1", "-a", "root", nullptr};
 
         CreateProcessSettings options{};
         options.Executable = "/usr/bin/setsid";
@@ -337,7 +337,7 @@ class LSWTests
         VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &options, &pid));
 
         wil::unique_handle processs;
-        VERIFY_SUCCEEDED(WslLaunchDebugShell(vm, &processs));
+        VERIFY_SUCCEEDED(WslLaunchDebugShell(vm, &processs));*/
 
         std::vector<const char*> commandLine{"/bin/sh", nullptr};
 
@@ -355,14 +355,49 @@ class LSWTests
         createProcessSettings.Environment = env.data();
         createProcessSettings.FdCount = static_cast<ULONG>(fds.size());
 
+        int pid = -1;
         VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
 
-        wil::unique_handle process;
+        auto validateTtyOutput = [&](const std::string& expected) {
+            std::string buffer(expected.size(), '\0');
 
+            DWORD offset = 0;
+
+            while (offset < buffer.size())
+            {
+                DWORD bytesRead{};
+                VERIFY_IS_TRUE(ReadFile(
+                    createProcessSettings.FileDescriptors[1].Handle, buffer.data() + offset, static_cast<DWORD>(buffer.size() - offset), &bytesRead, nullptr));
+
+                offset += bytesRead;
+                LogInfo("Offset: %lu", offset);
+            }
+
+            buffer.resize(offset);
+            VERIFY_ARE_EQUAL(buffer, expected);
+        };
+
+        auto writeTty = [&](const std::string& content) {
+            VERIFY_IS_TRUE(WriteFile(
+                createProcessSettings.FileDescriptors[0].Handle, content.data(), static_cast<DWORD>(content.size()), nullptr, nullptr));
+        };
+
+        // Expect the shell prompt to be displayed
+        validateTtyOutput("sh-5.1#");
+
+        writeTty("echo OK\n");
+
+        validateTtyOutput(" echo OK\r\nOK");
+
+        // Validate that the interactive process successfully starts
+        wil::unique_handle process;
         VERIFY_SUCCEEDED(WslLaunchInteractiveTerminal(
             createProcessSettings.FileDescriptors[0].Handle, createProcessSettings.FileDescriptors[1].Handle, &process));
 
-        WaitForSingleObject(process.get(), INFINITE);
-        system("pause");
+        // Exit the shell
+        writeTty("exit\n");
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(process.get(), 30 * 1000), WAIT_OBJECT_0);
+
     }
 };

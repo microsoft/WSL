@@ -432,7 +432,6 @@ struct _LSW_CREATE_PROCESS_RESULT {
    int Pid;
 } LSW_CREATE_PROCESS_RESULT;
 
-
 [
     uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
     pointer_default(unique),

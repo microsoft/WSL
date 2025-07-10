@@ -87,8 +87,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
 
     Channel.Close();
 
-    LOG_ERROR("Tty relay running");
-
     while (true)
     {
         int bytesWritten = 0;
@@ -137,7 +135,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
             else
             {
                 bytesWritten = write(Message.TtyMaster, buffer.data(), bytesRead);
-                LOG_ERROR("Write {} bytes on stdin", bytesWritten);
                 if (bytesWritten < 0)
                 {
                     //
@@ -172,24 +169,24 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
                 }
 
                 // The tty has been closed, stop relaying.
-                UtilSocketShutdown(pollDescriptors[1].fd, SHUT_WR);
+                CLOSE(pollDescriptors[1].fd);
                 pollDescriptors[1].fd = -1;
                 break;
             }
-
-            LOG_ERROR("Relayed {} to stdout", bytesRead);
 
             bytesWritten = UtilWriteBuffer(Message.TtyOutput, buffer.data(), bytesRead);
             if (bytesWritten < 0)
             {
                 LOG_ERROR("write failed {}", errno);
-                UtilSocketShutdown(pollDescriptors[1].fd, SHUT_WR);
+                CLOSE(pollDescriptors[1].fd);
                 pollDescriptors[1].fd = -1;
             }
         }
     }
 
-    LOG_ERROR("Tty relay exiting");
+    // Shutdown sockets and tty
+    UtilSocketShutdown(Message.TtyInput, SHUT_WR);
+    UtilSocketShutdown(Message.TtyOutput, SHUT_WR);
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Message, const gsl::span<gsl::byte>& Buffer)
@@ -253,16 +250,11 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
             {
                 sigset_t SignalMask;
                 sigemptyset(&SignalMask);
-                // std::this_thread::sleep_for(std::chrono::seconds(5));
-
                 try
                 {
-                    std::this_thread::sleep_for(std::chrono::seconds(5));
                     childLogic();
                 }
                 CATCH_LOG();
-
-                LOG_ERROR("Child logic exiting");
                 exit(0);
             }
 
@@ -444,7 +436,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 
 void ProcessMessages(wsl::shared::SocketChannel& Channel)
 {
-    while (true)
+    while (Channel.Connected())
     {
         auto [Message, Range] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
         if (Message == nullptr || Message->MessageType == LxMessageLswShutdown)
