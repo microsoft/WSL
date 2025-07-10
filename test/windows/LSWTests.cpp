@@ -39,7 +39,7 @@ class LSWTests
     TEST_METHOD(GetVersion)
     {
         auto coinit = wil::CoInitializeEx();
-        WSL_VERSION version{};
+        WSL_VERSION_INFORMATION version{};
 
         VERIFY_SUCCEEDED(WslGetVersion(&version));
 

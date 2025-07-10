@@ -35,14 +35,16 @@ private:
     void* m_context = nullptr;
 };
 
-HRESULT WslGetVersion(WSL_VERSION* Version)
+HRESULT WslGetVersion(WSL_VERSION_INFORMATION* Version)
 try
 {
     wil::com_ptr<ILSWUserSession> session;
 
     THROW_IF_FAILED(CoCreateInstance(__uuidof(LSWUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
 
-    return session->GetVersion(Version);
+    static_assert(sizeof(WSL_VERSION_INFORMATION) == sizeof(WSL_VERSION));
+
+    return session->GetVersion(reinterpret_cast<WSL_VERSION*>(Version));
 }
 CATCH_RETURN();
 

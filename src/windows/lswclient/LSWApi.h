@@ -14,12 +14,21 @@ Abstract:
 #pragma once
 
 #include <windows.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-HRESULT WslGetVersion(WSL_VERSION* Version);
+struct WSL_VERSION_INFORMATION
+{
+    uint32_t Major;
+    uint32_t Minor;
+    uint32_t Revision;
+};
+
+HRESULT WslGetVersion(WSL_VERSION_INFORMATION* Version);
 
 struct Memory
 {
@@ -114,7 +123,7 @@ enum ProcessState
 
 struct WaitResult
 {
-    ProcessState State;
+    enum ProcessState State;
     int32_t Code; // Signal number or exit code
 };
 
