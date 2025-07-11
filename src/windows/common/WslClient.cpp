@@ -275,14 +275,6 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     }
     else
     {
-        // If exporting to a vhd, ensure the filename ends with the vhdx file extension.
-        if (WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD) &&
-            !wsl::windows::common::string::IsPathComponentEqual(filePath.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension))
-        {
-            wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageRequiresVhdxFileExtension());
-            return -1;
-        }
-
         file.reset(CreateFileW(
             filePath.c_str(), GENERIC_WRITE, (FILE_SHARE_READ | FILE_SHARE_DELETE), nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 
@@ -371,28 +363,6 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     }
     else
     {
-        bool isVhd = wsl::windows::common::string::IsPathComponentEqual(
-            filePath.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension);
-
-        if (WI_IsFlagSet(flags, LXSS_IMPORT_DISTRO_FLAGS_VHD))
-        {
-            // If importing from a vhd, ensure the filename ends with the vhdx file extension.
-            if (!isVhd)
-            {
-                wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageRequiresVhdxFileExtension());
-                return -1;
-            }
-        }
-        else
-        {
-            // Fail if we expect a tar, but the file name has the .vhdx extension.
-            if (isVhd)
-            {
-                wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessagePassVhdFlag());
-                return -1;
-            }
-        }
-
         file.reset(CreateFileW(
             filePath.c_str(), GENERIC_READ, (FILE_SHARE_READ | FILE_SHARE_DELETE), nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 
