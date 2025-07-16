@@ -76,7 +76,7 @@ When started, the virtual machine will boot into the provided kernel, and then e
 
 - Identifiers for the system VHD, swap VHD and kernel modules VHD if any
 - The machine's hostname
-- The configured memory reclaim mode and page reporting order(See [wsl2.pageReporting](https://learn.microsoft.com/windows/wsl/wsl-config))*
+- The configured memory reclaim mode and page reporting order
 
 [mini_init](mini_init.md) then creates the [gns process](gns.md), which is responsible for networking configuration and then receives a `LxMiniInitMessageInitialConfig` message, which contains: 
 
