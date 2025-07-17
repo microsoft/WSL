@@ -79,7 +79,7 @@ class LSWTests
     LSWVirtualMachineHandle CreateVm(const VirtualMachineSettings* settings)
     {
         LSWVirtualMachineHandle vm{};
-        VERIFY_SUCCEEDED(WslCreateVirualMachine(settings, (LSWVirtualMachineHandle*)&vm));
+        VERIFY_SUCCEEDED(WslCreateVirtualMachine(settings, (LSWVirtualMachineHandle*)&vm));
 
 #ifdef WSL_SYSTEM_DISTRO_PATH
 

@@ -81,7 +81,7 @@ struct VirtualMachineSettings
 
 typedef void* LSWVirtualMachineHandle;
 
-HRESULT WslCreateVirualMachine(const struct VirtualMachineSettings* Settings, LSWVirtualMachineHandle* VirtualMachine);
+HRESULT WslCreateVirtualMachine(const struct VirtualMachineSettings* Settings, LSWVirtualMachineHandle* VirtualMachine);
 
 struct DiskAttachSettings
 {

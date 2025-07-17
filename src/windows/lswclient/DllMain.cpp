@@ -49,7 +49,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslCreateVirualMachine(const VirtualMachineSettings* UserSettings, LSWVirtualMachineHandle* VirtualMachine)
+HRESULT WslCreateVirtualMachine(const VirtualMachineSettings* UserSettings, LSWVirtualMachineHandle* VirtualMachine)
 try
 {
     wil::com_ptr<ILSWUserSession> session;
