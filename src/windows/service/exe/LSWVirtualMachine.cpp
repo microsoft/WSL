@@ -88,7 +88,7 @@ void LSWVirtualMachine::Start()
     vmSettings.Chipset.UseUtc = true;
 
     // Ensure the 2MB granularity enforced by HCS.
-    vmSettings.ComputeTopology.Memory.SizeInMB = ((m_settings.MemoryMb / _1MB) & ~0x1);
+    vmSettings.ComputeTopology.Memory.SizeInMB = m_settings.MemoryMb & ~0x1;
     vmSettings.ComputeTopology.Memory.AllowOvercommit = true;
     vmSettings.ComputeTopology.Memory.EnableDeferredCommit = true;
     vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
