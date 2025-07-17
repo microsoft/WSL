@@ -2704,7 +2704,7 @@ try
 
     if (Config.BootInitTimeout > 0)
     {
-        auto cmd = std::format("/usr/bin/systemctl is-active user@{}.service", Uid);
+        auto cmd = std::format("systemctl is-active user@{}.service", Uid);
         try
         {
             return wsl::shared::retry::RetryWithTimeout<bool>(

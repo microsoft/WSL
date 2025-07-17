@@ -2582,7 +2582,7 @@ void ProcessLaunchInitMessage(
             DISTRO_PATH,
             enableGuiApps,
             Config,
-            nullptr,
+            wsl::shared::string::FromSpan(Buffer, Message->VmIdOffset),
             wsl::shared::string::FromSpan(Buffer, Message->DistributionNameOffset),
             nullptr,
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),

@@ -34,12 +34,12 @@
                 "FriendlyName": "openSUSE Tumbleweed",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Tumbleweed-20250316.x86_64-15.8-Build15.8.wsl",
-                    "Sha256": "0xd3fc19e7a28143aa68dbfc0d9bacd8f670f312bf29dc9cc44138a60975e755ea"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250618.0/openSUSE-Tumbleweed-20250616.x86_64-19.23-Build19.23.wsl",
+                    "Sha256": "0x806cc94e57a2205d3ac1d5397d9a41c7d3b3337d958ca180f75d152fca756ebd"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Tumbleweed-20250316.aarch64-15.8-Build15.8.wsl",
-                    "Sha256": "0xc4a6844cfa0b791ab934c4e871a1245b217de734cb8c75a33bdc644fa0675e39"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250618.0/openSUSE-Tumbleweed-20250616.aarch64-19.57-Build19.57.wsl",
+                    "Sha256": "0x4d2b14287dd6bade7de1ff901079c2c438ce19d519c951bfdf98d2dfc049c65a"
                 }
             },
             {
@@ -58,21 +58,21 @@
         ],
         "SUSE": [
             {
-                "Name": "SUSE-Linux-Enterprise-15-SP5",
-                "FriendlyName": "SUSE Linux Enterprise 15 SP5",
+                "Name": "SUSE-Linux-Enterprise-15-SP6",
+                "FriendlyName": "SUSE Linux Enterprise 15 SP6",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250123.0/SUSE-Linux-Enterprise-15-SP5-15.5.x86_64-11.1-Build11.1.wsl",
-                    "Sha256": "0x64ae138a1cdaff5fdc578d8ea92176d2939146932ca7ce2bff685d974ec34932"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250618.0/SUSE-Linux-Enterprise-15-SP6-15.6.x86_64-23.23-Build23.23.wsl",
+                    "Sha256": "0x8f1101972eab1e503993a183e34851920935988f2d5dd1574e336e470101e0e6"
                 }
             },
             {
-                "Name": "SUSE-Linux-Enterprise-15-SP6",
-                "FriendlyName": "SUSE Linux Enterprise 15 SP6",
+                "Name": "SUSE-Linux-Enterprise-15-SP7",
+                "FriendlyName": "SUSE Linux Enterprise 15 SP7",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250320.0/SUSE-Linux-Enterprise-15-SP6-15.6.x86_64-18.4-Build18.4.wsl",
-                    "Sha256": "0x88c59b7b3a50fee4fdfbf978c1899e59b6e0b51db5af925eb570b171e895a671"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250618.0/SUSE-Linux-Enterprise-15-SP7-15.7.x86_64-23.26-Build23.26.wsl",
+                    "Sha256": "0x0c828685931adae35832d7098fee79a6586b9d77a8c250264fa270703bf3a3ce"
                 }
             }
         ],
@@ -82,12 +82,12 @@
                 "FriendlyName": "Kali Linux Rolling",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://kali.download/wsl-images/kali-2025.1c/kali-linux-2025.1c-wsl-rootfs-amd64.wsl",
-                    "Sha256": "1f1b0171b3b92dd7163ddbab2bb6b93c4a9d2e95fccd66237403cccf648d2b8e"
+                    "Url": "https://kali.download/wsl-images/kali-2025.2/kali-linux-2025.2-wsl-rootfs-amd64.wsl",
+                    "Sha256": "9a9d3dca4aec0c2d29320e7b2eee072ff37c5f3396759c25afeaed0bb700d778"
                 },
                 "Arm64Url": {
-                    "Url": "https://kali.download/wsl-images/kali-2025.1c/kali-linux-2025.1c-wsl-rootfs-arm64.wsl",
-                    "Sha256": "b0c5742e3baa4e5588deb974eeae81b45e18a49afa6cb7567321b8b6639d4034"
+                    "Url": "https://kali.download/wsl-images/kali-2025.2/kali-linux-2025.2-wsl-rootfs-arm64.wsl",
+                    "Sha256": "f0c1241af735f869499d68135852392317ebbf6b4fb6681d7e9c312dbe498567"
                 }
             }
         ],
@@ -166,8 +166,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.06.01.129180/archlinux-2025.06.01.129180.wsl",
-                    "Sha256": "97fe3d6c82d4a680d559e70e254797894aaa1b844a168c9f22806f41ddbe63c0"
+                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.07.01.132764/archlinux-2025.07.01.132764.wsl",
+                    "Sha256": "c23cebe8e9fbcf467526216506d322cce7fd4932c70199309b984e86ab1160ec"
                 }
             }
         ],
@@ -270,24 +270,24 @@
             "PackageFamilyName": "3810OracleAmericaInc.OracleLinux7.9_dm28ctvqnhe9g"
         },
         {
-            "Name": "OracleLinux_8_7",
-            "FriendlyName": "Oracle Linux 8.7",
-            "StoreAppId": "9NGGZVB0BKD9",
+            "Name": "OracleLinux_8_10",
+            "FriendlyName": "Oracle Linux 8.10",
+            "StoreAppId": "9MVFWTCT78ZN",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_8.7-230428.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_8.10-250708.Appx",
             "Arm64PackageUrl": null,
-            "PackageFamilyName": "3810OracleAmericaInc.51946E772388_dm28ctvqnhe9g"
+            "PackageFamilyName": "3810OracleAmericaInc.OracleLinux8.10_dm28ctvqnhe9g"
         },
         {
-            "Name": "OracleLinux_9_1",
-            "FriendlyName": "Oracle Linux 9.1",
-            "StoreAppId": "9N6CN5STZRX6",
+            "Name": "OracleLinux_9_5",
+            "FriendlyName": "Oracle Linux 9.5",
+            "StoreAppId": "9NL3F53JZ3HX",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_9.1-230428.Appx",
+            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/OracleLinux_9.5-250708.Appx",
             "Arm64PackageUrl": null,
-            "PackageFamilyName": "3810OracleAmericaInc.62074632F71C9_dm28ctvqnhe9g"
+            "PackageFamilyName": "3810OracleAmericaInc.OracleLinux9.5_dm28ctvqnhe9g"
         },
         {
             "Name": "openSUSE-Leap-15.6",
@@ -300,22 +300,12 @@
             "PackageFamilyName": "46932SUSE.openSUSELeap15.6_022rs5jcyhyac"
         },
         {
-            "Name": "SUSE-Linux-Enterprise-15-SP5",
-            "FriendlyName": "SUSE Linux Enterprise 15 SP5",
-            "StoreAppId": "9N648JDGXK2D",
-            "Amd64": true,
-            "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15_SP5-240801.Appx",
-            "Arm64PackageUrl": null,
-            "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP5_022rs5jcyhyac"
-        },
-        {
             "Name": "SUSE-Linux-Enterprise-15-SP6",
             "FriendlyName": "SUSE Linux Enterprise 15 SP6",
             "StoreAppId": "9N738KZGNB91",
             "Amd64": true,
             "Arm64": false,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/SUSELinuxEnterprise15SP6-250320_x64.Appx",
+            "Amd64PackageUrl": "https://github.com/SUSE/WSL-instarball/releases/download/v20250618.0/SUSE-Linux-Enterprise-15-SP6-15.6-WSL.x86_64-156.3.148.0-Build3.148.appx",
             "Arm64PackageUrl": null,
             "PackageFamilyName": "46932SUSE.SUSELinuxEnterprise15SP6_022rs5jcyhyac"
         },
@@ -325,8 +315,8 @@
             "StoreAppId": "9MSSK2ZXXN11",
             "Amd64": true,
             "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-250320_x64.Appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/openSUSETumbleweed-250320_ARM64.Appx",
+            "Amd64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250618.0/openSUSE-Tumbleweed-20250616-WSL.x86_64-25167.9.806.0-Build9.806.appx",
+            "Arm64PackageUrl": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250618.0/openSUSE-Tumbleweed-20250616-WSL.aarch64-25167.9.410.0-Build9.410.appx",
             "PackageFamilyName": "46932SUSE.openSUSETumbleweed_022rs5jcyhyac"
         }
     ]
