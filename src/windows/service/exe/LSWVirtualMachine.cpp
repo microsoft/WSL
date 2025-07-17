@@ -337,13 +337,14 @@ try
 {
     *Device = nullptr;
     auto result = wil::ResultFromException([&]() {
-        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-        auto runAsUser = wil::impersonate_token(userToken.get());
-
-        wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
-
         std::lock_guard lock{m_lock};
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+
+        {
+            const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+            auto runAsUser = wil::impersonate_token(userToken.get());
+            wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
+        }
 
         ULONG lun = 0;
         while (m_attachedDisks.find(lun) != m_attachedDisks.end())
@@ -351,10 +352,18 @@ try
             lun++;
         }
 
-        wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly);
+        bool vhdAdded = false;
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (vhdAdded)
+            {
+                wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), lun);
+            }
 
-        auto cleanup = wil::scope_exit_log(
-            WI_DIAGNOSTICS_INFO, [&]() { wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), lun); });
+            wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), Path);
+        });
+
+        wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly);
+        vhdAdded = true;
 
         LSW_GET_DISK message{};
         message.Header.MessageSize = sizeof(message);
