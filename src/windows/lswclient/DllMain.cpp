@@ -143,8 +143,8 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
     options.Executable = UserSettings->Executable;
     options.CommandLine = UserSettings->Arguments;
     options.CommandLineCount = Count(options.CommandLine);
-    options.Environmnent = UserSettings->Environment;
-    options.EnvironmnentCount = Count(options.Environmnent);
+    options.Environment = UserSettings->Environment;
+    options.EnvironmentCount = Count(options.Environment);
     options.CurrentDirectory = UserSettings->CurrentDirectory;
 
     LSW_CREATE_PROCESS_RESULT result{};

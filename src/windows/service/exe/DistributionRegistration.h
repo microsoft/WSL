@@ -105,7 +105,7 @@ namespace Property {
     inline DistributionPropertyWithDefault<DWORD> RunOOBE{L"RunOOBE", 0};
     inline DistributionPropertyWithDefault<DWORD> Modern{L"Modern", 0};
 
-    inline DistributionPropertyWithDefault<std::vector<std::string>> DefaultEnvironmnent{
+    inline DistributionPropertyWithDefault<std::vector<std::string>> DefaultEnvironment{
         L"DefaultEnvironment",
         {"HOSTTYPE=x86_64",
          "LANG=en_US.UTF-8",

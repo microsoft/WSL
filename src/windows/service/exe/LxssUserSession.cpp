@@ -1186,7 +1186,7 @@ try
     *Version = configuration.Version;
     *DefaultUid = registration.Read(Property::DefaultUid);
     *Flags = configuration.Flags;
-    const auto defaultEnvironment = registration.Read(Property::DefaultEnvironmnent);
+    const auto defaultEnvironment = registration.Read(Property::DefaultEnvironment);
     *DefaultEnvironmentCount = gsl::narrow_cast<ULONG>(defaultEnvironment.size());
     auto environment(wil::make_unique_cotaskmem<LPSTR[]>(defaultEnvironment.size()));
     for (size_t index = 0; index < defaultEnvironment.size(); index += 1)
@@ -3939,12 +3939,12 @@ CreateLxProcessContext LxssUserSessionImpl::s_GetCreateProcessContext(_In_ const
         const auto registration = DistributionRegistration::Open(lxssKey.get(), DistroGuid);
 
         context.Flags = registration.Read(Property::Flags);
-        context.DefaultEnvironment = registration.Read(Property::DefaultEnvironmnent);
+        context.DefaultEnvironment = registration.Read(Property::DefaultEnvironment);
     }
     else
     {
         context.Flags = DistributionRegistration::ApplyGlobalFlagsOverride(LXSS_DISTRO_FLAGS_DEFAULT | LXSS_DISTRO_FLAGS_VM_MODE);
-        context.DefaultEnvironment = Property::DefaultEnvironmnent.DefaultValue;
+        context.DefaultEnvironment = Property::DefaultEnvironment.DefaultValue;
     }
 
     context.UserToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);

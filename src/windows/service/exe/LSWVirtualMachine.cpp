@@ -487,7 +487,7 @@ try
     Message.WriteString(Message->ExecutableIndex, Options->Executable);
     Message.WriteString(Message->CurrentDirectoryIndex, Options->CurrentDirectory ? Options->CurrentDirectory : "/");
     Message.WriteStringArray(Message->CommandLineIndex, Options->CommandLine, Options->CommandLineCount);
-    Message.WriteStringArray(Message->EnvironmentIndex, Options->Environmnent, Options->EnvironmnentCount);
+    Message.WriteStringArray(Message->EnvironmentIndex, Options->Environment, Options->EnvironmentCount);
 
     // If this is an interactive tty, we need a relay process
     if (interactiveTty)

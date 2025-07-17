@@ -415,8 +415,8 @@ struct _LSW_CREATE_PROCESS_OPTIONS {
     [string] LPCSTR Executable;
     ULONG CommandLineCount;
     [unique, size_is(CommandLineCount)] LPCSTR* CommandLine;
-    ULONG EnvironmnentCount;
-    [unique, size_is(EnvironmnentCount)] LPCSTR* Environmnent;
+    ULONG EnvironmentCount;
+    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
     [unique] LPCSTR CurrentDirectory;
 } LSW_CREATE_PROCESS_OPTIONS;
 
