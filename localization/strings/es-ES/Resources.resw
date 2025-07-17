@@ -1701,12 +1701,6 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Funciones opcionales</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Habilitar informes de páginas</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>La configuración true predeterminada permite que Windows reclame la memoria no usada asignada a la máquina virtual WSL 2.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Declaración privacidad</value>
   </data>

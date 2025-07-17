@@ -1695,12 +1695,6 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Valgfrie funktioner</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Aktivér siderapportering</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Standardindstillingen sand gør det muligt for Windows at frigøre ubrugt hukommelse, der er allokeret til den virtuelle WSL 2-maskine.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Erklæring om beskyttelse af oplys.</value>
   </data>

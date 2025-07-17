@@ -1695,12 +1695,6 @@ Du kan också komma åt fler VS Code-fjärralternativ via kommandopaletten inom 
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Valfria funktioner</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Aktivera sidrapportering</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Med standardinställningen true kan Windows frigöra oanvänt minne som allokerats till den virtuella WSL 2-datorn.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Sekretesspolicy</value>
   </data>

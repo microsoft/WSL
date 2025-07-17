@@ -1702,12 +1702,6 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Recursos Opcionais</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Habilitar relatório de página</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>A configuração true padrão permite que o Windows recupere a memória não utilizada alocada para a máquina virtual WSL 2.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Política de Privacidade</value>
   </data>

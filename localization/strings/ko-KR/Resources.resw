@@ -1701,12 +1701,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>선택적 기능</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>페이지 보고 사용</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>기본 true 설정을 사용하면 Windows에서 WSL 2 가상 컴퓨터에 할당된 사용되지 않는 메모리를 회수할 수 있습니다.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>개인 정보 취급 방침</value>
   </data>

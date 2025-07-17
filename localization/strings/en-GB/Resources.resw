@@ -1695,12 +1695,6 @@ You can also access more VS Code Remote options through the command palette with
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Optional Features</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Enable page reporting</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Default true setting enables Windows to reclaim unused memory allocated to WSL 2 virtual machine.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Privacy Statement</value>
   </data>

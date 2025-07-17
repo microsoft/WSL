@@ -1695,12 +1695,6 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Választható funkciók</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Lapjelentés engedélyezése</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Az alapértelmezett igaz beállítás lehetővé teszi, hogy a Windows visszanyerje a WSL 2 virtuális gép számára lefoglalt nem használt memóriát.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Adatvédelmi nyilatkozat</value>
   </data>

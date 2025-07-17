@@ -1695,12 +1695,6 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Optionele onderdelen</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Paginarapportage inschakelen</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Met de standaardinstelling Waar, kan Windows ongebruikt geheugen vrijmaken dat is toegewezen aan de virtuele WSL 2-machine.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Privacyverklaring</value>
   </data>
