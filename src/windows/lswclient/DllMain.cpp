@@ -216,7 +216,7 @@ try
         basePath.value(),
         static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
         HandleToULong(Input),
-        HandleToUlong(Output));
+        HandleToULong(Output));
 
     WSL_LOG("LaunchWslRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));
 
@@ -249,7 +249,7 @@ try
         basePath.value(),
         static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
         HandleToULong(pipe.get()),
-        HandleToUlong(pipe.get()));
+        HandleToULong(pipe.get()));
 
     WSL_LOG("LaunchDebugShellRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));
 
