@@ -1701,12 +1701,6 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Funzionalità facoltative</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Abilita la creazione di report di pagine</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>L'impostazione true predefinita consente a Windows di recuperare la memoria inutilizzata allocata alla macchina virtuale WSL 2.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Informativa sulla privacy</value>
   </data>

@@ -1701,12 +1701,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>オプション機能</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>ページ レポートを有効にする</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>既定の true 設定では、WSL 2 仮想マシンに割り当てられた未使用のメモリを解放できます。</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>プライバシーに関する声明</value>
   </data>

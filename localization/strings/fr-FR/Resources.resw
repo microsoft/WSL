@@ -1702,12 +1702,6 @@ Vous pouvez également accéder à davantage d'options VS Code Remote via la pal
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Fonctionnalités facultatives</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Activer la création de rapports de page</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Le paramètre true par défaut permet à Windows de récupérer la mémoire inutilisée allouée à la machine virtuelle WSL 2.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Déclaration</value>
   </data>

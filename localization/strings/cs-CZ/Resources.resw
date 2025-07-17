@@ -1695,12 +1695,6 @@ K dalším možnostem VS Code Remote můžete přistupovat také prostřednictv�
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Volitelné funkce</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Povolit vytváření sestav stránek</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Výchozí nastavení true umožňuje systému Windows uvolnit nevyužitou paměť přidělenou virtuálnímu počítači WSL 2.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Prohlášení o zásadách ochrany osobních údajů</value>
   </data>

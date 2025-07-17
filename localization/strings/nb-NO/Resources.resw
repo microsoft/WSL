@@ -1695,12 +1695,6 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Valgfrie funksjoner</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Aktiver siderapportering</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Standard sann innstilling gjør det mulig for Windows å frigjøre ubrukt minne tildelt til virtuell WSL 2-maskin.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Personvernerklæring</value>
   </data>

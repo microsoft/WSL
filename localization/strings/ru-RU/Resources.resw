@@ -1702,12 +1702,6 @@ wsl.exe --manage &lt;имя_дистрибутива&gt; --set-sparse --allow-un
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Дополнительные функции</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Включить отчеты о страницах</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Значение ИСТИНА по умолчанию позволяет Windows освободить неиспользуемую память, выделенную виртуальной машине WSL 2.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Заявление о конфиденциальности</value>
   </data>

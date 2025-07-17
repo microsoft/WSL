@@ -1701,12 +1701,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>選用功能</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>啟用頁面報告</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>預設的 True 設定可讓 Windows 回收配置給 WSL 2 虛擬機的未使用記憶體。</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>隱私權聲明</value>
   </data>

@@ -1695,12 +1695,6 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Funkcje opcjonalne</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Włącz raportowanie stron</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Domyślne ustawienie wartości true umożliwia systemowi Windows odzyskanie nieużywanej pamięci przydzielonej do maszyny wirtualnej WSL 2.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Oświadczenie o ochronie prywatności</value>
   </data>

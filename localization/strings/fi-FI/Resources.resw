@@ -1695,12 +1695,6 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Valinnaiset ominaisuudet</value>
   </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Ota sivujen raportointi käyttöön</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Oletusarvon mukainen tosi-asetus antaa Windowsille mahdollisuuden vapauttaa WSL 2 -virtuaalikoneelle varattua käyttämätöntä muistia.</value>
-  </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Tietosuojatiedot</value>
   </data>
