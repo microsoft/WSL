@@ -213,7 +213,7 @@ revert_dir_case_sensitivity EnableNtfsDirCaseSensitivity()
 
     //
     // Just in case, make sure at least the main enable flag is set after
-    // reverting, otherwise WSL will break.
+    // reverting; otherwise, WSL will break.
     //
 
     WI_SetFlag(Flags, c_enableDirCaseSensitivity);
@@ -326,7 +326,7 @@ void EnsureCaseSensitiveDirectoryRecursive(_In_ HANDLE Directory)
     }
 
     //
-    // After all children are processed, mark the directory case sensitive.
+    // After all children are processed, mark the directory case-sensitive.
     //
     // N.B. This is done with a retry because if the NtfsEnableDirCaseSensitivity
     //      flag was just changed from 3 to 1, NTFS may not have updated its
@@ -562,7 +562,7 @@ void wsl::windows::common::filesystem::CreateRootFs(_In_ PCWSTR Path, _In_ ULONG
     }
 
     //
-    // Make sure the directory is marked case sensitive.
+    // Make sure the directory is marked case-sensitive.
     //
     // N.B. This is done without impersonating the client because setting this
     //      attribute requires the "delete subfolders and files" permission on
@@ -649,7 +649,7 @@ std::pair<ULONG, ULONG> wsl::windows::common::filesystem::EnumerateFixedDrives(H
 
 void wsl::windows::common::filesystem::EnsureCaseSensitiveDirectory(_In_ PCWSTR Path, _In_ ULONG Flags)
 {
-    // N.B. Passing SYNCHRONIZE and FILE_SYNCHRONOUS_IO_NONALERT is required, otherwise NtQueryDirectoryFile
+    // N.B. Passing SYNCHRONIZE and FILE_SYNCHRONOUS_IO_NONALERT is required; otherwise, NtQueryDirectoryFile
     // might return STATUS_PENDING, which would break our folder enumeration logic.
 
     const wil::unique_hfile Directory{CreateFileW(
@@ -753,8 +753,8 @@ void wsl::windows::common::filesystem::EnsureDirectoryWithAttributes(
     SetExtendedAttributes(Path, LX_S_IFDIR | Mode, Uid, Gid, DistroVersion);
 
     //
-    // Mark a new directory case sensitive, or upgrade the entire tree if it
-    // exists. If the root is already case sensitive, it's assumed the entire
+    // Mark a new directory case-sensitive, or upgrade the entire tree if it
+    // exists. If the root is already case-sensitive, it's assumed the entire
     // tree is.
     //
 
@@ -804,7 +804,7 @@ std::pair<std::string, std::string> wsl::windows::common::filesystem::GetHostAnd
     WI_VERIFY(GetComputerNameExA(ComputerNameDnsDomain, nullptr, &size) == FALSE);
 
     // If there is no domain name, initialize with a default. Truncate the
-    // domain name to the max size that the the driver allows.
+    // domain name to the max size that the driver allows.
     // N.B. If the buffer is too small, GetComputerNameEx() sets 'size' to the string size,
     // ** including ** the null terminator. On success it returns the string size,
     // See: https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getcomputernameexa
@@ -909,7 +909,7 @@ std::string wsl::windows::common::filesystem::GetWindowsHosts(const std::filesys
         std::string LineCopy = Line;
 
         // Each line is in the following format:
-        // <host-adress> <host-alias1> <host-alias2> ...
+        // <host-address> <host-alias1> <host-alias2> ...
         //
         // N.B. There must be at least one host aliases for each host address.
 

@@ -17,7 +17,7 @@ public:
         THROW_LAST_ERROR_IF(MountEnumCreateEx(&m_mountEnum, mountInfoFile) < 0);
     }
 
-    // Desctruct this instance of the MountEnum class.
+    // Destruct this instance of the MountEnum class.
     ~MountEnum()
     {
         MountEnumFree(&m_mountEnum);

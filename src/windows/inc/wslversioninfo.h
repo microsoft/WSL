@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains version definitions for WSL binairies.
+    This file contains version definitions for WSL binaries.
 
 --*/
 

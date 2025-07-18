@@ -78,7 +78,7 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
 def get_github_pr_message(token: str, message: str) -> str:
     match = re.search(r'\(#([0-9]+)\)', message)
     if match is None:
-        print(f'Warning: failed to extract Github PR number from message: {message}')
+        print(f'Warning: failed to extract GitHub PR number from message: {message}')
         return None, None
 
     pr_number = match.group(1)
@@ -108,7 +108,7 @@ def get_previous_release(version: tuple) -> str:
     previous_versions = [e for e in versions if e < version]
 
     if not previous_versions:
-        raise RuntimeError(f'No previous found on Github. Response: {response.json()}')
+        raise RuntimeError(f'No previous found on GitHub. Response: {response.json()}')
 
     return '.'.join(str(e) for e in max(previous_versions))
 
@@ -176,7 +176,7 @@ def get_change_list(version: str, previous: str, fetch: bool) -> list:
 
 @backoff.on_exception(backoff.expo, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException), max_time=600)
 def publish_release(version: str, changes: str, assets: list, auto_release_notes: bool, token: str):
-    print(f'Creating private Github release for: {version}', file=sys.stderr)
+    print(f'Creating private GitHub release for: {version}', file=sys.stderr)
 
     # First create the release
     headers = {'Accept': 'application/vnd.github+json',

@@ -30,7 +30,7 @@ namespace details {
         new (P9_EXPECTED_STD addressof(value)) T(P9_EXPECTED_STD forward<Args>(args)...);
     }
 
-    // Storage for the BasicExpected class for types that are trivially destructable.
+    // Storage for the BasicExpected class for types that are trivially destructible.
     template <typename T, typename E>
     struct TrivialExpectedStorage
     {
@@ -98,7 +98,7 @@ namespace details {
             return *this;
         }
 
-        // Default destructor, because the value type is trivially destructable.
+        // Default destructor, because the value type is trivially destructible.
         ~TrivialExpectedStorage() = default;
 
         bool HasValue;
@@ -111,7 +111,7 @@ namespace details {
         };
     };
 
-    // Storage for the BasicExpected class for types that are not trivially destructable.
+    // Storage for the BasicExpected class for types that are not trivially destructible.
     template <typename T, typename E>
     struct NonTrivialExpectedStorage
     {
@@ -204,7 +204,7 @@ namespace details {
         };
     };
 
-    // Class that helps to select between the storage for trivially and non-trivially destructable
+    // Class that helps to select between the storage for trivially and non-trivially destructible
     // types.
     template <typename T, typename E>
     struct ExpectedStorage

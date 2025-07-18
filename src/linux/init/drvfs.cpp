@@ -258,7 +258,7 @@ try
                 // For virtio-9p, there are two errors that could indicate the PCI device is not ready:
                 // EBUSY - Returned if all devices with the tag are already in use.
                 // ENOENT - Returned if there are no devices with the tag, which can happen after the VM first boots.
-                //   In this case, check if the the target exists; if it doesn't, ENOENT is for that and there's no reason to retry.
+                //   In this case, check if the target exists; if it doesn't, ENOENT is for that and there's no reason to retry.
                 //
                 // For virtiofs, EINVAL will be returned if the tag is not ready.
                 auto savedErrno = wil::ResultFromCaughtException();
@@ -336,7 +336,7 @@ try
         return MountFilesystem(DRVFS_FS_TYPE, Source, Target, Options, ExitCode);
     }
 
-    // Use virtiofs if the source of the mount is the root of a drive, otherwise use 9p.
+    // Use virtiofs if the source of the mount is the root of a drive; otherwise, use 9p.
     if (WSL_USE_VIRTIO_FS(Config))
     {
         if (wsl::shared::string::IsDriveRoot(Source))

@@ -43,7 +43,7 @@ sequenceDiagram
 
 ## CreateInstance()
 
-When [wslervice.exe](wslservice.exe.md) receives the CreateInstance() call via COM, it will:
+When [wslservice.exe](wslservice.exe.md) receives the CreateInstance() call via COM, it will:
 
 1) Identify which distribution the user wants to create. This is done by looking up the `DistributionRegistration` (see `src/windows/service/exe/DistributionRegistration.cpp`) in the Windows registry, matching either on the distribution ID, or using the default if none is provided.
 

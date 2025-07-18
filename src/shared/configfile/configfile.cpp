@@ -816,7 +816,7 @@ InvalidLine:
         {
             // Write out the rest of the remaining
             // invalid line. WEOF and '\n' will be
-            // handled/writen by the NewLine label.
+            // handled/written by the NewLine label.
             configFileOutput += ch;
         }
     }

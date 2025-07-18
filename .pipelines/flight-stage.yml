@@ -100,7 +100,7 @@ stages:
           zipPath: $(StoreBrokerPayloadPath)\WindowsSubsystemForLinux.zip
           force: true
           skipPolling: true # skips polling Partner Centre/store API for the state of the package; skipping will mean that errors in the process will only show up in Partner Center
-          targetPublishMode: Immediate # on completion of this task, the package will be published to the WSL SelfHost flight once ceritified (no manual clicking of any buttons in Partner Center)
+          targetPublishMode: Immediate # on completion of this task, the package will be published to the WSL SelfHost flight once certified (no manual clicking of any buttons in Partner Center)
           preserveSubmissionId: false
           deletePackages: true
           numberOfPackagesToKeep: 0
@@ -115,6 +115,6 @@ stages:
                 pip install --user -r tools/devops/requirements.txt
                 python tools/devops/create-release.py '${{ parameters.packageVersion }}' drop\bundle\Microsoft.WSL_${{ parameters.packageVersion }}.0_x64_ARM64.msixbundle drop\bundle\wsl.${{ parameters.packageVersion }}.0.arm64.msi drop\bundle\wsl.${{ parameters.packageVersion }}.0.x64.msi --no-fetch --github-token "$env:token" ${{ iif(parameters.publishPackage, '--publish --auto-release-notes', '--use-current-ref') }}
 
-        displayName: Create Github release
+        displayName: Create GitHub release
         env:
             token: $(GITHUB_RELEASE_TOKEN)
