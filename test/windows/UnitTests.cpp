@@ -4311,8 +4311,8 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
         // Distribution with overridden default location
         {
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overridden-default-location"); });
+            auto cleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overridden-default-location"); });
 
             auto currentPath = std::filesystem::current_path();
             WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
