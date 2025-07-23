@@ -1027,7 +1027,7 @@ Return Value:
     LxtCheckErrnoZeroSuccess(connect(ClientSocket, (struct sockaddr*)&Address, sizeof(Address)));
 
     //
-    // Tell the parent the process is running inside the execve'd binary.
+    // Tell the parent that the process is running inside the execve'd binary.
     //
 
     LxtCheckResult(LxtSendMessage(ClientSocket, "execve"));
