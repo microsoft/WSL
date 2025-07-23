@@ -1100,7 +1100,7 @@ Error code: {}</value>
     <value>Failed to query networking mode</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>Customised kernel modules were supplied without a specifying a customised kernel. Please see https://aka.ms/wslcustomkernel for more information.</value>
+    <value>Customised kernel modules were supplied without specifying a customised kernel. Please see https://aka.ms/wslcustomkernel for more information.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Due to a current compatibility issue with Global Secure Access Client, DNS Tunneling is disabled.</value>
