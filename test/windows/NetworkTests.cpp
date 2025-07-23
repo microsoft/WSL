@@ -3650,7 +3650,7 @@ class NetworkTests
         return std::find(v6State.Routes.begin(), v6State.Routes.end(), route) != v6State.Routes.end();
     }
 
-    // Reads from the file until the substring is found, a timeout is reached or ReadFile returns an error
+    // Reads from the file until the substring is found, a timeout is reached, or ReadFile returns an error
     // Returns true on success, false otherwise
     static bool FindSubstring(wil::unique_handle& file, const std::string& substr, std::string& output)
     {
