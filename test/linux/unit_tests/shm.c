@@ -575,7 +575,7 @@ int ShmAtAccess(PLXT_ARGS Args)
 
         //
         // Change the caller GID and attempt to map, this should still fail
-        // because the caller has a supplimentaty group membership.
+        // because the caller has a supplementary group membership.
         //
 
         LxtCheckErrno(setgid(SHM_ACCESS_GID));
@@ -588,7 +588,7 @@ int ShmAtAccess(PLXT_ARGS Args)
         }
 
         //
-        // Drop supplimentary group membership, finally this should succeed.
+        // Drop supplementary group membership, finally this should succeed.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -899,7 +899,7 @@ int ShmAtDtSyscall(PLXT_ARGS Args)
     LxtCheckEqual(Stat.shm_nattch, 1, "%Iu");
 
     //
-    // Use detatch to clear the range.
+    // Use detach to clear the range.
     //
 
     LxtCheckErrno(LxtShmDt(Address));
@@ -1076,7 +1076,7 @@ int ShmAtDtSyscall(PLXT_ARGS Args)
     LxtCheckEqual(Stat.shm_nattch, 2, "%Iu");
 
     //
-    // Detatch both mapped regions.
+    // Detach both mapped regions.
     //
 
     LxtCheckErrno(LxtShmDt(Address));
@@ -1136,7 +1136,7 @@ int ShmAtDtSyscall(PLXT_ARGS Args)
     LxtCheckEqual(Stat.shm_nattch, 2, "%Iu");
 
     //
-    // Detatch the original address and validate the second region remains.
+    // Detach the original address and validate the second region remains.
     //
 
     LxtCheckErrno(LxtShmDt(Address));
@@ -1278,7 +1278,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1371,7 +1371,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1451,7 +1451,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Change the GID (callers still has supplimentary group membership so
+        // Change the GID (callers still has supplementary group membership so
         // this should succeed).
         //
 
@@ -1465,7 +1465,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1545,7 +1545,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Change the GID (callers still has supplimentary group membership so
+        // Change the GID (callers still has supplementary group membership so
         // this should succeed).
         //
 
@@ -1559,7 +1559,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership (this should succeed).
+        // Drop supplementary group membership (this should succeed).
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1647,7 +1647,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Change the GID (callers still has supplimentary group membership so
+        // Change the GID (callers still has supplementary group membership so
         // this should succeed).
         //
 
@@ -1665,7 +1665,7 @@ int ShmGetAccess(PLXT_ARGS Args)
         LxtCheckEqual(Id, LxtShmGet(Key, PAGE_SIZE, 0000), "%Iu");
 
         //
-        // Drop supplimentary group membership (this should succeed).
+        // Drop supplementary group membership (this should succeed).
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -1854,7 +1854,7 @@ int ShmGetSyscall(PLXT_ARGS Args)
     // N.B. There appears to be no error checking for invalid flags, only the
     //      presence of valid flags.
     //
-    // -1 includes the IPC_EXCL flag so this shoudl return EEXIST.
+    // -1 includes the IPC_EXCL flag so this should return EEXIST.
     //
 
     LxtCheckErrnoFailure(LxtShmGet(Key, PAGE_SIZE, -1), EEXIST);
@@ -2035,7 +2035,7 @@ int ShmCtlSyscall(PLXT_ARGS Args)
         LxtCheckErrno(LxtShmCtl(Id, IPC_SET, &Stat));
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -2114,7 +2114,7 @@ int ShmCtlSyscall(PLXT_ARGS Args)
         LxtCheckErrno(LxtShmCtl(Id, IPC_SET, &Stat));
 
         //
-        // Drop supplimentary group membership.
+        // Drop supplementary group membership.
         //
 
         LxtCheckErrno(Result = setgroups(0, NULL));
@@ -2366,7 +2366,7 @@ int ShmCtlSyscall(PLXT_ARGS Args)
 
     //
     // Generate an ID that does not refer to a valid memory region and attempt
-    // operations on the non-existent region.
+    // operations on the nonexistent region.
     //
 
     do
@@ -2408,7 +2408,7 @@ Routine Description:
     and the parent and
     child communicate across a unix socket connection. Each side queries the
     credentials of the other side via SO_PEERCRED and ancillary messages and
-    validates that the appriate credentials are returned.
+    validates that the appropriate credentials are returned.
 
 Arguments:
 
@@ -2467,7 +2467,7 @@ Return Value:
         LxtLogInfo("Child's view of ChildPid %d", getpid());
 
         //
-        // Attatch the shared segment.
+        // Attach the shared segment.
         //
 
         LxtCheckMapErrno(Address2 = LxtShmAt(Id, NULL, 0));

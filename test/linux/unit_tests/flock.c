@@ -152,7 +152,7 @@ Return Value:
         //
         // Ensure that the lock was correctly set before. The lock descriptor is
         // correctly set from before. The test expects to see the lock type be
-        // changed to exlusive, WRLCK, though.
+        // changed to exclusive, WRLCK, though.
         //
 
         LxtLogInfo("Fcntl child locking - Reading lock type");

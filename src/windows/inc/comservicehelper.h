@@ -59,7 +59,7 @@ namespace Windows { namespace Internal {
             }
             else
             {
-                // Otherwise take a reference on the MTA apartment.
+                // Otherwise, take a reference on the MTA apartment.
                 m_hrMtaInitialized = CoIncrementMTAUsage(&m_mtaUsageCookie);
             }
             RETURN_IF_FAILED(m_hrMtaInitialized);
@@ -277,7 +277,7 @@ namespace Windows { namespace Internal {
             RETURN_IF_WIN32_BOOL_FALSE(MakeAbsoluteSD(
                 pSDRelative, pSDAbsolute, &cbSDAbsolute, pDacl, &cbDacl, pSacl, &cbSacl, pOwner, &cbOwner, pPrimaryGroup, &cbPrimaryGroup));
 
-            // ...and now we can call CoInitializeSecuirity
+            // ...and now we can call CoInitializeSecurity
             RETURN_IF_FAILED(CoInitializeSecurity(
                 pSDAbsolute, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IDENTIFY, NULL, EOAC_NONE, nullptr));
 
@@ -296,7 +296,7 @@ namespace Windows { namespace Internal {
         // COM callback object to support unloading shared-process services
         Microsoft::WRL::ComPtr<IContextCallback> m_icc;
 
-        // COM Server descritptor
+        // COM Server descriptor
         ServerDescriptor m_serverDescriptor{};
     };
 
@@ -644,7 +644,7 @@ namespace Windows { namespace Internal {
                     // control codes to the service.
                     //
                     // We stop asynchronously to have the same codepath as system
-                    // stop requestes.
+                    // stop requests.
                     //
                     reinterpret_cast<TBase*>(this)->OnSystemShutdown();
                     StopAsync();

@@ -119,7 +119,7 @@ int SelectFdBufferSize(PLXT_ARGS Args)
     //
     // Test select with different sized buffers that have all of the bits set
     // and a ReadSetCount of 1. The expectation is that the write will fail if
-    // the buffer is less an an unsigned long. If larger, the values will be
+    // the buffer is less than an unsigned long. If larger, the values will be
     // zeroed out to an unsigned long but not more.
     //
 

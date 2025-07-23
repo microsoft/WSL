@@ -54,7 +54,7 @@ public partial class NetworkingViewModel : WslConfigSettingViewModel
         _autoProxy = wslConfigService.GetWslConfigSetting(WslConfigEntry.AutoProxyEnabled);
         _initialAutoProxyTimeout = wslConfigService.GetWslConfigSetting(WslConfigEntry.InitialAutoProxyTimeout);
         _dNSProxy = wslConfigService.GetWslConfigSetting(WslConfigEntry.DNSProxyEnabled);
-        _dNSTunneling = wslConfigService.GetWslConfigSetting(WslConfigEntry.DNSTunellingEnabled);
+        _dNSTunneling = wslConfigService.GetWslConfigSetting(WslConfigEntry.DNSTunnelingEnabled);
         _bestEffortDNS = wslConfigService.GetWslConfigSetting(WslConfigEntry.BestEffortDNSParsingEnabled);
 
         string defaultIgnoredPorts = wslConfigService.GetWslConfigSetting(WslConfigEntry.IgnoredPorts, true).StringValue;

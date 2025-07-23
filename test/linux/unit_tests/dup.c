@@ -109,7 +109,7 @@ Return Value:
     LxtCheckResult((DupStdOut = dup(FD_STDOUT)));
 
     //
-    // Since we just closed STDIN, dup'ing STDOUT should take take the position
+    // Since we just closed STDIN, duping STDOUT should take the position
     // of STDIN
     //
 

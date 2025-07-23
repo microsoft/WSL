@@ -221,7 +221,7 @@ int ResourceLimitNoFile(PLXT_ARGS Args)
 
     //
     // Determine how many file descriptors are already open and allocate an
-    // array large enough to open the maxiumum number of file descriptors.
+    // array large enough to open the maximum number of file descriptors.
     //
 
     LxtLogInfo("%d currently open file descriptors", InitialFileDescriptorCount);

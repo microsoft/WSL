@@ -590,7 +590,7 @@ wsl::core::networking::WslMirroredNetworkManager::WslMirroredNetworkManager(
     // Subscribe for network change notifications. This is done before
     // obtaining the initial list of networks to connect to, in order to
     // avoid a race condition between the initial enumeration and any network
-    // changes that may be occuring at the same time. The subscription will
+    // changes that may be occurring at the same time. The subscription will
     // receive network change events, but will not be able to react to them
     // the lock is released.
     m_hcnCallback = windows::common::hcs::RegisterServiceCallback(HcnCallback, this);
@@ -1026,7 +1026,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
     const auto makingIpInterfaceUpdate = endpoint.Network->PendingIPInterfaceUpdate;
     // Linux may delete routes behind us when making interface, address, and route changes
     // will track when to refresh v4 and v6 routes to ensure routes are still present after changes
-    // a few custmomers have seen this when we update temporary v6 addresses, for example
+    // a few customers have seen this when we update temporary v6 addresses, for example
     auto refreshAllRoutes = false;
 
     // First: update Linux with any interface updates
@@ -1237,7 +1237,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         {
             auto trackedAddress = endpoint.StateTracking->IpAddresses.emplace(TrackedIpAddress(hostAddress)).first;
             // detect if previously sync'd addresses need to be updated
-            // this addresses issues we've seen where addresses were removed from Linux without our knowlege
+            // this addresses issues we've seen where addresses were removed from Linux without our knowledge
             shouldRefreshAllAddresses |= trackedAddress->SyncStatus == PendingAdd || trackedAddress->SyncStatus == PendingUpdate;
         }
 
@@ -1383,7 +1383,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         {
             const auto trackedRoute = endpoint.StateTracking->Routes.emplace(TrackedRoute(hostRoute)).first;
             // detect if previously sync'd routes need to be updated
-            // this addresses issues we've seen where routes were removed from Linux without our knowlege
+            // this addresses issues we've seen where routes were removed from Linux without our knowledge
             // and routes couldn't be updated later because required routes, like the prefix route, wasn't there
             refreshAllRoutes |= trackedRoute->SyncStatus == PendingAdd || trackedRoute->SyncStatus == PendingUpdate;
         }
@@ -1686,7 +1686,7 @@ try
             // mirroredConnectedInterfaces won't equal m_hostConnectedInterfaces when:
             // - there are hidden host interfaces
             //   i.e., interfaces are in m_networkEndpoints but not in m_hostConnectedInterfaces
-            // - when HNS hasn't yet mirrored an connected host interface
+            // - when HNS hasn't yet mirrored a connected host interface
             //   i.e. interfaces are in m_hostConnectedInterfaces but not in m_networkEndpoints
             //
             // if HNS has not yet mirrored a host interface, we should not indicate we are in sync

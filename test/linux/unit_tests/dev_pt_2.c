@@ -737,7 +737,7 @@ Return Value:
         LxtCheckEqual(TerminalForegroundId, ForegroundId, "%d");
 
         //
-        // Do a aimple IO check.
+        // Do a simple IO check.
         //
 
         LxtCheckErrno(RawInit(PtsFd));
@@ -1744,7 +1744,7 @@ int PtBufferTerminalFill(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine checks the internal implemenation of the buffer by attempting
+    This routine checks the internal implementation of the buffer by attempting
     to fill it.
 
 Arguments:
@@ -2395,7 +2395,7 @@ Return Value:
             LxtCheckErrno(tcsetpgrp(PtsFd, GrandChildPid));
 
             //
-            // Disassocate terminal.
+            // Disassociate terminal.
             //
 
             LxtCheckErrno(ioctl(PtsFd, TIOCNOTTY, (char*)NULL));
@@ -8715,7 +8715,7 @@ Return Value:
     tcflag_t InputFlags;
     int PtmFd;
     int PtsFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     char ReadBuffer[20];
     int Result;
     int SerialNumber;

@@ -24,7 +24,7 @@ public:
         std::wstring Name;
         std::optional<GUID> Id;
         std::optional<wsl::windows::common::distribution::TDistribution> Distribution;
-        bool InstalledViaGithub{};
+        bool InstalledViaGitHub{};
         bool Alreadyinstalled{};
     };
 

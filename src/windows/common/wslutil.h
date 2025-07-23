@@ -41,26 +41,26 @@ inline constexpr GUID WslTerminalNamespace = {0xbe9372fe, 0x59e1, 0x4876, {0xbd,
 inline constexpr GUID GeneratedProfilesTerminalNamespace = {0x2bde4a90, 0xd05f, 0x401c, {0x94, 0x92, 0xe4, 0x8, 0x84, 0xea, 0xd1, 0xd8}};
 
 inline auto c_msixPackageFamilyName = L"MicrosoftCorporationII.WindowsSubsystemForLinux_8wekyb3d8bbwe";
-inline auto c_githubUrlOverrideRegistryValue = L"GithubUrlOverride";
+inline auto c_githubUrlOverrideRegistryValue = L"GitHubUrlOverride";
 inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
 
-struct GithubReleaseAsset
+struct GitHubReleaseAsset
 {
     std::wstring url;
     uint64_t id{};
     std::wstring name;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GithubReleaseAsset, url, id, name);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GitHubReleaseAsset, url, id, name);
 };
 
-struct GithubRelease
+struct GitHubRelease
 {
     std::wstring name;
-    std::vector<GithubReleaseAsset> assets;
+    std::vector<GitHubReleaseAsset> assets;
     std::wstring created_at;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GithubRelease, name, assets, created_at);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GitHubRelease, name, assets, created_at);
 };
 
 template <typename T>
@@ -98,13 +98,13 @@ DWORD GetDefaultVersion(void);
 
 std::wstring GetErrorString(_In_ HRESULT result);
 
-std::optional<std::pair<std::wstring, GithubReleaseAsset>> GetGithubAssetFromRelease(const GithubRelease& Release);
+std::optional<std::pair<std::wstring, GitHubReleaseAsset>> GetGitHubAssetFromRelease(const GitHubRelease& Release);
 
-std::pair<std::wstring, GithubReleaseAsset> GetLatestGithubRelease(_In_ bool preRelease);
+std::pair<std::wstring, GitHubReleaseAsset> GetLatestGitHubRelease(_In_ bool preRelease);
 
-std::pair<std::wstring, GithubReleaseAsset> GetLatestGithubRelease(_In_ bool preRelease, _In_ LPCWSTR releases);
+std::pair<std::wstring, GitHubReleaseAsset> GetLatestGitHubRelease(_In_ bool preRelease, _In_ LPCWSTR releases);
 
-GithubRelease GetGithubReleaseByTag(_In_ const std::wstring& Version);
+GitHubRelease GetGitHubReleaseByTag(_In_ const std::wstring& Version);
 
 int GetLogicalProcessorCount();
 

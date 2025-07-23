@@ -102,7 +102,7 @@ int GetrandomSyscall(PLXT_ARGS Args)
     if (Result > DEV_URANDOM_MAX_BYTES)
     {
         Result = LXT_RESULT_FAILURE;
-        LxtLogError("BytesRead %Iu higher than expected %Iu", Result, DEV_URANDOM_MAX_BYTES);
+        LxtLogError("BytesRead %Iu greater than expected %Iu", Result, DEV_URANDOM_MAX_BYTES);
 
         goto ErrorExit;
     }
@@ -111,7 +111,7 @@ int GetrandomSyscall(PLXT_ARGS Args)
     if (Result > DEV_RANDOM_MAX_BYTES)
     {
         Result = LXT_RESULT_FAILURE;
-        LxtLogError("BytesRead %Iu higher than expected %Iu", Result, DEV_RANDOM_MAX_BYTES);
+        LxtLogError("BytesRead %Iu greater than expected %Iu", Result, DEV_RANDOM_MAX_BYTES);
 
         goto ErrorExit;
     }
@@ -150,7 +150,7 @@ int DevRandomDevice(PLXT_ARGS Args)
     if (BytesRead > DEV_RANDOM_MAX_BYTES)
     {
         Result = LXT_RESULT_FAILURE;
-        LxtLogError("BytesRead %d higher than expected %d", BytesRead, DEV_RANDOM_MAX_BYTES);
+        LxtLogError("BytesRead %d greater than expected %d", BytesRead, DEV_RANDOM_MAX_BYTES);
 
         goto ErrorExit;
     }
@@ -190,7 +190,7 @@ int DevUrandomDevice(PLXT_ARGS Args)
     if (BytesRead > DEV_URANDOM_MAX_BYTES)
     {
         Result = LXT_RESULT_FAILURE;
-        LxtLogError("BytesRead %d higher than expected %d", BytesRead, DEV_URANDOM_MAX_BYTES);
+        LxtLogError("BytesRead %d greater than expected %d", BytesRead, DEV_URANDOM_MAX_BYTES);
 
         goto ErrorExit;
     }

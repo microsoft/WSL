@@ -762,7 +762,7 @@ void EnableCrashDumpCollection()
         return;
     }
 
-    // If the first character is a pipe, then the kernel will interperet this path as a command.
+    // If the first character is a pipe, then the kernel will interpret this path as a command.
     constexpr auto core_pattern = "|/" LX_INIT_WSL_CAPTURE_CRASH " %t %E %p %s";
     WriteToFile("/proc/sys/kernel/core_pattern", core_pattern);
 }
@@ -1745,7 +1745,7 @@ try
     };
 
     //
-    // Set the communicaiton channel to expected file descriptor value.
+    // Set the communication channel to expected file descriptor value.
     //
 
     if (SocketFd != LX_INIT_UTILITY_VM_INIT_SOCKET_FD)
@@ -1779,7 +1779,7 @@ try
     {
         //
         // Creating the temporary mount can fail if:
-        // - The distro VHD was mounted read-only (because an fsck is needed)
+        // - The distro VHD was mounted read-only (because a fsck is needed)
         // - The distro VHD is full
         //
         // Mount a writable overlay if that's the case so the distro can start.
@@ -1873,7 +1873,7 @@ try
     }
 
     //
-    // Bind mount the init deamon into the distro namespace.
+    // Bind mount the init daemon into the distro namespace.
     //
 
     auto Path = std::format("{}{}", Target, LX_INIT_PATH);
@@ -2107,7 +2107,7 @@ try
     }
 
     //
-    // Mount to a temporary location if overlayfs was requested, otherwise mount
+    // Mount to a temporary location if overlayfs was requested; otherwise, mount
     // the device directly on the target.
     //
 
@@ -2260,7 +2260,7 @@ Return Value:
     }
 
     //
-    // Chroot to system system distro mount point.
+    // Chroot to system distro mount point.
     //
     // N.B. This allows running binaries present in the system distro without having to chroot.
     //
@@ -2362,7 +2362,7 @@ try
     auto* DeviceName = &DevicePath[sizeof(DEVFS_PATH)];
 
     //
-    // Find the partion on the specified device.
+    // Find the partition on the specified device.
     //
     // N.B. A retry is needed because there is a delay between when a device is
     //      hot-added, and when the device is available in the guest.
@@ -2492,7 +2492,7 @@ void ProcessLaunchInitMessage(
         //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
         //
-        // N.B. A connection for the system disto must established even if the distro opts out
+        // N.B. A connection for the system distro must established even if the distro opts out
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
@@ -3168,7 +3168,7 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a file desciptor to the socket the message was received
+    MessageFd - Supplies a file descriptor to the socket the message was received
         on. This is used for operations that require responses, for example a
         VHD eject request.
 
@@ -3579,7 +3579,7 @@ Return Value:
     // set to SYS_BIND to make bind system call.
 #ifdef __x86_64__
         // 32bit:
-        // If syscall_nr == __NR_socketcall then contine else goto allow:
+        // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 3),
         // if syscall arg0 == SYS_BIND then goto user_notify: else goto allow:
@@ -3905,7 +3905,7 @@ int main(int Argc, char* Argv[])
     }
 
     //
-    // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
+    // Open kmsg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
     //
     // N.B. This is to work around a rare race condition where init is launched without /dev/console set as the controlling terminal.
     //

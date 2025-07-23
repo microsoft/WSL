@@ -36,7 +36,7 @@ DEFINE_ENUM_FLAG_OPERATORS(TempFileFlags);
 // Used only in unit tests.
 constexpr ULONG c_case_sensitive_folders_only = 0x100;
 
-// Make sure that the above flag doesn't conflict with create intance flags
+// Make sure that the above flag doesn't conflict with create instance flags
 static_assert((LXSS_CREATE_INSTANCE_FLAGS_ALL & c_case_sensitive_folders_only) == 0);
 
 struct TempFile
@@ -124,7 +124,7 @@ std::pair<ULONG, ULONG> EnumerateFixedDrives(HANDLE Token = nullptr);
 bool EnsureDirectory(_In_ LPCWSTR pPath);
 
 /// <summary>
-/// Marks every directory in a tree case sensitive.
+/// Marks every directory in a tree case-sensitive.
 /// </summary>
 void EnsureCaseSensitiveDirectory(_In_ PCWSTR Path, _In_ ULONG Flags);
 

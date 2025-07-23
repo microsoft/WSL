@@ -1906,7 +1906,7 @@ Return Value:
     //
     // The following test cases deal with the old name containing a trailing slash.
     //
-    // Renaming a directory to a nonexistant directory should succeed.
+    // Renaming a directory to a nonexistent directory should succeed.
     //
 
     LxtCheckErrnoZeroSuccess(mkdir(RenameTestDirSlash, 0777));
@@ -3751,7 +3751,7 @@ Return Value:
     {
         LxtLogError(
             "getdents should return 0 when end of directory is reached, "
-            "but it retuend: %d.",
+            "but it returned: %d.",
             Size);
 
         Result = EINVAL;

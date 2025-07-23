@@ -1110,7 +1110,7 @@ Arguments:
 
     String - Supplies the string to split.
 
-    Delim - The deliminiter to split the string on.
+    Delim - The delimiter to split the string on.
 
 Return Value:
 
@@ -1142,7 +1142,7 @@ Return Value:
     return output;
 }
 
-// WslKeepAlive class defintions
+// WslKeepAlive class definitions
 
 WslKeepAlive::WslKeepAlive(HANDLE Token) : m_token(Token)
 {
@@ -2141,7 +2141,7 @@ Return Value:
     if (!g_originalDefaultDistro.empty())
     {
         // Edge case: If the previous default distro was the test distro, it might have been deleted during the testpass.
-        // Validate the the distro exists before restoring.
+        // Validate the distro exists before restoring.
 
         const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
 

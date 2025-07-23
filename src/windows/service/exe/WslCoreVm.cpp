@@ -203,7 +203,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     CATCH_LOG();
 
-    // If a private kernel was not speicifed, use the default.
+    // If a private kernel was not specified, use the default.
     m_defaultKernel = m_vmConfig.KernelPath.empty();
     if (m_defaultKernel)
     {
@@ -1144,7 +1144,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         {
             if (found != m_attachedDisks.end())
             {
-                // Prevent user from launching a distro vhd after manually mounting it, otherwise return the LUN of the mounted disk.
+                // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the LUN of the mounted disk.
                 THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
 
                 return found->second.Lun;
@@ -2521,7 +2521,7 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
         else
         {
-            // The VM has already been terminated, invoke the callback on a seperate thread.
+            // The VM has already been terminated, invoke the callback on a separate thread.
             std::thread([terminationCallback = std::move(TerminationCallback), runtimeId = m_runtimeId]() {
                 wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
                 terminationCallback(runtimeId);
@@ -2962,7 +2962,7 @@ void WslCoreVm::ValidateNetworkingMode()
         {
             if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(m_vmConfig))
             {
-                // Since hyper-V firewall is enabled by default, only show the warning if the user explicitely asked for it.
+                // Since hyper-V firewall is enabled by default, only show the warning if the user explicitly asked for it.
                 if (m_vmConfig.FirewallConfigPresence == ConfigKeyPresence::Present)
                 {
                     EMIT_USER_WARNING(Localization::MessageHyperVFirewallNotSupported());
@@ -3001,7 +3001,7 @@ void WslCoreVm::ValidateNetworkingMode()
     // If DNS tunneling was requested, ensure it is supported by Windows.
     if (m_vmConfig.EnableDnsTunneling && !IsDnsTunnelingSupported())
     {
-        // Since DNS tunneling is enabled by default, only show the warning if the user explicitely asked for it.
+        // Since DNS tunneling is enabled by default, only show the warning if the user explicitly asked for it.
         if (m_vmConfig.DnsTunnelingConfigPresence == ConfigKeyPresence::Present)
         {
             EMIT_USER_WARNING(Localization::MessageDnsTunnelingNotSupported());

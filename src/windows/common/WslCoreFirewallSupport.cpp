@@ -175,7 +175,7 @@ try
     //
     // Currently, there are 3 possible levels of Hyper-V firewall OS support:
     // 1 - No Hyper-V firewall OS support.
-    // 2 - Initial Hyper-V firewall support (Support for mirrrored mode only).
+    // 2 - Initial Hyper-V firewall support (Support for mirrored mode only).
     //     To check for this support, we query for the 'MSFT_NetFirewallHyperVVMCreator' object.
     // 3 - Enterprise Hyper-V firewall support (Support for NAT mode, configuring default settings values, and configuring per-profile configs).
     //     To check for this support, we query for the 'MSFT_NetFirewallHyperVProfile' object.

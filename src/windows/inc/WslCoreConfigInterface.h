@@ -34,7 +34,7 @@ enum WslConfigEntry
     AutoProxyEnabled,
     InitialAutoProxyTimeout,
     DNSProxyEnabled,
-    DNSTunellingEnabled,
+    DNSTunnelingEnabled,
     BestEffortDNSParsingEnabled,
     AutoMemoryReclaim,
     GUIApplicationsEnabled,

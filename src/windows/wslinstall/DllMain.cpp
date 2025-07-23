@@ -479,7 +479,7 @@ extern "C" UINT __stdcall CleanMsixState(MSIHANDLE install)
 
         /*
          * Because of a probable bug in MSIX / Packaged COM, it's possible that an old registration is still present on the machine,
-         * which will break instanciations of LxssUserSessions.
+         * which will break instantiations of LxssUserSessions.
          * Because this method executes after all MSIX packages have been removed, we know that this registration shouldn't be there,
          * so delete it if it still happens to be there.
          * See: https://github.com/microsoft/WSL/issues/10782
@@ -598,7 +598,7 @@ catch (...)
 wsl::windows::common::filesystem::TempFile ExtractMsix(MSIHANDLE install)
 {
     // N.B. We need to open the database this way instead of calling MsiGetActiveDatabase() because
-    // this is defered action so we don't have access to the MSI context here.
+    // this is deferred action so we don't have access to the MSI context here.
     // The MSIX needs to be extracted like this because in the case of an upgrade this action runs before 'MoveFiles' so the WSL directory isn't available yet.
 
     const auto installTarget = GetInstallTarget(install);
@@ -699,7 +699,7 @@ try
         catch (...)
         {
             // For convenience, automatically trust the MSIX's certificate if this is NOT an official build and
-            // the package installation failed because of an unstrusted certificate.
+            // the package installation failed because of an untrusted certificate.
 #ifndef WSL_OFFICIAL_BUILD
             auto error = wil::ResultFromCaughtException();
             if (error == CERT_E_UNTRUSTEDROOT)

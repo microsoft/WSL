@@ -88,7 +88,7 @@ For example, consider the file below, named `ExampleTest.cpp`:
 
     #include "Common.h" // referring to /test/Common.h, where general utility functions for interacting with WSL in regards to testing reside
 
-    #define INLINE_TEST_METHOD_MARKUP // optional, but defined within the directory cmake build instructions. this is the practice that the pre-existing tests use
+    #define INLINE_TEST_METHOD_MARKUP // optional, but defined within the directory cmake build instructions. this is the practice that the preexisting tests use
 
     namespace ExampleTest
     {
@@ -107,13 +107,13 @@ For example, consider the file below, named `ExampleTest.cpp`:
     } //namespace ExampleTest
 ```
 
-For more in-depth examples of writing TAEF tests, check out `/tests/MountTests.cpp` and [here](https://docs.microsoft.com/windows-hardware/drivers/taef/authoring-tests-in-c--#advanced-authoring-tests-in-c).
+For more in-depth examples of writing TAEF tests, check out `/tests/MountTests.cpp` and [Advanced Authoring Tests in C++](https://docs.microsoft.com/windows-hardware/drivers/taef/authoring-tests-in-c--#advanced-authoring-tests-in-c).
 
 ## Building Tests
 
 ### CMake
 
-For examples on how to get your test/s building within the repo, please view `/test/CMakeLists.txt` for the structure of creating add to the `wsltest.dll`. For additional information on how to use CMake, try [here](https://cmake.org/documentation/).
+For examples on how to get your test/s building within the repo, please view `/test/CMakeLists.txt` for the structure of creating add to the `wsltest.dll`. For additional information on how to use CMake, try [CMake Documentation and Community](https://cmake.org/documentation/).
 
 ### Building
 

@@ -56,7 +56,7 @@ Abstract:
 
 #define OVFS_TEST_MOUNT_DEFAULT "lowerdir=" OVFS_TEST_LOWER_DIR ",upperdir=" OVFS_TEST_UPPER_DIR ",workdir=" OVFS_TEST_WORK_DIR
 
-#define OVFS_TEST_MOUNT_MULI_LOWER \
+#define OVFS_TEST_MOUNT_MULTI_LOWER \
     "lowerdir=" OVFS_TEST_LOWER_DIR ":" OVFS_TEST_LOWER2_DIR ":" OVFS_TEST_LOWER3_DIR ",upperdir=" OVFS_TEST_UPPER_DIR \
     ",workdir=" OVFS_TEST_WORK_DIR
 
@@ -238,7 +238,7 @@ Return Value:
     int Result;
 
     //
-    // Setup the directories and ensure it's not a mount point yet.
+    // Set up the directories and ensure it's not a mount point yet.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -473,7 +473,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -752,7 +752,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -925,7 +925,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1203,7 +1203,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1385,7 +1385,7 @@ Return Value:
     struct stat StatMergedBuffer;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1562,7 +1562,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -1732,7 +1732,7 @@ Return Value:
     Fd = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2060,7 +2060,7 @@ Return Value:
     FdWrite = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2076,7 +2076,7 @@ Return Value:
     //
     // Open the same file for read and write. The read file will be from the
     // lower layer, but opening the file for write will cause the file to be
-    // hydated in the upper layer and the inode updated.
+    // hydrated in the upper layer and the inode updated.
     //
 
     LxtCheckErrno(Fd = open(OVFS_TEST_MOUNT_PATH "/OnlyInLowerFile", O_RDONLY, 0));
@@ -2359,7 +2359,7 @@ Return Value:
         LxtCheckErrno(LxtCapSet(&CapHeader, CapData));
 
         //
-        // Open the file with different trunctate variations.
+        // Open the file with different truncate variations.
         //
 
         LxtCheckErrno(Fd = open(OVFS_TEST_LOWER_DIR "/OnlyInLowerFile", O_RDONLY, 0));
@@ -2423,7 +2423,7 @@ Return Value:
     FdLower = -1;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2671,7 +2671,7 @@ Return Value:
     ssize_t ValueSize;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2847,7 +2847,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -2938,7 +2938,7 @@ Return Value:
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     //
     // Check that the whiteout cannot be opened but are reported through readdir
@@ -3073,7 +3073,7 @@ Return Value:
     Mapping = NULL;
 
     //
-    // Setup the directories and populate some state.
+    // Set up the directories and populate some state.
     //
 
     LxtCheckResult(OvFsTestDirsSetup());
@@ -3085,7 +3085,7 @@ Return Value:
     //
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     //
     // Check the behavior for VFS file object operations that support file
@@ -3326,7 +3326,7 @@ Return Value:
     //
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     LxtCheckErrno(stat(OVFS_TEST_MOUNT_PATH "/mixedType", &StatMergedBuffer));
     LxtCheckTrue(S_ISDIR(StatMergedBuffer.st_mode));
@@ -3393,7 +3393,7 @@ Return Value:
     //
 
     LxtCheckResult(MountCheckIsNotMount(OVFS_TEST_MOUNT_PATH));
-    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULI_LOWER));
+    LxtCheckErrnoZeroSuccess(mount("myovfsnew", OVFS_TEST_MOUNT_PATH, OVFS_TEST_MOUNT_NAME, 0, OVFS_TEST_MOUNT_MULTI_LOWER));
 
     LxtCheckErrno(stat(OVFS_TEST_MOUNT_PATH "/mixedType", &StatMergedBuffer));
     LxtCheckTrue(S_ISDIR(StatMergedBuffer.st_mode));

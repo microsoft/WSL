@@ -451,7 +451,7 @@ int RobustFutex(PLXT_ARGS Args)
     LxtCheckErrnoFailure(my_set_robust_list(&Head, (sizeof(struct robust_list_head) + 1)), EINVAL);
 
     //
-    // get_robust_list validates the buffesr.
+    // get_robust_list validates the buffers.
     //
 
     LxtCheckErrnoFailure(my_get_robust_list(0, NULL, &SizeReturned), EFAULT);
@@ -711,7 +711,7 @@ int VForkTestBasic(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPoll(ChildPid, LXT_RESULT_SUCCESS));
 
     //
-    // Repeat the above with the clone variaent of vfork.
+    // Repeat the above with the clone variant of vfork.
     //
 
     LxtCheckErrno(ChildPid = LxtCloneSyscall(CLONE_VM | CLONE_VFORK | SIGCHLD, NULL, NULL, NULL, NULL));
@@ -778,7 +778,7 @@ int VForkTest(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPoll(ChildPid, LXT_RESULT_SUCCESS));
 
     //
-    // Repease the above with execv.
+    // Release the above with execv.
     //
 
     ChildPidFromChild = -1;
@@ -866,7 +866,7 @@ int VForkTest(PLXT_ARGS Args)
 #if defined(__i386__) || defined(__amd64__)
 
     //
-    // Check that floating point context is preserved accross vfork.
+    // Check that floating point context is preserved across vfork.
     //
 
     _FPU_GETCW(OriginalControlWord);

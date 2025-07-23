@@ -319,7 +319,7 @@ bool IsSameSockAddr(const sockaddr_storage& left, const sockaddr_storage& right)
 // Start looking for ports bound to localhost or wildcard.
 int ScanProcNetTCP(wsl::shared::SocketChannel& channel)
 {
-    // Peridocally scan procfs for listening TCP sockets.
+    // Periodically scan procfs for listening TCP sockets.
     std::vector<sockaddr_storage> relays{};
     int result = 0;
     for (;;)

@@ -1172,7 +1172,7 @@ class MountTests
         VERIFY_ARE_EQUAL(mount.value()[1], Mountpoint.value());
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d " + Mountpoint.value()), (DWORD)0);
 
-        // If specifed, validate that ExpectedOption is in the mount options
+        // If specified, validate that ExpectedOption is in the mount options
         // (We don't want to do a direct compare because the kernel might add some like rw, ...)
         if (ExpectedOption.has_value())
         {

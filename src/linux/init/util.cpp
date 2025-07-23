@@ -733,8 +733,8 @@ Arguments:
 
     CommandLine - Supplies the command line of the process to launch.
 
-    Output - Supplies an optional pointer to an std::string to receive the output of the command.
-        If no buffer is provied the output will appear in stdout.
+    Output - Supplies an optional pointer to a std::string to receive the output of the command.
+        If no buffer is provided the output will appear in stdout.
 
     ExpectedStatus - Supplies the expected return status of the command.
 
@@ -1433,7 +1433,7 @@ Return Value:
     //
     // Check if the prefix matches.
     //
-    // N.B. For Windows paths, this is done case insensitive.
+    // N.B. For Windows paths, this is done case-insensitive.
     //
 
     if (!wsl::shared::string::StartsWith(Path, Prefix, WinPath))
@@ -2894,7 +2894,7 @@ Arguments:
     Path - Supplies the path to translate.
 
     Reverse - Supplies a bool, if set perform translation from Windows->Linux
-        path, otherwise translation from Linux->Windows path.
+        path; otherwise, translation from Linux->Windows path.
 
 Return Value:
 
@@ -3015,7 +3015,7 @@ Arguments:
     Path - Supplies the path to translate.
 
     Reverse - Supplies a bool, if set perform translation from Windows->Linux
-        path, otherwise translation from Linux->Windows path.
+        path; otherwise, translation from Linux->Windows path.
 
 Return Value:
 
@@ -3350,7 +3350,7 @@ int ProcessCreateProcessMessage(wsl::shared::SocketChannel& channel, gsl::span<g
     }
     else if (execResult == sizeof(execResult))
     {
-        // Otherwise return the error code to the service
+        // Otherwise, return the error code to the service
         execResult = abs(execResult);
     }
     else

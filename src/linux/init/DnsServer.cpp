@@ -118,7 +118,7 @@ try
         return;
     }
 
-    // Stop tracking the request, irrespective of the DNS response being succesfully sent
+    // Stop tracking the request, irrespective of the DNS response being successfully sent
     const auto removeDnsRequest = wil::scope_exit([&] { m_udpRequests.erase(dnsClientIdentifier.DnsClientId); });
 
     sockaddr_in& remoteAddr = it->second;

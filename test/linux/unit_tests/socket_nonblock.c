@@ -424,7 +424,7 @@ const char* NonblockDataToWrite[] = {
     "<This is the first message> ",
     "<This is another message> ",
     "<Dumbledore is dead> ",
-    "<Harry Potter must not go back to Hogwards> ",
+    "<Harry Potter must not go back to Hogwarts> ",
     "<There must always be a stark in Winterfell>",
 };
 
