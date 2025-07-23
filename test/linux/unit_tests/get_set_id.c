@@ -1106,7 +1106,7 @@ Return Value:
         LxtCheckEqual(Sid, getpgid(0), "%d");
 
         //
-        // Tell the parent the new session was created.
+        // Tell the parent that a new session was created.
         //
 
         LxtCheckErrnoZeroSuccess(kill(getppid(), SIGUSR1));
