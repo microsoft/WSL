@@ -1637,7 +1637,7 @@ Return Value:
 int UtilMountFile(const char* Source, const char* Destination)
 try
 {
-    wil::unique_fd Fd{open(Destination, (O_CREAT | O_WRONLY | O_TRUNC), 0755)};
+    wil::unique_fd Fd{open(Destination, (O_CREAT | O_WRONLY), 0755)};
     THROW_LAST_ERROR_IF(!Fd);
 
     THROW_LAST_ERROR_IF(mount(Source, Destination, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);

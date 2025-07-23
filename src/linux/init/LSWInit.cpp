@@ -247,9 +247,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
             ttySize.ws_row = Message.TtyRows;
 
             wil::unique_fd ttyMaster;
-
-            auto result = forkpty(ttyMaster.addressof(), nullptr, nullptr, nullptr);
-            // auto result = fork();
+            auto result = forkpty(ttyMaster.addressof(), nullptr, nullptr, &ttySize);
             THROW_ERRNO_IF(errno, result < 0);
 
             if (result == 0) // Child

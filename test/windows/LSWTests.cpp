@@ -327,19 +327,6 @@ class LSWTests
 
         auto vm = CreateVm(&settings);
 
-        /*std::vector<const char*> cmd = {"/usr/bin/setsid", "/sbin/agetty", "-w", "-L", "hvc1", "-a", "root", nullptr};
-
-        CreateProcessSettings options{};
-        options.Executable = "/usr/bin/setsid";
-        options.Arguments = cmd.data();
-        options.FdCount = 0;
-
-        int pid = -1;
-        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &options, &pid));
-
-        wil::unique_handle processs;
-        VERIFY_SUCCEEDED(WslLaunchDebugShell(vm, &processs));*/
-
         std::vector<const char*> commandLine{"/bin/sh", nullptr};
 
         std::vector<ProcessFileDescriptorSettings> fds(2);
