@@ -143,7 +143,7 @@ public:
     gsl::span<std::byte> Span()
     {
         // In case the structure is padded,
-        // make sure that the message is a least the size of the structure.
+        // make sure that the message is at least the size of the structure.
 
         const int64_t diff = sizeof(TMessage) - m_buffer.size();
         if (diff > 0)
