@@ -135,7 +135,7 @@ try
 
         THROW_HR_IF(E_INVALIDARG, !terminalInputHandle || !terminalOutputHandle);
 
-        // Create a thread to realy stdin to the pipe.
+        // Create a thread to relay stdin to the pipe.
         wsl::windows::common::SvcCommIo Io;
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
         std::thread inputThread([&]() {
@@ -164,6 +164,5 @@ try
 catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
-    system("pause");
     return 1;
 }

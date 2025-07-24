@@ -106,7 +106,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
                 {
                     LOG_ERROR("delayed stdin write failed {}", errno);
                 }
-                else if (bytesWritten <= pendingStdin.size()) // Partial or complete write
+            }
+            else
+            {
+                if (bytesWritten <= pendingStdin.size()) // Partial or complete write
                 {
                     pendingStdin.erase(pendingStdin.begin(), pendingStdin.begin() + bytesWritten);
                 }
@@ -402,7 +405,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& M
         return;
     }
 
-    LOG_ERROR("Poll returned an unexpected error state on fd: {} for pid: ", process.get(), Message.Pid);
+    LOG_ERROR("Poll returned an unexpected error state on fd: {} for pid: {}", process.get(), Message.Pid);
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)

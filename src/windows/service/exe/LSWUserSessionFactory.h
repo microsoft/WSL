@@ -16,10 +16,10 @@ Abstract:
 
 namespace wsl::windows::service::lsw {
 
-class LSWUSerSessionFactory : public Microsoft::WRL::ClassFactory<>
+class LSWUserSessionFactory : public Microsoft::WRL::ClassFactory<>
 {
 public:
-    LSWUSerSessionFactory() = default;
+    LSWUserSessionFactory() = default;
 
     STDMETHODIMP CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated) override;
 };

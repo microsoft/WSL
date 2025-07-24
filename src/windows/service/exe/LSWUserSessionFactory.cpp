@@ -16,11 +16,11 @@ Abstract:
 #include "LSWUserSessionFactory.h"
 #include "LSWUserSession.h"
 
-using wsl::windows::service::lsw::LSWUSerSessionFactory;
+using wsl::windows::service::lsw::LSWUserSessionFactory;
 
-CoCreatableClassWithFactory(LSWUserSession, LSWUSerSessionFactory);
+CoCreatableClassWithFactory(LSWUserSession, LSWUserSessionFactory);
 
-HRESULT LSWUSerSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
+HRESULT LSWUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
 {
     RETURN_HR_IF_NULL(E_POINTER, ppCreated);
     *ppCreated = nullptr;
