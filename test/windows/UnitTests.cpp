@@ -227,7 +227,7 @@ class UnitTests
         CreateUser(LXSST_TEST_USERNAME, &TestUid, &TestGid);
         auto userCleanup = wil::scope_exit([]() { LxsstuLaunchWsl(L"userdel " LXSST_TEST_USERNAME); });
 
-        auto validateUserSesssion = [&]() {
+        auto validateUserSession = [&]() {
             // verify that the user service is running
             const std::wstring isServiceActiveCmd =
                 std::format(L"-u {} systemctl is-active user@{}.service ; exit 0", LXSST_TEST_USERNAME, TestUid);
@@ -260,7 +260,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps disabled.
         {
-            validateUserSesssion();
+            validateUserSession();
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L"\n");
@@ -270,7 +270,7 @@ class UnitTests
         {
             WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
 
-            validateUserSesssion();
+            validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L":0\n");
         }
