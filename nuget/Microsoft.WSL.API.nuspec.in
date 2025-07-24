@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.WSL.Api</id>
+    <version>${WSL_NUGET_PACKAGE_VERSION}</version>
+    <authors>Microsoft</authors>
+    <projectUrl>https://github.com/microsoft/WSL</projectUrl>
+    <description>WSL API Interface</description>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+    <tags>WSL</tags>
+    <language>en-us</language>
+    <license type="expression">MIT</license>
+  </metadata>
+  <files>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\lswclient\LSWApi.h" target="include"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\lswclient.lib" target="lib\x64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\lswclient.dll" target="lib\x64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\lswclient.lib" target="lib\arm64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\lswclient.dll" target="lib\arm64"/>
+  </files>
+</package>

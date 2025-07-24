@@ -21,7 +21,8 @@ enum RelayMode
     DebugConsole,
     DebugConsoleRelay,
     PortRelay,
-    KdRelay
+    KdRelay,
+    InteractiveConsoleRelay
 };
 
 LPCWSTR const binary_name = L"wslrelay.exe";
@@ -32,4 +33,6 @@ LPCWSTR const pipe_option = L"--pipe";
 LPCWSTR const exit_event_option = L"--exit-event";
 LPCWSTR const port_option = L"--port";
 LPCWSTR const disable_telemetry_option = L"--disable-telemetry";
+LPCWSTR const input_option = L"--input";
+LPCWSTR const output_option = L"--output";
 } // namespace wslrelay

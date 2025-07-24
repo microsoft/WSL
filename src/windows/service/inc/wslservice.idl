@@ -160,6 +160,8 @@ cpp_quote("const GUID CLSID_LxssUserSessionInBox = {0x4f476546, 0xb412, 0x4579, 
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce7e\") LxssUserSession;")
 cpp_quote("class DECLSPEC_UUID(\"4f476546-b412-4579-b64c-123df331e3d6\") LxssUserSessionInBox;")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") LSWUserSession;")
+
 cpp_quote("#endif")
 
 [
@@ -395,3 +397,88 @@ cpp_quote("#define WSL_E_DISK_CORRUPTED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_IT
 cpp_quote("#define WSL_E_DISTRIBUTION_NAME_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x30) /* 0x80040330 */")
 cpp_quote("#define WSL_E_INVALID_JSON MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x31) /* 0x80040331 */")
 cpp_quote("#define WSL_E_VM_CRASHED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSL_E_BASE + 0x32) /* 0x80040332 */")
+
+
+typedef
+struct _WSL_VERSION {
+    ULONG Major;
+    ULONG Minor;
+    ULONG Revision;
+} WSL_VERSION;
+
+
+typedef [system_handle(sh_socket)] HANDLE HVSOCKET_HANDLE;
+
+
+typedef
+struct _LSW_CREATE_PROCESS_OPTIONS {
+    [string] LPCSTR Executable;
+    ULONG CommandLineCount;
+    [unique, size_is(CommandLineCount)] LPCSTR* CommandLine;
+    ULONG EnvironmentCount;
+    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
+    [unique] LPCSTR CurrentDirectory;
+} LSW_CREATE_PROCESS_OPTIONS;
+
+typedef struct _LSW_PROCESS_FD
+{
+    LONG Fd;
+    int Type;
+} LSW_PROCESS_FD;
+
+typedef
+struct _LSW_CREATE_PROCESS_RESULT {
+   int Errno;
+   int Pid;
+} LSW_CREATE_PROCESS_RESULT;
+
+[
+    uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
+    pointer_default(unique),
+    object
+]
+interface ITerminationCallback : IUnknown
+{
+    HRESULT OnTermination(ULONG Reason, LPCWSTR Details);
+};
+
+[
+    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
+    pointer_default(unique),
+    object
+]
+interface ILSWVirtualMachine : IUnknown
+{
+    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device);
+    HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
+    HRESULT CreateLinuxProcess([in] const LSW_CREATE_PROCESS_OPTIONS* Options, [in] ULONG FdCount, [in, unique, size_is(FdCount)] LSW_PROCESS_FD* Fds, [out, size_is(FdCount)] HVSOCKET_HANDLE* Handles, [out] LSW_CREATE_PROCESS_RESULT* Result);
+    HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
+    HRESULT Signal([in] LONG Pid, [in] int Signal);
+    HRESULT Shutdown([in] ULONGLONG TimeoutMs);
+    HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
+    HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
+}
+
+typedef
+struct _VIRTUAL_MACHINE_SETTINGS {
+    LPCWSTR DisplayName;
+    ULONGLONG MemoryMb;
+    ULONG CpuCount;
+    ULONG BootTimeoutMs;
+    ULONG DmesgOutput;
+    ULONG NetworkingMode;
+    BOOL EnableDnsTunneling;
+    BOOL EnableDebugShell;
+} VIRTUAL_MACHINE_SETTINGS;
+
+
+[
+    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
+    pointer_default(unique),
+    object
+]
+interface ILSWUserSession : IUnknown
+{
+    HRESULT GetVersion([out] WSL_VERSION* Error);
+    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]ILSWVirtualMachine** VirtualMachine);
+}
