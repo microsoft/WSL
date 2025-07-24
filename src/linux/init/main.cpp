@@ -3168,8 +3168,8 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a file descriptor to the socket the message was received
-        on. This is used for operations that require responses, for example a
+    MessageFd - Supplies a file descriptor to the socket on which the message was
+        received. This is used for operations that require responses, for example a
         VHD eject request.
 
     Buffer - Supplies the message.
