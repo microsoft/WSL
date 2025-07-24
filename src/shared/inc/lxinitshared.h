@@ -379,7 +379,10 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLswWaitPidResponse,
     LxMessageLswSignal,
     LxMessageLswShutdown,
-    LxMessageLswRelayTty
+    LxMessageLswRelayTty,
+    LxMessageLswMapPort,
+    LxMessageLswConnectRelay,
+    LxMessageLswPortRelay,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -481,6 +484,9 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLswSignal)
         X(LxMessageLswShutdown)
         X(LxMessageLswRelayTty)
+        X(LxMessageLswMapPort)
+        X(LxMessageLswConnectRelay)
+        X(LxMessageLswPortRelay)
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1072,13 +1078,14 @@ typedef struct _LX_INIT_START_SOCKET_RELAY
 {
     static inline auto Type = LxInitMessageStartSocketRelay;
 
+    DECLARE_MESSAGE_CTOR(_LX_INIT_START_SOCKET_RELAY);
+
     MESSAGE_HEADER Header;
     unsigned short Family;
     unsigned short Port;
-    int HvSocketPort;
     size_t BufferSize;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Family), FIELD(Port), FIELD(HvSocketPort), FIELD(BufferSize));
+    PRETTY_PRINT(FIELD(Header), FIELD(Family), FIELD(Port), FIELD(BufferSize));
 } LX_INIT_START_SOCKET_RELAY, *PLX_INIT_START_SOCKET_RELAY;
 
 using PCLX_INIT_START_SOCKET_RELAY = const LX_INIT_START_SOCKET_RELAY*;
@@ -1712,6 +1719,43 @@ struct LSW_SHUTDOWN
     MESSAGE_HEADER Header;
 
     PRETTY_PRINT(FIELD(Header));
+};
+
+struct LSW_MAP_PORT
+{
+    static inline auto Type = LxMessageLswMapPort;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_MAP_PORT);
+    MESSAGE_HEADER Header;
+    uint16_t WindowsPort;
+    uint16_t LinuxPort;
+    uint32_t AddressFamily;
+    bool Stop;
+    // TODO/ binding address
+
+    PRETTY_PRINT(FIELD(Header));
+};
+
+struct LSW_CONNECT_RELAY
+{
+    static inline auto Type = LxMessageLswConnectRelay;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_CONNECT_RELAY);
+    MESSAGE_HEADER Header;
+    uint16_t Port;
+    uint16_t Family;
+    PRETTY_PRINT(FIELD(Header), FIELD(Port), FIELD(Family));
+};
+
+struct LSW_PORT_RELAY
+{
+    static inline auto Type = LxMessageLswPortRelay;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_PORT_RELAY);
+    MESSAGE_HEADER Header;
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

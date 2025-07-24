@@ -98,6 +98,12 @@ try
         break;
     }
 
+    case wslrelay::RelayMode::WSLAPortRelay:
+    {
+        wsl::windows::wslrelay::localhost::RunWSLAPortRelay(handle.get(), vmId, port, exitEvent.get());
+        break;
+    }
+
     case wslrelay::RelayMode::KdRelay:
     {
         THROW_HR_IF(E_INVALIDARG, port == 0);

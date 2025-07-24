@@ -26,125 +26,6 @@
 
 namespace {
 
-void ListenThread(sockaddr_vm hvSocketAddress, int listenSocket)
-{
-    pollfd pollDescriptors[] = {{listenSocket, POLLIN}};
-    for (;;)
-    {
-        int result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
-        if (result < 0)
-        {
-            LOG_ERROR("poll failed {}", errno);
-            return;
-        }
-
-        if ((pollDescriptors[0].revents & POLLIN) == 0)
-        {
-            LOG_ERROR("unexpected revents {:x}", pollDescriptors[0].revents);
-            return;
-        }
-
-        // Accept a connection and start a relay worker thread.
-        wil::unique_fd relaySocket{UtilAcceptVsock(listenSocket, hvSocketAddress)};
-        THROW_LAST_ERROR_IF(!relaySocket);
-
-        std::thread([relaySocket = std::move(relaySocket)]() {
-            try
-            {
-                // Read a message to determine which TCP port to connect to.
-                std::vector<gsl::byte> buffer(sizeof(LX_INIT_START_SOCKET_RELAY));
-                auto bytesRead = UtilReadBuffer(relaySocket.get(), buffer);
-                if (bytesRead == 0)
-                {
-                    return;
-                }
-
-                auto* message = gslhelpers::try_get_struct<LX_INIT_START_SOCKET_RELAY>(gsl::make_span(buffer.data(), bytesRead));
-                THROW_ERRNO_IF(EINVAL, !message || (message->Header.MessageType != LxInitMessageStartSocketRelay));
-
-                // Connect to the actual socket address and set up a relay.
-                //
-                // N.B. During the time setting up the relay the server may have
-                //      stopped listening.
-                sockaddr* socketAddress;
-                int socketAddressSize;
-                sockaddr_in sockaddrIn{};
-                sockaddr_in6 sockaddrIn6{};
-                if (message->Family == AF_INET)
-                {
-                    sockaddrIn.sin_family = AF_INET;
-                    sockaddrIn.sin_port = htons(message->Port);
-                    sockaddrIn.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-                    socketAddress = reinterpret_cast<sockaddr*>(&sockaddrIn);
-                    socketAddressSize = sizeof(sockaddrIn);
-                }
-                else if (message->Family == AF_INET6)
-                {
-                    sockaddrIn6.sin6_family = AF_INET6;
-                    sockaddrIn6.sin6_port = htons(message->Port);
-                    sockaddrIn6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
-                    socketAddress = reinterpret_cast<sockaddr*>(&sockaddrIn6);
-                    socketAddressSize = sizeof(sockaddrIn6);
-                }
-                else
-                {
-                    THROW_ERRNO(EINVAL);
-                }
-
-                wil::unique_fd tcpSocket{socket(socketAddress->sa_family, SOCK_STREAM, IPPROTO_TCP)};
-                THROW_LAST_ERROR_IF(!tcpSocket);
-
-                if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
-                {
-                    return;
-                }
-
-                // Resize the buffer to be the requested size.
-                buffer.resize(message->BufferSize);
-
-                // Begin relaying data.
-                int outFd[2] = {tcpSocket.get(), relaySocket.get()};
-                pollfd pollDescriptors[] = {{relaySocket.get(), POLLIN}, {tcpSocket.get(), POLLIN}};
-
-                for (;;)
-                {
-                    if ((pollDescriptors[0].fd == -1) || (pollDescriptors[1].fd == -1))
-                    {
-                        return;
-                    }
-
-                    THROW_LAST_ERROR_IF(poll(pollDescriptors, COUNT_OF(pollDescriptors), -1) < 0);
-
-                    bytesRead = 0;
-                    for (int Index = 0; Index < COUNT_OF(pollDescriptors); Index += 1)
-                    {
-                        if (pollDescriptors[Index].revents & POLLIN)
-                        {
-                            bytesRead = UtilReadBuffer(pollDescriptors[Index].fd, buffer);
-                            if (bytesRead == 0)
-                            {
-                                pollDescriptors[Index].fd = -1;
-                                shutdown(outFd[Index], SHUT_WR);
-                            }
-                            else if (bytesRead < 0)
-                            {
-                                return;
-                            }
-                            else if (UtilWriteBuffer(outFd[Index], buffer.data(), bytesRead) < 0)
-                            {
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-            CATCH_LOG()
-        }).detach();
-    }
-
-    return;
-}
-
 std::vector<sockaddr_storage> ParseTcpFile(int family, FILE* file)
 {
     char* line = nullptr;
@@ -395,6 +276,125 @@ int ScanProcNetTCP(wsl::shared::SocketChannel& channel)
 }
 } // namespace
 
+void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
+{
+    pollfd pollDescriptors[] = {{listenSocket, POLLIN}};
+    for (;;)
+    {
+        int result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
+        if (result < 0)
+        {
+            LOG_ERROR("poll failed {}", errno);
+            return;
+        }
+
+        if ((pollDescriptors[0].revents & POLLIN) == 0)
+        {
+            LOG_ERROR("unexpected revents {:x}", pollDescriptors[0].revents);
+            return;
+        }
+
+        // Accept a connection and start a relay worker thread.
+        wil::unique_fd relaySocket{UtilAcceptVsock(listenSocket, hvSocketAddress)};
+        THROW_LAST_ERROR_IF(!relaySocket);
+
+        std::thread([relaySocket = std::move(relaySocket)]() {
+            try
+            {
+                // Read a message to determine which TCP port to connect to.
+                std::vector<gsl::byte> buffer(sizeof(LX_INIT_START_SOCKET_RELAY));
+                auto bytesRead = UtilReadBuffer(relaySocket.get(), buffer);
+                if (bytesRead == 0)
+                {
+                    return;
+                }
+
+                auto* message = gslhelpers::try_get_struct<LX_INIT_START_SOCKET_RELAY>(gsl::make_span(buffer.data(), bytesRead));
+                THROW_ERRNO_IF(EINVAL, !message || (message->Header.MessageType != LxInitMessageStartSocketRelay));
+
+                // Connect to the actual socket address and set up a relay.
+                //
+                // N.B. During the time setting up the relay the server may have
+                //      stopped listening.
+                sockaddr* socketAddress;
+                int socketAddressSize;
+                sockaddr_in sockaddrIn{};
+                sockaddr_in6 sockaddrIn6{};
+                if (message->Family == AF_INET)
+                {
+                    sockaddrIn.sin_family = AF_INET;
+                    sockaddrIn.sin_port = htons(message->Port);
+                    sockaddrIn.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                    socketAddress = reinterpret_cast<sockaddr*>(&sockaddrIn);
+                    socketAddressSize = sizeof(sockaddrIn);
+                }
+                else if (message->Family == AF_INET6)
+                {
+                    sockaddrIn6.sin6_family = AF_INET6;
+                    sockaddrIn6.sin6_port = htons(message->Port);
+                    sockaddrIn6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
+                    socketAddress = reinterpret_cast<sockaddr*>(&sockaddrIn6);
+                    socketAddressSize = sizeof(sockaddrIn6);
+                }
+                else
+                {
+                    THROW_ERRNO(EINVAL);
+                }
+
+                wil::unique_fd tcpSocket{socket(socketAddress->sa_family, SOCK_STREAM, IPPROTO_TCP)};
+                THROW_LAST_ERROR_IF(!tcpSocket);
+
+                if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
+                {
+                    return;
+                }
+
+                // Resize the buffer to be the requested size.
+                buffer.resize(message->BufferSize);
+
+                // Begin relaying data.
+                int outFd[2] = {tcpSocket.get(), relaySocket.get()};
+                pollfd pollDescriptors[] = {{relaySocket.get(), POLLIN}, {tcpSocket.get(), POLLIN}};
+
+                for (;;)
+                {
+                    if ((pollDescriptors[0].fd == -1) || (pollDescriptors[1].fd == -1))
+                    {
+                        return;
+                    }
+
+                    THROW_LAST_ERROR_IF(poll(pollDescriptors, COUNT_OF(pollDescriptors), -1) < 0);
+
+                    bytesRead = 0;
+                    for (int Index = 0; Index < COUNT_OF(pollDescriptors); Index += 1)
+                    {
+                        if (pollDescriptors[Index].revents & POLLIN)
+                        {
+                            bytesRead = UtilReadBuffer(pollDescriptors[Index].fd, buffer);
+                            if (bytesRead == 0)
+                            {
+                                pollDescriptors[Index].fd = -1;
+                                shutdown(outFd[Index], SHUT_WR);
+                            }
+                            else if (bytesRead < 0)
+                            {
+                                return;
+                            }
+                            else if (UtilWriteBuffer(outFd[Index], buffer.data(), bytesRead) < 0)
+                            {
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            CATCH_LOG()
+        }).detach();
+    }
+
+    return;
+}
+
 // Create a thread to monitor for connections to relay.
 int StartLocalhostRelay(wsl::shared::SocketChannel& channel, int GuestRelayFd, bool ScanForPorts)
 try
@@ -419,7 +419,7 @@ try
     std::thread([hvSocketAddress, listenSocket = std::move(listenSocket)]() {
         try
         {
-            ListenThread(hvSocketAddress, listenSocket.get());
+            RunLocalHostRelay(hvSocketAddress, listenSocket.get());
         }
         CATCH_LOG()
     }).detach();

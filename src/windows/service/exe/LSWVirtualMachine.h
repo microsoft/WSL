@@ -50,6 +50,7 @@ private:
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
 
     wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
+    void LaunchPortRelay();
 
     struct AttachedDisk
     {
@@ -74,6 +75,7 @@ private:
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
     wsl::shared::SocketChannel m_initChannel;
+    wil::unique_handle m_portRelayChannel;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::mutex m_lock;

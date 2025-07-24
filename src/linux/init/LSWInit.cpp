@@ -14,6 +14,7 @@ Abstract:
 #include "util.h"
 #include "SocketChannel.h"
 #include "message.h"
+#include "localhost.h"
 #include <utmp.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
@@ -353,6 +354,17 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_EXEC& Mess
 
     // Only reached if exec() fails
     Channel.SendResultMessage<int32_t>(errno);
+}
+
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_PORT_RELAY& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    sockaddr_vm SocketAddress{};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 10, false)};
+    THROW_LAST_ERROR_IF(!ListenSocket);
+
+    Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
+
+    RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& Message, const gsl::span<gsl::byte>& Buffer)
