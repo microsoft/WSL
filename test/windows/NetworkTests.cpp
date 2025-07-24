@@ -2680,7 +2680,7 @@ class NetworkTests
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
-        // We list the IPv4 addresses mirrored in Linux and use in the test the first one we find
+        // We list the IPv4 addresses mirrored in Linux and use the first one we find in the test
         std::vector<InterfaceState> interfaceStates = GetAllInterfaceStates();
         std::wstring ipAddress;
 
@@ -2760,7 +2760,7 @@ class NetworkTests
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
-        // We list the IPv4 addresses mirrored in Linux and use in the test the first one we find
+        // We list the IPv4 addresses mirrored in Linux and use the first one we find in the test
         std::vector<InterfaceState> interfaceStates = GetAllInterfaceStates();
         std::wstring ipAddress;
 
