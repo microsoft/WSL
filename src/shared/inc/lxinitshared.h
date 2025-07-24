@@ -187,6 +187,8 @@ Abstract:
 
 #define WSL_ROOT_INIT_ENV "WSL_ROOT_INIT"
 
+#define LSW_ROOT_INIT_ENV "LSW_ROOT_INIT"
+
 #define WSL_SOCKET_LOG_ENV "WSL_SOCKET_LOG"
 
 #define WSL_ENABLE_CRASH_DUMP_ENV "WSL_ENABLE_CRASH_DUMP"
@@ -272,6 +274,13 @@ Abstract:
 #define INIT_NETLINK_FD_ARG "--netlink-fd"
 #define INIT_PORT_TRACKER_LOCALHOST_RELAY "--localhost-relay"
 
+#define DECLARE_MESSAGE_CTOR(Name) \
+    Name() \
+    { \
+        Header.MessageSize = sizeof(Name); \
+        Header.MessageType = Name::Type; \
+    }
+
 //
 // The types of messages that can be sent to init and mini init.
 //
@@ -356,7 +365,21 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageResultBool,
     LxMessageResultInt32,
     LxMessageResultUint32,
-    LxMessageResultUint8
+    LxMessageResultUint8,
+    LxMessageLSWMount,
+    LxMessageLSWMountResult,
+    LxMessageLSWError,
+    LxMessageLswGetDisk,
+    LxMessageLswGetDiskResult,
+    LxMessageLswExec,
+    LxMessageLswFork,
+    LxMessageLswForkResult,
+    LxMessageLswConnect,
+    LxMessageLswWaitPid,
+    LxMessageLswWaitPidResponse,
+    LxMessageLswSignal,
+    LxMessageLswShutdown,
+    LxMessageLswRelayTty
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -445,7 +468,19 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageResultUint32)
         X(LxMiniInitTelemetryMessage)
         X(LxMessageResultUint8)
-
+        X(LxMessageLSWMount)
+        X(LxMessageLSWMountResult)
+        X(LxMessageLswGetDisk)
+        X(LxMessageLswGetDiskResult)
+        X(LxMessageLswExec)
+        X(LxMessageLswFork)
+        X(LxMessageLswForkResult)
+        X(LxMessageLswConnect)
+        X(LxMessageLswWaitPid)
+        X(LxMessageLswWaitPidResponse)
+        X(LxMessageLswSignal)
+        X(LxMessageLswShutdown)
+        X(LxMessageLswRelayTty)
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1463,6 +1498,221 @@ typedef struct _LX_MINI_INIT_CREATE_INSTANCE_RESULT
 
     PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(FailureStep), FIELD(Pid), FIELD(ConnectPort), STRING_FIELD(WarningsOffset));
 } LX_MINI_INIT_CREATE_INSTANCE_RESULT, *P_LX_MINI_INIT_CREATE_INSTANCE_RESULT;
+
+struct LSW_ERROR
+{
+    static inline auto Type = LxMessageLSWError;
+    MESSAGE_HEADER Header;
+    int Errno;
+    PRETTY_PRINT(FIELD(Header), FIELD(Errno));
+};
+
+struct LSW_GET_DISK_RESULT
+{
+    static inline auto Type = LxMessageLswGetDiskResult;
+
+    DECLARE_MESSAGE_CTOR(LSW_GET_DISK_RESULT);
+
+    MESSAGE_HEADER Header;
+    unsigned int Result;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Buffer));
+};
+
+struct LSW_GET_DISK
+{
+    static inline auto Type = LxMessageLswGetDisk;
+    using TResponse = LSW_GET_DISK_RESULT;
+
+    DECLARE_MESSAGE_CTOR(LSW_GET_DISK);
+
+    MESSAGE_HEADER Header;
+    unsigned int ScsiLun;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
+};
+
+struct LSW_MOUNT_RESULT
+{
+    static inline auto Type = LxMessageLSWMountResult;
+    MESSAGE_HEADER Header;
+    int Result;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Result));
+};
+
+struct LSW_MOUNT
+{
+    static inline auto Type = LxMessageLSWMount;
+    using TResponse = LSW_MOUNT_RESULT;
+
+    DECLARE_MESSAGE_CTOR(LSW_MOUNT);
+
+    MESSAGE_HEADER Header;
+    unsigned int SourceIndex;
+    unsigned int DestinationIndex;
+    unsigned int TypeIndex;
+    unsigned int OptionsIndex;
+    unsigned int Flags;
+
+    enum ForkType : uint8_t
+    {
+        None,
+        Chroot = 1,
+        OverlayFs = 2,
+    };
+
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(SourceIndex), STRING_FIELD(DestinationIndex), STRING_FIELD(TypeIndex), STRING_FIELD(OptionsIndex));
+};
+
+struct LSW_EXEC
+{
+    static inline auto Type = LxMessageLswExec;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_EXEC);
+
+    MESSAGE_HEADER Header;
+    unsigned int ExecutableIndex = 0;
+    unsigned int CommandLineIndex = 0;
+    unsigned int EnvironmentIndex = 0;
+    unsigned int CurrentDirectoryIndex = 0;
+    unsigned int FdIndex = 0;
+
+    char Buffer[];
+
+    PRETTY_PRINT(
+        FIELD(Header),
+        STRING_FIELD(ExecutableIndex),
+        STRING_FIELD(CurrentDirectoryIndex),
+        FIELD(FdIndex),
+        STRING_ARRAY_FIELD(CommandLineIndex),
+        STRING_ARRAY_FIELD(EnvironmentIndex));
+};
+struct LSW_FORK_RESULT
+{
+    static inline auto Type = LxMessageLswForkResult;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_FORK_RESULT)
+
+    MESSAGE_HEADER Header;
+    uint32_t Port = 0;
+    int32_t Pid = -1;
+    int32_t PtyMasterFd = -1;
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Port), FIELD(PtyMasterFd));
+};
+
+struct LSW_FORK
+{
+    static inline auto Type = LxMessageLswFork;
+    using TResponse = LSW_FORK_RESULT;
+
+    enum ForkType : uint8_t
+    {
+        Invalid,
+        Process,
+        Thread,
+        Pty
+    };
+
+    DECLARE_MESSAGE_CTOR(LSW_FORK);
+
+    MESSAGE_HEADER Header;
+    ForkType ForkType = Invalid;
+    uint16_t TtyColumns = 0;
+    uint16_t TtyRows = 0;
+    PRETTY_PRINT(FIELD(Header), FIELD(ForkType), FIELD(TtyColumns), FIELD(TtyRows));
+};
+
+struct LSW_TTY_RELAY
+{
+    static inline auto Type = LxMessageLswRelayTty;
+    using TResponse = LSW_FORK_RESULT;
+
+    DECLARE_MESSAGE_CTOR(LSW_TTY_RELAY);
+
+    MESSAGE_HEADER Header;
+    int32_t TtyMaster;
+    int32_t TtyInput;
+    int32_t TtyOutput;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput));
+};
+
+struct LSW_CONNECT
+{
+    static inline auto Type = LxMessageLswConnect;
+    using TResponse = RESULT_MESSAGE<uint32_t>;
+    DECLARE_MESSAGE_CTOR(LSW_CONNECT);
+
+    MESSAGE_HEADER Header;
+    int32_t Fd = -1; // TODO: multiple at once
+    PRETTY_PRINT(FIELD(Header), FIELD(Fd));
+};
+
+enum LSWProcessState
+{
+    LSWProcessStateUnknown,
+    LSWProcessStateRunning,
+    LSWProcessStateExited,
+    LSWProcessStateSignaled
+};
+
+struct LSW_WAITPID_RESULT
+{
+    static inline auto Type = LxMessageLswWaitPidResponse;
+
+    DECLARE_MESSAGE_CTOR(LSW_WAITPID_RESULT);
+
+    MESSAGE_HEADER Header;
+    LSWProcessState State = LSWProcessStateUnknown;
+    int32_t Code = -1;
+    int32_t Errno = -1;
+    PRETTY_PRINT(FIELD(Header), FIELD(State), FIELD(Code), FIELD(Errno));
+};
+
+struct LSW_WAITPID
+{
+    static inline auto Type = LxMessageLswWaitPid;
+    using TResponse = LSW_WAITPID_RESULT;
+
+    DECLARE_MESSAGE_CTOR(LSW_WAITPID);
+
+    MESSAGE_HEADER Header;
+    int32_t Pid = -1;
+    uint64_t TimeoutMs = 0;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(TimeoutMs));
+};
+
+struct LSW_SIGNAL
+{
+    static inline auto Type = LxMessageLswSignal;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_SIGNAL);
+
+    MESSAGE_HEADER Header;
+    int32_t Pid = -1;
+    int32_t Signal = -1;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Signal));
+};
+
+struct LSW_SHUTDOWN
+{
+    static inline auto Type = LxMessageLswShutdown;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_SHUTDOWN);
+    MESSAGE_HEADER Header;
+
+    PRETTY_PRINT(FIELD(Header));
+};
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT
 {

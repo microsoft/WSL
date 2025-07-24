@@ -279,6 +279,15 @@ public:
         return Transaction<TSentMessage>(gslhelpers::struct_as_writeable_bytes(message), responseSpan, timeout);
     }
 
+    template <typename TSentMessage>
+    TSentMessage::TResponse& Transaction()
+    {
+        TSentMessage message{};
+        message.Header.MessageSize = sizeof(message);
+        message.Header.MessageType = TSentMessage::Type;
+        return Transaction<TSentMessage>(message);
+    }
+
     void Close()
     {
         m_socket.reset();
@@ -287,6 +296,11 @@ public:
     auto Socket() const
     {
         return m_socket.get();
+    }
+
+    bool Connected() const
+    {
+        return m_socket.get() >= 0;
     }
 
     void IgnoreSequenceNumbers()

@@ -31,6 +31,8 @@ Abstract:
 
 #define STRING_FIELD(Name) #Name, (Name <= 0 ? "<empty>" : ((char*)(this)) + Name)
 
+#define STRING_ARRAY_FIELD(Name) #Name, (StringArray((char*)(this), Name))
+
 #define PRETTY_PRINT(...) \
     void PrettyPrintImpl(std::stringstream& Out) const \
     { \
@@ -43,6 +45,12 @@ Abstract:
         PrettyPrintImpl(Out); \
         return Out.str(); \
     }
+
+struct StringArray
+{
+    const char* MessageHead = nullptr;
+    unsigned int Index = 0;
+};
 
 template <typename T>
 inline void PrettyPrint(std::stringstream& Out, const T& Value)
@@ -70,6 +78,26 @@ inline void PrettyPrint(std::stringstream& Out, const T& Value)
     {
         // N.B. Enum can be specialized by creating an overload for this method.
         Out << std::to_string(Value);
+    }
+    else if constexpr (std::is_same_v<T, StringArray>)
+    {
+        if (Value.Index <= 0)
+        {
+            Out << "<empty>";
+            return;
+        }
+
+        const auto* it = Value.MessageHead + Value.Index;
+        while (*it != '\0')
+        {
+            if (it != Value.MessageHead + Value.Index)
+            {
+                Out << ",";
+            }
+
+            Out << it;
+            it += strlen(it) + 1;
+        }
     }
     else
     {

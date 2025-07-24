@@ -3857,6 +3857,7 @@ Return Value:
 
 int WslEntryPoint(int Argc, char* Argv[]);
 
+extern int LswEntryPoint(int Argc, char* Argv[]);
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -3874,6 +3875,16 @@ int main(int Argc, char* Argv[])
     //
     // Determine which entrypoint should be used.
     //
+
+    if (getenv(LSW_ROOT_INIT_ENV))
+    {
+        if (unsetenv(LSW_ROOT_INIT_ENV))
+        {
+            LOG_ERROR("unsetenv failed {}", errno);
+        }
+
+        return LswEntryPoint(Argc, Argv);
+    }
 
     if (getpid() != 1 || !getenv(WSL_ROOT_INIT_ENV))
     {

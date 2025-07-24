@@ -1,0 +1,14 @@
+LIBRARY lswclient
+
+EXPORTS
+    WslGetVersion
+    WslCreateVirtualMachine
+    WslAttachDisk
+    WslMount
+    WslCreateLinuxProcess
+    WslWaitForLinuxProcess
+    WslSignalLinuxProcess
+    WslReleaseVirtualMachine
+    WslShutdownVirtualMachine
+    WslLaunchInteractiveTerminal
+    WslLaunchDebugShell
