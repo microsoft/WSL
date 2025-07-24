@@ -131,6 +131,27 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8760}">
+                    <RegistryValue Value="ILSWUserSession" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8761}">
+                    <RegistryValue Value="ILSWVirtualMachine" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <RegistryKey Root="HKCR" Key="Interface\{7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE}">
+                    <RegistryValue Value="ITerminationCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}">
                     <RegistryValue Value="PSFactoryBuffer" Type="string" />
                 </RegistryKey>
@@ -152,6 +173,18 @@
                 <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce7e}">
                     <RegistryValue Name="AppId" Value="{370121D2-AA7E-4608-A86D-0BBAB9DA1A60}" Type="string" />
                     <RegistryValue Value="LxssUserSession" Type="string" />
+                </RegistryKey>
+
+                <!-- LSWUserSession -->
+                <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
+                    <RegistryValue Name="AppId" Value="{370121D2-AA7E-4608-A86D-0BBAB9DA1A60}" Type="string" />
+                    <RegistryValue Value="LSWUserSession" Type="string" />
+                </RegistryKey>
+
+                <!-- LSWVirtualMachine -->
+                <RegistryKey Root="HKCR" Key="CLSID\{0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30}">
+                    <RegistryValue Name="AppId" Value="{370121D2-AA7E-4608-A86D-0BBAB9DA1A60}" Type="string" />
+                    <RegistryValue Value="LSWVirtualMachine" Type="string" />
                 </RegistryKey>
 
                 <!-- Notification server -->

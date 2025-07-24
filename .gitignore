@@ -43,7 +43,7 @@ bin/
 *.nupkg
 build/
 generated/
-Microsoft.WSL.PluginApi.nuspec
+*.nuspec
 test/linux/unit_tests/wsl_unit_tests
 *.dir/
 UserConfig.cmake

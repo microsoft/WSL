@@ -1663,6 +1663,19 @@ Return Value:
     return 0;
 }
 
+int UtilMountFile(const char* Source, const char* Destination)
+try
+{
+    wil::unique_fd Fd{open(Destination, (O_CREAT | O_WRONLY), 0755)};
+    THROW_LAST_ERROR_IF(!Fd);
+
+    THROW_LAST_ERROR_IF(mount(Source, Destination, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);
+    THROW_LAST_ERROR_IF(mount(nullptr, Destination, nullptr, (MS_RDONLY | MS_REMOUNT | MS_BIND), nullptr) < 0);
+
+    return 0;
+}
+CATCH_RETURN_ERRNO();
+
 int UtilMount(const char* Source, const char* Target, const char* Type, unsigned long MountFlags, const char* Options, std::optional<std::chrono::seconds> TimeoutSeconds)
 
 /*++

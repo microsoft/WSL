@@ -18,6 +18,7 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "LxssIpTables.h"
 #include "LxssUserSessionFactory.h"
+#include "LSWUserSessionFactory.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -30,6 +31,7 @@ wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
+CoCreatableClassWrlCreatorMapInclude(LSWUserSession);
 
 struct WslServiceSecurityPolicy
 {

@@ -331,6 +331,7 @@ void GnsEngine::ProcessDNSChange(Interface& interface, const wsl::shared::hns::D
         content.str().c_str(),
         interface.Name().c_str());
 
+    THROW_LAST_ERROR_IF(UtilMkdirPath("/etc", 0755) < 0);
     std::wofstream resolvConf;
     resolvConf.exceptions(std::ofstream::badbit | std::ofstream::failbit);
     resolvConf.open("/etc/resolv.conf", std::ofstream::trunc);

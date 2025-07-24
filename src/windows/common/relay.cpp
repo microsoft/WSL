@@ -108,7 +108,7 @@ wsl::windows::common::relay::InterruptableRead(
             return 0;
         }
 
-        THROW_LAST_ERROR_IF(lastError != ERROR_IO_PENDING);
+        THROW_LAST_ERROR_IF_MSG(lastError != ERROR_IO_PENDING, "Handle: 0x%p", (void*)InputHandle);
 
         auto cancelRead = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
             CancelIoEx(InputHandle, Overlapped);
