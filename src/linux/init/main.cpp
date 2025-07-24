@@ -3802,7 +3802,7 @@ Routine Description:
 
 Arguments:
 
-    Pth - Supplies the path to the block device.
+    Path - Supplies the path to the block device.
 
 Return Value:
 
