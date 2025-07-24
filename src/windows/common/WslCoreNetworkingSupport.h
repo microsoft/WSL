@@ -545,7 +545,7 @@ private:
                 &BufferSize);
         } while (Result == ERROR_BUFFER_OVERFLOW);
 
-        THROW_LAST_ERROR_IF_MSG((Result != ERROR_SUCCESS), "GetAdpatersAddresses");
+        THROW_LAST_ERROR_IF_MSG((Result != ERROR_SUCCESS), "GetAdaptersAddresses");
         m_buffer.resize(BufferSize);
         auto AddressBuffer = (PIP_ADAPTER_ADDRESSES)m_buffer.data();
         std::vector<IpAdapterAddress> addresses;
