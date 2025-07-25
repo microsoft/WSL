@@ -29,8 +29,8 @@ Abstract:
 
 #define WAITPID_DEFAULT_WAIT_TIMEOUT_US 100000
 #define WAITPID_DEFAULT_WAIT_COUNT 20
-#define WAIDPID_THREADGROUP_LEADER_UID 1044
-#define WAIDPID_PTHREAD_UID 1055
+#define WAITPID_THREADGROUP_LEADER_UID 1044
+#define WAITPID_PTHREAD_UID 1055
 
 bool g_VmMode = false;
 
@@ -719,7 +719,7 @@ Return Value:
 
     int Result;
     LxtLogInfo("WaitPid child tid %d", gettid());
-    LxtCheckErrno(LxtSetUid(WAIDPID_PTHREAD_UID));
+    LxtCheckErrno(LxtSetUid(WAITPID_PTHREAD_UID));
 
     //
     // Enter a very long sleep, this will be interrupted when the threadgroup
@@ -785,7 +785,7 @@ Return Value:
         //
 
         sleep(1);
-        LxtCheckErrno(LxtSetUid(WAIDPID_THREADGROUP_LEADER_UID));
+        LxtCheckErrno(LxtSetUid(WAITPID_THREADGROUP_LEADER_UID));
         _exit(ExpectedStatus);
     }
 
@@ -794,7 +794,7 @@ Return Value:
     LxtCheckEqual(SigInfo.si_code, CLD_EXITED, "%d");
     LxtCheckEqual(SigInfo.si_status, ExpectedStatus, "%d");
     LxtCheckEqual(SigInfo.si_pid, ChildPid, "%d");
-    LxtCheckEqual(SigInfo.si_uid, WAIDPID_THREADGROUP_LEADER_UID, "%d");
+    LxtCheckEqual(SigInfo.si_uid, WAITPID_THREADGROUP_LEADER_UID, "%d");
 
     //
     // Wait for a specific child.
