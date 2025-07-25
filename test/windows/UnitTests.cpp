@@ -2608,7 +2608,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     {
         WSL2_TEST_ONLY();
 
-        // Get the kernel version and stip off everything after the first dash.
+        // Get the kernel version and strip off everything after the first dash.
         std::wstring kernelVersion{TEXT(KERNEL_VERSION)};
         auto position = kernelVersion.find_first_of(L"-");
         if (position != kernelVersion.npos)
