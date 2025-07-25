@@ -1006,7 +1006,7 @@ Return Value:
     ChildPid = -1;
 
     //
-    // Create a child process, that in turn creates a granchild process
+    // Create a child process, that in turn creates a grandchild process
     // with CLONE_PARENT.
     //
 
