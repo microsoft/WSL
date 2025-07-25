@@ -3585,10 +3585,10 @@ localhostForwarding=true
         validateUidChange(L"testuser", Uid, L"The operation completed successfully. \r\n", L"", 0);
         validateUidChange(L"root", 0, L"The operation completed successfully. \r\n", L"", 0);
 
-        const std::wstring invalidUser = L"DoesntExist";
+        const std::wstring invalidUser = L"Nonexistent";
         validateUidChange(invalidUser, 0, L"", L"/usr/bin/id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
 
-        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage doesntexist --set-default-user root", -1);
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
         VERIFY_ARE_EQUAL(
             out, L"There is no distribution with the supplied name.\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_FOUND\r\n");
@@ -5203,7 +5203,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "{}",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "file://doesnotexist",
+                    "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
             }},
@@ -5211,7 +5211,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "dummy",
                 "FriendlyName": "dummy",
                 "Amd64Url": {{
-                    "Url": "file://doesnotexist",
+                    "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
             }}
