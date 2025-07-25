@@ -72,7 +72,7 @@ int GetPtSerialNumFromDeviceString(const char PtsNameString[])
 
 Routine Description:
 
-    This routine will parse the PTS (Psedu Terminal Slave) device name and
+    This routine will parse the PTS (Pseudo Terminal Slave) device name and
     retrieve the Serial Number from the string.
 
 Arguments:

@@ -484,7 +484,7 @@ public:
     HRESULT AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags);
 
     /// <summary>
-    /// Detach a passthrough a disk from the utility VM.
+    /// Detach a passthrough disk from the utility VM.
     /// </summary>
     HRESULT DetachDisk(_In_ LPCWSTR Disk, _Out_ int* Result, _Out_ int* Step);
 

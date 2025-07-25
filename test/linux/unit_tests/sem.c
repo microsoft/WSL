@@ -181,7 +181,7 @@ int SemCtlSyscall(PLXT_ARGS Args)
 
     //
     // Ensure that each semaphore's value has been updated. Interestingly the
-    // lastpid value is not updated by the SETALL command.
+    // last pid value is not updated by the SETALL command.
     //
 
     LxtCheckErrno(LxtSemCtl(Id, 0, SETALL, &Values));

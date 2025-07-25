@@ -68,7 +68,7 @@ The script will output the path of the log file once done.
 
 ### Collect WSL logs (recommended method)
 
-If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue.
+If you choose to email these logs instead of attaching them to the bug, please send them to wsl-gh-logs@microsoft.com with the GitHub issue number in the subject, and include a link to your GitHub issue comment in the message body.
 
 To collect WSL logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an administrative powershell prompt:
 

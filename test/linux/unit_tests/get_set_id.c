@@ -1027,7 +1027,7 @@ Return Value:
     LxtCheckErrnoZeroSuccess(connect(ClientSocket, (struct sockaddr*)&Address, sizeof(Address)));
 
     //
-    // Tell the parent the process is running inside the execve'd binary.
+    // Tell the parent that the process is running inside the execve'd binary.
     //
 
     LxtCheckResult(LxtSendMessage(ClientSocket, "execve"));
@@ -1106,7 +1106,7 @@ Return Value:
         LxtCheckEqual(Sid, getpgid(0), "%d");
 
         //
-        // Tell the parent the new session was created.
+        // Tell the parent that a new session was created.
         //
 
         LxtCheckErrnoZeroSuccess(kill(getppid(), SIGUSR1));

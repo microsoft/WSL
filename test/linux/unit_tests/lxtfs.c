@@ -3403,7 +3403,7 @@ Return Value:
 
     //
     // When using the current time, there is a slight chance of this test
-    // failing when the time the file was set to and the time when the check
+    // failing when the time set for the file and the time when the check
     // is done straddle midnight.
     //
 

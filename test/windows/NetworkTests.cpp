@@ -2680,7 +2680,7 @@ class NetworkTests
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
-        // We list the IPv4 addresses mirrored in Linux and use in the test the first one we find
+        // We list the IPv4 addresses mirrored in Linux and use the first one we find in the test
         std::vector<InterfaceState> interfaceStates = GetAllInterfaceStates();
         std::wstring ipAddress;
 
@@ -2760,7 +2760,7 @@ class NetworkTests
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
-        // We list the IPv4 addresses mirrored in Linux and use in the test the first one we find
+        // We list the IPv4 addresses mirrored in Linux and use the first one we find in the test
         std::vector<InterfaceState> interfaceStates = GetAllInterfaceStates();
         std::wstring ipAddress;
 
@@ -3650,7 +3650,7 @@ class NetworkTests
         return std::find(v6State.Routes.begin(), v6State.Routes.end(), route) != v6State.Routes.end();
     }
 
-    // Reads from the file until the substring is found, a timeout is reached or ReadFile returns an error
+    // Reads from the file until the substring is found, a timeout is reached, or ReadFile returns an error
     // Returns true on success, false otherwise
     static bool FindSubstring(wil::unique_handle& file, const std::string& substr, std::string& output)
     {

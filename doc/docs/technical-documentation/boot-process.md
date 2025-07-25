@@ -82,7 +82,7 @@ When started, the virtual machine will boot into the provided kernel, and then e
 
 - An entropy buffer, to seed the virtual machine's entropy
 - Information about the GPU drivers shares to mount, if any
-- Wether [wslg](https://github.com/microsoft/wslg) is enabled
+- Whether [wslg](https://github.com/microsoft/wslg) is enabled
 
 After applying all the configuration requested by [wslservice.exe](wslservice.exe.md), the virtual machine is ready to start Linux distributions.
 

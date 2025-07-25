@@ -227,7 +227,7 @@ class UnitTests
         CreateUser(LXSST_TEST_USERNAME, &TestUid, &TestGid);
         auto userCleanup = wil::scope_exit([]() { LxsstuLaunchWsl(L"userdel " LXSST_TEST_USERNAME); });
 
-        auto validateUserSesssion = [&]() {
+        auto validateUserSession = [&]() {
             // verify that the user service is running
             const std::wstring isServiceActiveCmd =
                 std::format(L"-u {} systemctl is-active user@{}.service ; exit 0", LXSST_TEST_USERNAME, TestUid);
@@ -260,7 +260,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps disabled.
         {
-            validateUserSesssion();
+            validateUserSession();
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L"\n");
@@ -270,7 +270,7 @@ class UnitTests
         {
             WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
 
-            validateUserSesssion();
+            validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L":0\n");
         }
@@ -2608,7 +2608,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     {
         WSL2_TEST_ONLY();
 
-        // Get the kernel version and stip off everything after the first dash.
+        // Get the kernel version and strip off everything after the first dash.
         std::wstring kernelVersion{TEXT(KERNEL_VERSION)};
         auto position = kernelVersion.find_first_of(L"-");
         if (position != kernelVersion.npos)
@@ -3585,10 +3585,10 @@ localhostForwarding=true
         validateUidChange(L"testuser", Uid, L"The operation completed successfully. \r\n", L"", 0);
         validateUidChange(L"root", 0, L"The operation completed successfully. \r\n", L"", 0);
 
-        const std::wstring invalidUser = L"DoesntExist";
+        const std::wstring invalidUser = L"Nonexistent";
         validateUidChange(invalidUser, 0, L"", L"/usr/bin/id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
 
-        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage doesntexist --set-default-user root", -1);
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
         VERIFY_ARE_EQUAL(
             out, L"There is no distribution with the supplied name.\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_FOUND\r\n");
@@ -5203,7 +5203,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "{}",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "file://doesnotexist",
+                    "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
             }},
@@ -5211,7 +5211,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "dummy",
                 "FriendlyName": "dummy",
                 "Amd64Url": {{
-                    "Url": "file://doesnotexist",
+                    "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
             }}

@@ -320,7 +320,7 @@ int SetGetAffinityNp(PLXT_ARGS Args)
 
     //
     // N.B Affinity cannot be validated because its not guaranteed for it to
-    //     take affect.
+    //     take effect.
     //
 
     LxtLogInfo("Current Affinity: %08x", *(uint32_t*)&Set);
