@@ -155,6 +155,13 @@ struct WaitResult
     int32_t Code; // Signal number or exit code
 };
 
+struct PortMappingSettings
+{
+    short WindowsPort;
+    short LinuxPort;
+    int AddressFamily;
+};
+
 HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process);
 
 HRESULT WslWaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WaitResult* Result);
@@ -166,6 +173,8 @@ HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64
 void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine);
 
 HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process); // Used for development, might remove
+
+HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
 
 #ifdef __cplusplus
 }

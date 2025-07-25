@@ -483,12 +483,12 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
     }
 }
 
-std::optional<LSW_MAP_PORT> ReceiveServiceMessage(HANDLE Channel)
+std::optional<LSW_MAP_PORT> ReceiveServiceMessage()
 {
     LSW_MAP_PORT message{};
 
     DWORD bytesRead{};
-    if (!ReadFile(Channel, &message, sizeof(message), &bytesRead, nullptr))
+    if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), &message, sizeof(message), &bytesRead, nullptr))
     {
         LOG_LAST_ERROR();
         return {};
@@ -503,7 +503,7 @@ std::optional<LSW_MAP_PORT> ReceiveServiceMessage(HANDLE Channel)
     return message;
 }
 
-void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(HANDLE ServiceChannel, const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
+void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
 {
     std::map<std::tuple<uint16_t, uint16_t, uint32_t>, std::shared_ptr<PortRelay>> ports;
 
@@ -525,13 +525,24 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(HANDLE ServiceChannel, 
     while (true)
     {
         // Receive a message
-        auto message = ReceiveServiceMessage(ServiceChannel);
+        auto message = ReceiveServiceMessage();
+        if (!message.has_value())
+        {
+            return;
+        }
 
         std::tuple<uint16_t, uint16_t, uint16_t> key{message->WindowsPort, message->LinuxPort, message->AddressFamily};
 
         HRESULT result = E_UNEXPECTED;
         auto sendResponse = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            THROW_LAST_ERROR_IF(!WriteFile(ServiceChannel, &result, sizeof(result), nullptr, nullptr));
+            WSL_LOG(
+                "PortMapping",
+                TraceLoggingValue(result, "Result"),
+                TraceLoggingValue(message->WindowsPort, "WindowsPort"),
+                TraceLoggingValue(message->LinuxPort, "LinuxPort"),
+                TraceLoggingValue(message->Stop, "Remove"));
+
+            THROW_LAST_ERROR_IF(!WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), &result, sizeof(result), nullptr, nullptr));
         });
 
         // Check if the binding is valid.
@@ -555,6 +566,7 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(HANDLE ServiceChannel, 
             if (it != ports.end())
             {
                 result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+                continue;
             }
             else
             {
@@ -586,5 +598,7 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(HANDLE ServiceChannel, 
                 CATCH_LOG();
             });
         }
+
+        result = S_OK;
     }
 }

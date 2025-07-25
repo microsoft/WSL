@@ -37,6 +37,7 @@ public:
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
     IFACEMETHOD(RegisterCallback(_In_ ITerminationCallback* callback)) override;
     IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
+    IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
 
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
@@ -75,9 +76,11 @@ private:
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
     wsl::shared::SocketChannel m_initChannel;
-    wil::unique_handle m_portRelayChannel;
+    wil::unique_handle m_portRelayChannelRead;
+    wil::unique_handle m_portRelayChannelWrite;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::mutex m_lock;
+    std::mutex m_portRelaylock;
 };
 } // namespace wsl::windows::service::lsw

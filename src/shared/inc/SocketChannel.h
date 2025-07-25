@@ -149,6 +149,13 @@ public:
     }
 
     template <typename TMessage>
+    void SendMessage()
+    {
+        TMessage message;
+        SendMessage(message);
+    }
+
+    template <typename TMessage>
     void SendMessage(TMessage& message)
     {
         // Catch situations where the other SendMessage() method should be used

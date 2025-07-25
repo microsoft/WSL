@@ -60,6 +60,8 @@ try
     WslTraceLoggingInitialize(LxssTelemetryProvider, disableTelemetry);
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslTraceLoggingUninitialize(); });
 
+    WSL_LOG("WslRelayStarting");
+
     // Perform the requested operation.
     switch (mode)
     {
@@ -100,7 +102,18 @@ try
 
     case wslrelay::RelayMode::WSLAPortRelay:
     {
-        wsl::windows::wslrelay::localhost::RunWSLAPortRelay(handle.get(), vmId, port, exitEvent.get());
+        WSL_LOG("PortRelayStarting");
+        try
+        {
+            wsl::windows::wslrelay::localhost::RunWSLAPortRelay(vmId, port, exitEvent.get());
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+
+        WSL_LOG("PortRelayExiting");
+
         break;
     }
 

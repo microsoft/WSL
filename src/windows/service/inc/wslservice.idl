@@ -457,7 +457,7 @@ interface ILSWVirtualMachine : IUnknown
     HRESULT Shutdown([in] ULONGLONG TimeoutMs);
     HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
     HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
-    HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+    HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
 }
 
 typedef

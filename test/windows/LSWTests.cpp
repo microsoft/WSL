@@ -405,4 +405,20 @@ class LSWTests
         // Verify that /etc/resolv.conf is configured
         VERIFY_ARE_EQUAL(RunCommand(vm, {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
     }
+
+    TEST_METHOD(NATPortMapping)
+    {
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = NetworkingModeNAT;
+
+        auto vm = CreateVm(&settings);
+
+        // Map port
+        PortMappingSettings port{1234, 80, AF_INET};
+        VERIFY_SUCCEEDED(WslMapPort(vm, &port));
+    }
 };

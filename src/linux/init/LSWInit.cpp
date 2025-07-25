@@ -364,6 +364,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_PORT_RELAY
 
     Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
 
+    UtilSetThreadName("PortRelay");
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
@@ -460,7 +461,8 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY>(Channel, Type, Buffer);
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY>(
+            Channel, Type, Buffer);
     }
     catch (...)
     {

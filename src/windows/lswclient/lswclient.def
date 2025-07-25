@@ -12,3 +12,4 @@ EXPORTS
     WslShutdownVirtualMachine
     WslLaunchInteractiveTerminal
     WslLaunchDebugShell
+    WslMapPort
