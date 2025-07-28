@@ -13,3 +13,4 @@ EXPORTS
     WslLaunchInteractiveTerminal
     WslLaunchDebugShell
     WslMapPort
+    WslUnmapPort

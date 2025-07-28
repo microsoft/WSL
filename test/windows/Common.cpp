@@ -2539,3 +2539,33 @@ void DistroFileChange::Delete()
 {
     VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root rm -f '{}'", m_path).c_str()), 0L);
 }
+
+std::string ReadToString(SOCKET Handle)
+{
+    std::string output;
+    DWORD index = 0;
+    while (true) // TODO: timeout
+    {
+        constexpr auto bufferSize = 512;
+
+        output.resize(output.size() + bufferSize);
+        int bytesRead = 0;
+
+        if ((bytesRead = recv(Handle, &output[index], bufferSize, 0)) < 0)
+        {
+            LogError("ReadFile failed with %lu", GetLastError());
+            VERIFY_FAIL();
+        }
+
+        if (bytesRead == 0)
+        {
+            output.resize(index);
+            break;
+        }
+
+        output.resize(index + bytesRead);
+        index += bytesRead;
+    }
+
+    return output;
+}

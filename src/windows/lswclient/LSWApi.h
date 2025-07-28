@@ -176,6 +176,8 @@ HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Proc
 
 HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
 
+HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
+
 #ifdef __cplusplus
 }
 #endif

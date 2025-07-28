@@ -462,8 +462,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork
 
     auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmExitEvent.get(), m_settings.BootTimeoutMs);
 
-    // TODO: pid in channel name
-    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), "ForkedChannel"});
+    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid)});
 }
 
 wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
@@ -685,14 +684,16 @@ void LSWVirtualMachine::LaunchPortRelay()
     auto path = wsl::windows::common::wslutil::GetBasePath() / L"wslrelay.exe";
 
     auto cmd = std::format(
-        L"\"{}\" {} {} {} {} {} {}",
+        L"\"{}\" {} {} {} {} {} {} {} {}",
         path,
         wslrelay::mode_option,
         static_cast<int>(wslrelay::RelayMode::WSLAPortRelay),
         wslrelay::exit_event_option,
         HandleToUlong(m_vmExitEvent.get()),
         wslrelay::port_option,
-        relayPort.Result);
+        relayPort.Result,
+        wslrelay::vm_id_option,
+        m_vmId);
 
     WSL_LOG("LaunchWslRelay", TraceLoggingValue(cmd.c_str(), "cmd"));
 

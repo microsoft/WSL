@@ -40,7 +40,7 @@ try
     wil::unique_handle exitEvent{};
     wil::unique_handle terminalInputHandle{};
     wil::unique_handle terminalOutputHandle{};
-    int port{};
+    uint32_t port{};
     GUID vmId{};
     bool disableTelemetry = !wsl::shared::OfficialBuild;
 

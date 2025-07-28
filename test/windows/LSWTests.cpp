@@ -23,11 +23,18 @@ class LSWTests
     WSL_TEST_CLASS(LSWTests)
     wil::unique_couninitialize_call coinit = wil::CoInitializeEx();
     WSADATA Data;
+    std::filesystem::path testVhd;
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
 
+        auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
+
+        auto vhdPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath");
+        testVhd = std::filesystem::path{vhdPath} / "ext4.vhdx";
+
+        WslShutdown();
         return true;
     }
 
@@ -48,7 +55,8 @@ class LSWTests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
-    int RunCommand(LSWVirtualMachineHandle vm, const std::vector<const char*>& command)
+    std::tuple<int, wil::unique_handle, wil::unique_handle, wil::unique_handle> LaunchCommand(
+        LSWVirtualMachineHandle vm, const std::vector<const char*>& command)
     {
         auto copiedCommand = command;
         if (copiedCommand.back() != nullptr)
@@ -70,8 +78,16 @@ class LSWTests
         int pid = -1;
         VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
 
+        return std::make_tuple(
+            pid, wil::unique_handle{fds[0].Handle}, wil::unique_handle(fds[1].Handle), wil::unique_handle{fds[2].Handle});
+    }
+
+    int RunCommand(LSWVirtualMachineHandle vm, const std::vector<const char*>& command, int timeout = 600000)
+    {
+        auto [pid, _, __, ___] = LaunchCommand(vm, command);
+
         WaitResult result{};
-        VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
+        VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, timeout, &result));
         VERIFY_ARE_EQUAL(result.State, ProcessStateExited);
         return result.Code;
     }
@@ -81,15 +97,7 @@ class LSWTests
         LSWVirtualMachineHandle vm{};
         VERIFY_SUCCEEDED(WslCreateVirtualMachine(settings, (LSWVirtualMachineHandle*)&vm));
 
-#ifdef WSL_SYSTEM_DISTRO_PATH
-
-        std::wstring systemdDistroDiskPath = TEXT(WSL_SYSTEM_DISTRO_PATH);
-#else
-
-        auto systemdDistroDiskPath = std::format(L"{}/system.vhd", wsl::windows::common::wslutil::GetMsiPackagePath().value());
-#endif
-
-        DiskAttachSettings attachSettings{systemdDistroDiskPath.c_str(), true};
+        DiskAttachSettings attachSettings{testVhd.c_str(), true};
         AttachedDiskInformation attachedDisk;
 
         VERIFY_SUCCEEDED(WslAttachDisk(vm, &attachSettings, &attachedDisk));
@@ -417,8 +425,115 @@ class LSWTests
 
         auto vm = CreateVm(&settings);
 
-        // Map port
-        PortMappingSettings port{1234, 80, AF_INET};
-        VERIFY_SUCCEEDED(WslMapPort(vm, &port));
+        // Install netcat
+        //  VERIFY_ARE_EQUAL(RunCommand(vm, {"/usr/bin/tdnf", "install", "nc", "-y"}), 0);
+
+        auto listen = [&](short port, const char* content) {
+            auto cmd = std::format("echo -n '{}' | nc -l -p {} -v", content, port);
+            auto [pid, in, out, err] = LaunchCommand(vm, {"/bin/bash", "-c", cmd.c_str()});
+
+            auto expected = std::format("Listening on 0.0.0.0:{}", port);
+            std::string output;
+            DWORD index = 0;
+            while (true) // TODO: timeout
+            {
+                constexpr auto bufferSize = 100;
+
+                output.resize(output.size() + bufferSize);
+                DWORD bytesRead = 0;
+                if (!ReadFile(err.get(), &output[index], bufferSize, &bytesRead, nullptr))
+                {
+                    LogError("ReadFile failed with %lu", GetLastError());
+                    VERIFY_FAIL();
+                }
+
+                if (bytesRead == 0)
+                {
+                    LogError("Process exited");
+                    VERIFY_FAIL();
+                }
+
+                output.resize(index + bytesRead);
+                index += bytesRead;
+                if (output.find(expected) != std::string::npos)
+                {
+                    break;
+                }
+            }
+
+            return pid;
+        };
+
+        auto connectAndRead = [&](short port, int family) -> std::string {
+            SOCKADDR_INET addr{};
+            addr.si_family = family;
+            INETADDR_SETLOOPBACK((PSOCKADDR)&addr);
+            SS_PORT(&addr) = htons(port);
+
+            wil::unique_socket hostSocket{socket(family, SOCK_STREAM, IPPROTO_TCP)};
+            THROW_LAST_ERROR_IF(!hostSocket);
+            THROW_LAST_ERROR_IF(connect(hostSocket.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+
+            return ReadToString(hostSocket.get());
+        };
+
+        auto expectContent = [&](short port, int family, const char* expected) {
+            auto content = connectAndRead(port, family);
+            VERIFY_ARE_EQUAL(content, expected);
+        };
+
+        auto expectNotBound = [&](short port, int family) {
+            auto result = wil::ResultFromException([&]() { connectAndRead(port, family); });
+
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WSAECONNREFUSED));
+        };
+
+        {
+            // Map port
+            PortMappingSettings port{1234, 80, AF_INET};
+            VERIFY_SUCCEEDED(WslMapPort(vm, &port));
+
+            // Check simple case
+            listen(80, "port80");
+            expectContent(1234, AF_INET, "port80");
+
+            // Validate that same port mapping can be reused
+            listen(80, "port80");
+            expectContent(1234, AF_INET, "port80");
+
+            // Validate that the connection is immediately reset if the port is not bound on the linux side
+            expectContent(1234, AF_INET, "");
+
+            // Add a ipv6 binding
+            PortMappingSettings portv6{1234, 80, AF_INET6};
+            VERIFY_SUCCEEDED(WslMapPort(vm, &portv6));
+
+            // Validate that ipv6 bindings work as well.
+            listen(80, "port80ipv6");
+            expectContent(1234, AF_INET6, "port80ipv6");
+
+            // Unmap the ipv4 port
+            VERIFY_SUCCEEDED(WslUnmapPort(vm, &port));
+            expectNotBound(1234, AF_INET);
+
+            // Verify that a proper error is returned if the mapping doesn't exist
+            VERIFY_ARE_EQUAL(WslUnmapPort(vm, &port), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            // Unmap the v6 port
+            VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6));
+            expectNotBound(1234, AF_INET6);
+
+            // Map another port as v6 only
+            PortMappingSettings portv6Only{1235, 81, AF_INET6};
+            VERIFY_SUCCEEDED(WslMapPort(vm, &portv6Only));
+
+            listen(81, "port81ipv6");
+            expectContent(1235, AF_INET6, "port81ipv6");
+            expectNotBound(1235, AF_INET);
+
+            VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6Only));
+            VERIFY_ARE_EQUAL(WslUnmapPort(vm, &portv6Only), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            expectNotBound(1235, AF_INET6);
+        }
     }
 };

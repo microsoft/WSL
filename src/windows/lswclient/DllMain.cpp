@@ -209,10 +209,16 @@ void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine)
     reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Release();
 }
 
-HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* UserSettings)
+HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const PortMappingSettings* UserSettings)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
         ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, false);
+}
+
+HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const PortMappingSettings* UserSettings)
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+        ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, true);
 }
 
 HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process)
