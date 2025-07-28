@@ -211,7 +211,7 @@ try
 }
 CATCH_RETURN()
 
-std::vector<std::wstring> WslInstall::CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent)
+std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent)
 {
     // Include the WSL optional component if it was requested, or if the OS is not Windows 11 or later.
     std::vector<std::wstring> missingComponents;
@@ -226,6 +226,9 @@ std::vector<std::wstring> WslInstall::CheckForMissingOptionalComponents(_In_ boo
         missingComponents.emplace_back(c_optionalFeatureNameVmp);
     }
 
+    // If any components are no present, a reboot is required.
+    bool rebootRequired = !missingComponents.empty();
+
     // Query the list of optional components that have already been installed.
     const auto installedComponents = GetInstalledOptionalComponents();
     for (const auto& component : installedComponents)
@@ -233,7 +236,7 @@ std::vector<std::wstring> WslInstall::CheckForMissingOptionalComponents(_In_ boo
         std::erase(missingComponents, component);
     }
 
-    return missingComponents;
+    return {rebootRequired, std::move(missingComponents)};
 }
 
 void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& components)
