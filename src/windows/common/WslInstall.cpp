@@ -226,7 +226,7 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
         missingComponents.emplace_back(c_optionalFeatureNameVmp);
     }
 
-    // If any components are no present, a reboot is required.
+    // If any required components are not present, a reboot is required.
     bool rebootRequired = !missingComponents.empty();
 
     // Query the list of optional components that have already been installed.
