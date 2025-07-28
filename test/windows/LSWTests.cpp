@@ -425,14 +425,11 @@ class LSWTests
 
         auto vm = CreateVm(&settings);
 
-        // Install netcat
-        //  VERIFY_ARE_EQUAL(RunCommand(vm, {"/usr/bin/tdnf", "install", "nc", "-y"}), 0);
-
-        auto listen = [&](short port, const char* content) {
-            auto cmd = std::format("echo -n '{}' | nc -l -p {} -v", content, port);
+        auto listen = [&](short port, const char* content, bool ipv6) {
+            auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
             auto [pid, in, out, err] = LaunchCommand(vm, {"/bin/bash", "-c", cmd.c_str()});
 
-            auto expected = std::format("Listening on 0.0.0.0:{}", port);
+            constexpr auto expected = "listening on";
             std::string output;
             DWORD index = 0;
             while (true) // TODO: timeout
@@ -447,13 +444,14 @@ class LSWTests
                     VERIFY_FAIL();
                 }
 
+                output.resize(index + bytesRead);
+
                 if (bytesRead == 0)
                 {
-                    LogError("Process exited");
+                    LogError("Process exited, output: %hs", output.c_str());
                     VERIFY_FAIL();
                 }
 
-                output.resize(index + bytesRead);
                 index += bytesRead;
                 if (output.find(expected) != std::string::npos)
                 {
@@ -494,11 +492,11 @@ class LSWTests
             VERIFY_SUCCEEDED(WslMapPort(vm, &port));
 
             // Check simple case
-            listen(80, "port80");
+            listen(80, "port80", false);
             expectContent(1234, AF_INET, "port80");
 
             // Validate that same port mapping can be reused
-            listen(80, "port80");
+            listen(80, "port80", false);
             expectContent(1234, AF_INET, "port80");
 
             // Validate that the connection is immediately reset if the port is not bound on the linux side
@@ -509,7 +507,7 @@ class LSWTests
             VERIFY_SUCCEEDED(WslMapPort(vm, &portv6));
 
             // Validate that ipv6 bindings work as well.
-            listen(80, "port80ipv6");
+            listen(80, "port80ipv6", true);
             expectContent(1234, AF_INET6, "port80ipv6");
 
             // Unmap the ipv4 port
@@ -527,7 +525,7 @@ class LSWTests
             PortMappingSettings portv6Only{1235, 81, AF_INET6};
             VERIFY_SUCCEEDED(WslMapPort(vm, &portv6Only));
 
-            listen(81, "port81ipv6");
+            listen(81, "port81ipv6", true);
             expectContent(1235, AF_INET6, "port81ipv6");
             expectNotBound(1235, AF_INET);
 

@@ -213,7 +213,12 @@ public:
 #ifdef WIN32
             if (errno == HCS_E_CONNECTION_TIMEOUT)
             {
-                THROW_HR_MSG(HCS_E_CONNECTION_TIMEOUT, "Timeout: %d, expected type: %hs, channel: %hs", timeout, ToString(TMessage::Type), m_name.c_str());
+                THROW_HR_MSG(
+                    HCS_E_CONNECTION_TIMEOUT,
+                    "Timeout: %d, expected type: %hs, channel: %hs",
+                    timeout,
+                    ToString(TMessage::Type),
+                    m_name.c_str());
             }
 #endif
 
@@ -226,7 +231,11 @@ public:
         {
 #ifdef WIN32
             THROW_HR_MSG(
-                E_UNEXPECTED, "Message size is too small: %zd, expected type: %hs, channel: %hs", receivedSpan.size(), ToString(TMessage::Type), m_name.c_str());
+                E_UNEXPECTED,
+                "Message size is too small: %zd, expected type: %hs, channel: %hs",
+                receivedSpan.size(),
+                ToString(TMessage::Type),
+                m_name.c_str());
 #else
             LOG_ERROR("MessageSize is too small: {}, expected type: {}, channel: {}", receivedSpan.size(), ToString(TMessage::Type), m_name);
             THROW_ERRNO(EINVAL);
@@ -237,7 +246,9 @@ public:
 
 #ifdef WIN32
         WSL_LOG(
-            "ReceivedMessage", TraceLoggingValue(m_name.c_str(), "Name"), TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
+            "ReceivedMessage",
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
 #else
         if (LoggingEnabled())
         {

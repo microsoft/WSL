@@ -357,7 +357,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 LOG_ERROR("Connect OK: {}, ", message->Port);
 
-
                 // Resize the buffer to be the requested size.
                 buffer.resize(message->BufferSize);
 
