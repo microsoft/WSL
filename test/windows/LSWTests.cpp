@@ -18,6 +18,8 @@ Abstract:
 
 using namespace wsl::windows::common::registry;
 
+using unique_vm = wil::unique_any<LSWVirtualMachineHandle, decltype(WslReleaseVirtualMachine), &WslReleaseVirtualMachine>;
+
 class LSWTests
 {
     WSL_TEST_CLASS(LSWTests)
@@ -92,30 +94,30 @@ class LSWTests
         return result.Code;
     }
 
-    LSWVirtualMachineHandle CreateVm(const VirtualMachineSettings* settings)
+    unique_vm CreateVm(const VirtualMachineSettings* settings)
     {
-        LSWVirtualMachineHandle vm{};
-        VERIFY_SUCCEEDED(WslCreateVirtualMachine(settings, (LSWVirtualMachineHandle*)&vm));
+        unique_vm vm{};
+        VERIFY_SUCCEEDED(WslCreateVirtualMachine(settings, &vm));
 
         DiskAttachSettings attachSettings{testVhd.c_str(), true};
         AttachedDiskInformation attachedDisk;
 
-        VERIFY_SUCCEEDED(WslAttachDisk(vm, &attachSettings, &attachedDisk));
+        VERIFY_SUCCEEDED(WslAttachDisk(vm.get(), &attachSettings, &attachedDisk));
 
         MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", MountFlagsChroot | MountFlagsWriteableOverlayFs};
-        VERIFY_SUCCEEDED(WslMount(vm, &mountSettings));
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &mountSettings));
 
         MountSettings devmountSettings{nullptr, "/dev", "devtmpfs", "", false};
-        VERIFY_SUCCEEDED(WslMount(vm, &devmountSettings));
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &devmountSettings));
 
         MountSettings sysmountSettings{nullptr, "/sys", "sysfs", "", false};
-        VERIFY_SUCCEEDED(WslMount(vm, &sysmountSettings));
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &sysmountSettings));
 
         MountSettings procmountSettings{nullptr, "/proc", "proc", "", false};
-        VERIFY_SUCCEEDED(WslMount(vm, &procmountSettings));
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &procmountSettings));
 
         MountSettings ptsMountSettings{nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", false};
-        VERIFY_SUCCEEDED(WslMount(vm, &ptsMountSettings));
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &ptsMountSettings));
 
         return vm;
     }
@@ -161,7 +163,7 @@ class LSWTests
         write.reset();
 
         auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            WslReleaseVirtualMachine(vm);
+            vm.reset();
             if (thread.joinable())
             {
                 thread.join();
@@ -169,9 +171,9 @@ class LSWTests
         });
 
         std::vector<const char*> cmd = {"/bin/bash", "-c", "echo DmesgTest > /dev/kmsg"};
-        VERIFY_ARE_EQUAL(RunCommand(vm, cmd), 0);
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 0);
 
-        VERIFY_ARE_EQUAL(WslShutdownVirtualMachine(vm, 30 * 1000), S_OK);
+        VERIFY_ARE_EQUAL(WslShutdownVirtualMachine(vm.get(), 30 * 1000), S_OK);
         detach.reset();
 
         auto contentString = std::string(dmesgContent.begin(), dmesgContent.end());
@@ -202,15 +204,13 @@ class LSWTests
 
         auto vm = CreateVm(&settings);
 
-        VERIFY_SUCCEEDED(WslShutdownVirtualMachine(vm, 30 * 1000));
+        VERIFY_SUCCEEDED(WslShutdownVirtualMachine(vm.get(), 30 * 1000));
 
         auto future = callbackInfo.get_future();
         auto result = future.wait_for(std::chrono::seconds(10));
         auto [reason, details] = future.get();
         VERIFY_ARE_EQUAL(reason, VirtualMachineTerminationReasonShutdown);
         VERIFY_ARE_NOT_EQUAL(details, L"");
-
-        WslReleaseVirtualMachine(vm);
     }
 
     TEST_METHOD(CreateVmSmokeTest)
@@ -241,7 +241,7 @@ class LSWTests
             createProcessSettings.FdCount = 3;
 
             int pid = -1;
-            VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
+            VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid));
 
             LogInfo("pid: %lu", pid);
 
@@ -257,7 +257,7 @@ class LSWTests
             VERIFY_ARE_EQUAL(buffer.data(), std::string("foo\n"));
 
             WaitResult result{};
-            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, 1000, &result));
             VERIFY_ARE_EQUAL(result.State, ProcessStateExited);
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
@@ -279,19 +279,19 @@ class LSWTests
             createProcessSettings.FdCount = 3;
 
             int pid = -1;
-            VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
+            VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid));
 
             // Verify that the process is in a running state
             WaitResult result{};
-            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, 1000, &result));
             VERIFY_ARE_EQUAL(result.State, ProcessStateRunning);
 
             // Verify that it can be killed.
-            VERIFY_SUCCEEDED(WslSignalLinuxProcess(vm, pid, 9));
+            VERIFY_SUCCEEDED(WslSignalLinuxProcess(vm.get(), pid, 9));
 
             // Verify that the process is in a running state
 
-            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, 1000, &result));
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, 1000, &result));
             VERIFY_ARE_EQUAL(result.State, ProcessStateSignaled);
             VERIFY_ARE_EQUAL(result.Code, 9);
         }
@@ -313,14 +313,12 @@ class LSWTests
             createProcessSettings.FdCount = 3;
 
             int pid = -1;
-            VERIFY_ARE_EQUAL(WslCreateLinuxProcess(vm, &createProcessSettings, &pid), E_FAIL);
+            VERIFY_ARE_EQUAL(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid), E_FAIL);
 
             WaitResult result{};
-            VERIFY_ARE_EQUAL(WslWaitForLinuxProcess(vm, 1234, 1000, &result), E_FAIL);
+            VERIFY_ARE_EQUAL(WslWaitForLinuxProcess(vm.get(), 1234, 1000, &result), E_FAIL);
             VERIFY_ARE_EQUAL(result.State, ProcessStateUnknown);
         }
-
-        WslReleaseVirtualMachine(vm);
     }
 
     TEST_METHOD(InteractiveShell)
@@ -350,7 +348,7 @@ class LSWTests
         createProcessSettings.FdCount = static_cast<ULONG>(fds.size());
 
         int pid = -1;
-        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &createProcessSettings, &pid));
+        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid));
 
         auto validateTtyOutput = [&](const std::string& expected) {
             std::string buffer(expected.size(), '\0');
@@ -404,14 +402,14 @@ class LSWTests
         // Validate that eth0 has an ip address
         VERIFY_ARE_EQUAL(
             RunCommand(
-                vm,
+                vm.get(),
                 {"/bin/bash",
                  "-c",
                  "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"}),
             0);
 
         // Verify that /etc/resolv.conf is configured
-        VERIFY_ARE_EQUAL(RunCommand(vm, {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
     }
 
     TEST_METHOD(NATPortMapping)
@@ -458,7 +456,7 @@ class LSWTests
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
-            auto [pid, in, out, err] = LaunchCommand(vm, {"/bin/bash", "-c", cmd.c_str()});
+            auto [pid, in, out, err] = LaunchCommand(vm.get(), {"/bin/bash", "-c", cmd.c_str()});
             waitForOutput(err.get(), "listening on");
 
             return pid;
@@ -490,7 +488,10 @@ class LSWTests
 
         // Map port
         PortMappingSettings port{1234, 80, AF_INET};
-        VERIFY_SUCCEEDED(WslMapPort(vm, &port));
+        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &port));
+
+        // Validate that the same port can't be bound twice
+        VERIFY_ARE_EQUAL(WslMapPort(vm.get(), &port), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Check simple case
         listen(80, "port80", false);
@@ -505,39 +506,40 @@ class LSWTests
 
         // Add a ipv6 binding
         PortMappingSettings portv6{1234, 80, AF_INET6};
-        VERIFY_SUCCEEDED(WslMapPort(vm, &portv6));
+        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &portv6));
 
         // Validate that ipv6 bindings work as well.
         listen(80, "port80ipv6", true);
         expectContent(1234, AF_INET6, "port80ipv6");
 
         // Unmap the ipv4 port
-        VERIFY_SUCCEEDED(WslUnmapPort(vm, &port));
+        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &port));
         expectNotBound(1234, AF_INET);
 
         // Verify that a proper error is returned if the mapping doesn't exist
-        VERIFY_ARE_EQUAL(WslUnmapPort(vm, &port), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(WslUnmapPort(vm.get(), &port), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Unmap the v6 port
-        VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6));
+        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &portv6));
         expectNotBound(1234, AF_INET6);
 
         // Map another port as v6 only
         PortMappingSettings portv6Only{1235, 81, AF_INET6};
-        VERIFY_SUCCEEDED(WslMapPort(vm, &portv6Only));
+        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &portv6Only));
 
         listen(81, "port81ipv6", true);
         expectContent(1235, AF_INET6, "port81ipv6");
         expectNotBound(1235, AF_INET);
 
-        VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6Only));
-        VERIFY_ARE_EQUAL(WslUnmapPort(vm, &portv6Only), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &portv6Only));
+        VERIFY_ARE_EQUAL(WslUnmapPort(vm.get(), &portv6Only), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         expectNotBound(1235, AF_INET6);
 
         // Create a forking relay and stress test
-        VERIFY_SUCCEEDED(WslMapPort(vm, &port));
+        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &port));
 
-        auto [pid, in, out, err] = LaunchCommand(vm, {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"});
+        auto [pid, in, out, err] =
+            LaunchCommand(vm.get(), {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"});
         waitForOutput(err.get(), "listening on");
 
         for (auto i = 0; i < 100; i++)
@@ -545,6 +547,6 @@ class LSWTests
             expectContent(1234, AF_INET, "OK");
         }
 
-        VERIFY_SUCCEEDED(WslUnmapPort(vm, &port));
+        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &port));
     }
 };
