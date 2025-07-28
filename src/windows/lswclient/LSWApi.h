@@ -157,8 +157,8 @@ struct WaitResult
 
 struct PortMappingSettings
 {
-    short WindowsPort;
-    short LinuxPort;
+    uint16_t WindowsPort;
+    uint16_t LinuxPort;
     int AddressFamily;
 };
 

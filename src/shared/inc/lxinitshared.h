@@ -1732,7 +1732,6 @@ struct LSW_MAP_PORT
     uint16_t LinuxPort;
     uint32_t AddressFamily;
     bool Stop;
-    // TODO/ binding address
 
     PRETTY_PRINT(FIELD(Header));
 };
