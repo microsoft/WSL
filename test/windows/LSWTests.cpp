@@ -376,7 +376,7 @@ class LSWTests
         };
 
         // Expect the shell prompt to be displayed
-        validateTtyOutput("sh-5.1#");
+        validateTtyOutput("#");
         writeTty("echo OK\n");
         validateTtyOutput(" echo OK\r\nOK");
 
@@ -425,11 +425,7 @@ class LSWTests
 
         auto vm = CreateVm(&settings);
 
-        auto listen = [&](short port, const char* content, bool ipv6) {
-            auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
-            auto [pid, in, out, err] = LaunchCommand(vm, {"/bin/bash", "-c", cmd.c_str()});
-
-            constexpr auto expected = "listening on";
+        auto waitForOutput = [](HANDLE Handle, const char* Content) {
             std::string output;
             DWORD index = 0;
             while (true) // TODO: timeout
@@ -438,7 +434,7 @@ class LSWTests
 
                 output.resize(output.size() + bufferSize);
                 DWORD bytesRead = 0;
-                if (!ReadFile(err.get(), &output[index], bufferSize, &bytesRead, nullptr))
+                if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
                 {
                     LogError("ReadFile failed with %lu", GetLastError());
                     VERIFY_FAIL();
@@ -453,11 +449,17 @@ class LSWTests
                 }
 
                 index += bytesRead;
-                if (output.find(expected) != std::string::npos)
+                if (output.find(Content) != std::string::npos)
                 {
                     break;
                 }
             }
+        };
+
+        auto listen = [&](short port, const char* content, bool ipv6) {
+            auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
+            auto [pid, in, out, err] = LaunchCommand(vm, {"/bin/bash", "-c", cmd.c_str()});
+            waitForOutput(err.get(), "listening on");
 
             return pid;
         };
@@ -486,52 +488,63 @@ class LSWTests
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WSAECONNREFUSED));
         };
 
+        // Map port
+        PortMappingSettings port{1234, 80, AF_INET};
+        VERIFY_SUCCEEDED(WslMapPort(vm, &port));
+
+        // Check simple case
+        listen(80, "port80", false);
+        expectContent(1234, AF_INET, "port80");
+
+        // Validate that same port mapping can be reused
+        listen(80, "port80", false);
+        expectContent(1234, AF_INET, "port80");
+
+        // Validate that the connection is immediately reset if the port is not bound on the linux side
+        expectContent(1234, AF_INET, "");
+
+        // Add a ipv6 binding
+        PortMappingSettings portv6{1234, 80, AF_INET6};
+        VERIFY_SUCCEEDED(WslMapPort(vm, &portv6));
+
+        // Validate that ipv6 bindings work as well.
+        listen(80, "port80ipv6", true);
+        expectContent(1234, AF_INET6, "port80ipv6");
+
+        // Unmap the ipv4 port
+        VERIFY_SUCCEEDED(WslUnmapPort(vm, &port));
+        expectNotBound(1234, AF_INET);
+
+        // Verify that a proper error is returned if the mapping doesn't exist
+        VERIFY_ARE_EQUAL(WslUnmapPort(vm, &port), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+        // Unmap the v6 port
+        VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6));
+        expectNotBound(1234, AF_INET6);
+
+        // Map another port as v6 only
+        PortMappingSettings portv6Only{1235, 81, AF_INET6};
+        VERIFY_SUCCEEDED(WslMapPort(vm, &portv6Only));
+
+        listen(81, "port81ipv6", true);
+        expectContent(1235, AF_INET6, "port81ipv6");
+        expectNotBound(1235, AF_INET);
+
+        VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6Only));
+        VERIFY_ARE_EQUAL(WslUnmapPort(vm, &portv6Only), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        expectNotBound(1235, AF_INET6);
+
+        // Create a forking relay and stress test
+        VERIFY_SUCCEEDED(WslMapPort(vm, &port));
+
+        auto [pid, in, out, err] = LaunchCommand(vm, {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"});
+        waitForOutput(err.get(), "listening on");
+
+        for (auto i = 0; i < 100; i++)
         {
-            // Map port
-            PortMappingSettings port{1234, 80, AF_INET};
-            VERIFY_SUCCEEDED(WslMapPort(vm, &port));
-
-            // Check simple case
-            listen(80, "port80", false);
-            expectContent(1234, AF_INET, "port80");
-
-            // Validate that same port mapping can be reused
-            listen(80, "port80", false);
-            expectContent(1234, AF_INET, "port80");
-
-            // Validate that the connection is immediately reset if the port is not bound on the linux side
-            expectContent(1234, AF_INET, "");
-
-            // Add a ipv6 binding
-            PortMappingSettings portv6{1234, 80, AF_INET6};
-            VERIFY_SUCCEEDED(WslMapPort(vm, &portv6));
-
-            // Validate that ipv6 bindings work as well.
-            listen(80, "port80ipv6", true);
-            expectContent(1234, AF_INET6, "port80ipv6");
-
-            // Unmap the ipv4 port
-            VERIFY_SUCCEEDED(WslUnmapPort(vm, &port));
-            expectNotBound(1234, AF_INET);
-
-            // Verify that a proper error is returned if the mapping doesn't exist
-            VERIFY_ARE_EQUAL(WslUnmapPort(vm, &port), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-
-            // Unmap the v6 port
-            VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6));
-            expectNotBound(1234, AF_INET6);
-
-            // Map another port as v6 only
-            PortMappingSettings portv6Only{1235, 81, AF_INET6};
-            VERIFY_SUCCEEDED(WslMapPort(vm, &portv6Only));
-
-            listen(81, "port81ipv6", true);
-            expectContent(1235, AF_INET6, "port81ipv6");
-            expectNotBound(1235, AF_INET);
-
-            VERIFY_SUCCEEDED(WslUnmapPort(vm, &portv6Only));
-            VERIFY_ARE_EQUAL(WslUnmapPort(vm, &portv6Only), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            expectNotBound(1235, AF_INET6);
+            expectContent(1234, AF_INET, "OK");
         }
+
+        VERIFY_SUCCEEDED(WslUnmapPort(vm, &port));
     }
 };

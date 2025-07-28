@@ -363,7 +363,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_PORT_RELAY
     THROW_LAST_ERROR_IF(!ListenSocket);
 
     Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
-
+    Channel.Close();
     UtilSetThreadName("PortRelay");
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }

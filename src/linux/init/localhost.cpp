@@ -278,7 +278,6 @@ int ScanProcNetTCP(wsl::shared::SocketChannel& channel)
 
 void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 {
-    LOG_ERROR("Relay starting");
     pollfd pollDescriptors[] = {{listenSocket, POLLIN}};
     for (;;)
     {
@@ -298,8 +297,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
         // Accept a connection and start a relay worker thread.
         wil::unique_fd relaySocket{UtilAcceptVsock(listenSocket, hvSocketAddress)};
         THROW_LAST_ERROR_IF(!relaySocket);
-
-        LOG_ERROR("Accepted socket");
 
         std::thread([relaySocket = std::move(relaySocket)]() {
             try
@@ -323,8 +320,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                 int socketAddressSize;
                 sockaddr_in sockaddrIn{};
                 sockaddr_in6 sockaddrIn6{};
-
-                LOG_ERROR("Accepted socket port: {}, ", message->Port);
 
                 if (message->Family == AF_INET)
                 {
@@ -355,8 +350,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                     return;
                 }
 
-                LOG_ERROR("Connect OK: {}, ", message->Port);
-
                 // Resize the buffer to be the requested size.
                 buffer.resize(message->BufferSize);
 
@@ -366,7 +359,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 for (;;)
                 {
-                    LOG_ERROR("Relaying");
                     if ((pollDescriptors[0].fd == -1) || (pollDescriptors[1].fd == -1))
                     {
                         return;

@@ -378,9 +378,7 @@ struct PortRelay
 
     static void RunRelay(SOCKET WindowsSocket, const GUID& VmId, uint32_t LinuxPort, uint32_t RelayPort, uint32_t Family)
     {
-        WSL_LOG("PreConnect", TraceLoggingValue(VmId, "VmId"), TraceLoggingValue(RelayPort, "Port"));
         wsl::shared::SocketChannel channel(wsl::windows::common::hvsocket::Connect(VmId, RelayPort), "SocketRelay");
-        WSL_LOG("PostConnect");
 
         WI_VERIFY(Family == AF_INET || Family == AF_INET6);
         LX_INIT_START_SOCKET_RELAY message;
@@ -396,15 +394,12 @@ struct PortRelay
     {
         Pending = false;
 
-        WSL_LOG("Accept", TraceLoggingValue(LinuxPort, "LinuxPort"));
         DWORD bytes{};
         DWORD flags{};
-
         if (!WSAGetOverlappedResult(ListenSocket.get(), &Overlapped, &bytes, false, &flags))
         {
             THROW_WIN32(WSAGetLastError());
         }
-        WSL_LOG("AcceptCompleted", TraceLoggingValue(LinuxPort, "LinuxPort"));
     }
 
     bool ScheduleAccept()
@@ -429,10 +424,6 @@ struct PortRelay
 
 std::shared_ptr<PortRelay> CreatePortListener(uint16_t WindowsPort, uint16_t LinuxPort, uint32_t RelayPort, int Family)
 {
-    // Set the SO_REUSEADDR socket option.
-
-    WSL_LOG("CreateListener", TraceLoggingValue(RelayPort, "RelayPort"));
-
     wil::unique_socket ListenSocket(WSASocket(Family, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
 
     THROW_LAST_ERROR_IF(!ListenSocket);
@@ -440,10 +431,10 @@ std::shared_ptr<PortRelay> CreatePortListener(uint16_t WindowsPort, uint16_t Lin
     constexpr BOOLEAN On = true;
     THROW_LAST_ERROR_IF(setsockopt(ListenSocket.get(), SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&On), sizeof(On)) == SOCKET_ERROR);
 
-    sockaddr* Address;
+    sockaddr* Address{};
     sockaddr_in InetAddress{};
     sockaddr_in6 Inet6Address{};
-    DWORD AddressSize;
+    DWORD AddressSize{};
     if (Family == AF_INET)
     {
         InetAddress.sin_family = AF_INET;
@@ -479,7 +470,6 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
             {
                 while (e->ScheduleAccept())
                 {
-                    WSL_LOG("EarlyAcceptCompleted");
                     e->LaunchRelay(VmId); // Start the relay if accept completes immediately.
                 }
             }
