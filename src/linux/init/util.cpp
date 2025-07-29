@@ -1637,7 +1637,7 @@ Return Value:
 int UtilMountFile(const char* Source, const char* Destination)
 try
 {
-    // Is the file is a symlink, since that would break the mount.
+    // Is the file is a symlink, delete it since that would break the mount.
     if (std::filesystem::is_symlink(Destination))
     {
         std::filesystem::remove(Destination);
