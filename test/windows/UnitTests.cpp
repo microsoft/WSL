@@ -2942,19 +2942,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         LxssDynamicFunction<decltype(GetWslConfigSetting)> getWslConfigSetting(libWslDllPath.c_str(), "GetWslConfigSetting");
         LxssDynamicFunction<decltype(SetWslConfigSetting)> setWslConfigSetting(libWslDllPath.c_str(), "SetWslConfigSetting");
 
-        // Delete the test config file. The original has already been saved as part of module setup.
+        // Reset the test config file. The original has already been saved as part of module setup.
         auto wslConfigFilePath = getenv("userprofile") + std::string("\\.wslconfig");
-        if (std::filesystem::exists(wslConfigFilePath))
-        {
-            std::error_code ec{};
-            VERIFY_IS_TRUE(std::filesystem::remove(wslConfigFilePath, ec));
-        }
+        WslConfigChange config{L""};
 
         auto apiWslConfigFilePath = getWslConfigFilePath();
         VERIFY_IS_TRUE(std::filesystem::path(wslConfigFilePath) == std::filesystem::path(apiWslConfigFilePath));
-
-        // Cleanup any leftover config files.
-        auto cleanup = wil::scope_exit([apiWslConfigFilePath] { std::filesystem::remove(apiWslConfigFilePath); });
 
         auto wslConfigDefaults = createWslConfig(nullptr);
         VERIFY_IS_NOT_NULL(wslConfigDefaults);
