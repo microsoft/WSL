@@ -124,6 +124,8 @@ class LSWTests
 
     TEST_METHOD(CustomDmesgOutput)
     {
+        WSL2_TEST_ONLY();
+
         auto [read, write] = CreateSubprocessPipe(false, false);
 
         VirtualMachineSettings settings{};
@@ -184,6 +186,8 @@ class LSWTests
 
     TEST_METHOD(TerminationCallback)
     {
+        WSL2_TEST_ONLY();
+
         std::promise<std::pair<VirtualMachineTerminationReason, std::wstring>> callbackInfo;
 
         auto callback = [](void* context, VirtualMachineTerminationReason reason, LPCWSTR details) -> HRESULT {
@@ -215,6 +219,8 @@ class LSWTests
 
     TEST_METHOD(CreateVmSmokeTest)
     {
+        WSL2_TEST_ONLY();
+
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
@@ -323,6 +329,8 @@ class LSWTests
 
     TEST_METHOD(InteractiveShell)
     {
+        WSL2_TEST_ONLY();
+
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
@@ -390,6 +398,8 @@ class LSWTests
 
     TEST_METHOD(NATNetworking)
     {
+        WSL2_TEST_ONLY();
+
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
@@ -414,6 +424,8 @@ class LSWTests
 
     TEST_METHOD(NATPortMapping)
     {
+        WSL2_TEST_ONLY();
+
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
