@@ -110,7 +110,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &loadKernelModulesPresence),
         ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &loadKernelModulesPresence),
 
-        // Features that were previously experimental (the old header is maintained for compatability).
+        // Features that were previously experimental (the old header is maintained for compatibility).
         ConfigKey({ConfigSetting::NetworkingMode, ConfigSetting::Experimental::NetworkingMode}, wsl::core::NetworkingModes, NetworkingMode, &NetworkingModePresence),
         ConfigKey({ConfigSetting::DnsTunneling, ConfigSetting::Experimental::DnsTunneling}, EnableDnsTunneling, &DnsTunnelingConfigPresence),
         ConfigKey({ConfigSetting::Firewall, ConfigSetting::Experimental::Firewall}, enableFirewall, &FirewallConfigPresence),

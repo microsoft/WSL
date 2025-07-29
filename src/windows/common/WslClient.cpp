@@ -568,10 +568,7 @@ int Install(_In_ std::wstring_view commandLine)
     }
 
     bool rebootRequired = InstallPrerequisites(installWslOptionalComponent);
-    if (rebootRequired)
-    {
-        noLaunchAfterInstall = false;
-    }
+    noLaunchAfterInstall |= rebootRequired;
 
     // Install a distribution only if no reboot is required, or if we're on the --legacy path (to maintain old behavior).
     const Distribution* legacyDistro = nullptr;
@@ -647,10 +644,10 @@ int Install(_In_ std::wstring_view commandLine)
 
 bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
 {
-    const auto missingComponents = WslInstall::CheckForMissingOptionalComponents(installWslOptionalComponent);
+    const auto [rebootRequired, missingComponents] = WslInstall::CheckForMissingOptionalComponents(installWslOptionalComponent);
     if (missingComponents.empty())
     {
-        return false;
+        return rebootRequired;
     }
 
     // Install any optional components that have not yet been installed.
@@ -671,7 +668,7 @@ bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
         WslInstall::InstallOptionalComponents(missingComponents);
     }
 
-    return true;
+    return rebootRequired;
 }
 
 int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPCWSTR argv[], _In_ const LaunchProcessOptions& options)

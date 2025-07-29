@@ -918,11 +918,11 @@ Windows 版本： {}</value>
     <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
-    <value>無法設定 networkingMode {}) 的網络 (，回到 networkingMode {}。</value>
+    <value>無法設定 networkingMode {} 的網络，回到 networkingMode {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
-    <value>無法啟用結束代碼 {}) (Windows 元件 '{}'</value>
+    <value>無法啟用 Windows 元件 '{}' (結束代碼： {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFatalPluginError" xml:space="preserve">

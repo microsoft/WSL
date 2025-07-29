@@ -1875,7 +1875,7 @@ Return Value:
     LxtCheckErrnoZeroSuccess(rename(RenameTestDirChild, RenameTestDir2));
 
     //
-    // Renaming to a non-existant directory where the target directory
+    // Renaming to a non-existent directory where the target directory
     // contains trailing slash(es).
     //
 
