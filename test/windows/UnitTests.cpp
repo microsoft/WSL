@@ -2999,7 +2999,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         {
             // Enable NetworkingMode::Mirrored for IgnoredPorts to be set correctly upon parsing.
-            config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+            WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
 
             // std::pair[0] = Written value, std::pair[1] = Actual/Expected value
             static const std::vector<std::pair<PCWSTR, PCWSTR>> filePathsToTest{
@@ -3153,7 +3153,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         {
             // Enable NetworkingMode::Mirrored for IgnoredPorts to be set correctly upon parsing.
-            config.Update(LxssGenerateTestConfig());
+            WslConfigChange config(LxssGenerateTestConfig());
 
             // std::pair[0] = Written value, std::pair[1] = Actual/Expected value
             static const std::vector<std::pair<bool, bool>> booleansToTest{{false, false}, {true, true}};
@@ -3324,7 +3324,7 @@ autoProxy=false
 # end comment
 )"};
 
-            config.Update(customWslConfigContentOut);
+            WslConfigChange config(customWslConfigContentOut);
 
             wslConfig = createWslConfig(apiWslConfigFilePath);
             VERIFY_IS_NOT_NULL(wslConfig);
@@ -3409,7 +3409,7 @@ localhostForwarding=true
 autoProxy=false
 )"};
 
-            config.Update(customWslConfigContentOut);
+            WslConfigChange config(customWslConfigContentOut);
 
             wslConfig = createWslConfig(apiWslConfigFilePath);
             VERIFY_IS_NOT_NULL(wslConfig);
@@ -3455,7 +3455,7 @@ localhostForwarding=true
 autoProxy=false
 )"};
 
-            config.Update(customWslConfigContentOut);
+            WslConfigChange config(customWslConfigContentOut);
 
             wslConfig = createWslConfig(apiWslConfigFilePath);
             VERIFY_IS_NOT_NULL(wslConfig);
