@@ -2942,19 +2942,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         LxssDynamicFunction<decltype(GetWslConfigSetting)> getWslConfigSetting(libWslDllPath.c_str(), "GetWslConfigSetting");
         LxssDynamicFunction<decltype(SetWslConfigSetting)> setWslConfigSetting(libWslDllPath.c_str(), "SetWslConfigSetting");
 
-        // Delete the test config file. The original has already been saved as part of module setup.
+        // Reset the test config file. The original has already been saved as part of module setup.
         auto wslConfigFilePath = getenv("userprofile") + std::string("\\.wslconfig");
-        if (std::filesystem::exists(wslConfigFilePath))
-        {
-            std::error_code ec{};
-            VERIFY_IS_TRUE(std::filesystem::remove(wslConfigFilePath, ec));
-        }
+        WslConfigChange config{L""};
 
         auto apiWslConfigFilePath = getWslConfigFilePath();
         VERIFY_IS_TRUE(std::filesystem::path(wslConfigFilePath) == std::filesystem::path(apiWslConfigFilePath));
-
-        // Cleanup any leftover config files.
-        auto cleanup = wil::scope_exit([apiWslConfigFilePath] { std::filesystem::remove(apiWslConfigFilePath); });
 
         auto wslConfigDefaults = createWslConfig(nullptr);
         VERIFY_IS_NOT_NULL(wslConfigDefaults);
@@ -3006,7 +2999,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         {
             // Enable NetworkingMode::Mirrored for IgnoredPorts to be set correctly upon parsing.
-            WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+            config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
 
             // std::pair[0] = Written value, std::pair[1] = Actual/Expected value
             static const std::vector<std::pair<PCWSTR, PCWSTR>> filePathsToTest{
@@ -3160,7 +3153,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         {
             // Enable NetworkingMode::Mirrored for IgnoredPorts to be set correctly upon parsing.
-            WslConfigChange config(LxssGenerateTestConfig());
+            config.Update(LxssGenerateTestConfig());
 
             // std::pair[0] = Written value, std::pair[1] = Actual/Expected value
             static const std::vector<std::pair<bool, bool>> booleansToTest{{false, false}, {true, true}};
@@ -3331,7 +3324,7 @@ autoProxy=false
 # end comment
 )"};
 
-            WslConfigChange config(customWslConfigContentOut);
+            config.Update(customWslConfigContentOut);
 
             wslConfig = createWslConfig(apiWslConfigFilePath);
             VERIFY_IS_NOT_NULL(wslConfig);
@@ -3416,7 +3409,7 @@ localhostForwarding=true
 autoProxy=false
 )"};
 
-            WslConfigChange config(customWslConfigContentOut);
+            config.Update(customWslConfigContentOut);
 
             wslConfig = createWslConfig(apiWslConfigFilePath);
             VERIFY_IS_NOT_NULL(wslConfig);
@@ -3462,7 +3455,7 @@ localhostForwarding=true
 autoProxy=false
 )"};
 
-            WslConfigChange config(customWslConfigContentOut);
+            config.Update(customWslConfigContentOut);
 
             wslConfig = createWslConfig(apiWslConfigFilePath);
             VERIFY_IS_NOT_NULL(wslConfig);
