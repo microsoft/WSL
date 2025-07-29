@@ -835,8 +835,8 @@ try
 
     //
     // Run the Plan 9 server. This requires a DrvFs mount for the socket file,
-    // so either fstab or automount must be enabled to have a chance the mount
-    // exists.
+    // so either fstab or automount must be enabled to have a chance for the
+    // mount to be available.
     //
     // N.B. Failure to start the server is non-fatal.
     //

@@ -411,7 +411,7 @@ int AuxvAtExecfn(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPoll(ChildPid, LXT_RESULT_SUCCESS));
 
     //
-    // Run the binary an empty command line.
+    // Run the binary with an empty command line.
     //
 
     LxtCheckErrno(ChildPid = fork());
@@ -516,7 +516,7 @@ int AuxvAtExecfn(PLXT_ARGS Args)
     LxtCheckResult(LxtWaitPidPoll(ChildPid, LXT_RESULT_SUCCESS));
 
     //
-    // Run the script an empty command line.
+    // Run the script with an empty command line.
     //
 
     LxtCheckErrno(ChildPid = fork());

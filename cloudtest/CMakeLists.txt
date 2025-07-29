@@ -9,7 +9,7 @@ if (${TARGET_PLATFORM} STREQUAL x64)
         "wsl-test-image-win10-22h2-ent-g2-2024-09-10")
       
 
-    set(CLOUDTEST_TEST_PACKAGES "Test_Packages_2024_02_27")
+    set(CLOUDTEST_TEST_PACKAGES "Test_Packages_2025_07_28")
     set(DUMPTOOL_DROP "DumpTool_X64_2025-01-27")
 elseif (${TARGET_PLATFORM} STREQUAL arm64)
     set(CLOUDTEST_IMAGES)

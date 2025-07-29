@@ -22,7 +22,10 @@ from urllib.parse import urlparse
 @click.option('--auto-release-notes', is_flag=True, default=False)
 def main(version: str, previous: str, max_message_lines: int, publish: bool, assets: list, no_fetch: bool, github_token: str, use_current_ref: bool, auto_release_notes: bool):
     if publish:
-        if assets is None:
+        # Click provides an empty tuple when no assets are passed. Guard against both
+        # an explicit None (older Click versions / direct invocation) and an empty
+        # collection so we do not accidentally create a release without payload.
+        if not assets:
             raise RuntimeError('--publish requires at least one asset')
 
         if github_token is None:

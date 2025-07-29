@@ -1486,7 +1486,7 @@ Arguments:
 
     Flag - Supplies the flag to toggle.
 
-    IsFlagEnabled - Supplies the state the flag should be set to.
+    IsFlagEnabled - Supplies the state to which the flag should be set.
 
     Response - Supplies a pointer to receive the response errno.
 
