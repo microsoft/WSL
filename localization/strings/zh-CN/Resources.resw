@@ -1106,7 +1106,7 @@ Windows: {}</value>
     <value>查询网络模式失败</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>提供了自定义内核模块，但没有指定自定义内核。有关详细信息，请参阅 https://aka.ms/wslcustomkernel。</value>
+    <value>提供的自定义内核模块未指定自定义内核。有关详细信息，请参阅 https://aka.ms/wslcustomkernel。</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>由于当前与全球安全访问客户端的兼容性问题，DNS 隧道被禁用。</value>
