@@ -227,6 +227,8 @@ std::optional<LX_MINI_INIT_NETWORKING_MODE> UtilGetNetworkingMode(void);
 
 pid_t UtilGetPpid(pid_t Pid);
 
+std::string UtilGetVmId(void);
+
 void UtilInitGroups(const char* User, gid_t Gid);
 
 void UtilInitializeMessageBuffer(std::vector<gsl::byte>& Buffer);
