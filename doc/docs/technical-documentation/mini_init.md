@@ -22,7 +22,7 @@ The other hvsocket channel is used to send notifications to [wslservice.exe](wsl
 
 ## Networking configuration
 
-As part of the boot process, `mini_init` also launches the [gns binary](gns.md) which managed networking configuration
+As part of the boot process, `mini_init` also launches the [gns binary](gns.md) which manages networking configuration
 
 ## Other tasks
 

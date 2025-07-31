@@ -24,7 +24,7 @@ Notable ETL providers:
     - `Error`: Unexpected errors
     - `CreateVmBegin`, `CreateVmEnd`: Virtual machine lifetime
     - `CreateNetworkBegin`, `CreateNetworkEnd`: Networking configuration
-    - `SentMessage`, `ReceivedMessaged`: Communication on the hvsocket channels with Linux.
+    - `SentMessage`, `ReceivedMessage`: Communication on the hvsocket channels with Linux.
     
 - `Microsoft.Windows.Subsystem.Lxss`: Other WSL executables (wsl.exe, wslg.exe, wslconfig.exe, wslrelay.exe, ...)
     Important events:

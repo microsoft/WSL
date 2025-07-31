@@ -1,6 +1,6 @@
 # Relay
 
-Relay is a WSL2 linux process creating by a [session leader](session-leader.md). Its job is to create a linux process on behalf of the user, and relay its output back to Windows. 
+Relay is a WSL2 linux process created by a [session leader](session-leader.md). Its job is to create a linux process on behalf of the user, and relay its output back to Windows. 
 
 ## Creating a user process
 

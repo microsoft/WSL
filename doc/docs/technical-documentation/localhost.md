@@ -9,6 +9,6 @@ When `wsl2.networkingMode` is set to NAT, `localhost` will watch for bound TCP p
 
 ## Mirrored networking
 
-In mirrored mode, `localhost` register a BPF program to intercept calls to `bind()`, and forward the calls to Windows via [wslservice.exe](wslservice.exe.md) so Windows can route the network traffic directly to the WSL2 virtual machine.
+In mirrored mode, `localhost` registers a BPF program to intercept calls to `bind()`, and forward the calls to Windows via [wslservice.exe](wslservice.exe.md) so Windows can route the network traffic directly to the WSL2 virtual machine.
 
 See `src/linux/localhost.cpp`.
