@@ -1106,7 +1106,7 @@ Windows 版本： {}</value>
     <value>無法查詢網路模式</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>提供了自定義的核心模組，但未指定自定義核心。如需詳細資訊，請參閱 https://aka.ms/wslcustomkernel。</value>
+    <value>已提供自定義核心模組，但未指定自定義核心。如需詳細資訊，請參閱 https://aka.ms/wslcustomkernel。</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>由於目前與全球安全存取用戶端的相容性問題，已停用 DNS 通道。</value>

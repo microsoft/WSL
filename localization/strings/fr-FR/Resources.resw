@@ -1107,7 +1107,7 @@ Code d'erreur : {}</value>
     <value>La requête du mode de mise en réseau n’a pas abouti</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>Des modules de noyau personnalisés ont été fournis sans spécification de noyau personnalisé. Pour plus d’informations, consultez https://aka.ms/wslcustomkernel.</value>
+    <value>Des modules de noyau personnalisés ont été fournis sans spécifier de noyau personnalisé. Pour plus d’informations, consultez https://aka.ms/wslcustomkernel.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>En raison d’un problème de compatibilité actuel avec le client Accès global sécurisé, le tunneling DNS est désactivé.</value>
