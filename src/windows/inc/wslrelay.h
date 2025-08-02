@@ -21,6 +21,7 @@ enum RelayMode
     DebugConsole,
     DebugConsoleRelay,
     PortRelay,
+    WSLAPortRelay,
     KdRelay,
     InteractiveConsoleRelay
 };
