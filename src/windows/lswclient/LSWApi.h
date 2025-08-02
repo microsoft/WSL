@@ -178,6 +178,16 @@ HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMapp
 
 HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
 
+enum WslDependenciesState
+{
+    WslDependenciesStateInstalled = 0,
+    WslDependenciesStateMissingPackage,
+    WslDependenciesStateMissingVMP,
+    WslDependenciesStateMissingWslOC
+};
+
+HRESULT WslAreDepenciesInstalled(struct WslDependenciesState* State);
+
 #ifdef __cplusplus
 }
 #endif
