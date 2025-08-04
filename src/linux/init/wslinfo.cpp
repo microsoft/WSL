@@ -165,6 +165,11 @@ Return Value:
             std::cout << "wsl1";
         }
     }
+    else
+    {
+        assert(false && "Unknown WslInfoMode");
+        return 1;
+    }
 
     if (!noNewLine)
     {
