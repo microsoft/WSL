@@ -114,62 +114,86 @@ class LSWTests
 
     TEST_METHOD(CustomDmesgOutput)
     {
-        auto [read, write] = CreateSubprocessPipe(false, false);
+        auto createVmWithDmesg = [this](bool earlyBootLogging) {
+            auto [read, write] = CreateSubprocessPipe(false, false);
 
-        VirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
-        settings.Memory.MemoryMb = 1024;
-        settings.Options.BootTimeoutMs = 30000;
-        settings.Options.Dmesg = write.get();
+            VirtualMachineSettings settings{};
+            settings.CPU.CpuCount = 4;
+            settings.DisplayName = L"LSW";
+            settings.Memory.MemoryMb = 1024;
+            settings.Options.BootTimeoutMs = 30000;
+            settings.Options.Dmesg = write.get();
+            settings.Options.EnableEarlyBootDmesg = earlyBootLogging;
 
-        std::vector<char> dmesgContent;
+            std::vector<char> dmesgContent;
+            auto readDmesg = [read = read.get(), &dmesgContent]() mutable {
+                DWORD Offset = 0;
 
-        auto readDmesg = [&]() {
-            DWORD Offset = 0;
-
-            constexpr auto bufferSize = 1024;
-            while (true)
-            {
-                dmesgContent.resize(Offset + bufferSize);
-
-                DWORD Read{};
-                if (!ReadFile(read.get(), &dmesgContent[Offset], bufferSize, &Read, nullptr))
+                constexpr auto bufferSize = 1024;
+                while (true)
                 {
-                    LogInfo("ReadFile() failed: %lu", GetLastError());
-                }
+                    dmesgContent.resize(Offset + bufferSize);
 
-                if (Read == 0)
+                    DWORD Read{};
+                    if (!ReadFile(read, &dmesgContent[Offset], bufferSize, &Read, nullptr))
+                    {
+                        LogInfo("ReadFile() failed: %lu", GetLastError());
+                    }
+
+                    if (Read == 0)
+                    {
+                        break;
+                    }
+
+                    Offset += Read;
+                }
+            };
+
+            std::thread thread(readDmesg);
+            auto vm = CreateVm(&settings);
+            auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                WslReleaseVirtualMachine(vm);
+                if (thread.joinable())
                 {
-                    break;
+                    thread.join();
                 }
+            });
 
-                Offset += Read;
-            }
+            write.reset();
+
+            std::vector<const char*> cmd = {"/bin/bash", "-c", "echo DmesgTest > /dev/kmsg"};
+            VERIFY_ARE_EQUAL(RunCommand(vm, cmd), 0);
+
+            VERIFY_ARE_EQUAL(WslShutdownVirtualMachine(vm, 30 * 1000), S_OK);
+            detach.reset();
+
+            auto contentString = std::string(dmesgContent.begin(), dmesgContent.end());
+
+            VERIFY_ARE_NOT_EQUAL(contentString.find("Run /init as init process"), std::string::npos);
+            VERIFY_ARE_NOT_EQUAL(contentString.find("DmesgTest"), std::string::npos);
+
+            return contentString;
         };
 
-        std::thread thread(readDmesg);
-        auto vm = CreateVm(&settings);
-        write.reset();
+        auto validateFirstDmesgLine = [](const std::string& dmesg, const char* expected) {
+            auto firstLf = dmesg.find("\n");
+            VERIFY_ARE_NOT_EQUAL(firstLf, std::string::npos);
+            VERIFY_IS_TRUE(dmesg.find(expected) < firstLf);
+        };
 
-        auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            WslReleaseVirtualMachine(vm);
-            if (thread.joinable())
-            {
-                thread.join();
-            }
-        });
+        // Dmesg without early boot logging
+        {
+            auto dmesg = createVmWithDmesg(false);
 
-        std::vector<const char*> cmd = {"/bin/bash", "-c", "echo DmesgTest > /dev/kmsg"};
-        VERIFY_ARE_EQUAL(RunCommand(vm, cmd), 0);
+            // Verify that the first line is "brd: module loaded";
+            validateFirstDmesgLine(dmesg, "brd: module loaded");
+        }
 
-        VERIFY_ARE_EQUAL(WslShutdownVirtualMachine(vm, 30 * 1000), S_OK);
-        detach.reset();
-
-        auto contentString = std::string(dmesgContent.begin(), dmesgContent.end());
-
-        VERIFY_ARE_NOT_EQUAL(contentString.find("Run /init as init process"), std::string::npos);
-        VERIFY_ARE_NOT_EQUAL(contentString.find("DmesgTest"), std::string::npos);
+        // Dmesg with early boot logging
+        {
+            auto dmesg = createVmWithDmesg(true);
+            validateFirstDmesgLine(dmesg, "Linux version");
+        }
     }
 
     TEST_METHOD(TerminationCallback)
