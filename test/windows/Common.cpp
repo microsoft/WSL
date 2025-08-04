@@ -2543,7 +2543,7 @@ void DistroFileChange::Delete()
 std::string ReadToString(SOCKET Handle)
 {
     std::string output;
-    DWORD index = 0;
+    DWORD offset = 0;
     while (true) // TODO: timeout
     {
         constexpr auto bufferSize = 512;
@@ -2551,20 +2551,20 @@ std::string ReadToString(SOCKET Handle)
         output.resize(output.size() + bufferSize);
         int bytesRead = 0;
 
-        if ((bytesRead = recv(Handle, &output[index], bufferSize, 0)) < 0)
+        if ((bytesRead = recv(Handle, &output[offset], bufferSize, 0)) < 0)
         {
-            LogError("ReadFile failed with %lu", GetLastError());
+            LogError("recv failed with %lu", GetLastError());
             VERIFY_FAIL();
         }
 
         if (bytesRead == 0)
         {
-            output.resize(index);
+            output.resize(offset);
             break;
         }
 
-        output.resize(index + bytesRead);
-        index += bytesRead;
+        output.resize(offset + bytesRead);
+        offset += bytesRead;
     }
 
     return output;
