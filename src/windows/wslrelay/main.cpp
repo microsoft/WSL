@@ -40,7 +40,7 @@ try
     wil::unique_handle exitEvent{};
     wil::unique_handle terminalInputHandle{};
     wil::unique_handle terminalOutputHandle{};
-    int port{};
+    uint32_t port{};
     GUID vmId{};
     bool disableTelemetry = !wsl::shared::OfficialBuild;
 
@@ -95,6 +95,20 @@ try
     {
         wsl::shared::SocketChannel channel{wil::unique_socket{reinterpret_cast<SOCKET>(handle.release())}, "PortRelay"};
         wsl::windows::wslrelay::localhost::RelayWorker(channel, vmId);
+        break;
+    }
+
+    case wslrelay::RelayMode::WSLAPortRelay:
+    {
+        try
+        {
+            wsl::windows::wslrelay::localhost::RunWSLAPortRelay(vmId, port, exitEvent.get());
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+
         break;
     }
 

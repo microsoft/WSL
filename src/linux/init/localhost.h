@@ -2,3 +2,5 @@
 #pragma once
 
 int RunPortTracker(int argc, char** argv);
+
+void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket);

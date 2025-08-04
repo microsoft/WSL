@@ -17,6 +17,24 @@ Abstract:
 #include "LSWApi.h"
 #include "wslrelay.h"
 
+namespace {
+
+void ConfigureComSecurity(IUnknown* Instance)
+{
+    wil::com_ptr_nothrow<IClientSecurity> clientSecurity;
+    THROW_IF_FAILED(Instance->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
+
+    // Get the current proxy blanket settings.
+    DWORD authnSvc, authzSvc, authnLvl, capabilites;
+    THROW_IF_FAILED(clientSecurity->QueryBlanket(Instance, &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilites));
+
+    // Make sure that dynamic cloaking is used.
+    WI_ClearFlag(capabilites, EOAC_STATIC_CLOAKING);
+    WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
+    THROW_IF_FAILED(clientSecurity->SetBlanket(Instance, authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
+}
+} // namespace
+
 class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
 {
@@ -55,6 +73,7 @@ try
     wil::com_ptr<ILSWUserSession> session;
 
     THROW_IF_FAILED(CoCreateInstance(__uuidof(LSWUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
+    ConfigureComSecurity(session.get());
 
     wil::com_ptr<ILSWVirtualMachine> virtualMachineInstance;
 
@@ -70,19 +89,7 @@ try
     settings.EnableDnsTunneling = UserSettings->Networking.DnsTunneling;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
-
-    wil::com_ptr_nothrow<IClientSecurity> clientSecurity;
-    THROW_IF_FAILED(virtualMachineInstance->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
-
-    // Get the current proxy blanket settings.
-    DWORD authnSvc, authzSvc, authnLvl, capabilites;
-    THROW_IF_FAILED(clientSecurity->QueryBlanket(virtualMachineInstance.get(), &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilites));
-
-    // Make sure that dynamic cloaking is used.
-    WI_ClearFlag(capabilites, EOAC_STATIC_CLOAKING);
-    WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
-    THROW_IF_FAILED(clientSecurity->SetBlanket(
-        virtualMachineInstance.get(), authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
+    ConfigureComSecurity(virtualMachineInstance.get());
 
     // Register termination callback, if specified
     if (UserSettings->Options.TerminationCallback != nullptr)
@@ -201,6 +208,18 @@ HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64
 void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine)
 {
     reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Release();
+}
+
+HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const PortMappingSettings* UserSettings)
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+        ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, false);
+}
+
+HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const PortMappingSettings* UserSettings)
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+        ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, true);
 }
 
 HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process)
