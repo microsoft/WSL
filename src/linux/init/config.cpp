@@ -438,13 +438,13 @@ try
 
     case LxInitMessageQueryVmId:
     {
+        wsl::shared::MessageWriter<LX_INIT_QUERY_VM_ID> Response(LxInitMessageQueryVmId);
         if (Config.VmId.has_value())
         {
-            wsl::shared::MessageWriter<LX_INIT_QUERY_VM_ID> Response(LxInitMessageQueryVmId);
             Response.WriteString(Config.VmId.value());
-            ResponseChannel.SendMessage<LX_INIT_QUERY_VM_ID>(Response.Span());
         }
 
+        ResponseChannel.SendMessage<LX_INIT_QUERY_VM_ID>(Response.Span());
         break;
     }
 
