@@ -50,3 +50,7 @@ extends:
     - template: test-stage.yml@self
       parameters:
         rs_prerelease_only: false
+
+    - template: nuget-stage.yml@self
+          parameters:
+            isNightly: true
