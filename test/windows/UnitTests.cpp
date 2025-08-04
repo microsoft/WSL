@@ -843,7 +843,6 @@ class UnitTests
                 L"arguments.\n");
         }
 
-        if (LxsstuVmMode())
         {
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
             VERIFY_ARE_EQUAL(err, L"");
