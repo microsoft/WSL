@@ -176,7 +176,7 @@ class LSWTests
             std::vector<const char*> cmd = {"/bin/bash", "-c", "echo DmesgTest > /dev/kmsg"};
             VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 0);
 
-            VERIFY_ARE_EQUAL(WslShutdownVirtualMachine(vm, 30 * 1000), S_OK);
+            VERIFY_ARE_EQUAL(WslShutdownVirtualMachine(vm.get(), 30 * 1000), S_OK);
             detach.reset();
 
             auto contentString = std::string(dmesgContent.begin(), dmesgContent.end());
