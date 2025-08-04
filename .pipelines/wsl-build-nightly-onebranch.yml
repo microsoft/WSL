@@ -52,5 +52,5 @@ extends:
         rs_prerelease_only: false
 
     - template: nuget-stage.yml@self
-          parameters:
-            isNightly: true
+      parameters:
+        isNightly: true
