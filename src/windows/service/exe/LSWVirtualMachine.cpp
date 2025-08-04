@@ -292,6 +292,8 @@ void LSWVirtualMachine::ConfigureNetworking()
             m_computeSystem.get(), wsl::core::NatNetworking::CreateNetwork(config), std::move(gnsSocket), config, wil::unique_socket{});
 
         m_networkEngine->Initialize();
+
+        LaunchPortRelay();
     }
     else
     {
@@ -460,8 +462,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork
 
     auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmExitEvent.get(), m_settings.BootTimeoutMs);
 
-    // TODO: pid in channel name
-    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), "ForkedChannel"});
+    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid)});
 }
 
 wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
@@ -657,3 +658,76 @@ bool LSWVirtualMachine::ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdC
 
     return !foundNonTtyFd && FdCount > 0;
 }
+
+void LSWVirtualMachine::LaunchPortRelay()
+{
+    WI_ASSERT(!m_portRelayChannelRead);
+
+    auto [_, __, channel] = Fork(LSW_FORK::ForkType::Process);
+
+    std::lock_guard lock(m_portRelaylock);
+    auto relayPort = channel.Transaction<LSW_PORT_RELAY>();
+
+    wil::unique_handle readPipe;
+    wil::unique_handle writePipe;
+    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&readPipe, &m_portRelayChannelWrite, nullptr, 0));
+    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&m_portRelayChannelRead, &writePipe, nullptr, 0));
+
+    wsl::windows::common::helpers::SetHandleInheritable(readPipe.get());
+    wsl::windows::common::helpers::SetHandleInheritable(writePipe.get());
+    wsl::windows::common::helpers::SetHandleInheritable(m_vmExitEvent.get());
+
+    // Get an impersonation token
+    auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    auto restrictedToken = wsl::windows::common::security::CreateRestrictedToken(userToken.get());
+
+    auto path = wsl::windows::common::wslutil::GetBasePath() / L"wslrelay.exe";
+
+    auto cmd = std::format(
+        L"\"{}\" {} {} {} {} {} {} {} {}",
+        path,
+        wslrelay::mode_option,
+        static_cast<int>(wslrelay::RelayMode::WSLAPortRelay),
+        wslrelay::exit_event_option,
+        HandleToUlong(m_vmExitEvent.get()),
+        wslrelay::port_option,
+        relayPort.Result,
+        wslrelay::vm_id_option,
+        m_vmId);
+
+    WSL_LOG("LaunchWslRelay", TraceLoggingValue(cmd.c_str(), "cmd"));
+
+    wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
+    process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
+    process.SetToken(restrictedToken.get());
+    process.Start();
+
+    readPipe.release();
+    writePipe.release();
+}
+
+HRESULT LSWVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)
+try
+{
+    std::lock_guard lock(m_portRelaylock);
+
+    RETURN_HR_IF(E_ILLEGAL_STATE_CHANGE, !m_portRelayChannelWrite);
+
+    LSW_MAP_PORT message;
+    message.WindowsPort = WindowsPort;
+    message.LinuxPort = LinuxPort;
+    message.AddressFamily = Family;
+    message.Stop = Remove;
+
+    DWORD bytesTransfered{};
+    THROW_IF_WIN32_BOOL_FALSE(WriteFile(m_portRelayChannelWrite.get(), &message, sizeof(message), &bytesTransfered, nullptr));
+    THROW_HR_IF_MSG(E_UNEXPECTED, bytesTransfered != sizeof(message), "%u bytes transfered", bytesTransfered);
+
+    HRESULT result = E_UNEXPECTED;
+    THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
+
+    THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
+
+    return result;
+}
+CATCH_RETURN();
