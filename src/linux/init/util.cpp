@@ -1637,6 +1637,12 @@ Return Value:
 int UtilMountFile(const char* Source, const char* Destination)
 try
 {
+    // Is the file is a symlink, delete it since that would break the mount.
+    if (std::filesystem::is_symlink(Destination))
+    {
+        std::filesystem::remove(Destination);
+    }
+
     wil::unique_fd Fd{open(Destination, (O_CREAT | O_WRONLY), 0755)};
     THROW_LAST_ERROR_IF(!Fd);
 
