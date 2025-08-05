@@ -2683,7 +2683,7 @@ try
 
         e["name"] = WideToMultiByte(Configuration.Name);
         e["guid"] = WideToMultiByte(distributionProfileId);
-        e["icon"] = IconPath.string();
+        e["icon"] = WideToMultiByte(IconPath.native());
 
         // See https://github.com/microsoft/terminal/pull/18195. Supported in terminal >= 1.23
         e["pathTranslationStyle"] = "wsl";
