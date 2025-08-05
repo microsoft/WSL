@@ -121,10 +121,12 @@ void LSWVirtualMachine::Start()
     }
 
 #ifdef _AMD64_
+
     HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
     __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
     vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
     vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
+
 #endif
 
     // Initialize kernel command line.
