@@ -2250,7 +2250,14 @@ Return Value:
     if (Value != nullptr)
     {
         Config.VmId = Value;
-        unsetenv(LX_WSL2_VM_ID_ENV);
+
+        // Unset the environment variable for user distros.
+        // TODO: this can be removed when WSLg is updated to use `wslinfo --vm-id` instead of the environment variable.
+        Value = getenv(LX_WSL2_SYSTEM_DISTRO);
+        if (!Value || Value != std::string_view("1"))
+        {
+            unsetenv(LX_WSL2_VM_ID_ENV);
+        }
     }
 
     //
