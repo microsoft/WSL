@@ -2254,7 +2254,7 @@ Return Value:
         // Unset the environment variable for user distros.
         // TODO: this can be removed when WSLg is updated to use `wslinfo --vm-id` instead of the environment variable.
         Value = getenv(LX_WSL2_SYSTEM_DISTRO);
-        if (!Value || Value != std::string_view("1"))
+        if (!Value || strcmp(Value, "1") != 0)
         {
             unsetenv(LX_WSL2_VM_ID_ENV);
         }
