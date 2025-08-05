@@ -277,6 +277,7 @@ void LSWVirtualMachine::ConfigureNetworking()
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
+        config.FirewallConfig.reset(); // Don't enable firewall for now since it's only supported on >= Windows 11
 
         // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
