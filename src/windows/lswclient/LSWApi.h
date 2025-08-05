@@ -179,6 +179,21 @@ HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMapp
 
 HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
 
+
+enum WslInstallComponent
+{
+    WslInstallComponentNone = 0,
+    WslInstallComponentVMPOC = 1,
+    WslInstallComponentWslOC = 2,
+    WslInstallComponentWslPackage = 4,
+};
+
+HRESULT WslQueryMissingComponents(enum WslInstallComponent* Components);
+
+typedef HRESULT (*WslInstallCallback)(enum WslInstallComponent, uint8_t);
+
+HRESULT WslInstallComponents(enum WslInstallComponent Components, WslInstallCallback* ProgressCallback);
+
 #ifdef __cplusplus
 }
 #endif

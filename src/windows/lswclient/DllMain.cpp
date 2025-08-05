@@ -301,3 +301,24 @@ EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason,
 
     return TRUE;
 }
+
+DEFINE_ENUM_FLAG_OPERATORS(WslInstallComponent);
+
+HRESULT WslQueryInstallState(enum WslInstallComponent* Components)
+try
+{
+    *Components = WslInstallComponentNone;
+
+    // Check for Windows features
+    WI_SetFlagIf(
+        *Components,
+        WslInstallComponentWslOC,
+        !wsl::windows::common::helpers::IsWindows11OrAbove() && wsl::windows::common::helpers::IsServicePresent(L"lxssmanager"));
+
+    WI_SetFlagIf(*Components, WslInstallComponentVMPOC, !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled());
+
+    // Check if the WSL package is installed, and if the version support 
+
+
+}
+CATCH_RETURN();
