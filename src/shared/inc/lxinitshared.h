@@ -255,6 +255,7 @@ Abstract:
 #define LX_WSL2_SHARED_MEMORY_OB_DIRECTORY "WSL2_SHARED_MEMORY_OB_DIRECTORY"
 #define LX_WSL2_INSTALL_PATH "WSL2_INSTALL_PATH"
 #define LX_WSL2_SAFE_MODE "WSL2_SAFE_MODE"
+#define LX_WSL2_SYSTEM_DISTRO "WSL2_SYSTEM_DISTRO"
 #define LX_WSL2_USER_PROFILE "WSL2_USER_PROFILE"
 #define LX_WSL2_VM_ID_ENV "WSL2_VM_ID"
 #define LX_WSL_PID_ENV "WSL2_PID"
@@ -304,6 +305,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxInitMessageCreateLoginSession,
     LxInitMessageStopPlan9Server,
     LxInitMessageQueryNetworkingMode,
+    LxInitMessageQueryVmId,
     LxInitCreateProcess,
     LxInitOobeResult,
     LxMiniInitMessageLaunchInit,
@@ -1495,6 +1497,16 @@ typedef struct _LX_INIT_OOBE_RESULT
 
     PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(DefaultUid));
 } LX_INIT_OOBE_RESULT, *PLX_INIT_OOBE_RESULT;
+
+typedef struct _LX_INIT_QUERY_VM_ID
+{
+    static inline auto Type = LxInitMessageQueryVmId;
+
+    MESSAGE_HEADER Header;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
+} LX_INIT_QUERY_VM_ID, *PLX_INIT_QUERY_VM_ID;
 
 template <>
 struct std::formatter<LX_MESSAGE_TYPE, char>

@@ -2239,11 +2239,25 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_READ_ONLY_ENV);
     }
 
-    const auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
+    auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
     if (Value != nullptr)
     {
         Config.NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(std::atoi(Value));
         unsetenv(LX_WSL2_NETWORKING_MODE_ENV);
+    }
+
+    Value = getenv(LX_WSL2_VM_ID_ENV);
+    if (Value != nullptr)
+    {
+        Config.VmId = Value;
+
+        // Unset the environment variable for user distros.
+        // TODO: this can be removed when WSLg is updated to use `wslinfo --vm-id` instead of the environment variable.
+        Value = getenv(LX_WSL2_SYSTEM_DISTRO);
+        if (!Value || strcmp(Value, "1") != 0)
+        {
+            unsetenv(LX_WSL2_VM_ID_ENV);
+        }
     }
 
     //
