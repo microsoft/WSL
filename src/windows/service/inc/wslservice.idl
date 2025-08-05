@@ -470,6 +470,7 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     ULONG NetworkingMode;
     BOOL EnableDnsTunneling;
     BOOL EnableDebugShell;
+    BOOL EnableEarlyBootDmesg;
 } VIRTUAL_MACHINE_SETTINGS;
 
 

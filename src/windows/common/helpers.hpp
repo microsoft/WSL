@@ -154,6 +154,10 @@ bool IsPackageInstalled(_In_ LPCWSTR PackageFamilyName);
 
 bool IsServicePresent(_In_ LPCWSTR ServiceName);
 
+bool IsVirtioSerialConsoleSupported();
+
+bool IsVmemmSuffixSupported();
+
 bool IsWindows11OrAbove();
 
 bool IsWslOptionalComponentPresent();
