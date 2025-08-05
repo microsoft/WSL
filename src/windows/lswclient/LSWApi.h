@@ -56,6 +56,7 @@ struct Options
     VirtualMachineTerminationCallback TerminationCallback;
     void* TerminationContext;
     bool EnableDebugShell;
+    bool EnableEarlyBootDmesg;
 };
 
 enum NetworkingMode
