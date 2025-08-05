@@ -848,8 +848,15 @@ class UnitTests
             VERIFY_ARE_EQUAL(err, L"");
             if (LxsstuVmMode())
             {
-                const auto vmId = wsl::shared::string::ToGuid(out);
-                VERIFY_IS_TRUE(vmId.has_value());
+                // Ensure that the response from wslinfo has the VM ID.
+                auto guid = wsl::shared::string::ToGuid(out);
+                VERIFY_IS_TRUE(guid.has_value());
+                VERIFY_IS_FALSE(IsEqualGUID(guid.value(), GUID_NULL));
+
+                // Validate that the VM ID is not propagated to user commands.
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"echo -n \"$WSL2_VM_ID\"");
+                VERIFY_ARE_EQUAL(out, L"");
+                VERIFY_ARE_EQUAL(err, L"");
             }
             else
             {
