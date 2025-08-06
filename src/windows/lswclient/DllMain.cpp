@@ -16,6 +16,7 @@ Abstract:
 #include "wslservice.h"
 #include "LSWApi.h"
 #include "wslrelay.h"
+#include "wslInstall.h"
 
 namespace {
 
@@ -317,8 +318,49 @@ try
 
     WI_SetFlagIf(*Components, WslInstallComponentVMPOC, !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled());
 
-    // Check if the WSL package is installed, and if the version support 
+    // Check if the WSL package is installed, and if the version supports WSLA
+    auto version = wsl::windows::common::wslutil::GetInstalledPackageVersion();
 
+    constexpr auto minimalPackageVersion = wsl::shared::PackageVersion; // TODO: replace with correct version once WSLA is released.
+    WI_SetFlagIf(*Components, WslInstallComponentWslPackage, !version.has_value() || version < minimalPackageVersion);
 
+    // TODO: Check if hardware supports virtualization.
+}
+CATCH_RETURN();
+
+// Used for debugging.
+static LPCWSTR PackageUrl = nullptr;
+
+HRESULT WslInstallComponents(enum WslInstallComponent Components, WslInstallCallback* ProgressCallback)
+try
+{
+    if (WI_IsFlagSet(Components, WslInstallComponentWslPackage))
+    {
+        THROW_HR_IF(E_INVALIDARG, PackageUrl == nullptr);
+
+        const auto downloadPath = wsl::windows::common::wslutil::DownloadFile(PackageUrl, L"wsl.msi");
+
+        auto exitCode = wsl::windows::common::wslutil::UpgradeViaMsi(downloadPath.c_str(), nullptr, nullptr, [](auto, auto) {});
+
+        THROW_HR_IF_MSG(E_FAIL, exitCode, "MSI installation failed. URL: %ls, exitCode: %u", PackageUrl, exitCode);
+    }
+
+    std::vector<std::wstring> optionalComponents;
+    if (WI_IsFlagClear(Components, WslInstallComponentWslOC))
+    {
+        optionalComponents.emplace_back(WslInstall::c_optionalFeatureNameWsl);
+    }
+
+    if (WI_IsFlagClear(Components, WslInstallComponentVMPOC))
+    {
+        optionalComponents.emplace_back(WslInstall::c_optionalFeatureNameVmp);
+    }
+
+    if (!optionalComponents.empty())
+    {
+        WslInstall::InstallOptionalComponents(optionalComponents);
+    }
+
+    return optionalComponents.empty() ? S_OK : HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED);
 }
 CATCH_RETURN();

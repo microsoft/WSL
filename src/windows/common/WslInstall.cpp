@@ -23,8 +23,6 @@ Abstract:
 extern HINSTANCE g_dllInstance;
 
 constexpr LPCWSTR c_optionalFeatureInstallStatus = L"InstallStatus";
-constexpr LPCWSTR c_optionalFeatureNameVmp = L"VirtualMachinePlatform";
-constexpr LPCWSTR c_optionalFeatureNameWsl = L"Microsoft-Windows-Subsystem-Linux";
 
 using wsl::shared::Localization;
 using namespace wsl::windows::common::distribution;

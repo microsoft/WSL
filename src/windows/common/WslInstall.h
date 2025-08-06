@@ -19,6 +19,9 @@ Abstract:
 class WslInstall
 {
 public:
+    static inline LPCWSTR c_optionalFeatureNameVmp = L"VirtualMachinePlatform";
+    static inline LPCWSTR c_optionalFeatureNameWsl = L"Microsoft-Windows-Subsystem-Linux";
+
     struct InstallResult
     {
         std::wstring Name;

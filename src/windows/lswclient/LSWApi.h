@@ -190,9 +190,12 @@ enum WslInstallComponent
 
 HRESULT WslQueryMissingComponents(enum WslInstallComponent* Components);
 
-typedef HRESULT (*WslInstallCallback)(enum WslInstallComponent, uint8_t);
+typedef HRESULT (*WslInstallCallback)(enum WslInstallComponent, uint64_t, uint64_t);
 
 HRESULT WslInstallComponents(enum WslInstallComponent Components, WslInstallCallback* ProgressCallback);
+
+// Used for testing until the package is published.
+HRESULT WslSetPackageUrl(LPCWSTR Url);
 
 #ifdef __cplusplus
 }

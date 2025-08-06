@@ -84,6 +84,8 @@ GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> na
 
 std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
 
+std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<bool(uint64_t, uint64_t)>& Progress);
+
 [[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE handleInTarget);
 
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
@@ -115,6 +117,8 @@ std::wstring GetPackageFamilyName(_In_ HANDLE process = GetCurrentProcess());
 std::wstring GetSystemErrorString(_In_ HRESULT result);
 
 std::wstring GetDebugShellPipeName(_In_ PSID Sid);
+
+std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> GetInstalledPackageVersion();
 
 std::vector<BYTE> HashFile(HANDLE File, DWORD Algorithm);
 
