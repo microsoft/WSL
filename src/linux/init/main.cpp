@@ -1827,11 +1827,6 @@ try
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
 
-    if (UserProfile)
-    {
-        AddEnvironmentVariable(LX_WSL2_SYSTEM_DISTRO, "1");
-    }
-
     if (DistroInitPid.has_value())
     {
         AddEnvironmentVariable(LX_WSL2_DISTRO_INIT_PID, std::to_string(static_cast<int>(DistroInitPid.value())).c_str());
