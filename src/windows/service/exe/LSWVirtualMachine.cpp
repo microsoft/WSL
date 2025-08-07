@@ -8,20 +8,19 @@ Module Name:
 
 Abstract:
 
-    TODO
+    Class for the WSLA virtual machine.
 
 --*/
 #include "LSWVirtualMachine.h"
 #include "hcs_schema.h"
 #include "LSWApi.h"
 #include "NatNetworking.h"
+#include "MirroredNetworking.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
 using helpers::WindowsVersion;
 using wsl::windows::service::lsw::LSWVirtualMachine;
-
-#define VIRTIO_SERIAL_CONSOLE_COBALT_RELEASE_UBR 40 // TODO: factor
 
 LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid) :
     m_settings(Settings), m_userSid(UserSid)
@@ -114,24 +113,22 @@ void LSWVirtualMachine::Start()
     }
 
     // Configure the number of processors.
-    vmSettings.ComputeTopology.Processor.Count = 4; // TODO
+    vmSettings.ComputeTopology.Processor.Count = m_settings.CpuCount;
 
     // Set the vmmem suffix which will change the process name in task manager.
-    // if (IsVmemmSuffixSupported()) // TODO: impl
+    if (helpers::IsVmemmSuffixSupported())
     {
         vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = m_settings.DisplayName;
     }
 
-    // TODO
+#ifdef _AMD64_
 
-    /*
-    if (m_vmConfig.EnableHardwarePerformanceCounters)
-    {
-        HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
-        __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
-        vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
-        vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
-    }*/
+    HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
+    __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
+    vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
+    vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
+
+#endif
 
     // Initialize kernel command line.
     std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(LSW_ROOT_INIT_ENV) L"=1 panic=-1";
@@ -142,10 +139,7 @@ void LSWVirtualMachine::Start()
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
-    // TODO: check for virtio serial support
-
     wil::unique_handle dmesgOutput;
-
     if (m_settings.DmesgOutput != 0)
     {
         dmesgOutput.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(m_settings.DmesgOutput)));
@@ -153,35 +147,33 @@ void LSWVirtualMachine::Start()
 
     m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true, std::move(dmesgOutput));
 
-    if (false) // early boot logging
+    if (m_settings.EnableEarlyBootDmesg)
     {
         kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
         vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
     }
 
-    vmSettings.Devices.VirtioSerial.emplace();
-
-    // TODO: support early boot logging
-
-    // The primary "console" will be a virtio serial device.
-
-    if (true)
+    if (helpers::IsVirtioSerialConsoleSupported())
     {
+        vmSettings.Devices.VirtioSerial.emplace();
+
+        // The primary "console" will be a virtio serial device.
+
         kernelCmdLine += L" console=hvc0 debug";
         hcs::VirtioSerialPort virtioPort{};
         virtioPort.Name = L"hvc0";
         virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
         virtioPort.ConsoleSupport = true;
         vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
-    }
 
-    if (!m_debugShellPipe.empty())
-    {
-        hcs::VirtioSerialPort virtioPort;
-        virtioPort.Name = L"hvc1";
-        virtioPort.NamedPipe = m_debugShellPipe;
-        virtioPort.ConsoleSupport = true;
-        vmSettings.Devices.VirtioSerial->Ports["1"] = std::move(virtioPort);
+        if (!m_debugShellPipe.empty())
+        {
+            hcs::VirtioSerialPort virtioPort;
+            virtioPort.Name = L"hvc1";
+            virtioPort.NamedPipe = m_debugShellPipe;
+            virtioPort.ConsoleSupport = true;
+            vmSettings.Devices.VirtioSerial->Ports["1"] = std::move(virtioPort);
+        }
     }
 
     // Set up boot params.
@@ -286,6 +278,11 @@ void LSWVirtualMachine::ConfigureNetworking()
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
+
+        if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(config))
+        {
+            config.FirewallConfig.reset();
+        }
 
         // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(

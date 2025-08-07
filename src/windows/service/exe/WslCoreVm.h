@@ -269,10 +269,6 @@ private:
 
     bool IsDisableVgpuSettingsSupported() const;
 
-    bool IsVirtioSerialConsoleSupported() const;
-
-    bool IsVmemmSuffixSupported() const;
-
     _Requires_lock_held_(m_lock)
     DiskMountResult MountDiskLockHeld(
         _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options);
