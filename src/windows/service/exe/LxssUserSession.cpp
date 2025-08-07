@@ -2679,11 +2679,18 @@ try
         THROW_IF_FAILED(wil::GetSystemDirectory(systemDirectory));
 
         e["commandline"] = WideToMultiByte(std::format(
-            L"{}\\{} {} {} {} {}", systemDirectory, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distributionIdString, WSL_CHANGE_DIRECTORY_ARG, WSL_CWD_HOME));
+            L"{}\\{} {} {}", systemDirectory, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distributionIdString));
 
         e["name"] = WideToMultiByte(Configuration.Name);
         e["guid"] = WideToMultiByte(distributionProfileId);
         e["icon"] = WideToMultiByte(IconPath.native());
+        
+        // Set default starting directory to home directory if not already specified
+        // This allows Windows Terminal to override with startingDirectory setting
+        if (e.find("startingDirectory") == e.end())
+        {
+            e["startingDirectory"] = "~";
+        }
 
         // See https://github.com/microsoft/terminal/pull/18195. Supported in terminal >= 1.23
         e["pathTranslationStyle"] = "wsl";
