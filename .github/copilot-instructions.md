@@ -28,7 +28,7 @@ WSL is the Windows Subsystem for Linux - a compatibility layer for running Linux
 ### Building WSL (Windows Only)
 1. Clone the repository
 2. Generate Visual Studio solution: `cmake .`
-3. Build: `cmake --build .` OR open `wsl.sln` in Visual Studio
+3. Build: `cmake --build . -- -m` OR open `wsl.sln` in Visual Studio
 4. **NEVER CANCEL: Build takes 20-45 minutes on typical hardware. Set timeout to 60+ minutes.**
 
 Build parameters:
@@ -53,6 +53,7 @@ Build parameters:
 ### Code Formatting and Validation (Works on Linux/Windows)
 - Format check: `clang-format --dry-run --style=file <files>`
 - Apply formatting: `clang-format -i --style=file <files>`
+- Format all source: `powershell formatsource.ps1` (available at repo root after running `cmake .`)
 - Validate copyright headers: `python3 tools/devops/validate-copyright-headers.py`
   - **Note**: Will report missing headers in generated/dependency files (_deps/), which is expected
 - Validate localization: `python3 tools/devops/validate-localization.py` 
@@ -121,14 +122,14 @@ Test debugging:
 ```bash
 # Initial setup
 cmake .
-cmake --build . # 20-45 minutes, NEVER CANCEL
+cmake --build . -- -m # 20-45 minutes, NEVER CANCEL
 
 # Deploy and test  
 powershell tools\deploy\deploy-to-host.ps1
 wsl --version
 
 # Run tests
-bin\x64\debug\test.bat /name:*UnitTest* # 30-60 minutes, NEVER CANCEL
+bin\x64\debug\test.bat # 30-60 minutes, NEVER CANCEL
 ```
 
 #### Cross-Platform Validation:
