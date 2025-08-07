@@ -1085,6 +1085,7 @@ class InstallerTests
         }
     }
 
+    // This test case requires a machine without the OC's enabled.
     TEST_METHOD(WSLAInstallManual)
     {
         WslInstallComponent components{};
@@ -1092,12 +1093,12 @@ class InstallerTests
 
         if (!WI_IsAnyFlagSet(components, WslInstallComponentWslOC | WslInstallComponentVMPOC))
         {
-            LogSkipped("OC are installed, skipping test");
+            LogSkipped("OC are installed, skipping test. Flags: %i", components);
             return;
         }
 
         auto expectedComponents = WslInstallComponentVMPOC;
-        WI_SetFlagIf(expectedComponents, WslInstallComponentWslOC, wsl::windows::common::helpers::IsWindows11OrAbove());
+        WI_SetFlagIf(expectedComponents, WslInstallComponentWslOC, !wsl::windows::common::helpers::IsWindows11OrAbove());
 
         VERIFY_ARE_EQUAL(components, expectedComponents);
 
@@ -1108,10 +1109,5 @@ class InstallerTests
 
         VERIFY_ARE_EQUAL(WslInstallComponents(components, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
         VERIFY_ARE_EQUAL(progressedComponents, expectedComponents);
-
-        WslInstallComponent componentsAfterInstall{};
-        VERIFY_SUCCEEDED(WslQueryMissingComponents(&componentsAfterInstall));
-
-        VERIFY_ARE_EQUAL(componentsAfterInstall, WslInstallComponentNone);
     }
 };

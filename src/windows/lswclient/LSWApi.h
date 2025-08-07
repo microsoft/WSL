@@ -179,7 +179,6 @@ HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMapp
 
 HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
 
-
 enum WslInstallComponent
 {
     WslInstallComponentNone = 0,

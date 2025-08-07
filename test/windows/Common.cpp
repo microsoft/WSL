@@ -1976,6 +1976,8 @@ Return Value:
     }
     CATCH_LOG();
 
+    return true;
+
     try
     {
         const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();

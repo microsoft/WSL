@@ -316,7 +316,7 @@ try
     WI_SetFlagIf(
         *Components,
         WslInstallComponentWslOC,
-        !wsl::windows::common::helpers::IsWindows11OrAbove() && wsl::windows::common::helpers::IsServicePresent(L"lxssmanager"));
+        !wsl::windows::common::helpers::IsWindows11OrAbove() && !wsl::windows::common::helpers::IsServicePresent(L"lxssmanager"));
 
     WI_SetFlagIf(*Components, WslInstallComponentVMPOC, !wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled());
 
@@ -385,7 +385,7 @@ try
         }
 
         auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameWsl, false);
-        THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "Failed to install '%ls', %lu", WslInstall::c_optionalFeatureNameWsl, exitCode);
+        THROW_HR_IF_MSG(E_FAIL, exitCode != 0 && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED, "Failed to install '%ls', %lu", WslInstall::c_optionalFeatureNameWsl, exitCode);
     }
 
     if (WI_IsFlagSet(Components, WslInstallComponentVMPOC))
@@ -396,7 +396,7 @@ try
         }
 
         auto exitCode = WslInstall::InstallOptionalComponent(WslInstall::c_optionalFeatureNameVmp, false);
-        THROW_HR_IF_MSG(E_FAIL, exitCode != 0, "Failed to install '%ls', %lu", WslInstall::c_optionalFeatureNameVmp, exitCode);
+        THROW_HR_IF_MSG(E_FAIL, exitCode != 0 && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED, "Failed to install '%ls', %lu", WslInstall::c_optionalFeatureNameVmp, exitCode);
     }
 
     return WI_IsAnyFlagSet(Components, WslInstallComponentWslOC | WslInstallComponentVMPOC)
