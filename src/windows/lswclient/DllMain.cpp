@@ -84,6 +84,7 @@ try
     settings.BootTimeoutMs = UserSettings->Options.BootTimeoutMs;
     settings.DmesgOutput = HandleToULong(UserSettings->Options.Dmesg);
     settings.EnableDebugShell = UserSettings->Options.EnableDebugShell;
+    settings.EnableEarlyBootDmesg = UserSettings->Options.EnableEarlyBootDmesg;
     settings.NetworkingMode = UserSettings->Networking.Mode;
     settings.EnableDnsTunneling = UserSettings->Networking.DnsTunneling;
 
