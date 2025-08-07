@@ -23,7 +23,7 @@
                     "Sha256": "c74833a55e525b1e99e1541509c566bb3e32bdb53bf27ea3347174364a57f47c"
                 },
                 "Arm64Url": {
-                    "Url": "https://cdimages.ubuntu.com/releases/24.04.2/release/ubuntu-24.04.3-wsl-arm64.wsl",
+                    "Url": "https://cdimages.ubuntu.com/releases/24.04.3/release/ubuntu-24.04.3-wsl-arm64.wsl",
                     "Sha256": "edaf375ea0d1319da08e7154e9bc64cd4eead5af21ea032f2edaa335fadf0970"
                 }
             }
