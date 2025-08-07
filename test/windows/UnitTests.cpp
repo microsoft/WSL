@@ -2541,7 +2541,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         VERIFY_ARE_EQUAL(
             std::format("{}\\{} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString),
             launchProfile["commandline"].get<std::string>());
-        
+
         // Verify that startingDirectory is set to home directory
         VERIFY_ARE_EQUAL(launchProfile["startingDirectory"].get<std::string>(), "~");
 
