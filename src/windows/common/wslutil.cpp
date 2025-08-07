@@ -543,7 +543,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
 }
 
 std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
-    std::wstring_view Url, std::wstring Filename, const std::function<bool(uint64_t, uint64_t)>& Progress)
+    std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress)
 {
     const auto lastSlash = Url.find_last_of('/');
     THROW_HR_IF(E_INVALIDARG, lastSlash == std::wstring::npos);
@@ -587,7 +587,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     download.Progress([&](const auto& _, uint64_t progress) {
         if (totalBytes != 0)
         {
-            progressBar.Print(progress, totalBytes);
+            Progress(progress, totalBytes);
         }
     });
 
@@ -1145,21 +1145,21 @@ std::vector<BYTE> wsl::windows::common::wslutil::HashFile(HANDLE file, DWORD Alg
     return fileHash;
 }
 
-std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> GetInstalledPackageVersion()
+std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> wsl::windows::common::wslutil::GetInstalledPackageVersion()
 {
     std::wstring packageVersion;
     auto result = wil::ResultFromException([&]() {
         auto msiKey = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
 
-        packageVersion = wsl::windows::common::registry::ReadString(msiKey.get(), L"Msi", L"Version", L"");
+        packageVersion = wsl::windows::common::registry::ReadString(msiKey.get(), L"Msi", L"Version");
     });
 
-    THROW_HR_IF(result, result != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) && result != HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
-
-    if (!SUCCEEDED(result))
+    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND))
     {
         return {};
     }
+
+    THROW_IF_FAILED(result);
 
     return ParseWslPackageVersion(packageVersion);
 }

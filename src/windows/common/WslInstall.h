@@ -47,6 +47,8 @@ public:
 
     static void InstallOptionalComponents(const std::vector<std::wstring>& components);
 
+    static DWORD InstallOptionalComponent(LPCWSTR component, bool consoleOutput);
+
     static std::pair<std::wstring, GUID> InstallModernDistribution(
         const wsl::windows::common::distribution::ModernDistributionVersion& distribution,
         const std::optional<ULONG>& version,
