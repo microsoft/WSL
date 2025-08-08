@@ -531,6 +531,20 @@ GUID wsl::windows::common::wslutil::CreateV5Uuid(const GUID& namespaceGuid, cons
 
 std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, std::wstring Filename)
 {
+    wsl::windows::common::ConsoleProgressBar progressBar;
+    auto progress = [&](auto current, auto total) {
+        progressBar.Print(current, total);
+        return true;
+    };
+
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { progressBar.Clear(); });
+
+    return DownloadFileImpl(Url, Filename, progress);
+}
+
+std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
+    std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress)
+{
     const auto lastSlash = Url.find_last_of('/');
     THROW_HR_IF(E_INVALIDARG, lastSlash == std::wstring::npos);
 
@@ -559,7 +573,6 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
     const auto asyncResponse = client.GetInputStreamAsync(winrt::Windows::Foundation::Uri(Url));
 
     std::atomic<uint64_t> totalBytes;
-    wsl::windows::common::ConsoleProgressBar progressBar;
     asyncResponse.Progress(
         [&](const winrt::Windows::Foundation::IAsyncOperationWithProgress<winrt::Windows::Storage::Streams::IInputStream, winrt::Windows::Web::Http::HttpProgress>&,
             const winrt::Windows::Web::Http::HttpProgress& progress) {
@@ -574,12 +587,11 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
     download.Progress([&](const auto& _, uint64_t progress) {
         if (totalBytes != 0)
         {
-            progressBar.Print(progress, totalBytes);
+            Progress(progress, totalBytes);
         }
     });
 
     download.get();
-    progressBar.Clear();
     deleteFileOnFailure.release();
 
     return file.Path().c_str();
@@ -1133,6 +1145,25 @@ std::vector<BYTE> wsl::windows::common::wslutil::HashFile(HANDLE file, DWORD Alg
     return fileHash;
 }
 
+std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> wsl::windows::common::wslutil::GetInstalledPackageVersion()
+{
+    std::wstring packageVersion;
+    auto result = wil::ResultFromException([&]() {
+        auto msiKey = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
+
+        packageVersion = wsl::windows::common::registry::ReadString(msiKey.get(), L"Msi", L"Version");
+    });
+
+    if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND))
+    {
+        return {};
+    }
+
+    THROW_IF_FAILED(result);
+
+    return ParseWslPackageVersion(packageVersion);
+}
+
 void wsl::windows::common::wslutil::InitializeWil()
 {
     wil::WilInitialize_CppWinRT();
@@ -1247,8 +1278,8 @@ std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::O
 
 bool wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled()
 {
-    // Note for Windows 11 22H2 and above builds: If hyper-v is installed but VMP platform isn't, HNS and vmcompute are available
-    // but calls to HNS will fail if vfpext isn't installed.
+    // Note for Windows 11 22H2 and above builds: If hyper-v is installed but VMP platform isn't, HNS and vmcompute are
+    // available but calls to HNS will fail if vfpext isn't installed.
     return wsl::windows::common::helpers::IsServicePresent(L"HNS") &&
            wsl::windows::common::helpers::IsServicePresent(L"vmcompute") &&
            (helpers::GetWindowsVersion().BuildNumber < helpers::WindowsBuildNumbers::Nickel ||

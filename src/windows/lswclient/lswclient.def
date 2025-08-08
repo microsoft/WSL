@@ -16,3 +16,6 @@ EXPORTS
     WslUnmapPort
     WslDetachDisk
     WslUnmount
+    WslQueryMissingComponents
+    WslInstallComponents
+    WslSetPackageUrl

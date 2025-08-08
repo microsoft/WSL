@@ -15,6 +15,7 @@ Abstract:
 #include "hcs_schema.h"
 #include "LSWApi.h"
 #include "NatNetworking.h"
+#include "MirroredNetworking.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -277,6 +278,11 @@ void LSWVirtualMachine::ConfigureNetworking()
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
+
+        if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(config))
+        {
+            config.FirewallConfig.reset();
+        }
 
         // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
