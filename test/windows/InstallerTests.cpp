@@ -18,11 +18,14 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "lswapi.h"
 
 using namespace wsl::windows::common::registry;
 
 extern std::wstring g_dumpFolder;
 static std::wstring g_pipelineBuildId;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslInstallComponent);
 
 class InstallerTests
 {
@@ -1036,5 +1039,77 @@ class InstallerTests
         InstallMsi();
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
+    }
+
+    TEST_METHOD(WSLAInstall)
+    {
+        auto expectComponents = [](WslInstallComponent expected) {
+            WslInstallComponent components{};
+            VERIFY_SUCCEEDED(WslQueryMissingComponents(&components));
+
+            VERIFY_ARE_EQUAL(components, expected);
+        };
+
+        VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslPackage, nullptr, nullptr), E_INVALIDARG);
+
+        expectComponents(WslInstallComponentNone);
+        UninstallMsi();
+
+        expectComponents(WslInstallComponentWslPackage);
+
+        {
+            UniqueWebServer fileServer(L"http://127.0.0.1:12346/", std::filesystem::path(m_msiPath));
+            VERIFY_SUCCEEDED(WslSetPackageUrl(L"http://127.0.0.1:12346/"));
+
+            WslInstallComponent progressedComponents{};
+            auto callback = [](WslInstallComponent Component, uint64_t progress, uint64_t total, void* Context) {
+                *reinterpret_cast<WslInstallComponent*>(Context) |= Component;
+            };
+
+            VERIFY_SUCCEEDED(WslInstallComponents(WslInstallComponentWslPackage, callback, &progressedComponents));
+            VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslPackage);
+
+            ValidateInstalledVersion(WIDEN(WSL_PACKAGE_VERSION));
+            expectComponents(WslInstallComponentNone);
+
+            progressedComponents = WslInstallComponentNone;
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentVMPOC, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
+            VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentVMPOC);
+
+            progressedComponents = WslInstallComponentNone;
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslOC, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
+            VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslOC);
+        }
+
+        {
+            VERIFY_SUCCEEDED(WslSetPackageUrl(L"http://127.0.0.1:12346/"));
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslPackage, nullptr, nullptr), WININET_E_CANNOT_CONNECT);
+        }
+    }
+
+    // This test case requires a machine without the OC's enabled.
+    TEST_METHOD(WSLAInstallManual)
+    {
+        WslInstallComponent components{};
+        VERIFY_SUCCEEDED(WslQueryMissingComponents(&components));
+
+        if (!WI_IsAnyFlagSet(components, WslInstallComponentWslOC | WslInstallComponentVMPOC))
+        {
+            LogSkipped("OC are installed, skipping test. Flags: %i", components);
+            return;
+        }
+
+        auto expectedComponents = WslInstallComponentVMPOC;
+        WI_SetFlagIf(expectedComponents, WslInstallComponentWslOC, !wsl::windows::common::helpers::IsWindows11OrAbove());
+
+        VERIFY_ARE_EQUAL(components, expectedComponents);
+
+        WslInstallComponent progressedComponents{};
+        auto callback = [](WslInstallComponent Component, uint64_t progress, uint64_t total, void* Context) {
+            *reinterpret_cast<WslInstallComponent*>(Context) |= Component;
+        };
+
+        VERIFY_ARE_EQUAL(WslInstallComponents(components, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
+        VERIFY_ARE_EQUAL(progressedComponents, expectedComponents);
     }
 };
