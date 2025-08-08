@@ -325,7 +325,7 @@ void LSWVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
     }
 }
 
-HRESULT LSWVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)
+HRESULT LSWVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)
 try
 {
     *Device = nullptr;
@@ -339,35 +339,35 @@ try
             wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
         }
 
-        ULONG lun = 0;
-        while (m_attachedDisks.find(lun) != m_attachedDisks.end())
+        *Lun = 0;
+        while (m_attachedDisks.find(*Lun) != m_attachedDisks.end())
         {
-            lun++;
+            (*Lun)++;
         }
 
         bool vhdAdded = false;
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             if (vhdAdded)
             {
-                wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), lun);
+                wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), *Lun);
             }
 
             wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), Path);
         });
 
-        wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly);
+        wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly);
         vhdAdded = true;
 
         LSW_GET_DISK message{};
         message.Header.MessageSize = sizeof(message);
         message.Header.MessageType = LSW_GET_DISK::Type;
-        message.ScsiLun = lun;
+        message.ScsiLun = *Lun;
         const auto& response = m_initChannel.Transaction(message);
 
         THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to attach disk, init returned: %lu", response.Result);
 
         cleanup.release();
-        m_attachedDisks.emplace(lun, AttachedDisk{Path, response.Buffer});
+        m_attachedDisks.emplace(*Lun, AttachedDisk{Path, response.Buffer});
 
         *Device = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(response.Buffer).release();
     });
@@ -424,6 +424,49 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::Unmount(_In_ const char* Path)
+try
+{
+    auto [pid, _, subChannel] = Fork(LSW_FORK::Thread);
+
+    wsl::shared::MessageWriter<LSW_UNMOUNT> message;
+    message.WriteString(Path);
+
+    const auto& response = subChannel.Transaction<LSW_UNMOUNT>(message.Span());
+
+    // TODO: Return errno to caller
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LSWVirtualMachine::DetachDisk(_In_ ULONG Lun)
+try
+{
+    std::lock_guard lock{m_lock};
+
+    // Find the disk
+    auto it = m_attachedDisks.find(Lun);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_attachedDisks.end());
+
+    // Detach it from the guest
+    LSW_DETACH message;
+    message.Lun = Lun;
+    const auto& response = m_initChannel.Transaction(message);
+
+    // TODO: Return errno to caller
+    THROW_HR_IF(E_FAIL, response.Result != 0);
+
+    // Remove it from the VM
+    m_attachedDisks.erase(it);
+
+    hcs::RemoveScsiDisk(m_computeSystem.get(), Lun);
+
+    return S_OK;
+}
+CATCH_RETURN()
 
 std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(enum LSW_FORK::ForkType Type)
 {

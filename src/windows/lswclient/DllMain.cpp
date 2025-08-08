@@ -110,9 +110,9 @@ CATCH_RETURN();
 HRESULT WslAttachDisk(LSWVirtualMachineHandle VirtualMachine, const DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk)
 {
     wil::unique_cotaskmem_ansistring device;
-    RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->AttachDisk(Settings->WindowsPath, Settings->ReadOnly, &device));
+    RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+                         ->AttachDisk(Settings->WindowsPath, Settings->ReadOnly, &device, &AttachedDisk->ScsiLun));
 
-    // TODO: wire LUN
     auto deviceSize = strlen(device.get());
     WI_VERIFY(deviceSize < sizeof(AttachedDiskInformation::Device));
 
@@ -284,6 +284,15 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WslUnmount(LSWVirtualMachineHandle VirtualMachine, const char* Path)
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Unmount(Path);
+}
+
+HRESULT WslDetachDisk(LSWVirtualMachineHandle VirtualMachine, ULONG Lun)
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->DetachDisk(Lun);
+}
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {
     wil::DLLMain(Instance, Reason, Reserved);
