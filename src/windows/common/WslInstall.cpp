@@ -23,8 +23,6 @@ Abstract:
 extern HINSTANCE g_dllInstance;
 
 constexpr LPCWSTR c_optionalFeatureInstallStatus = L"InstallStatus";
-constexpr LPCWSTR c_optionalFeatureNameVmp = L"VirtualMachinePlatform";
-constexpr LPCWSTR c_optionalFeatureNameWsl = L"Microsoft-Windows-Subsystem-Linux";
 
 using wsl::shared::Localization;
 using namespace wsl::windows::common::distribution;
@@ -239,18 +237,32 @@ std::pair<bool, std::vector<std::wstring>> WslInstall::CheckForMissingOptionalCo
     return {rebootRequired, std::move(missingComponents)};
 }
 
-void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& components)
+DWORD WslInstall::InstallOptionalComponent(LPCWSTR component, bool consoleOutput)
 {
     std::wstring systemDirectory;
     THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
 
     const auto dismPath = std::filesystem::path(std::move(systemDirectory)) / L"dism.exe";
+
+    auto commandLine = std::format(L"{} /Online /NoRestart /enable-feature /featurename:{}", dismPath.native(), component);
+
+    wsl::windows::common::SubProcess process(nullptr, commandLine.c_str());
+    if (!consoleOutput)
+    {
+        process.SetFlags(CREATE_NEW_CONSOLE);
+        process.SetShowWindow(SW_HIDE);
+    }
+
+    return process.Run();
+}
+
+void WslInstall::InstallOptionalComponents(const std::vector<std::wstring>& components)
+{
     for (const auto& component : components)
     {
         wsl::windows::common::wslutil::PrintMessage(Localization::MessageInstallingWindowsComponent(component));
 
-        auto commandLine = std::format(L"{} /Online /NoRestart /enable-feature /featurename:{}", dismPath.wstring(), component);
-        const auto exitCode = wsl::windows::common::helpers::RunProcess(commandLine);
+        const auto exitCode = InstallOptionalComponent(component.c_str(), true);
         if (exitCode != 0 && exitCode != ERROR_SUCCESS_REBOOT_REQUIRED)
         {
             THROW_HR_WITH_USER_ERROR(WSL_E_INSTALL_COMPONENT_FAILED, Localization::MessageOptionalComponentInstallFailed(component, exitCode));
