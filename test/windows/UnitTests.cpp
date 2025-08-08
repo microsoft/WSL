@@ -2539,8 +2539,11 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         wil::GetSystemDirectoryW(systemDir);
 
         VERIFY_ARE_EQUAL(
-            std::format("{}\\{} {} {} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString, WSL_CHANGE_DIRECTORY_ARG, WSL_CWD_HOME),
+            std::format("{}\\{} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString),
             launchProfile["commandline"].get<std::string>());
+
+        // Verify that startingDirectory is set to home directory
+        VERIFY_ARE_EQUAL(launchProfile["startingDirectory"].get<std::string>(), "~");
 
         auto iconLocation = wsl::shared::string::MultiByteToWide(launchProfile["icon"].get<std::string>());
         if (defaultIcon)
