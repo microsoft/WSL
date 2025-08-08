@@ -42,7 +42,7 @@ stages:
           displayName: Push nuget/${{ package }}.*.nupkg
           inputs:
             command: 'push'
-            packagesToPush: drop/nuget/${{ package }}.*.nupkg
+            packagesToPush: drop/bin/nuget/${{ package }}.*.nupkg
             nuGetFeedType: 'internal'
             publishVstsFeed: wsl
             allowPackageConflicts: ${{ parameters.isNightly }}
