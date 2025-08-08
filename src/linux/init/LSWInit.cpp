@@ -429,7 +429,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_SIGNAL& Me
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    Channel.SendResultMessage<int32_t>(umount(Message.Buffer));
+    Channel.SendResultMessage<int32_t>(umount(Message.Buffer) == 0 ? 0 : errno);
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_DETACH& Message, const gsl::span<gsl::byte>& Buffer)

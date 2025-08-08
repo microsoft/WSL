@@ -141,7 +141,7 @@ class LSWTests
         auto msiPath = wsl::windows::common::wslutil::GetMsiPackagePath();
         VERIFY_IS_TRUE(msiPath.has_value());
 
-        auto vhdPath = std::filesystem::path(msiPath.value()) / "tools" / "system.vhd";
+        auto vhdPath = std::filesystem::path(msiPath.value()) / "system.vhd";
 
 #endif
 
