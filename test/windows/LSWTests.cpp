@@ -124,6 +124,8 @@ class LSWTests
 
     TEST_METHOD(AttachDetach)
     {
+        WSL2_TEST_ONLY();
+
         VirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
         settings.DisplayName = L"LSW";
