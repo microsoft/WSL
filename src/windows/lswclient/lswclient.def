@@ -14,6 +14,8 @@ EXPORTS
     WslLaunchDebugShell
     WslMapPort
     WslUnmapPort
+    WslDetachDisk
+    WslUnmount
     WslQueryMissingComponents
     WslInstallComponents
     WslSetPackageUrl

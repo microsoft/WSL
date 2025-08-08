@@ -383,6 +383,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLswMapPort,
     LxMessageLswConnectRelay,
     LxMessageLswPortRelay,
+    LxMessageLswUnmount,
+    LxMessageLswDetach,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -487,6 +489,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLswMapPort)
         X(LxMessageLswConnectRelay)
         X(LxMessageLswPortRelay)
+        X(LxMessageLswUnmount)
+        X(LxMessageLswDetach)
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1757,6 +1761,31 @@ struct LSW_PORT_RELAY
     MESSAGE_HEADER Header;
 
     PRETTY_PRINT(FIELD(Header));
+};
+
+struct LSW_UNMOUNT
+{
+    static inline auto Type = LxMessageLswUnmount;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_UNMOUNT);
+    MESSAGE_HEADER Header;
+
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Buffer));
+};
+
+struct LSW_DETACH
+{
+    static inline auto Type = LxMessageLswDetach;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(LSW_DETACH);
+    MESSAGE_HEADER Header;
+    unsigned int Lun;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Lun));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT
