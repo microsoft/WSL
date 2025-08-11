@@ -473,6 +473,23 @@ wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& 
     return wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
 }
 
+void LSWVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
+{
+    static_assert(LinuxFileInput == LswOpenFlagsRead);
+    static_assert(LinuxFileOutput == LswOpenFlagsWrite);
+    static_assert(LinuxFileAppend == LswOpenFlagsAppend);
+    static_assert(LinuxFileCreate == LswOpenFlagsCreate);
+
+    shared::MessageWriter<LSW_OPEN> message;
+    message->Fd = Fd;
+    message->Flags = Flags;
+    message.WriteString(Path);
+
+    auto result = Channel.Transaction<LSW_OPEN>(message.Span()).Result;
+
+    THROW_HR_IF_MSG(E_FAIL, result != 0, "Failed to open %hs (flags: %u), %i", Path, Flags, result);
+}
+
 HRESULT LSWVirtualMachine::CreateLinuxProcess(
     _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
@@ -486,7 +503,20 @@ try
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
-        sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
+        if (Fds[i].Type == Default || Fds[i].Type == TerminalInput || Fds[i].Type == TerminalOutput)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > TerminalOutput, "Invalid flags: %i", Fds[i].Type);
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Fds[i].Type);
+            sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
+        }
+        else
+        {
+            THROW_HR_IF_MSG(
+                E_INVALIDARG, WI_IsAnyFlagSet(Fds[i].Type, TerminalInput | TerminalOutput), "Invalid flags: %i", Fds[i].Type);
+
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path == nullptr, "Fd[%zu] has a null path but flags: %i", i, Fds[i].Type);
+            OpenLinuxFile(childChannel, Fds[i].Path, Fds[i].Type, Fds[i].Fd);
+        }
     }
 
     wsl::shared::MessageWriter<LSW_EXEC> Message;
@@ -537,10 +567,14 @@ try
     Result->Errno = 0;
     Result->Pid = pid;
 
+    // TODO remove hack
+    auto null = wsl::windows::common::filesystem::OpenNulDevice(GENERIC_READ);
     for (size_t i = 0; i < sockets.size(); i++)
     {
         Handles[i] = (HANDLE)sockets[i].release();
     }
+
+    null.release();
 
     return S_OK;
 }

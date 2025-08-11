@@ -161,7 +161,8 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
     std::vector<LSW_PROCESS_FD> inputFd(UserSettings->FdCount);
     for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
-        inputFd[i] = {UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Type};
+        inputFd[i] = {
+            UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Type, UserSettings->FileDescriptors[i].Path};
     }
 
     std::vector<HANDLE> fds(UserSettings->FdCount);

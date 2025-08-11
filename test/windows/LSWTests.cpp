@@ -446,6 +446,55 @@ class LSWTests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
     }
 
+    TEST_METHOD(OpenFiles)
+    {
+        WSL2_TEST_ONLY();
+
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+
+        auto vm = CreateVm(&settings);
+
+        struct FileFd
+        {
+            int Fd;
+            FileDescriptorType Flags;
+            const char* Path;
+        };
+
+        auto createProcess = [&](std::vector<const char*> Args, const std::vector<FileFd>& Fds, std::optional<HRESULT> expectedError = {}) {
+            Args.emplace_back(nullptr);
+
+            std::vector<ProcessFileDescriptorSettings> fds;
+
+            for (const auto& e : Fds)
+            {
+                fds.emplace_back(ProcessFileDescriptorSettings{e.Fd, e.Flags, e.Path, nullptr});
+            }
+
+            CreateProcessSettings createProcessSettings{};
+            createProcessSettings.Executable = Args[0];
+            createProcessSettings.Arguments = Args.data();
+            createProcessSettings.FileDescriptors = fds.data();
+            createProcessSettings.Environment = nullptr;
+            createProcessSettings.FdCount = static_cast<uint32_t>(fds.size());
+
+            int pid{};
+            VERIFY_ARE_EQUAL(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid), expectedError.value_or(S_OK));
+
+            return fds;
+        };
+
+        {
+            auto fds = createProcess({"/bin/cat"}, {{1, LinuxFileInput, "/proc/self/cmdline"}});
+
+            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[0].Handle), "/bin/cat");
+        }
+    }
+
     TEST_METHOD(NATPortMapping)
     {
         WSL2_TEST_ONLY();

@@ -51,6 +51,7 @@ private:
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
 
     wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
+    void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
 
     struct AttachedDisk
