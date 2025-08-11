@@ -122,6 +122,64 @@ class LSWTests
         return vm;
     }
 
+    TEST_METHOD(AttachDetach)
+    {
+        WSL2_TEST_ONLY();
+
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 1024;
+        settings.Options.BootTimeoutMs = 30000;
+        auto vm = CreateVm(&settings);
+
+#ifdef WSL_DEV_INSTALL_PATH
+
+        auto vhdPath = std::filesystem::path(WSL_DEV_INSTALL_PATH) / "system.vhd";
+#else
+
+        auto msiPath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        VERIFY_IS_TRUE(msiPath.has_value());
+
+        auto vhdPath = std::filesystem::path(msiPath.value()) / "system.vhd";
+
+#endif
+
+        auto blockDeviceExists = [&](ULONG Lun) {
+            std::string device = std::format("/sys/bus/scsi/devices/0:0:0:{}", Lun);
+            std::vector<const char*> cmd{"/usr/bin/test", "-d", device.c_str()};
+            return RunCommand(vm.get(), cmd) == 0;
+        };
+
+        // Attach the disk.
+        DiskAttachSettings attachSettings{vhdPath.c_str(), true};
+        AttachedDiskInformation attachedDisk{};
+        VERIFY_SUCCEEDED(WslAttachDisk(vm.get(), &attachSettings, &attachedDisk));
+        VERIFY_IS_TRUE(blockDeviceExists(attachedDisk.ScsiLun));
+
+        // Mount it to /mnt.
+        MountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro"};
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &mountSettings));
+
+        // Validate that the mountpoint is present.
+        std::vector<const char*> cmd{"/usr/bin/mountpoint", "/mnt"};
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 0L);
+
+        // Unmount /mnt.
+        VERIFY_SUCCEEDED(WslUnmount(vm.get(), "/mnt"));
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 32L);
+
+        // Verify that unmount fails now.
+        VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), E_FAIL);
+
+        // Detach the disk
+        VERIFY_SUCCEEDED(WslDetachDisk(vm.get(), attachedDisk.ScsiLun));
+        VERIFY_IS_FALSE(blockDeviceExists(attachedDisk.ScsiLun));
+
+        // Verify that disk can't be detached twice
+        VERIFY_ARE_EQUAL(WslDetachDisk(vm.get(), attachedDisk.ScsiLun), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+    }
+
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
