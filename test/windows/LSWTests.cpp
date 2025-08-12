@@ -374,6 +374,15 @@ class LSWTests
             VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, 1000, &result));
             VERIFY_ARE_EQUAL(result.State, ProcessStateRunning);
 
+            // Verify that the process can still be waited for
+            result = {};
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, 1000, &result));
+            VERIFY_ARE_EQUAL(result.State, ProcessStateRunning);
+
+            result = {};
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, 0, &result));
+            VERIFY_ARE_EQUAL(result.State, ProcessStateRunning);
+
             // Verify that it can be killed.
             VERIFY_SUCCEEDED(WslSignalLinuxProcess(vm.get(), pid, 9));
 
