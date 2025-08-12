@@ -31,7 +31,7 @@ public:
     IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)) override;
     IFACEMETHOD(CreateLinuxProcess(
-        _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
+        _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ ULONG* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
@@ -53,6 +53,9 @@ private:
     wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
     void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
+
+    std::vector<wil::unique_socket> CreateLinuxProcessImpl(
+        _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ LSW_CREATE_PROCESS_RESULT* Result);
 
     struct AttachedDisk
     {

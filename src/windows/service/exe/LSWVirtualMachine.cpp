@@ -259,9 +259,9 @@ void LSWVirtualMachine::ConfigureNetworking()
     {
         // Launch GNS
 
-        LSW_PROCESS_FD fds[2];
-        fds[0].Fd = 3;
-        fds[0].Type = FileDescriptorType::Default;
+        LSW_PROCESS_FD fd{};
+        fd.Fd = 3;
+        fd.Type = FileDescriptorType::Default;
 
         std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "3"};
         LSW_CREATE_PROCESS_OPTIONS options{};
@@ -272,9 +272,9 @@ void LSWVirtualMachine::ConfigureNetworking()
         std::vector<HANDLE> socketHandles(2);
 
         LSW_CREATE_PROCESS_RESULT result{};
-        THROW_IF_FAILED(CreateLinuxProcess(&options, 1, fds, socketHandles.data(), &result));
+        auto sockets = CreateLinuxProcessImpl(&options, 1, &fd, &result);
 
-        wil::unique_socket gnsSocket{(SOCKET)socketHandles[0]};
+        THROW_HR_IF(E_FAIL, result.Errno != 0);
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
@@ -286,7 +286,7 @@ void LSWVirtualMachine::ConfigureNetworking()
 
         // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
-            m_computeSystem.get(), wsl::core::NatNetworking::CreateNetwork(config), std::move(gnsSocket), config, wil::unique_socket{});
+            m_computeSystem.get(), wsl::core::NatNetworking::CreateNetwork(config), std::move(sockets[0]), config, wil::unique_socket{});
 
         m_networkEngine->Initialize();
 
@@ -491,8 +491,26 @@ void LSWVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const
 }
 
 HRESULT LSWVirtualMachine::CreateLinuxProcess(
-    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
+    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, _Out_ ULONG* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
+{
+    auto sockets = CreateLinuxProcessImpl(Options, FdCount, Fds, Result);
+
+    for (size_t i = 0; i < sockets.size(); i++)
+    {
+        if (sockets[i])
+        {
+            Handles[i] = HandleToUlong(
+                wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].release())));
+        }
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
+    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fds, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 {
     // Check if this is a tty or not
     const LSW_PROCESS_FD* ttyInput = nullptr;
@@ -540,7 +558,7 @@ try
         if (result != 0)
         {
             Result->Errno = result;
-            return E_FAIL;
+            THROW_HR(E_FAIL);
         }
 
         grandChildChannel.SendMessage<LSW_EXEC>(Message.Span());
@@ -548,7 +566,7 @@ try
         if (result != 0)
         {
             Result->Errno = result;
-            return E_FAIL;
+            THROW_HR(E_FAIL);
         }
 
         pid = grandChildPid;
@@ -560,25 +578,14 @@ try
         if (result != 0)
         {
             Result->Errno = result;
-            return E_FAIL;
+            THROW_HR(E_FAIL);
         }
     }
 
     Result->Errno = 0;
     Result->Pid = pid;
-
-    // TODO remove hack
-    auto null = wsl::windows::common::filesystem::OpenNulDevice(GENERIC_READ);
-    for (size_t i = 0; i < sockets.size(); i++)
-    {
-        Handles[i] = (HANDLE)sockets[i].release();
-    }
-
-    null.release();
-
-    return S_OK;
+    return sockets;
 }
-CATCH_RETURN();
 
 int32_t LSWVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
 {

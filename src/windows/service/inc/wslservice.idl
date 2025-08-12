@@ -425,7 +425,6 @@ typedef struct _LSW_PROCESS_FD
     LONG Fd;
     int Type;
     [string, unique] LPCSTR Path;
-    HVSOCKET_HANDLE Handle;
 } LSW_PROCESS_FD;
 
 typedef
@@ -453,7 +452,7 @@ interface ILSWVirtualMachine : IUnknown
 {
     HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device);
     HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
-    HRESULT CreateLinuxProcess([in] const LSW_CREATE_PROCESS_OPTIONS* Options, [in] ULONG FdCount, [in, unique, size_is(FdCount), length_is(FdCount)] LSW_PROCESS_FD* Fds, [out, size_is(FdCount)] HVSOCKET_HANDLE* Handles, [out] LSW_CREATE_PROCESS_RESULT* Result);
+    HRESULT CreateLinuxProcess([in] const LSW_CREATE_PROCESS_OPTIONS* Options, [in] ULONG FdCount, [in, unique, size_is(FdCount)] LSW_PROCESS_FD* Fds, [out, size_is(FdCount)] ULONG* Handles, [out] LSW_CREATE_PROCESS_RESULT* Result);
     HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
     HRESULT Signal([in] LONG Pid, [in] int Signal);
     HRESULT Shutdown([in] ULONGLONG TimeoutMs);

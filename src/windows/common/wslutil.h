@@ -88,6 +88,8 @@ std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, cons
 
 [[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE handleInTarget);
 
+[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle);
+
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
 
 std::wstring ErrorCodeToString(HRESULT Error);

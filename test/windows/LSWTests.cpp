@@ -479,8 +479,7 @@ class LSWTests
             createProcessSettings.Executable = Args[0];
             createProcessSettings.Arguments = Args.data();
             createProcessSettings.FileDescriptors = fds.data();
-            createProcessSettings.Environment = nullptr;
-            createProcessSettings.FdCount = static_cast<uint32_t>(fds.size());
+            createProcessSettings.FdCount = static_cast<DWORD>(fds.size());
 
             int pid{};
             VERIFY_ARE_EQUAL(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid), expectedError.value_or(S_OK));
@@ -489,9 +488,8 @@ class LSWTests
         };
 
         {
-            auto fds = createProcess({"/bin/cat"}, {{1, LinuxFileInput, "/proc/self/cmdline"}});
-
-            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[0].Handle), "/bin/cat");
+            auto fds = createProcess({"/bin/cat"}, {{0, LinuxFileInput, "/proc/self/comm"}, {1, Default, nullptr}});
+            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].Handle), "cat\n");
         }
     }
 
