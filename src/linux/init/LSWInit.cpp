@@ -88,6 +88,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_OPEN& Mess
     int flags = 0;
 
     WI_SetFlagIf(flags, O_APPEND, WI_IsFlagSet(Message.Flags, LswOpenFlagsAppend));
+    WI_SetFlagIf(flags, O_TRUNC, !WI_IsFlagSet(Message.Flags, LswOpenFlagsAppend) && WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite));
     WI_SetFlagIf(flags, O_CREAT, WI_IsFlagSet(Message.Flags, LswOpenFlagsCreate));
     if (WI_IsFlagSet(Message.Flags, LswOpenFlagsRead) && WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite))
     {

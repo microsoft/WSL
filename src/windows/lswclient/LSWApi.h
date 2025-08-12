@@ -131,7 +131,7 @@ struct ProcessFileDescriptorSettings
 {
     int32_t Number;
     enum FileDescriptorType Type;
-    const char* Path; // Required when 
+    const char* Path; // Required when 'Type' has LinuxFileInput or LinuxFileOutput
     HANDLE Handle;
 };
 
