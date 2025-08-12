@@ -28,7 +28,7 @@ public:
 
     void Start();
 
-    IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device)) override;
+    IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)) override;
     IFACEMETHOD(CreateLinuxProcess(
         _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ ULONG* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
@@ -38,6 +38,8 @@ public:
     IFACEMETHOD(RegisterCallback(_In_ ITerminationCallback* callback)) override;
     IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
     IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
+    IFACEMETHOD(Unmount(_In_ const char* Path)) override;
+    IFACEMETHOD(DetachDisk(_In_ ULONG Lun)) override;
 
 private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);

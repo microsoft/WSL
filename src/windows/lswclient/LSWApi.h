@@ -184,6 +184,10 @@ HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMapp
 
 HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
 
+HRESULT WslUnmount(LSWVirtualMachineHandle VirtualMachine, const char* Path);
+
+HRESULT WslDetachDisk(LSWVirtualMachineHandle VirtualMachine, ULONG Lun);
+
 enum WslInstallComponent
 {
     WslInstallComponentNone = 0,

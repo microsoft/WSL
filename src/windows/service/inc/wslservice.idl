@@ -450,7 +450,7 @@ interface ITerminationCallback : IUnknown
 ]
 interface ILSWVirtualMachine : IUnknown
 {
-    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device);
+    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device, [out] ULONG* Lun);
     HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
     HRESULT CreateLinuxProcess([in] const LSW_CREATE_PROCESS_OPTIONS* Options, [in] ULONG FdCount, [in, unique, size_is(FdCount)] LSW_PROCESS_FD* Fds, [out, size_is(FdCount)] ULONG* Handles, [out] LSW_CREATE_PROCESS_RESULT* Result);
     HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
@@ -459,6 +459,8 @@ interface ILSWVirtualMachine : IUnknown
     HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
     HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
     HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
+    HRESULT Unmount([in] LPCSTR Path);
+    HRESULT DetachDisk([in] ULONG Lun);
 }
 
 typedef

@@ -475,6 +475,18 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_SIGNAL& Me
     Channel.SendResultMessage(result < 0 ? errno : 0);
 }
 
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    Channel.SendResultMessage<int32_t>(umount(Message.Buffer) == 0 ? 0 : errno);
+}
+
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    sync();
+
+    Channel.SendResultMessage<int32_t>(DetachScsiDisk(Message.Lun));
+}
+
 template <typename TMessage, typename... Args>
 void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
 {
@@ -509,7 +521,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY, LSW_OPEN>(
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY, LSW_OPEN, LSW_UNMOUNT, LSW_DETACH>(
             Channel, Type, Buffer);
     }
     catch (...)
