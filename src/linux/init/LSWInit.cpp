@@ -120,6 +120,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_OPEN& Mess
     {
         result = errno;
         LOG_ERROR("dup2({}, {}) failed: {}", fd.get(), Message.Fd, result);
+        return;
     }
 
     result = 0;
