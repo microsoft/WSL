@@ -112,7 +112,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_OPEN& Mess
     if (!fd)
     {
         result = errno;
-
         LOG_ERROR("open({}, {}) failed: {}", path, flags, result);
         return;
     }

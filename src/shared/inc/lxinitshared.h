@@ -1687,7 +1687,7 @@ struct LSW_OPEN
     int32_t Fd;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Flags), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(Flags), FIELD(Fd), FIELD(Buffer));
 };
 
 enum LSWProcessState
