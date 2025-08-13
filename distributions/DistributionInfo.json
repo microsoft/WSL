@@ -185,6 +185,17 @@
                     "Sha256": "a5a2ceb8ca56b7245b909d021b0fd620427db349f02b8ef3b82b741bcb5611cd"
                 }
             }
+        ],
+        "NixOS": [
+            {
+                "Name": "NixOS-25.05",
+                "FriendlyName": "NixOS 25.05",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://github.com/nix-community/NixOS-WSL/releases/download/2505.7.0/nixos.wsl",
+                    "Sha256": "b9db52dc217e7852f715a4693d604da91591158b2da884d67a637cb70d63b1e1"
+                }
+            }
         ]
     },
     "Default": "Ubuntu",
