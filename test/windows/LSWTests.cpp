@@ -513,6 +513,139 @@ class LSWTests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
     }
 
+    TEST_METHOD(OpenFiles)
+    {
+        WSL2_TEST_ONLY();
+
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+
+        auto vm = CreateVm(&settings);
+
+        struct FileFd
+        {
+            int Fd;
+            FileDescriptorType Flags;
+            const char* Path;
+        };
+
+        auto createProcess = [&](std::vector<const char*> Args, const std::vector<FileFd>& Fds, HRESULT expectedError = S_OK) {
+            Args.emplace_back(nullptr);
+
+            std::vector<ProcessFileDescriptorSettings> fds;
+
+            for (const auto& e : Fds)
+            {
+                fds.emplace_back(ProcessFileDescriptorSettings{e.Fd, e.Flags, e.Path, nullptr});
+            }
+
+            CreateProcessSettings createProcessSettings{};
+            createProcessSettings.Executable = Args[0];
+            createProcessSettings.Arguments = Args.data();
+            createProcessSettings.FileDescriptors = fds.data();
+            createProcessSettings.FdCount = static_cast<DWORD>(fds.size());
+
+            int pid{};
+            VERIFY_ARE_EQUAL(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid), expectedError);
+
+            std::vector<wil::unique_handle> handles;
+
+            for (const auto& e : fds)
+            {
+                handles.emplace_back(e.Handle);
+            }
+
+            return std::make_pair(std::move(handles), pid);
+        };
+
+        auto wait = [&](int pid) {
+            WaitResult result{};
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, INFINITE, &result));
+            VERIFY_ARE_EQUAL(result.State, ProcessStateExited);
+
+            return result.Code;
+        };
+
+        {
+            auto [fds, pid] = createProcess({"/bin/cat"}, {{0, LinuxFileInput, "/proc/self/comm"}, {1, Default, nullptr}});
+            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "cat\n");
+            VERIFY_ARE_EQUAL(wait(pid), 0);
+        }
+
+        {
+            auto read = [&]() {
+                auto [readFds, readPid] = createProcess({"/bin/cat"}, {{0, LinuxFileInput, "/tmp/output"}, {1, Default, nullptr}});
+                VERIFY_ARE_EQUAL(wait(readPid), 0);
+
+                auto content = ReadToString((SOCKET)readFds[1].get());
+
+                return content;
+            };
+
+            // Write to a new file.
+            auto [fds, pid] = createProcess(
+                {"/bin/cat"},
+                {{0, Default, nullptr}, {1, static_cast<FileDescriptorType>(LinuxFileOutput | LinuxFileCreate), "/tmp/output"}});
+
+            constexpr auto content = "TestOutput";
+            VERIFY_IS_TRUE(WriteFile(fds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
+            fds.clear();
+            VERIFY_ARE_EQUAL(wait(pid), 0);
+
+            VERIFY_ARE_EQUAL(read(), content);
+
+            // Append content to the same file
+            auto [appendFds, appendPid] = createProcess(
+                {"/bin/cat"},
+                {{0, Default, nullptr}, {1, static_cast<FileDescriptorType>(LinuxFileOutput | LinuxFileAppend), "/tmp/output"}});
+
+            VERIFY_IS_TRUE(WriteFile(appendFds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
+            appendFds.clear();
+            VERIFY_ARE_EQUAL(wait(appendPid), 0);
+
+            VERIFY_ARE_EQUAL(read(), std::format("{}{}", content, content));
+
+            // Truncate the file
+            auto [truncFds, truncPid] = createProcess(
+                {"/bin/cat"}, {{0, Default, nullptr}, {1, static_cast<FileDescriptorType>(LinuxFileOutput), "/tmp/output"}});
+
+            VERIFY_IS_TRUE(WriteFile(truncFds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
+            truncFds.clear();
+            VERIFY_ARE_EQUAL(wait(truncPid), 0);
+
+            VERIFY_ARE_EQUAL(read(), content);
+        }
+
+        // Test various error paths
+        {
+            createProcess({"/bin/cat"}, {{0, static_cast<FileDescriptorType>(LinuxFileOutput), "/tmp/DoesNotExist"}}, E_FAIL);
+            createProcess({"/bin/cat"}, {{0, static_cast<FileDescriptorType>(LinuxFileOutput), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<FileDescriptorType>(Default), "should-be-null"}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<FileDescriptorType>(Default | LinuxFileOutput), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<FileDescriptorType>(LinuxFileAppend), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<FileDescriptorType>(LinuxFileInput | LinuxFileAppend), nullptr}}, E_INVALIDARG);
+        }
+
+        // Validate that read & write modes are respected
+        {
+            auto [fds, pid] = createProcess(
+                {"/bin/cat"}, {{0, LinuxFileInput, "/proc/self/comm"}, {1, LinuxFileInput, "/tmp/output"}, {2, Default, nullptr}});
+
+            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[2].get()), "/bin/cat: write error: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(wait(pid), 1);
+        }
+
+        {
+            auto [fds, pid] = createProcess({"/bin/cat"}, {{0, LinuxFileOutput, "/tmp/output"}, {2, Default, nullptr}});
+
+            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "/bin/cat: -: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(wait(pid), 1);
+        }
+    }
+
     TEST_METHOD(NATPortMapping)
     {
         WSL2_TEST_ONLY();
