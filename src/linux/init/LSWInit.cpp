@@ -78,6 +78,54 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& M
     THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
 }
 
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_OPEN& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    int32_t result = EINVAL;
+
+    auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
+
+    auto path = wsl::shared::string::FromMessageBuffer<LSW_OPEN>(Buffer);
+    int flags = 0;
+
+    WI_SetFlagIf(flags, O_APPEND, WI_IsFlagSet(Message.Flags, LswOpenFlagsAppend));
+    WI_SetFlagIf(flags, O_TRUNC, !WI_IsFlagSet(Message.Flags, LswOpenFlagsAppend) && WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite));
+    WI_SetFlagIf(flags, O_CREAT, WI_IsFlagSet(Message.Flags, LswOpenFlagsCreate));
+    if (WI_IsFlagSet(Message.Flags, LswOpenFlagsRead) && WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite))
+    {
+        WI_SetFlag(flags, O_RDWR);
+    }
+    else if (WI_IsFlagSet(Message.Flags, LswOpenFlagsRead))
+    {
+        static_assert(O_RDONLY == 0);
+    }
+    else if (WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite))
+    {
+        WI_SetFlag(flags, O_WRONLY);
+    }
+    else
+    {
+        LOG_ERROR("Invalid LSW_OPEN flags: {}", Message.Flags);
+        return; // Return -EINVAL if no opening flags are passed.
+    }
+
+    wil::unique_fd fd = open(path, flags);
+    if (!fd)
+    {
+        result = errno;
+        LOG_ERROR("open({}, {}) failed: {}", path, flags, result);
+        return;
+    }
+
+    if (dup2(fd.get(), Message.Fd) < 0)
+    {
+        result = errno;
+        LOG_ERROR("dup2({}, {}) failed: {}", fd.get(), Message.Fd, result);
+        return;
+    }
+
+    result = 0;
+}
+
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
 {
     THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
@@ -473,7 +521,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY, LSW_UNMOUNT, LSW_DETACH>(
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY, LSW_OPEN, LSW_UNMOUNT, LSW_DETACH>(
             Channel, Type, Buffer);
     }
     catch (...)

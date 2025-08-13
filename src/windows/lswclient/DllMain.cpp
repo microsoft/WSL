@@ -161,10 +161,13 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
     std::vector<LSW_PROCESS_FD> inputFd(UserSettings->FdCount);
     for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
-        inputFd[i] = {UserSettings->FileDescriptors[i].Number, UserSettings->FileDescriptors[i].Type};
+        inputFd[i] = {
+            UserSettings->FileDescriptors[i].Number,
+            UserSettings->FileDescriptors[i].Type,
+            (char*)UserSettings->FileDescriptors[i].Path};
     }
 
-    std::vector<HANDLE> fds(UserSettings->FdCount);
+    std::vector<ULONG> fds(UserSettings->FdCount);
     if (fds.empty())
     {
         fds.resize(1); // COM doesn't like null pointers.
@@ -175,7 +178,7 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
 
     for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
-        UserSettings->FileDescriptors[i].Handle = fds[i];
+        UserSettings->FileDescriptors[i].Handle = UlongToHandle(fds[i]);
     }
 
     *Pid = result.Pid;

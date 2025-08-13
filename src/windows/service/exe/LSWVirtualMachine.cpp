@@ -259,9 +259,9 @@ void LSWVirtualMachine::ConfigureNetworking()
     {
         // Launch GNS
 
-        LSW_PROCESS_FD fds[2];
-        fds[0].Fd = 3;
-        fds[0].Type = FileDescriptorType::Default;
+        LSW_PROCESS_FD fd{};
+        fd.Fd = 3;
+        fd.Type = FileDescriptorType::Default;
 
         std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "3"};
         LSW_CREATE_PROCESS_OPTIONS options{};
@@ -272,9 +272,9 @@ void LSWVirtualMachine::ConfigureNetworking()
         std::vector<HANDLE> socketHandles(2);
 
         LSW_CREATE_PROCESS_RESULT result{};
-        THROW_IF_FAILED(CreateLinuxProcess(&options, 1, fds, socketHandles.data(), &result));
+        auto sockets = CreateLinuxProcessImpl(&options, 1, &fd, &result);
 
-        wil::unique_socket gnsSocket{(SOCKET)socketHandles[0]};
+        THROW_HR_IF(E_FAIL, result.Errno != 0);
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
@@ -286,7 +286,7 @@ void LSWVirtualMachine::ConfigureNetworking()
 
         // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
-            m_computeSystem.get(), wsl::core::NatNetworking::CreateNetwork(config), std::move(gnsSocket), config, wil::unique_socket{});
+            m_computeSystem.get(), wsl::core::NatNetworking::CreateNetwork(config), std::move(sockets[0]), config, wil::unique_socket{});
 
         m_networkEngine->Initialize();
 
@@ -516,9 +516,44 @@ wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& 
     return wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
 }
 
+void LSWVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
+{
+    static_assert(LinuxFileInput == LswOpenFlagsRead);
+    static_assert(LinuxFileOutput == LswOpenFlagsWrite);
+    static_assert(LinuxFileAppend == LswOpenFlagsAppend);
+    static_assert(LinuxFileCreate == LswOpenFlagsCreate);
+
+    shared::MessageWriter<LSW_OPEN> message;
+    message->Fd = Fd;
+    message->Flags = Flags;
+    message.WriteString(Path);
+
+    auto result = Channel.Transaction<LSW_OPEN>(message.Span()).Result;
+
+    THROW_HR_IF_MSG(E_FAIL, result != 0, "Failed to open %hs (flags: %u), %i", Path, Flags, result);
+}
+
 HRESULT LSWVirtualMachine::CreateLinuxProcess(
-    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, HANDLE* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
+    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, _Out_ ULONG* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 try
+{
+    auto sockets = CreateLinuxProcessImpl(Options, FdCount, Fds, Result);
+
+    for (size_t i = 0; i < sockets.size(); i++)
+    {
+        if (sockets[i])
+        {
+            Handles[i] =
+                HandleToUlong(wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].get())));
+        }
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
+    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fds, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
 {
     // Check if this is a tty or not
     const LSW_PROCESS_FD* ttyInput = nullptr;
@@ -529,7 +564,20 @@ try
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
-        sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
+        if (Fds[i].Type == Default || Fds[i].Type == TerminalInput || Fds[i].Type == TerminalOutput)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > TerminalOutput, "Invalid flags: %i", Fds[i].Type);
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Fds[i].Type);
+            sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
+        }
+        else
+        {
+            THROW_HR_IF_MSG(
+                E_INVALIDARG, WI_IsAnyFlagSet(Fds[i].Type, TerminalInput | TerminalOutput), "Invalid flags: %i", Fds[i].Type);
+
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path == nullptr, "Fd[%zu] has a null path but flags: %i", i, Fds[i].Type);
+            OpenLinuxFile(childChannel, Fds[i].Path, Fds[i].Type, Fds[i].Fd);
+        }
     }
 
     wsl::shared::MessageWriter<LSW_EXEC> Message;
@@ -553,7 +601,7 @@ try
         if (result != 0)
         {
             Result->Errno = result;
-            return E_FAIL;
+            THROW_HR(E_FAIL);
         }
 
         grandChildChannel.SendMessage<LSW_EXEC>(Message.Span());
@@ -561,7 +609,7 @@ try
         if (result != 0)
         {
             Result->Errno = result;
-            return E_FAIL;
+            THROW_HR(E_FAIL);
         }
 
         pid = grandChildPid;
@@ -573,21 +621,14 @@ try
         if (result != 0)
         {
             Result->Errno = result;
-            return E_FAIL;
+            THROW_HR(E_FAIL);
         }
     }
 
     Result->Errno = 0;
     Result->Pid = pid;
-
-    for (size_t i = 0; i < sockets.size(); i++)
-    {
-        Handles[i] = (HANDLE)sockets[i].release();
-    }
-
-    return S_OK;
+    return sockets;
 }
-CATCH_RETURN();
 
 int32_t LSWVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
 {

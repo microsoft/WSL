@@ -118,15 +118,20 @@ HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const struct MountSetti
 
 enum FileDescriptorType
 {
-    Default,
-    TerminalInput,
-    TerminalOutput
+    Default = 0,
+    TerminalInput = 1,
+    TerminalOutput = 2,
+    LinuxFileInput = 4,
+    LinuxFileOutput = 8,
+    LinuxFileAppend = 16,
+    LinuxFileCreate = 32,
 };
 
 struct ProcessFileDescriptorSettings
 {
     int32_t Number;
-    enum FileDescriptorType Type; // Not implemented yet
+    enum FileDescriptorType Type;
+    const char* Path; // Required when 'Type' has LinuxFileInput or LinuxFileOutput
     HANDLE Handle;
 };
 

@@ -384,6 +384,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLswMapPort,
     LxMessageLswConnectRelay,
     LxMessageLswPortRelay,
+    LxMessageLswOpen,
     LxMessageLswUnmount,
     LxMessageLswDetach,
 } LX_MESSAGE_TYPE,
@@ -490,6 +491,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLswMapPort)
         X(LxMessageLswConnectRelay)
         X(LxMessageLswPortRelay)
+        X(LxMessageLswOpen)
         X(LxMessageLswUnmount)
         X(LxMessageLswDetach)
     default:
@@ -1664,6 +1666,29 @@ struct LSW_CONNECT
     MESSAGE_HEADER Header;
     int32_t Fd = -1; // TODO: multiple at once
     PRETTY_PRINT(FIELD(Header), FIELD(Fd));
+};
+
+enum LswOpenFlags // Must match FileDescriptorType.
+{
+    LswOpenFlagsNone = 0,
+    LswOpenFlagsRead = 4,
+    LswOpenFlagsWrite = 8,
+    LswOpenFlagsAppend = 16,
+    LswOpenFlagsCreate = 32
+};
+
+struct LSW_OPEN
+{
+    static inline auto Type = LxMessageLswOpen;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+    DECLARE_MESSAGE_CTOR(LSW_OPEN);
+
+    MESSAGE_HEADER Header;
+    uint32_t Flags;
+    int32_t Fd;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Flags), FIELD(Fd), FIELD(Buffer));
 };
 
 enum LSWProcessState

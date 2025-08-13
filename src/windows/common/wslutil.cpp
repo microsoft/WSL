@@ -609,6 +609,17 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     return handle;
 }
 
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(_In_ HANDLE Handle)
+{
+    const wil::unique_handle caller = OpenCallingProcess(PROCESS_DUP_HANDLE);
+    THROW_LAST_ERROR_IF(!caller);
+
+    HANDLE handle;
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(GetCurrentProcess(), Handle, caller.get(), &handle, 0, FALSE, DUPLICATE_SAME_ACCESS));
+
+    return handle;
+}
+
 void wsl::windows::common::wslutil::EnforceFileLimit(LPCWSTR Path, size_t Limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred)
 {
     std::map<std::filesystem::file_time_type, std::filesystem::path> files;
