@@ -101,7 +101,11 @@ DistributionList ReadFromManifest(const std::wstring& url)
         }
         else
         {
-            const winrt::Windows::Web::Http::HttpClient client;
+            const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
+            filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
+            filter.CacheControl().ReadBehavior(winrt::Windows::Web::Http::Filters::HttpCacheReadBehavior::NoCache);
+
+            const winrt::Windows::Web::Http::HttpClient client(filter);
             const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
             response.EnsureSuccessStatusCode();
 
