@@ -785,4 +785,33 @@ class LSWTests
 
         VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &port));
     }
+
+    TEST_METHOD(StuckVmTermination)
+    {
+        WSL2_TEST_ONLY();
+
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = NetworkingModeNAT;
+
+        auto vm = CreateVm(&settings);
+
+        auto [pid, stdinFd, _, __] = LaunchCommand(vm.get(), {"/bin/cat"});
+
+        // Create a 'stuck' thread, waiting for cat to exit
+
+        std::thread stuckThread([&]() {
+            WaitResult result{};
+            WslWaitForLinuxProcess(vm.get(), pid, INFINITE, &result);
+        });
+
+        // Stop the service
+        StopWslService();
+
+        // Verify that the thread is unstuck
+        stuckThread.join();
+    }
 };

@@ -12,16 +12,52 @@ Abstract:
 
 --*/
 #include "LSWUserSession.h"
-#include "LSWVirtualMachine.h"
 
 using wsl::windows::service::lsw::LSWUserSessionImpl;
 
-wsl::windows::service::lsw::LSWUserSessionImpl::LSWUserSessionImpl(HANDLE Token, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo) :
+LSWUserSessionImpl::LSWUserSessionImpl(HANDLE Token, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo) :
     m_tokenInfo(std::move(TokenInfo))
 {
 }
 
-PSID wsl::windows::service::lsw::LSWUserSessionImpl::GetUserSid() const
+LSWUserSessionImpl::~LSWUserSessionImpl()
+{
+    // Manually signal the VM termination events. This prevents being stuck on an API call that holds the VM lock.
+    {
+        std::lock_guard lock(m_virtualMachinesLock);
+
+        for (auto* e : m_virtualMachines)
+        {
+            e->OnSessionTerminating();
+        }
+    }
+}
+
+void LSWUserSessionImpl::OnVmTerminated(LSWVirtualMachine* machine)
+{
+    std::lock_guard lock(m_virtualMachinesLock);
+    auto pred = [machine](const auto* e) { return machine == e; };
+
+    // Remove any stale VM reference.
+    m_virtualMachines.erase(std::remove_if(m_virtualMachines.begin(), m_virtualMachines.end(), pred), m_virtualMachines.end());
+}
+
+HRESULT LSWUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, ILSWVirtualMachine** VirtualMachine)
+{
+    auto vm = wil::MakeOrThrow<LSWVirtualMachine>(*Settings, GetUserSid(), this);
+
+    {
+        std::lock_guard lock(m_virtualMachinesLock);
+        m_virtualMachines.emplace_back(vm.Get());
+    }
+
+    vm->Start();
+    THROW_IF_FAILED(vm.CopyTo(__uuidof(ILSWVirtualMachine), (void**)VirtualMachine));
+
+    return S_OK;
+}
+
+PSID LSWUserSessionImpl::GetUserSid() const
 {
     return m_tokenInfo->User.Sid;
 }
@@ -46,11 +82,6 @@ try
     auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    auto vm = wil::MakeOrThrow<LSWVirtualMachine>(*Settings, session->GetUserSid());
-
-    THROW_IF_FAILED(vm.CopyTo(__uuidof(ILSWVirtualMachine), (void**)VirtualMachine));
-
-    vm->Start();
-    return S_OK;
+    return session->CreateVirtualMachine(Settings, VirtualMachine);
 }
 CATCH_RETURN();
