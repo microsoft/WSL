@@ -23,4 +23,6 @@ public:
 
     STDMETHODIMP CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated) override;
 };
+
+void ClearLswSessionsAndBlockNewInstances();
 } // namespace wsl::windows::service::lsw

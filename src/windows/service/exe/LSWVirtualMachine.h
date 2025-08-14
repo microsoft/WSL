@@ -18,15 +18,19 @@ Abstract:
 #include "Dmesg.h"
 
 namespace wsl::windows::service::lsw {
+
+class LSWUserSessionImpl;
+
 class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") LSWVirtualMachine
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ILSWVirtualMachine, IFastRundown>
 
 {
 public:
-    LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid);
+    LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, LSWUserSessionImpl* UserSession);
     ~LSWVirtualMachine();
 
     void Start();
+    void OnSessionTerminating();
 
     IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)) override;
@@ -88,5 +92,6 @@ private:
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::mutex m_lock;
     std::mutex m_portRelaylock;
+    LSWUserSessionImpl* m_userSession;
 };
 } // namespace wsl::windows::service::lsw

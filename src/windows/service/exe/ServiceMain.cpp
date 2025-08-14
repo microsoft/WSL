@@ -241,6 +241,7 @@ void WslService::ServiceStopped()
 
     // Terminate all user sessions.
     ClearSessionsAndBlockNewInstances();
+    wsl::windows::service::lsw::ClearLswSessionsAndBlockNewInstances();
 
     // Disconnect from the LxCore driver.
     if (g_lxcoreInitialized)

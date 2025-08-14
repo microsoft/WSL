@@ -17,8 +17,13 @@ Abstract:
 #include "LSWUserSession.h"
 
 using wsl::windows::service::lsw::LSWUserSessionFactory;
+using wsl::windows::service::lsw::LSWUserSessionImpl;
 
 CoCreatableClassWithFactory(LSWUserSession, LSWUserSessionFactory);
+
+static std::mutex g_mutex;
+static std::optional<std::vector<std::shared_ptr<LSWUserSessionImpl>>> g_sessions =
+    std::make_optional<std::vector<std::shared_ptr<LSWUserSessionImpl>>>();
 
 HRESULT LSWUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
 {
@@ -40,17 +45,17 @@ HRESULT LSWUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REF
 
         auto tokenInfo = wil::get_token_information<TOKEN_USER>(userToken.get());
 
-        static std::mutex mutex;
-        static std::vector<std::shared_ptr<LSWUserSessionImpl>> sessions;
+        std::lock_guard lock{g_mutex};
 
-        std::lock_guard lock{mutex};
+        THROW_HR_IF(CO_E_SERVER_STOPPING, !g_sessions.has_value());
 
-        auto session = std::find_if(
-            sessions.begin(), sessions.end(), [&tokenInfo](auto it) { return EqualSid(it->GetUserSid(), &tokenInfo->User.Sid); });
+        auto session = std::find_if(g_sessions->begin(), g_sessions->end(), [&tokenInfo](auto it) {
+            return EqualSid(it->GetUserSid(), &tokenInfo->User.Sid);
+        });
 
-        if (session == sessions.end())
+        if (session == g_sessions->end())
         {
-            session = sessions.insert(sessions.end(), std::make_shared<LSWUserSessionImpl>(userToken.get(), std::move(tokenInfo)));
+            session = g_sessions->insert(g_sessions->end(), std::make_shared<LSWUserSessionImpl>(userToken.get(), std::move(tokenInfo)));
         }
 
         auto comInstance = wil::MakeOrThrow<LSWUserSession>(std::weak_ptr<LSWUserSessionImpl>(*session));
@@ -68,4 +73,10 @@ HRESULT LSWUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REF
     WSL_LOG("LSWUserSessionFactory", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
 
     return S_OK;
+}
+
+void wsl::windows::service::lsw::ClearLswSessionsAndBlockNewInstances()
+{
+    std::lock_guard lock{g_mutex};
+    g_sessions.reset();
 }
