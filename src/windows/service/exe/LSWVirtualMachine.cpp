@@ -16,14 +16,15 @@ Abstract:
 #include "LSWApi.h"
 #include "NatNetworking.h"
 #include "MirroredNetworking.h"
+#include "LSWUserSession.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
 using helpers::WindowsVersion;
 using wsl::windows::service::lsw::LSWVirtualMachine;
 
-LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid) :
-    m_settings(Settings), m_userSid(UserSid)
+LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, LSWUserSessionImpl* Session) :
+    m_settings(Settings), m_userSid(UserSid), m_userSession(Session)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
 
@@ -42,14 +43,38 @@ HRESULT LSWVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
     return S_OK;
 }
 
+void LSWVirtualMachine::OnSessionTerminating()
+{
+    m_userSession = nullptr;
+    std::lock_guard mutex(m_lock);
+
+    if (m_vmTerminatingEvent.is_signaled())
+    {
+        return;
+    }
+
+    WSL_LOG("LswSignalTerminating", TraceLoggingValue(m_running, "running"));
+
+    m_vmTerminatingEvent.SetEvent();
+}
+
 LSWVirtualMachine::~LSWVirtualMachine()
 {
+    {
+        std::lock_guard mutex(m_lock);
+
+        if (m_userSession != nullptr)
+        {
+            m_userSession->OnVmTerminated(this);
+        }
+    }
+
     WSL_LOG("LswTerminateVmStart", TraceLoggingValue(m_running, "running"));
-    m_vmTerminatingEvent.SetEvent();
 
     m_initChannel.Close();
 
     bool forceTerminate = false;
+
     // Wait up to 5 seconds for the VM to terminate.
     if (!m_vmExitEvent.wait(5000))
     {
@@ -502,7 +527,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork
 
     auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmExitEvent.get(), m_settings.BootTimeoutMs);
 
-    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid)});
+    return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get()});
 }
 
 wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
