@@ -417,41 +417,11 @@ CATCH_RETURN();
 HRESULT LSWVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)
 try
 {
-    static_assert(MountFlagsNone == LSW_MOUNT::None);
-    static_assert(MountFlagsChroot == LSW_MOUNT::Chroot);
-    static_assert(MountFlagsWriteableOverlayFs == LSW_MOUNT::OverlayFs);
-
-    wsl::shared::MessageWriter<LSW_MOUNT> message;
-
-    auto optionalAdd = [&](auto value, unsigned int& index) {
-        if (value != nullptr)
-        {
-            message.WriteString(index, value);
-        }
-    };
-
-    optionalAdd(Source, message->SourceIndex);
-    optionalAdd(Target, message->DestinationIndex);
-    optionalAdd(Type, message->TypeIndex);
-    optionalAdd(Options, message->OptionsIndex);
-    message->Flags = Flags;
-
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
-    const auto& response = m_initChannel.Transaction<LSW_MOUNT>(message.Span());
+    THROW_HR_IF(E_FAIL, MountImpl(m_initChannel, Source, Target, Type, Options, Flags) != 0);
 
-    WSL_LOG(
-        "LSWMount",
-        TraceLoggingValue(Source == nullptr ? "<null>" : Source, "Source"),
-        TraceLoggingValue(Target == nullptr ? "<null>" : Target, "Target"),
-        TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
-        TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
-        TraceLoggingValue(Flags, "Flags"),
-        TraceLoggingValue(response.Result, "Result"));
-
-    // TODO: better error
-    THROW_HR_IF(E_FAIL, response.Result != 0);
     return S_OK;
 }
 CATCH_RETURN();
@@ -532,9 +502,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork
 
 wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
 {
-    LSW_CONNECT message{};
-    message.Header.MessageSize = sizeof(message);
-    message.Header.MessageType = LSW_CONNECT::Type;
+    LSW_ACCEPT message{};
     message.Fd = Fd;
     const auto& response = Channel.Transaction(message);
 
@@ -653,6 +621,41 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
     Result->Errno = 0;
     Result->Pid = pid;
     return sockets;
+}
+
+int32_t LSWVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
+{
+    static_assert(MountFlagsNone == LSW_MOUNT::None);
+    static_assert(MountFlagsChroot == LSW_MOUNT::Chroot);
+    static_assert(MountFlagsWriteableOverlayFs == LSW_MOUNT::OverlayFs);
+
+    wsl::shared::MessageWriter<LSW_MOUNT> message;
+
+    auto optionalAdd = [&](auto value, unsigned int& index) {
+        if (value != nullptr)
+        {
+            message.WriteString(index, value);
+        }
+    };
+
+    optionalAdd(Source, message->SourceIndex);
+    optionalAdd(Target, message->DestinationIndex);
+    optionalAdd(Type, message->TypeIndex);
+    optionalAdd(Options, message->OptionsIndex);
+    message->Flags = Flags;
+
+    const auto& response = Channel.Transaction<LSW_MOUNT>(message.Span());
+
+    WSL_LOG(
+        "LSWMount",
+        TraceLoggingValue(Source == nullptr ? "<null>" : Source, "Source"),
+        TraceLoggingValue(Target == nullptr ? "<null>" : Target, "Target"),
+        TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
+        TraceLoggingValue(Options == nullptr ? "<null>" : Options, "Options"),
+        TraceLoggingValue(Flags, "Flags"),
+        TraceLoggingValue(response.Result, "Result"));
+
+    return response.Result;
 }
 
 int32_t LSWVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
@@ -835,5 +838,85 @@ try
     THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
 
     return result;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
+try
+{
+    std::filesystem::path Path(WindowsPath);
+    THROW_HR_IF_MSG(E_INVALIDARG, !Path.is_absolute(), "Path is not absolute: '%ls'", WindowsPath);
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(Path), "Path is not a directory: '%ls'", WindowsPath);
+
+    GUID shareGuid{};
+    THROW_IF_FAILED(CoCreateGuid(&shareGuid));
+
+    auto shareName = shared::string::GuidToString<wchar_t>(shareGuid, shared::string::None);
+
+    {
+        // Create the plan9 share on the host
+        std::lock_guard lock(m_lock);
+
+        // Verify that this folder isn't already mounted.
+        auto it = m_plan9Mounts.find(LinuxPath);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_plan9Mounts.end());
+
+        hcs::AddPlan9Share(
+            m_computeSystem.get(),
+            shareName.c_str(),
+            shareName.c_str(),
+            WindowsPath,
+            LX_INIT_UTILITY_VM_PLAN9_PORT,
+            hcs::Plan9ShareFlags::AllowOptions | (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None),
+            wsl::windows::common::security::GetUserToken(TokenImpersonation).get());
+
+        m_plan9Mounts.emplace(LinuxPath, shareName);
+    }
+
+    auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        std::lock_guard lock(m_lock);
+
+        LOG_HR_IF(E_UNEXPECTED, m_plan9Mounts.erase(LinuxPath) != 1);
+    });
+
+    // Create the guest mount
+    auto [_, __, channel] = Fork(LSW_FORK::Thread);
+
+    LSW_CONNECT message;
+    message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
+
+    auto fd = channel.Transaction(message).Result;
+    THROW_HR_IF_MSG(E_FAIL, fd < 0, "LSW_CONNECT failed with %i", fd);
+
+    auto shareNameUtf8 = shared::string::WideToMultiByte(shareName);
+    auto mountOptions =
+        std::format("msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, fd, fd, shareNameUtf8);
+
+    THROW_HR_IF(E_FAIL, MountImpl(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), 0) != 0);
+
+    deleteOnFailure.release();
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    // Verify that this folder is mounted.
+    auto it = m_plan9Mounts.find(LinuxPath);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_plan9Mounts.end());
+
+    // Unmount the folder from the guest.
+    THROW_IF_FAILED(Unmount(LinuxPath));
+
+    // Remove the share from the host
+    hcs::RemovePlan9Share(m_computeSystem.get(), it->second.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
+
+    m_plan9Mounts.erase(it);
+
+    return S_OK;
 }
 CATCH_RETURN();

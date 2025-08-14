@@ -44,8 +44,11 @@ public:
     IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
     IFACEMETHOD(Unmount(_In_ const char* Path)) override;
     IFACEMETHOD(DetachDisk(_In_ ULONG Lun)) override;
+    IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
+    IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
 
 private:
+    static int32_t MountImpl(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
     static bool ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdCount, const LSW_PROCESS_FD** TtyInput, const LSW_PROCESS_FD** TtyOutput);
 
@@ -90,7 +93,8 @@ private:
     wil::unique_handle m_portRelayChannelWrite;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
-    std::mutex m_lock;
+    std::map<std::string, std::wstring> m_plan9Mounts;
+    std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
     LSWUserSessionImpl* m_userSession;
 };

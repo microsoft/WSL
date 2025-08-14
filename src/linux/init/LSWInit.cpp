@@ -64,7 +64,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_GET_DISK& 
     Channel.SendMessage<LSW_GET_DISK::TResponse>(writer.Span());
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false)};
@@ -76,6 +76,22 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& M
     THROW_LAST_ERROR_IF(!Socket);
 
     THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
+}
+
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    int32_t result = -EINVAL;
+    auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
+
+    auto fd = UtilConnectVsock(Message.HostPort, true);
+    if (!fd)
+    {
+        result = -errno;
+    }
+    else
+    {
+        result = fd.release();
+    }
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_OPEN& Message, const gsl::span<gsl::byte>& Buffer)
@@ -521,7 +537,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY, LSW_OPEN, LSW_UNMOUNT, LSW_DETACH>(
+        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY, LSW_OPEN, LSW_UNMOUNT, LSW_DETACH, LSW_ACCEPT>(
             Channel, Type, Buffer);
     }
     catch (...)

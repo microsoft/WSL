@@ -45,6 +45,8 @@ void AddPlan9Share(
     _In_ Plan9ShareFlags Flags,
     _In_opt_ HANDLE UserToken = nullptr);
 
+void RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR AccessName, _In_ UINT32 Port);
+
 void AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly = false);
 
 void AddPassThroughDisk(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR Disk, _In_ ULONG Lun);
