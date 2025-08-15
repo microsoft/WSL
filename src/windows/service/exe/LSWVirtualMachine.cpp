@@ -437,6 +437,7 @@ try
     const auto& response = subChannel.Transaction<LSW_UNMOUNT>(message.Span());
 
     // TODO: Return errno to caller
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), response.Result == EINVAL);
     THROW_HR_IF(E_FAIL, response.Result != 0);
 
     return S_OK;
@@ -909,8 +910,9 @@ try
     auto it = m_plan9Mounts.find(LinuxPath);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_plan9Mounts.end());
 
-    // Unmount the folder from the guest.
-    THROW_IF_FAILED(Unmount(LinuxPath));
+    // Unmount the folder from the guest. If the mount is not found, this most likely means that the guest unmounted it.
+    auto result = Unmount(LinuxPath);
+    THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
     // Remove the share from the host
     hcs::RemovePlan9Share(m_computeSystem.get(), it->second.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);

@@ -887,6 +887,13 @@ class LSWTests
             VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), L"relative-path", "/win-path", true), E_INVALIDARG);
             VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
             VERIFY_ARE_EQUAL(WslUnmountWindowsFolder(vm.get(), "/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            // Validate that folders that are manually unmounted from the guest are handled properly
+            VERIFY_SUCCEEDED(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", true));
+            expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+
+            VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/umount", "/win-path"}), 0);
+            VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
         }
     }
 };
