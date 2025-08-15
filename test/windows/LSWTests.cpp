@@ -170,7 +170,7 @@ class LSWTests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 32L);
 
         // Verify that unmount fails now.
-        VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), E_FAIL);
+        VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Detach the disk
         VERIFY_SUCCEEDED(WslDetachDisk(vm.get(), attachedDisk.ScsiLun));
