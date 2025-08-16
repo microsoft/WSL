@@ -205,6 +205,10 @@ HRESULT WslInstallComponents(enum WslInstallComponent Components, WslInstallCall
 // Used for testing until the package is published.
 HRESULT WslSetPackageUrl(LPCWSTR Url);
 
+HRESULT WslMountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* LinuxPath, BOOL ReadOnly);
+
+HRESULT WslUnmountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, const char* LinuxPath);
+
 #ifdef __cplusplus
 }
 #endif

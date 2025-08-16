@@ -376,6 +376,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageLswFork,
     LxMessageLswForkResult,
     LxMessageLswConnect,
+    LxMessageLswAccept,
     LxMessageLswWaitPid,
     LxMessageLswWaitPidResponse,
     LxMessageLswSignal,
@@ -483,6 +484,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageLswFork)
         X(LxMessageLswForkResult)
         X(LxMessageLswConnect)
+        X(LxMessageLswAccept)
         X(LxMessageLswWaitPid)
         X(LxMessageLswWaitPidResponse)
         X(LxMessageLswSignal)
@@ -1657,15 +1659,26 @@ struct LSW_TTY_RELAY
     PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput));
 };
 
-struct LSW_CONNECT
+struct LSW_ACCEPT
 {
-    static inline auto Type = LxMessageLswConnect;
+    static inline auto Type = LxMessageLswAccept;
     using TResponse = RESULT_MESSAGE<uint32_t>;
-    DECLARE_MESSAGE_CTOR(LSW_CONNECT);
+    DECLARE_MESSAGE_CTOR(LSW_ACCEPT);
 
     MESSAGE_HEADER Header;
     int32_t Fd = -1; // TODO: multiple at once
     PRETTY_PRINT(FIELD(Header), FIELD(Fd));
+};
+
+struct LSW_CONNECT
+{
+    static inline auto Type = LxMessageLswConnect;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+    DECLARE_MESSAGE_CTOR(LSW_CONNECT);
+
+    MESSAGE_HEADER Header;
+    uint32_t HostPort;
+    PRETTY_PRINT(FIELD(Header), FIELD(HostPort));
 };
 
 enum LswOpenFlags // Must match FileDescriptorType.

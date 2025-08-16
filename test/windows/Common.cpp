@@ -1363,14 +1363,24 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+std::wstring ReadFileContent(const std::string& Path)
+{
+    std::ifstream configRead(Path);
+    return std::wstring{std::istreambuf_iterator<char>(configRead), {}};
+}
+
+std::wstring ReadFileContent(const std::wstring& Path)
+{
+    std::wifstream configRead(Path);
+    return std::wstring{std::istreambuf_iterator<wchar_t>(configRead), {}};
+}
+
 // writes global WSL 2 config settings at %userprofile%/.wslconfig
 std::wstring LxssWriteWslConfig(const std::wstring& Content)
 {
     auto path = getenv("userprofile") + std::string("\\.wslconfig");
 
-    std::wifstream configRead(path);
-    auto previousContent = std::wstring{std::istreambuf_iterator<wchar_t>(configRead), {}};
-    configRead.close();
+    auto previousContent = ReadFileContent(path);
 
     std::wofstream config(path);
     VERIFY_IS_TRUE(config.good());
