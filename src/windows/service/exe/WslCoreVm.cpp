@@ -56,7 +56,6 @@ DEFINE_GUID(VIRTIO_PMEM_DEVICE_ID, 0xEDBB24BB, 0x5E19, 0x40F4, 0x8A, 0x0F, 0x82,
 
 static constexpr size_t c_bootEntropy = 0x1000;
 static constexpr auto c_localDevicesKey = L"SOFTWARE\\Microsoft\\Terminal Server Client\\LocalDevices";
-static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
 
 // {ABB755FC-1B86-4255-83E2-E5787ABCF6C2}
 static constexpr GUID c_pmemClassId = {0xABB755FC, 0x1B86, 0x4255, {0x83, 0xe2, 0xe5, 0x78, 0x7a, 0xbc, 0xf6, 0xc2}};
@@ -367,7 +366,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         gpuRequest.RequestType = hcs::ModifyRequestType::Update;
         gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
         gpuRequest.Settings.AllowVendorExtension = true;
-        if (IsDisableVgpuSettingsSupported())
+        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
         {
             gpuRequest.Settings.DisableGdiAcceleration = true;
             gpuRequest.Settings.DisablePresentation = true;
@@ -917,12 +916,6 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
             fixedDrives ^= (1 << index);
         }
     }
-}
-
-bool WslCoreVm::IsDisableVgpuSettingsSupported() const
-{
-    // See if the Windows version has the required platform change.
-    return ((wsl::windows::common::hcs::GetSchemaVersion() >= c_schemaVersionNickel) && (m_windowsVersion.BuildNumber >= 22545));
 }
 
 _Requires_lock_held_(m_guestDeviceLock)

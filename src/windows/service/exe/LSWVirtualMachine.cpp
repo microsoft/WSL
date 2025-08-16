@@ -272,6 +272,23 @@ void LSWVirtualMachine::Start()
     m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
 
     ConfigureNetworking();
+
+    // Configure GPU if requested
+    if (m_settings.EnableGPU)
+    {
+        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
+        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
+        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
+        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
+        gpuRequest.Settings.AllowVendorExtension = true;
+        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
+        {
+            gpuRequest.Settings.DisableGdiAcceleration = true;
+            gpuRequest.Settings.DisablePresentation = true;
+        }
+
+        wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
+    }
 }
 
 void LSWVirtualMachine::ConfigureNetworking()
@@ -919,6 +936,54 @@ try
 
     m_plan9Mounts.erase(it);
 
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT LSWVirtualMachine::MountGpuLibrairies(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
+try
+{
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);
+
+    auto [channel, _, __] = Fork(LSW_FORK::Thread);
+
+    auto windowsPath = wil::GetWindowsDirectoryW<std::wstring>();
+
+    // Mount drivers.
+    RETURN_IF_FAILED(MountWindowsFolder(std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, true));
+
+    // Mount the inbox libraries.
+    auto inboxLibPath = std::format(L"{}\\System32\\lxss\\lib", windowsPath);
+    std::optional<std::string> inboxLibMountPoint;
+    if (std::filesystem::is_directory(inboxLibPath))
+    {
+        inboxLibMountPoint = std::format("{}/inbox", LibrariesMountPoint);
+        RETURN_IF_FAILED(MountWindowsFolder(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), true));
+    }
+
+    // Mount the packaged libraries.
+
+#ifdef WSL_GPU_LIB_PATH
+
+    auto packagedLibPath = std::filesystem::path(TEXT(WSL_GPU_LIB_PATH));
+
+#else
+
+    auto packagedLibPath = wslutil::GetBasePath() / L"lib";
+
+#endif
+
+    auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
+    RETURN_IF_FAILED(MountWindowsFolder(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), true));
+
+    // Mount an overlay containing both inbox and packaged libraries (the packaged mount take precedence).
+    std::string options = "lowerdir=" + packagedLibMountPoint;
+    if (inboxLibMountPoint.has_value())
+    {
+        options += ":" + inboxLibMountPoint.value();
+    }
+
+    RETURN_IF_FAILED(Mount("none", LibrariesMountPoint, "overlay", options.c_str(), 0));
     return S_OK;
 }
 CATCH_RETURN();

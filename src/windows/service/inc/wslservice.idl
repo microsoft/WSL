@@ -463,6 +463,7 @@ interface ILSWVirtualMachine : IUnknown
     HRESULT DetachDisk([in] ULONG Lun);
     HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
+    HRESULT MountGpuLibrairies([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint);
 }
 
 typedef
@@ -476,6 +477,7 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     BOOL EnableDnsTunneling;
     BOOL EnableDebugShell;
     BOOL EnableEarlyBootDmesg;
+    BOOL EnableGPU;
 } VIRTUAL_MACHINE_SETTINGS;
 
 
