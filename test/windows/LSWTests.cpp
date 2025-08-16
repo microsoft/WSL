@@ -170,7 +170,7 @@ class LSWTests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 32L);
 
         // Verify that unmount fails now.
-        VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), E_FAIL);
+        VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Detach the disk
         VERIFY_SUCCEEDED(WslDetachDisk(vm.get(), attachedDisk.ScsiLun));
@@ -813,5 +813,88 @@ class LSWTests
 
         // Verify that the thread is unstuck
         stuckThread.join();
+    }
+
+    TEST_METHOD(WindowsMounts)
+    {
+        WSL2_TEST_ONLY();
+
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = NetworkingModeNAT;
+
+        auto vm = CreateVm(&settings);
+
+        auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
+            auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
+            auto [pid, in, out, err] = LaunchCommand(vm.get(), {"/bin/bash", "-c", cmd.c_str()});
+
+            auto output = ReadToString((SOCKET)out.get());
+            auto error = ReadToString((SOCKET)err.get());
+
+            WaitResult result{};
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, INFINITE, &result));
+            if (result.Code != (options.has_value() ? 0 : 1))
+            {
+                LogError("%hs failed. code=%i, output: %hs, error: %hs", cmd.c_str(), result.Code, output.c_str(), error.c_str());
+                VERIFY_FAIL();
+            }
+
+            if (options.has_value() && !PathMatchSpecA(output.c_str(), options->c_str()))
+            {
+                std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", output, options.value());
+                VERIFY_FAIL(message.c_str());
+            }
+        };
+
+        auto testFolder = std::filesystem::current_path() / "test-folder";
+        std::filesystem::create_directories(testFolder);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
+
+        // Validate writeable mount.
+        {
+            VERIFY_SUCCEEDED(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", false));
+            expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+
+            // Validate that mount can't be stacked on each other
+            VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+            // Validate that folder is writeable from linux
+            VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "echo -n content > /win-path/file.txt && sync"}), 0);
+            VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
+
+            VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
+            expectMount("/win-path", {});
+        }
+
+        // Validate read-only mount.
+        {
+            VERIFY_SUCCEEDED(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", true));
+            expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+
+            // Validate that folder is not writeable from linux
+            VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "echo -n content > /win-path/file.txt"}), 1);
+
+            VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
+            expectMount("/win-path", {});
+        }
+
+        // Validate various error paths
+        {
+            VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), L"relative-path", "/win-path", true), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(WslUnmountWindowsFolder(vm.get(), "/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(WslUnmountWindowsFolder(vm.get(), "/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            // Validate that folders that are manually unmounted from the guest are handled properly
+            VERIFY_SUCCEEDED(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", true));
+            expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+
+            VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/umount", "/win-path"}), 0);
+            VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
+        }
     }
 };

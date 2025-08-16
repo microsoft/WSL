@@ -416,3 +416,17 @@ try
                : S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WslMountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* Target, BOOL ReadOnly)
+try
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountWindowsFolder(WindowsPath, Target, ReadOnly);
+}
+CATCH_RETURN();
+
+HRESULT WslUnmountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, const char* Target)
+try
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->UnmountWindowsFolder(Target);
+}
+CATCH_RETURN();
