@@ -71,13 +71,19 @@ struct Networking
     bool DnsTunneling; // Not implemented yet.
 };
 
+struct GPU
+{
+    bool Enable;
+};
+
 struct VirtualMachineSettings
 {
-    LPCWSTR DisplayName;  // Not implemented yet
-    struct Memory Memory; // Not implemented yet
-    struct CPU CPU;       // Not implemented yet
+    LPCWSTR DisplayName;
+    struct Memory Memory;
+    struct CPU CPU;
     struct Options Options;
     struct Networking Networking;
+    struct GPU GPU;
 };
 
 typedef void* LSWVirtualMachineHandle;
@@ -208,6 +214,8 @@ HRESULT WslSetPackageUrl(LPCWSTR Url);
 HRESULT WslMountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* LinuxPath, BOOL ReadOnly);
 
 HRESULT WslUnmountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, const char* LinuxPath);
+
+HRESULT WslMountGpuLibrairies(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint);
 
 #ifdef __cplusplus
 }
