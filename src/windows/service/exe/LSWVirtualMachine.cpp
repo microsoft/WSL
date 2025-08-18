@@ -273,7 +273,7 @@ void LSWVirtualMachine::Start()
 
     ConfigureNetworking();
 
-    // Configure GPU if requested
+    // Configure GPU if requested.
     if (m_settings.EnableGPU)
     {
         hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
@@ -976,7 +976,7 @@ try
     auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
     RETURN_IF_FAILED(MountWindowsFolder(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), true));
 
-    // Mount an overlay containing both inbox and packaged libraries (the packaged mount take precedence).
+    // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
     std::string options = "lowerdir=" + packagedLibMountPoint;
     if (inboxLibMountPoint.has_value())
     {
