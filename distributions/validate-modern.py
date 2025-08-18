@@ -37,6 +37,27 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
 
 WSL1_UNSUPPORTED_XATTRS = ['security.selinux', 'security.ima', 'security.evm']
 
+WSL_CONF_KEYS = ['automount.enabled',
+                 'automount.ldconfig',
+                 'automount.mountfstab',
+                 'automount.options',
+                 'automount.root',
+                 'boot.command',
+                 'boot.protectbinfmt',
+                 'boot.systemd',
+                 'fileserver.enabled',
+                 'filesystem.umask',
+                 'general.hostname',
+                 'gpu.appendlibpath',
+                 'gpu.enabled',
+                 'interop.appendwindowspath',
+                 'interop.enabled',
+                 'network.generatehosts',
+                 'network.generateresolvconf',
+                 'network.hostname',
+                 'time.usewindowstimezone',
+                 'user.default']
+
 errors = {}
 warnings = {}
 
@@ -200,7 +221,7 @@ def read_passwd(node, default_uid: int, fd):
             entries[uid] = fields
 
     if 0 not in entries:
-        error(flavor, name, f'No root (uid=0) found in /etc/passwd')
+        error(node, f'No root (uid=0) found in /etc/passwd')
     elif entries[0][0] != 'root':
         error(node, f'/etc/passwd has a uid=0, but it is not root: {entries[0][0]}')
 
@@ -352,7 +373,7 @@ def read_tar(node, file, elf_magic: str):
 
             if info is None:
                 if not optional:
-                    error(flavor, name, f'File "{path}" not found in tar')
+                    error(node, f'File "{path}" not found in tar')
                 return False
 
             permissions = oct(info.mode)
@@ -395,7 +416,7 @@ def read_tar(node, file, elf_magic: str):
 
             keys = read_config_keys(config)
 
-            unexpected_keys = [e for e in keys if e.lower() not in valid_keys]
+            unexpected_keys = [e for e in keys if e.casefold() not in valid_keys]
             if unexpected_keys:
                 error(node, f'Found unexpected_keys in "{path}": {unexpected_keys}')
             else:
@@ -434,14 +455,17 @@ def read_tar(node, file, elf_magic: str):
                     warning(node, f'value for windowsterminal.profileTemplate is not under {USR_LIB_WSL}: "{terminal_profile}"')
 
         if validate_mode('/etc/wsl.conf', [oct(0o664), oct(0o644)], 0, 0, optional=True, follow_symlink=True):
-            config = validate_config('/etc/wsl.conf', ['boot.systemd'])
+            config = validate_config('/etc/wsl.conf', WSL_CONF_KEYS)
             if config.get('boot.systemd', False):
-                validate_mode('/sbin/init', [oct(0o775), oct(0o755)], 0, 0, magic=elf_magic, follow_symlink=True)
+                validate_mode('/sbin/init', [oct(0o775), oct(0o755), oct(0o555)], 0, 0, magic=elf_magic, follow_symlink=True)
+
+            if (default_user := config.get('user.default')) is not None:
+                warning(node, f'Found discouraged wsl.conf key: user.default={default_user}')
 
         validate_mode('/etc/passwd', [oct(0o664), oct(0o644)], 0, 0, parse_method = lambda fd: read_passwd(node, defaultUid, fd))
         validate_mode('/etc/shadow', [oct(0o640), oct(0o600), oct(0)], 0, None)
-        validate_mode('/bin/bash', [oct(0o755), oct(0o775)], 0, 0, magic=elf_magic, follow_symlink=True)
-        validate_mode('/bin/sh', [oct(0o755), oct(0o775)], 0, 0, magic=elf_magic, follow_symlink=True)
+        validate_mode('/bin/bash', [oct(0o755), oct(0o775), oct(0o555)], 0, 0, magic=elf_magic, follow_symlink=True, optional=True)
+        validate_mode('/bin/sh', [oct(0o755), oct(0o775), oct(0o555)], 0, 0, magic=elf_magic, follow_symlink=True)
 
         enabled_systemd_units = read_systemd_enabled_units(node, tar)
         for unit, path in enabled_systemd_units.items():
