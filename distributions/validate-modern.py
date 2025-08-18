@@ -460,6 +460,7 @@ def read_tar(node, file, elf_magic: str):
                 validate_mode('/sbin/init', [oct(0o775), oct(0o755), oct(0o555)], 0, 0, magic=elf_magic, follow_symlink=True)
 
             if default_user :=config.get('user.default', None):
+            if default_user := config.get('user.default'):
                 warning(node, f'Found discouraged wsl.conf key: user.default={default_user}')
 
         validate_mode('/etc/passwd', [oct(0o664), oct(0o644)], 0, 0, parse_method = lambda fd: read_passwd(node, defaultUid, fd))
