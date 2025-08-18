@@ -916,7 +916,7 @@ class LSWTests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "test -c /dev/dxg"}), 0);
 
         // Validate GPU mounts
-        VERIFY_SUCCEEDED(WslMountGpuLibrairies(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"));
+        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"));
 
         std::vector<const char*> commandLine{"/bin/sh", nullptr};
 
@@ -964,7 +964,7 @@ class LSWTests
             settings.GPU.Enable = false;
             auto vm = CreateVm(&settings);
 
-            VERIFY_ARE_EQUAL(WslMountGpuLibrairies(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"), HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
+            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"), HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
         }
     }
 };
