@@ -432,9 +432,9 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslMountGpuLibrairies(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint)
+HRESULT WslMountGpuLibraries(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint)
 try
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountGpuLibrairies(LibrariesMountPoint, DriversMountpoint);
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountGpuLibraries(LibrariesMountPoint, DriversMountpoint);
 }
 CATCH_RETURN();

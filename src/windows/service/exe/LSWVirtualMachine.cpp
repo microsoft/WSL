@@ -940,7 +940,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::MountGpuLibrairies(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
+HRESULT LSWVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 try
 {
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);

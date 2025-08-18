@@ -215,7 +215,7 @@ HRESULT WslMountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, LPCWSTR Wi
 
 HRESULT WslUnmountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, const char* LinuxPath);
 
-HRESULT WslMountGpuLibrairies(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint);
+HRESULT WslMountGpuLibraries(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint);
 
 #ifdef __cplusplus
 }
