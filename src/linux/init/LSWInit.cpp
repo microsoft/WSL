@@ -43,6 +43,8 @@ int MountInit(const char* Target);
 
 extern int EnableInterface(int Socket, const char* Name);
 
+extern int SetCloseOnExec(int Fd, bool Enable);
+
 extern int g_LogFd;
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
@@ -67,13 +69,14 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_GET_DISK& 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
-    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, false)};
+    wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
     Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
 
     wil::unique_fd Socket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
     THROW_LAST_ERROR_IF(!Socket);
+    LOG_ERROR("Socket fd: {} -> {}", Socket.get(), Message.Fd);
 
     THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
 }
@@ -644,13 +647,15 @@ int LswEntryPoint(int Argc, char* Argv[])
     // Ensure /dev/console is present and set as the controlling terminal.
     // If opening /dev/console times out, stdout and stderr to the logging file descriptor.
     //
+
     wil::unique_fd ConsoleFd{};
 
     try
     {
+
         wsl::shared::retry::RetryWithTimeout<void>(
             [&]() {
-                ConsoleFd = open("/dev/console", O_RDWR);
+                ConsoleFd = open("/dev/console", O_RDWR | O_CLOEXEC);
                 THROW_LAST_ERROR_IF(!ConsoleFd);
             },
             c_defaultRetryPeriod,
@@ -660,12 +665,12 @@ int LswEntryPoint(int Argc, char* Argv[])
     }
     catch (...)
     {
-        if (dup2(g_LogFd, STDOUT_FILENO) < 0)
+        if (dup3(g_LogFd, STDOUT_FILENO, O_CLOEXEC) < 0)
         {
             LOG_ERROR("dup2 failed {}", errno);
         }
 
-        if (dup2(g_LogFd, STDERR_FILENO) < 0)
+        if (dup3(g_LogFd, STDERR_FILENO, O_CLOEXEC) < 0)
         {
             LOG_ERROR("dup2 failed {}", errno);
         }
@@ -701,16 +706,27 @@ int LswEntryPoint(int Argc, char* Argv[])
     // Enable the loopback interface.
     //
 
-    wil::unique_fd Fd{socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)};
-    if (!Fd)
     {
-        LOG_ERROR("socket failed {}", errno);
-        return -1;
+        wil::unique_fd Fd{socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)};
+        if (!Fd)
+        {
+            LOG_ERROR("socket failed {}", errno);
+            return -1;
+        }
+
+        if (EnableInterface(Fd.get(), "lo") < 0)
+        {
+            return -1;
+        }
     }
 
-    if (EnableInterface(Fd.get(), "lo") < 0)
+    //
+    // Make sure not to leak std fds to user processes.
+    //
+
+    for (int fd : {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO})
     {
-        return -1;
+        SetCloseOnExec(fd, true);
     }
 
     //
