@@ -76,7 +76,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_ACCEPT& Me
 
     wil::unique_fd Socket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
     THROW_LAST_ERROR_IF(!Socket);
-    LOG_ERROR("Socket fd: {} -> {}", Socket.get(), Message.Fd);
 
     THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
 }
