@@ -569,16 +569,16 @@ class LSWTests
         };
 
         {
-            auto [fds, pid] = createProcess(
-                {"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WslFdTypeDefault, nullptr}});
+            auto [fds, pid] =
+                createProcess({"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WslFdTypeDefault, nullptr}});
             VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "cat\n");
             VERIFY_ARE_EQUAL(wait(pid), 0);
         }
 
         {
             auto read = [&]() {
-                auto [readFds, readPid] = createProcess(
-                    {"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/tmp/output"}, {1, WslFdTypeDefault, nullptr}});
+                auto [readFds, readPid] =
+                    createProcess({"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/tmp/output"}, {1, WslFdTypeDefault, nullptr}});
                 VERIFY_ARE_EQUAL(wait(readPid), 0);
 
                 auto content = ReadToString((SOCKET)readFds[1].get());
@@ -590,9 +590,7 @@ class LSWTests
             auto [fds, pid] = createProcess(
                 {"/bin/cat"},
                 {{0, WslFdTypeDefault, nullptr},
-                 {1,
-                  static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileCreate),
-                  "/tmp/output"}});
+                 {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileCreate), "/tmp/output"}});
 
             constexpr auto content = "TestOutput";
             VERIFY_IS_TRUE(WriteFile(fds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
@@ -605,9 +603,7 @@ class LSWTests
             auto [appendFds, appendPid] = createProcess(
                 {"/bin/cat"},
                 {{0, WslFdTypeDefault, nullptr},
-                 {1,
-                  static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileAppend),
-                  "/tmp/output"}});
+                 {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileAppend), "/tmp/output"}});
 
             VERIFY_IS_TRUE(WriteFile(appendFds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
             appendFds.clear();
@@ -618,8 +614,7 @@ class LSWTests
             // Truncate the file
             auto [truncFds, truncPid] = createProcess(
                 {"/bin/cat"},
-                {{0, WslFdTypeDefault, nullptr},
-                 {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/output"}});
+                {{0, WslFdTypeDefault, nullptr}, {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/output"}});
 
             VERIFY_IS_TRUE(WriteFile(truncFds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
             truncFds.clear();
@@ -630,36 +625,26 @@ class LSWTests
 
         // Test various error paths
         {
-            createProcess(
-                {"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/DoesNotExist"}}, E_FAIL);
+            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/DoesNotExist"}}, E_FAIL);
             createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
             createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeDefault), "should-be-null"}}, E_INVALIDARG);
-            createProcess(
-                {"/bin/cat"},
-                {{0, static_cast<WslFdType>(WslFdTypeDefault | WslFdTypeLinuxFileOutput), nullptr}},
-                E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeDefault | WslFdTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
             createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
-            createProcess(
-                {"/bin/cat"},
-                {{0, static_cast<WslFdType>(WslFdTypeLinuxFileInput | WslFdTypeLinuxFileAppend), nullptr}},
-                E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileInput | WslFdTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
         }
 
         // Validate that read & write modes are respected
         {
             auto [fds, pid] = createProcess(
                 {"/bin/cat"},
-                {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"},
-                 {1, WslFdTypeLinuxFileInput, "/tmp/output"},
-                 {2, WslFdTypeDefault, nullptr}});
+                {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WslFdTypeLinuxFileInput, "/tmp/output"}, {2, WslFdTypeDefault, nullptr}});
 
             VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[2].get()), "/bin/cat: write error: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(wait(pid), 1);
         }
 
         {
-            auto [fds, pid] = createProcess(
-                {"/bin/cat"}, {{0, WslFdTypeLinuxFileOutput, "/tmp/output"}, {2, WslFdTypeDefault, nullptr}});
+            auto [fds, pid] = createProcess({"/bin/cat"}, {{0, WslFdTypeLinuxFileOutput, "/tmp/output"}, {2, WslFdTypeDefault, nullptr}});
 
             VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "/bin/cat: standard output: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(wait(pid), 1);

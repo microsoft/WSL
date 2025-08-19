@@ -584,7 +584,10 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
         else
         {
             THROW_HR_IF_MSG(
-                E_INVALIDARG, WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput), "Invalid flags: %i", Fds[i].Type);
+                E_INVALIDARG,
+                WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput),
+                "Invalid flags: %i",
+                Fds[i].Type);
 
             THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path == nullptr, "Fd[%zu] has a null path but flags: %i", i, Fds[i].Type);
             OpenLinuxFile(childChannel, Fds[i].Path, Fds[i].Type, Fds[i].Fd);
