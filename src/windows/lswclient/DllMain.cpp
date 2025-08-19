@@ -88,6 +88,7 @@ try
     settings.EnableEarlyBootDmesg = UserSettings->Options.EnableEarlyBootDmesg;
     settings.NetworkingMode = UserSettings->Networking.Mode;
     settings.EnableDnsTunneling = UserSettings->Networking.DnsTunneling;
+    settings.EnableGPU = UserSettings->GPU.Enable;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
     ConfigureComSecurity(virtualMachineInstance.get());
@@ -428,5 +429,12 @@ HRESULT WslUnmountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, const ch
 try
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->UnmountWindowsFolder(Target);
+}
+CATCH_RETURN();
+
+HRESULT WslMountGpuLibraries(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint)
+try
+{
+    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountGpuLibraries(LibrariesMountPoint, DriversMountpoint);
 }
 CATCH_RETURN();

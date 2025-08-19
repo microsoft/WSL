@@ -936,4 +936,74 @@ class LSWTests
             VERIFY_FAIL();
         }
     }
+
+    TEST_METHOD(GPU)
+    {
+        WSL2_TEST_ONLY();
+
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = NetworkingModeNAT;
+        settings.GPU.Enable = true;
+
+        auto vm = CreateVm(&settings);
+
+        // Validate that the GPU device is available.
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "test -c /dev/dxg"}), 0);
+
+        // Validate GPU mounts
+        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"));
+
+        std::vector<const char*> commandLine{"/bin/sh", nullptr};
+
+        std::vector<ProcessFileDescriptorSettings> fds(2);
+        fds[0].Number = 0;
+        fds[0].Type = TerminalInput;
+        fds[1].Number = 1;
+        fds[1].Type = TerminalOutput;
+
+        CreateProcessSettings createProcessSettings{};
+        createProcessSettings.Executable = "/bin/sh";
+        createProcessSettings.Arguments = commandLine.data();
+        createProcessSettings.FileDescriptors = fds.data();
+        createProcessSettings.FdCount = static_cast<ULONG>(fds.size());
+
+        auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
+            auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
+            auto [pid, in, out, err] = LaunchCommand(vm.get(), {"/bin/bash", "-c", cmd.c_str()});
+
+            auto output = ReadToString((SOCKET)out.get());
+            auto error = ReadToString((SOCKET)err.get());
+
+            WaitResult result{};
+            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, INFINITE, &result));
+            if (result.Code != (options.has_value() ? 0 : 1))
+            {
+                LogError("%hs failed. code=%i, output: %hs, error: %hs", cmd.c_str(), result.Code, output.c_str(), error.c_str());
+                VERIFY_FAIL();
+            }
+
+            if (options.has_value() && !PathMatchSpecA(output.c_str(), options->c_str()))
+            {
+                std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", output, options.value());
+                VERIFY_FAIL(message.c_str());
+            }
+        };
+
+        expectMount(
+            "/usr/lib/wsl/drivers",
+            "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+        expectMount("/usr/lib/wsl/lib", "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
+
+        // Validate that trying to mount the shared with GPU support disabled fails.
+        {
+            settings.GPU.Enable = false;
+            auto vm = CreateVm(&settings);
+
+            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"), HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
+        }
+    }
 };
