@@ -41,17 +41,17 @@ class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
 {
 
 public:
-    CallbackInstance(VirtualMachineTerminationCallback callback, void* context) : m_callback(callback), m_context(context)
+    CallbackInstance(WslVirtualMachineTerminationCallback callback, void* context) : m_callback(callback), m_context(context)
     {
     }
 
     HRESULT OnTermination(ULONG Reason, LPCWSTR Details) override
     {
-        return m_callback(m_context, static_cast<VirtualMachineTerminationReason>(Reason), Details);
+        return m_callback(m_context, static_cast<WslVirtualMachineTerminationReason>(Reason), Details);
     }
 
 private:
-    VirtualMachineTerminationCallback m_callback = nullptr;
+    WslVirtualMachineTerminationCallback m_callback = nullptr;
     void* m_context = nullptr;
 };
 
@@ -68,7 +68,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslCreateVirtualMachine(const VirtualMachineSettings* UserSettings, LSWVirtualMachineHandle* VirtualMachine)
+HRESULT WslCreateVirtualMachine(const WslVirtualMachineSettings* UserSettings, WslVirtualMachineHandle* VirtualMachine)
 try
 {
     wil::com_ptr<ILSWUserSession> session;
@@ -109,27 +109,27 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslAttachDisk(LSWVirtualMachineHandle VirtualMachine, const DiskAttachSettings* Settings, AttachedDiskInformation* AttachedDisk)
+HRESULT WslAttachDisk(WslVirtualMachineHandle VirtualMachine, const WslDiskAttachSettings* Settings, WslAttachedDiskInformation* AttachedDisk)
 {
     wil::unique_cotaskmem_ansistring device;
     RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
                          ->AttachDisk(Settings->WindowsPath, Settings->ReadOnly, &device, &AttachedDisk->ScsiLun));
 
     auto deviceSize = strlen(device.get());
-    WI_VERIFY(deviceSize < sizeof(AttachedDiskInformation::Device));
+    WI_VERIFY(deviceSize < sizeof(WslAttachedDiskInformation::Device));
 
-    strncpy(AttachedDisk->Device, device.get(), sizeof(AttachedDiskInformation::Device));
+    strncpy(AttachedDisk->Device, device.get(), sizeof(WslAttachedDiskInformation::Device));
 
     return S_OK;
 }
 
-HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const MountSettings* Settings)
+HRESULT WslMount(WslVirtualMachineHandle VirtualMachine, const WslMountSettings* Settings)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
         ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Flags);
 }
 
-HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProcessSettings* UserSettings, int32_t* Pid)
+HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, WslCreateProcessSettings* UserSettings, int32_t* Pid)
 {
     LSW_CREATE_PROCESS_OPTIONS options{};
 
@@ -187,41 +187,41 @@ HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, CreateProc
     return S_OK;
 }
 
-HRESULT WslWaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WaitResult* Result)
+HRESULT WslWaitForLinuxProcess(WslVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WslWaitResult* Result)
 {
-    static_assert(ProcessStateUnknown == LSWProcessStateUnknown);
-    static_assert(ProcessStateRunning == LSWProcessStateRunning);
-    static_assert(ProcessStateExited == LSWProcessStateExited);
-    static_assert(ProcessStateSignaled == LSWProcessStateSignaled);
-    static_assert(sizeof(ProcessState) == sizeof(LSWProcessState));
-    static_assert(sizeof(ProcessState) == sizeof(ULONG));
+    static_assert(WslProcessStateUnknown == LSWProcessStateUnknown);
+    static_assert(WslProcessStateRunning == LSWProcessStateRunning);
+    static_assert(WslProcessStateExited == LSWProcessStateExited);
+    static_assert(WslProcessStateSignaled == LSWProcessStateSignaled);
+    static_assert(sizeof(WslProcessState) == sizeof(LSWProcessState));
+    static_assert(sizeof(WslProcessState) == sizeof(ULONG));
 
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
         ->WaitPid(Pid, TimeoutMs, reinterpret_cast<ULONG*>(&Result->State), &Result->Code);
 }
 
-HRESULT WslSignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal)
+HRESULT WslSignalLinuxProcess(WslVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Signal(Pid, Signal);
 }
 
-HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs)
+HRESULT WslShutdownVirtualMachine(WslVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Shutdown(TimeoutMs);
 }
 
-void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine)
+void WslReleaseVirtualMachine(WslVirtualMachineHandle VirtualMachine)
 {
     reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Release();
 }
 
-HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const PortMappingSettings* UserSettings)
+HRESULT WslMapPort(WslVirtualMachineHandle VirtualMachine, const WslPortMappingSettings* UserSettings)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
         ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, false);
 }
 
-HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const PortMappingSettings* UserSettings)
+HRESULT WslUnmapPort(WslVirtualMachineHandle VirtualMachine, const WslPortMappingSettings* UserSettings)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
         ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, true);
@@ -256,7 +256,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process)
+HRESULT WslLaunchDebugShell(WslVirtualMachineHandle VirtualMachine, HANDLE* Process)
 try
 {
     wil::unique_cotaskmem_string pipePath;
@@ -289,12 +289,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslUnmount(LSWVirtualMachineHandle VirtualMachine, const char* Path)
+HRESULT WslUnmount(WslVirtualMachineHandle VirtualMachine, const char* Path)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Unmount(Path);
 }
 
-HRESULT WslDetachDisk(LSWVirtualMachineHandle VirtualMachine, ULONG Lun)
+HRESULT WslDetachDisk(WslVirtualMachineHandle VirtualMachine, ULONG Lun)
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->DetachDisk(Lun);
 }
@@ -418,21 +418,21 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslMountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* Target, BOOL ReadOnly)
+HRESULT WslMountWindowsFolder(WslVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* Target, BOOL ReadOnly)
 try
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountWindowsFolder(WindowsPath, Target, ReadOnly);
 }
 CATCH_RETURN();
 
-HRESULT WslUnmountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, const char* Target)
+HRESULT WslUnmountWindowsFolder(WslVirtualMachineHandle VirtualMachine, const char* Target)
 try
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->UnmountWindowsFolder(Target);
 }
 CATCH_RETURN();
 
-HRESULT WslMountGpuLibraries(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint)
+HRESULT WslMountGpuLibraries(WslVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint)
 try
 {
     return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountGpuLibraries(LibrariesMountPoint, DriversMountpoint);

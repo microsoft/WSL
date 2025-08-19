@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LSWApi.h
+    WSLA.h
 
 Abstract:
 
-    TODO
+    This file contains the WSLA api definitions.
 
 --*/
 #pragma once
@@ -30,88 +30,88 @@ struct WSL_VERSION_INFORMATION
 
 HRESULT WslGetVersion(struct WSL_VERSION_INFORMATION* Version);
 
-struct Memory
+struct WslVmMemory
 {
     uint64_t MemoryMb;
 };
 
-struct CPU
+struct WslVmCPU
 {
     uint32_t CpuCount;
 };
 
-enum VirtualMachineTerminationReason
+enum WslVirtualMachineTerminationReason
 {
-    VirtualMachineTerminationReasonUnknown,
-    VirtualMachineTerminationReasonShutdown,
-    VirtualMachineTerminationReasonCrashed,
+    WslVirtualMachineTerminationReasonUnknown,
+    WslVirtualMachineTerminationReasonShutdown,
+    WslVirtualMachineTerminationReasonCrashed,
 };
 
-typedef HRESULT (*VirtualMachineTerminationCallback)(void*, enum VirtualMachineTerminationReason, LPCWSTR);
+typedef HRESULT (*WslVirtualMachineTerminationCallback)(void*, enum WslVirtualMachineTerminationReason, LPCWSTR);
 
-struct Options
+struct WslVmOptions
 {
     uint32_t BootTimeoutMs;
     HANDLE Dmesg;
-    VirtualMachineTerminationCallback TerminationCallback;
+    WslVirtualMachineTerminationCallback TerminationCallback;
     void* TerminationContext;
     bool EnableDebugShell;
     bool EnableEarlyBootDmesg;
 };
 
-enum NetworkingMode
+enum WslNetworkingMode
 {
-    NetworkingModeNone,
-    NetworkingModeNAT
+    WslNetworkingModeNone,
+    WslNetworkingModeNAT
 };
 
-struct Networking
+struct WslVmNetworking
 {
-    enum NetworkingMode Mode;
+    enum WslNetworkingMode Mode;
     bool DnsTunneling; // Not implemented yet.
 };
 
-struct GPU
+struct WslVmGPU
 {
     bool Enable;
 };
 
-struct VirtualMachineSettings
+struct WslVirtualMachineSettings
 {
     LPCWSTR DisplayName;
-    struct Memory Memory;
-    struct CPU CPU;
-    struct Options Options;
-    struct Networking Networking;
-    struct GPU GPU;
+    struct WslVmMemory Memory;
+    struct WslVmCPU CPU;
+    struct WslVmOptions Options;
+    struct WslVmNetworking Networking;
+    struct WslVmGPU GPU;
 };
 
-typedef void* LSWVirtualMachineHandle;
+typedef void* WslVirtualMachineHandle;
 
-HRESULT WslCreateVirtualMachine(const struct VirtualMachineSettings* Settings, LSWVirtualMachineHandle* VirtualMachine);
+HRESULT WslCreateVirtualMachine(const struct WslVirtualMachineSettings* Settings, WslVirtualMachineHandle* VirtualMachine);
 
-struct DiskAttachSettings
+struct WslDiskAttachSettings
 {
     LPCWSTR WindowsPath;
     bool ReadOnly;
 };
 
-struct AttachedDiskInformation
+struct WslAttachedDiskInformation
 {
     ULONG ScsiLun;
     char Device[10];
 };
 
-HRESULT WslAttachDisk(LSWVirtualMachineHandle VirtualMachine, const struct DiskAttachSettings* Settings, struct AttachedDiskInformation* AttachedDisk);
+HRESULT WslAttachDisk(WslVirtualMachineHandle VirtualMachine, const struct WslDiskAttachSettings* Settings, struct WslAttachedDiskInformation* AttachedDisk);
 
-enum MountFlags
+enum WslMountFlags
 {
-    MountFlagsNone = 0,
-    MountFlagsChroot = 1,
-    MountFlagsWriteableOverlayFs = 2,
+    WslMountFlagsNone = 0,
+    WslMountFlagsChroot = 1,
+    WslMountFlagsWriteableOverlayFs = 2,
 };
 
-struct MountSettings
+struct WslMountSettings
 {
     const char* Device;
     const char* Target;
@@ -120,54 +120,54 @@ struct MountSettings
     uint32_t Flags;
 };
 
-HRESULT WslMount(LSWVirtualMachineHandle VirtualMachine, const struct MountSettings* Settings);
+HRESULT WslMount(WslVirtualMachineHandle VirtualMachine, const struct WslMountSettings* Settings);
 
-enum FileDescriptorType
+enum WslFileDescriptorType
 {
-    Default = 0,
-    TerminalInput = 1,
-    TerminalOutput = 2,
-    LinuxFileInput = 4,
-    LinuxFileOutput = 8,
-    LinuxFileAppend = 16,
-    LinuxFileCreate = 32,
+    WslFileDescriptorTypeDefault = 0,
+    WslFileDescriptorTypeTerminalInput = 1,
+    WslFileDescriptorTypeTerminalOutput = 2,
+    WslFileDescriptorTypeLinuxFileInput = 4,
+    WslFileDescriptorTypeLinuxFileOutput = 8,
+    WslFileDescriptorTypeLinuxFileAppend = 16,
+    WslFileDescriptorTypeLinuxFileCreate = 32,
 };
 
-struct ProcessFileDescriptorSettings
+struct WslProcessFileDescriptorSettings
 {
     int32_t Number;
-    enum FileDescriptorType Type;
+    enum WslFileDescriptorType Type;
     const char* Path; // Required when 'Type' has LinuxFileInput or LinuxFileOutput
     HANDLE Handle;
 };
 
-struct CreateProcessSettings
+struct WslCreateProcessSettings
 {
     const char* Executable;
     char const** Arguments;
     char const** Environment;
     const char* CurrentDirectory;
     uint32_t FdCount;
-    struct ProcessFileDescriptorSettings* FileDescriptors;
+    struct WslProcessFileDescriptorSettings* FileDescriptors;
 };
 
-HRESULT WslCreateLinuxProcess(LSWVirtualMachineHandle VirtualMachine, struct CreateProcessSettings* Settings, int32_t* Pid);
+HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, struct WslCreateProcessSettings* Settings, int32_t* Pid);
 
-enum ProcessState
+enum WslProcessState
 {
-    ProcessStateUnknown,
-    ProcessStateRunning,
-    ProcessStateExited,
-    ProcessStateSignaled
+    WslProcessStateUnknown,
+    WslProcessStateRunning,
+    WslProcessStateExited,
+    WslProcessStateSignaled
 };
 
-struct WaitResult
+struct WslWaitResult
 {
     enum ProcessState State;
     int32_t Code; // Signal number or exit code
 };
 
-struct PortMappingSettings
+struct WslPortMappingSettings
 {
     uint16_t WindowsPort;
     uint16_t LinuxPort;
@@ -176,23 +176,23 @@ struct PortMappingSettings
 
 HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process);
 
-HRESULT WslWaitForLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WaitResult* Result);
+HRESULT WslWaitForLinuxProcess(WslVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WslWaitResult* Result);
 
-HRESULT WslSignalLinuxProcess(LSWVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal);
+HRESULT WslSignalLinuxProcess(WslVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal);
 
-HRESULT WslShutdownVirtualMachine(LSWVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs);
+HRESULT WslShutdownVirtualMachine(WslVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs);
 
-void WslReleaseVirtualMachine(LSWVirtualMachineHandle VirtualMachine);
+void WslReleaseVirtualMachine(WslVirtualMachineHandle VirtualMachine);
 
-HRESULT WslLaunchDebugShell(LSWVirtualMachineHandle VirtualMachine, HANDLE* Process); // Used for development, might remove
+HRESULT WslLaunchDebugShell(WslVirtualMachineHandle VirtualMachine, HANDLE* Process); // Used for development, might remove
 
-HRESULT WslMapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
+HRESULT WslMapPort(WslVirtualMachineHandle VirtualMachine, const struct WslPortMappingSettings* Settings);
 
-HRESULT WslUnmapPort(LSWVirtualMachineHandle VirtualMachine, const struct PortMappingSettings* Settings);
+HRESULT WslUnmapPort(WslVirtualMachineHandle VirtualMachine, const struct WslPortMappingSettings* Settings);
 
-HRESULT WslUnmount(LSWVirtualMachineHandle VirtualMachine, const char* Path);
+HRESULT WslUnmount(WslVirtualMachineHandle VirtualMachine, const char* Path);
 
-HRESULT WslDetachDisk(LSWVirtualMachineHandle VirtualMachine, ULONG Lun);
+HRESULT WslDetachDisk(WslVirtualMachineHandle VirtualMachine, ULONG Lun);
 
 enum WslInstallComponent
 {
@@ -211,11 +211,11 @@ HRESULT WslInstallComponents(enum WslInstallComponent Components, WslInstallCall
 // Used for testing until the package is published.
 HRESULT WslSetPackageUrl(LPCWSTR Url);
 
-HRESULT WslMountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* LinuxPath, BOOL ReadOnly);
+HRESULT WslMountWindowsFolder(WslVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* LinuxPath, BOOL ReadOnly);
 
-HRESULT WslUnmountWindowsFolder(LSWVirtualMachineHandle VirtualMachine, const char* LinuxPath);
+HRESULT WslUnmountWindowsFolder(WslVirtualMachineHandle VirtualMachine, const char* LinuxPath);
 
-HRESULT WslMountGpuLibraries(LSWVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint);
+HRESULT WslMountGpuLibraries(WslVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint);
 
 #ifdef __cplusplus
 }

@@ -293,17 +293,17 @@ void LSWVirtualMachine::Start()
 
 void LSWVirtualMachine::ConfigureNetworking()
 {
-    if (m_settings.NetworkingMode == NetworkingModeNone)
+    if (m_settings.NetworkingMode == WslNetworkingModeNone)
     {
         return;
     }
-    else if (m_settings.NetworkingMode == NetworkingModeNAT)
+    else if (m_settings.NetworkingMode == WslNetworkingModeNAT)
     {
         // Launch GNS
 
         LSW_PROCESS_FD fd{};
         fd.Fd = 3;
-        fd.Type = FileDescriptorType::Default;
+        fd.Type = WslFileDescriptorType::WslFileDescriptorTypeDefault;
 
         std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "3"};
         LSW_CREATE_PROCESS_OPTIONS options{};
@@ -359,14 +359,14 @@ void LSWVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
     if (m_terminationCallback)
     {
         // TODO: parse json and give a better error.
-        VirtualMachineTerminationReason reason = VirtualMachineTerminationReasonUnknown;
+        WslVirtualMachineTerminationReason reason = WslVirtualMachineTerminationReasonUnknown;
         if (Event->Type == HcsEventSystemExited)
         {
-            reason = VirtualMachineTerminationReasonShutdown;
+            reason = WslVirtualMachineTerminationReasonShutdown;
         }
         else if (Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
         {
-            reason = VirtualMachineTerminationReasonCrashed;
+            reason = WslVirtualMachineTerminationReasonCrashed;
         }
 
         LOG_IF_FAILED(m_terminationCallback->OnTermination(static_cast<ULONG>(reason), Event->EventData));
@@ -529,10 +529,10 @@ wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& 
 
 void LSWVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
 {
-    static_assert(LinuxFileInput == LswOpenFlagsRead);
-    static_assert(LinuxFileOutput == LswOpenFlagsWrite);
-    static_assert(LinuxFileAppend == LswOpenFlagsAppend);
-    static_assert(LinuxFileCreate == LswOpenFlagsCreate);
+    static_assert(WslFileDescriptorTypeLinuxFileInput == LswOpenFlagsRead);
+    static_assert(WslFileDescriptorTypeLinuxFileOutput == LswOpenFlagsWrite);
+    static_assert(WslFileDescriptorTypeLinuxFileAppend == LswOpenFlagsAppend);
+    static_assert(WslFileDescriptorTypeLinuxFileCreate == LswOpenFlagsCreate);
 
     shared::MessageWriter<LSW_OPEN> message;
     message->Fd = Fd;
@@ -575,16 +575,16 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
-        if (Fds[i].Type == Default || Fds[i].Type == TerminalInput || Fds[i].Type == TerminalOutput)
+        if (Fds[i].Type == WslFileDescriptorTypeDefault || Fds[i].Type == WslFileDescriptorTypeTerminalInput || Fds[i].Type == WslFileDescriptorTypeTerminalOutput)
         {
-            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > TerminalOutput, "Invalid flags: %i", Fds[i].Type);
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > WslFileDescriptorTypeTerminalOutput, "Invalid flags: %i", Fds[i].Type);
             THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Fds[i].Type);
             sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
         }
         else
         {
             THROW_HR_IF_MSG(
-                E_INVALIDARG, WI_IsAnyFlagSet(Fds[i].Type, TerminalInput | TerminalOutput), "Invalid flags: %i", Fds[i].Type);
+                E_INVALIDARG, WI_IsAnyFlagSet(Fds[i].Type, WslFileDescriptorTypeTerminalInput | WslFileDescriptorTypeTerminalOutput), "Invalid flags: %i", Fds[i].Type);
 
             THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path == nullptr, "Fd[%zu] has a null path but flags: %i", i, Fds[i].Type);
             OpenLinuxFile(childChannel, Fds[i].Path, Fds[i].Type, Fds[i].Fd);
@@ -643,9 +643,9 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
 
 int32_t LSWVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
 {
-    static_assert(MountFlagsNone == LSW_MOUNT::None);
-    static_assert(MountFlagsChroot == LSW_MOUNT::Chroot);
-    static_assert(MountFlagsWriteableOverlayFs == LSW_MOUNT::OverlayFs);
+    static_assert(WslMountFlagsNone == LSW_MOUNT::None);
+    static_assert(WslMountFlagsChroot == LSW_MOUNT::Chroot);
+    static_assert(WslMountFlagsWriteableOverlayFs == LSW_MOUNT::OverlayFs);
 
     wsl::shared::MessageWriter<LSW_MOUNT> message;
 
@@ -763,13 +763,13 @@ bool LSWVirtualMachine::ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdC
 
     for (ULONG i = 0; i < FdCount; i++)
     {
-        if (Fds[i].Type == TerminalInput)
+        if (Fds[i].Type == WslFileDescriptorTypeTerminalInput)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyInput != nullptr, "Only one TtyInput fd can be passed. Index=%lu", i);
 
             *TtyInput = &Fds[i];
         }
-        else if (Fds[i].Type == TerminalOutput)
+        else if (Fds[i].Type == WslFileDescriptorTypeTerminalOutput)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyOutput != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
             *TtyOutput = &Fds[i];
