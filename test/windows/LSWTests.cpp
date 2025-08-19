@@ -435,9 +435,9 @@ class LSWTests
         std::vector<const char*> commandLine{"/bin/sh", nullptr};
         std::vector<WslProcessFileDescriptorSettings> fds(2);
         fds[0].Number = 0;
-        fds[0].Type = WslFileDescriptorTypeTerminalInput;
+        fds[0].Type = WslFdTypeTerminalInput;
         fds[1].Number = 1;
-        fds[1].Type = WslFileDescriptorTypeTerminalOutput;
+        fds[1].Type = WslFdTypeTerminalOutput;
 
         WslCreateProcessSettings WslCreateProcessSettings{};
         WslCreateProcessSettings.Executable = "/bin/sh";
@@ -527,7 +527,7 @@ class LSWTests
         struct FileFd
         {
             int Fd;
-            WslFileDescriptorType Flags;
+            WslFdType Flags;
             const char* Path;
         };
 
@@ -570,7 +570,7 @@ class LSWTests
 
         {
             auto [fds, pid] = createProcess(
-                {"/bin/cat"}, {{0, WslFileDescriptorTypeLinuxFileInput, "/proc/self/comm"}, {1, WslFileDescriptorTypeDefault, nullptr}});
+                {"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WslFdTypeDefault, nullptr}});
             VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "cat\n");
             VERIFY_ARE_EQUAL(wait(pid), 0);
         }
@@ -578,7 +578,7 @@ class LSWTests
         {
             auto read = [&]() {
                 auto [readFds, readPid] = createProcess(
-                    {"/bin/cat"}, {{0, WslFileDescriptorTypeLinuxFileInput, "/tmp/output"}, {1, WslFileDescriptorTypeDefault, nullptr}});
+                    {"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/tmp/output"}, {1, WslFdTypeDefault, nullptr}});
                 VERIFY_ARE_EQUAL(wait(readPid), 0);
 
                 auto content = ReadToString((SOCKET)readFds[1].get());
@@ -589,9 +589,9 @@ class LSWTests
             // Write to a new file.
             auto [fds, pid] = createProcess(
                 {"/bin/cat"},
-                {{0, WslFileDescriptorTypeDefault, nullptr},
+                {{0, WslFdTypeDefault, nullptr},
                  {1,
-                  static_cast<WslFileDescriptorType>(WslFileDescriptorTypeLinuxFileOutput | WslFileDescriptorTypeLinuxFileCreate),
+                  static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileCreate),
                   "/tmp/output"}});
 
             constexpr auto content = "TestOutput";
@@ -604,9 +604,9 @@ class LSWTests
             // Append content to the same file
             auto [appendFds, appendPid] = createProcess(
                 {"/bin/cat"},
-                {{0, WslFileDescriptorTypeDefault, nullptr},
+                {{0, WslFdTypeDefault, nullptr},
                  {1,
-                  static_cast<WslFileDescriptorType>(WslFileDescriptorTypeLinuxFileOutput | WslFileDescriptorTypeLinuxFileAppend),
+                  static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileAppend),
                   "/tmp/output"}});
 
             VERIFY_IS_TRUE(WriteFile(appendFds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
@@ -618,8 +618,8 @@ class LSWTests
             // Truncate the file
             auto [truncFds, truncPid] = createProcess(
                 {"/bin/cat"},
-                {{0, WslFileDescriptorTypeDefault, nullptr},
-                 {1, static_cast<WslFileDescriptorType>(WslFileDescriptorTypeLinuxFileOutput), "/tmp/output"}});
+                {{0, WslFdTypeDefault, nullptr},
+                 {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/output"}});
 
             VERIFY_IS_TRUE(WriteFile(truncFds[0].get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
             truncFds.clear();
@@ -631,17 +631,17 @@ class LSWTests
         // Test various error paths
         {
             createProcess(
-                {"/bin/cat"}, {{0, static_cast<WslFileDescriptorType>(WslFileDescriptorTypeLinuxFileOutput), "/tmp/DoesNotExist"}}, E_FAIL);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFileDescriptorType>(WslFileDescriptorTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFileDescriptorType>(WslFileDescriptorTypeDefault), "should-be-null"}}, E_INVALIDARG);
+                {"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/DoesNotExist"}}, E_FAIL);
+            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeDefault), "should-be-null"}}, E_INVALIDARG);
             createProcess(
                 {"/bin/cat"},
-                {{0, static_cast<WslFileDescriptorType>(WslFileDescriptorTypeDefault | WslFileDescriptorTypeLinuxFileOutput), nullptr}},
+                {{0, static_cast<WslFdType>(WslFdTypeDefault | WslFdTypeLinuxFileOutput), nullptr}},
                 E_INVALIDARG);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFileDescriptorType>(WslFileDescriptorTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
             createProcess(
                 {"/bin/cat"},
-                {{0, static_cast<WslFileDescriptorType>(WslFileDescriptorTypeLinuxFileInput | WslFileDescriptorTypeLinuxFileAppend), nullptr}},
+                {{0, static_cast<WslFdType>(WslFdTypeLinuxFileInput | WslFdTypeLinuxFileAppend), nullptr}},
                 E_INVALIDARG);
         }
 
@@ -649,9 +649,9 @@ class LSWTests
         {
             auto [fds, pid] = createProcess(
                 {"/bin/cat"},
-                {{0, WslFileDescriptorTypeLinuxFileInput, "/proc/self/comm"},
-                 {1, WslFileDescriptorTypeLinuxFileInput, "/tmp/output"},
-                 {2, WslFileDescriptorTypeDefault, nullptr}});
+                {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"},
+                 {1, WslFdTypeLinuxFileInput, "/tmp/output"},
+                 {2, WslFdTypeDefault, nullptr}});
 
             VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[2].get()), "/bin/cat: write error: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(wait(pid), 1);
@@ -659,7 +659,7 @@ class LSWTests
 
         {
             auto [fds, pid] = createProcess(
-                {"/bin/cat"}, {{0, WslFileDescriptorTypeLinuxFileOutput, "/tmp/output"}, {2, WslFileDescriptorTypeDefault, nullptr}});
+                {"/bin/cat"}, {{0, WslFdTypeLinuxFileOutput, "/tmp/output"}, {2, WslFdTypeDefault, nullptr}});
 
             VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "/bin/cat: standard output: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(wait(pid), 1);
@@ -934,7 +934,7 @@ class LSWTests
 
         std::vector<WslProcessFileDescriptorSettings> fds(1);
         fds[0].Number = 1;
-        fds[0].Type = WslFileDescriptorTypeDefault;
+        fds[0].Type = WslFdTypeDefault;
 
         const char* args[] = {"/bin/bash", "-c", "echo /proc/self/fd/* && readlink /proc/self/fd/*", nullptr};
         WslCreateProcessSettings WslCreateProcessSettings{};
@@ -981,9 +981,9 @@ class LSWTests
 
         std::vector<WslProcessFileDescriptorSettings> fds(2);
         fds[0].Number = 0;
-        fds[0].Type = WslFileDescriptorTypeTerminalInput;
+        fds[0].Type = WslFdTypeTerminalInput;
         fds[1].Number = 1;
-        fds[1].Type = WslFileDescriptorTypeTerminalOutput;
+        fds[1].Type = WslFdTypeTerminalOutput;
 
         WslCreateProcessSettings WslCreateProcessSettings{};
         WslCreateProcessSettings.Executable = "/bin/sh";

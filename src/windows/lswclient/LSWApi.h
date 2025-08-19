@@ -122,21 +122,21 @@ struct WslMountSettings
 
 HRESULT WslMount(WslVirtualMachineHandle VirtualMachine, const struct WslMountSettings* Settings);
 
-enum WslFileDescriptorType
+enum WslFdType
 {
-    WslFileDescriptorTypeDefault = 0,
-    WslFileDescriptorTypeTerminalInput = 1,
-    WslFileDescriptorTypeTerminalOutput = 2,
-    WslFileDescriptorTypeLinuxFileInput = 4,
-    WslFileDescriptorTypeLinuxFileOutput = 8,
-    WslFileDescriptorTypeLinuxFileAppend = 16,
-    WslFileDescriptorTypeLinuxFileCreate = 32,
+    WslFdTypeDefault = 0,
+    WslFdTypeTerminalInput = 1,
+    WslFdTypeTerminalOutput = 2,
+    WslFdTypeLinuxFileInput = 4,
+    WslFdTypeLinuxFileOutput = 8,
+    WslFdTypeLinuxFileAppend = 16,
+    WslFdTypeLinuxFileCreate = 32,
 };
 
 struct WslProcessFileDescriptorSettings
 {
     int32_t Number;
-    enum WslFileDescriptorType Type;
+    enum WslFdType Type;
     const char* Path; // Required when 'Type' has LinuxFileInput or LinuxFileOutput
     HANDLE Handle;
 };

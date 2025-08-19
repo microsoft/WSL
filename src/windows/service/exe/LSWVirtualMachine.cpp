@@ -303,7 +303,7 @@ void LSWVirtualMachine::ConfigureNetworking()
 
         LSW_PROCESS_FD fd{};
         fd.Fd = 3;
-        fd.Type = WslFileDescriptorType::WslFileDescriptorTypeDefault;
+        fd.Type = WslFdType::WslFdTypeDefault;
 
         std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "3"};
         LSW_CREATE_PROCESS_OPTIONS options{};
@@ -529,10 +529,10 @@ wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& 
 
 void LSWVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
 {
-    static_assert(WslFileDescriptorTypeLinuxFileInput == LswOpenFlagsRead);
-    static_assert(WslFileDescriptorTypeLinuxFileOutput == LswOpenFlagsWrite);
-    static_assert(WslFileDescriptorTypeLinuxFileAppend == LswOpenFlagsAppend);
-    static_assert(WslFileDescriptorTypeLinuxFileCreate == LswOpenFlagsCreate);
+    static_assert(WslFdTypeLinuxFileInput == LswOpenFlagsRead);
+    static_assert(WslFdTypeLinuxFileOutput == LswOpenFlagsWrite);
+    static_assert(WslFdTypeLinuxFileAppend == LswOpenFlagsAppend);
+    static_assert(WslFdTypeLinuxFileCreate == LswOpenFlagsCreate);
 
     shared::MessageWriter<LSW_OPEN> message;
     message->Fd = Fd;
@@ -575,16 +575,16 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
-        if (Fds[i].Type == WslFileDescriptorTypeDefault || Fds[i].Type == WslFileDescriptorTypeTerminalInput || Fds[i].Type == WslFileDescriptorTypeTerminalOutput)
+        if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput)
         {
-            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > WslFileDescriptorTypeTerminalOutput, "Invalid flags: %i", Fds[i].Type);
+            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > WslFdTypeTerminalOutput, "Invalid flags: %i", Fds[i].Type);
             THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Fds[i].Type);
             sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
         }
         else
         {
             THROW_HR_IF_MSG(
-                E_INVALIDARG, WI_IsAnyFlagSet(Fds[i].Type, WslFileDescriptorTypeTerminalInput | WslFileDescriptorTypeTerminalOutput), "Invalid flags: %i", Fds[i].Type);
+                E_INVALIDARG, WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput), "Invalid flags: %i", Fds[i].Type);
 
             THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path == nullptr, "Fd[%zu] has a null path but flags: %i", i, Fds[i].Type);
             OpenLinuxFile(childChannel, Fds[i].Path, Fds[i].Type, Fds[i].Fd);
@@ -763,13 +763,13 @@ bool LSWVirtualMachine::ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdC
 
     for (ULONG i = 0; i < FdCount; i++)
     {
-        if (Fds[i].Type == WslFileDescriptorTypeTerminalInput)
+        if (Fds[i].Type == WslFdTypeTerminalInput)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyInput != nullptr, "Only one TtyInput fd can be passed. Index=%lu", i);
 
             *TtyInput = &Fds[i];
         }
-        else if (Fds[i].Type == WslFileDescriptorTypeTerminalOutput)
+        else if (Fds[i].Type == WslFdTypeTerminalOutput)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyOutput != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
             *TtyOutput = &Fds[i];
