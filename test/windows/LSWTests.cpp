@@ -641,7 +641,7 @@ class LSWTests
         {
             auto [fds, pid] = createProcess({"/bin/cat"}, {{0, LinuxFileOutput, "/tmp/output"}, {2, Default, nullptr}});
 
-            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "/bin/cat: -: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(ReadToString((SOCKET)fds[1].get()), "/bin/cat: standard output: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(wait(pid), 1);
         }
     }
@@ -795,7 +795,7 @@ class LSWTests
         settings.DisplayName = L"LSW";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
-        settings.Networking.Mode = NetworkingModeNAT;
+        settings.Networking.Mode = NetworkingModeNone;
 
         auto vm = CreateVm(&settings);
 
@@ -824,7 +824,7 @@ class LSWTests
         settings.DisplayName = L"LSW";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
-        settings.Networking.Mode = NetworkingModeNAT;
+        settings.Networking.Mode = NetworkingModeNone;
 
         auto vm = CreateVm(&settings);
 
@@ -895,6 +895,45 @@ class LSWTests
 
             VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/umount", "/win-path"}), 0);
             VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
+        }
+    }
+
+    // This test case validates that no file descriptors are leaked to user processes.
+    TEST_METHOD(Fd)
+    {
+        WSL2_TEST_ONLY();
+
+        VirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"LSW";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = NetworkingModeNone;
+
+        auto vm = CreateVm(&settings);
+
+        std::vector<ProcessFileDescriptorSettings> fds(1);
+        fds[0].Number = 1;
+        fds[0].Type = Default;
+
+        const char* args[] = {"/bin/bash", "-c", "echo /proc/self/fd/* && readlink /proc/self/fd/*", nullptr};
+        CreateProcessSettings createProcessSettings{};
+        createProcessSettings.Executable = "/bin/bash";
+        createProcessSettings.Arguments = args;
+        createProcessSettings.FileDescriptors = fds.data();
+        createProcessSettings.FdCount = 1;
+
+        int pid = -1;
+        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm.get(), &createProcessSettings, &pid));
+
+        wil::unique_socket output{(SOCKET)fds[0].Handle};
+        auto result = ReadToString(output.get());
+
+        // Note: fd/0 is opened readlink to read the actual content of /proc/fd.
+        if (!PathMatchSpecA(result.c_str(), "/proc/self/fd/0 /proc/self/fd/1\nsocket:[*]\n"))
+        {
+            LogInfo("Found additional fds: %hs", result.c_str());
+            VERIFY_FAIL();
         }
     }
 
