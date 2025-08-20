@@ -8,13 +8,13 @@ Module Name:
 
 Abstract:
 
-    This file the entrypoint for the LSW client library.
+    This file the entrypoint for the WSLA client library.
 
 --*/
 
 #include "precomp.h"
 #include "wslservice.h"
-#include "LSWApi.h"
+#include "WSLAApi.h"
 #include "wslrelay.h"
 #include "wslInstall.h"
 
@@ -58,9 +58,9 @@ private:
 HRESULT WslGetVersion(WSL_VERSION_INFORMATION* Version)
 try
 {
-    wil::com_ptr<ILSWUserSession> session;
+    wil::com_ptr<IWSLAUserSession> session;
 
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(LSWUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
 
     static_assert(sizeof(WSL_VERSION_INFORMATION) == sizeof(WSL_VERSION));
 
@@ -71,12 +71,12 @@ CATCH_RETURN();
 HRESULT WslCreateVirtualMachine(const WslVirtualMachineSettings* UserSettings, WslVirtualMachineHandle* VirtualMachine)
 try
 {
-    wil::com_ptr<ILSWUserSession> session;
+    wil::com_ptr<IWSLAUserSession> session;
 
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(LSWUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
     ConfigureComSecurity(session.get());
 
-    wil::com_ptr<ILSWVirtualMachine> virtualMachineInstance;
+    wil::com_ptr<IWSLAVirtualMachine> virtualMachineInstance;
 
     VIRTUAL_MACHINE_SETTINGS settings{};
     settings.DisplayName = UserSettings->DisplayName;
@@ -104,7 +104,7 @@ try
         // Callback instance is now owned by the service.
     }
 
-    *reinterpret_cast<ILSWVirtualMachine**>(VirtualMachine) = virtualMachineInstance.detach();
+    *reinterpret_cast<IWSLAVirtualMachine**>(VirtualMachine) = virtualMachineInstance.detach();
     return S_OK;
 }
 CATCH_RETURN();
@@ -112,7 +112,7 @@ CATCH_RETURN();
 HRESULT WslAttachDisk(WslVirtualMachineHandle VirtualMachine, const WslDiskAttachSettings* Settings, WslAttachedDiskInformation* AttachedDisk)
 {
     wil::unique_cotaskmem_ansistring device;
-    RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+    RETURN_IF_FAILED(reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
                          ->AttachDisk(Settings->WindowsPath, Settings->ReadOnly, &device, &AttachedDisk->ScsiLun));
 
     auto deviceSize = strlen(device.get());
@@ -125,13 +125,13 @@ HRESULT WslAttachDisk(WslVirtualMachineHandle VirtualMachine, const WslDiskAttac
 
 HRESULT WslMount(WslVirtualMachineHandle VirtualMachine, const WslMountSettings* Settings)
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
         ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Flags);
 }
 
 HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, WslCreateProcessSettings* UserSettings, int32_t* Pid)
 {
-    LSW_CREATE_PROCESS_OPTIONS options{};
+    WSLA_CREATE_PROCESS_OPTIONS options{};
 
     auto Count = [](const auto* Ptr) -> ULONG {
         if (Ptr == nullptr)
@@ -157,9 +157,9 @@ HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, WslCreateP
     options.EnvironmentCount = Count(options.Environment);
     options.CurrentDirectory = UserSettings->CurrentDirectory;
 
-    LSW_CREATE_PROCESS_RESULT result{};
+    WSLA_CREATE_PROCESS_RESULT result{};
 
-    std::vector<LSW_PROCESS_FD> inputFd(UserSettings->FdCount);
+    std::vector<WSLA_PROCESS_FD> inputFd(UserSettings->FdCount);
     for (size_t i = 0; i < UserSettings->FdCount; i++)
     {
         inputFd[i] = {
@@ -174,7 +174,7 @@ HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, WslCreateP
         fds.resize(1); // COM doesn't like null pointers.
     }
 
-    RETURN_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+    RETURN_IF_FAILED(reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
                          ->CreateLinuxProcess(&options, UserSettings->FdCount, inputFd.data(), fds.data(), &result));
 
     for (size_t i = 0; i < UserSettings->FdCount; i++)
@@ -189,41 +189,41 @@ HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, WslCreateP
 
 HRESULT WslWaitForLinuxProcess(WslVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, WslWaitResult* Result)
 {
-    static_assert(WslProcessStateUnknown == LSWProcessStateUnknown);
-    static_assert(WslProcessStateRunning == LSWProcessStateRunning);
-    static_assert(WslProcessStateExited == LSWProcessStateExited);
-    static_assert(WslProcessStateSignaled == LSWProcessStateSignaled);
-    static_assert(sizeof(WslProcessState) == sizeof(LSWProcessState));
+    static_assert(WslProcessStateUnknown == WSLAOpenFlagsUnknown);
+    static_assert(WslProcessStateRunning == WSLAOpenFlagsRunning);
+    static_assert(WslProcessStateExited == WSLAOpenFlagsExited);
+    static_assert(WslProcessStateSignaled == WSLAOpenFlagsSignaled);
+    static_assert(sizeof(WslProcessState) == sizeof(WSLAOpenFlags));
     static_assert(sizeof(WslProcessState) == sizeof(ULONG));
 
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
         ->WaitPid(Pid, TimeoutMs, reinterpret_cast<ULONG*>(&Result->State), &Result->Code);
 }
 
 HRESULT WslSignalLinuxProcess(WslVirtualMachineHandle VirtualMachine, int32_t Pid, int32_t Signal)
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Signal(Pid, Signal);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->Signal(Pid, Signal);
 }
 
 HRESULT WslShutdownVirtualMachine(WslVirtualMachineHandle VirtualMachine, uint64_t TimeoutMs)
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Shutdown(TimeoutMs);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->Shutdown(TimeoutMs);
 }
 
 void WslReleaseVirtualMachine(WslVirtualMachineHandle VirtualMachine)
 {
-    reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Release();
+    reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->Release();
 }
 
 HRESULT WslMapPort(WslVirtualMachineHandle VirtualMachine, const WslPortMappingSettings* UserSettings)
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
         ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, false);
 }
 
 HRESULT WslUnmapPort(WslVirtualMachineHandle VirtualMachine, const WslPortMappingSettings* UserSettings)
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
         ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, true);
 }
 
@@ -260,7 +260,7 @@ HRESULT WslLaunchDebugShell(WslVirtualMachineHandle VirtualMachine, HANDLE* Proc
 try
 {
     wil::unique_cotaskmem_string pipePath;
-    THROW_IF_FAILED(reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->GetDebugShellPipe(&pipePath));
+    THROW_IF_FAILED(reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->GetDebugShellPipe(&pipePath));
 
     wil::unique_hfile pipe{CreateFileW(pipePath.get(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr)};
     THROW_LAST_ERROR_IF(!pipe);
@@ -291,12 +291,12 @@ CATCH_RETURN();
 
 HRESULT WslUnmount(WslVirtualMachineHandle VirtualMachine, const char* Path)
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->Unmount(Path);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->Unmount(Path);
 }
 
 HRESULT WslDetachDisk(WslVirtualMachineHandle VirtualMachine, ULONG Lun)
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->DetachDisk(Lun);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->DetachDisk(Lun);
 }
 EXTERN_C BOOL STDAPICALLTYPE DllMain(_In_ HINSTANCE Instance, _In_ DWORD Reason, _In_opt_ LPVOID Reserved)
 {
@@ -421,20 +421,20 @@ CATCH_RETURN();
 HRESULT WslMountWindowsFolder(WslVirtualMachineHandle VirtualMachine, LPCWSTR WindowsPath, const char* Target, BOOL ReadOnly)
 try
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountWindowsFolder(WindowsPath, Target, ReadOnly);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->MountWindowsFolder(WindowsPath, Target, ReadOnly);
 }
 CATCH_RETURN();
 
 HRESULT WslUnmountWindowsFolder(WslVirtualMachineHandle VirtualMachine, const char* Target)
 try
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->UnmountWindowsFolder(Target);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->UnmountWindowsFolder(Target);
 }
 CATCH_RETURN();
 
 HRESULT WslMountGpuLibraries(WslVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint)
 try
 {
-    return reinterpret_cast<ILSWVirtualMachine*>(VirtualMachine)->MountGpuLibraries(LibrariesMountPoint, DriversMountpoint);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->MountGpuLibraries(LibrariesMountPoint, DriversMountpoint);
 }
 CATCH_RETURN();

@@ -496,9 +496,9 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
     }
 }
 
-std::optional<LSW_MAP_PORT> ReceiveServiceMessage()
+std::optional<WSLA_MAP_PORT> ReceiveServiceMessage()
 {
-    LSW_MAP_PORT message{};
+    WSLA_MAP_PORT message{};
 
     DWORD bytesRead{};
     if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), &message, sizeof(message), &bytesRead, nullptr))
@@ -512,7 +512,7 @@ std::optional<LSW_MAP_PORT> ReceiveServiceMessage()
     }
 
     WI_ASSERT(message.Header.MessageSize == sizeof(message));
-    WI_ASSERT(message.Header.MessageType == LxMessageLswMapPort);
+    WI_ASSERT(message.Header.MessageType == LxMessageWSLAMapPort);
     return message;
 }
 

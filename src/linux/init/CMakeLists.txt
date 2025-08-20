@@ -21,7 +21,7 @@ set(SOURCES
     WslDistributionConfig.cpp
     wslinfo.cpp
     wslpath.cpp
-    LSWInit.cpp)
+    WSLAInit.cpp)
 
 set(HEADERS
     ../inc/lxwil.h

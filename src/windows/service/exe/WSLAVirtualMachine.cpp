@@ -4,26 +4,27 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LSWVirtualMachine.cpp
+    WSLAVirtualMachine.cpp
 
 Abstract:
 
     Class for the WSLA virtual machine.
 
 --*/
-#include "LSWVirtualMachine.h"
+
+#include "WSLAVirtualMachine.h"
 #include "hcs_schema.h"
-#include "LSWApi.h"
+#include "WSLAApi.h"
 #include "NatNetworking.h"
 #include "MirroredNetworking.h"
-#include "LSWUserSession.h"
+#include "WSLAUserSession.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
 using helpers::WindowsVersion;
-using wsl::windows::service::lsw::LSWVirtualMachine;
+using wsl::windows::service::wsla::WSLAVirtualMachine;
 
-LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, LSWUserSessionImpl* Session) :
+WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
     m_settings(Settings), m_userSid(UserSid), m_userSession(Session)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
@@ -34,7 +35,7 @@ LSWVirtualMachine::LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, P
     }
 }
 
-HRESULT LSWVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
+HRESULT WSLAVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
 {
     RETURN_HR_IF(E_INVALIDARG, m_debugShellPipe.empty());
 
@@ -43,7 +44,7 @@ HRESULT LSWVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
     return S_OK;
 }
 
-void LSWVirtualMachine::OnSessionTerminating()
+void WSLAVirtualMachine::OnSessionTerminating()
 {
     m_userSession = nullptr;
     std::lock_guard mutex(m_lock);
@@ -53,12 +54,12 @@ void LSWVirtualMachine::OnSessionTerminating()
         return;
     }
 
-    WSL_LOG("LswSignalTerminating", TraceLoggingValue(m_running, "running"));
+    WSL_LOG("WSLASignalTerminating", TraceLoggingValue(m_running, "running"));
 
     m_vmTerminatingEvent.SetEvent();
 }
 
-LSWVirtualMachine::~LSWVirtualMachine()
+WSLAVirtualMachine::~WSLAVirtualMachine()
 {
     {
         std::lock_guard mutex(m_lock);
@@ -69,7 +70,7 @@ LSWVirtualMachine::~LSWVirtualMachine()
         }
     }
 
-    WSL_LOG("LswTerminateVmStart", TraceLoggingValue(m_running, "running"));
+    WSL_LOG("WSLATerminateVmStart", TraceLoggingValue(m_running, "running"));
 
     m_initChannel.Close();
 
@@ -86,7 +87,7 @@ LSWVirtualMachine::~LSWVirtualMachine()
         CATCH_LOG()
     }
 
-    WSL_LOG("LswTerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
+    WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
 
     m_computeSystem.reset();
 
@@ -100,7 +101,7 @@ LSWVirtualMachine::~LSWVirtualMachine()
     }
 }
 
-void LSWVirtualMachine::Start()
+void WSLAVirtualMachine::Start()
 {
     hcs::ComputeSystem systemSettings{};
     systemSettings.Owner = L"WSL";
@@ -156,7 +157,7 @@ void LSWVirtualMachine::Start()
 #endif
 
     // Initialize kernel command line.
-    std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(LSW_ROOT_INIT_ENV) L"=1 panic=-1";
+    std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLA_ROOT_INIT_ENV) L"=1 panic=-1";
 
     // Set number of processors.
     kernelCmdLine += std::format(L" nr_cpus={}", m_settings.CpuCount);
@@ -254,7 +255,7 @@ void LSWVirtualMachine::Start()
     systemSettings.VirtualMachine = std::move(vmSettings);
     auto json = wsl::shared::ToJsonW(systemSettings);
 
-    WSL_LOG("CreateLSWVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
+    WSL_LOG("CreateWSLAVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
 
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_computeSystem = hcs::CreateComputeSystem(m_vmIdString.c_str(), json.c_str());
@@ -291,7 +292,7 @@ void LSWVirtualMachine::Start()
     }
 }
 
-void LSWVirtualMachine::ConfigureNetworking()
+void WSLAVirtualMachine::ConfigureNetworking()
 {
     if (m_settings.NetworkingMode == WslNetworkingModeNone)
     {
@@ -301,19 +302,19 @@ void LSWVirtualMachine::ConfigureNetworking()
     {
         // Launch GNS
 
-        LSW_PROCESS_FD fd{};
+        WSLA_PROCESS_FD fd{};
         fd.Fd = 3;
         fd.Type = WslFdType::WslFdTypeDefault;
 
         std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "3"};
-        LSW_CREATE_PROCESS_OPTIONS options{};
+        WSLA_CREATE_PROCESS_OPTIONS options{};
         options.Executable = "/init";
         options.CommandLine = cmd.data();
         options.CommandLineCount = static_cast<ULONG>(cmd.size());
 
         std::vector<HANDLE> socketHandles(2);
 
-        LSW_CREATE_PROCESS_RESULT result{};
+        WSLA_CREATE_PROCESS_RESULT result{};
         auto sockets = CreateLinuxProcessImpl(&options, 1, &fd, &result);
 
         THROW_HR_IF(E_FAIL, result.Errno != 0);
@@ -340,18 +341,18 @@ void LSWVirtualMachine::ConfigureNetworking()
     }
 }
 
-void CALLBACK LSWVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
+void CALLBACK WSLAVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
 {
     if (Event->Type == HcsEventSystemExited || Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
     {
-        reinterpret_cast<LSWVirtualMachine*>(Context)->OnExit(Event);
+        reinterpret_cast<WSLAVirtualMachine*>(Context)->OnExit(Event);
     }
 }
 
-void LSWVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
+void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 {
     WSL_LOG(
-        "LSWVmExited", TraceLoggingValue(Event->EventData, "details"), TraceLoggingValue(static_cast<int>(Event->Type), "type"));
+        "WSLAVmExited", TraceLoggingValue(Event->EventData, "details"), TraceLoggingValue(static_cast<int>(Event->Type), "type"));
 
     m_vmExitEvent.SetEvent();
 
@@ -373,7 +374,7 @@ void LSWVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
     }
 }
 
-HRESULT LSWVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)
+HRESULT WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)
 try
 {
     *Device = nullptr;
@@ -406,9 +407,9 @@ try
         wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly);
         vhdAdded = true;
 
-        LSW_GET_DISK message{};
+        WSLA_GET_DISK message{};
         message.Header.MessageSize = sizeof(message);
-        message.Header.MessageType = LSW_GET_DISK::Type;
+        message.Header.MessageType = WSLA_GET_DISK::Type;
         message.ScsiLun = *Lun;
         const auto& response = m_initChannel.Transaction(message);
 
@@ -421,7 +422,7 @@ try
     });
 
     WSL_LOG(
-        "LSWAttachDisk",
+        "WSLAAttachDisk",
         TraceLoggingValue(Path, "Path"),
         TraceLoggingValue(ReadOnly, "ReadOnly"),
         TraceLoggingValue(*Device == nullptr ? "<null>" : *Device, "Device"),
@@ -431,7 +432,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)
+HRESULT WSLAVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)
 try
 {
     std::lock_guard lock{m_lock};
@@ -443,15 +444,15 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::Unmount(_In_ const char* Path)
+HRESULT WSLAVirtualMachine::Unmount(_In_ const char* Path)
 try
 {
-    auto [pid, _, subChannel] = Fork(LSW_FORK::Thread);
+    auto [pid, _, subChannel] = Fork(WSLA_FORK::Thread);
 
-    wsl::shared::MessageWriter<LSW_UNMOUNT> message;
+    wsl::shared::MessageWriter<WSLA_UNMOUNT> message;
     message.WriteString(Path);
 
-    const auto& response = subChannel.Transaction<LSW_UNMOUNT>(message.Span());
+    const auto& response = subChannel.Transaction<WSLA_UNMOUNT>(message.Span());
 
     // TODO: Return errno to caller
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), response.Result == EINVAL);
@@ -461,7 +462,7 @@ try
 }
 CATCH_RETURN()
 
-HRESULT LSWVirtualMachine::DetachDisk(_In_ ULONG Lun)
+HRESULT WSLAVirtualMachine::DetachDisk(_In_ ULONG Lun)
 try
 {
     std::lock_guard lock{m_lock};
@@ -471,7 +472,7 @@ try
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_attachedDisks.end());
 
     // Detach it from the guest
-    LSW_DETACH message;
+    WSLA_DETACH message;
     message.Lun = Lun;
     const auto& response = m_initChannel.Transaction(message);
 
@@ -487,13 +488,13 @@ try
 }
 CATCH_RETURN()
 
-std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(enum LSW_FORK::ForkType Type)
+std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(enum WSLA_FORK::ForkType Type)
 {
     std::lock_guard lock{m_lock};
     return Fork(m_initChannel, Type);
 }
 
-std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork(wsl::shared::SocketChannel& Channel, enum LSW_FORK::ForkType Type)
+std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type)
 {
     uint32_t port{};
     int32_t pid{};
@@ -501,7 +502,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork
     {
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
-        LSW_FORK message;
+        WSLA_FORK message;
         message.ForkType = Type;
         message.TtyColumns = 80;
         message.TtyRows = 80;
@@ -518,34 +519,34 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> LSWVirtualMachine::Fork
     return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get()});
 }
 
-wil::unique_socket LSWVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
+wil::unique_socket WSLAVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
 {
-    LSW_ACCEPT message{};
+    WSLA_ACCEPT message{};
     message.Fd = Fd;
     const auto& response = Channel.Transaction(message);
 
     return wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
 }
 
-void LSWVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
+void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
 {
-    static_assert(WslFdTypeLinuxFileInput == LswOpenFlagsRead);
-    static_assert(WslFdTypeLinuxFileOutput == LswOpenFlagsWrite);
-    static_assert(WslFdTypeLinuxFileAppend == LswOpenFlagsAppend);
-    static_assert(WslFdTypeLinuxFileCreate == LswOpenFlagsCreate);
+    static_assert(WslFdTypeLinuxFileInput == WslaOpenFlagsRead);
+    static_assert(WslFdTypeLinuxFileOutput == WslaOpenFlagsWrite);
+    static_assert(WslFdTypeLinuxFileAppend == WslaOpenFlagsAppend);
+    static_assert(WslFdTypeLinuxFileCreate == WslaOpenFlagsCreate);
 
-    shared::MessageWriter<LSW_OPEN> message;
+    shared::MessageWriter<WSLA_OPEN> message;
     message->Fd = Fd;
     message->Flags = Flags;
     message.WriteString(Path);
 
-    auto result = Channel.Transaction<LSW_OPEN>(message.Span()).Result;
+    auto result = Channel.Transaction<WSLA_OPEN>(message.Span()).Result;
 
     THROW_HR_IF_MSG(E_FAIL, result != 0, "Failed to open %hs (flags: %u), %i", Path, Flags, result);
 }
 
-HRESULT LSWVirtualMachine::CreateLinuxProcess(
-    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, LSW_PROCESS_FD* Fds, _Out_ ULONG* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
+HRESULT WSLAVirtualMachine::CreateLinuxProcess(
+    _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, WSLA_PROCESS_FD* Fds, _Out_ ULONG* Handles, _Out_ WSLA_CREATE_PROCESS_RESULT* Result)
 try
 {
     auto sockets = CreateLinuxProcessImpl(Options, FdCount, Fds, Result);
@@ -563,14 +564,14 @@ try
 }
 CATCH_RETURN();
 
-std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
-    _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fds, _Out_ LSW_CREATE_PROCESS_RESULT* Result)
+std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
+    _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ WSLA_PROCESS_FD* Fds, _Out_ WSLA_CREATE_PROCESS_RESULT* Result)
 {
     // Check if this is a tty or not
-    const LSW_PROCESS_FD* ttyInput = nullptr;
-    const LSW_PROCESS_FD* ttyOutput = nullptr;
+    const WSLA_PROCESS_FD* ttyInput = nullptr;
+    const WSLA_PROCESS_FD* ttyOutput = nullptr;
     auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput);
-    auto [pid, _, childChannel] = Fork(LSW_FORK::Process);
+    auto [pid, _, childChannel] = Fork(WSLA_FORK::Process);
 
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
@@ -594,7 +595,7 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
         }
     }
 
-    wsl::shared::MessageWriter<LSW_EXEC> Message;
+    wsl::shared::MessageWriter<WSLA_EXEC> Message;
 
     Message.WriteString(Message->ExecutableIndex, Options->Executable);
     Message.WriteString(Message->CurrentDirectoryIndex, Options->CurrentDirectory ? Options->CurrentDirectory : "/");
@@ -604,8 +605,8 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
     // If this is an interactive tty, we need a relay process
     if (interactiveTty)
     {
-        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, LSW_FORK::Pty);
-        LSW_TTY_RELAY relayMessage;
+        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty);
+        WSLA_TTY_RELAY relayMessage;
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.TtyInput = ttyInput->Fd;
         relayMessage.TtyOutput = ttyOutput->Fd;
@@ -618,7 +619,7 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
             THROW_HR(E_FAIL);
         }
 
-        grandChildChannel.SendMessage<LSW_EXEC>(Message.Span());
+        grandChildChannel.SendMessage<WSLA_EXEC>(Message.Span());
         result = ExpectClosedChannelOrError(grandChildChannel);
         if (result != 0)
         {
@@ -630,7 +631,7 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
     }
     else
     {
-        childChannel.SendMessage<LSW_EXEC>(Message.Span());
+        childChannel.SendMessage<WSLA_EXEC>(Message.Span());
         auto result = ExpectClosedChannelOrError(childChannel);
         if (result != 0)
         {
@@ -644,13 +645,13 @@ std::vector<wil::unique_socket> LSWVirtualMachine::CreateLinuxProcessImpl(
     return sockets;
 }
 
-int32_t LSWVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
+int32_t WSLAVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
 {
-    static_assert(WslMountFlagsNone == LSW_MOUNT::None);
-    static_assert(WslMountFlagsChroot == LSW_MOUNT::Chroot);
-    static_assert(WslMountFlagsWriteableOverlayFs == LSW_MOUNT::OverlayFs);
+    static_assert(WslMountFlagsNone == WSLA_MOUNT::None);
+    static_assert(WslMountFlagsChroot == WSLA_MOUNT::Chroot);
+    static_assert(WslMountFlagsWriteableOverlayFs == WSLA_MOUNT::OverlayFs);
 
-    wsl::shared::MessageWriter<LSW_MOUNT> message;
+    wsl::shared::MessageWriter<WSLA_MOUNT> message;
 
     auto optionalAdd = [&](auto value, unsigned int& index) {
         if (value != nullptr)
@@ -665,10 +666,10 @@ int32_t LSWVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Sour
     optionalAdd(Options, message->OptionsIndex);
     message->Flags = Flags;
 
-    const auto& response = Channel.Transaction<LSW_MOUNT>(message.Span());
+    const auto& response = Channel.Transaction<WSLA_MOUNT>(message.Span());
 
     WSL_LOG(
-        "LSWMount",
+        "WSLAMount",
         TraceLoggingValue(Source == nullptr ? "<null>" : Source, "Source"),
         TraceLoggingValue(Target == nullptr ? "<null>" : Target, "Target"),
         TraceLoggingValue(Type == nullptr ? "<null>" : Type, "Type"),
@@ -679,7 +680,7 @@ int32_t LSWVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Sour
     return response.Result;
 }
 
-int32_t LSWVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
+int32_t WSLAVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
 {
     auto [response, span] = Channel.ReceiveMessageOrClosed<RESULT_MESSAGE<int32_t>>();
     if (response != nullptr)
@@ -692,18 +693,18 @@ int32_t LSWVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel
     }
 }
 
-HRESULT LSWVirtualMachine::WaitPid(LONG Pid, ULONGLONG TimeoutMs, ULONG* State, int* Code)
+HRESULT WSLAVirtualMachine::WaitPid(LONG Pid, ULONGLONG TimeoutMs, ULONG* State, int* Code)
 try
 {
-    auto [pid, _, subChannel] = Fork(LSW_FORK::Thread);
+    auto [pid, _, subChannel] = Fork(WSLA_FORK::Thread);
 
-    LSW_WAITPID message{};
+    WSLA_WAITPID message{};
     message.Pid = Pid;
     message.TimeoutMs = TimeoutMs;
 
     const auto& response = subChannel.Transaction(message);
 
-    THROW_HR_IF(E_FAIL, response.State == LSWProcessStateUnknown);
+    THROW_HR_IF(E_FAIL, response.State == WSLAOpenFlagsUnknown);
 
     *State = response.State;
     *Code = response.Code;
@@ -712,14 +713,14 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::Shutdown(ULONGLONG TimeoutMs)
+HRESULT WSLAVirtualMachine::Shutdown(ULONGLONG TimeoutMs)
 try
 {
     std::lock_guard lock(m_lock);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
-    LSW_SHUTDOWN message{};
+    WSLA_SHUTDOWN message{};
     m_initChannel.SendMessage(message);
     auto response = m_initChannel.ReceiveMessageOrClosed<MESSAGE_HEADER>(static_cast<wsl::shared::TTimeout>(TimeoutMs));
 
@@ -730,13 +731,13 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
+HRESULT WSLAVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
 try
 {
     std::lock_guard lock(m_lock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
-    LSW_SIGNAL message;
+    WSLA_SIGNAL message;
     message.Pid = Pid;
     message.Signal = Signal;
     const auto& response = m_initChannel.Transaction(message);
@@ -746,7 +747,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::RegisterCallback(ITerminationCallback* callback)
+HRESULT WSLAVirtualMachine::RegisterCallback(ITerminationCallback* callback)
 try
 {
     std::lock_guard lock(m_lock);
@@ -760,7 +761,7 @@ try
 }
 CATCH_RETURN();
 
-bool LSWVirtualMachine::ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdCount, const LSW_PROCESS_FD** TtyInput, const LSW_PROCESS_FD** TtyOutput)
+bool WSLAVirtualMachine::ParseTtyInformation(const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput)
 {
     bool foundNonTtyFd = false;
 
@@ -789,14 +790,14 @@ bool LSWVirtualMachine::ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdC
     return !foundNonTtyFd && FdCount > 0;
 }
 
-void LSWVirtualMachine::LaunchPortRelay()
+void WSLAVirtualMachine::LaunchPortRelay()
 {
     WI_ASSERT(!m_portRelayChannelRead);
 
-    auto [_, __, channel] = Fork(LSW_FORK::ForkType::Process);
+    auto [_, __, channel] = Fork(WSLA_FORK::ForkType::Process);
 
     std::lock_guard lock(m_portRelaylock);
-    auto relayPort = channel.Transaction<LSW_PORT_RELAY>();
+    auto relayPort = channel.Transaction<WSLA_PORT_RELAY>();
 
     wil::unique_handle readPipe;
     wil::unique_handle writePipe;
@@ -836,14 +837,14 @@ void LSWVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-HRESULT LSWVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)
+HRESULT WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)
 try
 {
     std::lock_guard lock(m_portRelaylock);
 
     RETURN_HR_IF(E_ILLEGAL_STATE_CHANGE, !m_portRelayChannelWrite);
 
-    LSW_MAP_PORT message;
+    WSLA_MAP_PORT message;
     message.WindowsPort = WindowsPort;
     message.LinuxPort = LinuxPort;
     message.AddressFamily = Family;
@@ -862,7 +863,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
+HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
 try
 {
     std::filesystem::path Path(WindowsPath);
@@ -902,13 +903,13 @@ try
     });
 
     // Create the guest mount
-    auto [_, __, channel] = Fork(LSW_FORK::Thread);
+    auto [_, __, channel] = Fork(WSLA_FORK::Thread);
 
-    LSW_CONNECT message;
+    WSLA_CONNECT message;
     message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
 
     auto fd = channel.Transaction(message).Result;
-    THROW_HR_IF_MSG(E_FAIL, fd < 0, "LSW_CONNECT failed with %i", fd);
+    THROW_HR_IF_MSG(E_FAIL, fd < 0, "WSLA_CONNECT failed with %i", fd);
 
     auto shareNameUtf8 = shared::string::WideToMultiByte(shareName);
     auto mountOptions =
@@ -921,7 +922,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
+HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 try
 {
     std::lock_guard lock(m_lock);
@@ -943,12 +944,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT LSWVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
+HRESULT WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 try
 {
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);
 
-    auto [channel, _, __] = Fork(LSW_FORK::Thread);
+    auto [channel, _, __] = Fork(WSLA_FORK::Thread);
 
     auto windowsPath = wil::GetWindowsDirectoryW<std::wstring>();
 

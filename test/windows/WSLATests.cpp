@@ -4,25 +4,25 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LSWTests.cpp
+    WSLATests.cpp
 
 Abstract:
 
-    This file contains test cases for the LSW API.
+    This file contains test cases for the WSLA API.
 
 --*/
 
 #include "precomp.h"
 #include "Common.h"
-#include "LSWApi.h"
+#include "WSLAApi.h"
 
 using namespace wsl::windows::common::registry;
 
 using unique_vm = wil::unique_any<WslVirtualMachineHandle, decltype(WslReleaseVirtualMachine), &WslReleaseVirtualMachine>;
 
-class LSWTests
+class WSLATests
 {
-    WSL_TEST_CLASS(LSWTests)
+    WSL_TEST_CLASS(WSLATests)
     wil::unique_couninitialize_call coinit = wil::CoInitializeEx();
     WSADATA Data;
     std::filesystem::path testVhd;
@@ -128,7 +128,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 1024;
         settings.Options.BootTimeoutMs = 30000;
         auto vm = CreateVm(&settings);
@@ -189,7 +189,7 @@ class LSWTests
 
             WslVirtualMachineSettings settings{};
             settings.CPU.CpuCount = 4;
-            settings.DisplayName = L"LSW";
+            settings.DisplayName = L"WSLA";
             settings.Memory.MemoryMb = 1024;
             settings.Options.BootTimeoutMs = 30000;
             settings.Options.Dmesg = write.get();
@@ -282,7 +282,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 1024;
         settings.Options.BootTimeoutMs = 30000;
         settings.Options.TerminationCallback = callback;
@@ -305,7 +305,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 1024;
         settings.Options.BootTimeoutMs = 30000;
 
@@ -424,7 +424,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Options.EnableDebugShell = true;
@@ -492,7 +492,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Networking.Mode = WslNetworkingModeNAT;
@@ -518,7 +518,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
 
@@ -657,7 +657,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Networking.Mode = WslNetworkingModeNAT;
@@ -797,7 +797,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Networking.Mode = WslNetworkingModeNone;
@@ -826,7 +826,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Networking.Mode = WslNetworkingModeNone;
@@ -910,7 +910,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Networking.Mode = WslNetworkingModeNone;
@@ -948,7 +948,7 @@ class LSWTests
 
         WslVirtualMachineSettings settings{};
         settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"LSW";
+        settings.DisplayName = L"WSLA";
         settings.Memory.MemoryMb = 2048;
         settings.Options.BootTimeoutMs = 30 * 1000;
         settings.Networking.Mode = WslNetworkingModeNAT;
