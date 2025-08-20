@@ -4,13 +4,14 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LSWInit.cpp
+    WSLAInit.cpp
 
 Abstract:
 
-    TODO
+    Init implementation for WSLA.
 
 --*/
+
 #include "util.h"
 #include "SocketChannel.h"
 #include "message.h"
@@ -47,9 +48,9 @@ extern int SetCloseOnExec(int Fd, bool Enable);
 
 extern int g_LogFd;
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    wsl::shared::MessageWriter<LSW_GET_DISK_RESULT> writer;
+    wsl::shared::MessageWriter<WSLA_GET_DISK_RESULT> writer;
 
     try
     {
@@ -63,10 +64,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_GET_DISK& 
         writer->Result = wil::ResultFromCaughtException();
     }
 
-    Channel.SendMessage<LSW_GET_DISK::TResponse>(writer.Span());
+    Channel.SendMessage<WSLA_GET_DISK::TResponse>(writer.Span());
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_ACCEPT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
@@ -80,7 +81,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_ACCEPT& Me
     THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     int32_t result = -EINVAL;
     auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
@@ -96,33 +97,33 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_CONNECT& M
     }
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_OPEN& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_OPEN& Message, const gsl::span<gsl::byte>& Buffer)
 {
     int32_t result = EINVAL;
 
     auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
 
-    auto path = wsl::shared::string::FromMessageBuffer<LSW_OPEN>(Buffer);
+    auto path = wsl::shared::string::FromMessageBuffer<WSLA_OPEN>(Buffer);
     int flags = 0;
 
-    WI_SetFlagIf(flags, O_APPEND, WI_IsFlagSet(Message.Flags, LswOpenFlagsAppend));
-    WI_SetFlagIf(flags, O_TRUNC, !WI_IsFlagSet(Message.Flags, LswOpenFlagsAppend) && WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite));
-    WI_SetFlagIf(flags, O_CREAT, WI_IsFlagSet(Message.Flags, LswOpenFlagsCreate));
-    if (WI_IsFlagSet(Message.Flags, LswOpenFlagsRead) && WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite))
+    WI_SetFlagIf(flags, O_APPEND, WI_IsFlagSet(Message.Flags, WslaOpenFlagsAppend));
+    WI_SetFlagIf(flags, O_TRUNC, !WI_IsFlagSet(Message.Flags, WslaOpenFlagsAppend) && WI_IsFlagSet(Message.Flags, WslaOpenFlagsWrite));
+    WI_SetFlagIf(flags, O_CREAT, WI_IsFlagSet(Message.Flags, WslaOpenFlagsCreate));
+    if (WI_IsFlagSet(Message.Flags, WslaOpenFlagsRead) && WI_IsFlagSet(Message.Flags, WslaOpenFlagsWrite))
     {
         WI_SetFlag(flags, O_RDWR);
     }
-    else if (WI_IsFlagSet(Message.Flags, LswOpenFlagsRead))
+    else if (WI_IsFlagSet(Message.Flags, WslaOpenFlagsRead))
     {
         static_assert(O_RDONLY == 0);
     }
-    else if (WI_IsFlagSet(Message.Flags, LswOpenFlagsWrite))
+    else if (WI_IsFlagSet(Message.Flags, WslaOpenFlagsWrite))
     {
         WI_SetFlag(flags, O_WRONLY);
     }
     else
     {
-        LOG_ERROR("Invalid LSW_OPEN flags: {}", Message.Flags);
+        LOG_ERROR("Invalid WSLA_OPEN flags: {}", Message.Flags);
         return; // Return -EINVAL if no opening flags are passed.
     }
 
@@ -144,7 +145,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_OPEN& Mess
     result = 0;
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
 {
     THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
 
@@ -265,15 +266,15 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_TTY_RELAY&
     UtilSocketShutdown(Message.TtyOutput, SHUT_WR);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 1, true)};
     THROW_LAST_ERROR_IF(!ListenSocket);
 
-    LSW_FORK_RESULT Response{};
+    WSLA_FORK_RESULT Response{};
     Response.Header.MessageSize = sizeof(Response);
-    Response.Header.MessageType = LSW_FORK_RESULT::Type;
+    Response.Header.MessageType = WSLA_FORK_RESULT::Type;
     Response.Port = SocketAddress.svm_port;
 
     std::promise<pid_t> childPid;
@@ -281,7 +282,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
     {
         auto childLogic = [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel, &Message, &childPid]() mutable {
             // Close parent channel
-            if (Message.ForkType == LSW_FORK::Process || Message.ForkType == LSW_FORK::Pty)
+            if (Message.ForkType == WSLA_FORK::Process || Message.ForkType == WSLA_FORK::Pty)
             {
                 Channel.Close();
             }
@@ -297,18 +298,18 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
             ProcessMessages(subChannel);
         };
 
-        if (Message.ForkType == LSW_FORK::Thread)
+        if (Message.ForkType == WSLA_FORK::Thread)
         {
             std::thread thread{std::move(childLogic)};
             thread.detach();
 
             Response.Pid = childPid.get_future().get();
         }
-        else if (Message.ForkType == LSW_FORK::Process)
+        else if (Message.ForkType == WSLA_FORK::Process)
         {
             Response.Pid = UtilCreateChildProcess("CreateChildProcess", std::move(childLogic));
         }
-        else if (Message.ForkType == LSW_FORK::Pty)
+        else if (Message.ForkType == WSLA_FORK::Pty)
         {
             THROW_LAST_ERROR_IF(prctl(PR_SET_CHILD_SUBREAPER, 1) < 0);
 
@@ -346,10 +347,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_FORK& Mess
     Channel.SendMessage(Response);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    LSW_MOUNT_RESULT response{};
-    response.Header.MessageType = LSW_MOUNT_RESULT::Type;
+    WSLA_MOUNT_RESULT response{};
+    response.Header.MessageType = WSLA_MOUNT_RESULT::Type;
     response.Header.MessageSize = sizeof(response);
 
     try
@@ -374,7 +375,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
         THROW_LAST_ERROR_IF(UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str()) < 0);
 
         std::optional<std::string> overlayTarget;
-        if (WI_IsFlagSet(Message.Flags, LSW_MOUNT::OverlayFs))
+        if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::OverlayFs))
         {
             overlayTarget.emplace(target + std::string("-rw"));
             THROW_LAST_ERROR_IF(UtilMountOverlayFs(overlayTarget->c_str(), target));
@@ -390,7 +391,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
             }
         }
 
-        if (WI_IsFlagSet(Message.Flags, LSW_MOUNT::Chroot))
+        if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(chdir(target));
             THROW_LAST_ERROR_IF(chroot("."));
@@ -404,10 +405,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_MOUNT& Mes
         response.Result = wil::ResultFromCaughtException();
     }
 
-    Channel.SendMessage<LSW_MOUNT_RESULT>(response);
+    Channel.SendMessage<WSLA_MOUNT_RESULT>(response);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_EXEC& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_EXEC& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto Executable = wsl::shared::string::FromSpan(Buffer, Message.ExecutableIndex);
     auto ArgumentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.CommandLineIndex);
@@ -422,7 +423,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_EXEC& Mess
     Channel.SendResultMessage<int32_t>(errno);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_PORT_RELAY& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_PORT_RELAY& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sockaddr_vm SocketAddress{};
     wil::unique_fd ListenSocket{UtilListenVsockAnyPort(&SocketAddress, 10, false)};
@@ -434,10 +435,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_PORT_RELAY
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_WAITPID& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    LSW_WAITPID_RESULT response{};
-    response.State = LSWProcessStateUnknown;
+    WSLA_WAITPID_RESULT response{};
+    response.State = WSLAOpenFlagsUnknown;
 
     auto sendResponse = wil::scope_exit([&]() { Channel.SendMessage(response); });
 
@@ -462,7 +463,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& M
     }
     else if (result == 0) // Timed out
     {
-        response.State = LSWProcessStateRunning;
+        response.State = WSLAOpenFlagsRunning;
         response.Errno = 0;
         return;
     }
@@ -480,25 +481,25 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_WAITPID& M
 
         response.Code = childState.si_status;
         response.Errno = 0;
-        response.State = childState.si_code == CLD_EXITED ? LSWProcessStateExited : LSWProcessStateSignaled;
+        response.State = childState.si_code == CLD_EXITED ? WSLAOpenFlagsExited : WSLAOpenFlagsSignaled;
         return;
     }
 
     LOG_ERROR("Poll returned an unexpected error state on fd: {} for pid: {}", process.get(), Message.Pid);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto result = kill(Message.Pid, Message.Signal);
     Channel.SendResultMessage(result < 0 ? errno : 0);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
 {
     Channel.SendResultMessage<int32_t>(umount(Message.Buffer) == 0 ? 0 : errno);
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const LSW_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_DETACH& Message, const gsl::span<gsl::byte>& Buffer)
 {
     sync();
 
@@ -539,7 +540,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<LSW_GET_DISK, LSW_MOUNT, LSW_EXEC, LSW_FORK, LSW_CONNECT, LSW_WAITPID, LSW_SIGNAL, LSW_TTY_RELAY, LSW_PORT_RELAY, LSW_OPEN, LSW_UNMOUNT, LSW_DETACH, LSW_ACCEPT>(
+        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_WAITPID, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT>(
             Channel, Type, Buffer);
     }
     catch (...)
@@ -555,7 +556,7 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
     while (Channel.Connected())
     {
         auto [Message, Range] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
-        if (Message == nullptr || Message->MessageType == LxMessageLswShutdown)
+        if (Message == nullptr || Message->MessageType == LxMessageWSLAShutdown)
         {
             break;
         }
@@ -566,7 +567,7 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
     LOG_INFO("Process {} exiting", getpid());
 }
 
-int LswEntryPoint(int Argc, char* Argv[])
+int WSLAEntryPoint(int Argc, char* Argv[])
 {
 
     //

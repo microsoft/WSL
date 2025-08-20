@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LSWUserSessionFactory.cpp
+    WSLAUserSessionFactory.cpp
 
 Abstract:
 
@@ -13,26 +13,26 @@ Abstract:
 --*/
 #include "precomp.h"
 
-#include "LSWUserSessionFactory.h"
-#include "LSWUserSession.h"
+#include "WSLAUserSessionFactory.h"
+#include "WSLAUserSession.h"
 
-using wsl::windows::service::lsw::LSWUserSessionFactory;
-using wsl::windows::service::lsw::LSWUserSessionImpl;
+using wsl::windows::service::wsla::WSLAUserSessionFactory;
+using wsl::windows::service::wsla::WSLAUserSessionImpl;
 
-CoCreatableClassWithFactory(LSWUserSession, LSWUserSessionFactory);
+CoCreatableClassWithFactory(WSLAUserSession, WSLAUserSessionFactory);
 
 static std::mutex g_mutex;
-static std::optional<std::vector<std::shared_ptr<LSWUserSessionImpl>>> g_sessions =
-    std::make_optional<std::vector<std::shared_ptr<LSWUserSessionImpl>>>();
+static std::optional<std::vector<std::shared_ptr<WSLAUserSessionImpl>>> g_sessions =
+    std::make_optional<std::vector<std::shared_ptr<WSLAUserSessionImpl>>>();
 
-HRESULT LSWUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
+HRESULT WSLAUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
 {
     RETURN_HR_IF_NULL(E_POINTER, ppCreated);
     *ppCreated = nullptr;
 
     RETURN_HR_IF(CLASS_E_NOAGGREGATION, pUnkOuter != nullptr);
 
-    WSL_LOG("LSWUserSessionFactory", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
+    WSL_LOG("WSLAUserSessionFactory", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
 
     try
     {
@@ -55,10 +55,10 @@ HRESULT LSWUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REF
 
         if (session == g_sessions->end())
         {
-            session = g_sessions->insert(g_sessions->end(), std::make_shared<LSWUserSessionImpl>(userToken.get(), std::move(tokenInfo)));
+            session = g_sessions->insert(g_sessions->end(), std::make_shared<WSLAUserSessionImpl>(userToken.get(), std::move(tokenInfo)));
         }
 
-        auto comInstance = wil::MakeOrThrow<LSWUserSession>(std::weak_ptr<LSWUserSessionImpl>(*session));
+        auto comInstance = wil::MakeOrThrow<WSLAUserSession>(std::weak_ptr<WSLAUserSessionImpl>(*session));
 
         THROW_IF_FAILED(comInstance.CopyTo(riid, ppCreated));
     }
@@ -70,12 +70,12 @@ HRESULT LSWUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REF
         return result == CO_E_SERVER_STOPPING ? S_FALSE : result;
     }
 
-    WSL_LOG("LSWUserSessionFactory", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
+    WSL_LOG("WSLAUserSessionFactory", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
 
     return S_OK;
 }
 
-void wsl::windows::service::lsw::ClearLswSessionsAndBlockNewInstances()
+void wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances()
 {
     std::lock_guard lock{g_mutex};
     g_sessions.reset();

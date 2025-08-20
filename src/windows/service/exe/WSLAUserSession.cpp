@@ -4,23 +4,23 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LSWUserSession.cpp
+    WSLAUserSession.cpp
 
 Abstract:
 
     TODO
 
 --*/
-#include "LSWUserSession.h"
+#include "WSLAUserSession.h"
 
-using wsl::windows::service::lsw::LSWUserSessionImpl;
+using wsl::windows::service::wsla::WSLAUserSessionImpl;
 
-LSWUserSessionImpl::LSWUserSessionImpl(HANDLE Token, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo) :
+WSLAUserSessionImpl::WSLAUserSessionImpl(HANDLE Token, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo) :
     m_tokenInfo(std::move(TokenInfo))
 {
 }
 
-LSWUserSessionImpl::~LSWUserSessionImpl()
+WSLAUserSessionImpl::~WSLAUserSessionImpl()
 {
     // Manually signal the VM termination events. This prevents being stuck on an API call that holds the VM lock.
     {
@@ -33,7 +33,7 @@ LSWUserSessionImpl::~LSWUserSessionImpl()
     }
 }
 
-void LSWUserSessionImpl::OnVmTerminated(LSWVirtualMachine* machine)
+void WSLAUserSessionImpl::OnVmTerminated(WSLAVirtualMachine* machine)
 {
     std::lock_guard lock(m_virtualMachinesLock);
     auto pred = [machine](const auto* e) { return machine == e; };
@@ -42,9 +42,9 @@ void LSWUserSessionImpl::OnVmTerminated(LSWVirtualMachine* machine)
     m_virtualMachines.erase(std::remove_if(m_virtualMachines.begin(), m_virtualMachines.end(), pred), m_virtualMachines.end());
 }
 
-HRESULT LSWUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, ILSWVirtualMachine** VirtualMachine)
+HRESULT WSLAUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
 {
-    auto vm = wil::MakeOrThrow<LSWVirtualMachine>(*Settings, GetUserSid(), this);
+    auto vm = wil::MakeOrThrow<WSLAVirtualMachine>(*Settings, GetUserSid(), this);
 
     {
         std::lock_guard lock(m_virtualMachinesLock);
@@ -52,22 +52,22 @@ HRESULT LSWUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS*
     }
 
     vm->Start();
-    THROW_IF_FAILED(vm.CopyTo(__uuidof(ILSWVirtualMachine), (void**)VirtualMachine));
+    THROW_IF_FAILED(vm.CopyTo(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
 
     return S_OK;
 }
 
-PSID LSWUserSessionImpl::GetUserSid() const
+PSID WSLAUserSessionImpl::GetUserSid() const
 {
     return m_tokenInfo->User.Sid;
 }
 
-wsl::windows::service::lsw::LSWUserSession::LSWUserSession(std::weak_ptr<LSWUserSessionImpl>&& Session) :
+wsl::windows::service::wsla::WSLAUserSession::WSLAUserSession(std::weak_ptr<WSLAUserSessionImpl>&& Session) :
     m_session(std::move(Session))
 {
 }
 
-HRESULT wsl::windows::service::lsw::LSWUserSession::GetVersion(_Out_ WSL_VERSION* Version)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSL_VERSION* Version)
 {
     Version->Major = WSL_PACKAGE_VERSION_MAJOR;
     Version->Minor = WSL_PACKAGE_VERSION_MINOR;
@@ -76,7 +76,7 @@ HRESULT wsl::windows::service::lsw::LSWUserSession::GetVersion(_Out_ WSL_VERSION
     return S_OK;
 }
 
-HRESULT wsl::windows::service::lsw::LSWUserSession::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, ILSWVirtualMachine** VirtualMachine)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
 try
 {
     auto session = m_session.lock();
