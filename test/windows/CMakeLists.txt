@@ -9,7 +9,7 @@ set(SOURCES
     PluginTests.cpp
     PolicyTests.cpp
     InstallerTests.cpp
-    LSWTests.cpp)
+    WSLATests.cpp)
 
 set(HEADERS
     Common.h
@@ -18,14 +18,14 @@ set(HEADERS
 
 add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
-include_directories(${CMAKE_SOURCE_DIR}/src/windows/lswclient)
+include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
 target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests
                       common
-                      lswclient
+                      wslaclient
                       ${TAEF_LINK_LIBRARIES}
                       ${COMMON_LINK_LIBRARIES}
                       VirtDisk.lib
@@ -33,5 +33,5 @@ target_link_libraries(wsltests
                       Dbghelp.lib
                       sfc.lib)
 
-add_dependencies(wsltests wslserviceidl lswclient)
+add_dependencies(wsltests wslserviceidl wslaclient)
 add_subdirectory(testplugin)

@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LSWVirtualMachine.h
+    WSLAVirtualMachine.h
 
 Abstract:
 
@@ -17,17 +17,17 @@ Abstract:
 #include "hcs.hpp"
 #include "Dmesg.h"
 
-namespace wsl::windows::service::lsw {
+namespace wsl::windows::service::wsla {
 
-class LSWUserSessionImpl;
+class WSLAUserSessionImpl;
 
-class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") LSWVirtualMachine
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ILSWVirtualMachine, IFastRundown>
+class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAVirtualMachine, IFastRundown>
 
 {
 public:
-    LSWVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, LSWUserSessionImpl* UserSession);
-    ~LSWVirtualMachine();
+    WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, WSLAUserSessionImpl* UserSession);
+    ~WSLAVirtualMachine();
 
     void Start();
     void OnSessionTerminating();
@@ -35,7 +35,7 @@ public:
     IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)) override;
     IFACEMETHOD(CreateLinuxProcess(
-        _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ ULONG* Handles, _Out_ LSW_CREATE_PROCESS_RESULT* Result)) override;
+        _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ WSLA_PROCESS_FD* Fd, _Out_ ULONG* Handles, _Out_ WSLA_CREATE_PROCESS_RESULT* Result)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
@@ -51,13 +51,13 @@ public:
 private:
     static int32_t MountImpl(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
-    static bool ParseTtyInformation(const LSW_PROCESS_FD* Fds, ULONG FdCount, const LSW_PROCESS_FD** TtyInput, const LSW_PROCESS_FD** TtyOutput);
+    static bool ParseTtyInformation(const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput);
 
     void ConfigureNetworking();
     void OnExit(_In_ const HCS_EVENT* Event);
 
-    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum LSW_FORK::ForkType Type);
-    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(wsl::shared::SocketChannel& Channel, enum LSW_FORK::ForkType Type);
+    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
+    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type);
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
 
     wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
@@ -65,7 +65,7 @@ private:
     void LaunchPortRelay();
 
     std::vector<wil::unique_socket> CreateLinuxProcessImpl(
-        _In_ const LSW_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ LSW_PROCESS_FD* Fd, _Out_ LSW_CREATE_PROCESS_RESULT* Result);
+        _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ WSLA_PROCESS_FD* Fd, _Out_ WSLA_CREATE_PROCESS_RESULT* Result);
 
     struct AttachedDisk
     {
@@ -97,6 +97,6 @@ private:
     std::map<std::string, std::wstring> m_plan9Mounts;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
-    LSWUserSessionImpl* m_userSession;
+    WSLAUserSessionImpl* m_userSession;
 };
-} // namespace wsl::windows::service::lsw
+} // namespace wsl::windows::service::wsla

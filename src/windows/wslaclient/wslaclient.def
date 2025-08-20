@@ -1,4 +1,4 @@
-LIBRARY lswclient
+LIBRARY wslaclient
 
 EXPORTS
     WslGetVersion

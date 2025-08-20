@@ -18,7 +18,7 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
-#include "lswapi.h"
+#include "WSLAApi.h"
 
 using namespace wsl::windows::common::registry;
 
