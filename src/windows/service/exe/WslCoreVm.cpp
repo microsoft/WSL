@@ -545,7 +545,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->DefaultKernel = m_defaultKernel;
     message->KernelModulesDeviceId = modulesLun;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
-    message.WriteString(message->KernelModulesListOffset, wsl::shared::string::Join<wchar_t>(m_vmConfig.KernelModulesList, L','));
+    message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
 
     m_miniInitChannel.SendMessage<LX_MINI_INIT_EARLY_CONFIG_MESSAGE>(message.Span());
