@@ -14,10 +14,10 @@ Abstract:
 
 #pragma once
 
+#define T_ENUM(c, n) TraceLoggingValue(wsl::core::ToString((c).n), #n)
 #define T_PRESENT(c, n) TraceLoggingValue((c).n == ConfigKeyPresence::Present, #n)
 #define T_SET(c, n) TraceLoggingValue(!(c).n.empty(), #n "Set")
-#define T_STRING(c, n) TraceLoggingValue(wsl::core::ToString((c).n), #n)
-#define T_STRING_VECTOR(c, n) TraceLoggingValue(wsl::shared::string::Join((c).n, L',').c_str(), #n)
+#define T_STRING(c, n) TraceLoggingValue((c).n.c_str(), #n)
 #define T_VALUE(c, n) TraceLoggingValue((c).n, #n)
 
 #define CONFIG_TELEMETRY(c) \
@@ -27,11 +27,11 @@ Abstract:
         T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
         T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
         T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
-        T_STRING(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), \
-        T_VALUE(c, KernelDebugPort), T_SET(c, KernelModulesPath), T_STRING_VECTOR(c, KernelModulesList), T_SET(c, KernelPath), \
+        T_ENUM(c, FirewallConfigPresence), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), \
+        T_VALUE(c, KernelDebugPort), T_SET(c, KernelModulesPath), T_STRING(c, KernelModulesList), T_SET(c, KernelPath), \
         T_VALUE(c, LoadDefaultKernelModules), T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), \
-        T_VALUE(c, MaximumProcessorCount), T_STRING(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), \
-        T_STRING(c, NetworkingMode), T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), \
+        T_VALUE(c, MaximumProcessorCount), T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), \
+        T_ENUM(c, NetworkingMode), T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), \
         T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
 
 namespace wsl::core {
@@ -304,11 +304,10 @@ struct Config
     void SaveNetworkingSettings(_In_opt_ HANDLE UserToken) const;
     static unsigned long WriteConfigFile(_In_ LPCWSTR ConfigFilePath, _In_ ConfigKey KeyToWrite, _In_ bool RemoveKey = false);
 
-    // Values set in ParseConfigFile
     std::filesystem::path KernelPath;
     std::wstring KernelCommandLine;
+    std::wstring KernelModulesList;
     std::filesystem::path KernelModulesPath;
-    std::vector<std::wstring> KernelModulesList = {L"tun", L"ip_tables", L"br_netfilter"};
     UINT64 MemorySizeBytes = 0;
     UINT64 MaximumMemorySizeBytes = 0;
     int ProcessorCount = 0;
