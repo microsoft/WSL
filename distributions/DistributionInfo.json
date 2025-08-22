@@ -220,16 +220,6 @@
             "PackageFamilyName": "KaliLinux.54290C8133FEE_ey8k8hqnwqnmg"
         },
         {
-            "Name": "Ubuntu-18.04",
-            "FriendlyName": "Ubuntu 18.04 LTS",
-            "StoreAppId": "9PNKSF5ZN4SW",
-            "Amd64": true,
-            "Arm64": true,
-            "Amd64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu1804-230608_x64.appx",
-            "Arm64PackageUrl": "https://publicwsldistros.blob.core.windows.net/wsldistrostorage/Ubuntu1804-230608_ARM64.appx",
-            "PackageFamilyName": "CanonicalGroupLimited.Ubuntu18.04LTS_79rhkp1fndgsc"
-        },
-        {
             "Name": "Ubuntu-20.04",
             "FriendlyName": "Ubuntu 20.04 LTS",
             "StoreAppId": "9MTTCL66CPXJ",
