@@ -197,9 +197,15 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
     auto kernelModules =
         LoadDefaultKernelModules ? std::vector<std::wstring>{L"tun", L"ip_tables", L"br_netfilter"} : std::vector<std::wstring>{};
 
-    for (auto& e : wsl::shared::string::Split(userKernelModules, L','))
+    if (!userKernelModules.empty())
     {
-        kernelModules.emplace_back(std::move(e));
+        for (const auto& e : wsl::shared::string::Split(userKernelModules, L','))
+        {
+            if (!e.empty())
+            {
+                kernelModules.emplace_back(e);
+            }
+        }
     }
 
     KernelModulesList = wsl::shared::string::Join(kernelModules, L',');
