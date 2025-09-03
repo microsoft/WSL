@@ -115,10 +115,6 @@ try
 
         for (;;)
         {
-            if (exitEvent && WaitForSingleObject(exitEvent.get(), 0) == WAIT_OBJECT_0)
-            {
-                break;
-            }
 
             const wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
             THROW_LAST_ERROR_IF(!socket);
