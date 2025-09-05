@@ -394,6 +394,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(chdir(target));
+            THROW_LAST_ERROR_IF(mount(".", "/", nullptr, MS_MOVE, nullptr) < 0);
             THROW_LAST_ERROR_IF(chroot("."));
         }
 
