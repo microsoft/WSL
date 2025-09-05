@@ -336,7 +336,7 @@ try
     // Check if the WSL package is installed, and if the version supports WSLA
     auto version = wsl::windows::common::wslutil::GetInstalledPackageVersion();
 
-    constexpr auto minimalPackageVersion = wsl::shared::PackageVersion; // TODO: replace with correct version once WSLA is released.
+    constexpr auto minimalPackageVersion = std::tuple{2, 7, 0};
     WI_SetFlagIf(*Components, WslInstallComponentWslPackage, !version.has_value() || version < minimalPackageVersion);
 
     // TODO: Check if hardware supports virtualization.

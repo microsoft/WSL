@@ -1050,6 +1050,20 @@ class InstallerTests
 
         VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslPackage, nullptr, nullptr), E_INVALIDARG);
 
+        // TODO: remove once 2.7.0 is released.
+        RegistryKeyChange<std::wstring> version(HKEY_LOCAL_MACHINE, LXSS_REGISTRY_PATH "\\MSI", L"Version", L"2.7.0");
+
+        expectComponents(WslInstallComponentNone);
+
+        // Validate that a package < 2.7 is handled correctly.
+        {
+            version.Set(L"2.6.0");
+            expectComponents(WslInstallComponentWslPackage);
+        }
+
+        version.Set(L"2.7.0");
+
+        // Validate that a missing package is detected.
         expectComponents(WslInstallComponentNone);
         UninstallMsi();
 
@@ -1068,6 +1082,8 @@ class InstallerTests
             VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslPackage);
 
             ValidateInstalledVersion(WIDEN(WSL_PACKAGE_VERSION));
+            version.Set(L"2.7.0");
+
             expectComponents(WslInstallComponentNone);
 
             progressedComponents = WslInstallComponentNone;
