@@ -46,6 +46,8 @@ extern int EnableInterface(int Socket, const char* Name);
 
 extern int SetCloseOnExec(int Fd, bool Enable);
 
+int Chroot(const char* Target);
+
 extern int g_LogFd;
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
@@ -393,8 +395,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
 
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
         {
-            THROW_LAST_ERROR_IF(chdir(target));
-            THROW_LAST_ERROR_IF(chroot("."));
+            THROW_LAST_ERROR_IF(Chroot(target) < 0);
         }
 
         response.Result = 0;
