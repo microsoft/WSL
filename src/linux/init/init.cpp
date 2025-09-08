@@ -365,8 +365,8 @@ ExecStart=/bin/mount -o bind,ro,X-mount.mkdir -t none /mnt/wslg/.X11-unix /tmp/.
 ExecStop=
 ExecStart=/bin/sh -c '(echo -1 > {}/{}) ; (echo "{}" > {})' )",
                 BINFMT_MISC_MOUNT_TARGET,
-                LX_INIT_BINFMT_NAME_LATE,
-                BINFMT_INTEROP_REGISTRATION_STRING(LX_INIT_BINFMT_NAME_LATE),
+                LX_INIT_BINFMT_NAME,
+                BINFMT_INTEROP_REGISTRATION_STRING(LX_INIT_BINFMT_NAME),
                 BINFMT_MISC_REGISTER_FILE);
 
             // Install the override for systemd-binfmt.service.
