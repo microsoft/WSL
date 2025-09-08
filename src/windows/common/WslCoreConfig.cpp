@@ -201,10 +201,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
     {
         for (const auto& e : wsl::shared::string::Split(userKernelModules, L','))
         {
-            if (!e.empty())
-            {
-                kernelModules.emplace_back(e);
-            }
+            kernelModules.emplace_back(std::move(e));
         }
     }
 
