@@ -225,6 +225,14 @@ stages:
                                     }
                               ]
 
+                  - task: PowerShell@2
+                    displayName: 'Debug'
+                    inputs:
+                      targetType: inline
+                      script: |
+                        Get-AuthenticodeSignature "bin\\${{ platform }}\Release\wslaclient.dll"
+
+
                   # Replace the intermediate wslsettings binaries file with the signed versions so that any future steps building wslsettings will use the signed versions
                   - task: PowerShell@2
                     displayName: 'Replace wslsettings binaries in intermediate folder with signed versions'
