@@ -2081,7 +2081,7 @@ Return Value:
 
         for (const auto& e : defenderCommands)
         {
-            LogInfo("\"%s\" returned: %lu", e.c_str(), LxsstuRunCommand(std::format(L"Powershell -NoProfile -Command \"{}\"", e).data()));
+            LogInfo("\"%ls\" returned: %lu", e.c_str(), LxsstuRunCommand(std::format(L"Powershell -NoProfile -Command \"{}\"", e).data()));
         }
     }
 
