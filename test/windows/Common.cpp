@@ -2073,12 +2073,16 @@ Return Value:
 
     if (!g_pipelineBuildId.empty())
     {
-        LxsstuRunCommand(std::format(
-                             L"Powershell -NoProfile -Command \"Add-MpPreference -ExclusionPath '{}'\"",
-                             wsl::windows::common::wslutil::GetMsiPackagePath().value())
-                             .data());
+        std::vector<std::wstring> defenderCommands{
+            std::format(L"Add-MpPreference -ExclusionPath '{}'", wsl::windows::common::wslutil::GetMsiPackagePath().value()),
+            L"Add-MpPreference -ExclusionPath '.'",
+            L"Add-MpPreference -ExclusionProcess @('wsl.exe', 'wslg.exe', 'wslconfig.exe', 'wslrelay.exe', 'wslhost.exe', "
+            "'msrdc.exe', 'wslservice.exe', 'msal.wsl.proxy.exe')"};
 
-        LxsstuRunCommand(std::format(L"Powershell -NoProfile -Command \"Add-MpPreference -ExclusionPath '.'\"").data());
+        for (const auto& e : defenderCommands)
+        {
+            LogInfo("\"%s\" returned: %lu", e.c_str(), LxsstuRunCommand(std::format(L"Powershell -NoProfile -Command \"{}\"", e).data()));
+        }
     }
 
     return true;
@@ -2128,7 +2132,7 @@ Return Value:
         commandLine = std::format(L"Get-MpThreat > \"{}\\Get-MpThreat.txt\"", g_dumpFolder);
         LxsstuLaunchPowershellAndCaptureOutput(commandLine.data());
 
-        commandLine = std::format(L"Get-MpPreference > \"{}\\Get-MpPreference\"", g_dumpFolder);
+        commandLine = std::format(L"Get-MpPreference > \"{}\\Get-MpPreference.txt\"", g_dumpFolder);
         LxsstuLaunchPowershellAndCaptureOutput(commandLine.data());
     }
 
