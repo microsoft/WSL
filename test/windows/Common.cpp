@@ -2078,19 +2078,7 @@ Return Value:
             L"Add-MpPreference -ExclusionPath '.'",
             L"Add-MpPreference -ExclusionProcess @('wsl.exe', 'wslg.exe', 'wslconfig.exe', 'wslrelay.exe', 'wslhost.exe', "
             "'msrdc.exe', 'wslservice.exe', 'msal.wsl.proxy.exe', 'te.processhost.exe')",
-            L"Set-MpPreference"
-            " -DisableBehaviorMonitoring $true"
-            " -DisableRealtimeMonitoring $true"
-            " -DisableScriptScanning $true"
-            " -DisableArchiveScanning $true"
-            " -DisableIOAVProtection $true"
-            " -MAPSReporting 0"
-            " -SubmitSamplesConsent 2"
-            " -UnknownThreatDefaultAction NoAction"
-            " -LowThreatDefaultAction NoAction"
-            " -ModerateThreatDefaultAction NoAction"
-            " -HighThreatDefaultAction NoAction"
-            " -SevereThreatDefaultAction NoAction"
+            L"Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -MAPSReporting 0"
 
         };
 
