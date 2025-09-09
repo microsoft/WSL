@@ -225,14 +225,6 @@ stages:
                                     }
                               ]
 
-                  - task: PowerShell@2
-                    displayName: 'Debug'
-                    inputs:
-                      targetType: inline
-                      script: |
-                        Get-AuthenticodeSignature "bin\\${{ platform }}\Release\wslaclient.dll"
-
-
                   # Replace the intermediate wslsettings binaries file with the signed versions so that any future steps building wslsettings will use the signed versions
                   - task: PowerShell@2
                     displayName: 'Replace wslsettings binaries in intermediate folder with signed versions'
@@ -248,7 +240,7 @@ stages:
                         Copy-Item $wslsettingsbinpath\wslsettings.dll $wslsettingsobjpath\wslsettings.dll -Force
                         Copy-Item $wslsettingsbinpath\wslsettings.exe $wslsettingsobjpath\apphost.exe -Force
 
-              - script: cmake --build . --config Release  --target msixinstallerpackage testplugin ${{ iif(eq(platform, 'arm64'), 'bundle', '') }} -- -m
+              - script: cmake --build . --config Release -- -m
                 displayName: "Build installer msix and tests (${{ platform }})"
 
               - task: PowerShell@2
@@ -260,13 +252,6 @@ stages:
                       $arch = '${{ platform }}'
                       Copy-Item -Path "bin\$arch\release\wsl.msi" -Destination "$(ob_outputDirectory)\bundle\wsl.$(version.WSL_PACKAGE_VERSION).$arch.msi"
                       
-              - task: PowerShell@2
-                displayName: 'Debug'
-                inputs:
-                  targetType: inline
-                  script: |
-                    Get-AuthenticodeSignature "bin\\${{ platform }}\Release\wslaclient.dll"
-
           - ${{ if eq(parameters.isRelease, 'true') }}:
               - task: SFP.build-tasks.custom-build-task-1.EsrpCodeSigning@5
                 displayName: "Sign the bundle"
