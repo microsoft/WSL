@@ -15,7 +15,7 @@ stages:
   jobs:
   - job: nuget
     displayName: 'Publish nuget packages'
-    #condition: and(succeeded(), or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.isNightly }}', false)))
+    condition: and(succeeded(), or(eq(variables['Build.Reason'], 'Schedule'), eq('${{ parameters.isNightly }}', false)))
     dependsOn: [] # The stage handles this dependency
 
     pool:
