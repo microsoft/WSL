@@ -303,7 +303,6 @@ stages:
             displayName: "Create the nuget directory"
 
           - ${{ each package in parameters.nugetPackages }}:
-              - script: Get-Content ${{ package }}
               - script: nuget.exe pack ${{ package }} -OutputDirectory $(ob_outputDirectory)\bin\nuget -NonInteractive
                 displayName: Build ${{ package }}
 
