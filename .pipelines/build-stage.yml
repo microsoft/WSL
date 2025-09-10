@@ -7,6 +7,10 @@ parameters:
     type: string
     default: ""
 
+  - name: nugetSuffix
+    type: string
+    default: ""
+
   - name: isNightly
     type: boolean
     default: false
@@ -160,7 +164,7 @@ stages:
               ${{ else }}:
                 script: |
                   Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}' + '.0'))"
-                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}'))"
+                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}{{ parameters.nugetSuffix }}'))"
 
           - ${{ each platform in parameters.platforms }}:
               - task: CMake@1

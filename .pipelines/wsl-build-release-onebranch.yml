@@ -8,6 +8,11 @@ parameters:
   displayName: 'Test the release pipeline'
   type: string
   default: ''
+  
+- name: nugetSuffix
+  displayName: 'Nuget version suffix (must include "-")'
+  type: string
+  default: ''
 
 trigger:
   tags:
@@ -51,6 +56,7 @@ extends:
       parameters:
         isRelease: true
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
+        packageVersion: ${{ parameters.nugetSuffix }}
         traceLoggingConfig: $(ReleaseTraceLoggingConfig)
         vsoOrg: microsoft
         vsoProject: Microsoft.WSL
@@ -65,7 +71,7 @@ extends:
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
         bypassTests: ${{ parameters.bypassTests }}
 
-    - ${{ if eq(parameters.testVersion, '') }}:
+    - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self
           parameters:
             isNightly: false
