@@ -2071,23 +2071,6 @@ Return Value:
         THROW_HR_MSG(E_FAIL, "Test setup returned non-zero exit code %lu", ExitCode);
     }
 
-    if (!g_pipelineBuildId.empty())
-    {
-        std::vector<std::wstring> defenderCommands{
-            std::format(L"Add-MpPreference -ExclusionPath '{}'", wsl::windows::common::wslutil::GetMsiPackagePath().value()),
-            L"Add-MpPreference -ExclusionPath '.'",
-            L"Add-MpPreference -ExclusionProcess @('wsl.exe', 'wslg.exe', 'wslconfig.exe', 'wslrelay.exe', 'wslhost.exe', "
-            "'msrdc.exe', 'wslservice.exe', 'msal.wsl.proxy.exe', 'te.processhost.exe')",
-            L"Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -MAPSReporting 0"
-
-        };
-
-        for (const auto& e : defenderCommands)
-        {
-            LogInfo("\"%ls\" returned: %lu", e.c_str(), LxsstuRunCommand(std::format(L"Powershell -NoProfile -Command \"{}\"", e).data()));
-        }
-    }
-
     return true;
 }
 
