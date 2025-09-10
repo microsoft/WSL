@@ -374,7 +374,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
 
         const char* source = readField(Message.SourceIndex);
         const char* target = readField(Message.DestinationIndex);
-        THROW_LAST_ERROR_IF(UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str()) < 0);
+        THROW_LAST_ERROR_IF(
+            UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
 
         std::optional<std::string> overlayTarget;
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::OverlayFs))
