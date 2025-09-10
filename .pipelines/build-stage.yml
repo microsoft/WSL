@@ -164,7 +164,7 @@ stages:
               ${{ else }}:
                 script: |
                   Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}' + '.0'))"
-                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}{{ parameters.nugetSuffix }}'))"
+                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}${{ parameters.nugetSuffix }}'))"
 
           - ${{ each platform in parameters.platforms }}:
               - task: CMake@1
@@ -303,6 +303,7 @@ stages:
             displayName: "Create the nuget directory"
 
           - ${{ each package in parameters.nugetPackages }}:
+              - script: Get-Content ${{ package }}
               - script: nuget.exe pack ${{ package }} -OutputDirectory $(ob_outputDirectory)\bin\nuget -NonInteractive
                 displayName: Build ${{ package }}
 
