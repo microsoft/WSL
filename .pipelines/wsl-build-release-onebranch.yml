@@ -56,7 +56,7 @@ extends:
       parameters:
         isRelease: true
         packageVersion: ${{ iif(eq(parameters.testVersion, ''), variables['Build.SourceBranchName'], parameters.testVersion) }}
-        packageVersion: ${{ parameters.nugetSuffix }}
+        nugetSuffix: ${{ parameters.nugetSuffix }}
         traceLoggingConfig: $(ReleaseTraceLoggingConfig)
         vsoOrg: microsoft
         vsoProject: Microsoft.WSL
