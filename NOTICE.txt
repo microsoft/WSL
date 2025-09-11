@@ -1584,7 +1584,7 @@ GPL-1.0-or-later OR Artistic-1.0-Perl
 
 ---------------------------------------------------------
 
-Microsoft.Windows.SDK.NET.Ref 10.0.26100.57 - LicenseRef-scancode-unknown
+Microsoft.Windows.SDK.NET.Ref 10.0.26100.75 - LicenseRef-scancode-unknown
 
 
 (c) Microsoft Corporation
@@ -1676,7 +1676,7 @@ THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ---------------------------------------------------------
 
-Microsoft.Extensions.Hosting 9.0.4 - MIT
+Microsoft.Extensions.Hosting 9.0.8 - MIT
 
 
 Copyright (c) 2021
@@ -1766,7 +1766,7 @@ SOFTWARE.
 
 ---------------------------------------------------------
 
-Microsoft.NETCore.App.Runtime.win-arm64 9.0.6 - MIT
+Microsoft.NETCore.App.Runtime.win-arm64 9.0.8 - MIT
 
 
 Copyright (c) 2021
@@ -1859,7 +1859,7 @@ SOFTWARE.
 
 ---------------------------------------------------------
 
-Microsoft.NETCore.App.Runtime.win-x64 9.0.6 - MIT
+Microsoft.NETCore.App.Runtime.win-x64 9.0.8 - MIT
 
 
 Copyright (c) 2021
