@@ -17,7 +17,7 @@ from git import Repo, Commit, Tag
 def main(ref: str, line: int, commit: bool):
     repo = Repo('.')
 
-    repo.remote('origin').fetch('--tags')
+    repo.remote('origin').fetch()
     tags = list_tags(repo)
     
     if commit:
