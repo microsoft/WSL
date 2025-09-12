@@ -1,7 +1,7 @@
 {
   "version": 1,
   "dependencies": {
-    "net8.0-windows10.0.26100": {
+    ".NETCoreApp,Version=v8.0": {
       "CommunityToolkit.Mvvm": {
         "type": "Direct",
         "requested": "[8.4.0, )",
@@ -417,18 +417,18 @@
       "configfile": {
         "type": "Project",
         "dependencies": {
-          "common": "[1.0.0, )"
+          "common": "1.0.0"
         }
       },
       "libwsl": {
         "type": "Project",
         "dependencies": {
-          "common": "[1.0.0, )",
-          "configfile": "[1.0.0, )"
+          "common": "1.0.0",
+          "configfile": "1.0.0"
         }
       }
     },
-    "net8.0-windows10.0.26100/win-x64": {
+    ".NETCoreApp,Version=v8.0/win-x64": {
       "Microsoft.WindowsAppSDK": {
         "type": "Direct",
         "requested": "[1.7.250606001, )",
@@ -454,24 +454,6 @@
         "resolved": "9.0.8",
         "contentHash": "W+LotQsM4wBJ4PG7uRkyul4wqL4Fz7R4ty6uXrCNZUhbaHYANgrPaYR2ZpMVpdCjQEJ17Jr1NMN8hv4SHaHY4A=="
       }
-    },
-    "Microsoft.NETCore.App.Runtime.win-x64": {
-        "type": "Direct",
-        "requested": "[9.0.8, 9.0.8]",
-        "resolved": "9.0.8",
-        "contentHash": "IBp8H2PnJl0zaspyXqOSfnJ3Ags5bXPFo7EOvarxTvngClfylA5SfEQnm3DTi1kNBO416j9R+dernaLJzAdtbg=="
-      },
-    "Microsoft.AspNetCore.App.Runtime.win-x64": {
-        "type": "Direct",
-        "requested": "[8.0.19, 8.0.19]",
-        "resolved": "8.0.19",
-        "contentHash": "JHWOkYXhAAY83e0H1+2ckxBjkTJcq1YU5GSYidgpfzoo9/j4qTa5OlxyY45zS8WbWDDKP6o+Cl9e4dvL2lShAQ=="
-      },
-    "Microsoft.WindowsDesktop.App.Runtime.win-x64": {
-        "type": "Direct",
-        "requested": "[8.0.19, 8.0.19]",
-        "resolved": "8.0.19",
-        "contentHash": "klDztNjzA4rBNr59NYdXpubT1Mw/BWnf8RRqZ++d3wPNzD1UU/YFuBXf9ohgfdQFBFbEblFPVm+rBF76Wc2Ebw=="
-      }
+    }
   }
 }
