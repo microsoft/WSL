@@ -174,7 +174,7 @@ stages:
               # The plugin credential provider could not acquire credentials. Authentication may require manual action.
               # Consider re-running the command with --interactive for `dotnet`, /p:NuGetInteractive="true" for MSBuild or removing the -NonInteractive switch for `NuGet`
               # Response status code does not indicate success: 401 (Unauthorized)
-              - script: _deps\nuget.exe restore -NonInteractive -LockFilePath src/windows/wslsettings/packages.lock.${{ plaform }}.json  -UseLockFile -LockedMode
+              - script: _deps\nuget.exe restore -NonInteractive -LockFilePath src/windows/wslsettings/packages.lock.${{ plaform }}.json  -UseLockFile
 
               - ${{ each target in parameters.targets }}:
                   - script: cmake --build . --config Release --target ${{ target.target }} -- -m
