@@ -231,7 +231,7 @@ stages:
                         Copy-Item $wslsettingsbinpath\wslsettings.dll $wslsettingsobjpath\wslsettings.dll -Force
                         Copy-Item $wslsettingsbinpath\wslsettings.exe $wslsettingsobjpath\apphost.exe -Force
 
-              - script: cmake --build . --config Release -- -m
+              - script: cmake --build . --config Release -- -m -v:d
                 displayName: "Build installer msix and tests (${{ platform }})"
 
               - task: PowerShell@2
