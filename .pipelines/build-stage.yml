@@ -168,14 +168,6 @@ stages:
                   workingDirectory: "."
                   cmakeArgs: . --fresh -A ${{ platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true
 
-              # This additional Restore NuGet package task is added as a workaround for WSL Settings to have its packages restored properly.
-              # Without this, building wsl settings may encounter the following error:
-              #
-              # The plugin credential provider could not acquire credentials. Authentication may require manual action.
-              # Consider re-running the command with --interactive for `dotnet`, /p:NuGetInteractive="true" for MSBuild or removing the -NonInteractive switch for `NuGet`
-              # Response status code does not indicate success: 401 (Unauthorized)
-              - script: _deps\nuget.exe restore -NonInteractive -LockFilePath src/windows/wslsettings/packages.lock.${{ platform }}.json  -UseLockFile
-
               - ${{ each target in parameters.targets }}:
                   - script: cmake --build . --config Release --target ${{ target.target }} -- -m
                     condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
