@@ -208,10 +208,7 @@ CommunityToolkit.WinUI.Controls.SettingsControls_${CTK_STTNGS_CTRLS_VERSION};\
 Microsoft.Extensions.Hosting_${EXTS_HOSTING_VERSION};\
 Microsoft.WindowsAppSDK_${WIN_APP_SDK_VERSION};\
 Microsoft.Xaml.Behaviors.WinUI.Managed_${XAML_BEHAVIORS_VERSION};\
-WinUIEx_${WINUIEX_VERSION};\
-Microsoft.WindowsDesktop.App.Runtime.win-x64_8.0.19;\
-Microsoft.AspNetCore.App.Runtime.win-x64_8.0.19;\
-Microsoft.NETCore.App.Runtime.win-x64_8.0.19"
+WinUIEx_${WINUIEX_VERSION}"
 )
 
 set(
