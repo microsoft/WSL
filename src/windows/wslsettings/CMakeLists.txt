@@ -253,8 +253,6 @@ set_target_properties(
   VS_GLOBAL_AppendRuntimeIdentifierToOutputPath false
   VS_GLOBAL_GenerateAssemblyInfo false
   VS_GLOBAL_TargetLatestRuntimePatch false
-  VS_GLOBAL_DisableTransitiveProjectReferences true
-  VS_GLOBAL_TargetFramework 8.0.19
   DOTNET_SDK "Microsoft.NET.Sdk"
   DOTNET_TARGET_FRAMEWORK "net8.0-${WINDOWS_TARGET_PLATFORM_VERSION}"
 )

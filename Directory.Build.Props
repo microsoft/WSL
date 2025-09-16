@@ -2,8 +2,6 @@
    <PropertyGroup>
       <UseMultiToolTask>true</UseMultiToolTask>
       <EnforceProcessCountAcrossBuilds>true</EnforceProcessCountAcrossBuilds>
-      <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-      <NuGetLockFilePath>packages.lock.$(PlatformTarget).json</NuGetLockFilePath>
    </PropertyGroup>
    <ItemDefinitionGroup>
       <CustomBuild>
