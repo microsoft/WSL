@@ -250,7 +250,7 @@ class InstallerTests
         try
         {
             // It is possible for the 'DeprovisionMsix' stage of the MSI installation to take a long time.
-            // on vb_release, up to 8 minutes have been observed. Wait for up to 20 minutes to be safe.
+            // On vb_release, up to 7 minutes have been observed. Wait for up to 20 minutes to be safe.
             wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::seconds(1), std::chrono::minutes(20));
         }
         catch (...)
