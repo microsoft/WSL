@@ -43,6 +43,8 @@
     <EventProvider Id="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch" Name="08FACCFA-125D-4ED6-B0B7-B4A1A912E693" />
     <EventProvider Id="EventProvider_Microsoft.Windows.EMPS.Enrollment" Name="E74EFD1A-B62D-4B83-AB00-66F4A166A2D3" />
     <EventProvider Id="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment" Name="F9E3B648-9AF1-4DC3-9A8E-BF42C0FBCE9A" />
+    <EventProvider Id="Microsoft.Windows.HyperV.Vid" Name="1111450B-DACC-40A3-84AB-F7DBA4A6E63A" NonPagedMemory="true"/>
+    <EventProvider Id="Microsoft-Windows-HyperV-Vid" Name="5931D877-4860-4ee7-A95C-610A5F0D1407" NonPagedMemory="true" />
     <EventProvider Id="virtdisk_wpp" Name="e14dcdd9-d1ec-4dc3-8395-a606df8ef115" Level="4">
       <Keywords>
         <Keyword Value="0xFFFFFFFFFFFFFFFF" />
@@ -143,6 +145,8 @@
             <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.EMPS.Enrollment"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment"/>
+            <EventProviderId Value="Microsoft.Windows.HyperV.Vid"/>
+            <EventProviderId Value="Microsoft-Windows-HyperV-Vid"/>
             <EventProviderId Value="virtdisk"/>
             <EventProviderId Value="virtdisk_wpp"/>
             <EventProviderId Value="vhdmp"/>
