@@ -4,6 +4,8 @@
       <EnforceProcessCountAcrossBuilds>true</EnforceProcessCountAcrossBuilds>
       <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
       <NuGetLockFilePath>packages.lock.$(Platform).json</NuGetLockFilePath>
+      <RestoreLockedMode>true</RestoreLockedMode>
+      <TargetLatestRuntimePatch>false</TargetLatestRuntimePatch>
    </PropertyGroup>
    <ItemDefinitionGroup>
       <CustomBuild>
