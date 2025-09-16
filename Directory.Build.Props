@@ -3,7 +3,7 @@
       <UseMultiToolTask>true</UseMultiToolTask>
       <EnforceProcessCountAcrossBuilds>true</EnforceProcessCountAcrossBuilds>
       <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-      <NuGetLockFilePath>packages.lock.$(Platform).json</NuGetLockFilePath>
+      <NuGetLockFilePath>packages.lock.$(PlatformTarget).json</NuGetLockFilePath>
       <RestoreLockedMode>true</RestoreLockedMode>
       <TargetLatestRuntimePatch>false</TargetLatestRuntimePatch>
    </PropertyGroup>
