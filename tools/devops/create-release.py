@@ -56,7 +56,7 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
                 issues = filter_github_issues(issues, github_token)
 
             if len(issues) > 1:
-                print(f'WARNING: found more than 1 github issues in message: {message}. Issues: {issues}', file=sys.stderr)
+                print(f'WARNING: found more than 1 github issues in message: {e.message}. Issues: {issues}', file=sys.stderr)
 
             message = e.message[:-1] if e.message.endswith('\n') else e.message
 
