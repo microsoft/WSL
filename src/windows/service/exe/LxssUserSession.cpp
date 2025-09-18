@@ -510,7 +510,7 @@ try
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->Shutdown(false, Force);
+    return session->Shutdown(false, Force ? ShutdownBehavior::Force : ShutdownBehavior::Wait);
 }
 CATCH_RETURN()
 
@@ -2052,13 +2052,11 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
     return result;
 }
 
-HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceTerminate)
+HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBehavior Behavior)
 {
     try
     {
-        // If the user asks for a forced termination, kill the VM
-        if (ForceTerminate)
-        {
+        auto forceTerminate = [this]() {
             auto vmId = m_vmId.load();
             if (!IsEqualGUID(vmId, GUID_NULL))
             {
@@ -2071,11 +2069,43 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceT
 
                 WSL_LOG("ForceTerminateVm", TraceLoggingValue(result, "Result"));
             }
+        };
+
+        // If the user asks for a forced termination, kill the VM
+        if (Behavior == ShutdownBehavior::Force)
+        {
+            forceTerminate();
         }
 
         {
+            bool locked = false;
+            auto unlock = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &locked]() {
+                if (locked)
+                {
+                    m_instanceLock.unlock();
+                }
+            });
+
+            if (Behavior == ShutdownBehavior::ForceAfter30Seconds)
+            {
+                if (m_instanceLock.try_lock_for(std::chrono::seconds(30)))
+                {
+                    locked = true;
+                }
+                else
+                {
+                    WSL_LOG("VmShutdownLockTimedOut");
+                    forceTerminate();
+                }
+            }
+
+            if (!locked)
+            {
+                m_instanceLock.lock();
+                locked = true;
+            }
+
             // Stop each instance with the lock held.
-            std::lock_guard lock(m_instanceLock);
             while (!m_runningInstances.empty())
             {
                 _TerminateInstanceInternal(&m_runningInstances.begin()->first, false);

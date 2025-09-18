@@ -49,7 +49,7 @@ void ClearSessionsAndBlockNewInstancesLockHeld(std::optional<std::vector<std::sh
             // since that could lead to a deadlock if FindSessionByCookie is called since that would try to lock g_sessionLock
             // while holding the session inner lock
 
-            session->Shutdown(true);
+            session->Shutdown(true, ShutdownBehavior::ForceAfter30Seconds);
         }
 
         sessions.reset();
