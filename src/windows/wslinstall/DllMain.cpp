@@ -23,6 +23,7 @@ Abstract:
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 using namespace wsl::windows::common::registry;
+using namespace wsl::windows::common::wslutil;
 
 static constexpr auto c_progIdPrefix{L"App."};
 static constexpr auto c_protocolProgIdSuffix{L".Protocol"};
@@ -519,6 +520,7 @@ extern "C" UINT __stdcall DeprovisionMsix(MSIHANDLE install)
 try
 {
     WSL_LOG("DeprovisionMsix");
+    WriteInstallLog("MSI install: DeprovisionMsix");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
     const auto result = packageManager.DeprovisionPackageForAllUsersAsync(wsl::windows::common::wslutil::c_msixPackageFamilyName).get();
@@ -542,6 +544,7 @@ extern "C" UINT __stdcall RemoveMsixAsSystem(MSIHANDLE install)
 try
 {
     WSL_LOG("RemoveMsixAsSystem");
+    WriteInstallLog("MSI install: RemoveMsixAsSystem");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -571,6 +574,7 @@ extern "C" UINT __stdcall RemoveMsixAsUser(MSIHANDLE install)
 try
 {
     WSL_LOG("RemoveMsixAsUser");
+    WriteInstallLog("MSI install: RemoveMsixAsUser");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -640,6 +644,7 @@ extern "C" UINT __stdcall InstallMsixAsUser(MSIHANDLE install)
 try
 {
     WSL_LOG("InstallMsixAsUser");
+    WriteInstallLog("MSI install: InstallMsixAsUser");
 
     // RegisterPackageByFamilyNameAsync() cannot be run as SYSTEM.
     //  If this thread runs as SYSTEM, simply skip this step.
@@ -683,6 +688,7 @@ try
     msixFile.Handle.reset();
 
     WSL_LOG("InstallMsix", TraceLoggingValue(msixFile.Path.c_str(), "Path"));
+    WriteInstallLog("MSI install: InstallMsix");
 
     winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -780,10 +786,24 @@ catch (...)
     return ERROR_INSTALL_FAILURE;
 }
 
+extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
+{
+    try
+    {
+        WSL_LOG("WslFinalizeInstallation");
+        WriteInstallLog(std::format("MSI install: WslFinalizeInstallation"));
+    }
+    CATCH_LOG();
+
+    return NOERROR;
+}
+
 extern "C" UINT __stdcall WslValidateInstallation(MSIHANDLE install)
 try
 {
     WSL_LOG("WslValidateInstallation");
+
+    WriteInstallLog(std::format("MSI install: WslValidateInstallation"));
 
     // TODO: Use a more precise version check so we don't install if the Windows build doesn't support lifted.
 

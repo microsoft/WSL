@@ -397,6 +397,14 @@
             Execute="deferred"
          />
 
+        <CustomAction Id="FinalizeInstall"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="WslFinalizeInstallation"
+            Return="check"
+            Execute="deferred"
+         />
+
         <CustomAction Id="DeprovisionMsix"
             Impersonate="no"
             BinaryRef="wslinstall.dll"
@@ -532,6 +540,8 @@
                 <!-- This needs to run before the registry is written because this action calculates registry key names and values -->
                 <Custom Action="CalculateWslSettingsProtocolIds" Before="WriteRegistryValues" Condition='(not REMOVE~="ALL")' />
             <?endif?>
+
+            <Custom Action="FinalizeInstall" After="PublishFeatures"/>
 
         </InstallExecuteSequence>
 
