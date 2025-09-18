@@ -1408,7 +1408,7 @@ int wsl::windows::common::wslutil::UpdatePackage(bool PreRelease, bool Repair)
 UINT wsl::windows::common::wslutil::UpgradeViaMsi(
     _In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
 {
-    WriteInstallLog(std::format("Upgrading via MSI package: {}. Args: {}", PackageLocation, ExtraArgs));
+    WriteInstallLog(std::format("Upgrading via MSI package: {}. Args: {}", PackageLocation, ExtraArgs != nullptr ? ExtraArgs : L""));
 
     ConfigureMsiLogging(LogFile, Callback);
 
