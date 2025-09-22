@@ -52,6 +52,8 @@ if (Test-Path $wslconfig)
     Copy-Item $wslconfig $folder | Out-Null
 }
 
+Copy-Item "C:\Windows\temp\wsl-install-log.txt" $folder -ErrorAction ignore
+
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt
 Get-WindowsOptionalFeature -Online > $folder/optional-components.txt
