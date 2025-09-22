@@ -129,6 +129,8 @@ void InitEntryUtilityVm(wsl::linux::WslDistributionConfig& Config);
 
 void InitTerminateInstance(gsl::span<gsl::byte> Buffer, wsl::shared::SocketChannel& Channel, wsl::linux::WslDistributionConfig& Config);
 
+void InitTerminateInstanceInternal(wsl::linux::WslDistributionConfig& Config);
+
 void InstallSystemdUnit(const char* Path, const std::string& Name, const char* Content);
 
 int GenerateSystemdUnits(int Argc, char** Argv);
@@ -2507,18 +2509,7 @@ Return Value:
         }
     }
 
-    //
-    // If the distro init process was booted, use the shutdown command to terminate the instance.
-    //
-
-    if (Config.BootInit && !Config.BootStartWriteSocket)
-    {
-        UtilExecCommandLine("systemctl reboot", nullptr);
-    }
-
-    reboot(RB_POWER_OFF);
-    FATAL_ERROR("reboot(RB_POWER_OFF) failed {}", errno);
-
+    InitTerminateInstanceInternal(Config);
     return;
 }
 
@@ -2661,10 +2652,56 @@ try
     }
 
     //
-    // Respond to the instance termination request.
+    // Attempt to stop the plan9 server, if it is not able to be stopped because of an
+    // in-use file, reply to the service that the instance could not be terminated.
     //
 
-    Channel.SendResultMessage<bool>(StopPlan9Server(Message->Force, Config));
+    if (!StopPlan9Server(Message->Force, Config))
+    {
+        Channel.SendResultMessage<bool>(false);
+        return;
+    }
+
+    InitTerminateInstanceInternal(Config);
+}
+CATCH_LOG();
+
+void InitTerminateInstanceInternal(wsl::linux::WslDistributionConfig& Config)
+
+/*++
+
+Routine Description:
+
+    This routine attempts to cleanly terminate the instance.
+
+Arguments:
+
+    Config - Supplies the distribution config.
+
+Return Value:
+
+    None.
+
+--*/
+try
+{
+    if (Config.BootInit && !Config.BootStartWriteSocket)
+    {
+        THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
+
+        UtilExecCommandLine("systemctl poweroff", nullptr);
+
+        //
+        // Wait for systemd to terminate the instance, this should terminate the current process.
+        // If this does not happen, call the reboot syscall to terminate the pid namespace.
+        //
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
+        LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
+    }
+
+    reboot(RB_POWER_OFF);
+    FATAL_ERROR("reboot(RB_POWER_OFF) failed {}", errno);
 }
 CATCH_LOG();
 
