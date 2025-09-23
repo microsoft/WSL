@@ -1114,8 +1114,8 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>데이터 손상 가능성으로 인해 스파스 VHD 지원은 현재 비활성화되어 있습니다.
 배포 시 강제로 스파스 VHD를 사용하도록 하려면 다음을 실행하세요.
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>{}을(를) 탑재하지 못했습니다. 자세한 내용은 dmesg를 참조하세요.</value>
