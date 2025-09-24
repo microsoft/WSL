@@ -169,7 +169,7 @@ std::vector<gsl::byte> LxssMessagePort::Receive(DWORD Timeout)
 
         if (Status == STATUS_PENDING)
         {
-            WaitForMessage(&IoStatus);
+            WaitForMessage(&IoStatus, Timeout);
             Status = IoStatus.Status;
             SizeReceived = static_cast<ULONG>(IoStatus.Information);
         }
