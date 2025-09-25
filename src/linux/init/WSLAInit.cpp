@@ -383,7 +383,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         const char* source = readField(Message.SourceIndex);
 
         const char* target{};
-
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::KernelModules))
         {
             assert(!g_state.ModulesMountPoint.has_value());

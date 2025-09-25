@@ -158,8 +158,8 @@ class WSLATests
         VERIFY_IS_TRUE(blockDeviceExists(attachedDisk.ScsiLun));
 
         // Mount it to /mnt.
-        WslMountSettings WslMountSettings{attachedDisk.Device, "/mnt", "ext4", "ro"};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &WslMountSettings));
+        WslMountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro"};
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &mountSettings));
 
         // Validate that the mountpoint is present.
         std::vector<const char*> cmd{"/usr/bin/mountpoint", "/mnt"};
@@ -172,12 +172,19 @@ class WSLATests
         // Verify that unmount fails now.
         VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
-        // Detach the disk
+        // Detach the disk.
         VERIFY_SUCCEEDED(WslDetachDisk(vm.get(), attachedDisk.ScsiLun));
         VERIFY_IS_FALSE(blockDeviceExists(attachedDisk.ScsiLun));
 
-        // Verify that disk can't be detached twice
+        // Verify that disk can't be detached twice.
         VERIFY_ARE_EQUAL(WslDetachDisk(vm.get(), attachedDisk.ScsiLun), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+        // Validate that invalid flags return E_INVALIDARG.
+        WslMountSettings invalidFlagSettings{"/dev/sda", "/mnt", "ext4", "ro", 0x4};
+        VERIFY_ARE_EQUAL(WslMount(vm.get(), &invalidFlagSettings), E_INVALIDARG);
+
+        invalidFlagSettings.Flags = 0xff;
+        VERIFY_ARE_EQUAL(WslMount(vm.get(), &invalidFlagSettings), E_INVALIDARG);
     }
 
     TEST_METHOD(CustomDmesgOutput)
