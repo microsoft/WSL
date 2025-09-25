@@ -4,7 +4,7 @@ This page describes the steps in the WSL2 process, from the user invoking [wsl.e
 
 ## Overview 
 
-The below diagram shows the sequence of event to start bash within a WSL2 distribution. See [WSL architecture](index.md) for details about what each process does.
+The below diagram shows the sequence of events to start bash within a WSL2 distribution. See [WSL architecture](index.md) for details about what each process does.
 
 ```mermaid
 sequenceDiagram

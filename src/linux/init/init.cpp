@@ -365,8 +365,8 @@ ExecStart=/bin/mount -o bind,ro,X-mount.mkdir -t none /mnt/wslg/.X11-unix /tmp/.
 ExecStop=
 ExecStart=/bin/sh -c '(echo -1 > {}/{}) ; (echo "{}" > {})' )",
                 BINFMT_MISC_MOUNT_TARGET,
-                LX_INIT_BINFMT_NAME_LATE,
-                BINFMT_INTEROP_REGISTRATION_STRING(LX_INIT_BINFMT_NAME_LATE),
+                LX_INIT_BINFMT_NAME,
+                BINFMT_INTEROP_REGISTRATION_STRING(LX_INIT_BINFMT_NAME),
                 BINFMT_MISC_REGISTER_FILE);
 
             // Install the override for systemd-binfmt.service.
@@ -2239,11 +2239,18 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_READ_ONLY_ENV);
     }
 
-    const auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
+    auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
     if (Value != nullptr)
     {
         Config.NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(std::atoi(Value));
         unsetenv(LX_WSL2_NETWORKING_MODE_ENV);
+    }
+
+    Value = getenv(LX_WSL2_VM_ID_ENV);
+    if (Value != nullptr)
+    {
+        Config.VmId = Value;
+        unsetenv(LX_WSL2_VM_ID_ENV);
     }
 
     //

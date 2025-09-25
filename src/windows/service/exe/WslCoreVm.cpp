@@ -223,6 +223,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         // copies of the initrd file and private kernel.
         if constexpr (wsl::shared::Arm64)
         {
+            auto impersonate = wil::impersonate_token(m_userToken.get());
+
             m_rootFsPath = m_tempPath / LXSS_ROOTFS_DIRECTORY;
             wil::CreateDirectoryDeep(m_rootFsPath.c_str());
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
@@ -536,7 +538,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->DefaultKernel = m_defaultKernel;
     message->KernelModulesDeviceId = modulesLun;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
-    message.WriteString(message->KernelModulesListOffset, wsl::shared::string::Join<wchar_t>(m_vmConfig.KernelModulesList, L','));
+    message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
 
     m_miniInitChannel.SendMessage<LX_MINI_INIT_EARLY_CONFIG_MESSAGE>(message.Span());

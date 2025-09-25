@@ -843,16 +843,25 @@ class UnitTests
                 L"arguments.\n");
         }
 
-        if (LxsstuVmMode())
         {
-            // Get the VM ID from the distro and validate that it not null.
-            auto [vmId, vmIdErr] = LxsstuLaunchWslAndCaptureOutput(L"env | grep 'WSL2_VM_ID' | awk -F= '{print $2}'");
-            VERIFY_ARE_NOT_EQUAL(vmId, L"");
-
-            // Ensure that the response from wslinfo matches the VM id from the distros environment
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id");
-            VERIFY_ARE_EQUAL(out, std::format(L"{}", vmId));
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
             VERIFY_ARE_EQUAL(err, L"");
+            if (LxsstuVmMode())
+            {
+                // Ensure that the response from wslinfo has the VM ID.
+                auto guid = wsl::shared::string::ToGuid(out);
+                VERIFY_IS_TRUE(guid.has_value());
+                VERIFY_IS_FALSE(IsEqualGUID(guid.value(), GUID_NULL));
+
+                // Validate that the VM ID is not propagated to user commands.
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"echo -n \"$WSL2_VM_ID\"");
+                VERIFY_ARE_EQUAL(out, L"");
+                VERIFY_ARE_EQUAL(err, L"");
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(out, L"wsl1");
+            }
         }
     }
 
@@ -2530,8 +2539,11 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         wil::GetSystemDirectoryW(systemDir);
 
         VERIFY_ARE_EQUAL(
-            std::format("{}\\{} {} {} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString, WSL_CHANGE_DIRECTORY_ARG, WSL_CWD_HOME),
+            std::format("{}\\{} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString),
             launchProfile["commandline"].get<std::string>());
+
+        // Verify that startingDirectory is set to home directory
+        VERIFY_ARE_EQUAL(launchProfile["startingDirectory"].get<std::string>(), "~");
 
         auto iconLocation = wsl::shared::string::MultiByteToWide(launchProfile["icon"].get<std::string>());
         if (defaultIcon)
@@ -2942,19 +2954,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         LxssDynamicFunction<decltype(GetWslConfigSetting)> getWslConfigSetting(libWslDllPath.c_str(), "GetWslConfigSetting");
         LxssDynamicFunction<decltype(SetWslConfigSetting)> setWslConfigSetting(libWslDllPath.c_str(), "SetWslConfigSetting");
 
-        // Delete the test config file. The original has already been saved as part of module setup.
+        // Reset the test config file. The original has already been saved as part of module setup.
         auto wslConfigFilePath = getenv("userprofile") + std::string("\\.wslconfig");
-        if (std::filesystem::exists(wslConfigFilePath))
-        {
-            std::error_code ec{};
-            VERIFY_IS_TRUE(std::filesystem::remove(wslConfigFilePath, ec));
-        }
+        WslConfigChange config{L""};
 
         auto apiWslConfigFilePath = getWslConfigFilePath();
         VERIFY_IS_TRUE(std::filesystem::path(wslConfigFilePath) == std::filesystem::path(apiWslConfigFilePath));
-
-        // Cleanup any leftover config files.
-        auto cleanup = wil::scope_exit([apiWslConfigFilePath] { std::filesystem::remove(apiWslConfigFilePath); });
 
         auto wslConfigDefaults = createWslConfig(nullptr);
         VERIFY_IS_NOT_NULL(wslConfigDefaults);

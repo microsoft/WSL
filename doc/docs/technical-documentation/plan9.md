@@ -12,7 +12,7 @@ In WSL2 distributions, `plan9` runs its filesystem through an `hvsocket`
 
 ## Accessing the distribution files from Windows
 
-From Windows, a special redirector driver (p9rdr.sys) registers both `\\wsl$` and `\\wsl.localhost`. When either of those paths are accessed, `p9rdr.sys` calls [wslservice.exe](wslservice.exe.md) to list the available distributions for a given Windows users.
+From Windows, a special redirector driver (p9rdr.sys) registers both `\\wsl$` and `\\wsl.localhost`. When either of those paths are accessed, `p9rdr.sys` calls [wslservice.exe](wslservice.exe.md) to list the available distributions for a given Windows user.
 
 When a distribution path is accessed (like `\\wsl.localhost\debian`), `p9rdr.sys` calls into [wslservice.exe](wslservice.exe.md) via COM to start the distribution, and connect to its plan9 server, which allows the files to be accessed from Windows. 
 

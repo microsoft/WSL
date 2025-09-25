@@ -1100,7 +1100,7 @@ Kód chyby: {}</value>
     <value>Dotaz na síťový režim se nezdařil</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>Vlastní moduly jádra byly zadány bez zadání vlastního jádra. Další informace najdete https://aka.ms/wslcustomkernel.</value>
+    <value>Byly zadány přizpůsobené moduly jádra bez zadání přizpůsobeného jádra. Další informace najdete https://aka.ms/wslcustomkernel.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Kvůli aktuálnímu problému s kompatibilitou s klientem globálního bezpečného přístupu je tunelování DNS zakázané.</value>

@@ -1194,9 +1194,27 @@ Return Value:
 --*/
 
 {
-    UtilCreateChildProcess("agetty", []() {
-        execl("/usr/bin/setsid", "/usr/bin/setsid", "/sbin/agetty", "-w", "-L", LX_INIT_HVC_DEBUG_SHELL, "-a", "root", NULL);
-        LOG_ERROR("execl failed, {}", errno);
+    // Spawn a child process to handle relaunching the debug shell if it exits.
+    UtilCreateChildProcess("DebugShell", []() {
+        for (;;)
+        {
+            const auto Pid = UtilCreateChildProcess("agetty", []() {
+                execl("/usr/bin/setsid", "/usr/bin/setsid", "/sbin/agetty", "-w", "-L", LX_INIT_HVC_DEBUG_SHELL, "-a", "root", NULL);
+                LOG_ERROR("execl failed, {}", errno);
+            });
+
+            if (Pid < 0)
+            {
+                _exit(1);
+            }
+
+            int Status = -1;
+            if (TEMP_FAILURE_RETRY(waitpid(Pid, &Status, 0)) < 0)
+            {
+                LOG_ERROR("waitpid failed {}", errno);
+                _exit(1);
+            }
+        }
     });
 }
 

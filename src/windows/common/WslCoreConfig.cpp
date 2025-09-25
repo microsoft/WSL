@@ -107,8 +107,8 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::MaxCrashDumpCount, MaxCrashDumpCount),
         ConfigKey(ConfigSetting::DistributionInstallPath, DefaultDistributionLocation),
         ConfigKey(ConfigSetting::InstanceIdleTimeout, InstanceIdleTimeout),
-        ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &loadKernelModulesPresence),
-        ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &loadKernelModulesPresence),
+        ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &LoadKernelModulesPresence),
+        ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &LoadKernelModulesPresence),
 
         // Features that were previously experimental (the old header is maintained for compatibility).
         ConfigKey({ConfigSetting::NetworkingMode, ConfigSetting::Experimental::NetworkingMode}, wsl::core::NetworkingModes, NetworkingMode, &NetworkingModePresence),
@@ -194,15 +194,18 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         DefaultDistributionLocation = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken) / "wsl";
     }
 
-    if (!LoadDefaultKernelModules)
+    auto kernelModules =
+        LoadDefaultKernelModules ? std::vector<std::wstring>{L"tun", L"ip_tables", L"br_netfilter"} : std::vector<std::wstring>{};
+
+    if (!userKernelModules.empty())
     {
-        KernelModulesList.clear();
+        for (const auto& e : wsl::shared::string::Split(userKernelModules, L','))
+        {
+            kernelModules.emplace_back(std::move(e));
+        }
     }
 
-    for (auto& e : wsl::shared::string::Split(userKernelModules, L','))
-    {
-        KernelModulesList.emplace_back(std::move(e));
-    }
+    KernelModulesList = wsl::shared::string::Join(kernelModules, L',');
 }
 
 void wsl::core::Config::SaveNetworkingSettings(_In_opt_ HANDLE UserToken) const
@@ -287,7 +290,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 {
     // Determine the maximum number of processors that can be added to the VM.
     // If the user did not supply a processor count, use the maximum.
-    const auto MaximumProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
+    MaximumProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
     if (ProcessorCount <= 0)
     {
         ProcessorCount = MaximumProcessorCount;

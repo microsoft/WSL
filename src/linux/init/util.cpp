@@ -1201,8 +1201,7 @@ std::optional<LX_MINI_INIT_NETWORKING_MODE> UtilGetNetworkingMode(void)
 
 Routine Description:
 
-    This routine gets the feature flags, either directly, from an environment
-    variable, or by querying it from the init process.
+    This routine queries the networking mode from the init process.
 
 Arguments:
 
@@ -1210,16 +1209,12 @@ Arguments:
 
 Return Value:
 
-    The feature flags.
+    The networking mode if successful, std::nullopt otherwise.
 
 --*/
 
 try
 {
-    //
-    // Query init for the value.
-    //
-
     wsl::shared::SocketChannel channel{UtilConnectUnix(WSL_INIT_INTEROP_SOCKET), "wslinfo"};
     THROW_LAST_ERROR_IF(channel.Socket() < 0);
 
@@ -1295,6 +1290,40 @@ Return Value:
     }
 
     return Result;
+}
+
+std::string UtilGetVmId(void)
+
+/*++
+
+Routine Description:
+
+    This routine queries the VM ID from the init process.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    The VM ID if successful, an empty string otherwise.
+
+--*/
+
+try
+{
+    wsl::shared::SocketChannel channel{UtilConnectUnix(WSL_INIT_INTEROP_SOCKET), "wslinfo"};
+    THROW_LAST_ERROR_IF(channel.Socket() < 0);
+
+    wsl::shared::MessageWriter<LX_INIT_QUERY_VM_ID> Message(LxInitMessageQueryVmId);
+    channel.SendMessage<LX_INIT_QUERY_VM_ID>(Message.Span());
+
+    return channel.ReceiveMessage<LX_INIT_QUERY_VM_ID>().Buffer;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return {};
 }
 
 void UtilInitGroups(const char* User, gid_t Gid)

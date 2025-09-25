@@ -436,6 +436,18 @@ try
         ResponseChannel.SendResultMessage<uint8_t>(static_cast<uint8_t>(Config.NetworkingMode.value()));
         break;
 
+    case LxInitMessageQueryVmId:
+    {
+        wsl::shared::MessageWriter<LX_INIT_QUERY_VM_ID> Response(LxInitMessageQueryVmId);
+        if (Config.VmId.has_value())
+        {
+            Response.WriteString(Config.VmId.value());
+        }
+
+        ResponseChannel.SendMessage<LX_INIT_QUERY_VM_ID>(Response.Span());
+        break;
+    }
+
     default:
         LOG_ERROR("unexpected message {}", Header->MessageType);
         break;
@@ -1660,17 +1672,6 @@ Return Value:
     if ((Config.InteropAppendWindowsPath) && (*Buffer != '\0'))
     {
         ConfigAppendNtPath(Environment, Buffer);
-    }
-
-    //
-    // If the VM ID environment variable is present, add it to the environment
-    // block.
-    //
-
-    auto VmId = getenv(LX_WSL2_VM_ID_ENV);
-    if (VmId)
-    {
-        Environment.AddVariable(LX_WSL2_VM_ID_ENV, VmId);
     }
 
     return Environment;
