@@ -19,7 +19,6 @@ Abstract:
 // Defines.
 
 #define LAUNCH_PROCESS_DEFAULT_BUFFER_SIZE 1024
-#define LAUNCH_PROCESS_DEFAULT_TIMEOUT_MS 30000
 
 LxssMessagePort::LxssMessagePort(_In_ HANDLE MessagePort) : m_messagePort(MessagePort), m_messageEvent(wil::EventOptions::None)
 {
@@ -52,7 +51,7 @@ std::shared_ptr<LxssPort> LxssMessagePort::CreateSessionLeader(_In_ HANDLE Clien
     LX_INIT_CREATE_SESSION Message{{LxInitMessageCreateSession, sizeof(Message)}, MarshalId};
 
     Send(&Message, sizeof(Message));
-    auto LocalMessagePort = m_serverPort->WaitForConnection(LAUNCH_PROCESS_DEFAULT_TIMEOUT_MS);
+    auto LocalMessagePort = m_serverPort->WaitForConnection(c_defaultMessageTimeout);
     ReleaseConsole.release();
     return LocalMessagePort;
 }
@@ -156,7 +155,7 @@ void LxssMessagePort::Receive(_Out_writes_bytes_(Length) PVOID Buffer, _In_ ULON
     return;
 }
 
-std::vector<gsl::byte> LxssMessagePort::Receive()
+std::vector<gsl::byte> LxssMessagePort::Receive(DWORD Timeout)
 {
     IO_STATUS_BLOCK IoStatus;
     std::vector<gsl::byte> Message;
@@ -170,7 +169,7 @@ std::vector<gsl::byte> LxssMessagePort::Receive()
 
         if (Status == STATUS_PENDING)
         {
-            WaitForMessage(&IoStatus);
+            WaitForMessage(&IoStatus, Timeout);
             Status = IoStatus.Status;
             SizeReceived = static_cast<ULONG>(IoStatus.Information);
         }
@@ -274,7 +273,7 @@ wil::unique_handle LxssMessagePort::UnmarshalVfsFile(_In_ LXBUS_IPC_HANDLE_ID Vf
 
 void LxssMessagePort::WaitForMessage(_In_ PIO_STATUS_BLOCK IoStatus, _In_ DWORD Timeout) const
 {
-    const DWORD WaitStatus = WaitForSingleObject(m_messageEvent.get(), LAUNCH_PROCESS_DEFAULT_TIMEOUT_MS);
+    const DWORD WaitStatus = WaitForSingleObject(m_messageEvent.get(), Timeout);
     if (WaitStatus == WAIT_TIMEOUT)
     {
         IO_STATUS_BLOCK IoStatusCancel;

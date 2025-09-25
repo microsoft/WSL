@@ -551,7 +551,9 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
             m_oobeThread = std::thread([this, OobeMessagePort = std::move(OobeMessagePort), registration = std::move(registration)]() mutable {
                 try
                 {
-                    auto Message = OobeMessagePort->Receive();
+                    // N.B. The LX_INIT_OOBE_RESULT message is only sent once the OOBE process completes, which might be waiting on user input.
+                    // Do no set a timeout here otherwise the OOBE flow will fail if the OOBE process takes longer than expected.
+                    auto Message = OobeMessagePort->Receive(INFINITE);
                     auto* OobeResult = gslhelpers::try_get_struct<LX_INIT_OOBE_RESULT>(gsl::make_span(Message));
                     THROW_HR_IF(E_INVALIDARG, !OobeResult || (OobeResult->Header.MessageType != LxInitOobeResult));
 
