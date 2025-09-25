@@ -1115,8 +1115,8 @@ Code d'erreur : {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>La prise en charge des VHD espacés est actuellement désactivée en raison d’un risque potentiel de corruption des données.
 Pour forcer une distribution à utiliser un VHD espacé, veuillez exécuter : 
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Échec du montage {}. Pour plus de détails, consultez dmesg.</value>

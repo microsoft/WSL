@@ -1108,8 +1108,8 @@ Hibakód: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>A ritka VHD-támogatás jelenleg le van tiltva, mivel lehetséges adatsérülés léphet fel.
 A ritka virtuális merevlemez használatának kényszerítéséhez futtassa a következő parancsot:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>A(z) {} csatlakoztatása nem sikerült. További részletekért tekintse meg a dmesg fájlt.</value>
