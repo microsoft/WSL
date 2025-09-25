@@ -432,9 +432,9 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslMountGpuLibraries(WslVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint)
+HRESULT WslMountGpuLibraries(WslVirtualMachineHandle VirtualMachine, const char* LibrariesMountPoint, const char* DriversMountpoint, WslMountFlags Flags)
 try
 {
-    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->MountGpuLibraries(LibrariesMountPoint, DriversMountpoint);
+    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)->MountGpuLibraries(LibrariesMountPoint, DriversMountpoint, static_cast<DWORD>(Flags));
 }
 CATCH_RETURN();

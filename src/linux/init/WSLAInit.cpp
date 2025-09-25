@@ -381,16 +381,42 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::OverlayFs))
         {
             overlayTarget.emplace(target + std::string("-rw"));
+            if (std::filesystem::exists(overlayTarget->c_str()))
+            {
+                LOG_ERROR("Overlay directory already exists: {}", overlayTarget.value());
+                THROW_ERRNO(EEXIST);
+            }
+
             THROW_LAST_ERROR_IF(UtilMountOverlayFs(overlayTarget->c_str(), target));
 
-            target = overlayTarget->c_str();
-
-            THROW_LAST_ERROR_IF(MountInit((overlayTarget.value() + "/wsl-init").c_str()) < 0); // Required to call /gns later
-
-            // If it exists, mount /etc/resolv.conf
-            if (std::filesystem::exists("/etc/resolv.conf"))
+            if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
             {
-                THROW_LAST_ERROR_IF(UtilMountFile("/etc/resolv.conf", (overlayTarget.value() + "/etc/resolv.conf").c_str()) < 0);
+                // If this is a chroot, simply mounts the overlay on top of the "-rw" folder.
+                // We'll chroot into it later, so moving the mountpoint isn't needed.
+                target = overlayTarget->c_str();
+
+                THROW_LAST_ERROR_IF(MountInit((overlayTarget.value() + "/wsl-init").c_str()) < 0); // Required to call /gns later
+
+                // If it exists, mount /etc/resolv.conf
+                if (std::filesystem::exists("/etc/resolv.conf"))
+                {
+                    THROW_LAST_ERROR_IF(UtilMountFile("/etc/resolv.conf", (overlayTarget.value() + "/etc/resolv.conf").c_str()) < 0);
+                }
+            }
+            else
+            {
+                // Move the "-rw" mount to its final target.
+                THROW_LAST_ERROR_IF(mount(overlayTarget->c_str(), target, "none", MS_MOVE, nullptr) < 0);
+
+                // Clean up the underlying mount point
+                THROW_LAST_ERROR_IF(umount((overlayTarget.value() + "/rw").c_str()));
+
+                std::error_code error;
+                std::filesystem::remove_all(overlayTarget.value(), error);
+                if (error.value() != 0)
+                {
+                    THROW_ERRNO(error.value());
+                }
             }
         }
 

@@ -16,6 +16,7 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "hcs.hpp"
 #include "Dmesg.h"
+#include "WSLAApi.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -46,7 +47,7 @@ public:
     IFACEMETHOD(DetachDisk(_In_ ULONG Lun)) override;
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
     IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
-    IFACEMETHOD(MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)) override;
+    IFACEMETHOD(MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)) override;
 
 private:
     static int32_t MountImpl(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
@@ -66,6 +67,8 @@ private:
 
     std::vector<wil::unique_socket> CreateLinuxProcessImpl(
         _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ WSLA_PROCESS_FD* Fd, _Out_ WSLA_CREATE_PROCESS_RESULT* Result);
+
+    HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags);
 
     struct AttachedDisk
     {

@@ -14,7 +14,6 @@ Abstract:
 
 #include "WSLAVirtualMachine.h"
 #include "hcs_schema.h"
-#include "WSLAApi.h"
 #include "NatNetworking.h"
 #include "MirroredNetworking.h"
 #include "WSLAUserSession.h"
@@ -864,6 +863,11 @@ try
 CATCH_RETURN();
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
+{
+    return MountWindowsFolderImpl(WindowsPath, LinuxPath, ReadOnly, WslMountFlagsNone);
+}
+
+HRESULT WSLAVirtualMachine::MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags)
 try
 {
     std::filesystem::path Path(WindowsPath);
@@ -915,7 +919,7 @@ try
     auto mountOptions =
         std::format("msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, fd, fd, shareNameUtf8);
 
-    THROW_HR_IF(E_FAIL, MountImpl(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), 0) != 0);
+    THROW_HR_IF(E_FAIL, MountImpl(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags) != 0);
 
     deleteOnFailure.release();
     return S_OK;
@@ -944,9 +948,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
+HRESULT WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)
 try
 {
+    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WslMountFlagsWriteableOverlayFs), "Unexpected flags: %lu", Flags);
+
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);
 
     auto [channel, _, __] = Fork(WSLA_FORK::Thread);
@@ -954,7 +960,8 @@ try
     auto windowsPath = wil::GetWindowsDirectoryW<std::wstring>();
 
     // Mount drivers.
-    RETURN_IF_FAILED(MountWindowsFolder(std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, true));
+    RETURN_IF_FAILED(MountWindowsFolderImpl(
+        std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, true, static_cast<WslMountFlags>(Flags)));
 
     // Mount the inbox libraries.
     auto inboxLibPath = std::format(L"{}\\System32\\lxss\\lib", windowsPath);
@@ -987,7 +994,7 @@ try
         options += ":" + inboxLibMountPoint.value();
     }
 
-    RETURN_IF_FAILED(Mount("none", LibrariesMountPoint, "overlay", options.c_str(), 0));
+    RETURN_IF_FAILED(Mount("none", LibrariesMountPoint, "overlay", options.c_str(), Flags));
     return S_OK;
 }
 CATCH_RETURN();
