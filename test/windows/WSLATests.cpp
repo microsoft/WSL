@@ -1052,7 +1052,7 @@ class WSLATests
         auto rootfs = std::filesystem::path(TEXT(WSL_SYSTEM_DISTRO_PATH));
 
 #else
-         auto rootfs = wsl::windows::common::wslutil::GetMsiPackagePath().value() /L"tools" / L"system.vhd");
+        auto rootfs = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
 
 #endif
 

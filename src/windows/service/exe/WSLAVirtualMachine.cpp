@@ -281,7 +281,7 @@ void WSLAVirtualMachine::Start()
 
 #else
 
-    auto kernelModulesPath = basePath / L"modules.vhd";
+    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
 
 #endif
 
