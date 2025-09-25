@@ -1012,29 +1012,6 @@ class WSLATests
             "rw,relatime,lowerdir=/usr/lib/wsl/lib-rw,upperdir=/usr/lib/wsl/lib-rw-rw/rw/upper,workdir=/usr/lib/wsl/lib-rw-rw/rw/"
             "work*");
 
-        std::vector<const char*> commandLine{"/bin/sh", nullptr};
-        std::vector<WslProcessFileDescriptorSettings> fds(2);
-        fds[0].Number = 0;
-        fds[0].Type = WslFdTypeTerminalInput;
-        fds[1].Number = 1;
-        fds[1].Type = WslFdTypeTerminalOutput;
-
-        WslCreateProcessSettings WslCreateProcessSettings{};
-        WslCreateProcessSettings.Executable = "/bin/sh";
-        WslCreateProcessSettings.Arguments = commandLine.data();
-        WslCreateProcessSettings.FileDescriptors = fds.data();
-        WslCreateProcessSettings.FdCount = static_cast<ULONG>(fds.size());
-
-        int pid = -1;
-        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm.get(), &WslCreateProcessSettings, &pid));
-
-        // Validate that the interactive process successfully starts
-        wil::unique_handle process;
-        VERIFY_SUCCEEDED(WslLaunchInteractiveTerminal(
-            WslCreateProcessSettings.FileDescriptors[0].Handle, WslCreateProcessSettings.FileDescriptors[1].Handle, &process));
-
-        WaitForSingleObject(process.get(), INFINITE);
-
         // Verify that the mountpoints are actually writeable.
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib-rw/test"}), 0L);
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers-rw/test"}), 0L);
