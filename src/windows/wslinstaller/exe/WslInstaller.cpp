@@ -102,7 +102,7 @@ DWORD WINAPI InstallMsiPackage(LPVOID Context)
     return 0;
 }
 
-bool IsUpdateNeeded()
+std::pair<bool, std::wstring> IsUpdateNeeded()
 {
     try
     {
@@ -115,13 +115,15 @@ bool IsUpdateNeeded()
             TraceLoggingLevel(WINEVENT_LEVEL_INFO),
             TraceLoggingValue(installedVersion.c_str(), "InstalledVersion"));
 
-        return installedVersion.empty() || wsl::windows::common::wslutil::ParseWslPackageVersion(installedVersion) < wsl::shared::PackageVersion;
+        return std::make_pair(
+            installedVersion.empty() || wsl::windows::common::wslutil::ParseWslPackageVersion(installedVersion) < wsl::shared::PackageVersion,
+            installedVersion);
     }
     catch (...)
     {
         LOG_CAUGHT_EXCEPTION();
 
-        return false;
+        return std::make_pair(false, L"");
     }
 }
 
@@ -132,10 +134,13 @@ std::shared_ptr<InstallContext> LaunchInstall()
 
     auto lock = mutex.lock_exclusive();
 
-    if (!IsUpdateNeeded())
+    auto [updateNeeded, existingVersion] = IsUpdateNeeded();
+    if (!updateNeeded)
     {
         return {};
     }
+
+    wsl::windows::common::wslutil::WriteInstallLog(std::format("Starting upgrade via WslInstaller. Previous version: {}", existingVersion));
 
     // Return an existing install if any
     if (auto ptr = weak_context.lock(); ptr != nullptr)
