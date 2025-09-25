@@ -959,7 +959,6 @@ class WSLATests
         // Validate that the GPU device is available.
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "test -c /dev/dxg"}), 0);
 
-<<<<<<< HEAD
         // Validate that invalid flags return E_INVALIDARG
         {
             VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsChroot), E_INVALIDARG);
@@ -968,24 +967,6 @@ class WSLATests
 
         // Validate GPU mounts
         VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsNone));
-=======
-        // Validate GPU mounts
-        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"));
-
-        std::vector<const char*> commandLine{"/bin/sh", nullptr};
-
-        std::vector<WslProcessFileDescriptorSettings> fds(2);
-        fds[0].Number = 0;
-        fds[0].Type = WslFdTypeTerminalInput;
-        fds[1].Number = 1;
-        fds[1].Type = WslFdTypeTerminalOutput;
-
-        WslCreateProcessSettings WslCreateProcessSettings{};
-        WslCreateProcessSettings.Executable = "/bin/sh";
-        WslCreateProcessSettings.Arguments = commandLine.data();
-        WslCreateProcessSettings.FileDescriptors = fds.data();
-        WslCreateProcessSettings.FdCount = static_cast<ULONG>(fds.size());
->>>>>>> origin/feature/wsl-for-apps
 
         auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
             auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
@@ -1014,7 +995,6 @@ class WSLATests
             "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
         expectMount("/usr/lib/wsl/lib", "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
 
-<<<<<<< HEAD
         // Validate that the mount points arenot writeable.
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}), 1L);
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}), 1L);
@@ -1037,20 +1017,13 @@ class WSLATests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers-rw/test"}), 0L);
 
         // Validate that trying to mount the shares without GPU support disabled fails.
-=======
-        // Validate that trying to mount the shared with GPU support disabled fails.
->>>>>>> origin/feature/wsl-for-apps
         {
             settings.GPU.Enable = false;
             auto vm = CreateVm(&settings);
 
-<<<<<<< HEAD
             VERIFY_ARE_EQUAL(
                 WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsNone),
                 HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
-=======
-            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers"), HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
->>>>>>> origin/feature/wsl-for-apps
         }
     }
 };
