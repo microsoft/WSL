@@ -1572,11 +1572,12 @@ struct WSLA_MOUNT
     unsigned int OptionsIndex;
     unsigned int Flags;
 
-    enum ForkType : uint8_t
+    enum MountType : uint8_t
     {
         None,
         Chroot = 1,
         OverlayFs = 2,
+        KernelModules = 4
     };
 
     char Buffer[];

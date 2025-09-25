@@ -273,6 +273,28 @@ void WSLAVirtualMachine::Start()
 
     ConfigureNetworking();
 
+    // Mount the kernel modules VHD.
+
+#ifdef WSL_KERNEL_MODULES_PATH
+
+    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
+
+#else
+
+    auto kernelModulesPath = basePath / L"modules.vhd";
+
+#endif
+
+    wil::unique_cotaskmem_ansistring device;
+    ULONG lun{};
+    THROW_IF_FAILED(AttachDisk(kernelModulesPath.c_str(), true, &device, &lun));
+
+    THROW_HR_IF_MSG(
+        E_FAIL,
+        MountImpl(m_initChannel, device.get(), "", "ext4", "ro", WSLA_MOUNT::KernelModules) != 0,
+        "Failed to mount the kernel modules from: %hs",
+        device.get());
+
     // Configure GPU if requested.
     if (m_settings.EnableGPU)
     {
@@ -434,6 +456,8 @@ CATCH_RETURN();
 HRESULT WSLAVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)
 try
 {
+    THROW_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~(WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs)));
+
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 

@@ -23,6 +23,7 @@ Abstract:
 #include <sys/epoll.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
+#include <sys/utsname.h>
 #include <arpa/inet.h>
 
 #include <pty.h>
@@ -49,6 +50,13 @@ extern int SetCloseOnExec(int Fd, bool Enable);
 int Chroot(const char* Target);
 
 extern int g_LogFd;
+
+struct WSLAState
+{
+    std::optional<std::filesystem::path> ModulesMountPoint;
+};
+
+static WSLAState g_state;
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
 {
@@ -373,7 +381,26 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         }
 
         const char* source = readField(Message.SourceIndex);
-        const char* target = readField(Message.DestinationIndex);
+
+        const char* target{};
+
+        if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::KernelModules))
+        {
+            assert(!g_state.ModulesMountPoint.has_value());
+
+            // Modules need to be mounted to a specific path that depends on the kernel version.
+
+            utsname UnameBuffer{};
+            THROW_LAST_ERROR_IF(uname(&UnameBuffer) < 0);
+
+            g_state.ModulesMountPoint = std::format("/lib/modules/{}", UnameBuffer.release);
+            target = g_state.ModulesMountPoint->c_str();
+        }
+        else
+        {
+            target = readField(Message.DestinationIndex);
+        }
+
         THROW_LAST_ERROR_IF(
             UtilMount(source, target, readField(Message.TypeIndex), options.MountFlags, options.StringOptions.c_str(), c_defaultRetryTimeout) < 0);
 
@@ -401,6 +428,15 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
                 if (std::filesystem::exists("/etc/resolv.conf"))
                 {
                     THROW_LAST_ERROR_IF(UtilMountFile("/etc/resolv.conf", (overlayTarget.value() + "/etc/resolv.conf").c_str()) < 0);
+                }
+
+                // If the modules were previously mounted, move them to the chroot.
+                if (g_state.ModulesMountPoint.has_value())
+                {
+                    auto chrootTarget = std::format("{}/{}", overlayTarget.value(), g_state.ModulesMountPoint->native());
+                    std::filesystem::create_directories(chrootTarget);
+
+                    THROW_LAST_ERROR_IF(mount(g_state.ModulesMountPoint->c_str(), chrootTarget.c_str(), "none", MS_MOVE, nullptr) < 0);
                 }
             }
             else
