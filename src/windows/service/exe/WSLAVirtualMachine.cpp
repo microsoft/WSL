@@ -94,7 +94,10 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     {
         try
         {
-            wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str());
+            if (e.second.AccessGranted)
+            {
+                wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str());
+            }
         }
         CATCH_LOG()
     }
@@ -403,10 +406,18 @@ try
         std::lock_guard lock{m_lock};
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
-        {
+        AttachedDisk disk{Path};
+
+        auto grantDiskAccess = [&]() {
             const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
             auto runAsUser = wil::impersonate_token(userToken.get());
             wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
+            disk.AccessGranted = true;
+        };
+
+        if (!ReadOnly)
+        {
+            grantDiskAccess();
         }
 
         *Lun = 0;
@@ -422,10 +433,25 @@ try
                 wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), *Lun);
             }
 
-            wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), Path);
+            if (disk.AccessGranted)
+            {
+                wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), Path);
+            }
         });
 
-        wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly);
+        auto result =
+            wil::ResultFromException([&]() { wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly); });
+
+        if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && !disk.AccessGranted)
+        {
+            grantDiskAccess();
+            wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly);
+        }
+        else
+        {
+            THROW_IF_FAILED(result);
+        }
+
         vhdAdded = true;
 
         WSLA_GET_DISK message{};
@@ -437,7 +463,9 @@ try
         THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to attach disk, init returned: %lu", response.Result);
 
         cleanup.release();
-        m_attachedDisks.emplace(*Lun, AttachedDisk{Path, response.Buffer});
+
+        disk.Device = response.Buffer;
+        m_attachedDisks.emplace(*Lun, std::move(disk));
 
         *Device = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(response.Buffer).release();
     });
