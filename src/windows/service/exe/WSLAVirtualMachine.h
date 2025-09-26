@@ -74,6 +74,7 @@ private:
     {
         std::filesystem::path Path;
         std::string Device;
+        bool AccessGranted = false;
     };
 
     VIRTUAL_MACHINE_SETTINGS m_settings;

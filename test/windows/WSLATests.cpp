@@ -94,12 +94,12 @@ class WSLATests
         return result.Code;
     }
 
-    unique_vm CreateVm(const WslVirtualMachineSettings* settings)
+    unique_vm CreateVm(const WslVirtualMachineSettings* settings, const std::optional<LPCWSTR> rootfs = {})
     {
         unique_vm vm{};
         VERIFY_SUCCEEDED(WslCreateVirtualMachine(settings, &vm));
 
-        WslDiskAttachSettings attachSettings{testVhd.c_str(), true};
+        WslDiskAttachSettings attachSettings{rootfs.value_or(testVhd.c_str()), true};
         WslAttachedDiskInformation attachedDisk;
 
         VERIFY_SUCCEEDED(WslAttachDisk(vm.get(), &attachSettings, &attachedDisk));
@@ -158,8 +158,8 @@ class WSLATests
         VERIFY_IS_TRUE(blockDeviceExists(attachedDisk.ScsiLun));
 
         // Mount it to /mnt.
-        WslMountSettings WslMountSettings{attachedDisk.Device, "/mnt", "ext4", "ro"};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &WslMountSettings));
+        WslMountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro"};
+        VERIFY_SUCCEEDED(WslMount(vm.get(), &mountSettings));
 
         // Validate that the mountpoint is present.
         std::vector<const char*> cmd{"/usr/bin/mountpoint", "/mnt"};
@@ -172,12 +172,19 @@ class WSLATests
         // Verify that unmount fails now.
         VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
-        // Detach the disk
+        // Detach the disk.
         VERIFY_SUCCEEDED(WslDetachDisk(vm.get(), attachedDisk.ScsiLun));
         VERIFY_IS_FALSE(blockDeviceExists(attachedDisk.ScsiLun));
 
-        // Verify that disk can't be detached twice
+        // Verify that disk can't be detached twice.
         VERIFY_ARE_EQUAL(WslDetachDisk(vm.get(), attachedDisk.ScsiLun), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+        // Validate that invalid flags return E_INVALIDARG.
+        WslMountSettings invalidFlagSettings{"/dev/sda", "/mnt", "ext4", "ro", 0x4};
+        VERIFY_ARE_EQUAL(WslMount(vm.get(), &invalidFlagSettings), E_INVALIDARG);
+
+        invalidFlagSettings.Flags = 0xff;
+        VERIFY_ARE_EQUAL(WslMount(vm.get(), &invalidFlagSettings), E_INVALIDARG);
     }
 
     TEST_METHOD(CustomDmesgOutput)
@@ -1025,5 +1032,39 @@ class WSLATests
                 WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsNone),
                 HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
         }
+    }
+
+    TEST_METHOD(Modules)
+    {
+        WSL2_TEST_ONLY();
+
+        WslVirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = WslNetworkingModeNone;
+
+        // Use the system distro vhd for modprobe & lsmod.
+
+#ifdef WSL_SYSTEM_DISTRO_PATH
+
+        auto rootfs = std::filesystem::path(TEXT(WSL_SYSTEM_DISTRO_PATH));
+
+#else
+        auto rootfs = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
+
+#endif
+
+        auto vm = CreateVm(&settings, rootfs.c_str());
+
+        // Sanity check.
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}), 1);
+
+        // Validate that modules can be loaded.
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/sbin/modprobe", "xsk_diag"}), 0);
+
+        // Validate that xsk_diag is now loaded.
+        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}), 0);
     }
 };
