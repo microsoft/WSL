@@ -223,6 +223,8 @@ std::string UtilGetEnvironmentVariable(const char* Name);
 
 int UtilGetFeatureFlags(const wsl::linux::WslDistributionConfig& Config);
 
+std::optional<std::string> UtilGetKernelCommandLineArgument(const char* Name);
+
 std::optional<LX_MINI_INIT_NETWORKING_MODE> UtilGetNetworkingMode(void);
 
 pid_t UtilGetPpid(pid_t Pid);
