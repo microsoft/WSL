@@ -21,6 +21,10 @@ if ($LogProfile -eq $null -Or ![System.IO.File]::Exists($LogProfile))
     {
          $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_storage.wprp"
     }
+    elseif ($LogProfile -eq "hvsocket")
+    {
+         $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_hvsocket.wprp"
+    }
     else
     {
         Write-Error "Unknown log profile: $LogProfile"
