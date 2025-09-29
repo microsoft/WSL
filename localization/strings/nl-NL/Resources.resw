@@ -1108,8 +1108,8 @@ Foutcode: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparse VHD-ondersteuning is momenteel uitgeschakeld vanwege mogelijk beschadigde gegevens.
 Om een distributie te dwingen een sparse vhd te gebruiken, voer je het volgende uit:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Kan {} niet koppelen. Zie dmesg voor meer informatie.</value>

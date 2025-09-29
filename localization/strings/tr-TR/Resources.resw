@@ -1108,8 +1108,8 @@ Hata kodu: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Seyrek VHD desteği olası veri bozulması nedeniyle şu anda devre dışıdır.
 Bir dağıtımı seyrek VHD kullanmaya zorlamak için lütfen şu komutu çalıştırın:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>{} bağlanamadı, daha fazla ayrıntı için dmesg komutuna bakın.</value>

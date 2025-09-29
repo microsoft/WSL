@@ -1108,8 +1108,8 @@ Feilkode: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparsom VHD-støtte er deaktivert på grunn av potensiell dataskade.
 Hvis du vil tvinge en distribusjon til å bruke en sparsom vhd, kan du kjøre:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Kan ikke montere {}. Se dmesg hvis du vil ha mer informasjon.</value>

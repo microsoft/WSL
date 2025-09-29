@@ -1114,8 +1114,8 @@ Código de error: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>La compatibilidad con VHD disperso está deshabilitada actualmente debido a posibles daños en los datos.
 Para forzar que una distribución use un VHD disperso, ejecute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>No se pudo montar {}, consulte dmesg para obtener más detalles.</value>

@@ -1108,8 +1108,8 @@ Felkod: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Stöd för dynamiskt expanderbar VHD är för närvarande inaktiverat på grund av potentiell datakorruption.
 Om du vill tvinga en distribution att använda en dynamiskt expanderbar VHD kör du:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Det gick inte att montera {}, se dmesg för mer information.</value>

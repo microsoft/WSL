@@ -1114,8 +1114,8 @@ Windows 版本： {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>目前已停用 疏鬆 VHD 支援，因為可能會導致資料損毀。
 若要強制發行版本使用疏鬆 VHD，請執行:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse true "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>無法掛接 {}，如需詳細數據，請參閱 dmesg。</value>
