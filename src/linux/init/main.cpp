@@ -4081,6 +4081,8 @@ int main(int Argc, char* Argv[])
     {
         LOG_ERROR("Running in debug mode: '{}'", debugMode);
         EnableDebugMode(debugMode);
+
+        unsetenv(WSL_DEBUG_ENV);
     }
 
     //
