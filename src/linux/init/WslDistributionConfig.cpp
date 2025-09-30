@@ -55,7 +55,8 @@ WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
         ConfigKey(c_ConfigBootSystemdOption, BootInit),
         ConfigKey("boot.initTimeout", BootInitTimeout),
         ConfigKey(c_ConfigBootProtectBinfmtOption, BootProtectBinfmt),
-        ConfigKey(c_ConfigBootProtectBinfmtOption, BootProtectBinfmt),
+
+        ConfigKey(c_ConfigEnableGuiAppsOption, GuiAppsEnabled),
     };
 
     //

@@ -1852,7 +1852,7 @@ try
     }
 
     //
-    // Mount cgroup v1 when running in WSL1 mode.
+    // Mount cgroup v1 when running in WSL1 mode or when a WSL2 distro has automount.cgroups=v1 specified.
     //
     // Open the /proc/cgroups file and parse each line, ignoring malformed
     // lines and disabled controllers.
