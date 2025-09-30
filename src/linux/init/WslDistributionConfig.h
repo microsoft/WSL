@@ -48,6 +48,12 @@ struct WslDistributionConfig
     WslDistributionConfig(WslDistributionConfig&&) = default;
     WslDistributionConfig& operator=(WslDistributionConfig&&) = default;
 
+    enum class CGroupVersion
+    {
+        v1 = 0,
+        v2 = 1
+    };
+
     bool AutoMount = true;
     bool AutoUpdateTimezone = true;
     std::optional<std::string> BootCommand;
@@ -71,6 +77,7 @@ struct WslDistributionConfig
     bool AppendGpuLibPath = true;
     bool GpuEnabled = true;
     bool LinkOsLibs = true;
+    CGroupVersion CGroup = CGroupVersion::v2;
 
     //
     // Values not set by /etc/wsl.conf.

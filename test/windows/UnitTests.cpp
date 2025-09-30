@@ -6147,5 +6147,43 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(err, L"");
     }
 
+    TEST_METHOD(CGroupv1)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectedMount = [](const char* path, const wchar_t* expected) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
+
+            VERIFY_ARE_EQUAL(out, expected);
+        };
+
+        // Validate that cgroupv2 is mounted by default.
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that setting cgroup=v1 causes unified cgroups to be mounted.
+        DistroFileChange wslConf(L"/etc/wsl.conf", false);
+        wslConf.SetContent(L"[automount]\ncgroups=v1");
+
+        TerminateDistribution();
+
+        expectedMount(
+            "/sys/fs/cgroup/unified", L"/sys/fs/cgroup/unified cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that the cgroupv1 mounts are present.
+        expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
+
+        // Validate that having cgroup_no_v1=all causes the distribution to fall back to v2.
+        WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
+
+        expectedMount("/sys/fs/cgroup/unified", L"");
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
+        VERIFY_ARE_NOT_EQUAL(
+            dmesg.find(
+                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            std::wstring::npos);
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests

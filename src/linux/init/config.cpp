@@ -73,6 +73,8 @@ Abstract:
 #define MOUNTS_DEVICE_FIELD 0
 #define MOUNTS_FSTYPE_FIELD 2
 
+using wsl::linux::WslDistributionConfig;
+
 static void ConfigApplyWindowsLibPath(const wsl::linux::WslDistributionConfig& Config);
 
 static bool CreateLoginSession(const wsl::linux::WslDistributionConfig& Config, const char* Username, uid_t Uid);
@@ -567,7 +569,7 @@ Return Value:
     // Initialize cgroups based on what the kernel supports.
     //
 
-    ConfigInitializeCgroups();
+    ConfigInitializeCgroups(Config);
 
     //
     // Attempt to register the NT interop binfmt extension.
@@ -1783,7 +1785,7 @@ Return Value:
         {LX_WSL2_GUI_APP_SUPPORT_ENV, "1"}};
 }
 
-void ConfigInitializeCgroups(void)
+void ConfigInitializeCgroups(wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -1795,7 +1797,7 @@ Routine Description:
 
 Arguments:
 
-    None.
+    Config - Supplies the distribution configuration.
 
 Return Value:
 
@@ -1805,50 +1807,78 @@ Return Value:
 
 try
 {
-
-    //
-    // For WSL2 mount cgroup v2.
-    //
-    // N.B. Cgroup v2 is not implemented for WSL1.
-    //
+    std::vector<std::string> DisabledControllers;
 
     if (UtilIsUtilityVm())
     {
-        const auto Target = CGROUP_MOUNTPOINT;
+        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1)
+        {
+            auto commandLine = UtilReadFileContent("/proc/cmdline");
+            auto position = commandLine.find(CGROUPS_NO_V1);
+            if (position != std::string::npos)
+            {
+                auto list = commandLine.substr(position + sizeof(CGROUPS_NO_V1) - 1);
+                auto end = list.find_first_of(" \n");
+                if (end != std::string::npos)
+                {
+                    list = list.substr(0, end);
+                }
+
+                if (list == "all")
+                {
+                    LOG_WARNING("Distribution has cgroupv1 enabled, but kernel command line has {}all. Falling back to cgroupv2", CGROUPS_NO_V1);
+                    Config.CGroup = WslDistributionConfig::CGroupVersion::v2;
+                }
+                else
+                {
+                    DisabledControllers = wsl::shared::string::Split(list, ',');
+                }
+            }
+        }
+
+        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v1)
+        {
+            THROW_LAST_ERROR_IF(mount("tmpfs", CGROUP_MOUNTPOINT, "tmpfs", (MS_NOSUID | MS_NODEV | MS_NOEXEC), "mode=755") < 0);
+        }
+
+        const auto Target = Config.CGroup == WslDistributionConfig::CGroupVersion::v1 ? CGROUP_MOUNTPOINT "/unified" : CGROUP_MOUNTPOINT;
         THROW_LAST_ERROR_IF(
             UtilMount(CGROUP2_DEVICE, Target, CGROUP2_DEVICE, (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RELATIME), "nsdelegate") < 0);
-    }
-    else
-    {
-        //
-        // Mount cgroup v1 when running in WSL1 mode.
-        //
-        // Open the /proc/cgroups file and parse each line, ignoring malformed
-        // lines and disabled controllers.
-        //
 
-        THROW_LAST_ERROR_IF(mount("tmpfs", CGROUP_MOUNTPOINT, "tmpfs", (MS_NOSUID | MS_NODEV | MS_NOEXEC), "mode=755") < 0);
-
-        wil::unique_file Cgroups{fopen(CGROUPS_FILE, "r")};
-        THROW_LAST_ERROR_IF(!Cgroups);
-
-        ssize_t BytesRead;
-        char* Line = nullptr;
-        auto LineCleanup = wil::scope_exit([&]() { free(Line); });
-        size_t LineLength = 0;
-        while ((BytesRead = getline(&Line, &LineLength, Cgroups.get())) != -1)
+        if (Config.CGroup == WslDistributionConfig::CGroupVersion::v2)
         {
-            char* Subsystem = nullptr;
-            bool Enabled = false;
-            if ((UtilParseCgroupsLine(Line, &Subsystem, &Enabled) < 0) || (Enabled == false))
-            {
-                continue;
-            }
-
-            auto Target = std::format("{}/{}", CGROUP_MOUNTPOINT, Subsystem);
-            THROW_LAST_ERROR_IF(
-                UtilMount(CGROUP_DEVICE, Target.c_str(), CGROUP_DEVICE, (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RELATIME), Subsystem) < 0);
+            return;
         }
+    }
+
+    //
+    // Mount cgroup v1 when running in WSL1 mode.
+    //
+    // Open the /proc/cgroups file and parse each line, ignoring malformed
+    // lines and disabled controllers.
+    //
+
+    wil::unique_file Cgroups{fopen(CGROUPS_FILE, "r")};
+    THROW_LAST_ERROR_IF(!Cgroups);
+
+    ssize_t BytesRead;
+    char* Line = nullptr;
+    auto LineCleanup = wil::scope_exit([&]() { free(Line); });
+    size_t LineLength = 0;
+    while ((BytesRead = getline(&Line, &LineLength, Cgroups.get())) != -1)
+    {
+        char* Subsystem = nullptr;
+        bool Enabled = false;
+        if ((UtilParseCgroupsLine(Line, &Subsystem, &Enabled) < 0) || (Enabled == false) ||
+            std::find(DisabledControllers.begin(), DisabledControllers.end(), Subsystem) != DisabledControllers.end())
+
+        {
+            continue;
+        }
+
+        auto Target = std::format("{}/{}", CGROUP_MOUNTPOINT, Subsystem);
+        THROW_LAST_ERROR_IF(
+            UtilMount(CGROUP_DEVICE, Target.c_str(), CGROUP_DEVICE, (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_RELATIME), Subsystem) < 0);
     }
 }
 CATCH_LOG()

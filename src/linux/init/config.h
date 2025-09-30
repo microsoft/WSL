@@ -406,7 +406,7 @@ void ConfigHandleInteropMessage(
     const MESSAGE_HEADER* Header,
     const wsl::linux::WslDistributionConfig& Config);
 
-void ConfigInitializeCgroups(void);
+void ConfigInitializeCgroups(wsl::linux::WslDistributionConfig& Config);
 
 int ConfigInitializeInstance(wsl::shared::SocketChannel& Channel, gsl::span<gsl::byte> Buffer, wsl::linux::WslDistributionConfig& Config);
 

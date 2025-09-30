@@ -28,6 +28,7 @@ WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
         ConfigKey("automount.options", DrvFsOptions),
         ConfigKey(c_ConfigMountFsTabOption, MountFsTab),
         ConfigKey(c_ConfigLinkOsLibsOption, LinkOsLibs),
+        ConfigKey("automount.cgroups", {{"v1", CGroupVersion::v1}, {"v2", CGroupVersion::v2}}, CGroup, nullptr),
 
         ConfigKey("filesystem.umask", Umask),
 
@@ -54,8 +55,7 @@ WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
         ConfigKey(c_ConfigBootSystemdOption, BootInit),
         ConfigKey("boot.initTimeout", BootInitTimeout),
         ConfigKey(c_ConfigBootProtectBinfmtOption, BootProtectBinfmt),
-
-        ConfigKey(c_ConfigEnableGuiAppsOption, GuiAppsEnabled),
+        ConfigKey(c_ConfigBootProtectBinfmtOption, BootProtectBinfmt),
     };
 
     //
