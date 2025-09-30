@@ -2806,8 +2806,6 @@ void LxssUserSessionImpl::_CreateVm()
         // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
 
-        m_utilityVm->GetRuntimeId();
-
         if (m_httpProxyStateTracker)
         {
             // this needs to be done after the VM has finished in case we fell back to NAT mode
