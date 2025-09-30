@@ -3918,7 +3918,7 @@ void EnableDebugMode(const std::string& Mode)
             std::string line;
             while (std::getline(file, line))
             {
-                LOG_INFO("{}: {}", path, line);
+                LOG_INFO("{}", line);
             }
 
             LOG_ERROR("{}: closed", path);
