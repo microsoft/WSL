@@ -1850,6 +1850,10 @@ try
             return;
         }
     }
+    else
+    {
+        THROW_LAST_ERROR_IF(mount("tmpfs", CGROUP_MOUNTPOINT, "tmpfs", (MS_NOSUID | MS_NODEV | MS_NOEXEC), "mode=755") < 0);
+    }
 
     //
     // Mount cgroup v1 when running in WSL1 mode or when a WSL2 distro has automount.cgroups=v1 specified.
