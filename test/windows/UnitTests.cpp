@@ -6147,5 +6147,14 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         VERIFY_ARE_EQUAL(err, L"");
     }
 
+    TEST_METHOD(WslDebug)
+    {
+        WSL2_TEST_ONLY();
+
+        // Verify that hvsocket debug events are logged to dmesg.
+        WslConfigChange config(LxssGenerateTestConfig({.kernelCommandLine = L"WSL_DEBUG=hvsocket"}));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"dmesg | grep -iF 'vmbus_send_tl_connect_request'"), 0L);
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests
