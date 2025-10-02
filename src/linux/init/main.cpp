@@ -857,10 +857,10 @@ Return Value:
 
         if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
         {
-            compressionArguments += "v";
+            compressionArguments += "vv";
         }
 
-        const char* arguments[] = {
+        std::vector<const char*> arguments{
             BSDTAR_PATH,
             "-C",
             Source,
@@ -872,7 +872,13 @@ Return Value:
             "-",
             ".",
             nullptr};
-        execv(BSDTAR_PATH, const_cast<char**>(arguments));
+
+        if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
+        {
+            arguments.emplace(arguments.begin() + 3, "--totals");
+        }
+
+        execv(BSDTAR_PATH, const_cast<char**>(arguments.data()));
         LOG_ERROR("execl failed, {}", errno);
     });
 
@@ -1158,7 +1164,7 @@ Return Value:
             "-C",
             Destination,
             "-x",
-            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vp" : "-p",
+            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vvp" : "-p",
             "--xattrs",
             "--numeric-owner",
             "-f",
