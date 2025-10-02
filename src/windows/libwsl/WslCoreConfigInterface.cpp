@@ -328,6 +328,7 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
             MemoryString(defaultConfig.VhdSizeBytes),
             MemoryString(wslConfigSetting.UInt64Value),
             wslConfig->Config.VhdSizeBytes);
+        break;
     case VhdType:
     {
         wsl::core::VhdType vhdTypeConfiguration{static_cast<wsl::core::VhdType>(wslConfigSetting.VhdTypeValue)};
@@ -340,6 +341,7 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
         }
         return result;
     }
+    break;
     case Networking:
     {
         wsl::core::NetworkingMode networkingConfiguration{static_cast<wsl::core::NetworkingMode>(wslConfigSetting.NetworkingConfigurationValue)};
