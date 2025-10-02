@@ -1431,7 +1431,16 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 
             if (TargetDirectory == nullptr)
             {
-                distributionPath = config.DefaultDistributionLocation / wsl::shared::string::GuidToString<wchar_t>(DistributionId);
+                // If a custom name is provided, use it as the folder name instead of a GUID.
+                // This improves usability when distributionInstallPath is configured in .wslconfig.
+                if (DistributionName != nullptr)
+                {
+                    distributionPath = config.DefaultDistributionLocation / DistributionName;
+                }
+                else
+                {
+                    distributionPath = config.DefaultDistributionLocation / wsl::shared::string::GuidToString<wchar_t>(DistributionId);
+                }
             }
             else
             {

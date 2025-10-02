@@ -4337,12 +4337,76 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             // Validate that the distribution was created in the correct path
             VERIFY_ARE_EQUAL(std::filesystem::path(basePath).parent_path().string(), currentPath.string());
 
+            // Validate that the folder name matches the instance name (not a GUID)
+            VERIFY_ARE_EQUAL(std::filesystem::path(basePath).filename().wstring(), L"test-overridden-default-location");
+
             ValidateDistributionShortcut(L"test-overridden-default-location", nullptr);
 
             cleanup.reset();
 
             // Validate that the base path is removed and that the shortcut is gone*
             VERIFY_IS_FALSE(std::filesystem::exists(shortcutPath));
+            VERIFY_IS_FALSE(std::filesystem::exists(basePath));
+        }
+
+        // Distribution with overridden default location but without explicit name (should use GUID)
+        {
+            auto cleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, []() {
+                    auto distros = wsl::windows::common::SvcComm().EnumerateDistributions();
+                    for (const auto& distro : distros)
+                    {
+                        auto name = distro.DistributionName.get();
+                        if (wcsstr(name, L"Ubuntu") != nullptr)
+                        {
+                            std::wstring cmd = std::wstring(L"--unregister ") + name;
+                            LxsstuLaunchWsl(cmd.c_str());
+                            break;
+                        }
+                    }
+                });
+
+            auto currentPath = std::filesystem::current_path();
+            WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
+
+            // Install without --name, so the distribution name will be auto-generated
+            InstallFromTar(g_testDistroPath.c_str(), L"");
+            
+            // Find the installed distribution
+            auto distros = wsl::windows::common::SvcComm().EnumerateDistributions();
+            std::wstring installedName;
+            for (const auto& distro : distros)
+            {
+                auto name = distro.DistributionName.get();
+                if (wcsstr(name, L"Ubuntu") != nullptr)
+                {
+                    installedName = name;
+                    break;
+                }
+            }
+
+            VERIFY_IS_FALSE(installedName.empty());
+            ValidateDistributionStarts(installedName.c_str());
+
+            auto distroKey = OpenDistributionKey(installedName.c_str());
+            VERIFY_IS_TRUE(!!distroKey);
+
+            auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+            VERIFY_IS_TRUE(std::filesystem::exists(basePath));
+
+            // Validate that the distribution was created in the correct path
+            VERIFY_ARE_EQUAL(std::filesystem::path(basePath).parent_path().string(), currentPath.string());
+
+            // Validate that the folder name is a GUID (since no --name was provided)
+            auto folderName = std::filesystem::path(basePath).filename().wstring();
+            // A GUID has the format {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} (38 chars)
+            VERIFY_ARE_EQUAL(folderName.length(), static_cast<size_t>(38));
+            VERIFY_ARE_EQUAL(folderName[0], L'{');
+            VERIFY_ARE_EQUAL(folderName[37], L'}');
+
+            cleanup.reset();
+
+            // Validate that the base path is removed
             VERIFY_IS_FALSE(std::filesystem::exists(basePath));
         }
 
