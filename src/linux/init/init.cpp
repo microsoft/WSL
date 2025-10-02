@@ -129,7 +129,7 @@ void InitEntryUtilityVm(wsl::linux::WslDistributionConfig& Config);
 
 void InitTerminateInstance(gsl::span<gsl::byte> Buffer, wsl::shared::SocketChannel& Channel, wsl::linux::WslDistributionConfig& Config);
 
-void InitTerminateInstanceInternal(wsl::linux::WslDistributionConfig& Config);
+void InitTerminateInstanceInternal(const wsl::linux::WslDistributionConfig& Config);
 
 void InstallSystemdUnit(const char* Path, const std::string& Name, const char* Content);
 
@@ -2666,7 +2666,7 @@ try
 }
 CATCH_LOG();
 
-void InitTerminateInstanceInternal(wsl::linux::WslDistributionConfig& Config)
+void InitTerminateInstanceInternal(const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -2685,19 +2685,19 @@ Return Value:
 --*/
 try
 {
+    //
+    // If systemd is enabled, attempt to poweroff the instance via systemctl.
+    //
+
     if (Config.BootInit && !Config.BootStartWriteSocket)
     {
         THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
-        UtilExecCommandLine("systemctl poweroff", nullptr);
-
-        //
-        // Wait for systemd to terminate the instance, this should terminate the current process.
-        // If this does not happen, call the reboot syscall to terminate the pid namespace.
-        //
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
-        LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
+        if (UtilExecCommandLine("systemctl poweroff", nullptr) == 0)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
+            LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
+        }
     }
 
     reboot(RB_POWER_OFF);
