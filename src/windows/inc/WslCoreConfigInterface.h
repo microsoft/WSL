@@ -26,6 +26,7 @@ enum WslConfigEntry
     SwapSizeBytes,
     SwapFilePath,
     VhdSizeBytes,
+    VhdType,
     Networking,
     FirewallEnabled,
     IgnoredPorts,
@@ -65,6 +66,12 @@ enum MemoryReclaimConfiguration
     DropCache = 2
 };
 
+enum VhdTypeConfiguration
+{
+    Dynamic = 0,
+    Fixed = 1
+};
+
 typedef struct WslConfig* WslConfig_t;
 
 struct WslConfigSetting
@@ -78,6 +85,7 @@ struct WslConfigSetting
         bool BoolValue;
         enum NetworkingConfiguration NetworkingConfigurationValue;
         enum MemoryReclaimConfiguration MemoryReclaimModeValue;
+        enum VhdTypeConfiguration VhdTypeValue;
     };
 };
 

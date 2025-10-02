@@ -103,6 +103,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::DnsProxy, EnableDnsProxy),
         ConfigKey(ConfigSetting::SafeMode, EnableSafeMode),
         ConfigKey(ConfigSetting::DefaultVhdSize, MemoryString(VhdSizeBytes)),
+        ConfigKey(ConfigSetting::DefaultVhdType, wsl::core::VhdTypes, VhdDefaultType),
         ConfigKey(ConfigSetting::CrashDumpFolder, CrashDumpFolder),
         ConfigKey(ConfigSetting::MaxCrashDumpCount, MaxCrashDumpCount),
         ConfigKey(ConfigSetting::DistributionInstallPath, DefaultDistributionLocation),

@@ -1407,8 +1407,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
             RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
         }
 
-        // Registering a distro with a fixed VHD is only allowed if a size is specified.
-        RETURN_HR_IF(E_INVALIDARG, VhdSize == 0 && WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+        // Note: Validation for fixed VHD without explicit size is now allowed - defaults from .wslconfig will be applied below.
 
         // Registering a WSL1 distro is not possible if the lxcore driver is not present.
         RETURN_HR_IF(WSL_E_WSL1_NOT_SUPPORTED, (Version == LXSS_WSL_VERSION_1) && !g_lxcoreInitialized);
@@ -1508,8 +1507,12 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                         VhdSize = config.VhdSizeBytes;
                     }
 
+                    // Determine VHD type: use explicit flag if present, otherwise use config default
+                    bool useFixedVhd = WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD) || 
+                                      (config.VhdDefaultType == wsl::core::VhdType::Fixed);
+
                     wsl::core::filesystem::CreateVhd(
-                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD));
+                        configuration.VhdFilePath.c_str(), VhdSize, GetUserSid(), config.EnableSparseVhd, useFixedVhd);
 
                     deleteFlags = LXSS_DELETE_DISTRO_FLAGS_VHD;
                 }

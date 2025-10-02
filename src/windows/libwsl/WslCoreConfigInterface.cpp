@@ -103,6 +103,9 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
         static_assert(std::is_same<decltype(wslConfigSetting.UInt64Value), decltype(wslConfig->Config.VhdSizeBytes)>::value);
         wslConfigSetting.UInt64Value = wslConfig->Config.VhdSizeBytes;
         break;
+    case VhdType:
+        wslConfigSetting.VhdTypeValue = static_cast<VhdTypeConfiguration>(wslConfig->Config.VhdDefaultType);
+        break;
     case Networking:
         wslConfigSetting.NetworkingConfigurationValue = static_cast<NetworkingConfiguration>(wslConfig->Config.NetworkingMode);
         break;
@@ -325,6 +328,18 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
             MemoryString(defaultConfig.VhdSizeBytes),
             MemoryString(wslConfigSetting.UInt64Value),
             wslConfig->Config.VhdSizeBytes);
+    case VhdType:
+    {
+        wsl::core::VhdType vhdTypeConfiguration{static_cast<wsl::core::VhdType>(wslConfigSetting.VhdTypeValue)};
+        ConfigKey key(ConfigSetting::DefaultVhdType, wsl::core::VhdTypes, vhdTypeConfiguration);
+        const auto removeKey = defaultConfig.VhdDefaultType == vhdTypeConfiguration;
+        const auto result = wslConfig->Config.WriteConfigFile(wslConfig->ConfigFilePath.c_str(), key, removeKey);
+        if (result == 0)
+        {
+            wslConfig->Config.VhdDefaultType = vhdTypeConfiguration;
+        }
+        return result;
+    }
     case Networking:
     {
         wsl::core::NetworkingMode networkingConfiguration{static_cast<wsl::core::NetworkingMode>(wslConfigSetting.NetworkingConfigurationValue)};

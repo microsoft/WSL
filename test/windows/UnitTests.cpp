@@ -169,6 +169,72 @@ class UnitTests
         }
     }
 
+    TEST_METHOD(DefaultVhdTypeConfiguration)
+    {
+        WSL2_TEST_ONLY();
+
+        // Test that defaultVhdType setting in .wslconfig works correctly
+        const auto testDistroName = L"TestDefaultVhdType";
+        const auto configContent = L"[wsl2]\ndefaultVhdSize=10GB\ndefaultVhdType=fixed\n";
+        
+        WslConfigChange config(configContent);
+        
+        // Clean up any existing test distro
+        LxsstuLaunchWsl(std::format(L"--unregister {}", testDistroName));
+        
+        auto cleanup = wil::scope_exit([&] {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", testDistroName));
+        });
+
+        // Install a distribution using --fixed-vhd without --vhd-size
+        // This should use the defaultVhdSize from config
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--install Ubuntu-24.04 --name {} --no-launch --fixed-vhd", testDistroName));
+
+        // Verify installation succeeded
+        VERIFY_ARE_NOT_EQUAL(out.find(L"completed successfully"), std::wstring::npos);
+
+        // Get the VHD path for the test distribution
+        auto distroList = LxsstuEnumerateDistributions();
+        auto distroIt = std::find_if(distroList.begin(), distroList.end(), 
+            [&](const auto& d) { return d.Name == testDistroName; });
+        
+        if (distroIt != distroList.end())
+        {
+            auto vhdPath = distroIt->BasePath / L"ext4.vhdx";
+            
+            // Verify the VHD type is Fixed as specified in config
+            auto [vhdType, _] = LxsstuLaunchPowershellAndCaptureOutput(
+                std::format(L"(Get-VHD '{}').VhdType", vhdPath.wstring()));
+            VERIFY_ARE_EQUAL(vhdType, L"Fixed\r\n");
+        }
+
+        // Test with defaultVhdType=dynamic (default)
+        config.Update(L"[wsl2]\ndefaultVhdSize=10GB\ndefaultVhdType=dynamic\n");
+        
+        LxsstuLaunchWsl(std::format(L"--unregister {}", testDistroName));
+        
+        // Install without --fixed-vhd, should use dynamic from config
+        auto [out2, err2] = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--install Ubuntu-24.04 --name {} --no-launch", testDistroName));
+
+        VERIFY_ARE_NOT_EQUAL(out2.find(L"completed successfully"), std::wstring::npos);
+
+        distroList = LxsstuEnumerateDistributions();
+        distroIt = std::find_if(distroList.begin(), distroList.end(), 
+            [&](const auto& d) { return d.Name == testDistroName; });
+        
+        if (distroIt != distroList.end())
+        {
+            auto vhdPath = distroIt->BasePath / L"ext4.vhdx";
+            
+            // Verify the VHD type is Dynamic
+            auto [vhdType, _] = LxsstuLaunchPowershellAndCaptureOutput(
+                std::format(L"(Get-VHD '{}').VhdType", vhdPath.wstring()));
+            VERIFY_ARE_EQUAL(vhdType, L"Dynamic\r\n");
+        }
+    }
+
     TEST_METHOD(SystemdSafeMode)
     {
         WSL2_TEST_ONLY();
