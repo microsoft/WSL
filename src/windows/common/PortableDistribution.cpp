@@ -361,7 +361,7 @@ void ValidatePortablePath(_In_ const std::filesystem::path& path, _In_ bool allo
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
         !IsRemovableDrive(path, allowFixed),
-        "Portable path must be on removable media: %ls",
+        "Portable path must be on removable media: %ls. To allow fixed drives, use the --allow-fixed flag.",
         path.c_str());
 }
 
