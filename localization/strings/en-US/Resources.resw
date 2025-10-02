@@ -205,6 +205,35 @@ Install using 'wsl.exe {} &lt;Distro&gt;'.
   <data name="MessageImportingDistribution" xml:space="preserve">
     <value>Importing distribution</value>
   </data>
+  <data name="MessagePortableDistroMounted" xml:space="preserve">
+    <value>Portable distribution '{}' successfully mounted from '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePortableDistroMountFailed" xml:space="preserve">
+    <value>Failed to mount portable distribution from '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePortableDistroUnmounted" xml:space="preserve">
+    <value>Portable distribution '{}' successfully unmounted.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageNotPortableDistro" xml:space="preserve">
+    <value>Distribution '{}' is not a portable distribution.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePortableDistroCreated" xml:space="preserve">
+    <value>Portable distribution '{}' created successfully at '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePortableDistroCreationFailed" xml:space="preserve">
+    <value>Failed to create portable distribution at '{}'.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePortablePathNotRemovable" xml:space="preserve">
+    <value>Portable path must be on removable media: {}
+Use the --allow-fixed flag to allow portable distributions on fixed drives for development/testing.</value>
+    <comment>{FixedPlaceholder="{}"}{Locked="--allow-fixed "}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageDownloadComplete" xml:space="preserve">
     <value>{} has been downloaded.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
