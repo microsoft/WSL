@@ -250,7 +250,11 @@ void MergeDistributionLists(DistributionList& target, const DistributionList& so
             {
                 // Check if version already exists
                 auto it = std::find_if(targetVersions.begin(), targetVersions.end(),
-                    [&](const ModernDistributionVersion& v) { return v.Name == version.Name; });
+                    [&](const ModernDistributionVersion& v) {
+                        return v.Name == version.Name
+                            && v.Version == version.Version
+                            && v.Architecture == version.Architecture;
+                    });
                 
                 if (it == targetVersions.end())
                 {
