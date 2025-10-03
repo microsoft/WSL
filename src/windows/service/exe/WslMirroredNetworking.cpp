@@ -208,6 +208,74 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessIpAddressChange()
     }
 }
 
+// Helper function to find the source address on the same subnet as the next-hop
+static std::optional<SOCKADDR_INET> FindSourceAddressForNextHop(
+    const SOCKADDR_INET& nextHop,
+    const std::set<wsl::core::networking::EndpointIpAddress>& addresses)
+{
+    for (const auto& addr : addresses)
+    {
+        // Skip if address family doesn't match
+        if (addr.Address.si_family != nextHop.si_family)
+        {
+            continue;
+        }
+
+        // Check if next-hop is within the address's subnet
+        if (nextHop.si_family == AF_INET)
+        {
+            // Create prefix mask
+            uint32_t mask = 0xFFFFFFFF;
+            if (addr.PrefixLength < 32)
+            {
+                mask <<= (32 - addr.PrefixLength);
+            }
+
+            // Apply mask to both addresses (in network byte order)
+            uint32_t addrMasked = ntohl(addr.Address.Ipv4.sin_addr.S_un.S_addr) & mask;
+            uint32_t nextHopMasked = ntohl(nextHop.Ipv4.sin_addr.S_un.S_addr) & mask;
+
+            if (addrMasked == nextHopMasked)
+            {
+                return addr.Address;
+            }
+        }
+        else if (nextHop.si_family == AF_INET6)
+        {
+            // For IPv6, compare byte by byte with prefix mask
+            bool match = true;
+            int remainingBits = addr.PrefixLength;
+
+            for (int i = 0; i < 16 && remainingBits > 0; i++)
+            {
+                uint8_t mask = 0xFF;
+                if (remainingBits < 8)
+                {
+                    mask <<= (8 - remainingBits);
+                }
+
+                uint8_t addrByte = addr.Address.Ipv6.sin6_addr.u.Byte[i] & mask;
+                uint8_t nextHopByte = nextHop.Ipv6.sin6_addr.u.Byte[i] & mask;
+
+                if (addrByte != nextHopByte)
+                {
+                    match = false;
+                    break;
+                }
+
+                remainingBits -= 8;
+            }
+
+            if (match)
+            {
+                return addr.Address;
+            }
+        }
+    }
+
+    return std::nullopt;
+}
+
 _Requires_lock_held_(m_networkLock)
 void wsl::core::networking::WslMirroredNetworkManager::ProcessRouteChange()
 {
@@ -374,6 +442,15 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessRouteChange()
                 ZeroMemory(&newRoute.NextHop, sizeof newRoute.NextHop);
                 newRoute.NextHop.si_family = route.NextHop.si_family;
                 newRoute.NextHopString = windows::common::string::SockAddrInetToWstring(newRoute.NextHop);
+
+                // Find and set the preferred source address from the same subnet as the next-hop
+                // This ensures correct source address selection for multi-IP interfaces
+                auto sourceAddr = FindSourceAddressForNextHop(route.NextHop, endpoint.Network->IpAddresses);
+                if (sourceAddr.has_value())
+                {
+                    newRoute.PreferredSource = sourceAddr.value();
+                    newRoute.PreferredSourceString = windows::common::string::SockAddrInetToWstring(newRoute.PreferredSource);
+                }
 
                 // force a copy so the route strings are re-calculated in the new EndpointRoute object
                 newRoutes.emplace_back(std::move(newRoute));

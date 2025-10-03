@@ -268,22 +268,29 @@ void RoutingTable::ModifyLinkLocalRouteImpl(const Route& route, int operation, i
     {
         utils::AddressAttribute<TAddr> to;
         utils::IntegerAttribute metric;
+        utils::AddressAttribute<TAddr> preferredSource;
     } __attribute__((packed));
 
     GNS_LOG_INFO(
-        "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
+        "SendMessage Route (to {}, via {}, preferredSource {}), operation ({}), netLinkflags ({})",
         route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
         route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.preferredSource.has_value() ? route.preferredSource.value().Addr().c_str() : "[empty]",
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ([not set]), RTA_PRIORITY ({})",
+            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ([not set]), RTA_PRIORITY ({}), RTA_PREFSRC ({})",
             route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
-            route.metric);
+            route.metric,
+            route.preferredSource.has_value() ? route.preferredSource.value().Addr().c_str() : "[not set]");
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
+        if (route.preferredSource.has_value())
+        {
+            utils::InitializeAddressAttribute<TAddr>(message.preferredSource, route.preferredSource.value(), RTA_PREFSRC);
+        }
     });
 }
 
@@ -300,24 +307,31 @@ void RoutingTable::ModifyOfflinkRouteImpl(const Route& route, int operation, int
         utils::AddressAttribute<TAddr> to;
         utils::AddressAttribute<TAddr> via;
         utils::IntegerAttribute metric;
+        utils::AddressAttribute<TAddr> preferredSource;
     } __attribute__((packed));
 
     GNS_LOG_INFO(
-        "SendMessage Route (to {}, via {}), operation ({}), netLinkflags ({})",
+        "SendMessage Route (to {}, via {}, preferredSource {}), operation ({}), netLinkflags ({})",
         route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
         route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
+        route.preferredSource.has_value() ? route.preferredSource.value().Addr().c_str() : "[empty]",
         RouteOperationToString(operation),
         NetLinkFormatFlagsToString(flags).c_str());
 
     SendMessage<Message>(route, operation, flags, [&](Message& message) {
         GNS_LOG_INFO(
-            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ({}), RTA_PRIORITY ({})",
+            "InitializeAddressAttribute RTA_DST ({}) RTA_GATEWAY ({}), RTA_PRIORITY ({}), RTA_PREFSRC ({})",
             route.to.has_value() ? route.to.value().Addr().c_str() : "[empty]",
             route.via.has_value() ? route.via.value().Addr().c_str() : "[empty]",
-            route.metric);
+            route.metric,
+            route.preferredSource.has_value() ? route.preferredSource.value().Addr().c_str() : "[not set]");
         utils::InitializeAddressAttribute<TAddr>(message.to, route.to.value(), RTA_DST);
         utils::InitializeAddressAttribute<TAddr>(message.via, route.via.value(), RTA_GATEWAY);
         utils::InitializeIntegerAttribute(message.metric, route.metric, RTA_PRIORITY);
+        if (route.preferredSource.has_value())
+        {
+            utils::InitializeAddressAttribute<TAddr>(message.preferredSource, route.preferredSource.value(), RTA_PREFSRC);
+        }
     });
 }
 

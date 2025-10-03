@@ -146,6 +146,7 @@ struct TrackedRoute
         route.SitePrefixLength = Route.SitePrefixLength;
         route.NextHop = Route.NextHopString;
         route.Metric = Route.Metric;
+        route.PreferredSource = Route.PreferredSourceString;
         return route;
     }
 
