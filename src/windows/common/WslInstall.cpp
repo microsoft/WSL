@@ -371,8 +371,11 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
                         continue;
                     }
 
-                    // Download file to temp location
-                    const auto tempFileName = std::format(L"injected_file_{}.tmp", std::hash<std::wstring>{}(*fileSpec.Url));
+                    // Download file to temp location with UUID to prevent collisions
+                    GUID uniqueId{};
+                    THROW_IF_FAILED(CoCreateGuid(&uniqueId));
+                    const auto tempFileName = std::format(L"injected_file_{}.tmp", 
+                        wsl::shared::string::GuidToString<wchar_t>(uniqueId, wsl::shared::string::GuidToStringFlags::None));
                     const auto tempFilePath = DownloadFile(*fileSpec.Url, tempFileName);
                     
                     // Verify hash
