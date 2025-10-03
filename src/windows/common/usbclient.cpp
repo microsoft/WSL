@@ -174,21 +174,40 @@ int UsbClient::AttachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
             return 1;
         }
 
-        // Get the distribution's VM ID (if not specified, use default)
-        GUID vmId = {};
+        // Get the distribution's VM Runtime ID (needed for Hyper-V socket connection)
+        // Note: Distribution GUID != VM Runtime ID. Runtime ID is dynamic per VM boot.
+        GUID runtimeId = {};
         {
             wsl::windows::common::SvcComm svcComm;
+            
+            // First get the distribution GUID
+            GUID distroGuid = {};
             if (!distribution.empty()) {
-                vmId = svcComm.GetDistributionId(distribution.c_str());
+                distroGuid = svcComm.GetDistributionId(distribution.c_str());
             } else {
-                vmId = svcComm.GetDefaultDistribution();
+                distroGuid = svcComm.GetDefaultDistribution();
+            }
+            
+            // Now get the VM Runtime ID for this distribution
+            try {
+                runtimeId = svcComm.GetDistributionRuntimeId(&distroGuid);
+            } catch (...) {
+                std::wcerr << L"Error: Distribution is not running. Please start the distribution first." << std::endl;
+                if (!distribution.empty()) {
+                    std::wcerr << L"Try: wsl -d " << distribution << std::endl;
+                } else {
+                    std::wcerr << L"Try: wsl" << std::endl;
+                }
+                usbService.Shutdown();
+                return 1;
             }
         }
 
-        // Connect to the distribution's USB service
-        auto hvSocket = hvsocket::Connect(vmId, usb::USB_PASSTHROUGH_PORT);
+        // Connect to the distribution's USB service using Runtime ID
+        auto hvSocket = hvsocket::Connect(runtimeId, usb::USB_PASSTHROUGH_PORT);
         if (!hvSocket) {
             std::wcerr << L"Error: Failed to connect to distribution's USB service." << std::endl;
+            std::wcerr << L"Make sure the WSL USB kernel module is loaded." << std::endl;
             usbService.Shutdown();
             return 1;
         }

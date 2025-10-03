@@ -299,6 +299,18 @@ try
 }
 CATCH_RETURN()
 
+HRESULT STDMETHODCALLTYPE LxssUserSession::GetDistributionRuntimeId(_In_opt_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pRuntimeId)
+try
+{
+    ServiceExecutionContext context(Error);
+
+    const auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->GetDistributionRuntimeId(DistroGuid, pRuntimeId);
+}
+CATCH_RETURN()
+
 HRESULT STDMETHODCALLTYPE LxssUserSession::ImportDistributionInplace(
     _In_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid)
 try
@@ -1232,6 +1244,49 @@ try
     // Return an error if no distribution was found with a matching name.
     RETURN_HR_IF(WSL_E_DISTRO_NOT_FOUND, !distroFound);
 
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT LxssUserSessionImpl::GetDistributionRuntimeId(_In_opt_ LPCGUID DistroGuid, _Out_ GUID* pRuntimeId)
+try
+{
+    std::lock_guard lock(m_instanceLock);
+
+    // Check if a VM is currently running
+    if (m_utilityVm == nullptr)
+    {
+        return HCS_E_SERVICE_NOT_AVAILABLE;
+    }
+
+    // Get the VM Runtime ID
+    auto vmId = m_vmId.load();
+    if (IsEqualGUID(vmId, GUID_NULL))
+    {
+        return HCS_E_SERVICE_NOT_AVAILABLE;
+    }
+
+    // If a specific distribution was requested, verify it's running in this VM
+    if (DistroGuid != nullptr)
+    {
+        // Check if any running instance matches this distribution
+        bool distributionRunning = false;
+        for (const auto& [clientId, instance] : m_runningInstances)
+        {
+            if (IsEqualGUID(*DistroGuid, instance->GetDistributionId()))
+            {
+                distributionRunning = true;
+                break;
+            }
+        }
+
+        if (!distributionRunning)
+        {
+            return HCS_E_SERVICE_NOT_AVAILABLE;
+        }
+    }
+
+    *pRuntimeId = vmId;
     return S_OK;
 }
 CATCH_RETURN()
