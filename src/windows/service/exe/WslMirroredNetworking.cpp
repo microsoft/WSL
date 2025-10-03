@@ -208,11 +208,15 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessIpAddressChange()
     }
 }
 
-// Helper function to find the source address on the same subnet as the next-hop
+// Helper function to find the source address on the same subnet as the next-hop.
+// Uses longest prefix match to select the most specific matching subnet when multiple addresses match.
 static std::optional<SOCKADDR_INET> FindSourceAddressForNextHop(
     const SOCKADDR_INET& nextHop,
     const std::set<wsl::core::networking::EndpointIpAddress>& addresses)
 {
+    std::optional<SOCKADDR_INET> bestMatch;
+    unsigned char longestPrefix = 0;
+
     for (const auto& addr : addresses)
     {
         // Skip if address family doesn't match
@@ -221,59 +225,75 @@ static std::optional<SOCKADDR_INET> FindSourceAddressForNextHop(
             continue;
         }
 
-        // Check if next-hop is within the address's subnet
+        // Skip if this prefix is shorter than our best match
+        if (addr.PrefixLength <= longestPrefix)
+        {
+            continue;
+        }
+
+        bool matches = false;
+
         if (nextHop.si_family == AF_INET)
         {
-            // Create prefix mask
-            uint32_t mask = 0xFFFFFFFF;
-            if (addr.PrefixLength < 32)
+            // Handle IPv4 prefix matching with mask generation
+            uint32_t mask;
+            if (addr.PrefixLength == 0)
             {
-                mask <<= (32 - addr.PrefixLength);
+                // Match any address (0.0.0.0/0)
+                mask = 0;
+            }
+            else if (addr.PrefixLength >= 32)
+            {
+                // Exact match required
+                mask = 0xFFFFFFFF;
+            }
+            else
+            {
+                // Generate mask for prefix length (e.g., /24 -> 0xFFFFFF00)
+                mask = 0xFFFFFFFF << (32 - addr.PrefixLength);
             }
 
-            // Apply mask to both addresses (in network byte order)
-            uint32_t addrMasked = ntohl(addr.Address.Ipv4.sin_addr.S_un.S_addr) & mask;
-            uint32_t nextHopMasked = ntohl(nextHop.Ipv4.sin_addr.S_un.S_addr) & mask;
+            // Compare network portions (convert to host byte order for masking)
+            uint32_t addrNetwork = ntohl(addr.Address.Ipv4.sin_addr.S_un.S_addr) & mask;
+            uint32_t nextHopNetwork = ntohl(nextHop.Ipv4.sin_addr.S_un.S_addr) & mask;
 
-            if (addrMasked == nextHopMasked)
-            {
-                return addr.Address;
-            }
+            matches = (addrNetwork == nextHopNetwork);
         }
         else if (nextHop.si_family == AF_INET6)
         {
-            // For IPv6, compare byte by byte with prefix mask
-            bool match = true;
+            // Optimized IPv6 prefix matching using 64-bit comparisons where possible
+            matches = true;
             int remainingBits = addr.PrefixLength;
+            const uint8_t* addrBytes = addr.Address.Ipv6.sin6_addr.u.Byte;
+            const uint8_t* nextHopBytes = nextHop.Ipv6.sin6_addr.u.Byte;
 
-            for (int i = 0; i < 16 && remainingBits > 0; i++)
+            // Process full bytes first (faster than bit-by-bit)
+            int fullBytes = remainingBits / 8;
+            if (fullBytes > 0 && memcmp(addrBytes, nextHopBytes, fullBytes) != 0)
             {
-                uint8_t mask = 0xFF;
-                if (remainingBits < 8)
-                {
-                    mask <<= (8 - remainingBits);
-                }
-
-                uint8_t addrByte = addr.Address.Ipv6.sin6_addr.u.Byte[i] & mask;
-                uint8_t nextHopByte = nextHop.Ipv6.sin6_addr.u.Byte[i] & mask;
-
-                if (addrByte != nextHopByte)
-                {
-                    match = false;
-                    break;
-                }
-
-                remainingBits -= 8;
+                matches = false;
             }
-
-            if (match)
+            else if (remainingBits % 8 != 0)
             {
-                return addr.Address;
+                // Handle partial byte at the end
+                int partialBits = remainingBits % 8;
+                uint8_t mask = 0xFF << (8 - partialBits);
+                if ((addrBytes[fullBytes] & mask) != (nextHopBytes[fullBytes] & mask))
+                {
+                    matches = false;
+                }
             }
+        }
+
+        if (matches)
+        {
+            // Found a better match (longer prefix)
+            bestMatch = addr.Address;
+            longestPrefix = addr.PrefixLength;
         }
     }
 
-    return std::nullopt;
+    return bestMatch;
 }
 
 _Requires_lock_held_(m_networkLock)
