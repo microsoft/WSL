@@ -345,8 +345,7 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
                     }
 
                     // Convert content to base64 to safely pass through shell
-                    const auto contentUtf8 = wsl::shared::string::WideToMultiByte(fileSpec.Contents->c_str());
-                    const auto contentBase64 = wsl::shared::string::Base64Encode(contentUtf8);
+                    const auto contentBase64 = wsl::shared::string::Base64EncodeFromWide(fileSpec.Contents->c_str());
                     
                     // Create parent directory and decode base64 content into file
                     const auto command = std::format(
