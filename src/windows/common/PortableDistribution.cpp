@@ -390,6 +390,7 @@ void CreatePortableDistribution(
     auto vhdxPath = portablePath / vhdxFileName;
 
     // Import the distribution using WSL service
+    // We'll register it temporarily to create the VHDX, then manually clean up the registry
     wsl::windows::common::SvcComm service;
     
     wil::unique_hfile sourceFileHandle;
@@ -405,6 +406,7 @@ void CreatePortableDistribution(
     THROW_LAST_ERROR_IF(!sourceFileHandle);
 
     // Create the VHDX in the portable location
+    // The RegisterDistribution service handles tar extraction and VHDX creation
     auto [guid, name] = service.RegisterDistribution(
         distroName,
         version,
@@ -412,25 +414,29 @@ void CreatePortableDistribution(
         portablePath.c_str(),
         flags | LXSS_IMPORT_DISTRO_FLAGS_VHD);
 
-    // Mark as portable in registry
+    // Clean up the registry entry without deleting the VHDX file
+    // We do this manually to avoid the full UnregisterDistribution which would delete the VHDX
     try
     {
+        // Open the LXSS registry key
         auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-        auto distroKeyName = wsl::shared::string::GuidToString<wchar_t>(guid);
-        auto distroKey = wsl::windows::common::registry::OpenKey(lxssKey.get(), distroKeyName.c_str());
         
-        wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, c_portableFlagValue, 1);
-        wsl::windows::common::registry::WriteString(
-            distroKey.get(), 
-            nullptr, 
-            c_portableRegistryValue, 
-            portablePath.c_str());
+        // Convert GUID to string for registry key name
+        auto guidStr = wsl::windows::common::string::GuidToString<wchar_t>(guid);
+        
+        // Delete only the distribution's registry key, leaving the VHDX intact
+        wsl::windows::common::registry::DeleteKey(lxssKey.get(), guidStr.c_str());
+        
+        // Note: We intentionally do NOT call UnregisterDistribution here because
+        // it would delete the VHDX file we just created. Instead, we manually remove
+        // just the registry entry, leaving the VHDX for portable use.
     }
-    catch (...) 
+    catch (...)
     {
-        // If we can't mark as portable, unregister to avoid leaving orphaned registration
-        try { service.UnregisterDistribution(&guid); } catch (...) {}
-        throw;
+        // If cleanup fails, log but continue - the VHDX was created successfully
+        // The orphaned registry entry will be cleaned up if the user tries to use
+        // the distribution and it doesn't exist
+        LOG_CAUGHT_EXCEPTION();
     }
 
     // Create portable metadata
@@ -440,7 +446,6 @@ void CreatePortableDistribution(
     metadata.VhdxPath = vhdxFileName;
     metadata.Version = version;
     metadata.DefaultUid = 1000; // Standard default
-    metadata.Guid = guid;
     metadata.IsPortable = true;
 
     // Write metadata

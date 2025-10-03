@@ -92,6 +92,9 @@ std::optional<std::filesystem::path> GetPortableBasePath(_In_ const GUID& distro
 void ValidatePortablePath(_In_ const std::filesystem::path& path, _In_ bool allowFixed = false);
 
 // Create a new portable distribution from a tar/vhdx file
+// This function temporarily registers the distribution to extract the tar and create the VHDX,
+// then manually removes only the registry entry (not the VHDX file) to make it portable.
+// The VHDX remains on disk and can be mounted later using MountPortableDistribution.
 void CreatePortableDistribution(
     _In_ const std::filesystem::path& portablePath,
     _In_ LPCWSTR distroName,
