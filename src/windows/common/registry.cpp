@@ -448,7 +448,7 @@ std::vector<std::wstring> wsl::windows::common::registry::ReadWideStringSet(
     // Allocate a buffer to hold the value and two NULL terminators.
     //
 
-    std::vector<WCHAR> Buffer(Size + 2);
+    std::vector<WCHAR> Buffer((Size / sizeof(WCHAR)) + 2);
 
     //
     // Read the value.
