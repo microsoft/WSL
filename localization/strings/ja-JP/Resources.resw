@@ -1114,7 +1114,7 @@ WSL を修復するには任意のキーを押すか、取り消すには CTRL-C
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>スパース VHD のサポートは、データの破損の可能性があるため、現在無効になっています。
 ディストリビューションでスパース VHD を強制的に使用するには、次を実行してください。
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

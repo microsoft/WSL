@@ -1115,7 +1115,7 @@
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Поддержка разреженного VHD в настоящее время отключена из-за возможного повреждения данных.
 Чтобы принудительно использовать разреженный VHD в дистрибутиве, выполните команду:
-wsl.exe --manage &lt;имя_дистрибутива&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
