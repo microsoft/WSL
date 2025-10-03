@@ -225,7 +225,11 @@ void MergeDistributionLists(DistributionList& target, const DistributionList& so
         {
             // Check if distribution already exists (avoid duplicates)
             auto it = std::find_if(target.Distributions->begin(), target.Distributions->end(),
-                [&](const Distribution& d) { return d.Name == dist.Name; });
+                [&](const Distribution& d) {
+                    return d.Name == dist.Name
+                        && d.Version == dist.Version
+                        && d.Architecture == dist.Architecture;
+                });
             
             if (it == target.Distributions->end())
             {
