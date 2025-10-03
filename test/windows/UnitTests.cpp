@@ -5337,7 +5337,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 for (size_t i = 0; i < expected.size(); i++)
                 {
                     auto end = lines[i + 4].find_first_of(L" \t");
-                    VERIFY_ARE_NOT_EQUAL(end, std::string::npos);
+                    VERIFY_ARE_NOT_EQUAL(end, std::wstring::npos);
 
                     auto distro = lines[i + 4].substr(0, end);
 
