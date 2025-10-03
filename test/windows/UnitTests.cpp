@@ -5383,7 +5383,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         ],
         "distro1": [
             {
-                "Name": "distro2",
+                "Name": "distro1",
                 "FriendlyName": "distro1Name",
                 "Amd64Url": {"Url": "","Sha256": ""}
             }
