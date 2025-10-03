@@ -412,12 +412,26 @@ void CreatePortableDistribution(
         portablePath.c_str(),
         flags | LXSS_IMPORT_DISTRO_FLAGS_VHD);
 
-    // Unregister immediately as we only wanted to create the VHDX
+    // Mark as portable in registry
     try
     {
-        service.UnregisterDistribution(&guid);
+        auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
+        auto distroKeyName = wsl::shared::string::GuidToString<wchar_t>(guid);
+        auto distroKey = wsl::windows::common::registry::OpenKey(lxssKey.get(), distroKeyName.c_str());
+        
+        wsl::windows::common::registry::WriteDword(distroKey.get(), nullptr, c_portableFlagValue, 1);
+        wsl::windows::common::registry::WriteString(
+            distroKey.get(), 
+            nullptr, 
+            c_portableRegistryValue, 
+            portablePath.c_str());
     }
-    catch (...) {}
+    catch (...) 
+    {
+        // If we can't mark as portable, unregister to avoid leaving orphaned registration
+        try { service.UnregisterDistribution(&guid); } catch (...) {}
+        throw;
+    }
 
     // Create portable metadata
     PortableDistributionMetadata metadata;
@@ -426,6 +440,7 @@ void CreatePortableDistribution(
     metadata.VhdxPath = vhdxFileName;
     metadata.Version = version;
     metadata.DefaultUid = 1000; // Standard default
+    metadata.Guid = guid;
     metadata.IsPortable = true;
 
     // Write metadata
