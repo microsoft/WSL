@@ -266,14 +266,169 @@ HRESULT UsbService::ProcessUrbRequest(
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
 
-    // Process URB (simplified - real implementation would use IOCTL_INTERNAL_USB_SUBMIT_URB)
-    // For production, this would forward URBs to the USB device
-    DWORD bytesReturned = 0;
+    // Allocate URB buffer - use maximum size to accommodate all URB types
+    std::vector<uint8_t> urbBuffer(sizeof(struct _URB_CONTROL_TRANSFER_EX));
+    struct _URB_HEADER* urbHeader = reinterpret_cast<struct _URB_HEADER*>(urbBuffer.data());
+    
+    // Allocate transfer buffer
     responseData.resize(request.TransferBufferLength);
 
-    // Placeholder for actual URB processing
-    response.Status = ERROR_SUCCESS;
-    response.TransferredLength = 0;
+    // Build URB based on function code
+    switch (request.Function)
+    {
+        case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
+        {
+            auto* urb = reinterpret_cast<struct _URB_BULK_OR_INTERRUPT_TRANSFER*>(urbBuffer.data());
+            urb->Hdr.Length = sizeof(struct _URB_BULK_OR_INTERRUPT_TRANSFER);
+            urb->Hdr.Function = URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER;
+            urb->PipeHandle = reinterpret_cast<USBD_PIPE_HANDLE>(static_cast<ULONG_PTR>(request.Endpoint));
+            urb->TransferFlags = request.Flags;
+            urb->TransferBufferLength = request.TransferBufferLength;
+            urb->TransferBuffer = responseData.data();
+            urb->TransferBufferMDL = nullptr;
+            urb->UrbLink = nullptr;
+            break;
+        }
+
+        case URB_FUNCTION_CONTROL_TRANSFER:
+        case URB_FUNCTION_CONTROL_TRANSFER_EX:
+        {
+            auto* urb = reinterpret_cast<struct _URB_CONTROL_TRANSFER*>(urbBuffer.data());
+            urb->Hdr.Length = sizeof(struct _URB_CONTROL_TRANSFER);
+            urb->Hdr.Function = request.Function;
+            urb->PipeHandle = reinterpret_cast<USBD_PIPE_HANDLE>(static_cast<ULONG_PTR>(request.Endpoint));
+            urb->TransferFlags = request.Flags;
+            urb->TransferBufferLength = request.TransferBufferLength;
+            urb->TransferBuffer = responseData.data();
+            urb->TransferBufferMDL = nullptr;
+            urb->UrbLink = nullptr;
+            // Setup packet would be extracted from request payload
+            ZeroMemory(&urb->SetupPacket, sizeof(urb->SetupPacket));
+            break;
+        }
+
+        case URB_FUNCTION_ISOCH_TRANSFER:
+        {
+            auto* urb = reinterpret_cast<struct _URB_ISOCH_TRANSFER*>(urbBuffer.data());
+            urb->Hdr.Length = sizeof(struct _URB_ISOCH_TRANSFER);
+            urb->Hdr.Function = URB_FUNCTION_ISOCH_TRANSFER;
+            urb->PipeHandle = reinterpret_cast<USBD_PIPE_HANDLE>(static_cast<ULONG_PTR>(request.Endpoint));
+            urb->TransferFlags = request.Flags;
+            urb->TransferBufferLength = request.TransferBufferLength;
+            urb->TransferBuffer = responseData.data();
+            urb->TransferBufferMDL = nullptr;
+            urb->UrbLink = nullptr;
+            urb->NumberOfPackets = 0; // Would be extracted from request
+            break;
+        }
+
+        case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
+        case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
+        case URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT:
+        {
+            auto* urb = reinterpret_cast<struct _URB_CONTROL_DESCRIPTOR_REQUEST*>(urbBuffer.data());
+            urb->Hdr.Length = sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST);
+            urb->Hdr.Function = request.Function;
+            urb->TransferBufferLength = request.TransferBufferLength;
+            urb->TransferBuffer = responseData.data();
+            urb->TransferBufferMDL = nullptr;
+            urb->UrbLink = nullptr;
+            // Descriptor type, index, language ID would be extracted from request
+            urb->Index = 0;
+            urb->DescriptorType = 0;
+            urb->LanguageId = 0;
+            break;
+        }
+
+        case URB_FUNCTION_SELECT_CONFIGURATION:
+        {
+            auto* urb = reinterpret_cast<struct _URB_SELECT_CONFIGURATION*>(urbBuffer.data());
+            urb->Hdr.Length = sizeof(struct _URB_SELECT_CONFIGURATION);
+            urb->Hdr.Function = URB_FUNCTION_SELECT_CONFIGURATION;
+            urb->ConfigurationDescriptor = nullptr; // Would point to config descriptor
+            urb->UrbLink = nullptr;
+            break;
+        }
+
+        case URB_FUNCTION_SELECT_INTERFACE:
+        {
+            auto* urb = reinterpret_cast<struct _URB_SELECT_INTERFACE*>(urbBuffer.data());
+            urb->Hdr.Length = sizeof(struct _URB_SELECT_INTERFACE);
+            urb->Hdr.Function = URB_FUNCTION_SELECT_INTERFACE;
+            urb->ConfigurationHandle = nullptr; // Would be extracted from request
+            urb->UrbLink = nullptr;
+            break;
+        }
+
+        case URB_FUNCTION_ABORT_PIPE:
+        case URB_FUNCTION_RESET_PIPE:
+        {
+            auto* urb = reinterpret_cast<struct _URB_PIPE_REQUEST*>(urbBuffer.data());
+            urb->Hdr.Length = sizeof(struct _URB_PIPE_REQUEST);
+            urb->Hdr.Function = request.Function;
+            urb->PipeHandle = reinterpret_cast<USBD_PIPE_HANDLE>(static_cast<ULONG_PTR>(request.Endpoint));
+            urb->Reserved = 0;
+            break;
+        }
+
+        default:
+            response.Status = ERROR_NOT_SUPPORTED;
+            response.TransferredLength = 0;
+            return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+    }
+
+    // Submit URB to USB device via IOCTL
+    DWORD bytesReturned = 0;
+    BOOL success = DeviceIoControl(
+        it->DeviceHandle.get(),
+        IOCTL_INTERNAL_USB_SUBMIT_URB,
+        urbBuffer.data(),
+        static_cast<DWORD>(urbBuffer.size()),
+        urbBuffer.data(),
+        static_cast<DWORD>(urbBuffer.size()),
+        &bytesReturned,
+        nullptr);
+
+    if (!success)
+    {
+        DWORD error = GetLastError();
+        response.Status = error;
+        response.TransferredLength = 0;
+        responseData.clear();
+        return HRESULT_FROM_WIN32(error);
+    }
+
+    // Extract results from URB based on function
+    USBD_STATUS usbStatus = urbHeader->Status;
+    response.Status = USBD_SUCCESS(usbStatus) ? ERROR_SUCCESS : ERROR_GEN_FAILURE;
+
+    // Get transferred length based on URB type
+    if (request.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER ||
+        request.Function == URB_FUNCTION_CONTROL_TRANSFER ||
+        request.Function == URB_FUNCTION_CONTROL_TRANSFER_EX)
+    {
+        auto* urb = reinterpret_cast<struct _URB_BULK_OR_INTERRUPT_TRANSFER*>(urbBuffer.data());
+        response.TransferredLength = urb->TransferBufferLength;
+    }
+    else if (request.Function == URB_FUNCTION_ISOCH_TRANSFER)
+    {
+        auto* urb = reinterpret_cast<struct _URB_ISOCH_TRANSFER*>(urbBuffer.data());
+        response.TransferredLength = urb->TransferBufferLength;
+    }
+    else
+    {
+        response.TransferredLength = 0;
+    }
+
+    // Resize response data to actual transferred length
+    if (response.TransferredLength > 0 && (request.Flags & USBD_TRANSFER_DIRECTION_IN))
+    {
+        responseData.resize(response.TransferredLength);
+    }
+    else
+    {
+        responseData.clear();
+    }
 
     return S_OK;
 }

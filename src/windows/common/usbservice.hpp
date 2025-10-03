@@ -20,6 +20,8 @@ Abstract:
 #include <usbiodef.h>
 #include <usb.h>
 #include <usbioctl.h>
+#include <usb200.h>
+#include <usbspec.h>
 #include <wil/resource.h>
 #include <vector>
 #include <string>
