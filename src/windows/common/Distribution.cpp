@@ -210,34 +210,149 @@ std::optional<TDistribution> LookupDistributionInManifest(const DistributionList
     return *it;
 }
 
+// Helper function to merge distributions from multiple manifests
+void MergeDistributionLists(DistributionList& target, const DistributionList& source)
+{
+    // Merge legacy distributions
+    if (source.Distributions.has_value())
+    {
+        if (!target.Distributions.has_value())
+        {
+            target.Distributions = std::vector<Distribution>{};
+        }
+        
+        for (const auto& dist : *source.Distributions)
+        {
+            // Check if distribution already exists (avoid duplicates)
+            auto it = std::find_if(target.Distributions->begin(), target.Distributions->end(),
+                [&](const Distribution& d) { return d.Name == dist.Name; });
+            
+            if (it == target.Distributions->end())
+            {
+                target.Distributions->push_back(dist);
+            }
+        }
+    }
+
+    // Merge modern distributions
+    if (source.ModernDistributions.has_value())
+    {
+        if (!target.ModernDistributions.has_value())
+        {
+            target.ModernDistributions = std::map<std::string, std::vector<ModernDistributionVersion>>{};
+        }
+
+        for (const auto& [distroName, versions] : *source.ModernDistributions)
+        {
+            auto& targetVersions = (*target.ModernDistributions)[distroName];
+            
+            for (const auto& version : versions)
+            {
+                // Check if version already exists
+                auto it = std::find_if(targetVersions.begin(), targetVersions.end(),
+                    [&](const ModernDistributionVersion& v) { return v.Name == version.Name; });
+                
+                if (it == targetVersions.end())
+                {
+                    targetVersions.push_back(version);
+                }
+            }
+        }
+    }
+
+    // Update default if source has one and target doesn't
+    if (source.Default.has_value() && !target.Default.has_value())
+    {
+        target.Default = source.Default;
+    }
+}
+
 } // namespace
 
 AvailableDistributions wsl::windows::common::distribution::GetAvailable()
 {
     AvailableDistributions distributions{};
 
+    // Determine the base manifest URL
+    // Priority: HKCU > HKLM > Default
     std::wstring url = c_defaultDistroListUrl;
-    std::optional<std::wstring> appendUrl;
+    std::vector<std::wstring> appendUrls;
+
     try
     {
-        const auto registryKey = registry::OpenLxssMachineKey();
-        url = registry::ReadString(registryKey.get(), nullptr, c_distroUrlRegistryValue, c_defaultDistroListUrl);
+        // First check HKEY_LOCAL_MACHINE
+        const auto machineKey = registry::OpenLxssMachineKey();
+        url = registry::ReadString(machineKey.get(), nullptr, c_distroUrlRegistryValue, c_defaultDistroListUrl);
+        
+        // Read HKLM append URLs (supports REG_MULTI_SZ)
+        auto hklmAppendUrls = registry::ReadWideStringSet(machineKey.get(), nullptr, c_distroUrlAppendRegistryValue, {});
+        appendUrls.insert(appendUrls.end(), hklmAppendUrls.begin(), hklmAppendUrls.end());
+        
         if (url != c_defaultDistroListUrl)
         {
-            WSL_LOG("Found custom URL for distribution list", TraceLoggingValue(url.c_str(), "url"));
+            WSL_LOG("Found custom URL for distribution list in HKLM", TraceLoggingValue(url.c_str(), "url"));
         }
-
-        appendUrl = registry::ReadOptionalString(registryKey.get(), nullptr, c_distroUrlAppendRegistryValue);
+        
+        if (!appendUrls.empty())
+        {
+            WSL_LOG("Found append URLs in HKLM", TraceLoggingValue(static_cast<UINT32>(appendUrls.size()), "count"));
+        }
     }
     CATCH_LOG()
 
+    try
+    {
+        // Then check HKEY_CURRENT_USER (takes precedence)
+        const auto userKey = registry::OpenLxssUserKey();
+        
+        // Check if user has overridden the base URL
+        auto userUrl = registry::ReadOptionalString(userKey.get(), nullptr, c_distroUrlRegistryValue);
+        if (userUrl.has_value())
+        {
+            url = userUrl.value();
+            WSL_LOG("Found custom URL for distribution list in HKCU (overriding)", TraceLoggingValue(url.c_str(), "url"));
+        }
+        
+        // Read HKCU append URLs (supports REG_MULTI_SZ) - these are added to HKLM append URLs
+        auto hkcuAppendUrls = registry::ReadWideStringSet(userKey.get(), nullptr, c_distroUrlAppendRegistryValue, {});
+        appendUrls.insert(appendUrls.end(), hkcuAppendUrls.begin(), hkcuAppendUrls.end());
+        
+        if (!hkcuAppendUrls.empty())
+        {
+            WSL_LOG("Found append URLs in HKCU", TraceLoggingValue(static_cast<UINT32>(hkcuAppendUrls.size()), "count"));
+        }
+    }
+    CATCH_LOG()
+
+    // Load the base manifest
     distributions.Manifest = ReadFromManifest(url);
 
-    if (appendUrl.has_value())
+    // Load and merge all append manifests
+    if (!appendUrls.empty())
     {
-        WSL_LOG("Found append URL for distribution list", TraceLoggingValue(appendUrl->c_str(), "url"));
-
-        distributions.OverrideManifest = ReadFromManifest(appendUrl.value());
+        for (const auto& appendUrl : appendUrls)
+        {
+            try
+            {
+                WSL_LOG("Loading append manifest", TraceLoggingValue(appendUrl.c_str(), "url"));
+                auto appendManifest = ReadFromManifest(appendUrl);
+                
+                // Merge into override manifest if it exists, otherwise create it
+                if (!distributions.OverrideManifest.has_value())
+                {
+                    distributions.OverrideManifest = appendManifest;
+                }
+                else
+                {
+                    MergeDistributionLists(*distributions.OverrideManifest, appendManifest);
+                }
+            }
+            catch (...)
+            {
+                // Log the error but continue with other sources
+                LOG_CAUGHT_EXCEPTION_MSG("Failed to load append manifest from %ls", appendUrl.c_str());
+            }
+        }
     }
 
     return distributions;

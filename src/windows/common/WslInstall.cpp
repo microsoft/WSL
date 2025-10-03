@@ -324,5 +324,106 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
         fixedVhd ? LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD : 0,
         vhdSize);
 
+    // Inject files if specified in the distribution metadata
+    if (downloadInfo->Files.has_value() && !downloadInfo->Files->empty())
+    {
+        try
+        {
+            PrintMessage(L"Injecting configuration files...", stdout);
+            
+            for (const auto& [targetPath, fileSpec] : *downloadInfo->Files)
+            {
+                const auto targetPathWide = wsl::shared::string::MultiByteToWide(targetPath);
+                
+                if (wsl::windows::common::string::IsEqual(fileSpec.Source, L"inline", true))
+                {
+                    // Inline content - write directly using base64 encoding to avoid shell escaping issues
+                    if (!fileSpec.Contents.has_value())
+                    {
+                        LOG_HR_MSG(E_INVALIDARG, "Inline file source specified but no contents provided for %s", targetPath.c_str());
+                        continue;
+                    }
+
+                    // Convert content to base64 to safely pass through shell
+                    const auto contentUtf8 = wsl::shared::string::WideToMultiByte(fileSpec.Contents->c_str());
+                    const auto contentBase64 = wsl::shared::string::Base64Encode(contentUtf8);
+                    
+                    // Create parent directory and decode base64 content into file
+                    const auto command = std::format(
+                        L"/bin/sh -c \"mkdir -p $(dirname '{}') && echo '{}' | base64 -d > '{}'\"",
+                        targetPathWide,
+                        wsl::shared::string::MultiByteToWide(contentBase64),
+                        targetPathWide);
+                    
+                    LPCWSTR argv[] = {L"/bin/sh", L"-c", command.c_str()};
+                    const auto exitCode = service.LaunchProcess(&id, L"/bin/sh", 3, argv, LXSS_LAUNCH_FLAGS_NONE, nullptr, nullptr, 30000);
+                    
+                    if (exitCode != 0)
+                    {
+                        LOG_HR_MSG(E_FAIL, "Failed to inject inline file %s, exit code: %d", targetPath.c_str(), exitCode);
+                    }
+                }
+                else if (wsl::windows::common::string::IsEqual(fileSpec.Source, L"url", true))
+                {
+                    // URL-based file - download and inject
+                    if (!fileSpec.Url.has_value() || !fileSpec.Sha256.has_value())
+                    {
+                        LOG_HR_MSG(E_INVALIDARG, "URL file source specified but no URL or SHA256 provided for %s", targetPath.c_str());
+                        continue;
+                    }
+
+                    // Download file to temp location
+                    const auto tempFileName = std::format(L"injected_file_{}.tmp", std::hash<std::wstring>{}(*fileSpec.Url));
+                    const auto tempFilePath = DownloadFile(*fileSpec.Url, tempFileName);
+                    
+                    // Verify hash
+                    wil::unique_handle tempFile{CreateFile(tempFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)};
+                    if (tempFile)
+                    {
+                        try
+                        {
+                            EnforceFileHash(tempFile.get(), *fileSpec.Sha256);
+                            tempFile.reset();
+                            
+                            // Read file content and inject (using base64 for safety)
+                            const auto fileContent = wsl::shared::string::ReadFile<char, char>(tempFilePath.c_str());
+                            const auto contentBase64 = wsl::shared::string::Base64Encode(fileContent);
+                            
+                            const auto command = std::format(
+                                L"/bin/sh -c \"mkdir -p $(dirname '{}') && echo '{}' | base64 -d > '{}'\"",
+                                targetPathWide,
+                                wsl::shared::string::MultiByteToWide(contentBase64),
+                                targetPathWide);
+                            
+                            LPCWSTR argv[] = {L"/bin/sh", L"-c", command.c_str()};
+                            const auto exitCode = service.LaunchProcess(&id, L"/bin/sh", 3, argv, LXSS_LAUNCH_FLAGS_NONE, nullptr, nullptr, 30000);
+                            
+                            if (exitCode != 0)
+                            {
+                                LOG_HR_MSG(E_FAIL, "Failed to inject URL-based file %s, exit code: %d", targetPath.c_str(), exitCode);
+                            }
+                        }
+                        catch (...)
+                        {
+                            LOG_CAUGHT_EXCEPTION_MSG("Failed to inject file from URL for %s", targetPath.c_str());
+                        }
+                        
+                        // Clean up temp file
+                        DeleteFileW(tempFilePath.c_str());
+                    }
+                }
+                else
+                {
+                    LOG_HR_MSG(E_INVALIDARG, "Unknown file source type: %ls for %s", fileSpec.Source.c_str(), targetPath.c_str());
+                }
+            }
+        }
+        catch (...)
+        {
+            // Log but don't fail installation if file injection fails
+            LOG_CAUGHT_EXCEPTION_MSG("File injection failed, but installation will continue");
+        }
+    }
+
     return {installedName.get(), id};
 }

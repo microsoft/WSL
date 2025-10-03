@@ -426,6 +426,50 @@ std::vector<std::string> wsl::windows::common::registry::ReadStringSet(
     return Values;
 }
 
+std::vector<std::wstring> wsl::windows::common::registry::ReadWideStringSet(
+    _In_ HKEY Key, _In_opt_ LPCWSTR KeyName, _In_opt_ LPCWSTR ValueName, const std::vector<std::wstring>& Default)
+{
+    //
+    // Detect if the key exists and determine how large of a buffer is needed.
+    // If the key does not exist, return the default value.
+    //
+
+    LONG Result;
+    DWORD Size = 0;
+    Result = RegGetValueW(Key, KeyName, ValueName, RRF_RT_REG_MULTI_SZ, nullptr, nullptr, &Size);
+    if ((Result == ERROR_PATH_NOT_FOUND) || (Result == ERROR_FILE_NOT_FOUND) || (Size == 0))
+    {
+        return Default;
+    }
+
+    ReportErrorIfFailed(Result, Key, KeyName, ValueName);
+
+    //
+    // Allocate a buffer to hold the value and two NULL terminators.
+    //
+
+    std::vector<WCHAR> Buffer(Size + 2);
+
+    //
+    // Read the value.
+    //
+
+    Result = RegGetValueW(Key, KeyName, ValueName, RRF_RT_REG_MULTI_SZ, nullptr, Buffer.data(), &Size);
+    ReportErrorIfFailed(Result, Key, KeyName, ValueName);
+
+    //
+    // Convert the reg value into a vector of wide strings.
+    //
+
+    std::vector<std::wstring> Values{};
+    for (auto Current = Buffer.data(); UNICODE_NULL != *Current; Current += wcslen(Current) + 1)
+    {
+        Values.push_back(Current);
+    }
+
+    return Values;
+}
+
 void wsl::windows::common::registry::WriteDword(_In_ HKEY Key, _In_ LPCWSTR SubKey, _In_ LPCWSTR ValueName, _In_ DWORD Value)
 {
     const auto Result = RegSetKeyValueW(Key, SubKey, ValueName, REG_DWORD, &Value, sizeof(Value));
