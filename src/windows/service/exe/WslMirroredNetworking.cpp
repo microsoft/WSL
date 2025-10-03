@@ -261,7 +261,7 @@ static std::optional<SOCKADDR_INET> FindSourceAddressForNextHop(
         }
         else if (nextHop.si_family == AF_INET6)
         {
-            // Optimized IPv6 prefix matching using 64-bit comparisons where possible
+            // Optimized IPv6 prefix matching using byte-by-byte comparison with memcmp and partial byte masking
             matches = true;
             int remainingBits = addr.PrefixLength;
             const uint8_t* addrBytes = addr.Address.Ipv6.sin6_addr.u.Byte;
