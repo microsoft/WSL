@@ -4340,6 +4340,9 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             // Validate that the folder name matches the instance name (not a GUID)
             VERIFY_ARE_EQUAL(std::filesystem::path(basePath).filename().wstring(), L"test-overridden-default-location");
 
+            // Validate that the folder name matches the instance name (not a GUID)
+            VERIFY_ARE_EQUAL(std::filesystem::path(basePath).filename().wstring(), L"test-overridden-default-location");
+
             ValidateDistributionShortcut(L"test-overridden-default-location", nullptr);
 
             cleanup.reset();
@@ -4351,44 +4354,26 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
         // Distribution with overridden default location but without explicit name (should use GUID)
         {
+            constexpr auto distroName = L"test-guid-folder";
+            
             auto cleanup = wil::scope_exit_log(
-                WI_DIAGNOSTICS_INFO, []() {
-                    auto distros = wsl::windows::common::SvcComm().EnumerateDistributions();
-                    for (const auto& distro : distros)
-                    {
-                        auto name = distro.DistributionName.get();
-                        if (wcsstr(name, L"Ubuntu") != nullptr)
-                        {
-                            std::wstring cmd = std::wstring(L"--unregister ") + name;
-                            LxsstuLaunchWsl(cmd.c_str());
-                            break;
-                        }
-                    }
+                WI_DIAGNOSTICS_INFO, [&]() {
+                    LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                    DeleteFile(L"test-guid-folder.tar");
                 });
 
             auto currentPath = std::filesystem::current_path();
             WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
 
-            // Install without --name, so the distribution name will be auto-generated
-            InstallFromTar(g_testDistroPath.c_str(), L"");
+            // Create a tar with a default name, then install without --name
+            CreateTarFromManifest(std::format(L"[oobe]\ndefaultName = {}", distroName).c_str(), L"test-guid-folder.tar");
             
-            // Find the installed distribution
-            auto distros = wsl::windows::common::SvcComm().EnumerateDistributions();
-            std::wstring installedName;
-            for (const auto& distro : distros)
-            {
-                auto name = distro.DistributionName.get();
-                if (wcsstr(name, L"Ubuntu") != nullptr)
-                {
-                    installedName = name;
-                    break;
-                }
-            }
+            // Install without --name, so the folder should use a GUID despite having a default name
+            InstallFromTar(L"test-guid-folder.tar", L"");
+            
+            ValidateDistributionStarts(distroName);
 
-            VERIFY_IS_FALSE(installedName.empty());
-            ValidateDistributionStarts(installedName.c_str());
-
-            auto distroKey = OpenDistributionKey(installedName.c_str());
+            auto distroKey = OpenDistributionKey(distroName);
             VERIFY_IS_TRUE(!!distroKey);
 
             auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
@@ -4398,11 +4383,12 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             VERIFY_ARE_EQUAL(std::filesystem::path(basePath).parent_path().string(), currentPath.string());
 
             // Validate that the folder name is a GUID (since no --name was provided)
-            auto folderName = std::filesystem::path(basePath).filename().wstring();
-            // A GUID has the format {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} (38 chars)
-            VERIFY_ARE_EQUAL(folderName.length(), static_cast<size_t>(38));
-            VERIFY_ARE_EQUAL(folderName[0], L'{');
-            VERIFY_ARE_EQUAL(folderName[37], L'}');
+            // The GUID should match the distribution ID
+            wsl::windows::common::SvcComm service;
+            auto distroGuid = service.GetDistributionId(distroName);
+            auto expectedFolderName = wsl::shared::string::GuidToString<wchar_t>(distroGuid);
+            auto actualFolderName = std::filesystem::path(basePath).filename().wstring();
+            VERIFY_ARE_EQUAL(expectedFolderName, actualFolderName);
 
             cleanup.reset();
 
