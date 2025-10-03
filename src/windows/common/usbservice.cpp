@@ -233,6 +233,46 @@ HRESULT UsbService::AttachDevice(_In_ const std::string& instanceId, _In_ wil::u
     wil::unique_hfile deviceHandle;
     RETURN_IF_FAILED(OpenUsbDevice(instanceId, deviceHandle));
 
+    // Get device info to send to Linux
+    UsbDeviceInfo deviceInfo = {};
+    
+    // Enumerate to get device details
+    wil::unique_hdevinfo deviceInfoSet(SetupDiGetClassDevs(
+        &GUID_DEVINTERFACE_USB_DEVICE,
+        nullptr,
+        nullptr,
+        DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
+    
+    if (deviceInfoSet)
+    {
+        SP_DEVINFO_DATA devInfoData{};
+        devInfoData.cbSize = sizeof(devInfoData);
+        
+        for (DWORD i = 0; SetupDiEnumDeviceInfo(deviceInfoSet.get(), i, &devInfoData); i++)
+        {
+            DWORD requiredSize = 0;
+            CM_Get_Device_ID_Size(&requiredSize, devInfoData.DevInst, 0);
+            std::vector<wchar_t> deviceId(requiredSize + 1);
+            
+            if (CM_Get_Device_ID(devInfoData.DevInst, deviceId.data(), requiredSize + 1, 0) == CR_SUCCESS)
+            {
+                std::string narrowDeviceId;
+                int size = WideCharToMultiByte(CP_UTF8, 0, deviceId.data(), -1, nullptr, 0, nullptr, nullptr);
+                if (size > 0)
+                {
+                    narrowDeviceId.resize(size - 1);
+                    WideCharToMultiByte(CP_UTF8, 0, deviceId.data(), -1, &narrowDeviceId[0], size, nullptr, nullptr);
+                }
+                
+                if (narrowDeviceId == instanceId)
+                {
+                    GetDeviceInfo(deviceInfoSet.get(), &devInfoData, deviceInfo);
+                    break;
+                }
+            }
+        }
+    }
+
     // Create attached device structure
     auto device = std::make_unique<AttachedDevice>();
     device->InstanceId = instanceId;
@@ -241,7 +281,44 @@ HRESULT UsbService::AttachDevice(_In_ const std::string& instanceId, _In_ wil::u
     device->StopRequested.store(false);
     device->Service = this;  // Set back-pointer to service
 
+    // Send attach message to Linux BEFORE starting the message thread
+    // This notifies Linux to create the virtual USB device
+    UsbAttachRequest attachRequest = {};
+    strncpy_s(attachRequest.InstanceId, sizeof(attachRequest.InstanceId), instanceId.c_str(), _TRUNCATE);
+    
+    HRESULT hr = SendUsbMessage(
+        device->Socket.get(),
+        UsbMessageType::DeviceAttach,
+        &attachRequest,
+        sizeof(attachRequest),
+        GetNextSequenceNumber());
+    
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    // Wait for attach response from Linux
+    UsbMessageHeader responseHeader;
+    std::vector<uint8_t> responsePayload;
+    hr = ReceiveUsbMessage(device->Socket.get(), responseHeader, responsePayload);
+    
+    if (FAILED(hr) || responseHeader.Type != UsbMessageType::DeviceAttach)
+    {
+        return FAILED(hr) ? hr : E_FAIL;
+    }
+    
+    if (responsePayload.size() >= sizeof(UsbAttachResponse))
+    {
+        UsbAttachResponse* attachResponse = reinterpret_cast<UsbAttachResponse*>(responsePayload.data());
+        if (attachResponse->Status != 0)
+        {
+            return HRESULT_FROM_WIN32(attachResponse->Status);
+        }
+    }
+
     // Start message processing thread for this device
+    // This thread will handle URB requests coming FROM Linux
     device->MessageThread.reset(CreateThread(
         nullptr,
         0,
