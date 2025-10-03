@@ -116,7 +116,7 @@ struct UsbUrbResponse {
 class UsbService {
 public:
     UsbService() = default;
-    ~UsbService() = default;
+    ~UsbService();
 
     // Initialize the USB service
     HRESULT Initialize();
@@ -127,14 +127,14 @@ public:
     // Enumerate all USB devices
     std::vector<UsbDeviceInfo> EnumerateDevices();
 
-    // Attach a USB device for passthrough
-    HRESULT AttachDevice(_In_ const std::string& instanceId, _In_ SOCKET hvSocket);
+    // Attach a USB device for passthrough (takes ownership of socket)
+    HRESULT AttachDevice(_In_ const std::string& instanceId, _In_ wil::unique_socket hvSocket);
 
     // Detach a USB device
     HRESULT DetachDevice(_In_ const std::string& instanceId);
 
     // Process URB requests from the guest
-    HRESULT ProcessUrbRequest(_In_ const UsbUrbRequest& request, _Out_ UsbUrbResponse& response, _Out_ std::vector<uint8_t>& responseData);
+    HRESULT ProcessUrbRequest(_In_ SOCKET socket, _In_ const std::string& instanceId, _In_ const UsbUrbRequest& request, _Out_ UsbUrbResponse& response, _Out_ std::vector<uint8_t>& responseData);
 
     // Check if a device is currently attached
     bool IsDeviceAttached(_In_ const std::string& instanceId) const;
@@ -146,17 +146,28 @@ private:
     struct AttachedDevice {
         std::string InstanceId;
         wil::unique_hfile DeviceHandle;
-        SOCKET Socket;
+        wil::unique_socket Socket;
+        wil::unique_handle MessageThread;
+        std::atomic<bool> StopRequested{false};
+        UsbService* Service{nullptr};  // Pointer back to service for callbacks
     };
 
-    std::vector<AttachedDevice> m_attachedDevices;
+    std::vector<std::unique_ptr<AttachedDevice>> m_attachedDevices;
     wil::critical_section m_lock;
     std::atomic<uint32_t> m_sequenceNumber{0};
+    std::atomic<bool> m_initialized{false};
 
     // Internal helpers
     HRESULT GetDeviceInfo(_In_ HDEVINFO deviceInfoSet, _In_ PSP_DEVINFO_DATA deviceInfoData, _Out_ UsbDeviceInfo& info);
     HRESULT OpenUsbDevice(_In_ const std::string& instanceId, _Out_ wil::unique_hfile& handle);
     HRESULT SendUrbToDevice(_In_ HANDLE deviceHandle, _In_ const UsbUrbRequest& request, _In_ const std::vector<uint8_t>& requestData, _Out_ UsbUrbResponse& response, _Out_ std::vector<uint8_t>& responseData);
+    
+    // Message loop for attached device
+    static DWORD WINAPI DeviceMessageThreadProc(_In_ LPVOID parameter);
+    void DeviceMessageLoop(_In_ AttachedDevice* device);
+    
+    // Find attached device by instance ID
+    AttachedDevice* FindAttachedDevice(_In_ const std::string& instanceId);
 };
 
 // Protocol helper functions

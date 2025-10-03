@@ -25,14 +25,38 @@ Abstract:
 
 namespace wsl::windows::common::usb {
 
+UsbService::~UsbService()
+{
+    Shutdown();
+}
+
 HRESULT UsbService::Initialize()
 {
+    m_initialized.store(true);
     return S_OK;
 }
 
 void UsbService::Shutdown()
 {
+    m_initialized.store(false);
+    
     auto lock = m_lock.lock();
+    
+    // Stop all device message threads
+    for (auto& device : m_attachedDevices)
+    {
+        device->StopRequested.store(true);
+        
+        // Close socket to unblock recv() in message loop
+        device->Socket.reset();
+        
+        // Wait for thread to exit
+        if (device->MessageThread)
+        {
+            WaitForSingleObject(device->MessageThread.get(), 5000);
+        }
+    }
+    
     m_attachedDevices.clear();
 }
 
@@ -195,7 +219,7 @@ HRESULT UsbService::OpenUsbDevice(_In_ const std::string& instanceId, _Out_ wil:
     return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
 }
 
-HRESULT UsbService::AttachDevice(_In_ const std::string& instanceId, _In_ SOCKET hvSocket)
+HRESULT UsbService::AttachDevice(_In_ const std::string& instanceId, _In_ wil::unique_socket hvSocket)
 {
     auto lock = m_lock.lock();
 
@@ -209,57 +233,102 @@ HRESULT UsbService::AttachDevice(_In_ const std::string& instanceId, _In_ SOCKET
     wil::unique_hfile deviceHandle;
     RETURN_IF_FAILED(OpenUsbDevice(instanceId, deviceHandle));
 
-    // Add to attached devices list
-    AttachedDevice attached;
-    attached.InstanceId = instanceId;
-    attached.DeviceHandle = std::move(deviceHandle);
-    attached.Socket = hvSocket;
+    // Create attached device structure
+    auto device = std::make_unique<AttachedDevice>();
+    device->InstanceId = instanceId;
+    device->DeviceHandle = std::move(deviceHandle);
+    device->Socket = std::move(hvSocket);  // Take ownership of socket
+    device->StopRequested.store(false);
+    device->Service = this;  // Set back-pointer to service
 
-    m_attachedDevices.push_back(std::move(attached));
+    // Start message processing thread for this device
+    device->MessageThread.reset(CreateThread(
+        nullptr,
+        0,
+        DeviceMessageThreadProc,
+        device.get(),
+        0,
+        nullptr));
+    
+    RETURN_HR_IF(E_FAIL, !device->MessageThread);
+
+    // Add to attached devices list
+    m_attachedDevices.push_back(std::move(device));
 
     return S_OK;
 }
 
 HRESULT UsbService::DetachDevice(_In_ const std::string& instanceId)
 {
-    auto lock = m_lock.lock();
-
-    auto it = std::find_if(m_attachedDevices.begin(), m_attachedDevices.end(),
-        [&instanceId](const AttachedDevice& device) {
-            return device.InstanceId == instanceId;
-        });
-
-    if (it == m_attachedDevices.end())
+    std::unique_ptr<AttachedDevice> deviceToStop;
+    
     {
-        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-    }
+        auto lock = m_lock.lock();
 
-    m_attachedDevices.erase(it);
+        auto it = std::find_if(m_attachedDevices.begin(), m_attachedDevices.end(),
+            [&instanceId](const std::unique_ptr<AttachedDevice>& device) {
+                return device->InstanceId == instanceId;
+            });
+
+        if (it == m_attachedDevices.end())
+        {
+            return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        }
+
+        // Move device out of list for cleanup outside lock
+        deviceToStop = std::move(*it);
+        m_attachedDevices.erase(it);
+    }
+    
+    // Stop message thread outside of lock to avoid deadlock
+    if (deviceToStop)
+    {
+        deviceToStop->StopRequested.store(true);
+        
+        // Close socket to unblock recv()
+        deviceToStop->Socket.reset();
+        
+        // Wait for thread to exit
+        if (deviceToStop->MessageThread)
+        {
+            WaitForSingleObject(deviceToStop->MessageThread.get(), 5000);
+        }
+    }
+    
     return S_OK;
 }
 
 bool UsbService::IsDeviceAttached(_In_ const std::string& instanceId) const
 {
     return std::any_of(m_attachedDevices.begin(), m_attachedDevices.end(),
-        [&instanceId](const AttachedDevice& device) {
-            return device.InstanceId == instanceId;
+        [&instanceId](const std::unique_ptr<AttachedDevice>& device) {
+            return device->InstanceId == instanceId;
         });
 }
 
+UsbService::AttachedDevice* UsbService::FindAttachedDevice(_In_ const std::string& instanceId)
+{
+    auto it = std::find_if(m_attachedDevices.begin(), m_attachedDevices.end(),
+        [&instanceId](const std::unique_ptr<AttachedDevice>& device) {
+            return device->InstanceId == instanceId;
+        });
+    
+    return (it != m_attachedDevices.end()) ? it->get() : nullptr;
+}
+
 HRESULT UsbService::ProcessUrbRequest(
+    _In_ SOCKET socket,
+    _In_ const std::string& instanceId,
     _In_ const UsbUrbRequest& request,
     _Out_ UsbUrbResponse& response,
     _Out_ std::vector<uint8_t>& responseData)
 {
     auto lock = m_lock.lock();
 
-    // Find the attached device
-    auto it = std::find_if(m_attachedDevices.begin(), m_attachedDevices.end(),
-        [&request](const AttachedDevice& device) {
-            return device.InstanceId == request.InstanceId;
-        });
-
-    if (it == m_attachedDevices.end())
+    // Find the attached device by instance ID
+    AttachedDevice* device = FindAttachedDevice(instanceId);
+    
+    if (device == nullptr)
     {
         response.Status = ERROR_NOT_FOUND;
         response.TransferredLength = 0;
@@ -380,7 +449,7 @@ HRESULT UsbService::ProcessUrbRequest(
     // Submit URB to USB device via IOCTL
     DWORD bytesReturned = 0;
     BOOL success = DeviceIoControl(
-        it->DeviceHandle.get(),
+        device->DeviceHandle.get(),
         IOCTL_INTERNAL_USB_SUBMIT_URB,
         urbBuffer.data(),
         static_cast<DWORD>(urbBuffer.size()),
@@ -482,6 +551,100 @@ HRESULT ReceiveUsbMessage(
     }
 
     return S_OK;
+}
+
+// Static thread procedure - forwards to member function
+DWORD WINAPI UsbService::DeviceMessageThreadProc(_In_ LPVOID parameter)
+{
+    auto* device = static_cast<AttachedDevice*>(parameter);
+    
+    if (device && device->Service)
+    {
+        // Call the instance method on the service
+        device->Service->DeviceMessageLoop(device);
+    }
+    
+    return 0;
+}
+
+void UsbService::DeviceMessageLoop(_In_ AttachedDevice* device)
+{
+    while (!device->StopRequested.load())
+    {
+        try
+        {
+            // Receive message
+            UsbMessageHeader header;
+            std::vector<uint8_t> payload;
+            
+            HRESULT hr = ReceiveUsbMessage(device->Socket.get(), header, payload);
+            if (FAILED(hr))
+            {
+                // Socket closed or error
+                break;
+            }
+            
+            // Process message based on type
+            switch (header.Type)
+            {
+                case UsbMessageType::UrbRequest:
+                {
+                    // Parse URB request
+                    if (payload.size() < sizeof(UsbUrbRequest))
+                    {
+                        break;
+                    }
+                    
+                    UsbUrbRequest urbRequest;
+                    memcpy(&urbRequest, payload.data(), sizeof(UsbUrbRequest));
+                    
+                    // Process URB request
+                    UsbUrbResponse urbResponse = {};
+                    std::vector<uint8_t> responseData;
+                    
+                    hr = ProcessUrbRequest(
+                        device->Socket.get(),
+                        device->InstanceId,
+                        urbRequest,
+                        urbResponse,
+                        responseData);
+                    
+                    // Send response back to guest
+                    std::vector<uint8_t> responsePayload(sizeof(UsbUrbResponse) + responseData.size());
+                    memcpy(responsePayload.data(), &urbResponse, sizeof(UsbUrbResponse));
+                    if (!responseData.empty())
+                    {
+                        memcpy(responsePayload.data() + sizeof(UsbUrbResponse), responseData.data(), responseData.size());
+                    }
+                    
+                    SendUsbMessage(
+                        device->Socket.get(),
+                        UsbMessageType::UrbResponse,
+                        responsePayload.data(),
+                        static_cast<uint32_t>(responsePayload.size()),
+                        header.SequenceNumber);
+                    
+                    break;
+                }
+                
+                case UsbMessageType::DeviceDetach:
+                {
+                    // Guest requested detach
+                    device->StopRequested.store(true);
+                    break;
+                }
+                
+                default:
+                    // Unknown message type - ignore
+                    break;
+            }
+        }
+        catch (...)
+        {
+            // Error in message processing
+            break;
+        }
+    }
 }
 
 } // namespace wsl::windows::common::usb

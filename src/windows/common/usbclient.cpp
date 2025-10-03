@@ -198,7 +198,6 @@ int UsbClient::AttachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
                 } else {
                     std::wcerr << L"Try: wsl" << std::endl;
                 }
-                usbService.Shutdown();
                 return 1;
             }
         }
@@ -208,7 +207,6 @@ int UsbClient::AttachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
         if (!hvSocket) {
             std::wcerr << L"Error: Failed to connect to distribution's USB service." << std::endl;
             std::wcerr << L"Make sure the WSL USB kernel module is loaded." << std::endl;
-            usbService.Shutdown();
             return 1;
         }
 
@@ -218,11 +216,10 @@ int UsbClient::AttachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
         WideCharToMultiByte(CP_UTF8, 0, instanceId.c_str(), -1, &narrowInstanceId[0], narrowSize, nullptr, nullptr);
         narrowInstanceId.resize(narrowSize - 1); // Remove null terminator
 
-        // Attach the device
-        hr = usbService.AttachDevice(narrowInstanceId, hvSocket.get());
+        // Attach the device (takes ownership of socket)
+        hr = usbService.AttachDevice(narrowInstanceId, std::move(hvSocket));
         if (FAILED(hr)) {
             std::wcerr << L"Error: Failed to attach device. Make sure the device is not already attached." << std::endl;
-            usbService.Shutdown();
             return 1;
         }
 
@@ -230,7 +227,15 @@ int UsbClient::AttachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
         if (!distribution.empty()) {
             std::wcout << L"To distribution: " << distribution << std::endl;
         }
-        usbService.Shutdown();
+        std::wcout << L"Device is now attached. The service will continue running to process USB requests." << std::endl;
+        std::wcout << L"Press Ctrl+C to detach and exit." << std::endl;
+        
+        // Keep the service alive - it will clean up in destructor
+        // Wait for Ctrl+C or other termination signal
+        while (true) {
+            Sleep(1000);
+        }
+        
         return 0;
     }
     catch (const std::exception& e)
@@ -270,12 +275,10 @@ int UsbClient::DetachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
         hr = usbService.DetachDevice(narrowInstanceId);
         if (FAILED(hr)) {
             std::wcerr << L"Error: Failed to detach device. Make sure the device is currently attached." << std::endl;
-            usbService.Shutdown();
             return 1;
         }
 
         std::wcout << L"Successfully detached device: " << instanceId << std::endl;
-        usbService.Shutdown();
         return 0;
     }
     catch (const std::exception& e)
