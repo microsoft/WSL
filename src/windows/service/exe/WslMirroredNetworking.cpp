@@ -226,7 +226,7 @@ static std::optional<SOCKADDR_INET> FindSourceAddressForNextHop(
         }
 
         // Skip if this prefix is shorter than our best match
-        if (addr.PrefixLength <= longestPrefix)
+        if (addr.PrefixLength < longestPrefix)
         {
             continue;
         }
