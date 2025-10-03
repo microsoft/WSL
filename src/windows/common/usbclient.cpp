@@ -131,20 +131,25 @@ int UsbClient::ListUsbDevices(_In_ bool verbose)
 {
     try
     {
+        usb::UsbService usbService;
+        HRESULT hr = usbService.Initialize();
+        if (FAILED(hr)) {
+            std::wcerr << L"Failed to initialize USB service" << std::endl;
+            return 1;
+        }
         auto devices = EnumerateUsbDevicesForDisplay();
-
-        if (devices.empty())
-        {
+        if (devices.empty()) {
             std::wcout << L"No USB devices found." << std::endl;
+            usbService.Shutdown();
             return 0;
         }
-
         PrintUsbDeviceList(devices, verbose);
+        usbService.Shutdown();
         return 0;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Error enumerating USB devices: " << e.what() << std::endl;
+        std::wcerr << L"Error enumerating USB devices: " << e.what() << std::endl;
         return 1;
     }
 }
@@ -156,22 +161,37 @@ int UsbClient::AttachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
     {
         // Get full instance ID if abbreviated ID was provided
         std::wstring instanceId = GetDeviceInstanceIdFromFriendlyId(deviceId);
-        if (instanceId.empty())
-        {
+        if (instanceId.empty()) {
             std::wcerr << L"Error: Device not found: " << deviceId << std::endl;
             return 1;
         }
 
         // Initialize USB service
         usb::UsbService usbService;
-        RETURN_IF_FAILED_MSG(usbService.Initialize(), "Failed to initialize USB service");
+        HRESULT hr = usbService.Initialize();
+        if (FAILED(hr)) {
+            std::wcerr << L"Failed to initialize USB service" << std::endl;
+            return 1;
+        }
 
         // Get the distribution's VM ID (if not specified, use default)
-        GUID vmId = {}; // This would be retrieved from the distribution
-        
+        GUID vmId = {};
+        {
+            wsl::windows::common::SvcComm svcComm;
+            if (!distribution.empty()) {
+                vmId = svcComm.GetDistributionId(distribution.c_str());
+            } else {
+                vmId = svcComm.GetDefaultDistribution();
+            }
+        }
+
         // Connect to the distribution's USB service
         auto hvSocket = hvsocket::Connect(vmId, usb::USB_PASSTHROUGH_PORT);
-        RETURN_HR_IF(E_FAIL, !hvSocket);
+        if (!hvSocket) {
+            std::wcerr << L"Error: Failed to connect to distribution's USB service." << std::endl;
+            usbService.Shutdown();
+            return 1;
+        }
 
         // Convert instance ID to narrow string
         int narrowSize = WideCharToMultiByte(CP_UTF8, 0, instanceId.c_str(), -1, nullptr, 0, nullptr, nullptr);
@@ -180,24 +200,23 @@ int UsbClient::AttachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
         narrowInstanceId.resize(narrowSize - 1); // Remove null terminator
 
         // Attach the device
-        HRESULT hr = usbService.AttachDevice(narrowInstanceId, hvSocket.get());
-        if (FAILED(hr))
-        {
+        hr = usbService.AttachDevice(narrowInstanceId, hvSocket.get());
+        if (FAILED(hr)) {
             std::wcerr << L"Error: Failed to attach device. Make sure the device is not already attached." << std::endl;
+            usbService.Shutdown();
             return 1;
         }
 
         std::wcout << L"Successfully attached device: " << instanceId << std::endl;
-        if (!distribution.empty())
-        {
+        if (!distribution.empty()) {
             std::wcout << L"To distribution: " << distribution << std::endl;
         }
-
+        usbService.Shutdown();
         return 0;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Error attaching USB device: " << e.what() << std::endl;
+        std::wcerr << L"Error attaching USB device: " << e.what() << std::endl;
         return 1;
     }
 }
@@ -209,15 +228,18 @@ int UsbClient::DetachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
     {
         // Get full instance ID if abbreviated ID was provided
         std::wstring instanceId = GetDeviceInstanceIdFromFriendlyId(deviceId);
-        if (instanceId.empty())
-        {
+        if (instanceId.empty()) {
             std::wcerr << L"Error: Device not found: " << deviceId << std::endl;
             return 1;
         }
 
         // Initialize USB service
         usb::UsbService usbService;
-        RETURN_IF_FAILED_MSG(usbService.Initialize(), "Failed to initialize USB service");
+        HRESULT hr = usbService.Initialize();
+        if (FAILED(hr)) {
+            std::wcerr << L"Failed to initialize USB service" << std::endl;
+            return 1;
+        }
 
         // Convert instance ID to narrow string
         int narrowSize = WideCharToMultiByte(CP_UTF8, 0, instanceId.c_str(), -1, nullptr, 0, nullptr, nullptr);
@@ -226,19 +248,20 @@ int UsbClient::DetachUsbDevice(_In_ const std::wstring& deviceId, _In_opt_ const
         narrowInstanceId.resize(narrowSize - 1);
 
         // Detach the device
-        HRESULT hr = usbService.DetachDevice(narrowInstanceId);
-        if (FAILED(hr))
-        {
+        hr = usbService.DetachDevice(narrowInstanceId);
+        if (FAILED(hr)) {
             std::wcerr << L"Error: Failed to detach device. Make sure the device is currently attached." << std::endl;
+            usbService.Shutdown();
             return 1;
         }
 
         std::wcout << L"Successfully detached device: " << instanceId << std::endl;
+        usbService.Shutdown();
         return 0;
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Error detaching USB device: " << e.what() << std::endl;
+        std::wcerr << L"Error detaching USB device: " << e.what() << std::endl;
         return 1;
     }
 }
@@ -252,16 +275,16 @@ int UsbClient::ShowUsbHelp()
     std::wcout << L"      Use --verbose for detailed information.\n\n";
     std::wcout << L"  wsl --usb-attach <device-id> [--distribution <name>]\n";
     std::wcout << L"      Attach a USB device to WSL.\n";
-    std::wcout << L"      device-id: Device instance ID or busid (e.g., 'USB\\VID_1234&PID_5678\\...' or '1-1')\n";
+    std::wcout << L"      device-id: Device instance ID (e.g., 'USB\\VID_1234&PID_5678\\6&1234ABCD')\n";
     std::wcout << L"      --distribution: Optional. Attach to a specific distribution (default: default distribution)\n\n";
     std::wcout << L"  wsl --usb-detach <device-id> [--distribution <name>]\n";
     std::wcout << L"      Detach a USB device from WSL.\n";
-    std::wcout << L"      device-id: Device instance ID or busid used during attach\n\n";
+    std::wcout << L"      device-id: Device instance ID used during attach\n\n";
     std::wcout << L"Examples:\n";
     std::wcout << L"  wsl --usb-list\n";
     std::wcout << L"  wsl --usb-attach USB\\VID_1234&PID_5678\\6&1234ABCD\n";
-    std::wcout << L"  wsl --usb-attach 1-1 --distribution Ubuntu\n";
-    std::wcout << L"  wsl --usb-detach 1-1\n\n";
+    std::wcout << L"  wsl --usb-attach USB\\VID_8765&PID_4321\\7&DEADBEEF --distribution Ubuntu\n";
+    std::wcout << L"  wsl --usb-detach USB\\VID_1234&PID_5678\\6&1234ABCD\n\n";
     std::wcout << L"Note: This feature uses Hyper-V sockets and does not require IP networking.\n";
     std::wcout << L"      It works reliably with VPNs and complex network configurations.\n";
     

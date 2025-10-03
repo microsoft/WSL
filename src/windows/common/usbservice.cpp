@@ -437,12 +437,13 @@ HRESULT SendUsbMessage(
     _In_ SOCKET socket,
     _In_ UsbMessageType type,
     _In_reads_bytes_opt_(payloadSize) const void* payload,
-    _In_ uint32_t payloadSize)
+    _In_ uint32_t payloadSize,
+    _In_ uint32_t sequenceNumber)
 {
     UsbMessageHeader header{};
     header.Type = type;
     header.PayloadSize = payloadSize;
-    header.SequenceNumber = 0; // Should be tracked
+    header.SequenceNumber = sequenceNumber;
     header.Reserved = 0;
 
     // Send header

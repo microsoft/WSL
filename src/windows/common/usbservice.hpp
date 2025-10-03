@@ -139,6 +139,9 @@ public:
     // Check if a device is currently attached
     bool IsDeviceAttached(_In_ const std::string& instanceId) const;
 
+    // Get next sequence number for message tracking
+    uint32_t GetNextSequenceNumber() { return ++m_sequenceNumber; }
+
 private:
     struct AttachedDevice {
         std::string InstanceId;
@@ -148,6 +151,7 @@ private:
 
     std::vector<AttachedDevice> m_attachedDevices;
     wil::critical_section m_lock;
+    std::atomic<uint32_t> m_sequenceNumber{0};
 
     // Internal helpers
     HRESULT GetDeviceInfo(_In_ HDEVINFO deviceInfoSet, _In_ PSP_DEVINFO_DATA deviceInfoData, _Out_ UsbDeviceInfo& info);
@@ -156,7 +160,7 @@ private:
 };
 
 // Protocol helper functions
-HRESULT SendUsbMessage(_In_ SOCKET socket, _In_ UsbMessageType type, _In_reads_bytes_opt_(payloadSize) const void* payload, _In_ uint32_t payloadSize);
+HRESULT SendUsbMessage(_In_ SOCKET socket, _In_ UsbMessageType type, _In_reads_bytes_opt_(payloadSize) const void* payload, _In_ uint32_t payloadSize, _In_ uint32_t sequenceNumber = 0);
 HRESULT ReceiveUsbMessage(_In_ SOCKET socket, _Out_ UsbMessageHeader& header, _Out_ std::vector<uint8_t>& payload);
 
 } // namespace wsl::windows::common::usb
