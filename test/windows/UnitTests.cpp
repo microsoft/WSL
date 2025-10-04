@@ -6080,6 +6080,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto cleanup =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
 
+        // The below logline makes it easier to find the bsdtar output when debugging this test case.
+        fprintf(stderr, "Starting ImportExportStdout test case\n");
+
         auto commandLine = std::format(L"cmd.exe /c wsl --export {} - | wsl --import {} . -", LXSS_DISTRO_NAME_TEST_L, test_distro);
 
         VERIFY_ARE_EQUAL(LxsstuRunCommand(commandLine.data()), 0L);

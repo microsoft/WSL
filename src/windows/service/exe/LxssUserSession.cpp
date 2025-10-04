@@ -1926,7 +1926,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             if (m_utilityVm->GetConfig().SetVersionDebug)
             {
-                commandLine += " -v";
+                commandLine += " -vv --totals";
             }
 
             // Run the bsdtar elf binary expand the tar file using the socket as stdin.
@@ -1991,7 +1991,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             if (m_utilityVm->GetConfig().SetVersionDebug)
             {
-                commandLine += " -v";
+                commandLine += " -vv --totals";
             }
 
             // Run the bsdtar elf binary to create the tar file using the socket as stdout.
