@@ -13,6 +13,7 @@ struct Route
     std::optional<Address> to;
     int metric = 0;
     bool isLoopbackRoute = false;
+    std::optional<Address> preferredSource;
 
     Route(int family, const std::optional<Address>& via, int dev, bool defaultRoute, const std::optional<Address>& to, int metric);
 
