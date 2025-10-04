@@ -1113,8 +1113,8 @@ Windows: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>由于潜在的数据损坏，目前已禁用稀疏 VHD 支持。
-若要强制分发使用稀疏 vhd，请运行：
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+要强制发行版使用稀疏 vhd，请运行:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
