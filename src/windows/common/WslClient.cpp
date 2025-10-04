@@ -504,10 +504,8 @@ int Install(_In_ std::wstring_view commandLine)
             E_INVALIDARG, Localization::MessageArgumentsNotValidTogether(WSL_INSTALL_ARG_NO_DISTRIBUTION_OPTION, WSL_INSTALL_ARG_DIST_OPTION_LONG));
     }
 
-    if (fixedVhd && !vhdSize.has_value())
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageArgumentNotValidWithout(WSL_INSTALL_ARG_FIXED_VHD, WSL_INSTALL_ARG_VHD_SIZE));
-    }
+    // Note: Validation for --fixed-vhd now allows it without --vhd-size if defaultVhdSize is set in .wslconfig.
+    // The service will handle the validation and application of defaults.
 
     // A distribution to be installed can be specified in three ways:
     // wsl.exe --install --distribution Ubuntu
