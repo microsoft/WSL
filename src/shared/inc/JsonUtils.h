@@ -46,18 +46,18 @@ std::wstring ToJsonW(const T& Value)
     return wsl::shared::string::MultiByteToWide(ToJson(Value));
 }
 
-template <typename T>
+template <typename T, typename TJson = nlohmann::json>
 T FromJson(const char* Value)
 {
     try
     {
-        auto json = nlohmann::json::parse(Value);
+        auto json = TJson::parse(Value);
         T object{};
         from_json(json, object);
 
         return object;
     }
-    catch (const nlohmann::json::exception& e)
+    catch (const TJson::exception& e)
     {
 
 #ifdef WIN32
@@ -72,10 +72,10 @@ T FromJson(const char* Value)
     }
 }
 
-template <typename T>
+template <typename T, typename TJson = nlohmann::json>
 T FromJson(const wchar_t* Value)
 {
-    return FromJson<T>(wsl::shared::string::WideToMultiByte(Value).c_str());
+    return FromJson<T, TJson>(wsl::shared::string::WideToMultiByte(Value).c_str());
 }
 
 template <typename T>

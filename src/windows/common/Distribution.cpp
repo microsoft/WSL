@@ -112,7 +112,7 @@ DistributionList ReadFromManifest(const std::wstring& url)
             content = response.Content().ReadAsStringAsync().get();
         }
 
-        auto distros = wsl::shared::FromJson<DistributionList>(content.c_str());
+        auto distros = wsl::shared::FromJson<DistributionList, nlohmann::ordered_json>(content.c_str());
 
         if (distros.Distributions.has_value())
         {
