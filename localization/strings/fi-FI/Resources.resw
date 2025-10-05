@@ -1108,7 +1108,7 @@ Virhekoodi: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Harva virtuaalikiintolevyn tuki on tällä hetkellä poistettu käytöstä tietojen mahdollisen vioittumisen vuoksi.
 Jos haluat pakottaa jakelun käyttämään harvaa virtuaalikiintolevyä, suorita seuraavasti:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
