@@ -6267,5 +6267,14 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             std::wstring::npos);
     }
 
+    TEST_METHOD(InitPermissions)
+    {
+        WSL2_TEST_ONLY();
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"stat -c %a /init");
+
+        VERIFY_ARE_EQUAL(out, L"755\n");
+    }
+
 }; // namespace UnitTests
 } // namespace UnitTests
