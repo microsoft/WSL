@@ -33,7 +33,8 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-tmpfiles-setup-dev.service',
                             'tmp.mount',
                             'NetworkManager.service',
-                            'networking.service']
+                            'networking.service',
+                            'hypervkvpd.service']
 
 WSL1_UNSUPPORTED_XATTRS = ['security.selinux', 'security.ima', 'security.evm']
 
