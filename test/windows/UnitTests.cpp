@@ -5326,6 +5326,76 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(error, L"");
         }
+
+        // Validate that manifest distribution ordering is preserved.
+        {
+            auto validateOrder = [](const std::vector<LPCWSTR>& expected) {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --online");
+
+                auto lines = wsl::shared::string::Split<wchar_t>(out, '\n');
+
+                for (size_t i = 0; i < expected.size(); i++)
+                {
+                    auto end = lines[i + 4].find_first_of(L" \t");
+                    VERIFY_ARE_NOT_EQUAL(end, std::wstring::npos);
+
+                    auto distro = lines[i + 4].substr(0, end);
+
+                    VERIFY_ARE_EQUAL(expected[i], distro);
+                }
+            };
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+                validateOrder({L"distro1", L"distro2"});
+            }
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+
+                validateOrder({L"distro2", L"distro1"});
+            }
+        }
     }
 
     TEST_METHOD(ModernInstallEndToEnd)

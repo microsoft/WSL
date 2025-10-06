@@ -58,10 +58,28 @@ struct Distribution
 struct DistributionList
 {
     std::optional<std::vector<Distribution>> Distributions;
-    std::optional<std::map<std::string, std::vector<ModernDistributionVersion>>> ModernDistributions;
+    std::optional<nlohmann::ordered_map<std::string, std::vector<ModernDistributionVersion>>> ModernDistributions;
     std::optional<std::wstring> Default;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DistributionList, Distributions, ModernDistributions, Default)
+    friend void from_json(const nlohmann::ordered_json& nlohmann_json_j, DistributionList& nlohmann_json_t)
+    {
+        const DistributionList nlohmann_json_default_obj{};
+        NLOHMANN_JSON_EXPAND(NLOHMANN_JSON_PASTE(NLOHMANN_JSON_FROM_WITH_DEFAULT, Distributions, Default));
+
+        auto modernDistributions = nlohmann_json_j.find("ModernDistributions");
+        if (modernDistributions != nlohmann_json_j.end())
+        {
+            nlohmann_json_t.ModernDistributions.emplace();
+
+            for (const auto& e : modernDistributions->items())
+            {
+                std::vector<ModernDistributionVersion> distros;
+                from_json(e.value(), distros);
+
+                nlohmann_json_t.ModernDistributions->emplace_back(e.key(), std::move(distros));
+            }
+        }
+    }
 };
 
 constexpr inline auto c_distroUrlRegistryValue = L"DistributionListUrl";
