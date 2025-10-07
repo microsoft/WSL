@@ -213,6 +213,15 @@ rules:
 
     - logline:
         provider: Microsoft.Windows.Lxss.Manager
+        task: LinuxCrash
+      set:
+        name: linux-crash
+        capture:
+          field3: linux-crash-path
+          field6: linux-crash-process
+
+    - logline:
+        provider: Microsoft.Windows.Lxss.Manager
       set: wsl-service-logs
       oneshot: true
 
@@ -254,6 +263,11 @@ actions:
     - foreach:
         var: user-visible-error
         debug_message: 'Detected user visible error: $error'
+        skip_similar_issues: false
+
+    - foreach:
+        var: linux-crash
+        debug_message: 'Found evidence of linux crash: $linux-crash-process (dump: $linux-crash-path)'
         skip_similar_issues: false
 
     - foreach:
