@@ -1112,9 +1112,9 @@ Windows 版本： {}</value>
     <value>由於目前與全球安全存取用戶端的相容性問題，已停用 DNS 通道。</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>目前已停用 疏鬆 VHD 支援，因為可能會導致資料損毀。
+    <value>由於可能會導致資料損毀，目前已停用疏鬆 VHD 支援。
 若要強制發行版本使用疏鬆 VHD，請執行:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
