@@ -2814,30 +2814,6 @@ void LxssUserSessionImpl::_CreateVm()
 
         try
         {
-            auto callback = [this](auto Pid) {
-                // If the vm is currently being destroyed, the instance lock might be held
-                // while WslCoreVm's destructor is waiting on this thread.
-                // Cancel the call if the vm destruction is signaled.
-                // Note: This is safe because m_instanceLock is always initialized
-                // and because WslCoreVm's destructor waits for this thread, the session can't be gone
-                // until this callback completes.
-
-                auto lock = m_instanceLock.try_lock();
-                while (!lock)
-                {
-                    if (m_vmTerminating.wait(100))
-                    {
-                        return;
-                    }
-                    lock = m_instanceLock.try_lock();
-                }
-
-                auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
-                TerminateByClientIdLockHeld(Pid);
-            };
-
-            m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
-
             // Mount disks after the system distro vhd is mounted in case filesystem detection is needed.
             _LoadDiskMounts();
 
@@ -2869,6 +2845,34 @@ void LxssUserSessionImpl::_CreateVm()
             _VmTerminate();
             throw;
         }
+
+        auto callback = [this](auto Pid) {
+            // If the vm is currently being destroyed, the instance lock might be held
+            // while WslCoreVm's destructor is waiting on this thread.
+            // Cancel the call if the vm destruction is signaled.
+            // Note: This is safe because m_instanceLock is always initialized
+            // and because WslCoreVm's destructor waits for this thread, the session can't be gone
+            // until this callback completes.
+
+            auto lock = m_instanceLock.try_lock();
+            while (!lock)
+            {
+                if (m_vmTerminating.wait(100))
+                {
+                    return;
+                }
+                lock = m_instanceLock.try_lock();
+            }
+
+            auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
+            TerminateByClientIdLockHeld(Pid);
+        };
+
+        // N.B. The callbacks must be registered outside of the above try/catch.
+        // Otherwise if an exception is thrown, calling _VmTerminate() will trigger the 's_VmTerminated' termination callback
+        // Which can deadlock since this thread holds the instance lock and HCS can block until the VM termination callback returns before deleting the VM.
+
+        m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
     }
 
     _VmCheckIdle();
