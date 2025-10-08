@@ -375,13 +375,6 @@ void WslCoreInstance::Initialize()
         drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
 
-    // If not using the WSL init, initialization is complete.
-    if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_WSLCORE_MODE))
-    {
-        m_initialized = true;
-        return;
-    }
-
     // Create a console manager that will be used to manage session leaders.
     m_consoleManager = ConsoleManager::CreateConsoleManager(m_initChannel);
 

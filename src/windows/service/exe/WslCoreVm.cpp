@@ -879,9 +879,10 @@ WslCoreVm::~WslCoreVm() noexcept
     WSL_LOG("TerminateVmStop");
 }
 
-wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout) const
+wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get());
+    auto socket =
+        wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
     if (ReceiveTimeout != 0)
     {
         THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);

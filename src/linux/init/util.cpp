@@ -537,7 +537,7 @@ Return Value:
     return Socket;
 }
 
-wil::unique_fd UtilConnectVsock(unsigned int Port, bool CloseOnExec, std::optional<int> SocketBuffer) noexcept
+wil::unique_fd UtilConnectVsock(unsigned int Port, bool CloseOnExec, std::optional<int> SocketBuffer, const std::source_location& Source) noexcept
 
 /*++
 
@@ -553,6 +553,8 @@ Arguments:
 
     SocketBuffer - Optionally supplies the size to use for the socket send and receive buffers.
 
+    Source - Supplies the caller location.
+
 Return Value:
 
     A file descriptor representing the connected socket, -1 on failure.
@@ -565,7 +567,7 @@ Return Value:
     wil::unique_fd SocketFd{socket(AF_VSOCK, Type, 0)};
     if (!SocketFd)
     {
-        LOG_ERROR("socket failed {}", errno);
+        LOG_ERROR("socket failed {} (from: {})", errno, Source);
         return {};
     }
 
@@ -577,7 +579,7 @@ Return Value:
     Timeout.tv_sec = LX_INIT_HVSOCKET_TIMEOUT_SECONDS;
     if (setsockopt(SocketFd.get(), AF_VSOCK, SO_VM_SOCKETS_CONNECT_TIMEOUT, &Timeout, sizeof(Timeout)) < 0)
     {
-        LOG_ERROR("setsockopt SO_VM_SOCKETS_CONNECT_TIMEOUT failed {}", errno);
+        LOG_ERROR("setsockopt SO_VM_SOCKETS_CONNECT_TIMEOUT failed {}, (from: {})", errno, Source);
         return {};
     }
 
@@ -586,13 +588,13 @@ Return Value:
         int BufferSize = *SocketBuffer;
         if (setsockopt(SocketFd.get(), SOL_SOCKET, SO_SNDBUF, &BufferSize, sizeof(BufferSize)) < 0)
         {
-            LOG_ERROR("setsockopt(SO_SNDBUF, {}) failed {}", BufferSize, errno);
+            LOG_ERROR("setsockopt(SO_SNDBUF, {}) failed {}, (from: {})", BufferSize, errno, Source);
             return {};
         }
 
         if (setsockopt(SocketFd.get(), SOL_SOCKET, SO_RCVBUF, &BufferSize, sizeof(BufferSize)) < 0)
         {
-            LOG_ERROR("setsockopt(SO_RCVBUF, {}) failed {}", BufferSize, errno);
+            LOG_ERROR("setsockopt(SO_RCVBUF, {}) failed {}, (from: {})", BufferSize, errno, Source);
             return {};
         }
     }
@@ -603,7 +605,7 @@ Return Value:
     SocketAddress.svm_port = Port;
     if (connect(SocketFd.get(), (const struct sockaddr*)&SocketAddress, sizeof(SocketAddress)) < 0)
     {
-        LOG_ERROR("connect port {} failed {}", Port, errno);
+        LOG_ERROR("connect port {} failed {} (from: {})", Port, errno, Source);
         return {};
     }
 
