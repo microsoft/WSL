@@ -39,15 +39,17 @@ void InitializeWildcardSocketAddress(_Out_ PSOCKADDR_HV Address)
 }
 } // namespace
 
-wil::unique_socket wsl::windows::common::hvsocket::Accept(_In_ SOCKET ListenSocket, _In_ int Timeout, _In_opt_ HANDLE ExitHandle)
+wil::unique_socket wsl::windows::common::hvsocket::Accept(
+    _In_ SOCKET ListenSocket, _In_ int Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
     wil::unique_socket Socket = Create();
-    wsl::windows::common::socket::Accept(ListenSocket, Socket.get(), Timeout, ExitHandle);
+    wsl::windows::common::socket::Accept(ListenSocket, Socket.get(), Timeout, ExitHandle, Location);
 
     return Socket;
 }
 
-wil::unique_socket wsl::windows::common::hvsocket::Connect(_In_ const GUID& VmId, _In_ unsigned long Port, _In_opt_ HANDLE ExitHandle)
+wil::unique_socket wsl::windows::common::hvsocket::Connect(
+    _In_ const GUID& VmId, _In_ unsigned long Port, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
     OVERLAPPED Overlapped{};
     const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
@@ -71,7 +73,7 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(_In_ const GUID& VmId
 
     if (Result != 0)
     {
-        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle);
+        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle, Location);
     }
 
     ULONG Timeout = CONNECT_TIMEOUT;
@@ -86,7 +88,7 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(_In_ const GUID& VmId
     const BOOL Success = ConnectFn(Socket.get(), reinterpret_cast<sockaddr*>(&Addr), sizeof(Addr), nullptr, 0, nullptr, &Overlapped);
     if (Success == FALSE)
     {
-        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle);
+        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle, Location);
     }
 
     return Socket;
