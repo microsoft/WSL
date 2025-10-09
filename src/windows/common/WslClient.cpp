@@ -17,6 +17,7 @@ Abstract:
 #include "HandleConsoleProgressBar.h"
 #include "Distribution.h"
 #include "CommandLine.h"
+#include "PortableDistribution.h"
 #include <conio.h>
 
 #define BASH_PATH L"/bin/bash"
@@ -128,6 +129,8 @@ void PromptForKeyPress()
 bool InstallPrerequisites(_In_ bool installWslOptionalComponent);
 int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPCWSTR argv[], _In_ const LaunchProcessOptions& options);
 int ListDistributionsHelper(_In_ ListOptions options);
+int MountRemovable(_In_ std::wstring_view commandLine);
+int UnmountRemovable(_In_ std::wstring_view commandLine);
 LaunchProcessOptions ParseLegacyArguments(_Inout_ std::wstring_view& commandLine);
 DWORD ParseVersionString(_In_ const std::wstring_view& versionString);
 int SetSparse(GUID& distroGuid, bool sparse, bool allowUnsafe);
@@ -327,18 +330,52 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     std::filesystem::path filePath;
     ULONG flags = LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE;
     DWORD version = LXSS_WSL_VERSION_DEFAULT;
+    bool portable = false;
+    bool allowFixed = false;
 
     parser.AddPositionalArgument(name, 0);
     parser.AddPositionalArgument(AbsolutePath(installPath), 1);
     parser.AddPositionalArgument(filePath, 2);
     parser.AddArgument(WslVersion(version), WSL_IMPORT_ARG_VERSION);
     parser.AddArgument(SetFlag<ULONG, LXSS_IMPORT_DISTRO_FLAGS_VHD>{flags}, WSL_IMPORT_ARG_VHD);
+    parser.AddArgument(portable, WSL_IMPORT_ARG_PORTABLE);
+    parser.AddArgument(allowFixed, WSL_IMPORT_ARG_ALLOW_FIXED);
 
     parser.Parse();
 
     if (name == nullptr || !installPath.has_value() || filePath.empty())
     {
         THROW_HR(E_INVALIDARG);
+    }
+
+    // If portable flag is set, create a portable distribution
+    if (portable)
+    {
+        try
+        {
+            wsl::windows::common::portable::CreatePortableDistribution(
+                *installPath,
+                name,
+                filePath,
+                version,
+                flags,
+                allowFixed);
+
+            wsl::windows::common::wslutil::PrintMessage(
+                Localization::MessagePortableDistroCreated(name, installPath->c_str()),
+                stdout);
+
+            wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+            return 0;
+        }
+        catch (...)
+        {
+            const auto hr = wil::ResultFromCaughtException();
+            wsl::windows::common::wslutil::PrintMessage(
+                Localization::MessagePortableDistroCreationFailed(installPath->c_str()),
+                stderr);
+            THROW_HR(hr);
+        }
     }
 
     // Ensure that the install path exists.
@@ -1260,6 +1297,79 @@ int Unmount(_In_ const std::wstring& arg)
     return 0;
 }
 
+int MountRemovable(_In_ std::wstring_view commandLine)
+{
+    std::filesystem::path portablePath;
+    std::optional<std::wstring> distroName;
+    bool temporary = false;
+    bool allowFixed = false;
+
+    ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
+    parser.AddPositionalArgument(UnquotedPath(portablePath), 0);
+    parser.AddArgument(distroName, WSL_MOUNT_REMOVABLE_ARG_DISTRO_OPTION_LONG, WSL_MOUNT_REMOVABLE_ARG_DISTRO_OPTION);
+    parser.AddArgument(temporary, WSL_MOUNT_REMOVABLE_ARG_TEMPORARY_OPTION_LONG, WSL_MOUNT_REMOVABLE_ARG_TEMPORARY_OPTION);
+    parser.AddArgument(allowFixed, WSL_MOUNT_REMOVABLE_ARG_ALLOW_FIXED_OPTION_LONG, WSL_MOUNT_REMOVABLE_ARG_ALLOW_FIXED_OPTION);
+    parser.Parse();
+
+    THROW_HR_IF(WSL_E_INVALID_USAGE, portablePath.empty());
+
+    try
+    {
+        auto result = wsl::windows::common::portable::MountPortableDistribution(
+            portablePath,
+            distroName.has_value() ? distroName->c_str() : nullptr,
+            temporary,
+            allowFixed);
+
+        wsl::windows::common::wslutil::PrintMessage(
+            Localization::MessagePortableDistroMounted(result.DistroName.c_str(), result.VhdxPath.c_str()),
+            stdout);
+
+        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+        return 0;
+    }
+    catch (...)
+    {
+        const auto hr = wil::ResultFromCaughtException();
+        wsl::windows::common::wslutil::PrintMessage(
+            Localization::MessagePortableDistroMountFailed(portablePath.c_str()),
+            stderr);
+        THROW_HR(hr);
+    }
+}
+
+int UnmountRemovable(_In_ std::wstring_view commandLine)
+{
+    LPCWSTR distributionName{};
+    ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
+    parser.AddPositionalArgument(distributionName, 0);
+    parser.Parse();
+
+    THROW_HR_IF(WSL_E_INVALID_USAGE, distributionName == nullptr);
+
+    wsl::windows::common::SvcComm service;
+    const GUID distroGuid = service.GetDistributionId(distributionName);
+
+    // Check if it's a portable distribution
+    if (!wsl::windows::common::portable::IsPortableDistribution(distroGuid))
+    {
+        wsl::windows::common::wslutil::PrintMessage(
+            Localization::MessageNotPortableDistro(distributionName),
+            stderr);
+        return -1;
+    }
+
+    // Unmount the portable distribution
+    wsl::windows::common::portable::UnmountPortableDistribution(distroGuid, true);
+
+    wsl::windows::common::wslutil::PrintMessage(
+        Localization::MessagePortableDistroUnmounted(distributionName),
+        stdout);
+
+    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    return 0;
+}
+
 int UnregisterDistribution(_In_ LPCWSTR distributionName)
 {
     auto progress = wsl::windows::common::ConsoleProgressIndicator(wsl::shared::Localization::MessageStatusUnregistering(), true);
@@ -1667,6 +1777,16 @@ int WslMain(_In_ std::wstring_view commandLine)
         {
             commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
             return ImportDistributionInplace(commandLine);
+        }
+        else if (argument == WSL_MOUNT_REMOVABLE_ARG)
+        {
+            commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
+            return MountRemovable(commandLine);
+        }
+        else if (argument == WSL_UNMOUNT_REMOVABLE_ARG)
+        {
+            commandLine = wsl::windows::common::helpers::ConsumeArgument(commandLine, argument);
+            return UnmountRemovable(commandLine);
         }
         else if ((argument == WSL_LIST_ARG) || (argument == WSL_LIST_ARG_LONG))
         {
