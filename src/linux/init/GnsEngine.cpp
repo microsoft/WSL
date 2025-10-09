@@ -268,6 +268,13 @@ void GnsEngine::ProcessRouteChange(Interface& interface, const wsl::shared::hns:
     auto interfaceRoute =
         Route{addrFamily, {{addrFamily, route.SitePrefixLength, nextHopValue}}, interface.Index(), defaultRoute, to, route.Metric};
 
+    // Extract preferred source if provided
+    if (!route.PreferredSource.empty())
+    {
+        const auto preferredSourceValue = wsl::shared::string::WideToMultiByte(route.PreferredSource);
+        interfaceRoute.preferredSource = Address{addrFamily, 0, preferredSourceValue};
+    }
+
     auto routeString = utils::Stringify(interfaceRoute);
 
     if (action == ModifyRequestType::Add)
