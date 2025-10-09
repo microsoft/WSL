@@ -32,7 +32,7 @@ Abstract:
         T_VALUE(c, LoadDefaultKernelModules), T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), \
         T_VALUE(c, MaximumProcessorCount), T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), \
         T_ENUM(c, NetworkingMode), T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), \
-        T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
+        T_SET(c, SystemDistroPath), T_VALUE(c, VhdSizeBytes), T_ENUM(c, VhdDefaultType), T_VALUE(c, VmIdleTimeout), T_SET(c, VmSwitch)
 
 namespace wsl::core {
 constexpr auto ToString(ConfigKeyPresence key)
@@ -79,6 +79,29 @@ const std::map<std::string, MemoryReclaimMode, shared::string::CaseInsensitiveCo
     {ToString(MemoryReclaimMode::Gradual), MemoryReclaimMode::Gradual},
     {ToString(MemoryReclaimMode::DropCache), MemoryReclaimMode::DropCache},
     {ToString(MemoryReclaimMode::Disabled), MemoryReclaimMode::Disabled}};
+
+enum class VhdType
+{
+    Dynamic,
+    Fixed
+};
+
+constexpr auto ToString(VhdType type)
+{
+    switch (type)
+    {
+    case VhdType::Dynamic:
+        return "Dynamic";
+    case VhdType::Fixed:
+        return "Fixed";
+    default:
+        return "Invalid";
+    }
+}
+
+const std::map<std::string, VhdType, shared::string::CaseInsensitiveCompare> VhdTypes = {
+    {ToString(VhdType::Dynamic), VhdType::Dynamic},
+    {ToString(VhdType::Fixed), VhdType::Fixed}};
 
 // N.B. These enum values are also used in InTune ADMX templates, if entries are added or removed ensure that existing
 //      values are not changed.
@@ -266,6 +289,7 @@ namespace ConfigSetting {
     static constexpr auto DnsProxy = "wsl2.dnsProxy";
     static constexpr auto SafeMode = "wsl2.safeMode";
     static constexpr auto DefaultVhdSize = "wsl2.defaultVhdSize";
+    static constexpr auto DefaultVhdType = "wsl2.defaultVhdType";
     static constexpr auto CrashDumpFolder = "wsl2.crashDumpFolder";
     static constexpr auto MaxCrashDumpCount = "wsl2.maxCrashDumpCount";
     static constexpr auto DistributionInstallPath = "general.distributionInstallPath";
@@ -363,6 +387,7 @@ struct Config
     MemoryReclaimMode MemoryReclaim = MemoryReclaimMode::DropCache;
     bool EnableSparseVhd = false;
     UINT64 VhdSizeBytes = 0x10000000000; // 1TB
+    VhdType VhdDefaultType = VhdType::Dynamic;
 
     wsl::shared::string::MacAddress MacAddress;
     std::wstring NatIpAddress;
