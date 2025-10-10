@@ -1108,7 +1108,7 @@ Kod błędu: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Obsługa rozrzedzonych dysków VHD jest obecnie wyłączona z powodu potencjalnego uszkodzenia danych.
 Aby wymusić używanie rozrzedzonego dysku VHD przez dystrybucję, uruchom polecenie:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
