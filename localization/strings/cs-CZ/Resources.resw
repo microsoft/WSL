@@ -321,6 +321,9 @@ Pokud chcete používat WSL1, povolte prosím volitelnou komponentu Subsystém W
     --msal-proxy-path
         Zobrazení cesty k aplikaci proxy MSAL.
 
+    --vm-id
+        Zobrazí ID virtuálního počítače WSL.
+
     --version
         Zobrazí verzi balíčku WSL.
 
@@ -328,6 +331,7 @@ Pokud chcete používat WSL1, povolte prosím volitelnou komponentu Subsystém W
         Netisknout nový řádek.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1096,7 +1100,7 @@ Kód chyby: {}</value>
     <value>Dotaz na síťový režim se nezdařil</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>Vlastní moduly jádra byly zadány bez zadání vlastního jádra. Další informace najdete https://aka.ms/wslcustomkernel.</value>
+    <value>Byly zadány přizpůsobené moduly jádra bez zadání přizpůsobeného jádra. Další informace najdete https://aka.ms/wslcustomkernel.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Kvůli aktuálnímu problému s kompatibilitou s klientem globálního bezpečného přístupu je tunelování DNS zakázané.</value>
@@ -1690,12 +1694,6 @@ K dalším možnostem VS Code Remote můžete přistupovat také prostřednictv�
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Volitelné funkce</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Povolit vytváření sestav stránek</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Výchozí nastavení true umožňuje systému Windows uvolnit nevyužitou paměť přidělenou virtuálnímu počítači WSL 2.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Prohlášení o zásadách ochrany osobních údajů</value>

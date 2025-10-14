@@ -109,7 +109,7 @@ std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::Alloca
         }
     });
 
-    // N.B. Use an odd number of ports to avoid Linux kernel warning about prefering different parity for start / end values.
+    // N.B. Use an odd number of ports to avoid Linux kernel warning about preferring different parity for start / end values.
     static constexpr auto c_ephemeralPortRangeSize = 4095;
     THROW_IF_FAILED(m_allocatePortRange.value()(m_service.get(), c_ephemeralPortRangeSize, &m_reservedPortRange, &port));
 

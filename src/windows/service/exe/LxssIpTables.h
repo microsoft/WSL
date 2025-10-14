@@ -118,7 +118,7 @@ class LxssNetworkingFirewallPort;
 class LxssNetworkingNat;
 
 /// <summary>
-/// Emulate iptables functionailty.
+/// Emulate iptables functionality.
 /// </summary>
 class LxssIpTables
 {
@@ -298,7 +298,7 @@ public:
     LxssNetworkingFirewallPort(const std::shared_ptr<LxssNetworkingFirewall>& Firewall, const Microsoft::WRL::ComPtr<INetFwRule>& Existing);
 
     /// <summary>
-    /// Desstructor.
+    /// Destructor.
     /// </summary>
     ~LxssNetworkingFirewallPort();
 

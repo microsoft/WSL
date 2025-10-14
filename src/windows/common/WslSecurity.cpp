@@ -46,7 +46,7 @@ void wsl::windows::common::security::ApplyProcessMitigationPolicies()
     LOG_IF_WIN32_BOOL_FALSE(SetProcessMitigationPolicy(ProcessDynamicCodePolicy, &codePolicy, sizeof(codePolicy)));
 
     // Note: Enabling PROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY::DisallowWin32kSystemCalls
-    // breaks the service initialization logic (CoIntializeSecurity fails).
+    // breaks the service initialization logic (CoInitializeSecurity fails).
 
     PROCESS_MITIGATION_FONT_DISABLE_POLICY fontPolicy{};
     fontPolicy.DisableNonSystemFonts = true;

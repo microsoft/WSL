@@ -31,7 +31,7 @@ using namespace wsl::windows::common::wslutil;
 constexpr auto c_latestReleaseUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/latest";
 constexpr auto c_releaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases";
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
-constexpr auto c_userAgent = L"wsl-install"; // required to use the Github API
+constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";
 
 namespace {
@@ -134,7 +134,9 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(HCS_E_INVALID_JSON),
     X_WIN32(ERROR_INVALID_SECURITY_DESCR),
     X(VM_E_INVALID_STATE),
-    X_WIN32(STATUS_SHUTDOWN_IN_PROGRESS)};
+    X_WIN32(STATUS_SHUTDOWN_IN_PROGRESS),
+    X_WIN32(ERROR_BAD_PATHNAME),
+    X(WININET_E_TIMEOUT)};
 
 #undef X
 
@@ -171,7 +173,7 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
     X(UnregisterDistro),
     X(RegisterLxBus),
     X(MountDisk),
-    X(QueryLatestGithubRelease),
+    X(QueryLatestGitHubRelease),
     X(DebugShell),
     X(Plugin),
     X(CallMsi),
@@ -255,7 +257,7 @@ int UpdatePackageImpl(bool preRelease, bool repair)
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
 
-    auto [version, release] = GetLatestGithubRelease(preRelease);
+    auto [version, release] = GetLatestGitHubRelease(preRelease);
 
     if (!repair && ParseWslPackageVersion(version) <= wsl::shared::PackageVersion)
     {
@@ -825,7 +827,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
 
         return Localization::MessageOsNotSupported(helpers::GetWindowsVersionString().c_str(), kbUrl.c_str());
 
-    // All the errors below this comment are not supposed to be reachable here (since there's meant to be emmited from the
+    // All the errors below this comment are not supposed to be reachable here (since there's meant to be emitted from the
     // service). But if we somehow hit them here, it's better show something useful to the user.
     case WSL_E_VM_MODE_MOUNT_NAME_ALREADY_EXISTS:
         return Localization::MessageDiskMountNameAlreadyExists();
@@ -899,7 +901,7 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     return GetSystemErrorString(result);
 }
 
-std::optional<std::pair<std::wstring, GithubReleaseAsset>> wsl::windows::common::wslutil::GetGithubAssetFromRelease(const GithubRelease& Release)
+std::optional<std::pair<std::wstring, GitHubReleaseAsset>> wsl::windows::common::wslutil::GetGitHubAssetFromRelease(const GitHubRelease& Release)
 {
     auto findAsset = [&Release](LPCWSTR Suffix) {
         for (const auto& asset : Release.assets)
@@ -913,7 +915,7 @@ std::optional<std::pair<std::wstring, GithubReleaseAsset>> wsl::windows::common:
             }
         }
 
-        return std::optional<std::pair<std::wstring, GithubReleaseAsset>>();
+        return std::optional<std::pair<std::wstring, GitHubReleaseAsset>>();
     };
 
     // Look for an MSI package first
@@ -929,31 +931,31 @@ std::optional<std::pair<std::wstring, GithubReleaseAsset>> wsl::windows::common:
     return asset.value();
 }
 
-std::pair<std::wstring, GithubReleaseAsset> wsl::windows::common::wslutil::GetLatestGithubRelease(bool preRelease)
+std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLatestGitHubRelease(bool preRelease)
 {
-    ExecutionContext context(Context::QueryLatestGithubRelease);
+    ExecutionContext context(Context::QueryLatestGitHubRelease);
 
     auto registryKey = registry::OpenLxssMachineKey();
     const auto url =
         registry::ReadString(registryKey.get(), nullptr, c_githubUrlOverrideRegistryValue, preRelease ? c_releaseListUrl : c_latestReleaseUrl);
-    WSL_LOG("PollLatestGithubRelease", TraceLoggingValue(url.c_str(), "url"));
+    WSL_LOG("PollLatestGitHubRelease", TraceLoggingValue(url.c_str(), "url"));
 
     winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
     response.EnsureSuccessStatusCode();
 
-    return GetLatestGithubRelease(preRelease, response.Content().ReadAsStringAsync().get().c_str());
+    return GetLatestGitHubRelease(preRelease, response.Content().ReadAsStringAsync().get().c_str());
 }
 
-std::pair<std::wstring, GithubReleaseAsset> wsl::windows::common::wslutil::GetLatestGithubRelease(bool preRelease, LPCWSTR releases)
+std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLatestGitHubRelease(bool preRelease, LPCWSTR releases)
 {
-    std::optional<GithubRelease> parsed{};
+    std::optional<GitHubRelease> parsed{};
 
     if (preRelease)
     {
         std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> highestVersion;
-        for (const auto& e : wsl::shared::FromJson<std::vector<GithubRelease>>(releases))
+        for (const auto& e : wsl::shared::FromJson<std::vector<GitHubRelease>>(releases))
         {
             auto version = ParseWslPackageVersion(e.name);
             if (!highestVersion.has_value() || version > highestVersion)
@@ -965,21 +967,21 @@ std::pair<std::wstring, GithubReleaseAsset> wsl::windows::common::wslutil::GetLa
     }
     else
     {
-        parsed = wsl::shared::FromJson<GithubRelease>(releases);
+        parsed = wsl::shared::FromJson<GitHubRelease>(releases);
     }
 
     THROW_HR_IF(E_UNEXPECTED, !parsed.has_value());
 
     // Find the latest release with an msix package asset
-    auto asset = GetGithubAssetFromRelease(parsed.value());
+    auto asset = GetGitHubAssetFromRelease(parsed.value());
     THROW_HR_IF_MSG(E_UNEXPECTED, !asset.has_value(), "No suitable WSL release found on github");
 
     return asset.value();
 }
 
-GithubRelease wsl::windows::common::wslutil::GetGithubReleaseByTag(_In_ const std::wstring& inTag)
+GitHubRelease wsl::windows::common::wslutil::GetGitHubReleaseByTag(_In_ const std::wstring& inTag)
 {
-    ExecutionContext context(Context::QueryLatestGithubRelease);
+    ExecutionContext context(Context::QueryLatestGitHubRelease);
 
     const winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
@@ -989,7 +991,7 @@ GithubRelease wsl::windows::common::wslutil::GetGithubReleaseByTag(_In_ const st
 
     const auto content = response.Content().ReadAsStringAsync().get();
 
-    return wsl::shared::FromJson<GithubRelease>(content.c_str());
+    return wsl::shared::FromJson<GitHubRelease>(content.c_str());
 }
 
 int wsl::windows::common::wslutil::GetLogicalProcessorCount()
@@ -1343,10 +1345,17 @@ int WINAPI InstallRecordHandler(void* context, UINT messageType, LPCWSTR message
     try
     {
         WSL_LOG("MSIMessage", TraceLoggingValue(messageType, "type"), TraceLoggingValue(message, "message"));
+        auto type = (INSTALLMESSAGE)(0xFF000000 & (UINT)messageType);
+
+        if (type == INSTALLMESSAGE_ERROR || type == INSTALLMESSAGE_FATALEXIT || type == INSTALLMESSAGE_WARNING)
+        {
+            WriteInstallLog(std::format("MSI message: {}", message));
+        }
+
         auto* callback = reinterpret_cast<const std::function<void(UINT, LPCWSTR)>*>(context);
         if (callback != nullptr)
         {
-            (*callback)((INSTALLMESSAGE)(0xFF000000 & (UINT)messageType), message);
+            (*callback)(type, message);
         }
     }
     CATCH_LOG();
@@ -1400,6 +1409,8 @@ int wsl::windows::common::wslutil::UpdatePackage(bool PreRelease, bool Repair)
 UINT wsl::windows::common::wslutil::UpgradeViaMsi(
     _In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
 {
+    WriteInstallLog(std::format("Upgrading via MSI package: {}. Args: {}", PackageLocation, ExtraArgs != nullptr ? ExtraArgs : L""));
+
     ConfigureMsiLogging(LogFile, Callback);
 
     auto result = MsiInstallProduct(PackageLocation, ExtraArgs);
@@ -1407,6 +1418,8 @@ UINT wsl::windows::common::wslutil::UpgradeViaMsi(
         "MsiInstallResult",
         TraceLoggingValue(result, "result"),
         TraceLoggingValue(ExtraArgs != nullptr ? ExtraArgs : L"", "ExtraArgs"));
+
+    WriteInstallLog(std::format("MSI upgrade result: {}", result));
 
     return result;
 }
@@ -1416,10 +1429,15 @@ UINT wsl::windows::common::wslutil::UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _I
     const auto key = OpenLxssMachineKey(KEY_READ);
     const auto productCode = ReadString(key.get(), L"Msi", L"ProductCode", nullptr);
 
+    WriteInstallLog(std::format("Uninstalling MSI package: {}", productCode));
+
     ConfigureMsiLogging(LogFile, Callback);
 
     auto result = MsiConfigureProduct(productCode.c_str(), 0, INSTALLSTATE_ABSENT);
     WSL_LOG("MsiUninstallResult", TraceLoggingValue(result, "result"));
+
+    WriteInstallLog(std::format("MSI package uninstall result: {}", result));
+
     return result;
 }
 
@@ -1449,6 +1467,43 @@ wil::unique_hfile wsl::windows::common::wslutil::ValidateFileSignature(LPCWSTR P
 
     return fileHandle;
 }
+
+void wsl::windows::common::wslutil::WriteInstallLog(const std::string& Content)
+try
+{
+    static std::wstring path = wil::GetWindowsDirectoryW<std::wstring>() + L"\\temp\\wsl-install-log.txt";
+
+    // Wait up to 10 seconds for the log file mutex
+    wil::unique_handle mutex{CreateMutex(nullptr, true, L"Global\\WslInstallLog")};
+    THROW_LAST_ERROR_IF(!mutex);
+
+    THROW_LAST_ERROR_IF(WaitForSingleObject(mutex.get(), 10 * 1000) != WAIT_OBJECT_0);
+
+    wil::unique_handle file{CreateFile(
+        path.c_str(), GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, 0, nullptr)};
+
+    THROW_LAST_ERROR_IF(!file);
+
+    LARGE_INTEGER size{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(file.get(), &size));
+
+    // Append to the file if its size is below 10MB, otherwise truncate.
+    if (size.QuadPart < 10 * _1MB)
+    {
+        THROW_LAST_ERROR_IF(SetFilePointer(file.get(), 0, nullptr, FILE_END) == INVALID_SET_FILE_POINTER);
+    }
+    else
+    {
+        THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(file.get()));
+    }
+
+    static auto processName = wil::GetModuleFileNameW<std::wstring>();
+    auto logLine = std::format("{:%FT%TZ} {}[{}]: {}\n", std::chrono::system_clock::now(), processName, WSL_PACKAGE_VERSION, Content);
+
+    DWORD bytesWritten{};
+    THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), logLine.c_str(), static_cast<DWORD>(logLine.size()), &bytesWritten, nullptr));
+}
+CATCH_LOG();
 
 winrt::Windows::Management::Deployment::PackageVolume wsl::windows::common::wslutil::GetSystemVolume()
 try

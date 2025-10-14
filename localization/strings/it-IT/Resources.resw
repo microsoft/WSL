@@ -327,13 +327,17 @@ Per usare WSL1, è necessario abilitare il componente facoltativo "Sottosistema 
     --msal-proxy-path
         Visualizza il percorso dell'applicazione proxy MSAL.
 
+    --vm-id
+        Visualizza l'ID della macchina virtuale WSL.
+
     --version
         Visualizza la versione del pacchetto WSL.
 
     -n
-        Non stampare una nuova riga.</value>
+        Non stampa una nuova riga.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1696,12 +1700,6 @@ Puoi anche accedere a più opzioni remote di VS Code tramite il riquadro comandi
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Funzionalità facoltative</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Abilita la creazione di report di pagine</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>L'impostazione true predefinita consente a Windows di recuperare la memoria inutilizzata allocata alla macchina virtuale WSL 2.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Informativa sulla privacy</value>

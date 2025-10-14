@@ -112,7 +112,7 @@ public:
 
     /// <summary>
     /// Registers connection targets with the Plan 9 Redirector for the calling user, if they're
-    /// not already regsistered.
+    /// not already registered.
     /// </summary>
     void RegisterPlan9ConnectionTarget(_In_ HANDLE userToken) override;
 

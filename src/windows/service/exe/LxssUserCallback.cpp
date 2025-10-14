@@ -27,7 +27,7 @@ LxssUserCallback::LxssUserCallback(_In_ HANDLE Handle, _In_ LXBUS_USER_CALLBACK_
     // Allocate a buffer of the requested size.
     m_buffer.resize(OutputBufferSize);
 
-    // Setup the threapool wait callback.
+    // Set up the threadpool wait callback.
     PTP_WAIT_CALLBACK ThreadpoolCallback;
     ThreadpoolCallback = reinterpret_cast<PTP_WAIT_CALLBACK>(&ThreadpoolCallbackProxy);
 

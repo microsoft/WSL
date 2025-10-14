@@ -21,6 +21,10 @@ if ($LogProfile -eq $null -Or ![System.IO.File]::Exists($LogProfile))
     {
          $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_storage.wprp"
     }
+    elseif ($LogProfile -eq "hvsocket")
+    {
+         $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_hvsocket.wprp"
+    }
     else
     {
         Write-Error "Unknown log profile: $LogProfile"
@@ -51,6 +55,8 @@ if (Test-Path $wslconfig)
 {
     Copy-Item $wslconfig $folder | Out-Null
 }
+
+Copy-Item "C:\Windows\temp\wsl-install-log.txt" $folder -ErrorAction ignore
 
 get-appxpackage MicrosoftCorporationII.WindowsSubsystemforLinux -ErrorAction Ignore > $folder/appxpackage.txt
 get-acl "C:\ProgramData\Microsoft\Windows\WindowsApps" -ErrorAction Ignore | Format-List > $folder/acl.txt

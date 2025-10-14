@@ -328,13 +328,17 @@ Para obter informações, visite https://aka.ms/enablevirtualization</value>
     --msal-proxy-path
         Exibir o caminho para o aplicativo proxy MSAL.
 
+    --vm-id
+        Exibir a ID da VM do WSL.
+
     --version
         Exibir a versão do pacote WSL.
 
     -n
-        Não imprimir uma nova linha.</value>
+        Não imprima uma nova linha.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1697,12 +1701,6 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Recursos Opcionais</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Habilitar relatório de página</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>A configuração true padrão permite que o Windows recupere a memória não utilizada alocada para a máquina virtual WSL 2.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Política de Privacidade</value>

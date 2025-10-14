@@ -306,7 +306,7 @@ wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsSetting
             }
         }
 
-        // Give precedence to interfaces that have IPv4 DNS servers, otherwise give precedence to the lower interface index.
+        // Give precedence to interfaces that have IPv4 DNS servers; otherwise, give precedence to the lower interface index.
         return (FirstHasIpv4 ^ SecondHasIpv4) ? FirstHasIpv4 : (First->IfIndex < Second->IfIndex);
     });
 

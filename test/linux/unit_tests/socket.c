@@ -91,7 +91,7 @@ static const LXT_VARIATION g_LxtClientVariations[] = {
 
 //
 // N.B. Keep the number of variations up to date with
-// LXT_SOCKET_NUM_SERVER_VARAITIONS in socket/common.h
+// LXT_SOCKET_NUM_SERVER_VARIATIONS in socket/common.h
 //
 
 static const LXT_VARIATION g_LxtServerVariations[] = {

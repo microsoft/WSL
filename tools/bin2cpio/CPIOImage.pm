@@ -40,7 +40,7 @@ use constant TRAILER => "TRAILER!!!";
 #      like initramfs.
 #
 use constant INODE => 0;
-use constant MODE => oct("100777");
+use constant MODE => oct("100755");
 use constant UID => 0;
 use constant GID => 0;
 use constant NLINK => 0;

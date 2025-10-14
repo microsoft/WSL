@@ -72,7 +72,7 @@ int GetPtSerialNumFromDeviceString(const char PtsNameString[])
 
 Routine Description:
 
-    This routine will parse the PTS (Psedu Terminal Slave) device name and
+    This routine will parse the PTS (Pseudo Terminal Slave) device name and
     retrieve the Serial Number from the string.
 
 Arguments:
@@ -199,7 +199,7 @@ Return Value:
 
     int Fdm;
     int Fds;
-    char LocalBuffer[PTS_DEV_NAME_BUFER_SIZE];
+    char LocalBuffer[PTS_DEV_NAME_BUFFER_SIZE];
     int Result;
     int SubordinateSerialNumber;
 
@@ -214,7 +214,7 @@ Return Value:
     LxtCheckErrno((Fdm = open("/dev/ptmx", O_RDWR)));
     LxtCheckErrno(grantpt(Fdm));
     LxtCheckErrno(unlockpt(Fdm));
-    LxtCheckErrno(ptsname_r(Fdm, LocalBuffer, PTS_DEV_NAME_BUFER_SIZE));
+    LxtCheckErrno(ptsname_r(Fdm, LocalBuffer, PTS_DEV_NAME_BUFFER_SIZE));
     LxtCheckErrno(Fds = open(LocalBuffer, O_RDWR));
     if (PtsDevName != NULL)
     {

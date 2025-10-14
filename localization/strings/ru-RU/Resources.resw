@@ -328,6 +328,9 @@
     --msal-proxy-path
         Отображение пути к прокси-приложению MSAL.
 
+    --vm-id
+        Отображение ИД виртуальной машины WSL.
+
     --version
         Отображение версии пакета WSL.
 
@@ -335,6 +338,7 @@
         Не печатать новую строку.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1103,7 +1107,7 @@
     <value>Не удалось запросить сетевой режим</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>Настраиваемые модули ядра были предоставлены без указания настраиваемого ядра. Дополнительные https://aka.ms/wslcustomkernel см. в https://aka.ms/wslcustomkernel.</value>
+    <value>Модули настроенного ядра предоставлены без указания настроенного ядра. Дополнительные сведения см. на странице https://aka.ms/wslcustomkernel.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Из-за текущей проблемы совместимости с клиентом глобального безопасного доступа туннелирование DNS отключено.</value>
@@ -1697,12 +1701,6 @@ wsl.exe --manage &lt;имя_дистрибутива&gt; --set-sparse --allow-un
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Дополнительные функции</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Включить отчеты о страницах</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Значение ИСТИНА по умолчанию позволяет Windows освободить неиспользуемую память, выделенную виртуальной машине WSL 2.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Заявление о конфиденциальности</value>

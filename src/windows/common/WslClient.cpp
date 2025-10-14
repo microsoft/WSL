@@ -568,10 +568,7 @@ int Install(_In_ std::wstring_view commandLine)
     }
 
     bool rebootRequired = InstallPrerequisites(installWslOptionalComponent);
-    if (rebootRequired)
-    {
-        noLaunchAfterInstall = false;
-    }
+    noLaunchAfterInstall |= rebootRequired;
 
     // Install a distribution only if no reboot is required, or if we're on the --legacy path (to maintain old behavior).
     const Distribution* legacyDistro = nullptr;
@@ -630,7 +627,7 @@ int Install(_In_ std::wstring_view commandLine)
 
             if (legacyDistro != nullptr)
             {
-                wsl::windows::common::distribution::Launch(*legacyDistro, installResult.InstalledViaGithub, !installResult.Alreadyinstalled);
+                wsl::windows::common::distribution::Launch(*legacyDistro, installResult.InstalledViaGitHub, !installResult.Alreadyinstalled);
             }
             else
             {
@@ -647,10 +644,10 @@ int Install(_In_ std::wstring_view commandLine)
 
 bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
 {
-    const auto missingComponents = WslInstall::CheckForMissingOptionalComponents(installWslOptionalComponent);
+    const auto [rebootRequired, missingComponents] = WslInstall::CheckForMissingOptionalComponents(installWslOptionalComponent);
     if (missingComponents.empty())
     {
-        return false;
+        return rebootRequired;
     }
 
     // Install any optional components that have not yet been installed.
@@ -671,7 +668,7 @@ bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
         WslInstall::InstallOptionalComponents(missingComponents);
     }
 
-    return true;
+    return rebootRequired;
 }
 
 int LaunchProcess(_In_opt_ LPCWSTR filename, _In_ int argc, _In_reads_(argc) LPCWSTR argv[], _In_ const LaunchProcessOptions& options)
@@ -1076,7 +1073,7 @@ LaunchProcessOptions ParseLegacyArguments(_Inout_ std::wstring_view& commandLine
     // Strip any leading whitespace.
     commandLine = wsl::windows::common::string::StripLeadingWhitespace(commandLine);
 
-    // Check for a distributon GUID as the first parameter and strip it out if present.
+    // Check for a distribution GUID as the first parameter and strip it out if present.
     auto argument = wsl::windows::common::helpers::ParseArgument(commandLine);
     auto distroGuid = wsl::shared::string::ToGuid(argument);
     if (distroGuid.has_value())
@@ -1523,7 +1520,7 @@ int RunDebugShell()
     // a pipe is connected, so it's lost.
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(pipe.get(), "\n", 1, nullptr, nullptr));
 
-    // Create a thread to realy stdin to the pipe.
+    // Create a thread to relay stdin to the pipe.
     wsl::windows::common::SvcCommIo Io;
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread(

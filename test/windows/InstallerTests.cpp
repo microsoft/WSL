@@ -249,7 +249,9 @@ class InstallerTests
 
         try
         {
-            wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::seconds(1), std::chrono::minutes(2));
+            // It is possible for the 'DeprovisionMsix' stage of the MSI installation to take a long time.
+            // On vb_release, up to 7 minutes have been observed. Wait for up to 20 minutes to be safe.
+            wsl::shared::retry::RetryWithTimeout<void>(pred, std::chrono::seconds(1), std::chrono::minutes(20));
         }
         catch (...)
         {
@@ -332,7 +334,7 @@ class InstallerTests
         wsl::windows::common::registry::DeleteKeyValue(msiKey.get(), L"ProductCode");
     }
 
-    void InstallGitubRelease(const std::wstring& version)
+    void InstallGitHubRelease(const std::wstring& version)
     {
         auto arch = wsl::shared::Arm64 ? L".0.arm64" : L".0.x64";
 
@@ -354,8 +356,8 @@ class InstallerTests
             LogInfo("Downloading: %ls", version.c_str());
 
             VERIFY_IS_TRUE(g_pipelineBuildId.empty()); // Pipeline builds should have the installers already available
-            auto release = wsl::windows::common::wslutil::GetGithubReleaseByTag(version);
-            auto asset = wsl::windows::common::wslutil::GetGithubAssetFromRelease(release);
+            auto release = wsl::windows::common::wslutil::GetGitHubReleaseByTag(version);
+            auto asset = wsl::windows::common::wslutil::GetGitHubAssetFromRelease(release);
             VERIFY_IS_TRUE(asset.has_value());
 
             auto downloadPath = wsl::windows::common::wslutil::DownloadFile(asset->second.url, asset->second.name);
@@ -383,9 +385,9 @@ class InstallerTests
     TEST_METHOD(UpgradeFromWsl130)
     {
         UninstallMsi();
-        InstallGitubRelease(L"1.3.17");
+        InstallGitHubRelease(L"1.3.17");
 
-        // Note: we can't use wsl --update here because GithubUrlOverride was introduced in 2.0.0
+        // Note: we can't use wsl --update here because GitHubUrlOverride was introduced in 2.0.0
         InstallMsi();
         ValidatePackageInstalledProperly();
     }
@@ -395,7 +397,7 @@ class InstallerTests
         UninstallMsi();
 
         // Note: we can't use wsl --update here because wsl 2.0.0 passes REINSTALL=ALL to msiexec
-        InstallGitubRelease(L"2.0.0");
+        InstallGitHubRelease(L"2.0.0");
         InstallMsi();
         ValidatePackageInstalledProperly();
     }
@@ -403,7 +405,7 @@ class InstallerTests
     TEST_METHOD(UpgradeFromWsl202)
     {
         UninstallMsi();
-        InstallGitubRelease(L"2.0.2");
+        InstallGitHubRelease(L"2.0.2");
         CallWslUpdateViaMsi();
     }
 
@@ -651,7 +653,7 @@ class InstallerTests
         RegistryKeyChange<std::wstring> change(
             HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", wsl::windows::common::wslutil::c_githubUrlOverrideRegistryValue, endpoint);
 
-        constexpr auto GithubApiResponse =
+        constexpr auto GitHubApiResponse =
             LR"({
                     \"name\": \"1.0.0\",
                     \"created_at\": \"2023-06-14T16:56:30Z\",
@@ -664,7 +666,7 @@ class InstallerTests
                      ]
                  })";
 
-        UniqueWebServer server(endpoint, GithubApiResponse);
+        UniqueWebServer server(endpoint, GitHubApiResponse);
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--update");
         VERIFY_ARE_EQUAL(
@@ -899,7 +901,7 @@ class InstallerTests
         RegistryKeyChange<std::wstring> change(
             HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", wsl::windows::common::wslutil::c_githubUrlOverrideRegistryValue, endpoint);
 
-        constexpr auto GithubApiResponse =
+        constexpr auto GitHubApiResponse =
             LR"({
                     \"name\": \"999.0.0\",
                     \"created_at\": \"2023-06-14T16:56:30Z\",
@@ -912,7 +914,7 @@ class InstallerTests
                      ]
                  })";
 
-        UniqueWebServer apiServer(endpoint, GithubApiResponse);
+        UniqueWebServer apiServer(endpoint, GitHubApiResponse);
         UniqueWebServer fileServer(L"http://127.0.0.1:12346/", std::filesystem::path(m_msiPath));
 
         // DeleteProductCode();
@@ -946,7 +948,7 @@ class InstallerTests
         RegistryKeyChange<std::wstring> change(
             HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", wsl::windows::common::wslutil::c_githubUrlOverrideRegistryValue, endpoint);
 
-        constexpr auto GithubApiResponse =
+        constexpr auto GitHubApiResponse =
             LR"({
                     \"name\": \"999.0.0\",
                     \"created_at\": \"2023-06-14T16:56:30Z\",
@@ -959,7 +961,7 @@ class InstallerTests
                      ]
                  })";
 
-        UniqueWebServer apiServer(endpoint, GithubApiResponse);
+        UniqueWebServer apiServer(endpoint, GitHubApiResponse);
         UniqueWebServer fileServer(L"http://127.0.0.1:12346/", std::filesystem::path(m_msixPackagePath));
 
         UninstallMsix();

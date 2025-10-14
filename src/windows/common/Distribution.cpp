@@ -101,14 +101,18 @@ DistributionList ReadFromManifest(const std::wstring& url)
         }
         else
         {
-            const winrt::Windows::Web::Http::HttpClient client;
+            const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
+            filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
+            filter.CacheControl().ReadBehavior(winrt::Windows::Web::Http::Filters::HttpCacheReadBehavior::NoCache);
+
+            const winrt::Windows::Web::Http::HttpClient client(filter);
             const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
             response.EnsureSuccessStatusCode();
 
             content = response.Content().ReadAsStringAsync().get();
         }
 
-        auto distros = wsl::shared::FromJson<DistributionList>(content.c_str());
+        auto distros = wsl::shared::FromJson<DistributionList, nlohmann::ordered_json>(content.c_str());
 
         if (distros.Distributions.has_value())
         {
@@ -141,7 +145,7 @@ DistributionList ReadFromManifest(const std::wstring& url)
             }
         }
 
-        // The "Default" string takes precendence. If not present, use the first legacy distro entry.
+        // The "Default" string takes precedence. If not present, use the first legacy distro entry.
         if (!distros.Default.has_value() && distros.Distributions.has_value() && distros.Distributions->size() > 0)
         {
             distros.Default = (*distros.Distributions)[0].Name;

@@ -41,7 +41,7 @@ public sealed partial class MemAndProcPage : Page
             return;
         }
 
-        RuntimeHelper.TryMoveFocusPrevousControl(sender as Button);
+        RuntimeHelper.TryMoveFocusPreviousControl(sender as Button);
     }
 
     public async void SwapFilePath_Click(object sender, RoutedEventArgs e)

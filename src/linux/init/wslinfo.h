@@ -20,6 +20,7 @@ Abstract:
 #define WSLINFO_NETWORKING_MODE "--networking-mode"
 #define WSLINFO_WSL_VERSION "--version"
 #define WSLINFO_WSL_VERSION_LEGACY "--wsl-version"
+#define WSLINFO_WSL_VMID "--vm-id"
 #define WSLINFO_WSL_HELP "--help"
 #define WSLINFO_NO_NEWLINE 'n'
 

@@ -4,7 +4,7 @@ This page describes the steps in the WSL2 process, from the user invoking [wsl.e
 
 ## Overview 
 
-The below diagram shows the sequence of event to start bash within a WSL2 distribution. See [WSL architecture](index.md) for details about what each process does.
+The below diagram shows the sequence of events to start bash within a WSL2 distribution. See [WSL architecture](index.md) for details about what each process does.
 
 ```mermaid
 sequenceDiagram
@@ -43,7 +43,7 @@ sequenceDiagram
 
 ## CreateInstance()
 
-When [wslervice.exe](wslservice.exe.md) receives the CreateInstance() call via COM, it will:
+When [wslservice.exe](wslservice.exe.md) receives the CreateInstance() call via COM, it will:
 
 1) Identify which distribution the user wants to create. This is done by looking up the `DistributionRegistration` (see `src/windows/service/exe/DistributionRegistration.cpp`) in the Windows registry, matching either on the distribution ID, or using the default if none is provided.
 
@@ -76,13 +76,13 @@ When started, the virtual machine will boot into the provided kernel, and then e
 
 - Identifiers for the system VHD, swap VHD and kernel modules VHD if any
 - The machine's hostname
-- The configured memory reclaim mode and page reporting order(See [wsl2.pageReporting](https://learn.microsoft.com/windows/wsl/wsl-config))*
+- The configured memory reclaim mode and page reporting order
 
 [mini_init](mini_init.md) then creates the [gns process](gns.md), which is responsible for networking configuration and then receives a `LxMiniInitMessageInitialConfig` message, which contains: 
 
 - An entropy buffer, to seed the virtual machine's entropy
 - Information about the GPU drivers shares to mount, if any
-- Wether [wslg](https://github.com/microsoft/wslg) is enabled
+- Whether [wslg](https://github.com/microsoft/wslg) is enabled
 
 After applying all the configuration requested by [wslservice.exe](wslservice.exe.md), the virtual machine is ready to start Linux distributions.
 

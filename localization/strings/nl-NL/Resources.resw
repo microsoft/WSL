@@ -321,6 +321,9 @@ Schakel het optionele onderdeel 'Windows Subsystem for Linux' in om WSL1 te gebr
     --msal-proxy-path
         Geef het pad naar de MSAL-proxytoepassing weer.
 
+    --vm-id
+        Geef de WSL VM-id weer.
+
     --version
         De versie van het WSL-pakket weergeven.
 
@@ -328,6 +331,7 @@ Schakel het optionele onderdeel 'Windows Subsystem for Linux' in om WSL1 te gebr
         Druk geen nieuwe regel af.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Optionele onderdelen</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Paginarapportage inschakelen</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Met de standaardinstelling Waar, kan Windows ongebruikt geheugen vrijmaken dat is toegewezen aan de virtuele WSL 2-machine.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Privacyverklaring</value>

@@ -1110,7 +1110,7 @@ Arguments:
 
     String - Supplies the string to split.
 
-    Delim - The deliminiter to split the string on.
+    Delim - The delimiter to split the string on.
 
 Return Value:
 
@@ -1142,7 +1142,7 @@ Return Value:
     return output;
 }
 
-// WslKeepAlive class defintions
+// WslKeepAlive class definitions
 
 WslKeepAlive::WslKeepAlive(HANDLE Token) : m_token(Token)
 {
@@ -2071,16 +2071,6 @@ Return Value:
         THROW_HR_MSG(E_FAIL, "Test setup returned non-zero exit code %lu", ExitCode);
     }
 
-    if (!g_pipelineBuildId.empty())
-    {
-        LxsstuRunCommand(std::format(
-                             L"Powershell -NoProfile -Command \"Add-MpPreference -ExclusionPath '{}'\"",
-                             wsl::windows::common::wslutil::GetMsiPackagePath().value())
-                             .data());
-
-        LxsstuRunCommand(std::format(L"Powershell -NoProfile -Command \"Add-MpPreference -ExclusionPath '.'\"").data());
-    }
-
     return true;
 }
 
@@ -2128,7 +2118,7 @@ Return Value:
         commandLine = std::format(L"Get-MpThreat > \"{}\\Get-MpThreat.txt\"", g_dumpFolder);
         LxsstuLaunchPowershellAndCaptureOutput(commandLine.data());
 
-        commandLine = std::format(L"Get-MpPreference > \"{}\\Get-MpPreference\"", g_dumpFolder);
+        commandLine = std::format(L"Get-MpPreference > \"{}\\Get-MpPreference.txt\"", g_dumpFolder);
         LxsstuLaunchPowershellAndCaptureOutput(commandLine.data());
     }
 
@@ -2141,7 +2131,7 @@ Return Value:
     if (!g_originalDefaultDistro.empty())
     {
         // Edge case: If the previous default distro was the test distro, it might have been deleted during the testpass.
-        // Validate the the distro exists before restoring.
+        // Validate the distro exists before restoring.
 
         const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
 

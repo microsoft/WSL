@@ -110,7 +110,7 @@ class SimpleTests
             L"The operation completed successfully. \r\n",
             L"wsl: Sparse VHD support is currently disabled due to potential data corruption.\r\n"
             L"To force a distribution to use a sparse vhd, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse --allow-unsafe\r\n",
+            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\n",
             0);
 
         std::filesystem::path vhdPath = vhdDir / LXSS_VM_MODE_VHD_NAME;
@@ -123,7 +123,7 @@ class SimpleTests
             std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true").c_str(),
             L"Sparse VHD support is currently disabled due to potential data corruption.\r\n"
             L"To force a distribution to use a sparse vhd, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse --allow-unsafe\r\nError code: Wsl/Service/E_INVALIDARG\r\n",
+            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\nError code: Wsl/Service/E_INVALIDARG\r\n",
             L"",
             -1);
 
@@ -183,8 +183,8 @@ class SimpleTests
             {nullptr, std::nullopt},
             {"", std::nullopt},
             {"2", std::nullopt},
-            {"tru", std::nullopt},
-            {"fals", std::nullopt},
+            {"true_", std::nullopt},
+            {"false_", std::nullopt},
         };
 
         for (const auto& [input, expected] : boolTests)

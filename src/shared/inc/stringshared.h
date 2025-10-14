@@ -20,6 +20,7 @@ Abstract:
 #include <fstream>
 #include <gsl/gsl>
 #include <format>
+#include <source_location>
 
 #ifndef WIN32
 #include <string.h>
@@ -713,7 +714,7 @@ inline MacAddress ParseMacAddress(const std::basic_string<T>& Input, T Separator
 }
 
 template <typename TChar>
-inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar seperator)
+inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar separator)
 {
     std::basic_string<TChar> output(17, '\0');
 
@@ -724,15 +725,15 @@ inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar 
             output.size() + 1,
             MAC_ADDRESS_FORMAT_STRING,
             input[0],
-            seperator,
+            separator,
             input[1],
-            seperator,
+            separator,
             input[2],
-            seperator,
+            separator,
             input[3],
-            seperator,
+            separator,
             input[4],
-            seperator,
+            separator,
             input[5]);
     }
     else if constexpr (std::is_same_v<TChar, wchar_t>)
@@ -742,15 +743,15 @@ inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar 
             output.size() + 1,
             STRING_TO_WIDE_STRING(MAC_ADDRESS_FORMAT_STRING),
             input[0],
-            seperator,
+            separator,
             input[1],
-            seperator,
+            separator,
             input[2],
-            seperator,
+            separator,
             input[3],
-            seperator,
+            separator,
             input[4],
-            seperator,
+            separator,
             input[5]);
     }
     else
@@ -831,6 +832,22 @@ struct std::formatter<wchar_t[N], char>
     auto format(const wchar_t str[N], TCtx& ctx) const
     {
         return std::format_to(ctx.out(), "{}", wsl::shared::string::WideToMultiByte(str));
+    }
+};
+
+template <>
+struct std::formatter<std::source_location, char>
+{
+    template <typename TCtx>
+    static constexpr auto parse(TCtx& ctx)
+    {
+        return ctx.begin();
+    }
+
+    template <typename TCtx>
+    auto format(const std::source_location& location, TCtx& ctx) const
+    {
+        return std::format_to(ctx.out(), "{}[{}:{}]", location.function_name(), location.file_name(), location.line());
     }
 };
 

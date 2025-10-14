@@ -654,7 +654,7 @@ Return Value:
             // Test case: Bind with nl_pid = 0, kernel should assign a unique
             //            ID. The first netlink socket of the process is
             //            assigned the process ID as the nl_pid. It also confirms
-            //            the the pad value is ignored.
+            //            the pad value is ignored.
             //
 
             LxtCheckErrno(Socket = socket(AF_NETLINK, Type, Family));
@@ -671,7 +671,7 @@ Return Value:
             LxtCheckEqual(AddressLength, sizeof(BindAddress), "%d");
 
             //
-            // Validate that a socket that is already bound, can not be bound again.
+            // Validate that a socket that is already bound, cannot be bound again.
             //
 
             memset(&BindAddress, 0, sizeof(BindAddress));
@@ -684,7 +684,7 @@ Return Value:
             //            kernel assigns to the non-first sockets of the process).
             //            Test that the kernel will skip any negative nl_pid's that
             //            the user already specified. For example, Socket2 gets
-            //            an auto-assigned nl_pid of -5. Socket3 is binded with
+            //            an auto-assigned nl_pid of -5. Socket3 is bound with
             //            the user specifying nl_pid of -4. Socket4 gets an
             //            auto-assigned nl_pid of -3, since -4 was already taken
             //            by the user.
@@ -1745,7 +1745,7 @@ Return Value:
     // technically there is space in the receive buffer for the response.
     // The test sends a message with a unique sequence number. Later on, the
     // entire receive buffer will be drained and all responses checked to
-    // verify that this unqiue sequence number is not in any of the responses.
+    // verify that this unique sequence number is not in any of the responses.
     //
 
     Request.nlmsg_seq = 0x98765432;
@@ -2188,7 +2188,7 @@ Return Value:
     Timeout.tv_nsec = 0;
 
     //
-    // Setup the receive buffers.
+    // Set up the receive buffers.
     //
 
     memset(ReceiveMessages, 0, sizeof(ReceiveMessages));
@@ -2369,7 +2369,7 @@ Return Value:
     struct timespec Timeout;
 
     //
-    // The timeout value passed to recvmmsg() is ignored. Setup the receive
+    // The timeout value passed to recvmmsg() is ignored. Set up the receive
     // buffers.
     //
 
@@ -2411,7 +2411,7 @@ Return Value:
     {
         LxtLogError(
             "recvmmsg should return 0 messages read, "
-            "but it retured %d messages for flags %x",
+            "but it returned %d messages for flags %x",
             MessagesRead,
             Flags);
 
@@ -5379,7 +5379,7 @@ Return Value:
     // Check for general set/get of the SO_PASSCRED socket option.
     //
     // N.B After this routine, the state of the 'SO_PASSCRED' socket option in
-    //     the socket is not gauranteed.
+    //     the socket is not guaranteed.
     //
 
     LxtCheckErrno(SocketGetSetBooleanSocketOption(Socket, SOL_SOCKET, SO_PASSCRED, false));

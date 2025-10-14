@@ -2634,7 +2634,7 @@ class NetworkTests
 
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
-        // needs to be accesible from the new namespace, so it can't use a 127* IP.
+        // needs to be accessible from the new namespace, so it can't use a 127* IP.
         WslConfigChange config(LxssGenerateTestConfig({
             .guiApplications = true,
             .dnsTunneling = true,
@@ -2662,7 +2662,7 @@ class NetworkTests
 
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
-        // needs to be accesible from the new namespace, so it can't use a 127* IP
+        // needs to be accessible from the new namespace, so it can't use a 127* IP
         WslConfigChange config(LxssGenerateTestConfig(
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true, .dnsTunnelingIpAddress = L"10.255.255.254"}));
         WaitForMirroredStateInLinux();
@@ -2680,7 +2680,7 @@ class NetworkTests
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
-        // We list the IPv4 addresses mirrored in Linux and use in the test the first one we find
+        // We list the IPv4 addresses mirrored in Linux and use the first one we find in the test
         std::vector<InterfaceState> interfaceStates = GetAllInterfaceStates();
         std::wstring ipAddress;
 
@@ -2760,7 +2760,7 @@ class NetworkTests
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
-        // We list the IPv4 addresses mirrored in Linux and use in the test the first one we find
+        // We list the IPv4 addresses mirrored in Linux and use the first one we find in the test
         std::vector<InterfaceState> interfaceStates = GetAllInterfaceStates();
         std::wstring ipAddress;
 
@@ -2886,7 +2886,7 @@ class NetworkTests
     {
         // Verify that we have an initially working connection.
         // This also ensures that WSL is started to allow for
-        // valdiating the initial Hyper-V port state
+        // validating the initial Hyper-V port state
         GuestClient(L"tcp-connect:bing.com:80");
 
         if (expectHyperVFirewallObjects == FirewallObjects::Required)
@@ -2952,7 +2952,7 @@ class NetworkTests
     static auto AddFirewallRuleAndValidateTraffic(const FirewallRule& rule, FirewallTestConnectivity expectedConnectivityAfterRule)
     {
         LogInfo(
-            "Validing ruleType=[%ls] name=[%ls] and expectedConnectivity=[%ls]",
+            "Validating ruleType=[%ls] name=[%ls] and expectedConnectivity=[%ls]",
             (rule.Type == FirewallType::Host) ? L"Host" : L"HyperV",
             rule.Name.c_str(),
             expectedConnectivityAfterRule == FirewallTestConnectivity::Allowed ? L"Allowed" : L"Blocked");
@@ -3650,7 +3650,7 @@ class NetworkTests
         return std::find(v6State.Routes.begin(), v6State.Routes.end(), route) != v6State.Routes.end();
     }
 
-    // Reads from the file until the substring is found, a timeout is reached or ReadFile returns an error
+    // Reads from the file until the substring is found, a timeout is reached, or ReadFile returns an error
     // Returns true on success, false otherwise
     static bool FindSubstring(wil::unique_handle& file, const std::string& substr, std::string& output)
     {

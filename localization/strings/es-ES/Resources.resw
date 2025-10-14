@@ -327,13 +327,17 @@ Habilita el componente opcional "Subsistema de Windows para Linux" para usar WSL
     --msal-proxy-path
         Muestra la ruta de acceso a la aplicación proxy MSAL.
 
+    --vm-id
+        Muestra el ID de la máquina virtual de WSL.
+
     --version
-        Muestra la versión del paquete WSL.
+        Muestra la versión del paquete de WSL.
 
     -n
         No imprima una nueva línea.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1696,12 +1700,6 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Funciones opcionales</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Habilitar informes de páginas</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>La configuración true predeterminada permite que Windows reclame la memoria no usada asignada a la máquina virtual WSL 2.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Declaración privacidad</value>

@@ -54,6 +54,13 @@ typedef struct _LXSS_VM_MODE_SETUP_CONTEXT
     std::shared_ptr<LxssRunningInstance> instance;
 } LXSS_VM_MODE_SETUP_CONTEXT, *PLXSS_VM_MODE_SETUP_CONTEXT;
 
+enum class ShutdownBehavior
+{
+    Wait,
+    Force,
+    ForceAfter30Seconds
+};
+
 /// <summary>
 /// Each COM client gets a unique LxssUserSession object which contains a std::weak_ptr to a LxssUserSessionImpl for that user.
 /// </summary>
@@ -199,12 +206,12 @@ public:
     IFACEMETHOD(SetVersion)(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Passtrough a disk to the utility VM.
+    /// Pass through a disk to the utility VM.
     /// </summary>
     IFACEMETHOD(AttachDisk)(_In_ LPCWSTR Disk, _In_ ULONG Flags, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
-    /// Detach a passtrough disk from the utility VM.
+    /// Detach a passthrough disk from the utility VM.
     /// </summary>
     IFACEMETHOD(DetachDisk)(_In_ LPCWSTR Disk, _Out_ int* Result, _Out_ int* Step, _Out_ LXSS_ERROR_INFO* Error) override;
 
@@ -479,19 +486,19 @@ public:
     SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle);
 
     /// <summary>
-    /// Passtrough a disk to the utility VM.
+    /// Pass through a disk to the utility VM.
     /// </summary>
     HRESULT AttachDisk(_In_ LPCWSTR Disk, _In_ ULONG Flags);
 
     /// <summary>
-    /// Detach a passtrough a disk from the utility VM.
+    /// Detach a passthrough disk from the utility VM.
     /// </summary>
     HRESULT DetachDisk(_In_ LPCWSTR Disk, _Out_ int* Result, _Out_ int* Step);
 
     /// <summary>
     /// Terminates all running instances and the Linux utility vm.
     /// </summary>
-    HRESULT Shutdown(_In_ bool PreventNewInstances = false, _In_ bool ForceTerminate = false);
+    HRESULT Shutdown(_In_ bool PreventNewInstances = false, ShutdownBehavior Behavior = ShutdownBehavior::Wait);
 
     /// <summary>
     /// Worker thread for logging telemetry about processes running inside of WSL.
@@ -755,7 +762,7 @@ private:
     static wil::unique_hkey s_OpenLxssUserKey();
 
     /// <summary>
-    /// Ensures the distribuiton name is valid.
+    /// Ensures the distribution name is valid.
     /// </summary>
     static void s_ValidateDistroName(_In_ LPCWSTR Name);
 
@@ -784,7 +791,7 @@ private:
     /// <summary>
     /// Lock for protecting various lists.
     /// </summary>
-    std::recursive_mutex m_instanceLock;
+    std::recursive_timed_mutex m_instanceLock;
 
     /// <summary>
     /// Contains the currently running utility VM's.

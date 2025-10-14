@@ -220,8 +220,8 @@ try
 
     // Launch the interop server.
     //
-    // See Github #7568. There needs to be a console for interop.
-    // From Github #8161 we learned we can't be attached to the same
+    // See GitHub #7568. There needs to be a console for interop.
+    // From GitHub #8161 we learned we can't be attached to the same
     // console as wsl.exe. If we are we will be terminated and unable
     // to serve daemonized processes after the console is closed.
     wsl::windows::common::helpers::CreateConsole(nullptr);
@@ -258,7 +258,7 @@ try
     {
         wsl::shared::SocketChannel channel{wil::unique_socket{reinterpret_cast<SOCKET>(handle.release())}, "Interop-wslhost"};
 
-        // This is required because there could have been messages beetween the process and wsl.exe, and wslhost has no way to know what the sequence numbers were.
+        // This is required because there could have been messages between the process and wsl.exe, and wslhost has no way to know what the sequence numbers were.
         channel.IgnoreSequenceNumbers();
 
         wsl::windows::common::interop::VmModeWorkerThread(channel, vmId, true);

@@ -61,7 +61,7 @@ public:
 
     ~WslCoreVm() noexcept;
 
-    wil::unique_socket AcceptConnection(_In_ DWORD ReceiveTimeout = 0) const;
+    wil::unique_socket AcceptConnection(_In_ DWORD ReceiveTimeout = 0, _In_ const std::source_location& Location = std::source_location::current()) const;
 
     enum class DiskType
     {

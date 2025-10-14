@@ -64,7 +64,7 @@ void ListenThread(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 // Connect to the actual socket address and set up a relay.
                 //
-                // N.B. During the time setting up the relay the server may have
+                // N.B. While the relay was being set up, the server may have
                 //      stopped listening.
                 sockaddr* socketAddress;
                 int socketAddressSize;
@@ -319,7 +319,7 @@ bool IsSameSockAddr(const sockaddr_storage& left, const sockaddr_storage& right)
 // Start looking for ports bound to localhost or wildcard.
 int ScanProcNetTCP(wsl::shared::SocketChannel& channel)
 {
-    // Peridocally scan procfs for listening TCP sockets.
+    // Periodically scan procfs for listening TCP sockets.
     std::vector<sockaddr_storage> relays{};
     int result = 0;
     for (;;)

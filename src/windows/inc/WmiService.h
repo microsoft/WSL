@@ -448,7 +448,7 @@ public:
     }
 
     // Invokes an instance method with zero -> 5 arguments from the instantiated IWbemClassObject
-    // Returns a WmiInstace containing the [out] parameters from the method call
+    // Returns a WmiInstance containing the [out] parameters from the method call
     // (the property "ReturnValue" contains the return value)
     WmiInstance execute_method(PCWSTR method)
     {
@@ -468,11 +468,11 @@ public:
 
         // Instantiate a class object to iterate through each property
         const WmiClassObject propertyObject(m_wbemServices, inParamsDefinition);
-        auto propertyItererator = propertyObject.property_begin();
+        auto propertyIterator = propertyObject.property_begin();
 
         // write the property
         WmiInstance propertyclassObject(m_wbemServices, inParamsInstance);
-        propertyclassObject.set(*propertyItererator, arg1);
+        propertyclassObject.set(*propertyIterator, arg1);
 
         // execute the method with the properties set
         return execute_method_impl(method, inParamsInstance.get());
@@ -491,13 +491,13 @@ public:
 
         // Instantiate a class object to iterate through each property
         const WmiClassObject propertyObject(m_wbemServices, inParamsDefinition);
-        auto propertyItererator = propertyObject.property_begin();
+        auto propertyIterator = propertyObject.property_begin();
 
         // write each property
         WmiInstance propertyclassObject(m_wbemServices, inParamsInstance);
-        propertyclassObject.set(*propertyItererator, arg1);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg2);
+        propertyclassObject.set(*propertyIterator, arg1);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg2);
 
         // execute the method with the properties set
         return execute_method_impl(method, inParamsInstance.get());
@@ -516,15 +516,15 @@ public:
 
         // Instantiate a class object to iterate through each property
         const WmiClassObject propertyObject(m_wbemServices, inParamsDefinition);
-        auto propertyItererator = propertyObject.property_begin();
+        auto propertyIterator = propertyObject.property_begin();
 
         // write each property
         WmiInstance propertyclassObject(m_wbemServices, inParamsInstance);
-        propertyclassObject.set(*propertyItererator, arg1);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg2);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg3);
+        propertyclassObject.set(*propertyIterator, arg1);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg2);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg3);
 
         // execute the method with the properties set
         return execute_method_impl(method, inParamsInstance.get());
@@ -543,17 +543,17 @@ public:
 
         // Instantiate a class object to iterate through each property
         const WmiClassObject propertyObject(m_wbemServices, inParamsDefinition);
-        auto propertyItererator = propertyObject.property_begin();
+        auto propertyIterator = propertyObject.property_begin();
 
         // write each property
         WmiInstance propertyclassObject(m_wbemServices, inParamsInstance);
-        propertyclassObject.set(*propertyItererator, arg1);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg2);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg3);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg4);
+        propertyclassObject.set(*propertyIterator, arg1);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg2);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg3);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg4);
 
         // execute the method with the properties set
         return execute_method_impl(method, inParamsInstance.get());
@@ -572,20 +572,20 @@ public:
 
         // Instantiate a class object to iterate through each property
         const WmiClassObject propertyObject(m_wbemServices, inParamsDefinition);
-        auto propertyItererator = propertyObject.property_begin();
+        auto propertyIterator = propertyObject.property_begin();
 
         // write each property
         //
         WmiInstance propertyclassObject(m_wbemServices, inParamsInstance);
-        propertyclassObject.set(*propertyItererator, arg1);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg2);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg3);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg4);
-        ++propertyItererator;
-        propertyclassObject.set(*propertyItererator, arg5);
+        propertyclassObject.set(*propertyIterator, arg1);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg2);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg3);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg4);
+        ++propertyIterator;
+        propertyclassObject.set(*propertyIterator, arg5);
 
         // execute the method with the properties set
         return execute_method_impl(method, inParamsInstance.get());
@@ -807,7 +807,7 @@ public:
 
 private:
     WmiService m_wbemServices;
-    // Marking wbemEnumerator mutabale to allow for const correctness of begin() and end()
+    // Marking wbemEnumerator mutable to allow for const correctness of begin() and end()
     //   specifically, invoking Reset() is an implementation detail and should not affect external contracts
     mutable wil::com_ptr<IEnumWbemClassObject> m_wbemEnumerator;
 };

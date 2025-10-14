@@ -1875,7 +1875,7 @@ Return Value:
     LxtCheckErrnoZeroSuccess(rename(RenameTestDirChild, RenameTestDir2));
 
     //
-    // Renaming to a non-existant directory where the target directory
+    // Renaming to a non-existent directory where the target directory
     // contains trailing slash(es).
     //
 
@@ -1906,7 +1906,7 @@ Return Value:
     //
     // The following test cases deal with the old name containing a trailing slash.
     //
-    // Renaming a directory to a nonexistant directory should succeed.
+    // Renaming a directory to a nonexistent directory should succeed.
     //
 
     LxtCheckErrnoZeroSuccess(mkdir(RenameTestDirSlash, 0777));
@@ -3403,7 +3403,7 @@ Return Value:
 
     //
     // When using the current time, there is a slight chance of this test
-    // failing when the time the file was set to and the time when the check
+    // failing when the time set for the file and the time when the check
     // is done straddle midnight.
     //
 
@@ -3751,7 +3751,7 @@ Return Value:
     {
         LxtLogError(
             "getdents should return 0 when end of directory is reached, "
-            "but it retuend: %d.",
+            "but it returned: %d.",
             Size);
 
         Result = EINVAL;

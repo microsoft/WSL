@@ -19,9 +19,13 @@ from urllib.parse import urlparse
 @click.option('--no-fetch', is_flag=True, default=False)
 @click.option('--github-token', default=None)
 @click.option('--use-current-ref', is_flag=True, default=False)
-def main(version: str, previous: str, max_message_lines: int, publish: bool, assets: list, no_fetch: bool, github_token: str, use_current_ref: bool):
+@click.option('--auto-release-notes', is_flag=True, default=False)
+def main(version: str, previous: str, max_message_lines: int, publish: bool, assets: list, no_fetch: bool, github_token: str, use_current_ref: bool, auto_release_notes: bool):
     if publish:
-        if assets is None:
+        # Click provides an empty tuple when no assets are passed. Guard against both
+        # an explicit None (older Click versions / direct invocation) and an empty
+        # collection so we do not accidentally create a release without payload.
+        if not assets:
             raise RuntimeError('--publish requires at least one asset')
 
         if github_token is None:
@@ -38,36 +42,38 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
     print(f'Creating release notes for: {previous} -> {current_ref}', file=sys.stderr)
 
     changes = ''
-    for e in get_change_list(None if use_current_ref else version, previous, not no_fetch):
 
-        # Detect attached github issues
-        issues = find_github_issues(e.message)
-        pr_description, pr_number = get_github_pr_message(github_token, e.message)
-        if pr_description is not None:
-            issues = issues.union(find_github_issues(pr_description))
+    if not auto_release_notes:
+        for e in get_change_list(None if use_current_ref else version, previous, not no_fetch):
 
-        if github_token is not None:
-            issues = filter_github_issues(issues, github_token)
+            # Detect attached github issues
+            issues = find_github_issues(e.message)
+            pr_description, pr_number = get_github_pr_message(github_token, e.message)
+            if pr_description is not None:
+                issues = issues.union(find_github_issues(pr_description))
 
-        if len(issues) > 1:
-            print(f'WARNING: found more than 1 github issues in message: {message}. Issues: {issues}', file=sys.stderr)
+            if github_token is not None:
+                issues = filter_github_issues(issues, github_token)
 
-        message = e.message[:-1] if e.message.endswith('\n') else e.message
+            if len(issues) > 1:
+                print(f'WARNING: found more than 1 github issues in message: {e.message}. Issues: {issues}', file=sys.stderr)
 
-        # Shrink the message if it's too long
-        lines = message.split('\n')
-        message = '\n'.join([e for e in lines if e][:max_message_lines])
+            message = e.message[:-1] if e.message.endswith('\n') else e.message
 
-        # Get rid of the github PR #
-        if pr_number is not None:
-            message = message.replace(f'(#{pr_number})', '')
+            # Shrink the message if it's too long
+            lines = message.split('\n')
+            message = '\n'.join([e for e in lines if e][:max_message_lines])
 
-        # Append to the changes (chr(92) == '\n')
-        message = f'{message.replace(chr(92), "")} (solves {",".join(issues)})' if issues else message
-        changes += f'* {message}\n'
+            # Get rid of the github PR #
+            if pr_number is not None:
+                message = message.replace(f'(#{pr_number})', '')
+
+            # Append to the changes (chr(92) == '\n')
+            message = f'{message.replace(chr(92), "")} (solves {",".join(issues)})' if issues else message
+            changes += f'* {message}\n'
 
     if publish:
-        publish_release(version, changes, assets, github_token)
+        publish_release(version, changes, assets, auto_release_notes, github_token)
     else:
         print(f'\n{changes}')
 
@@ -75,7 +81,7 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
 def get_github_pr_message(token: str, message: str) -> str:
     match = re.search(r'\(#([0-9]+)\)', message)
     if match is None:
-        print(f'Warning: failed to extract Github PR number from message: {message}')
+        print(f'Warning: failed to extract GitHub PR number from message: {message}')
         return None, None
 
     pr_number = match.group(1)
@@ -105,7 +111,7 @@ def get_previous_release(version: tuple) -> str:
     previous_versions = [e for e in versions if e < version]
 
     if not previous_versions:
-        raise RuntimeError(f'No previous found on Github. Response: {response.json()}')
+        raise RuntimeError(f'No previous found on GitHub. Response: {response.json()}')
 
     return '.'.join(str(e) for e in max(previous_versions))
 
@@ -172,8 +178,8 @@ def get_change_list(version: str, previous: str, fetch: bool) -> list:
 
 
 @backoff.on_exception(backoff.expo, (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException), max_time=600)
-def publish_release(version: str, changes: str, assets: list, token: str):
-    print(f'Creating private Github release for: {version}', file=sys.stderr)
+def publish_release(version: str, changes: str, assets: list, auto_release_notes: bool, token: str):
+    print(f'Creating private GitHub release for: {version}', file=sys.stderr)
 
     # First create the release
     headers = {'Accept': 'application/vnd.github+json',
@@ -183,10 +189,12 @@ def publish_release(version: str, changes: str, assets: list, token: str):
     content = {'tag_name': version,
                'target_commitish': 'master',
                'name': version,
-               'body': changes,
                "draft":True ,
                'prerelease':True ,
-               'generate_release_notes': False}
+               'generate_release_notes': auto_release_notes}
+
+    if changes:
+        content['body'] = changes
 
     response = requests.post('https://api.github.com/repos/microsoft/wsl/releases', json=content, headers=headers)
     response.raise_for_status()

@@ -552,14 +552,14 @@ wsl::windows::common::SvcComm::SvcComm()
     THROW_IF_FAILED(m_userSession->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
 
     // Get the current proxy blanket settings.
-    DWORD authnSvc, authzSvc, authnLvl, capabilites;
-    THROW_IF_FAILED(clientSecurity->QueryBlanket(m_userSession.get(), &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilites));
+    DWORD authnSvc, authzSvc, authnLvl, capabilities;
+    THROW_IF_FAILED(clientSecurity->QueryBlanket(m_userSession.get(), &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilities));
 
     // Make sure that dynamic cloaking is used.
-    WI_ClearFlag(capabilites, EOAC_STATIC_CLOAKING);
-    WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
+    WI_ClearFlag(capabilities, EOAC_STATIC_CLOAKING);
+    WI_SetFlag(capabilities, EOAC_DYNAMIC_CLOAKING);
     THROW_IF_FAILED(clientSecurity->SetBlanket(
-        m_userSession.get(), authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
+        m_userSession.get(), authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilities));
 }
 
 wsl::windows::common::SvcComm::~SvcComm()

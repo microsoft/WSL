@@ -327,6 +327,9 @@ Aktivieren Sie bitte die optionale Komponente „Windows Subsystem für Linux“
     --msal-proxy-path
         Zeigt den Pfad zur MSAL-Proxyanwendung an.
 
+    --vm-id
+        Zeigt die WSL-VM-ID an.
+
     --version
         Zeigt die Version des WSL-Pakets an.
 
@@ -334,6 +337,7 @@ Aktivieren Sie bitte die optionale Komponente „Windows Subsystem für Linux“
         Keinen Zeilenumbruch drucken.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1696,12 +1700,6 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Optionale Features</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Aktivieren der Seitenberichterstellung</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Mit der Standardeinstellung „TRUE“ kann Windows nicht verwendeten Speicher freigeben, der dem virtuellen WSL 2-Computer zugeordnet ist.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Datenschutzbestimmung</value>

@@ -762,7 +762,7 @@ void EnableCrashDumpCollection()
         return;
     }
 
-    // If the first character is a pipe, then the kernel will interperet this path as a command.
+    // If the first character is a pipe, then the kernel will interpret this path as a command.
     constexpr auto core_pattern = "|/" LX_INIT_WSL_CAPTURE_CRASH " %t %E %p %s";
     WriteToFile("/proc/sys/kernel/core_pattern", core_pattern);
 }
@@ -857,10 +857,10 @@ Return Value:
 
         if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
         {
-            compressionArguments += "v";
+            compressionArguments += "vv";
         }
 
-        const char* arguments[] = {
+        std::vector<const char*> arguments{
             BSDTAR_PATH,
             "-C",
             Source,
@@ -872,7 +872,13 @@ Return Value:
             "-",
             ".",
             nullptr};
-        execv(BSDTAR_PATH, const_cast<char**>(arguments));
+
+        if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
+        {
+            arguments.emplace(arguments.begin() + 3, "--totals");
+        }
+
+        execv(BSDTAR_PATH, const_cast<char**>(arguments.data()));
         LOG_ERROR("execl failed, {}", errno);
     });
 
@@ -1158,7 +1164,7 @@ Return Value:
             "-C",
             Destination,
             "-x",
-            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vp" : "-p",
+            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vvp" : "-p",
             "--xattrs",
             "--numeric-owner",
             "-f",
@@ -1194,9 +1200,27 @@ Return Value:
 --*/
 
 {
-    UtilCreateChildProcess("agetty", []() {
-        execl("/usr/bin/setsid", "/usr/bin/setsid", "/sbin/agetty", "-w", "-L", LX_INIT_HVC_DEBUG_SHELL, "-a", "root", NULL);
-        LOG_ERROR("execl failed, {}", errno);
+    // Spawn a child process to handle relaunching the debug shell if it exits.
+    UtilCreateChildProcess("DebugShell", []() {
+        for (;;)
+        {
+            const auto Pid = UtilCreateChildProcess("agetty", []() {
+                execl("/usr/bin/setsid", "/usr/bin/setsid", "/sbin/agetty", "-w", "-L", LX_INIT_HVC_DEBUG_SHELL, "-a", "root", NULL);
+                LOG_ERROR("execl failed, {}", errno);
+            });
+
+            if (Pid < 0)
+            {
+                _exit(1);
+            }
+
+            int Status = -1;
+            if (TEMP_FAILURE_RETRY(waitpid(Pid, &Status, 0)) < 0)
+            {
+                LOG_ERROR("waitpid failed {}", errno);
+                _exit(1);
+            }
+        }
     });
 }
 
@@ -1745,7 +1769,7 @@ try
     };
 
     //
-    // Set the communicaiton channel to expected file descriptor value.
+    // Set the communication channel to expected file descriptor value.
     //
 
     if (SocketFd != LX_INIT_UTILITY_VM_INIT_SOCKET_FD)
@@ -1779,7 +1803,7 @@ try
     {
         //
         // Creating the temporary mount can fail if:
-        // - The distro VHD was mounted read-only (because an fsck is needed)
+        // - The distro VHD was mounted read-only (because a fsck is needed)
         // - The distro VHD is full
         //
         // Mount a writable overlay if that's the case so the distro can start.
@@ -1873,7 +1897,7 @@ try
     }
 
     //
-    // Bind mount the init deamon into the distro namespace.
+    // Bind mount the init daemon into the distro namespace.
     //
 
     auto Path = std::format("{}{}", Target, LX_INIT_PATH);
@@ -2107,7 +2131,7 @@ try
     }
 
     //
-    // Mount to a temporary location if overlayfs was requested, otherwise mount
+    // Mount to a temporary location if overlayfs was requested; otherwise, mount
     // the device directly on the target.
     //
 
@@ -2260,7 +2284,7 @@ Return Value:
     }
 
     //
-    // Chroot to system system distro mount point.
+    // Chroot to system distro mount point.
     //
     // N.B. This allows running binaries present in the system distro without having to chroot.
     //
@@ -2362,7 +2386,7 @@ try
     auto* DeviceName = &DevicePath[sizeof(DEVFS_PATH)];
 
     //
-    // Find the partion on the specified device.
+    // Find the partition on the specified device.
     //
     // N.B. A retry is needed because there is a delay between when a device is
     //      hot-added, and when the device is available in the guest.
@@ -2492,7 +2516,7 @@ void ProcessLaunchInitMessage(
         //
         // Allow /etc/wsl.conf in the user distro to opt-out of GUI support.
         //
-        // N.B. A connection for the system disto must established even if the distro opts out
+        // N.B. A connection for the system distro must established even if the distro opts out
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
@@ -2582,7 +2606,7 @@ void ProcessLaunchInitMessage(
             DISTRO_PATH,
             enableGuiApps,
             Config,
-            nullptr,
+            wsl::shared::string::FromSpan(Buffer, Message->VmIdOffset),
             wsl::shared::string::FromSpan(Buffer, Message->DistributionNameOffset),
             nullptr,
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
@@ -3168,8 +3192,8 @@ Routine Description:
 
 Arguments:
 
-    MessageFd - Supplies a file desciptor to the socket the message was received
-        on. This is used for operations that require responses, for example a
+    MessageFd - Supplies a file descriptor to the socket on which the message was
+        received. This is used for operations that require responses, for example a
         VHD eject request.
 
     Buffer - Supplies the message.
@@ -3579,7 +3603,7 @@ Return Value:
     // set to SYS_BIND to make bind system call.
 #ifdef __x86_64__
         // 32bit:
-        // If syscall_nr == __NR_socketcall then contine else goto allow:
+        // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 3),
         // if syscall arg0 == SYS_BIND then goto user_notify: else goto allow:
@@ -3802,7 +3826,7 @@ Routine Description:
 
 Arguments:
 
-    Pth - Supplies the path to the block device.
+    Path - Supplies the path to the block device.
 
 Return Value:
 
@@ -3857,6 +3881,63 @@ Return Value:
 
 int WslEntryPoint(int Argc, char* Argv[]);
 
+void EnableDebugMode(const std::string& Mode)
+{
+    if (Mode == "hvsocket")
+    {
+        // Mount the debugfs.
+        THROW_LAST_ERROR_IF(UtilMount("none", "/sys/kernel/debug", "debugfs", 0, nullptr) < 0);
+
+        // Enable hvsocket events.
+        std::vector<const char*> files{
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_on_msg_dpc/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_on_message/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onoffer/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onoffer_rescind/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onopen_result/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_ongpadl_created/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_ongpadl_torndown/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_open/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_close_internal/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_establish_gpadl_header/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_establish_gpadl_body/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_teardown_gpadl/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_release_relid/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_send_tl_connect_request/enable"};
+
+        for (auto* e : files)
+        {
+            WriteToFile(e, "1");
+        }
+
+        // Relay logs to the host.
+        std::thread relayThread{[]() {
+            constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
+            std::ifstream file(path);
+
+            if (!file)
+            {
+                LOG_ERROR("Failed to open {}, {}", path, errno);
+                return;
+            }
+
+            std::string line;
+            while (std::getline(file, line))
+            {
+                LOG_INFO("{}", line);
+            }
+
+            LOG_ERROR("{}: closed", path);
+        }};
+
+        relayThread.detach();
+    }
+    else
+    {
+        LOG_ERROR("Unknown debugging mode: '{}'", Mode);
+    }
+}
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -3905,7 +3986,7 @@ int main(int Argc, char* Argv[])
     }
 
     //
-    // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
+    // Open kmsg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
     //
     // N.B. This is to work around a rare race condition where init is launched without /dev/console set as the controlling terminal.
     //
@@ -3980,6 +4061,37 @@ int main(int Argc, char* Argv[])
     }
 
     //
+    // Create the etc directory and mount procfs and sysfs.
+    //
+
+    if (UtilMkdir(ETC_PATH, 0755) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, PROCFS_PATH, "proc", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, SYSFS_PATH, "sysfs", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    //
+    // Enable debug mode, if specified.
+    //
+
+    if (const auto* debugMode = getenv(WSL_DEBUG_ENV))
+    {
+        LOG_ERROR("Running in debug mode: '{}'", debugMode);
+        EnableDebugMode(debugMode);
+
+        unsetenv(WSL_DEBUG_ENV);
+    }
+
+    //
     // Establish the message channel with the service via hvsocket.
     //
 
@@ -4004,25 +4116,6 @@ int main(int Argc, char* Argv[])
     {
         Result = -1;
         goto ErrorExit;
-    }
-
-    //
-    // Create the etc directory and mount procfs and sysfs.
-    //
-
-    if (UtilMkdir(ETC_PATH, 0755) < 0)
-    {
-        return -1;
-    }
-
-    if (UtilMount(nullptr, PROCFS_PATH, "proc", 0, nullptr) < 0)
-    {
-        return -1;
-    }
-
-    if (UtilMount(nullptr, SYSFS_PATH, "sysfs", 0, nullptr) < 0)
-    {
-        return -1;
     }
 
     if (getenv(WSL_ENABLE_CRASH_DUMP_ENV))

@@ -1218,7 +1218,7 @@ private:
 
         // Utilize a small stack-allocated buffer that's large enough for the largest response
         // without dynamic content (which is Rgetattr). Messages requiring a larger response will
-        // allocate a dynamic buffer by calling MessageResonse::EnsureSize.
+        // allocate a dynamic buffer by calling MessageResponse::EnsureSize.
         // N.B. Message handlers that only return the header (e.g. HandleClunk) don't need to call
         //      EnsureSize since the static buffer is always big enough for that.
         gsl::byte staticBuffer[c_staticBufferSize];

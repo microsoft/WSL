@@ -107,10 +107,10 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::MaxCrashDumpCount, MaxCrashDumpCount),
         ConfigKey(ConfigSetting::DistributionInstallPath, DefaultDistributionLocation),
         ConfigKey(ConfigSetting::InstanceIdleTimeout, InstanceIdleTimeout),
-        ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &loadKernelModulesPresence),
-        ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &loadKernelModulesPresence),
+        ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &LoadKernelModulesPresence),
+        ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &LoadKernelModulesPresence),
 
-        // Features that were previously experimental (the old header is maintained for compatability).
+        // Features that were previously experimental (the old header is maintained for compatibility).
         ConfigKey({ConfigSetting::NetworkingMode, ConfigSetting::Experimental::NetworkingMode}, wsl::core::NetworkingModes, NetworkingMode, &NetworkingModePresence),
         ConfigKey({ConfigSetting::DnsTunneling, ConfigSetting::Experimental::DnsTunneling}, EnableDnsTunneling, &DnsTunnelingConfigPresence),
         ConfigKey({ConfigSetting::Firewall, ConfigSetting::Experimental::Firewall}, enableFirewall, &FirewallConfigPresence),
@@ -194,15 +194,18 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         DefaultDistributionLocation = wsl::windows::common::filesystem::GetLocalAppDataPath(UserToken) / "wsl";
     }
 
-    if (!LoadDefaultKernelModules)
+    auto kernelModules =
+        LoadDefaultKernelModules ? std::vector<std::wstring>{L"tun", L"ip_tables", L"br_netfilter"} : std::vector<std::wstring>{};
+
+    if (!userKernelModules.empty())
     {
-        KernelModulesList.clear();
+        for (const auto& e : wsl::shared::string::Split(userKernelModules, L','))
+        {
+            kernelModules.emplace_back(std::move(e));
+        }
     }
 
-    for (auto& e : wsl::shared::string::Split(userKernelModules, L','))
-    {
-        KernelModulesList.emplace_back(std::move(e));
-    }
+    KernelModulesList = wsl::shared::string::Join(kernelModules, L',');
 }
 
 void wsl::core::Config::SaveNetworkingSettings(_In_opt_ HANDLE UserToken) const
@@ -287,7 +290,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 {
     // Determine the maximum number of processors that can be added to the VM.
     // If the user did not supply a processor count, use the maximum.
-    const auto MaximumProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
+    MaximumProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
     if (ProcessorCount <= 0)
     {
         ProcessorCount = MaximumProcessorCount;
@@ -314,10 +317,10 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         MemorySizeBytes = std::min<UINT64>(MemorySizeBytes, MaximumMemorySizeBytes);
     }
 
-    // Use the user-defined swap size if one was specified, otherwise set to 25%
+    // Use the user-defined swap size if one was specified; otherwise, set to 25%
     // the memory size rounded up to the nearest GB.
     //
-    // N.B. This heuristic is modeled after RedHat and Ubuntu's recommended swap size.
+    // N.B. This heuristic is modeled after Red Hat and Ubuntu's recommended swap size.
     if (SwapSizeBytes == UINT64_MAX)
     {
         SwapSizeBytes = ((MemorySizeBytes / 4 + _1GB - 1) & ~(_1GB - 1));

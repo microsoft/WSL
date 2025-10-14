@@ -203,7 +203,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     }
     CATCH_LOG();
 
-    // If a private kernel was not speicifed, use the default.
+    // If a private kernel was not specified, use the default.
     m_defaultKernel = m_vmConfig.KernelPath.empty();
     if (m_defaultKernel)
     {
@@ -231,6 +231,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         // copies of the initrd file and private kernel.
         if constexpr (wsl::shared::Arm64)
         {
+            auto impersonate = wil::impersonate_token(m_userToken.get());
+
             m_rootFsPath = m_tempPath / LXSS_ROOTFS_DIRECTORY;
             wil::CreateDirectoryDeep(m_rootFsPath.c_str());
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
@@ -543,7 +545,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->DefaultKernel = m_defaultKernel;
     message->KernelModulesDeviceId = modulesLun;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
-    message.WriteString(message->KernelModulesListOffset, wsl::shared::string::Join<wchar_t>(m_vmConfig.KernelModulesList, L','));
+    message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
 
     m_miniInitChannel.SendMessage<LX_MINI_INIT_EARLY_CONFIG_MESSAGE>(message.Span());
@@ -877,9 +879,10 @@ WslCoreVm::~WslCoreVm() noexcept
     WSL_LOG("TerminateVmStop");
 }
 
-wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout) const
+wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get());
+    auto socket =
+        wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
     if (ReceiveTimeout != 0)
     {
         THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
@@ -1144,7 +1147,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
         {
             if (found != m_attachedDisks.end())
             {
-                // Prevent user from launching a distro vhd after manually mounting it, otherwise return the LUN of the mounted disk.
+                // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the LUN of the mounted disk.
                 THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
 
                 return found->second.Lun;
@@ -2521,7 +2524,7 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
         }
         else
         {
-            // The VM has already been terminated, invoke the callback on a seperate thread.
+            // The VM has already been terminated, invoke the callback on a separate thread.
             std::thread([terminationCallback = std::move(TerminationCallback), runtimeId = m_runtimeId]() {
                 wsl::windows::common::wslutil::SetThreadDescription(L"TerminationCallback");
                 terminationCallback(runtimeId);
@@ -2962,7 +2965,7 @@ void WslCoreVm::ValidateNetworkingMode()
         {
             if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(m_vmConfig))
             {
-                // Since hyper-V firewall is enabled by default, only show the warning if the user explicitely asked for it.
+                // Since hyper-V firewall is enabled by default, only show the warning if the user explicitly asked for it.
                 if (m_vmConfig.FirewallConfigPresence == ConfigKeyPresence::Present)
                 {
                     EMIT_USER_WARNING(Localization::MessageHyperVFirewallNotSupported());
@@ -3001,7 +3004,7 @@ void WslCoreVm::ValidateNetworkingMode()
     // If DNS tunneling was requested, ensure it is supported by Windows.
     if (m_vmConfig.EnableDnsTunneling && !IsDnsTunnelingSupported())
     {
-        // Since DNS tunneling is enabled by default, only show the warning if the user explicitely asked for it.
+        // Since DNS tunneling is enabled by default, only show the warning if the user explicitly asked for it.
         if (m_vmConfig.DnsTunnelingConfigPresence == ConfigKeyPresence::Present)
         {
             EMIT_USER_WARNING(Localization::MessageDnsTunnelingNotSupported());

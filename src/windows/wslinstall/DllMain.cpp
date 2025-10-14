@@ -23,6 +23,7 @@ Abstract:
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 using namespace wsl::windows::common::registry;
+using namespace wsl::windows::common::wslutil;
 
 static constexpr auto c_progIdPrefix{L"App."};
 static constexpr auto c_protocolProgIdSuffix{L".Protocol"};
@@ -479,7 +480,7 @@ extern "C" UINT __stdcall CleanMsixState(MSIHANDLE install)
 
         /*
          * Because of a probable bug in MSIX / Packaged COM, it's possible that an old registration is still present on the machine,
-         * which will break instanciations of LxssUserSessions.
+         * which will break instantiations of LxssUserSessions.
          * Because this method executes after all MSIX packages have been removed, we know that this registration shouldn't be there,
          * so delete it if it still happens to be there.
          * See: https://github.com/microsoft/WSL/issues/10782
@@ -519,6 +520,7 @@ extern "C" UINT __stdcall DeprovisionMsix(MSIHANDLE install)
 try
 {
     WSL_LOG("DeprovisionMsix");
+    WriteInstallLog("MSI install: DeprovisionMsix");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
     const auto result = packageManager.DeprovisionPackageForAllUsersAsync(wsl::windows::common::wslutil::c_msixPackageFamilyName).get();
@@ -542,6 +544,7 @@ extern "C" UINT __stdcall RemoveMsixAsSystem(MSIHANDLE install)
 try
 {
     WSL_LOG("RemoveMsixAsSystem");
+    WriteInstallLog("MSI install: RemoveMsixAsSystem");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -571,6 +574,7 @@ extern "C" UINT __stdcall RemoveMsixAsUser(MSIHANDLE install)
 try
 {
     WSL_LOG("RemoveMsixAsUser");
+    WriteInstallLog("MSI install: RemoveMsixAsUser");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -598,7 +602,7 @@ catch (...)
 wsl::windows::common::filesystem::TempFile ExtractMsix(MSIHANDLE install)
 {
     // N.B. We need to open the database this way instead of calling MsiGetActiveDatabase() because
-    // this is defered action so we don't have access to the MSI context here.
+    // this is deferred action so we don't have access to the MSI context here.
     // The MSIX needs to be extracted like this because in the case of an upgrade this action runs before 'MoveFiles' so the WSL directory isn't available yet.
 
     const auto installTarget = GetInstallTarget(install);
@@ -640,6 +644,7 @@ extern "C" UINT __stdcall InstallMsixAsUser(MSIHANDLE install)
 try
 {
     WSL_LOG("InstallMsixAsUser");
+    WriteInstallLog("MSI install: InstallMsixAsUser");
 
     // RegisterPackageByFamilyNameAsync() cannot be run as SYSTEM.
     //  If this thread runs as SYSTEM, simply skip this step.
@@ -683,6 +688,7 @@ try
     msixFile.Handle.reset();
 
     WSL_LOG("InstallMsix", TraceLoggingValue(msixFile.Path.c_str(), "Path"));
+    WriteInstallLog("MSI install: InstallMsix");
 
     winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -699,7 +705,7 @@ try
         catch (...)
         {
             // For convenience, automatically trust the MSIX's certificate if this is NOT an official build and
-            // the package installation failed because of an unstrusted certificate.
+            // the package installation failed because of an untrusted certificate.
 #ifndef WSL_OFFICIAL_BUILD
             auto error = wil::ResultFromCaughtException();
             if (error == CERT_E_UNTRUSTEDROOT)
@@ -780,10 +786,24 @@ catch (...)
     return ERROR_INSTALL_FAILURE;
 }
 
+extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
+{
+    try
+    {
+        WSL_LOG("WslFinalizeInstallation");
+        WriteInstallLog(std::format("MSI install: WslFinalizeInstallation"));
+    }
+    CATCH_LOG();
+
+    return NOERROR;
+}
+
 extern "C" UINT __stdcall WslValidateInstallation(MSIHANDLE install)
 try
 {
     WSL_LOG("WslValidateInstallation");
+
+    WriteInstallLog(std::format("MSI install: WslValidateInstallation"));
 
     // TODO: Use a more precise version check so we don't install if the Windows build doesn't support lifted.
 

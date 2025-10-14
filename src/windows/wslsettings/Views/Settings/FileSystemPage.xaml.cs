@@ -40,7 +40,7 @@ public sealed partial class FileSystemPage : Page
             return;
         }
 
-        RuntimeHelper.TryMoveFocusPrevousControl(sender as Button);
+        RuntimeHelper.TryMoveFocusPreviousControl(sender as Button);
     }
 
     private void DefaultVHDSizeTextBox_TextChanged(object sender, TextChangedEventArgs e)

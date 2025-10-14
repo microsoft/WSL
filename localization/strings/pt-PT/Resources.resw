@@ -319,15 +319,19 @@ Ative o componente opcional "Subsistema Windows para Linux" para utilizar o WSL1
        Exibir o modo de rede atual.
 
     --msal-proxy-path
-        Exibir o caminho para a aplicação de proxy MSAL.
+        Apresentar o caminho para a aplicação proxy MSAL.
+
+    --vm-id
+        Apresentar o ID de VM WSL.
 
     --version
-        Exibir a versão do pacote WSL.
+        Apresentar a versão do pacote WSL.
 
     -n
         Não imprimir uma nova linha.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ Também pode aceder a mais Opções remotas do VS Code através da paleta de com
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Funcionalidades Opcionais</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Ativar relatórios de página</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>A predefinição "true" permite ao Windows recuperar memória não utilizada alocada à máquina virtual WSL 2.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Declaração de Privacidade</value>

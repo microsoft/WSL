@@ -320,12 +320,15 @@ WSL1 を使用するには、"Linux 用 Windows サブシステム" オプショ
     <value>この操作は WSL2 でのみサポートされています。</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>使用法: 
+    <value>使用: 
     --networking-mode
        現在のネットワーク モードを表示します。
 
     --msal-proxy-path
         MSAL プロキシ アプリケーションへのパスを表示します。
+
+    --vm-id
+        WSL VM ID を表示します。
 
     --version
         WSL パッケージのバージョンを表示します。
@@ -334,6 +337,7 @@ WSL1 を使用するには、"Linux 用 Windows サブシステム" オプショ
         改行を出力しません。</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1696,12 +1700,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>オプション機能</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>ページ レポートを有効にする</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>既定の true 設定では、WSL 2 仮想マシンに割り当てられた未使用のメモリを解放できます。</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>プライバシーに関する声明</value>

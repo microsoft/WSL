@@ -24,7 +24,7 @@ public:
         std::wstring Name;
         std::optional<GUID> Id;
         std::optional<wsl::windows::common::distribution::TDistribution> Distribution;
-        bool InstalledViaGithub{};
+        bool InstalledViaGitHub{};
         bool Alreadyinstalled{};
     };
 
@@ -40,7 +40,7 @@ public:
         _In_ const std::optional<std::wstring>& location,
         _In_ const std::optional<uint64_t>& vhdSize);
 
-    static std::vector<std::wstring> CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent);
+    static std::pair<bool, std::vector<std::wstring>> CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent);
 
     static void InstallOptionalComponents(const std::vector<std::wstring>& components);
 

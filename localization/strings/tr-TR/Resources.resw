@@ -321,6 +321,9 @@ Lütfen WSL1'i kullanmak için "Windows Subsystem for Linux" isteğe bağlı bil
     --msal-proxy-path
         MSAL ara sunucu uygulamasının yolunu görüntüle.
 
+    --vm-id
+        WSL VM kimliğini görüntüle.
+
     --version
         WSL paketinin sürümünü görüntüle.
 
@@ -328,6 +331,7 @@ Lütfen WSL1'i kullanmak için "Windows Subsystem for Linux" isteğe bağlı bil
         Yeni bir satır yazdırma.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>İsteğe Bağlı Özellikler</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Sayfa raporlamayı etkinleştir</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Varsayılan true ayarı, Windows'un WSL 2 sanal makinesine ayrılan kullanılmayan belleği geri kazanmasını sağlar.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Gizlilik Bildirimi</value>

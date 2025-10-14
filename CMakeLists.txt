@@ -34,8 +34,8 @@ FetchContent_GetProperties(GSL SOURCE_DIR GSL_SOURCE_DIR)
 
 
 FetchContent_Declare(nlohmannjson
-                     URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-                     URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d)
+                     URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+                     URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa )
 
 FetchContent_MakeAvailable(nlohmannjson)
 FetchContent_GetProperties(nlohmannjson SOURCE_DIR NLOHMAN_JSON_SOURCE_DIR)
@@ -111,7 +111,7 @@ endif()
 # Optional target configuration
 
 if (NOT DEFINED WSL_BUILD_WSL_SETTINGS)
-    set(WSL_BUILD_WSL_SETTINGS true)
+    set(WSL_BUILD_WSL_SETTINGS false)
 endif ()
 
 # Only generate the build configuration that CMake is configured for

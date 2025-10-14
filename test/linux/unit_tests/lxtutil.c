@@ -1761,7 +1761,7 @@ Routine Description:
 
 Arguments:
 
-    SingalInfo - Supplies a pointer which receives the signal info.
+    SignalInfo - Supplies a pointer which receives the signal info.
 
 Return Value:
 

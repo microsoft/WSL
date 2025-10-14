@@ -321,6 +321,9 @@ A WSL1 használatához engedélyezze a Linuxos Windows-alrendszer választható 
     --msal-proxy-path
         Az MSAL proxyalkalmazás elérési útjának megjelenítése.
 
+    --vm-id
+        A WSL VM-azonosítójának megjelenítése.
+
     --version
         A WSL-csomag verziójának megjelenítése.
 
@@ -328,6 +331,7 @@ A WSL1 használatához engedélyezze a Linuxos Windows-alrendszer választható 
         Ne nyomtasson új sort.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Választható funkciók</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Lapjelentés engedélyezése</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Az alapértelmezett igaz beállítás lehetővé teszi, hogy a Windows visszanyerje a WSL 2 virtuális gép számára lefoglalt nem használt memóriát.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Adatvédelmi nyilatkozat</value>

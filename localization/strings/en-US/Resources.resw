@@ -321,6 +321,9 @@ Please enable the "Windows Subsystem for Linux" optional component to use WSL1.<
     --msal-proxy-path
         Display the path to the MSAL proxy application.
 
+    --vm-id
+        Display the WSL VM ID.
+
     --version
         Display the version of the WSL package.
 
@@ -328,6 +331,7 @@ Please enable the "Windows Subsystem for Linux" optional component to use WSL1.<
         Do not print a newline.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1096,7 +1100,7 @@ Error code: {}</value>
     <value>Failed to query networking mode</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>Customised kernel modules were supplied without a specifying a customised kernel. Please see https://aka.ms/wslcustomkernel for more information.</value>
+    <value>Customised kernel modules were supplied without specifying a customised kernel. Please see https://aka.ms/wslcustomkernel for more information.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Due to a current compatibility issue with Global Secure Access Client, DNS Tunneling is disabled.</value>
@@ -1104,7 +1108,7 @@ Error code: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparse VHD support is currently disabled due to potential data corruption.
 To force a distribution to use a sparse vhd, please run:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
@@ -1690,12 +1694,6 @@ You can also access more VS Code Remote options through the command palette with
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Optional Features</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Enable page reporting</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Default true setting enables Windows to reclaim unused memory allocated to WSL 2 virtual machine.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Privacy Statement</value>

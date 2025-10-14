@@ -321,6 +321,9 @@ Aktivér den valgfrie komponent "Windows-undersystem til Linux" for at bruge WSL
     --msal-proxy-path
         Vis stien til MSAL-proxyprogrammet.
 
+    --vm-id
+        Vis WSL VM ID.
+
     --version
         Vis versionen af WSL-pakken.
 
@@ -328,6 +331,7 @@ Aktivér den valgfrie komponent "Windows-undersystem til Linux" for at bruge WSL
         Udskriv ikke en ny linje.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Valgfrie funktioner</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Aktivér siderapportering</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Standardindstillingen sand gør det muligt for Windows at frigøre ubrugt hukommelse, der er allokeret til den virtuelle WSL 2-maskine.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Erklæring om beskyttelse af oplys.</value>

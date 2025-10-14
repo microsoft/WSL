@@ -327,6 +327,9 @@
     --msal-proxy-path
         顯示 MSAL Proxy 應用程式的路徑。
 
+    --vm-id
+        顯示 WSL 虛擬機器識別碼。
+
     --version
         顯示 WSL 套件的版本。
 
@@ -334,6 +337,7 @@
         不要列印新行。</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -914,11 +918,11 @@ Windows 版本： {}</value>
     <comment>{Locked="--install "}{Locked="--no-distribution"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNetworkInitializationFailedFallback2" xml:space="preserve">
-    <value>無法設定 networkingMode {}) 的網络 (，回到 networkingMode {}。</value>
+    <value>無法設定 networkingMode {} 的網络，回到 networkingMode {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageOptionalComponentInstallFailed" xml:space="preserve">
-    <value>無法啟用結束代碼 {}) (Windows 元件 '{}'</value>
+    <value>無法啟用 Windows 元件 '{}' (結束代碼： {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFatalPluginError" xml:space="preserve">
@@ -1102,7 +1106,7 @@ Windows 版本： {}</value>
     <value>無法查詢網路模式</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>提供了自定義的核心模組，但未指定自定義核心。如需詳細資訊，請參閱 https://aka.ms/wslcustomkernel。</value>
+    <value>已提供自定義核心模組，但未指定自定義核心。如需詳細資訊，請參閱 https://aka.ms/wslcustomkernel。</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>由於目前與全球安全存取用戶端的相容性問題，已停用 DNS 通道。</value>
@@ -1696,12 +1700,6 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>選用功能</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>啟用頁面報告</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>預設的 True 設定可讓 Windows 回收配置給 WSL 2 虛擬機的未使用記憶體。</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>隱私權聲明</value>

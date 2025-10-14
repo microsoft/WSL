@@ -25,6 +25,6 @@ Inside Linux, each [session leader](session-leader.md), and each instance of [in
 
 `/init` uses the `$WSL_INTEROP` environment variable to know which server to connect to. If the variable is not set, `/init` will try to connect to `/run/WSL/${pid}_interop`, with its own PID. If that doesn't work, `/init` will try its parent's pid, and then will continue to go up the chain until it reached [init](init.md).
 
-Once connected `/init` sends a `LxInitMessageCreateProcess` (WSL1) or a `LxInitMessageCreateProcessUtilityVm` (WSL2), which then forwards that message to the associated Windows process, which will launched the requested command and relay its output to `/init`. 
+Once connected `/init` sends a `LxInitMessageCreateProcess` (WSL1) or a `LxInitMessageCreateProcessUtilityVm` (WSL2), which then forwards that message to the associated Windows process, which will launch the requested command and relay its output to `/init`. 
 
 See `src/linux/init/binfmt.cpp`

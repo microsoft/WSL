@@ -327,13 +327,17 @@ WSL1을 사용하려면 "Windows Subsystem for Linux” 선택적 구성 요소�
     --msal-proxy-path
         MSAL 프록시 애플리케이션의 경로를 표시합니다.
 
+    --vm-id
+        WSL VM ID를 표시합니다.
+
     --version
         WSL 패키지의 버전을 표시합니다.
 
     -n
-        줄 바꿈을 인쇄하지 마세요.</value>
+        줄 바꿈하지 마세요.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1696,12 +1700,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>선택적 기능</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>페이지 보고 사용</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>기본 true 설정을 사용하면 Windows에서 WSL 2 가상 컴퓨터에 할당된 사용되지 않는 메모리를 회수할 수 있습니다.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>개인 정보 취급 방침</value>

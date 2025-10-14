@@ -73,7 +73,7 @@ inline bool operator<(const SOCKADDR_INET& lhs, const SOCKADDR_INET& rhs) noexce
             return lhs.Ipv4.sin_addr.S_un.S_addr < rhs.Ipv4.sin_addr.S_un.S_addr;
         }
 
-        // implmenting the comparison operation following the shortcut from mstcpip.h IN6_ADDR_EQUAL
+        // implementing the comparison operation following the shortcut from mstcpip.h IN6_ADDR_EQUAL
         const __int64 UNALIGNED* lhsRawPointer = (__int64 UNALIGNED*)(&lhs.Ipv6.sin6_addr);
         const __int64 UNALIGNED* rhsRawPointer = (__int64 UNALIGNED*)(&rhs.Ipv6.sin6_addr);
         if (lhsRawPointer[0] == rhsRawPointer[0])
@@ -94,7 +94,7 @@ inline bool operator>(const SOCKADDR_INET& lhs, const SOCKADDR_INET& rhs) noexce
             return lhs.Ipv4.sin_addr.S_un.S_addr > rhs.Ipv4.sin_addr.S_un.S_addr;
         }
 
-        // implmenting the comparison operation following the shortcut from mstcpip.h IN6_ADDR_EQUAL
+        // implementing the comparison operation following the shortcut from mstcpip.h IN6_ADDR_EQUAL
         const __int64 UNALIGNED* lhsRawPointer = (__int64 UNALIGNED*)(&lhs.Ipv6.sin6_addr);
         const __int64 UNALIGNED* rhsRawPointer = (__int64 UNALIGNED*)(&rhs.Ipv6.sin6_addr);
         if (lhsRawPointer[0] == rhsRawPointer[0])
@@ -545,7 +545,7 @@ private:
                 &BufferSize);
         } while (Result == ERROR_BUFFER_OVERFLOW);
 
-        THROW_LAST_ERROR_IF_MSG((Result != ERROR_SUCCESS), "GetAdpatersAddresses");
+        THROW_LAST_ERROR_IF_MSG((Result != ERROR_SUCCESS), "GetAdaptersAddresses");
         m_buffer.resize(BufferSize);
         auto AddressBuffer = (PIP_ADAPTER_ADDRESSES)m_buffer.data();
         std::vector<IpAdapterAddress> addresses;

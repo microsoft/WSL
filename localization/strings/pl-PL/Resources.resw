@@ -314,12 +314,15 @@ Włącz opcjonalny składnik „Podsystem Windows dla systemu Linux”, aby uży
     <value>Ta operacja jest obsługiwana tylko przez podsystem WSL2.</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>Użycie: 
+    <value>Użycie:
     --networking-mode
        Wyświetl bieżący tryb sieciowy.
 
     --msal-proxy-path
         Wyświetl ścieżkę do aplikacji serwera proxy MSAL.
+
+    --vm-id
+        Wyświetl identyfikator maszyny wirtualnej WSL.
 
     --version
         Wyświetl wersję pakietu WSL.
@@ -328,6 +331,7 @@ Włącz opcjonalny składnik „Podsystem Windows dla systemu Linux”, aby uży
         Nie drukuj nowego wiersza.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ Możesz również uzyskać dostęp do większej liczby opcji zdalnych programu V
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Funkcje opcjonalne</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Włącz raportowanie stron</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Domyślne ustawienie wartości true umożliwia systemowi Windows odzyskanie nieużywanej pamięci przydzielonej do maszyny wirtualnej WSL 2.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Oświadczenie o ochronie prywatności</value>

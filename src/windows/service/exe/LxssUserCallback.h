@@ -109,7 +109,7 @@ private:
     // N.B. Keep this as the last member so that it is the first to be
     //      destructed. This will ensure that if the threadpool callback
     //      races with instance destruction, all of the fields will be valid.
-    //      At completion of this member's destruction, any oustanding
+    //      At completion of this member's destruction, any outstanding
     //      threadpool thread should have completed and the callback
     //      will have been unregistered.
     wil::unique_threadpool_wait m_threadpoolWait;

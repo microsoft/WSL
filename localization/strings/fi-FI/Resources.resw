@@ -321,6 +321,9 @@ Ota valinnainen Windows-alijärjestelmä Linuxille -osa käyttöön, jotta voit 
     --msal-proxy-path
         Näytä MSAL-välityspalvelinsovelluksen polku.
 
+    --vm-id
+        Näytä WSL-näennäiskoneen tunnus.
+
     --version
         Näytä WSL-paketin versio.
 
@@ -328,6 +331,7 @@ Ota valinnainen Windows-alijärjestelmä Linuxille -osa käyttöön, jotta voit 
         Älä tulosta uutta riviä.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ Voit käyttää myös muita VS Code Remote -asetuksia VS Coden komentovalikoiman
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Valinnaiset ominaisuudet</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Ota sivujen raportointi käyttöön</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Oletusarvon mukainen tosi-asetus antaa Windowsille mahdollisuuden vapauttaa WSL 2 -virtuaalikoneelle varattua käyttämätöntä muistia.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Tietosuojatiedot</value>

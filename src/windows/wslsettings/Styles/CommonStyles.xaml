@@ -44,6 +44,7 @@
             <Setter Property="FontSize" Value="20" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="1,28,0,4" />
+            <Setter Property="AutomationProperties.HeadingLevel" Value="Level1" />
         </Style.Setters>
     </Style>
 

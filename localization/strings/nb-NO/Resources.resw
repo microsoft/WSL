@@ -321,13 +321,17 @@ Aktiver den valgfrie Windows-undersystem for Linux-komponenten for å bruke WSL1
     --msal-proxy-path
         Vis banen til MSAL-proxyprogrammet.
 
+    --vm-id
+        Vis VM-ID-en for WSL.
+
     --version
         Vis versjonen av WSL-pakken.
 
-    –n
+    -n
         Ikke skriv ut et linjeskift.</value>
     <comment>{Locked="--networking-mode
 "}{Locked="--msal-proxy-path
+"}{Locked="--vm-id
 "}{Locked="--version
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1690,12 +1694,6 @@ Du kan også åpne flere eksterne alternativer for VS Code gjennom kommandopalet
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
     <value>Valgfrie funksjoner</value>
-  </data>
-  <data name="Settings_PageReporting.Header" xml:space="preserve">
-    <value>Aktiver siderapportering</value>
-  </data>
-  <data name="Settings_PageReporting.Description" xml:space="preserve">
-    <value>Standard sann innstilling gjør det mulig for Windows å frigjøre ubrukt minne tildelt til virtuell WSL 2-maskin.</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
     <value>Personvernerklæring</value>

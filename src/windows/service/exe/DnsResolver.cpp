@@ -179,7 +179,7 @@ try
 
     m_dnsChannel.Stop();
 
-    // Stop interface change notificaions
+    // Stop interface change notifications
     m_interfaceNotificationHandle.reset();
 
     GenerateTelemetry();

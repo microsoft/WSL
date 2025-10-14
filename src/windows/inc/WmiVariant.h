@@ -479,7 +479,7 @@ inline bool WmiReadFromVariant(_In_ const VARIANT* variant, _Inout_ std::vector<
 
 inline wil::unique_variant WmiMakeVariant(const std::vector<unsigned short>& data)
 {
-    // WMI marshaler complaines type mismatch using VT_UI2 | VT_ARRAY, and VT_I4 | VT_ARRAY works fine.
+    // WMI marshaler complains type mismatch using VT_UI2 | VT_ARRAY, and VT_I4 | VT_ARRAY works fine.
     auto* const tempSafeArray = SafeArrayCreateVector(VT_I4, 0, static_cast<ULONG>(data.size()));
     THROW_IF_NULL_ALLOC(tempSafeArray);
     auto guardArray = wil::scope_exit([&]() noexcept { SafeArrayDestroy(tempSafeArray); });
@@ -506,7 +506,7 @@ inline wil::unique_variant WmiMakeVariant(const std::vector<unsigned short>& dat
 
 inline bool WmiReadFromVariant(_In_ const VARIANT* variant, _Inout_ std::vector<unsigned short>* value)
 {
-    // WMI marshaler complaines type mismatch using VT_UI2 | VT_ARRAY, and VT_I4 | VT_ARRAY works fine.
+    // WMI marshaler complains type mismatch using VT_UI2 | VT_ARRAY, and VT_I4 | VT_ARRAY works fine.
     if (IsVariantEmptyOrNull(variant))
     {
         return false;

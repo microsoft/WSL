@@ -319,8 +319,8 @@ int SetGetAffinityNp(PLXT_ARGS Args)
     LxtCheckErrno(LxtSched_GetAffinity(0, sizeof(Set), &Set));
 
     //
-    // N.B Affinity cannot be validated because its not gauranteed for it to
-    //     take affect.
+    // N.B Affinity cannot be validated because its not guaranteed for it to
+    //     take effect.
     //
 
     LxtLogInfo("Current Affinity: %08x", *(uint32_t*)&Set);

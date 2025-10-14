@@ -1,6 +1,6 @@
 # GNS
 
-`gns` is a process created by `mini_init`. Its jobs is to configure networking within the WSL2 virtual machine. 
+`gns` is a process created by `mini_init`. Its job is to configure networking within the WSL2 virtual machine. 
 
 ## Networking configuration 
 

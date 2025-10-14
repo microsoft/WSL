@@ -19,7 +19,7 @@ You can file issues for WSL at the WSL repository, or linked repositories. Befor
 
 1. If your issue is related to WSL documentation, please file it at [microsoftdocs/wsl](https://github.com/microsoftdocs/WSL/issues)
 2. If your issue is related to a Linux GUI app, please file it at [microsoft/wslg](https://github.com/microsoft/wslg/issues)
-3. Otherwise if you have a technical issue related to WSL in general, such as start up issues, etc., please file it at [microsoft/wsl](https://github.com/microsoft/WSL/issues)
+3. Otherwise, if you have a technical issue related to WSL in general, such as start up issues, etc., please file it at [microsoft/wsl](https://github.com/microsoft/WSL/issues)
 
 Please provide as much information as possible when reporting a bug or filing an issue on the Windows Subsystem for Linux, and be sure to include logs as necessary!
 
@@ -68,7 +68,7 @@ The script will output the path of the log file once done.
 
 ### Collect WSL logs (recommended method)
 
-If you choose to email these logs instead of attaching to the bug, please send them to wsl-gh-logs@microsoft.com with the number of the github issue in the subject, and in the message a link to your comment in the github issue.
+If you choose to email these logs instead of attaching them to the bug, please send them to wsl-gh-logs@microsoft.com with the GitHub issue number in the subject, and include a link to your GitHub issue comment in the message body.
 
 To collect WSL logs, download and execute [collect-wsl-logs.ps1](https://github.com/Microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1) in an administrative powershell prompt:
 
@@ -94,7 +94,7 @@ After reboot, the kernel dump will be in `%SystemRoot%\MEMORY.DMP` (unless this 
 Please send this dump to: secure@microsoft.com .
 Make sure that the email body contains:
 
-- The Github issue number, if any
+- The GitHub issue number, if any
 - That this dump is intended for the WSL team
 
 ### 11) Reporting a WSL process crash

@@ -23,12 +23,14 @@ Abstract:
 #include "defs.h"
 #include "Localization.h"
 #include "CommandLine.h"
+#include "../../shared/inc/lxinitshared.h"
 
 enum class WslInfoMode
 {
     GetNetworkingMode,
     MsalProxyPath,
-    WslVersion
+    WslVersion,
+    VMId
 };
 
 int WslInfoEntry(int Argc, char* Argv[])
@@ -65,6 +67,7 @@ Return Value:
     parser.AddArgument(UniqueSetValue<WslInfoMode, WslInfoMode::MsalProxyPath>{Mode, Usage}, WSLINFO_MSAL_PROXY_PATH);
     parser.AddArgument(UniqueSetValue<WslInfoMode, WslInfoMode::WslVersion>{Mode, Usage}, WSLINFO_WSL_VERSION);
     parser.AddArgument(UniqueSetValue<WslInfoMode, WslInfoMode::WslVersion>{Mode, Usage}, WSLINFO_WSL_VERSION_LEGACY);
+    parser.AddArgument(UniqueSetValue<WslInfoMode, WslInfoMode::VMId>{Mode, Usage}, WSLINFO_WSL_VMID);
     parser.AddArgument(NoOp{}, WSLINFO_WSL_HELP);
     parser.AddArgument(noNewLine, nullptr, WSLINFO_NO_NEWLINE);
 
@@ -143,6 +146,29 @@ Return Value:
     else if (Mode.value() == WslInfoMode::WslVersion)
     {
         std::cout << WSL_PACKAGE_VERSION;
+    }
+    else if (Mode.value() == WslInfoMode::VMId)
+    {
+        if (UtilIsUtilityVm())
+        {
+            auto vmId = UtilGetVmId();
+            if (vmId.empty())
+            {
+                std::cerr << Localization::MessageNoValueFound() << "\n";
+                return 1;
+            }
+
+            std::cout << vmId;
+        }
+        else
+        {
+            std::cout << "wsl1";
+        }
+    }
+    else
+    {
+        assert(false && "Unknown WslInfoMode");
+        return 1;
     }
 
     if (!noNewLine)

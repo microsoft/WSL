@@ -542,7 +542,7 @@ Routine Description:
     This routine performs a very basic check for pseudo terminal. The steps are:
     - Open the master.
     - Open the subordinate.
-    - Turns off ONLR to verify termios applies only to subordinate.
+    - Turns off ICRNL to verify termios applies only to subordinate.
     - Perform simple read/write check on the master-subordinate.
 
 
@@ -1222,7 +1222,7 @@ Return Value:
     char MessageBuffer[10];
     size_t MessageLength;
     int PtmFd;
-    char PtsBuffer[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsBuffer[PTS_DEV_NAME_BUFFER_SIZE];
     int Result;
     pid_t SelfPid;
     pid_t SessionId;
@@ -1352,7 +1352,7 @@ Return Value:
 {
 
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int Result;
     int SerialNumber;
@@ -1387,7 +1387,7 @@ Return Value:
     // It should fail.
     //
 
-    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFER_SIZE));
+    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFFER_SIZE));
     LxtLogInfo("Subordinate Device is:%s", PtsDevName);
     PtsFd = open(PtsDevName, O_RDWR);
     LxtCheckErrnoFailure(open(PtsDevName, O_RDWR), EIO);
@@ -1492,7 +1492,7 @@ Return Value:
 {
 
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int Result;
     int SerialNumber1;
@@ -1532,7 +1532,7 @@ Return Value:
 
     LxtCheckErrno((PtmFd = open("/dev/ptmx", O_RDWR)));
     LxtLogInfo("Master opened at FD:%d", PtmFd);
-    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFER_SIZE));
+    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFFER_SIZE));
     LxtLogInfo("Subordinate Device is:%s", PtsDevName);
     LxtCheckErrno((SerialNumber2 = GetPtSerialNumFromDeviceString(PtsDevName)));
 
@@ -1607,7 +1607,7 @@ int PtCheck3(PLXT_ARGS Args)
 Routine Description:
 
     This routine validates that the pseudo terminal driver is able to
-    handle muliple opens on the same subordinate device.
+    handle multiple opens on the same subordinate device.
 
 Arguments:
 
@@ -1622,7 +1622,7 @@ Return Value:
 {
 
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int PtsFd1;
     int PtsFd2;
@@ -1727,7 +1727,7 @@ Return Value:
     char Message1[] = "ls -al\n";
     char Message2[] = "date\n";
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     char ReadBuffer[50];
     int Result;
@@ -3042,7 +3042,7 @@ Return Value:
 
     int Result;
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
 
     //
@@ -3060,7 +3060,7 @@ Return Value:
     LxtLogInfo("Master opened at FD:%d", PtmFd);
     LxtCheckErrno(grantpt(PtmFd));
     LxtCheckErrno(unlockpt(PtmFd));
-    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFER_SIZE));
+    LxtCheckErrno(ptsname_r(PtmFd, PtsDevName, PTS_DEV_NAME_BUFFER_SIZE));
     LxtLogInfo("Subordinate Device is:%s", PtsDevName);
 
     //
@@ -3111,7 +3111,7 @@ Return Value:
 
     int Result;
     int PtmFd;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int PtsFd;
     int SerialNumber;
 
@@ -4445,7 +4445,7 @@ Return Value:
         LxtCheckErrnoFailure(BytesReadWrite = write(PtsFd, WriteBuffer, WriteBufferLen), EAGAIN);
 
         //
-        // Try to write a byte, which will block. Wait for the the other thread
+        // Try to write a byte, which will block. Wait for the other thread
         // to unblock this request. Do this multiple times to test different
         // methods of unblocking.
         //
@@ -4601,7 +4601,7 @@ int PtMasterHangup1(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine will try to determine the the behavior when the subordinate
+    This routine will try to determine the behavior when the subordinate
     tries to write after the master has hangup.
     Expected Result: The write on subordinate should return with error 5:EIO.
 
@@ -4837,7 +4837,7 @@ int PtMasterHangup3(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine will try to determine the the behavior when the master opens,
+    This routine will try to determine the behavior when the master opens,
     writes some complete messages and closes. Subordinate then tries to read.
     Expected Result: The read on subordinate should return 0 bytes read.
 
@@ -5042,7 +5042,7 @@ Return Value:
     int Loop;
     int LoopCount;
     int NumPtToTest;
-    char PtsDevName[PTS_DEV_NAME_BUFER_SIZE];
+    char PtsDevName[PTS_DEV_NAME_BUFFER_SIZE];
     int Result;
 
     //
@@ -5681,7 +5681,7 @@ Return Value:
     {
 
         //
-        // Setup the argument for the stress I/O thread.
+        // Set up the argument for the stress I/O thread.
         //
 
         ThreadArg[Itr].PtmFd = PtFds[Itr][0];
@@ -5692,7 +5692,7 @@ Return Value:
         {
 
             //
-            // Create I/O Strss thread#ThreadItr for PT#Itr
+            // Create I/O Stress thread#ThreadItr for PT#Itr
             //
 
             LxtCheckErrno(pthread_create(&Thread[Itr][ThreadItr], NULL, PerformIoStressThread, (void*)&ThreadArg[Itr]));
@@ -6564,7 +6564,7 @@ int PtUTF8Basic7(PLXT_ARGS Args)
 
 Routine Description:
 
-    This routine sends a string ending with a UTF-8 character, follwed by the
+    This routine sends a string ending with a UTF-8 character, followed by the
     delete char. This is expected to remove only a single byte from the string.
 
 Arguments:

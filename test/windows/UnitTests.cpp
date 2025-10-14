@@ -227,7 +227,7 @@ class UnitTests
         CreateUser(LXSST_TEST_USERNAME, &TestUid, &TestGid);
         auto userCleanup = wil::scope_exit([]() { LxsstuLaunchWsl(L"userdel " LXSST_TEST_USERNAME); });
 
-        auto validateUserSesssion = [&]() {
+        auto validateUserSession = [&]() {
             // verify that the user service is running
             const std::wstring isServiceActiveCmd =
                 std::format(L"-u {} systemctl is-active user@{}.service ; exit 0", LXSST_TEST_USERNAME, TestUid);
@@ -260,7 +260,7 @@ class UnitTests
 
         // Validate user sessions state with gui apps disabled.
         {
-            validateUserSesssion();
+            validateUserSession();
 
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L"\n");
@@ -270,7 +270,7 @@ class UnitTests
         {
             WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
 
-            validateUserSesssion();
+            validateUserSession();
             auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L":0\n");
         }
@@ -373,7 +373,7 @@ class UnitTests
             // Enable systemd (restarts distro).
             auto cleanupSystemd = EnableSystemd("protectBinfmt=false");
 
-            // Validate that WSL's binfmt interpreter is overriden
+            // Validate that WSL's binfmt interpreter is overridden
             auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"cmd.exe /c echo ok");
             VERIFY_IS_TRUE(wsl::shared::string::IsEqual(output, L"/mnt/c/Windows/system32/cmd.exe cmd.exe /c echo ok\n", true));
         }
@@ -788,7 +788,7 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | wc -l | grep 1"), 0u);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode -n | wc -l | grep 0"), 0u);
 
-            // Ensure various wslinfo functionaly works as expected.
+            // Ensure various wslinfo functionally works as expected.
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
 
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
@@ -841,6 +841,27 @@ class UnitTests
                 err,
                 L"Invalid command line argument: --invalid\nPlease use 'wslinfo --help' to get a list of supported "
                 L"arguments.\n");
+        }
+
+        {
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
+            VERIFY_ARE_EQUAL(err, L"");
+            if (LxsstuVmMode())
+            {
+                // Ensure that the response from wslinfo has the VM ID.
+                auto guid = wsl::shared::string::ToGuid(out);
+                VERIFY_IS_TRUE(guid.has_value());
+                VERIFY_IS_FALSE(IsEqualGUID(guid.value(), GUID_NULL));
+
+                // Validate that the VM ID is not propagated to user commands.
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"echo -n \"$WSL2_VM_ID\"");
+                VERIFY_ARE_EQUAL(out, L"");
+                VERIFY_ARE_EQUAL(err, L"");
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(out, L"wsl1");
+            }
         }
     }
 
@@ -1224,8 +1245,8 @@ class UnitTests
                 L"Wsl/Service/DetachDisk/ERROR_FILE_NOT_FOUND");
 
             ValidateErrorMessage(
-                WSL_MANAGE_ARG L" " LXSS_DISTRO_NAME_TEST L" " WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L" fulse",
-                L"fulse is not a valid boolean, <true|false>",
+                WSL_MANAGE_ARG L" " LXSS_DISTRO_NAME_TEST L" " WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG L" false_",
+                L"false_ is not a valid boolean, <true|false>",
                 L"Wsl/E_INVALIDARG");
 
             const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
@@ -1904,7 +1925,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // This loop is here because of a race condition when starting WSL to get the warnings.
             // If a p9rdr distribution startup notification arrives just before wsl.exe calls CreateInstance(),
-            // the warnings will be 'consummed' before wsl.exe can read them.
+            // the warnings will be 'consumed' before wsl.exe can read them.
             // To work around that, loop for up to 2 minutes while we don't get any warnings
 
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(2);
@@ -1961,7 +1982,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
             // This loop is here because of a race condition when starting WSL to get the warnings.
             // If a p9rdr distribution startup notification arrives just before wsl.exe calls CreateInstance(),
-            // the warnings will be 'consummed' before wsl.exe can read them.
+            // the warnings will be 'consumed' before wsl.exe can read them.
             // To work around that, loop for up to 2 minutes while we don't get any warnings
 
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(2);
@@ -2518,8 +2539,11 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         wil::GetSystemDirectoryW(systemDir);
 
         VERIFY_ARE_EQUAL(
-            std::format("{}\\{} {} {} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString, WSL_CHANGE_DIRECTORY_ARG, WSL_CWD_HOME),
+            std::format("{}\\{} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString),
             launchProfile["commandline"].get<std::string>());
+
+        // Verify that startingDirectory is set to home directory
+        VERIFY_ARE_EQUAL(launchProfile["startingDirectory"].get<std::string>(), "~");
 
         auto iconLocation = wsl::shared::string::MultiByteToWide(launchProfile["icon"].get<std::string>());
         if (defaultIcon)
@@ -2556,7 +2580,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanup =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(L"--set-version test_distro " + originalVersion); });
 
-        // Convert the test distribuiton to the target version and back to the original.
+        // Convert the test distribution to the target version and back to the original.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--set-version test_distro " + targetVersion), 0u);
         ValidateDistributionShortcut(LXSS_DISTRO_NAME_TEST_L, nullptr);
         ValidateDistributionTerminalProfile(LXSS_DISTRO_NAME_TEST_L, true);
@@ -2596,7 +2620,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
     {
         WSL2_TEST_ONLY();
 
-        // Get the kernel version and stip off everything after the first dash.
+        // Get the kernel version and strip off everything after the first dash.
         std::wstring kernelVersion{TEXT(KERNEL_VERSION)};
         auto position = kernelVersion.find_first_of(L"-");
         if (position != kernelVersion.npos)
@@ -2617,7 +2641,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command.c_str(), nullptr, nullptr, nullptr, nullptr), 0u);
 
-        // Update .wslconfig and ensure an error is displayed if non-existent kernel or modules is specified.
+        // Update .wslconfig and ensure an error is displayed if nonexistent kernel or modules is specified.
         const std::wstring wslConfigPath = wsl::windows::common::helpers::GetWslConfigPath();
         const std::wstring nonExistentFile = L"DoesNotExist";
         WslConfigChange configChange(LxssGenerateTestConfig({.kernel = nonExistentFile.c_str()}));
@@ -2930,19 +2954,12 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         LxssDynamicFunction<decltype(GetWslConfigSetting)> getWslConfigSetting(libWslDllPath.c_str(), "GetWslConfigSetting");
         LxssDynamicFunction<decltype(SetWslConfigSetting)> setWslConfigSetting(libWslDllPath.c_str(), "SetWslConfigSetting");
 
-        // Delete the test config file. The original has already been saved as part of module setup.
+        // Reset the test config file. The original has already been saved as part of module setup.
         auto wslConfigFilePath = getenv("userprofile") + std::string("\\.wslconfig");
-        if (std::filesystem::exists(wslConfigFilePath))
-        {
-            std::error_code ec{};
-            VERIFY_IS_TRUE(std::filesystem::remove(wslConfigFilePath, ec));
-        }
+        WslConfigChange config{L""};
 
         auto apiWslConfigFilePath = getWslConfigFilePath();
         VERIFY_IS_TRUE(std::filesystem::path(wslConfigFilePath) == std::filesystem::path(apiWslConfigFilePath));
-
-        // Cleanup any leftover config files.
-        auto cleanup = wil::scope_exit([apiWslConfigFilePath] { std::filesystem::remove(apiWslConfigFilePath); });
 
         auto wslConfigDefaults = createWslConfig(nullptr);
         VERIFY_IS_NOT_NULL(wslConfigDefaults);
@@ -3177,13 +3194,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
                     booleansToTest,
                 },
                 {
-                    {.ConfigEntry = WslConfigEntry::DNSTunellingEnabled},
+                    {.ConfigEntry = WslConfigEntry::DNSTunnelingEnabled},
                     // This setting is only enabled when NetworkingMode != Nat && NetworkingMode != Mirrored
                     booleansToTest,
                 },
                 {
                     {.ConfigEntry = WslConfigEntry::BestEffortDNSParsingEnabled},
-                    // This setting is only enabled when DNSTunellingEnabled = true
+                    // This setting is only enabled when DNSTunnelingEnabled = true
                     booleansToTest,
                 },
                 {
@@ -3339,7 +3356,7 @@ autoProxy=false
 
             VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, wslConfigSettingWriteOut), ERROR_SUCCESS);
 
-            // Write out a new setting that doesn't exist in the original config but its' section
+            // Write out a new setting that doesn't exist in the original config but its section
             // does. The new setting should be appended to that section. There are two cases here::
             wslConfigSettingWriteOut.ConfigEntry = WslConfigEntry::HardwarePerformanceCountersEnabled;
             wslConfigSettingWriteOut.BoolValue = true;
@@ -3573,10 +3590,10 @@ localhostForwarding=true
         validateUidChange(L"testuser", Uid, L"The operation completed successfully. \r\n", L"", 0);
         validateUidChange(L"root", 0, L"The operation completed successfully. \r\n", L"", 0);
 
-        const std::wstring invalidUser = L"DoesntExist";
+        const std::wstring invalidUser = L"Nonexistent";
         validateUidChange(invalidUser, 0, L"", L"/usr/bin/id: \u2018" + invalidUser + L"\u2019: no such user\n", 1);
 
-        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage doesntexist --set-default-user root", -1);
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage nonexistent --set-default-user root", -1);
 
         VERIFY_ARE_EQUAL(
             out, L"There is no distribution with the supplied name.\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_FOUND\r\n");
@@ -4001,7 +4018,7 @@ VERSION_ID="Invalid|Format"
         };
 
         auto InstallFromTar =
-            [](LPCWSTR TarName, LPCWSTR ExtraArgs = L"", int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpextedWarnings = nullptr) {
+            [](LPCWSTR TarName, LPCWSTR ExtraArgs = L"", int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpectedWarnings = nullptr) {
                 auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
                     std::format(L"--install --no-launch --from-file {} {}", TarName, ExtraArgs), ExpectedExitCode);
 
@@ -4010,9 +4027,9 @@ VERSION_ID="Invalid|Format"
                     VERIFY_ARE_EQUAL(ExpectedOutput, out);
                 }
 
-                if (ExpextedWarnings != nullptr)
+                if (ExpectedWarnings != nullptr)
                 {
-                    VERIFY_ARE_EQUAL(ExpextedWarnings, err);
+                    VERIFY_ARE_EQUAL(ExpectedWarnings, err);
                 }
             };
 
@@ -4146,7 +4163,7 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
 
             InstallFromTar(L"distro-no-default-name.tar", L"", -1, expectedOutput);
 
-            // And suceed with --name
+            // And succeed with --name
             InstallFromTar(L"distro-no-default-name.tar", L"--name test-distro-no-default-name");
             ValidateDistributionStarts(L"test-distro-no-default-name");
 
@@ -4248,7 +4265,7 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             };
 
             auto InstallFromVhd =
-                [](LPCWSTR DistroName, LPCWSTR VhdName, int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpextedWarnings = nullptr) {
+                [](LPCWSTR DistroName, LPCWSTR VhdName, int ExpectedExitCode = 0, LPCWSTR ExpectedOutput = nullptr, LPCWSTR ExpectedWarnings = nullptr) {
                     auto [out, err] =
                         LxsstuLaunchWslAndCaptureOutput(std::format(L"--import-in-place {} {}", DistroName, VhdName), ExpectedExitCode);
 
@@ -4257,9 +4274,9 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
                         VERIFY_ARE_EQUAL(ExpectedOutput, out);
                     }
 
-                    if (ExpextedWarnings != nullptr)
+                    if (ExpectedWarnings != nullptr)
                     {
-                        VERIFY_ARE_EQUAL(ExpextedWarnings, err);
+                        VERIFY_ARE_EQUAL(ExpectedWarnings, err);
                     }
                 };
 
@@ -4297,18 +4314,18 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             VERIFY_IS_FALSE(std::filesystem::exists(shortcutPath));
         }
 
-        // Distribution with overriden default location
+        // Distribution with overridden default location
         {
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overriden-default-location"); });
+            auto cleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overridden-default-location"); });
 
             auto currentPath = std::filesystem::current_path();
             WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
 
-            InstallFromTar(g_testDistroPath.c_str(), L"--name test-overriden-default-location");
-            ValidateDistributionStarts(L"test-overriden-default-location");
+            InstallFromTar(g_testDistroPath.c_str(), L"--name test-overridden-default-location");
+            ValidateDistributionStarts(L"test-overridden-default-location");
 
-            auto distroKey = OpenDistributionKey(L"test-overriden-default-location");
+            auto distroKey = OpenDistributionKey(L"test-overridden-default-location");
             VERIFY_IS_TRUE(!!distroKey);
 
             auto shortcutPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"ShortcutPath", L"");
@@ -4320,7 +4337,7 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             // Validate that the distribution was created in the correct path
             VERIFY_ARE_EQUAL(std::filesystem::path(basePath).parent_path().string(), currentPath.string());
 
-            ValidateDistributionShortcut(L"test-overriden-default-location", nullptr);
+            ValidateDistributionShortcut(L"test-overridden-default-location", nullptr);
 
             cleanup.reset();
 
@@ -4560,7 +4577,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             ValidateDistributionStarts(distroName);
         }
 
-        // Distribution with a a pre-existing hide profile.
+        // Distribution with a preexisting hide profile.
         {
             constexpr auto distroName = L"custom-terminal-profile-hide";
             constexpr auto tarName = L"custom-terminal-profile-hide.tar";
@@ -4796,13 +4813,13 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n");
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
 
-            // Verify that name matching is not case sensitive on the version.
+            // Verify that name matching is not case-sensitive on the version.
             ValidateInstall(L"Debian-12 --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unregister debian-12"), 0L);
 
-            // Verify that name matching is not case sensitive on the flavor.
+            // Verify that name matching is not case-sensitive on the flavor.
             ValidateInstall(L"Debian --no-launch --name debian-12");
             ValidateDistributionStarts(L"debian-12");
 
@@ -4949,7 +4966,7 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
-        // Validate that modern distros takes precedences, but can be overriden.
+        // Validate that modern distros takes precedences, but can be overridden.
         {
             auto manifest = std::format(
                 R"({{
@@ -4993,7 +5010,7 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
                 L"wsl: Using legacy distribution registration. Consider using a tar based distribution instead.\r\n");
         }
 
-        // Validate that distribution can be overriden
+        // Validate that distribution can be overridden
         {
             auto manifest = std::format(
                 R"({{
@@ -5030,7 +5047,7 @@ Error code: Wsl/InstallDistro/WININET_E_CANNOT_CONNECT\r\n",
         "debian": [
             {{
                 "Name": "debian-12",
-                "FriendlyName": "DebianFriendlyNameOverriden",
+                "FriendlyName": "DebianFriendlyNameOverridden",
                 "Amd64Url": {{
                     "Url": "{}",
                     "Sha256": "{}"
@@ -5191,7 +5208,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "{}",
                 "FriendlyName": "DebianFriendlyName",
                 "Amd64Url": {{
-                    "Url": "file://doesnotexist",
+                    "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
             }},
@@ -5199,7 +5216,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND\r\n",
                 "Name": "dummy",
                 "FriendlyName": "dummy",
                 "Amd64Url": {{
-                    "Url": "file://doesnotexist",
+                    "Url": "file://nonexistent",
                     "Sha256": ""
                 }}
             }}
@@ -5308,6 +5325,76 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 L"launched via 'wsl.exe -d test-url-download'\r\n");
 
             VERIFY_ARE_EQUAL(error, L"");
+        }
+
+        // Validate that manifest distribution ordering is preserved.
+        {
+            auto validateOrder = [](const std::vector<LPCWSTR>& expected) {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --online");
+
+                auto lines = wsl::shared::string::Split<wchar_t>(out, '\n');
+
+                for (size_t i = 0; i < expected.size(); i++)
+                {
+                    auto end = lines[i + 4].find_first_of(L" \t");
+                    VERIFY_ARE_NOT_EQUAL(end, std::wstring::npos);
+
+                    auto distro = lines[i + 4].substr(0, end);
+
+                    VERIFY_ARE_EQUAL(expected[i], distro);
+                }
+            };
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+                validateOrder({L"distro1", L"distro2"});
+            }
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+
+                validateOrder({L"distro2", L"distro1"});
+            }
         }
     }
 
@@ -5913,7 +6000,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
               "name": "wsl.2.4.12.0.x64.msi"
             }]})";
 
-            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGithubRelease(false, json);
+            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(false, json);
 
             VERIFY_ARE_EQUAL(version, L"2.4.12");
             VERIFY_ARE_EQUAL(asset.id, 2);
@@ -5947,7 +6034,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
           "name": "2.4.13"
         }])";
 
-            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGithubRelease(true, json);
+            auto [version, asset] = wsl::windows::common::wslutil::GetLatestGitHubRelease(true, json);
 
             VERIFY_ARE_EQUAL(version, L"2.5.1");
             VERIFY_ARE_EQUAL(asset.id, 2);
@@ -6063,6 +6150,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto cleanup =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
 
+        // The below logline makes it easier to find the bsdtar output when debugging this test case.
+        fprintf(stderr, "Starting ImportExportStdout test case\n");
+
         auto commandLine = std::format(L"cmd.exe /c wsl --export {} - | wsl --import {} . -", LXSS_DISTRO_NAME_TEST_L, test_distro);
 
         VERIFY_ARE_EQUAL(LxsstuRunCommand(commandLine.data()), 0L);
@@ -6117,6 +6207,73 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    // Validate that calling the binfmt interpreter with tty fd's but not controlling terminal doesn't display a warning.
+    // See https://github.com/microsoft/WSL/issues/13173.
+    TEST_METHOD(SetSidNoWarning)
+    {
+        auto [out, err] =
+            LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
+
+        VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(WslDebug)
+    {
+        WSL2_TEST_ONLY();
+
+        // Verify that hvsocket debug events are logged to dmesg.
+        WslConfigChange config(LxssGenerateTestConfig({.kernelCommandLine = L"WSL_DEBUG=hvsocket"}));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"dmesg | grep -iF 'vmbus_send_tl_connect_request'"), 0L);
+    }
+
+    TEST_METHOD(CGroupv1)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectedMount = [](const char* path, const wchar_t* expected) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
+
+            VERIFY_ARE_EQUAL(out, expected);
+        };
+
+        // Validate that cgroupv2 is mounted by default.
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that setting cgroup=v1 causes unified cgroups to be mounted.
+        DistroFileChange wslConf(L"/etc/wsl.conf", false);
+        wslConf.SetContent(L"[automount]\ncgroups=v1");
+
+        TerminateDistribution();
+
+        expectedMount(
+            "/sys/fs/cgroup/unified", L"/sys/fs/cgroup/unified cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that the cgroupv1 mounts are present.
+        expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
+
+        // Validate that having cgroup_no_v1=all causes the distribution to fall back to v2.
+        WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
+
+        expectedMount("/sys/fs/cgroup/unified", L"");
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
+        VERIFY_ARE_NOT_EQUAL(
+            dmesg.find(
+                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            std::wstring::npos);
+    }
+
+    TEST_METHOD(InitPermissions)
+    {
+        WSL2_TEST_ONLY();
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"stat -c %a /init");
+
+        VERIFY_ARE_EQUAL(out, L"755\n");
     }
 
 }; // namespace UnitTests

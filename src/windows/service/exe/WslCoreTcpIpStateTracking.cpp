@@ -86,7 +86,7 @@ try
         else
         {
             WSL_LOG(
-                "IpStateTracking::SyncFirewallState - FirewallTrackedIpAddresses is syncd with the preferredNetwork",
+                "IpStateTracking::SyncFirewallState - FirewallTrackedIpAddresses is synced with the preferredNetwork",
                 TraceLoggingValue(FirewallTrackedIpAddresses.size(), "FirewallTrackedIpAddresses.size"));
         }
     }
