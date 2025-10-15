@@ -80,6 +80,27 @@ try
 #endif
         if (BytesRead <= 0)
         {
+            const auto* Header = reinterpret_cast<const MESSAGE_HEADER*>(Buffer.data());
+
+#if defined(_MSC_VER)
+
+            LOG_HR_MSG(
+                E_UNEXPECTED,
+                "Socket closed while reading message. Size: %u, type: %i, sequence: %u",
+                Header->MessageSize,
+                Header->MessageType,
+                Header->SequenceNumber);
+
+#elif defined(__GNUC__)
+
+            LOG_ERROR(
+                "Socket closed while reading message. Size: {}, type: {}, sequence: {}",
+                Header->MessageSize,
+                Header->MessageType,
+                Header->SequenceNumber);
+
+#endif
+
             return {};
         }
 
