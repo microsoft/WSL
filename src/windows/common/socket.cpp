@@ -138,18 +138,43 @@ std::vector<gsl::byte> wsl::windows::common::socket::Receive(
 int wsl::windows::common::socket::Send(
     _In_ SOCKET Socket, _In_ gsl::span<const gsl::byte> Buffer, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
-    OVERLAPPED Overlapped{};
     const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
-    WSABUF VectorBuffer = {gsl::narrow_cast<ULONG>(Buffer.size()), const_cast<CHAR*>(reinterpret_cast<const CHAR*>(Buffer.data()))};
+    OVERLAPPED Overlapped{};
     Overlapped.hEvent = OverlappedEvent.get();
-    DWORD BytesWritten{};
-    if (WSASend(Socket, &VectorBuffer, 1, &BytesWritten, 0, &Overlapped, nullptr) != 0)
+
+    DWORD Offset = 0;
+    while (Offset < Buffer.size())
     {
-        DWORD Flags;
-        std::tie(BytesWritten, Flags) = GetResult(Socket, Overlapped, INFINITE, ExitHandle, Location);
+        OverlappedEvent.ResetEvent();
+
+        WSABUF VectorBuffer = {
+            gsl::narrow_cast<ULONG>(Buffer.size() - Offset), const_cast<CHAR*>(reinterpret_cast<const CHAR*>(Buffer.data() + Offset))};
+
+        DWORD BytesWritten{};
+        if (WSASend(Socket, &VectorBuffer, 1, &BytesWritten, 0, &Overlapped, nullptr) != 0)
+        {
+            // If WSASend returns non-zero, expect WSA_IO_PENDING.
+            if (auto error = WSAGetLastError(); error != WSA_IO_PENDING)
+            {
+                THROW_WIN32_MSG(error, "WSASend failed. From: %hs", std::format("{}", Location).c_str());
+            }
+
+            DWORD Flags;
+            std::tie(BytesWritten, Flags) = GetResult(Socket, Overlapped, INFINITE, ExitHandle, Location);
+            if (BytesWritten == 0)
+            {
+                THROW_WIN32_MSG(ERROR_CONNECTION_ABORTED, "Socket closed during WSASend(). From: %hs", std::format("{}", Location).c_str());
+            }
+        }
+
+        Offset += BytesWritten;
+        if (Offset < Buffer.size())
+        {
+            WSL_LOG("PartialSocketWrite", TraceLoggingValue(Buffer.size(), "MessagSize"), TraceLoggingValue(Offset, "Offset"));
+        }
     }
 
-    WI_ASSERT(BytesWritten == gsl::narrow_cast<DWORD>(Buffer.size()));
+    WI_ASSERT(Offset == gsl::narrow_cast<DWORD>(Buffer.size()));
 
-    return BytesWritten;
+    return Offset;
 }
