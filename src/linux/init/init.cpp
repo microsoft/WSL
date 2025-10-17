@@ -327,6 +327,10 @@ int GenerateSystemdUnits(int Argc, char** Argv)
             File.reset();
         }
 
+        // Mask systemd-networkd-wait-online.service since WSL always ensures that networking is configured during boot.
+        // That unit can cause systemd boot timeouts since WSL's network interface is unmanaged by systemd.
+        THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/systemd-networkd-wait-online.service", installPath).c_str()) < 0);
+
         // Only create the wslg unit if both enabled in wsl.conf, and if the wslg folder actually exists.
         if (enableGuiApps && access("/mnt/wslg/runtime-dir", F_OK) == 0)
         {
