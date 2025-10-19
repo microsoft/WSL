@@ -1113,9 +1113,9 @@ Código de erro: {}</value>
     <value>Devido a um problema de compatibilidade atual com o Cliente do Acesso Global Seguro, o Túnel DNS está desabilitado.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>O suporte ao VHD esparso está desabilitado no momento devido à possível corrupção de dados.
-Para forçar uma distribuição a usar um VHD esparso, execute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <value>O suporte a VHD esparso está atualmente desativado devido a possível corrupção de dados.
+Para forçar uma distribuição a usar um vhd esparso, execute:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
