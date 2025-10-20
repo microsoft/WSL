@@ -193,6 +193,8 @@ Abstract:
 
 #define WSL_ENABLE_CRASH_DUMP_ENV "WSL_ENABLE_CRASH_DUMP"
 
+#define WSL_DEBUG_ENV "WSL_DEBUG"
+
 #define WSL_DISTRIBUTION_CONF "/etc/wsl-distribution.conf"
 
 //

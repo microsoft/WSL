@@ -43,16 +43,16 @@
                 }
             },
             {
-                "Name": "openSUSE-Leap-15.6",
-                "FriendlyName": "openSUSE Leap 15.6",
+                "Name": "openSUSE-Leap-16.0",
+                "FriendlyName": "openSUSE Leap 16.0",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Leap-15.6-15.6.x86_64-15.2-Build15.2.wsl",
-                    "Sha256": "0x63ea1828168026c86522743d551b2c88f0f4f94d813d2adc5881164d176b0ea1"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20251001.0/openSUSE-Leap-16.0-16.0.x86_64-22.57-Build22.57.wsl",
+                    "Sha256": "0x0d1faa095153beee0a9b5089b0f9aa3d2aec95e2cdcffdeeff84dd54c48b8393"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20250320.0/openSUSE-Leap-15.6-15.6.aarch64-15.2-Build15.2.wsl",
-                    "Sha256": "0x0a3c646f69bb83889c4264e41030076104a2f3d71ae6a1e14a1e0653dfd2e3d4"
+                    "Url": "https://github.com/openSUSE/WSL-instarball/releases/download/v20251001.0/openSUSE-Leap-16.0-16.0.aarch64-22.57-Build22.57.wsl",
+                    "Sha256": "0x91bcdc7e9f42d7a60a4464ad867d91243aaaecab7b3a057039f77a989daac51e"
                 }
             }
         ],
@@ -166,8 +166,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.09.01.145298/archlinux-2025.09.01.145298.wsl",
-                    "Sha256": "9b011093c7ad5d0dccd0be785c9d968c30b4fce3957f3f1868f2c1c4415ae841"
+                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.10.01.148042/archlinux-2025.10.01.148042.wsl",
+                    "Sha256": "98a5792935c46476f471854bc93344b2b1d63f7947905ce4dd75d20a546db7ea"
                 }
             }
         ],

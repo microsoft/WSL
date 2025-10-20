@@ -28,6 +28,7 @@ Abstract:
 #include <future>
 #include <filesystem>
 #include <vector>
+#include <source_location>
 #include "lxinitshared.h"
 #include "lxdef.h"
 #include "common.h"
@@ -128,7 +129,8 @@ wil::unique_fd UtilConnectToInteropServer(std::optional<pid_t> Pid = {});
 
 wil::unique_fd UtilConnectUnix(const char* Path);
 
-wil::unique_fd UtilConnectVsock(unsigned int Port, bool CloseOnExec, std::optional<int> SocketBuffer = {}) noexcept;
+wil::unique_fd UtilConnectVsock(
+    unsigned int Port, bool CloseOnExec, std::optional<int> SocketBuffer = {}, const std::source_location& Source = std::source_location::current()) noexcept;
 
 // Needs to be declared before UtilCreateChildProcess().
 void UtilSetThreadName(const char* Name);

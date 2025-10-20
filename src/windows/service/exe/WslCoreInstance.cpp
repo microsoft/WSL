@@ -375,13 +375,6 @@ void WslCoreInstance::Initialize()
         drvfsMount = m_initializeDrvFs(m_userToken.get());
     }
 
-    // If not using the WSL init, initialization is complete.
-    if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_WSLCORE_MODE))
-    {
-        m_initialized = true;
-        return;
-    }
-
     // Create a console manager that will be used to manage session leaders.
     m_consoleManager = ConsoleManager::CreateConsoleManager(m_initChannel);
 
@@ -477,8 +470,12 @@ bool WslCoreInstance::RequestStop(_In_ bool Force)
             terminateMessage.Header.MessageSize = sizeof(terminateMessage);
             terminateMessage.Force = Force;
 
-            const auto& terminateResponse = m_initChannel->GetChannel().Transaction(terminateMessage, nullptr, m_socketTimeout);
-            shutdown = terminateResponse.Result;
+            m_initChannel->GetChannel().SendMessage(terminateMessage);
+            auto [message, span] = m_initChannel->GetChannel().ReceiveMessageOrClosed<RESULT_MESSAGE<bool>>(m_socketTimeout);
+            if (message)
+            {
+                shutdown = message->Result;
+            }
         }
     CATCH_LOG()
 

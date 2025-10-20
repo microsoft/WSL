@@ -187,6 +187,8 @@ UINT UpgradeViaMsi(_In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In
 
 UINT UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
 
+void WriteInstallLog(const std::string& Content);
+
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 
 } // namespace wsl::windows::common::wslutil

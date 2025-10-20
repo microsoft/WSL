@@ -5326,6 +5326,76 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
             VERIFY_ARE_EQUAL(error, L"");
         }
+
+        // Validate that manifest distribution ordering is preserved.
+        {
+            auto validateOrder = [](const std::vector<LPCWSTR>& expected) {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --online");
+
+                auto lines = wsl::shared::string::Split<wchar_t>(out, '\n');
+
+                for (size_t i = 0; i < expected.size(); i++)
+                {
+                    auto end = lines[i + 4].find_first_of(L" \t");
+                    VERIFY_ARE_NOT_EQUAL(end, std::wstring::npos);
+
+                    auto distro = lines[i + 4].substr(0, end);
+
+                    VERIFY_ARE_EQUAL(expected[i], distro);
+                }
+            };
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+                validateOrder({L"distro1", L"distro2"});
+            }
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+
+                validateOrder({L"distro2", L"distro1"});
+            }
+        }
     }
 
     TEST_METHOD(ModernInstallEndToEnd)
@@ -6080,6 +6150,9 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto cleanup =
             wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
 
+        // The below logline makes it easier to find the bsdtar output when debugging this test case.
+        fprintf(stderr, "Starting ImportExportStdout test case\n");
+
         auto commandLine = std::format(L"cmd.exe /c wsl --export {} - | wsl --import {} . -", LXSS_DISTRO_NAME_TEST_L, test_distro);
 
         VERIFY_ARE_EQUAL(LxsstuRunCommand(commandLine.data()), 0L);
@@ -6145,6 +6218,62 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
         VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(WslDebug)
+    {
+        WSL2_TEST_ONLY();
+
+        // Verify that hvsocket debug events are logged to dmesg.
+        WslConfigChange config(LxssGenerateTestConfig({.kernelCommandLine = L"WSL_DEBUG=hvsocket"}));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"dmesg | grep -iF 'vmbus_send_tl_connect_request'"), 0L);
+    }
+
+    TEST_METHOD(CGroupv1)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectedMount = [](const char* path, const wchar_t* expected) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
+
+            VERIFY_ARE_EQUAL(out, expected);
+        };
+
+        // Validate that cgroupv2 is mounted by default.
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that setting cgroup=v1 causes unified cgroups to be mounted.
+        DistroFileChange wslConf(L"/etc/wsl.conf", false);
+        wslConf.SetContent(L"[automount]\ncgroups=v1");
+
+        TerminateDistribution();
+
+        expectedMount(
+            "/sys/fs/cgroup/unified", L"/sys/fs/cgroup/unified cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that the cgroupv1 mounts are present.
+        expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
+
+        // Validate that having cgroup_no_v1=all causes the distribution to fall back to v2.
+        WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
+
+        expectedMount("/sys/fs/cgroup/unified", L"");
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
+        VERIFY_ARE_NOT_EQUAL(
+            dmesg.find(
+                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            std::wstring::npos);
+    }
+
+    TEST_METHOD(InitPermissions)
+    {
+        WSL2_TEST_ONLY();
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"stat -c %a /init");
+
+        VERIFY_ARE_EQUAL(out, L"755\n");
     }
 
 }; // namespace UnitTests

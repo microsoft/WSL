@@ -111,12 +111,13 @@ public:
 
 #ifdef WIN32
 
+        auto sentBytes = wsl::windows::common::socket::Send(m_socket.get(), span, m_exitEvent);
+
         WSL_LOG(
             "SentMessage",
             TraceLoggingValue(m_name.c_str(), "Name"),
-            TraceLoggingValue(reinterpret_cast<const TMessage*>(span.data())->PrettyPrint().c_str(), "Content"));
-
-        wsl::windows::common::socket::Send(m_socket.get(), span, m_exitEvent);
+            TraceLoggingValue(reinterpret_cast<const TMessage*>(span.data())->PrettyPrint().c_str(), "Content"),
+            TraceLoggingValue(sentBytes, "SentBytes"));
 
 #else
 
@@ -129,7 +130,7 @@ public:
         {
             LOG_ERROR("Failed to write message {}. Channel: {}", header->MessageType, m_name);
             THROW_LAST_ERROR();
-        };
+        }
 
 #endif
     }

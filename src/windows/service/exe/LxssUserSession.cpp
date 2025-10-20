@@ -510,7 +510,7 @@ try
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->Shutdown(false, Force);
+    return session->Shutdown(false, Force ? ShutdownBehavior::Force : ShutdownBehavior::Wait);
 }
 CATCH_RETURN()
 
@@ -1926,7 +1926,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             if (m_utilityVm->GetConfig().SetVersionDebug)
             {
-                commandLine += " -v";
+                commandLine += " -vv --totals";
             }
 
             // Run the bsdtar elf binary expand the tar file using the socket as stdin.
@@ -1991,7 +1991,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             if (m_utilityVm->GetConfig().SetVersionDebug)
             {
-                commandLine += " -v";
+                commandLine += " -vv --totals";
             }
 
             // Run the bsdtar elf binary to create the tar file using the socket as stdout.
@@ -2052,13 +2052,11 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
     return result;
 }
 
-HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceTerminate)
+HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBehavior Behavior)
 {
     try
     {
-        // If the user asks for a forced termination, kill the VM
-        if (ForceTerminate)
-        {
+        auto forceTerminate = [this]() {
             auto vmId = m_vmId.load();
             if (!IsEqualGUID(vmId, GUID_NULL))
             {
@@ -2071,11 +2069,43 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceT
 
                 WSL_LOG("ForceTerminateVm", TraceLoggingValue(result, "Result"));
             }
+        };
+
+        // If the user asks for a forced termination, kill the VM
+        if (Behavior == ShutdownBehavior::Force)
+        {
+            forceTerminate();
         }
 
         {
+            bool locked = false;
+            auto unlock = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &locked]() {
+                if (locked)
+                {
+                    m_instanceLock.unlock();
+                }
+            });
+
+            if (Behavior == ShutdownBehavior::ForceAfter30Seconds)
+            {
+                if (m_instanceLock.try_lock_for(std::chrono::seconds(30)))
+                {
+                    locked = true;
+                }
+                else
+                {
+                    WSL_LOG("VmShutdownLockTimedOut");
+                    forceTerminate();
+                }
+            }
+
+            if (!locked)
+            {
+                m_instanceLock.lock();
+                locked = true;
+            }
+
             // Stop each instance with the lock held.
-            std::lock_guard lock(m_instanceLock);
             while (!m_runningInstances.empty())
             {
                 _TerminateInstanceInternal(&m_runningInstances.begin()->first, false);
@@ -2776,8 +2806,6 @@ void LxssUserSessionImpl::_CreateVm()
         // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
 
-        m_utilityVm->GetRuntimeId();
-
         if (m_httpProxyStateTracker)
         {
             // this needs to be done after the VM has finished in case we fell back to NAT mode
@@ -2786,30 +2814,6 @@ void LxssUserSessionImpl::_CreateVm()
 
         try
         {
-            auto callback = [this](auto Pid) {
-                // If the vm is currently being destroyed, the instance lock might be held
-                // while WslCoreVm's destructor is waiting on this thread.
-                // Cancel the call if the vm destruction is signaled.
-                // Note: This is safe because m_instanceLock is always initialized
-                // and because WslCoreVm's destructor waits for this thread, the session can't be gone
-                // until this callback completes.
-
-                auto lock = m_instanceLock.try_lock();
-                while (!lock)
-                {
-                    if (m_vmTerminating.wait(100))
-                    {
-                        return;
-                    }
-                    lock = m_instanceLock.try_lock();
-                }
-
-                auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
-                TerminateByClientIdLockHeld(Pid);
-            };
-
-            m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
-
             // Mount disks after the system distro vhd is mounted in case filesystem detection is needed.
             _LoadDiskMounts();
 
@@ -2841,6 +2845,34 @@ void LxssUserSessionImpl::_CreateVm()
             _VmTerminate();
             throw;
         }
+
+        auto callback = [this](auto Pid) {
+            // If the vm is currently being destroyed, the instance lock might be held
+            // while WslCoreVm's destructor is waiting on this thread.
+            // Cancel the call if the vm destruction is signaled.
+            // Note: This is safe because m_instanceLock is always initialized
+            // and because WslCoreVm's destructor waits for this thread, the session can't be gone
+            // until this callback completes.
+
+            auto lock = m_instanceLock.try_lock();
+            while (!lock)
+            {
+                if (m_vmTerminating.wait(100))
+                {
+                    return;
+                }
+                lock = m_instanceLock.try_lock();
+            }
+
+            auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
+            TerminateByClientIdLockHeld(Pid);
+        };
+
+        // N.B. The callbacks must be registered outside of the above try/catch.
+        // Otherwise if an exception is thrown, calling _VmTerminate() will trigger the 's_VmTerminated' termination callback
+        // Which can deadlock since this thread holds the instance lock and HCS can block until the VM termination callback returns before deleting the VM.
+
+        m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
     }
 
     _VmCheckIdle();

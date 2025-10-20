@@ -857,10 +857,10 @@ Return Value:
 
         if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
         {
-            compressionArguments += "v";
+            compressionArguments += "vv";
         }
 
-        const char* arguments[] = {
+        std::vector<const char*> arguments{
             BSDTAR_PATH,
             "-C",
             Source,
@@ -872,7 +872,13 @@ Return Value:
             "-",
             ".",
             nullptr};
-        execv(BSDTAR_PATH, const_cast<char**>(arguments));
+
+        if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
+        {
+            arguments.emplace(arguments.begin() + 3, "--totals");
+        }
+
+        execv(BSDTAR_PATH, const_cast<char**>(arguments.data()));
         LOG_ERROR("execl failed, {}", errno);
     });
 
@@ -1158,7 +1164,7 @@ Return Value:
             "-C",
             Destination,
             "-x",
-            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vp" : "-p",
+            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vvp" : "-p",
             "--xattrs",
             "--numeric-owner",
             "-f",
@@ -3877,6 +3883,63 @@ int WslEntryPoint(int Argc, char* Argv[]);
 
 extern int WSLAEntryPoint(int Argc, char* Argv[]);
 
+void EnableDebugMode(const std::string& Mode)
+{
+    if (Mode == "hvsocket")
+    {
+        // Mount the debugfs.
+        THROW_LAST_ERROR_IF(UtilMount("none", "/sys/kernel/debug", "debugfs", 0, nullptr) < 0);
+
+        // Enable hvsocket events.
+        std::vector<const char*> files{
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_on_msg_dpc/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_on_message/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onoffer/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onoffer_rescind/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onopen_result/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_ongpadl_created/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_ongpadl_torndown/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_open/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_close_internal/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_establish_gpadl_header/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_establish_gpadl_body/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_teardown_gpadl/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_release_relid/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_send_tl_connect_request/enable"};
+
+        for (auto* e : files)
+        {
+            WriteToFile(e, "1");
+        }
+
+        // Relay logs to the host.
+        std::thread relayThread{[]() {
+            constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
+            std::ifstream file(path);
+
+            if (!file)
+            {
+                LOG_ERROR("Failed to open {}, {}", path, errno);
+                return;
+            }
+
+            std::string line;
+            while (std::getline(file, line))
+            {
+                LOG_INFO("{}", line);
+            }
+
+            LOG_ERROR("{}: closed", path);
+        }};
+
+        relayThread.detach();
+    }
+    else
+    {
+        LOG_ERROR("Unknown debugging mode: '{}'", Mode);
+    }
+}
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -4010,6 +4073,37 @@ int main(int Argc, char* Argv[])
     }
 
     //
+    // Create the etc directory and mount procfs and sysfs.
+    //
+
+    if (UtilMkdir(ETC_PATH, 0755) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, PROCFS_PATH, "proc", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, SYSFS_PATH, "sysfs", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    //
+    // Enable debug mode, if specified.
+    //
+
+    if (const auto* debugMode = getenv(WSL_DEBUG_ENV))
+    {
+        LOG_ERROR("Running in debug mode: '{}'", debugMode);
+        EnableDebugMode(debugMode);
+
+        unsetenv(WSL_DEBUG_ENV);
+    }
+
+    //
     // Establish the message channel with the service via hvsocket.
     //
 
@@ -4034,25 +4128,6 @@ int main(int Argc, char* Argv[])
     {
         Result = -1;
         goto ErrorExit;
-    }
-
-    //
-    // Create the etc directory and mount procfs and sysfs.
-    //
-
-    if (UtilMkdir(ETC_PATH, 0755) < 0)
-    {
-        return -1;
-    }
-
-    if (UtilMount(nullptr, PROCFS_PATH, "proc", 0, nullptr) < 0)
-    {
-        return -1;
-    }
-
-    if (UtilMount(nullptr, SYSFS_PATH, "sysfs", 0, nullptr) < 0)
-    {
-        return -1;
     }
 
     if (getenv(WSL_ENABLE_CRASH_DUMP_ENV))
