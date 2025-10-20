@@ -1090,7 +1090,7 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
                 THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(FileHandle, exportPath));
 
                 const auto sourceFileExtension = configuration.VhdFilePath.extension().native();
-                const auto targetFileExtension = std::filesystem::path(std::move(exportPath)).extension().native();
+                const auto targetFileExtension = std::filesystem::path(exportPath).extension().native();
                 if (!wsl::windows::common::string::IsPathComponentEqual(sourceFileExtension, targetFileExtension))
                 {
                     THROW_HR_WITH_USER_ERROR(
