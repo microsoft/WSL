@@ -1284,6 +1284,11 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
     }
 }
 
+void wsl::windows::common::wslutil::PrintSuccessMessage(_Inout_ FILE* const stream)
+{
+    fwprintf(stream, L"%ls\n", GetSystemErrorString(ERROR_SUCCESS).c_str());
+}
+
 void wsl::windows::common::wslutil::PrintSystemError(_In_ HRESULT result, _Inout_ FILE* const stream)
 {
     fwprintf(stream, L"%ls\n", GetSystemErrorString(result).c_str());

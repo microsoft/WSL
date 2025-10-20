@@ -312,7 +312,7 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
 
     if (file)
     {
-        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+        wsl::windows::common::wslutil::PrintSuccessMessage();
     }
 
     cleanup.release();
@@ -409,7 +409,7 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     }
 
     directory_cleanup.release();
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -427,7 +427,7 @@ int ImportDistributionInplace(_In_ std::wstring_view commandLine)
 
     wsl::windows::common::SvcComm service;
     service.ImportDistributionInplace(name, filePath.c_str());
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -975,7 +975,7 @@ int Manage(_In_ std::wstring_view commandLine)
         THROW_IF_FAILED(service.ResizeDistribution(&distroGuid, resize.value()));
     }
 
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -1050,7 +1050,7 @@ int Mount(_In_ std::wstring_view commandLine)
     }
     else
     {
-        wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+        wsl::windows::common::wslutil::PrintSuccessMessage();
     }
 
     return 0;
@@ -1108,7 +1108,7 @@ int SetDefaultDistribution(_In_ LPCWSTR distributionName)
     wsl::windows::common::SvcComm service;
     const GUID distroGuid = service.GetDistributionId(distributionName);
     service.SetDefaultDistribution(&distroGuid);
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -1129,7 +1129,7 @@ int SetDefaultVersion(_In_ std::wstring_view commandLine)
 
     const wil::unique_hkey lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
     wsl::windows::common::registry::WriteDword(lxssKey.get(), nullptr, LXSS_WSL_DEFAULT_VERSION, version);
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -1183,7 +1183,7 @@ int SetVersion(_In_ std::wstring_view commandLine)
     progress.End();
     THROW_IF_FAILED(result);
 
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -1225,7 +1225,7 @@ int TerminateDistribution(_In_ LPCWSTR distributionName)
     wsl::windows::common::SvcComm service;
     const GUID distroGuid = service.GetDistributionId(distributionName);
     service.TerminateInstance(&distroGuid);
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -1256,7 +1256,7 @@ int Unmount(_In_ const std::wstring& arg)
         return -1;
     }
 
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
@@ -1267,7 +1267,7 @@ int UnregisterDistribution(_In_ LPCWSTR distributionName)
     const GUID distroGuid = service.GetDistributionId(distributionName, LXSS_GET_DISTRO_ID_LIST_ALL);
     service.UnregisterDistribution(&distroGuid);
     progress.End();
-    wsl::windows::common::wslutil::PrintSystemError(ERROR_SUCCESS);
+    wsl::windows::common::wslutil::PrintSuccessMessage();
     return 0;
 }
 
