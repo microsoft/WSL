@@ -293,7 +293,8 @@ en 'wsl.exe --install &lt;Distro&gt;' om te installeren.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 wordt niet ondersteund met de huidige computerconfiguratie. 
-Schakel het optionele onderdeel Virtual Machine Platform in en zorg ervoor dat virtualisatie is ingeschakeld in het BIOS.
+
+Schakel het optionele onderdeel Virtual Machine Platform in en zorg ervoor dat virtualisatie is ingeschakeld in het BIOS.
 Schakel Virtual Machine Platform in door uit te voeren: wsl.exe --install --no-distribution
 Ga naar https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
@@ -606,7 +607,7 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
 "}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
-    <value>WSL-versiie: {}
+    <value>WSL-versie: {}
 Kernelversie: {}
 WSLg-versie: {}
 MSRDC-versie: {}
@@ -1869,4 +1870,5 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Het aantal milliseconden dat een VM inactief is voordat deze wordt afgesloten.</value>
   </data>
+
 </root>
