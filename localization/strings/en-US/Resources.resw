@@ -1131,12 +1131,6 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
     <value>Failed to translate '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageImportVhdInvalidArg" xml:space="preserve">
-    <value>Cannot import a VHD from stdin.</value>
-  </data>
-  <data name="MessageExportVhdInvalidArg" xml:space="preserve">
-    <value>Cannot export a VHD to stdout.</value>
-  </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
     <value>Something went wrong. Try again later.</value>
   </data>
