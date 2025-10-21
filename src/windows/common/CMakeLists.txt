@@ -43,6 +43,7 @@ set(SOURCES
     WslCoreFilesystem.cpp
     WslCoreHostDnsInfo.cpp
     DeviceHostProxy.cpp
+    LxssSecurity.cpp
     )
 
 set(HEADERS
@@ -112,6 +113,9 @@ set(HEADERS
     RingBuffer.h
     WslCoreFilesystem.h
     WslCoreHostDnsInfo.h
+    WslCoreNetworkEndpointSettings.h
+    WslCoreMessageQueue.h
+    LxssSecurity.h
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})

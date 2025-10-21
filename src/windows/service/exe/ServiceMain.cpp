@@ -31,7 +31,6 @@ wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 // Declare the LxssUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(LxssUserSession);
-CoCreatableClassWrlCreatorMapInclude(WSLAUserSession);
 
 struct WslServiceSecurityPolicy
 {
@@ -241,7 +240,6 @@ void WslService::ServiceStopped()
 
     // Terminate all user sessions.
     ClearSessionsAndBlockNewInstances();
-    wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances();
 
     // Disconnect from the LxCore driver.
     if (g_lxcoreInitialized)

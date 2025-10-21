@@ -12,6 +12,7 @@ set(SOURCES
     BridgedNetworking.cpp
     GnsPortTrackerChannel.cpp
     GnsRpcServer.cpp
+    GuestTelemetryLogger.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
     LxssCreateProcess.cpp
@@ -48,10 +49,8 @@ set(HEADERS
     MirroredNetworking.h
     WslCoreGuestNetworkService.h
     WslCoreInstance.h
-    WslCoreMessageQueue.h
     WslMirroredNetworking.h
     WslCoreNetworkEndpoint.h
-    WslCoreNetworkEndpointSettings.h
     WslCoreTcpIpStateTracking.h
     WslCoreVm.h)
 

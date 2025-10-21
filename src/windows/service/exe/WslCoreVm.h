@@ -39,8 +39,6 @@ inline constexpr auto c_optionsValueName = L"Options";
 inline constexpr auto c_typeValueName = L"Type";
 inline constexpr auto c_mountNameValueName = L"Name";
 
-inline constexpr auto c_vmOwner = L"WSL";
-
 static constexpr GUID c_virtiofsAdminClassId = {0x7e6ad219, 0xd1b3, 0x42d5, {0xb8, 0xee, 0xd9, 0x63, 0x24, 0xe6, 0x4f, 0xf6}};
 
 // {60285AE6-AAF3-4456-B444-A6C2D0DEDA38}
