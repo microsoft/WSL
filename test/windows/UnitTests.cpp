@@ -6329,9 +6329,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         auto tempFile = wsl::windows::common::filesystem::TempFile(
             GENERIC_ALL, 0, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::None, L"txt");
 
-        auto deleteFile =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFile(tempFile.Path.c_str())); });
-
         tempFile.Handle.reset();
 
         constexpr auto negativeVariationDistro = L"negative-variation-distro";
