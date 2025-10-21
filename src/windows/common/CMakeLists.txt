@@ -44,6 +44,7 @@ set(SOURCES
     WslCoreHostDnsInfo.cpp
     DeviceHostProxy.cpp
     LxssSecurity.cpp
+    WslCoreNetworkEndpointSettings.cpp
     )
 
 set(HEADERS

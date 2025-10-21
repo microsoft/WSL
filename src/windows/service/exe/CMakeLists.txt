@@ -20,7 +20,6 @@ set(SOURCES
     WslCoreGuestNetworkService.cpp
     WslCoreInstance.cpp
     WslMirroredNetworking.cpp
-    WslCoreNetworkEndpointSettings.cpp
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
     VirtioNetworking.cpp

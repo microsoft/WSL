@@ -1,4 +1,4 @@
-LIBRARY WslServiceProxyStub.dll
+LIBRARY WslaServiceProxyStub.dll
 
 EXPORTS
     DllGetClassObject      PRIVATE

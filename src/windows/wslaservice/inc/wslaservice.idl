@@ -4,20 +4,21 @@ Copyright (c) Microsoft Corporation.  All rights reserved.
 
 Module Name:
 
-    wslservice.idl
+    wslaservice.idl
 
 Abstract:
 
-    This file contains the COM object definitions used to talk with the WSL
-    service "WslService"
+    This file contains the COM object definitions used to talk with the WSLa
+    service "WslaService"
 
 --*/
 
 import "unknwn.idl";
 import "wtypes.idl";
 
-
+cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLAUserSession;")
+cpp_quote("#endif")
 
 typedef
 struct _WSL_VERSION {

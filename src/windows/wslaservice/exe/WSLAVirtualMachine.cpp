@@ -15,7 +15,6 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "hcs_schema.h"
 #include "NatNetworking.h"
-#include "MirroredNetworking.h"
 #include "WSLAUserSession.h"
 
 using namespace wsl::windows::common;
@@ -346,10 +345,11 @@ void WSLAVirtualMachine::ConfigureNetworking()
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
 
-        if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(config))
+        // TODO-WSLA: Implement firewall logic
+        /*if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(config))
         {
             config.FirewallConfig.reset();
-        }
+        }*/
 
         // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
