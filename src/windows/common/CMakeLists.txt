@@ -31,7 +31,19 @@ set(SOURCES
     WslSecurity.cpp
     WslTelemetry.cpp
     wslutil.cpp
-    notifications.cpp)
+    notifications.cpp
+    DeviceHostProxy.h
+    Dmesg.h
+    Dmesg.cpp
+    DnsResolver.cpp
+    DnsTunnelingChannel.cpp
+    GnsChannel.cpp
+    NatNetworking.cpp
+    RingBuffer.cpp
+    WslCoreFilesystem.cpp
+    WslCoreHostDnsInfo.cpp
+    DeviceHostProxy.cpp
+    )
 
 set(HEADERS
     ../../../generated/Localization.h
@@ -91,7 +103,16 @@ set(HEADERS
     WslSecurity.h
     WslTelemetry.h
     wslutil.h
-    notifications.h)
+    notifications.h
+    DnsResolver.h
+    DnsTunnelingChannel.h
+    GnsChannel.h
+    INetworkingEngine.h
+    NatNetworking.h
+    RingBuffer.h
+    WslCoreFilesystem.h
+    WslCoreHostDnsInfo.h
+    )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
 add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl)

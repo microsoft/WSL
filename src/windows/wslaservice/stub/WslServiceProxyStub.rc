@@ -1,0 +1,23 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WslServiceProxyStub.rc
+
+Abstract:
+
+    This file contains resources for wslserviceproxystub.dll.
+
+--*/
+
+#include <windows.h>
+#include "wslversioninfo.h"
+
+#define VER_INTERNALNAME_STR "wslserviceproxystub.dll"
+#define VER_ORIGINALFILENAME_STR "wslserviceproxystub.dll"
+
+#define VER_FILEDESCRIPTION_STR "WSL Service ProxyStub DLL"
+
+#include <common.ver>
