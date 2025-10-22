@@ -704,8 +704,13 @@ The system may need to be restarted so the changes can take effect.</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>The specified file must have the .vhdx file extension.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>The specified file must have the {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>The specified file must have the {} or {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>The VmSwitch '{}' was not found. Available switches: {}</value>
@@ -1108,7 +1113,7 @@ Error code: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparse VHD support is currently disabled due to potential data corruption.
 To force a distribution to use a sparse vhd, please run:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
