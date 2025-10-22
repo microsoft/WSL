@@ -466,7 +466,7 @@ Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler
                 Dağıtımı yeni bir konuma taşır.
 
             --set-sparse, -s &lt;true|false&gt;
-                Dağıtım vhdx'inin aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
+                Dağıtım VHD'inin aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
 
             --set-default-user &lt;Username&gt;
                 Dağıtımın varsayılan kullanıcısını ayarlar.
@@ -537,7 +537,7 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
             --format &lt;Format&gt;
                 Dışarı aktarma biçimini belirtir. Desteklenen değerler: tar, tar.gz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Seçenekler]
         Belirtilen tar dosyasını yeni bir dağıtım olarak içeri aktarır.
         Dosya adı - for stdin olabilir.
 
@@ -546,11 +546,11 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
                 Yeni dağıtım için kullanılacak sürümü belirtir.
 
             --vhd
-                Sağlanan dosyanın tar dosyası değil, .vhdx dosyası olduğunu belirtir.
-                Bu işlem, belirtilen yükleme konumunda .vhdx dosyasının bir kopyasını oluşturur.
+                Sağlanan dosyanın tar dosyası değil, .vhd veya .vhdx dosyası olduğunu belirtir.
+                Bu işlem, belirtilen yükleme konumunda VHD dosyasının bir kopyasını oluşturur.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Belirtilen .vhdx dosyasını yeni bir dağıtım olarak içeri aktarır.
+        Belirtilen VHD dosyasını yeni bir dağıtım olarak içeri aktarır.
         Bu sanal sabit diskin ext4 dosya sistemi türüyle biçimlendirilmesi gerekir.
 
     --list, -l [Seçenekler]

@@ -402,8 +402,8 @@ Linux 이진 파일을 실행하기 위한 인수:
 옵션:
     --cd &lt;Directory&gt;
         지정된 디렉터리를 현재 작업 디렉터리로 설정합니다.
-        ~가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가 시작되면
-        / 문자를 사용하면 절대 Linux 경로로 해석됩니다.
+        ~가 사용되는 경우 Linux 사용자의 홈 경로가 사용됩니다. 경로가
+        / 문자로 시작하면 절대 Linux 경로로 해석됩니다.
         그렇지 않으면 값이 절대 Windows 경로여야 합니다.
 
     --distribution, -d &lt;DistroName&gt;
@@ -472,7 +472,7 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
                 배포를 새 위치로 이동합니다.
 
             --set-sparse, -s &lt;true|false&gt;
-                배포판의 vhdx를 스파스로 설정하여 디스크 공간을 자동으로 회수할 수 있도록 합니다.
+                배포판의 VHD를 스파스로 설정하여 디스크 공간을 자동으로 회수할 수 있도록 합니다.
 
             --set-default-user &lt;Username&gt;
                 배포의 기본 사용자를 설정합니다.
@@ -552,11 +552,11 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
                 새 배포에 사용할 버전을 지정합니다.
 
             --vhd
-                제공된 파일이 tar 파일이 아닌 .vhdx 파일임을 지정합니다.
-                이 작업은 지정된 설치 위치에 .vhdx 파일의 복사본을 만듭니다.
+                제공된 파일이 tar 파일이 아닌 .vhd 또는 .vhdx 파일임을 지정합니다.
+                이 작업은 지정된 설치 위치에 VHD 파일의 복사본을 만듭니다.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        지정된 .vhdx 파일을 새 배포판로 가져옵니다.
+        지정된 VHD 파일을 새 배포판으로 가져옵니다.
         이 가상 하드 디스크는 ext4 파일 시스템 형식으로 포맷해야 합니다.
 
     --list, -l [Options]
@@ -1017,7 +1017,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>스파스 vhdx는 WSL2에서만 지원됩니다.</value>
+    <value>스파스 VHD는 WSL2에서만 지원됩니다.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>WSL을 로컬 시스템으로 실행할 수 없습니다.</value>
@@ -1118,7 +1118,7 @@ NAT 네트워킹으로 대체합니다.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>데이터 손상 가능성으로 인해 스파스 VHD 지원은 현재 비활성화되어 있습니다.
-배포 시 강제로 스파스 VHD를 사용하도록 하려면 다음을 실행하세요.
+배포 시 강제로 스파스 VHD를 사용하도록 하려면 다음을 실행하세요. 
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

@@ -384,13 +384,13 @@ WSL1 を使用するには、"Linux 用 Windows サブシステム" オプショ
     <value>Copyright (c) Microsoft Corporation.All rights reserved.
 この製品のプライバシーに関する情報については、https://aka.ms/privacy にアクセスしてください。
 
-使用法: wsl.exe [引数] [オプション...] [コマンド ライン]
+使用法: wsl.exe [Argument] [Options...] [CommandLine]
 
 Linux バイナリを実行するための引数:
 
     コマンド ラインが指定されていない場合、wsl.exe は既定のシェルを起動します。
 
-    --exec, -e &lt;コマンド ライン&gt;
+    --exec, -e &lt;CommandLine&gt;
         既定の Linux シェルを使用せずに、指定されたコマンドを実行します。
 
     --shell-type &lt;standard|login|none&gt;
@@ -400,19 +400,19 @@ Linux バイナリを実行するための引数:
         残りのコマンド ラインをそのまま渡します。
 
 オプション:
-    --cd &lt;ディレクトリ&gt;
+    --cd &lt;Directory&gt;
         指定されたディレクトリを現在の作業ディレクトリとして設定します。
         ~ が使用されている場合、Linux ユーザーのホーム パスが使用されます。パスが
         / 文字で始まる場合、絶対 Linux パスとして解釈されます。
         それ以外の場合、値は絶対 Windows パスである必要があります。
 
-    --distribution, -d &lt;ディストリビューション名&gt;
+    --distribution, -d &lt;DistroName&gt;
         指定されたディストリビューションを実行します。
 
     --distribution-id &lt;DistroGuid&gt;
         指定されたディストリビューション ID を実行します。
 
-    --user, -u &lt;ユーザー名&gt;
+    --user, -u &lt;UserName&gt;
         指定されたユーザーとして実行します。
 
     --system
@@ -426,7 +426,7 @@ Linux 用 Windows サブシステムを管理するための引数:
     --debug-shell
         診断のために WSL2 デバッグ シェルを開きます。
 
-    --install [ディストリビューション] [オプション...]
+    --install [Distro] [Options...]
         Linux 用 Windows サブシステム ディストリビューションをインストールします。
         有効なディストリビューションの一覧を表示するには、'wsl.exe --list --online' を使用します。
 
@@ -437,16 +437,16 @@ Linux 用 Windows サブシステムを管理するための引数:
             --fixed-vhd
                 ディストリビューションを保存するための固定サイズのディスクを作成します。
 
-            --from-file &lt;パス&gt;
+            --from-file &lt;Path&gt;
                 ローカル ファイルからディストリビューションをインストールします。
 
             --legacy
                 レガシ ディストリビューション マニフェストを使用します。
 
-            --location &lt;場所&gt;
+            --location &lt;Location&gt;
                 ディストリビューションのインストール パスを設定します。
 
-            --name &lt;名前&gt;
+            --name &lt;Name&gt;
                 ディストリビューションの名前を設定します。
 
             --no-distribution
@@ -455,32 +455,32 @@ Linux 用 Windows サブシステムを管理するための引数:
             --no-launch, -n
                 インストール後にディストリビューションを起動しません。
 
-            --version &lt;バージョン&gt;
+            --version &lt;Version&gt;
                 新しいディストリビューションに使用するバージョンを指定します。
 
-            --vhd-size &lt;メモリ文字列&gt;
+            --vhd-size &lt;MemoryString&gt;
                 ディストリビューションを保存するディスクのサイズを指定します。
 
             --web-download
                 Microsoft Store ではなく、インターネットからディストリビューションをダウンロードします。
 
-    --manage &lt;ディストリビューション&gt; &lt;オプション...&gt;
+    --manage &lt;Distro&gt; &lt;Options...&gt;
         ディストリビューション固有のオプションを変更します。
 
         オプション:
-            --move &lt;場所&gt;
+            --move &lt;Location&gt;
                 ディストリビューションを新しい場所に移動します。
 
             --set-sparse, -s &lt;true|false&gt;
-                ディストリビューションの vhdx をスパースに設定し、ディスク領域を自動的に解放できるようにします。
+                ディストリビューションの VHD をスパースに設定し、ディスク領域を自動的に解放できるようにします。
 
-            --set-default-user &lt;ユーザー名&gt;
+            --set-default-user &lt;Username&gt;
                 ディストリビューションの既定のユーザーを設定します。
 
-            --resize &lt;メモリ文字列&gt;
+            --resize &lt;MemoryString&gt;
                 ディストリビューションのディスクのサイズを指定したサイズに変更します。
 
-    --mount &lt;ディスク&gt;
+    --mount &lt;Disk&gt;
         物理ディスクまたは仮想ディスクをすべての WSL 2 ディストリビューションにアタッチしてマウントします。
 
         オプション:
@@ -490,19 +490,19 @@ Linux 用 Windows サブシステムを管理するための引数:
             --bare
                 ディスクを WSL2 にアタッチしますが、マウントはしません。
 
-            --name &lt;名前&gt;
+            --name &lt;Name&gt;
                 マウントポイントにカスタム名を使用してディスクをマウントします。
 
-            --type &lt;種類&gt;
+            --type &lt;Type&gt;
                 ディスクをマウントするときに使用するファイルシステム。指定しない場合は既定で ext4 になります。
 
-            --options &lt;オプション&gt;
+            --options &lt;Options&gt;
                 追加のマウント オプション。
 
-            --partition &lt;インデックス&gt;
+            --partition &lt;Index&gt;
                 マウントするパーティションのインデックス。指定しない場合は既定でディスク全体になります。
 
-    --set-default-version &lt;バージョン&gt;
+    --set-default-version &lt;Version&gt;
         新しいディストリビューションの既定のインストール バージョンを変更します。
 
     --shutdown
@@ -516,7 +516,7 @@ Linux 用 Windows サブシステムを管理するための引数:
     --status
         Linux 用 Windows サブシステムの状態を表示します。
 
-    --unmount [ディスク]
+    --unmount [Disk]
         すべての WSL2 ディストリビューションからディスクのマウントを解除してデタッチします。
         引数を指定せずに呼び出した場合、すべてのディスクのマウントを解除してデタッチします。
 
@@ -535,31 +535,31 @@ Linux 用 Windows サブシステムを管理するための引数:
 
 Linux 用 Windows サブシステムでディストリビューションを管理するための引数:
 
-    --export &lt;ディストリビューション&gt; &lt;ファイル名&gt; [オプション]
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         ディストリビューションを tar ファイルにエクスポートします。
         stdout の場合は、ファイル名に - を使用できます。
 
         オプション:
-            --format &lt;形式&gt;
+            --format &lt;Format&gt;
                 エクスポート形式を指定します。サポートされている値は、tar、tar.gz、tar.xz、vhd です。
 
-    --import &lt;ディストリビューション&gt; &lt;インストール場所&gt; &lt;ファイル名&gt; [オプション]
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
         指定された tar ファイルを新しいディストリビューションとしてインポートします。
         stdin の場合は、ファイル名に - を使用できます。
 
         オプション:
-            --version &lt;バージョン&gt;
+            --version &lt;Version&gt;
                 新しいディストリビューションに使用するバージョンを指定します。
 
             --vhd
-                提供されたファイルが tar ファイルではなく .vhdx ファイルであることを指定します。
-                この操作により、指定されたインストール場所に .vhdx ファイルのコピーが作成されます。
+                指定されたファイルが tar ファイルではなく、.vhd または .vhdx ファイルであることを指定します。
+                この操作により、指定したインストール場所に VHD ファイルのコピーが作成されます。
 
-    --import-in-place &lt;ディストリビューション&gt; &lt;ファイル名&gt;
-        指定された .vhdx ファイルを新しいディストリビューションとしてインポートします。
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        指定した VHD ファイルを新しいディストリビューションとしてインポートします。
         この仮想ハード ディスクは、ext4 ファイルシステムの種類でフォーマットする必要があります。
 
-    --list, -l [オプション]
+    --list, -l [Options]
         ディストリビューションを一覧表示します。
 
         オプション:
@@ -579,16 +579,16 @@ Linux 用 Windows サブシステムでディストリビューションを管�
             --online, -o
                 'wsl.exe --install' を使用してインストールできるディストリビューションの一覧を表示します。
 
-    --set-default, -s &lt;ディストリビューション&gt;
+    --set-default, -s &lt;Distro&gt;
         このディストリビューションを既定として設定します。
 
-    --set-version &lt;ディストリビューション&gt; &lt;バージョン&gt;
+    --set-version &lt;Distro&gt; &lt;Version&gt;
         指定されたディストリビューションのバージョンを変更します。
 
-    --terminate, -t &lt;ディストリビューション&gt;
+    --terminate, -t &lt;Distro&gt;
         指定されたディストリビューションを終了します。
 
-    --unregister &lt;ディストリビューション&gt;
+    --unregister &lt;Distro&gt;
         このディストリビューションの登録を解除し、ルート ファイルシステムを削除します。</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
@@ -632,7 +632,7 @@ Windows バージョン: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>{} にカスタム カーネル モジュール VHD が見つかりませんでした: '{}'。</value>
+    <value>{} にあるカスタム カーネル モジュール VHD が見つかりませんでした: '{}'。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -1009,7 +1009,7 @@ NAT ネットワークにフォールバックしています。</value>
     <value>ドキュメントを表示</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>vhdx が現在使用中のため、操作を完了できませんでした。WSL の使用を強制的に停止するには: wsl.exe --shutdown</value>
+    <value>VHD が現在使用中のため、操作を完了できませんでした。WSL の使用を強制的に停止するには: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1017,7 +1017,7 @@ NAT ネットワークにフォールバックしています。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>スパース vhdx は WSL2 でのみサポートされています。</value>
+    <value>スパース VHD は WSL2 のみでサポートされています。</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>ローカル システムとして WSL を実行することはサポートされていません。</value>

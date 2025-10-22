@@ -1003,7 +1003,7 @@ Falling back to NAT networking.</value>
     <value>See Docs</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>The operation could not be completed because the vhdx is currently in use. To force WSL to stop use: wsl.exe --shutdown</value>
+    <value>The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">

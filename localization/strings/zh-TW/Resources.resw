@@ -381,206 +381,206 @@
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation。著作權所有，並保留一切權利。
-如需此產品的隱私權資訊，請瀏覽 https://aka.ms/privacy。
+    <value>Copyright (c) Microsoft Corporation. 著作權所有，並保留一切權利。
+如需有關此產品的隱私權資訊，請造訪 https://aka.ms/privacy。
 
 使用方式: wsl.exe [Argument] [Options...] [CommandLine]
 
-用於執行 Linux 二進位檔案的引數:
+用於執行 Linux 二進位檔的引數:
 
-    如果未提供命令列，wsl.exe 會啟動預設殼層。
+    如果未提供任何命令列，wsl.exe 會啟動預設殼層。.
 
     --exec, -e &lt;CommandLine&gt;
         執行指定的命令，而不使用預設的 Linux 殼層。
 
     --shell-type &lt;standard|login|none&gt;
-        使用提供的殼層類型執行指定的命令。
+        使用提供的殼層類型執行指定的命令。.
 
     --
-        按原樣傳遞剩餘的命令列。
+      依原樣傳遞其餘的命令列。
 
 選項:
     --cd &lt;Directory&gt;
         將指定的目錄設定為目前的工作目錄。
-        如果使用 ~，將會使用 Linux 使用者首頁路徑。如果路徑開頭
-        為 / 字元，它將被解譯為絕對 Linux 路徑。
-        否則，此值必須是絕對 Windows 路徑。
+        如果使用 ~，則會使用 Linux 使用者的常用路徑。如果路徑的開頭為
+        / 字元，它則會被解譯為絕對 Linux 路徑。
+        否則，該值必須是絕對 Windows 路徑。
 
     --distribution, -d &lt;DistroName&gt;
-        執行指定的發行版本。
+        執行指定的發佈。
 
     --distribution-id &lt;DistroGuid&gt;
-        執行指定的發行版本識別碼。
+        執行指定的發佈識別碼。
 
     --user, -u &lt;UserName&gt;
-        作為指定的使用者執行。
+        以指定使用者身分執行。
 
     --system
-        啟動系統發行版本的殼層。
+        啟動系統發佈的殼層。
 
-用於管理 Windows 子系統 Linux 版的引數: 
+用於管理 Linux 版 Windows 子系統的引數:
 
     --help
-        顯示使用資訊。
+        顯示使用方式資訊。
 
     --debug-shell
-        開啟 WSL2 偵錯工具進行診斷。
+        開啟用於診斷用途的 WSL2 偵錯殼層。
 
     --install [Distro] [Options...]
-        安裝 Windows 子系統 Linux 版發行版本。
-        對於有效的通訊群組清單，請使用 'wsl.exe --list --online'。
+        安裝 Linux 版 Windows 子系統發行版本。
+        如需有效發行版本的清單，請使用 'wsl.exe --list --online'。
 
-        選項:
+       選項:
             --enable-wsl1
-                啟用 WSL1 支援。
+                啟用 WSL1 支援。 
 
             --fixed-vhd
-                建立固定大小的磁碟以儲存發行版本。
+                建立大小固定的磁碟，以儲存發佈。 
 
             --from-file &lt;Path&gt;
-                從本機檔案安裝發行版本。
+                從本機檔案安裝發佈。
 
             --legacy
-                使用舊版發行版本資訊清單。
+                使用舊版發佈資訊清單。
 
             --location &lt;Location&gt;
-                設定發行版本的安裝路徑。
+                設定發佈的安裝路徑。
 
             --name &lt;Name&gt;
-                設定發行版本的名稱。
+                設定發佈的名稱。
 
             --no-distribution
-                只安裝必要的選擇性元件，不會安裝發行版本。
+                僅安裝必須的選擇性元件，不安裝發行版本。
 
             --no-launch, -n
-                安裝之後請勿啟動發行版本。
+                安裝後請勿啟動發佈。
 
             --version &lt;Version&gt;
-                指定要用於新發行版本的版本。
+                指定要用於新發佈的版本。
 
             --vhd-size &lt;MemoryString&gt;
-                指定要儲存發行版本之磁碟的大小。
+                指定磁碟大小，以儲存發佈。
 
             --web-download
-                從網際網路下載發行版本，而非從 Microsoft Store 下載。
-
-    --manage &lt;Distro&gt; &lt;Options...&gt;
-        變更發行版本特定選項。
+                從網際網路下載發佈，而非從 Microsoft Store 下載。
+ 
+    --manage &lt;Distro&gt; &lt;Options...&gt; 
+        變更 distro 指定選項。
 
         選項:
             --move &lt;Location&gt;
-                將發行版本移至新位置。
+                將發佈移動到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
-                將發行版本的 vhdx 設定為稀疏，允許自動回收磁碟空間。
+將 distro 的 VHD 設為疏鬆，允許磁碟空格自動回收。 
 
             --set-default-user &lt;Username&gt;
-                設定發行版本的預設使用者。
+                設定發佈的預設使用者。
 
             --resize &lt;MemoryString&gt;
-                將發行版本的磁碟大小調整為指定的大小。
+                將發佈的磁碟大小調整為指定大小。
 
     --mount &lt;Disk&gt;
-        在所有 WSL 2 發行版本中連結和掛載實體或虛擬磁碟。
+        在所有 WSL 2 發行版本中連結和掛接實體或虛擬磁碟。
 
         選項:
-            --vhd
-                指定 &lt;Disk&gt; 參照虛擬硬碟。
+		--vhd
+                指定 &lt;Disk&gt; 參考虛擬硬碟。
 
             --bare
-                將磁碟附加到 WSL2，但不掛載。
+                將磁碟連結到 WSL2，但不要掛接。
 
             --name &lt;Name&gt;
-                使用掛載點的自訂名稱掛載磁碟。
+                使用掛接點的自訂名稱掛接磁碟。
 
             --type &lt;Type&gt;
-                掛載磁碟時使用的檔案系統 (若未指定，則預設為 ext4)。
+                掛接磁碟時要使用的檔案系統，如果未指定，則預設為 ext4。
 
             --options &lt;Options&gt;
-                其他掛載選項。
+                其他掛接選項。
 
             --partition &lt;Index&gt;
-                要掛載之磁碟分割的索引 (若未指定，則預設為整個磁碟)。
+                要掛接之磁碟分割的索引，如果未指定，則預設為整個磁碟。
 
     --set-default-version &lt;Version&gt;
-        變更新發行版本的預設安裝版本。
+        為新的發行版本變更預設安裝版本。
 
     --shutdown
-        立即終止所有執行中的發行版本和 WSL 2
+        立即終止所有正在執行的發行版本和 WSL 2
         輕量型公用程式虛擬機器。
 
         選項:
             --force
-                終止 WSL 2 虛擬機器，即使有作業正在進行中。可能會導致資料遺失。
-
+                結束 WSL 2 虛擬機器，即使作業正在進行中。可能會造成資料遺失。
+ 
     --status
-        顯示 Windows 子系統 Linux 版的狀態。
+        顯示 Linux 版 Windows 子系統的狀態。
 
     --unmount [Disk]
-        從所有 WSL2 發行版本卸載並中斷與磁碟的連結。
-        如果在沒有引數的情況下進行調用，會卸載和中斷與所有磁碟的連結。
+        從所有 WSL2 發行版本卸載並中斷連結磁碟。
+        如果呼叫時沒有引數，則卸載並中斷連結所有磁碟。
 
     --uninstall
-        自此電腦解除安裝 Windows 子系統 Linux 版套件。
+        從此電腦取消安裝 Linux 套件的 Windows 子系統。
 
     --update
-        更新 Windows 子系統 Linux 版封裝。
+        更新 Linux 版 Windows 子系統套件。
 
         選項:
             --pre-release
-                下載發行前版本 (如果可用)。
+                下載預先發行版本 (如果有提供)。
 
     --version, -v
-        顯示版本資訊。
+       顯示版本資訊。
 
-在 Windows 子系統 Linux 版中管理發行版本的引數: 
+用於在 Linux 版 Windows 子系統中管理發行版本的引數:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         將發行版本匯出至 tar 檔案。
-        檔案名稱可以是 - 代表標準輸出。
+        stdout 的檔案名稱可以是 -。
 
-        選項:
+        選項: 
             --format &lt;Format&gt;
                 指定匯出格式。支援的值: tar、tar.gz、tar.xz、vhd。
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        將指定的 tar 檔案做為新的發行版本。
-        檔案名稱可以是 - 代表標準輸入。
+        匯入指定的 tar 檔案以做為新發行版本。
+        標準輸出的檔案名稱可以是 -。
 
         選項:
             --version &lt;Version&gt;
                 指定要用於新發行版本的版本。
 
             --vhd
-                指定提供的檔案是 .vhdx 檔案，而非 tar 檔案。
-                此作業會複製指定安裝位置的 .vhdx 檔案。
+                指定提供的檔案是 .vhd 或 .vhdx 檔案，而不是 tar 檔案。
+                此作業會在指定的安裝位置複製 .vhdx 檔案。
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        將指定的 .vhdx 檔案匯入為新的發行版本。
-        此虛擬硬碟必須使用 ext4 檔案系統類型進行格式化。
+        匯入指定的 VHD 檔案以做為新發行版本。
+        此虛擬硬碟必須格式化為 ext4 檔案系統類型。
 
     --list, -l [Options]
         列出發行版本。
 
-        選項:
+        Options:
             --all
                 列出所有發行版本，包括
-                目前正在安裝或卸載的發行版本。
+                目前正在安裝或解除安裝的發行版本。
 
             --running
-                只列出目前正在執行的發行版本。
+                僅列出目前正在執行的發行版本。
 
             --quiet, -q
                 只顯示發行版本名稱。
 
             --verbose, -v
-                顯示所有發行版本的詳細資訊。
+                顯示所有發行版本的詳細資訊
 
             --online, -o
-                顯示可用發行版本的清單，以使用 'wsl.exe --install' 安裝。
+                顯示可使用 'wsl.exe --install' 安裝的可用發行版本清單。
 
     --set-default, -s &lt;Distro&gt;
-        將發行版本設定為預設。
+        將發行版本設定為預設值。
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
         變更指定發行版本的版本。
@@ -1017,7 +1017,7 @@ Windows 版本： {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>只有 WSL2 支援疏鬆 vhdx。</value>
+    <value>只有 WSL2 支援稀疏 VHD。</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>系統不支援將 WSL 執行為本機系統。</value>
@@ -1117,8 +1117,8 @@ Windows 版本： {}</value>
     <value>由於目前與全球安全存取用戶端的相容性問題，已停用 DNS 通道。</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>由於可能會導致資料損毀，目前已停用疏鬆 VHD 支援。
-若要強制發行版本使用疏鬆 VHD，請執行:
+    <value>由於可能會導致資料損毀，目前已停用稀疏 VHD 支援。
+若要強制發行版本以使用稀疏 VHD，請執行:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
