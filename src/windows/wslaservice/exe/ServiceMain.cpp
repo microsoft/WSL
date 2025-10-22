@@ -74,7 +74,7 @@ try
     // Don't kill the process on unknown C++ exceptions.
     wil::g_fResultFailFastUnknownExceptions = false;
 
-    //wsl::windows::common::security::ApplyProcessMitigationPolicies();
+    // wsl::windows::common::security::ApplyProcessMitigationPolicies();
 
     // Initialize Winsock.
     WSADATA Data;
