@@ -710,8 +710,13 @@ Windows: {}</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>指定的文件必须具有 .vhdx 文件扩展名。</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>指定的文件必须具有 {} 文件扩展名。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>The specified file must have the {} or {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>找不到 VmSwitch“{}”。可用开关: {}</value>
@@ -1113,8 +1118,8 @@ Windows: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>由于潜在的数据损坏，目前已禁用稀疏 VHD 支持。
-若要强制分发使用稀疏 vhd，请运行：
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+要强制发行版使用稀疏 vhd，请运行:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

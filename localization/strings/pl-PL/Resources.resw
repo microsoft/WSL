@@ -704,8 +704,13 @@ Może być konieczne ponowne uruchomienie systemu, aby zmiany zostały wprowadzo
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Określony plik musi mieć rozszerzenie pliku vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Określony plik musi mieć rozszerzenie pliku {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Określony plik musi mieć rozszerzenie pliku {} lub {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Nie znaleziono przełącznika maszyny wirtualnej „{}”. Dostępne przełączniki: {}</value>
@@ -998,7 +1003,7 @@ Powrót do sieci NAT.</value>
     <value>Zobacz dokumenty</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Nie można ukończyć operacji, ponieważ dysk vhdx jest obecnie używany. Aby wymusić zatrzymanie używania protokołu WSL:  wsl.exe --shutdown</value>
+    <value>Nie można ukończyć operacji, ponieważ dysk VHD jest obecnie używany. Aby wymusić zatrzymanie używania protokołu WSL:  wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1108,7 +1113,7 @@ Kod błędu: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Obsługa rozrzedzonych dysków VHD jest obecnie wyłączona z powodu potencjalnego uszkodzenia danych.
 Aby wymusić używanie rozrzedzonego dysku VHD przez dystrybucję, uruchom polecenie:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

@@ -626,7 +626,7 @@ Hora da criação: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>O vhd de módulos kernel personalizados em {} não foi encontrado: "{}".</value>
+    <value>O VHD dos módulos kernel personalizados em {} não foi encontrado: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -704,8 +704,13 @@ O sistema poderá ter de ser reiniciado para que as alterações possam ter efei
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>O ficheiro especificado tem de ter a extensão de ficheiro. vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>O ficheiro especificado tem de ter a extensão de ficheiro {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>O ficheiro especificado tem de ter a extensão de ficheiro {} ou {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>O VmSwitch "{}" não foi encontrado. Interruptores disponíveis: {}</value>
@@ -1108,7 +1113,7 @@ Código de erro: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>O suporte a VHD disperso está atualmente desativado devido a potenciais danos nos dados.
 Para forçar uma distribuição a utilizar um VHD disperso, execute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

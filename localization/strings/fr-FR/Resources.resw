@@ -711,8 +711,13 @@ Le système devra peut-être être redémarré pour que les modifications prenne
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Le fichier spécifié doit avoir l’extension de fichier .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Le fichier spécifié doit avoir l’extension de fichier {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Le fichier spécifié doit avoir l’extension de fichier {} ou {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Le VmSwitch « {} » est introuvable. Commutateurs disponibles : {}</value>
@@ -1005,7 +1010,7 @@ Retour à la mise en réseau NAT.</value>
     <value>Voir les documents</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Impossible d’effectuer l’opération, car le vhdx est en cours d’utilisation. Pour forcer WSL à arrêter l’utilisation : wsl.exe --shutdown</value>
+    <value>Impossible d’effectuer l’opération, car le disque dur virtuel est en cours d’utilisation. Pour forcer WSL à arrêter l’utilisation : wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1115,7 +1120,7 @@ Code d'erreur : {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>La prise en charge des VHD espacés est actuellement désactivée en raison d’un risque potentiel de corruption des données.
 Pour forcer une distribution à utiliser un VHD espacé, veuillez exécuter : 
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
