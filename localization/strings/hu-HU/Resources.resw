@@ -704,8 +704,13 @@ Lehet, hogy újra kell indítani a rendszert, hogy a módosítások érvénybe l
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>A megadott fájlnak .vhdx kiterjesztésűnek kell lennie.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>The specified file must have the {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>The specified file must have the {} or {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>A(z) {} VmSwitch nem található. Elérhető kapcsolók: {}</value>
@@ -1106,9 +1111,9 @@ Hibakód: {}</value>
     <value>A Globális biztonságos hozzáférés ügyféllel kapcsolatos jelenlegi kompatibilitási probléma miatt a DNS-alagútképzés le van tiltva.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>A ritka VHD-támogatás jelenleg le van tiltva, mivel lehetséges adatsérülés léphet fel.
-A ritka virtuális merevlemez használatának kényszerítéséhez futtassa a következő parancsot:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <value>A ritka VHD-támogatás jelenleg le van tiltva az adatok esetleges sérülése miatt.
+Ha egy disztribúciót ritka VHD használatára szeretne kényszeríteni, futtassa a következőt:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

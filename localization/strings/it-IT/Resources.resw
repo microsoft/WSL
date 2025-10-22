@@ -710,8 +710,13 @@ Potrebbe essere necessario riavviare il sistema per rendere effettive le modific
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Il file specificato deve avere l'estensione vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>The specified file must have the {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>The specified file must have the {} or {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>VmSwitch '{}' non è stato trovato. Switch disponibili: {}</value>
@@ -1114,7 +1119,7 @@ Codice errore: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Il supporto VHD di tipo Sparse è attualmente disabilitato a causa di un potenziale danneggiamento dei dati.
 Per forzare l'uso di un disco rigido virtuale di tipo Sparse in una distribuzione, esegui:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

@@ -710,8 +710,13 @@ Es posible que sea necesario reiniciar el sistema para que los cambios surtan ef
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>El archivo especificado debe tener la extensión de archivo .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>The specified file must have the {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>The specified file must have the {} or {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>No se encontró el VmSwitch '{}'. Modificadores disponibles: {}</value>
@@ -1113,8 +1118,8 @@ Código de error: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>La compatibilidad con VHD disperso está deshabilitada actualmente debido a posibles daños en los datos.
-Para forzar que una distribución use un VHD disperso, ejecute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+Para forzar que una distribución use un VHD disperso, ejecuta:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

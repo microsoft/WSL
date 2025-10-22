@@ -704,8 +704,13 @@ Het systeem moet mogelijk opnieuw worden opgestart, zodat de wijzigingen van kra
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Het opgegeven bestand moet de bestandsextensie .vhdx hebben.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>The specified file must have the {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>The specified file must have the {} or {} file extension.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Kan de VmSwitch {} niet vinden. Beschikbare switches: {}</value>
