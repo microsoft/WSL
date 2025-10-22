@@ -1003,7 +1003,7 @@ Mer information finns på https://aka.ms/wslinstall</value>
     <value>Visa dokument</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Det gick inte att slutföra åtgärden eftersom vhdx används för närvarande. Så här tvingar du WSL att sluta använda: wsl.exe --shutdown</value>
+    <value>Det gick inte att slutföra åtgärden eftersom den virtuella hårddisken används för närvarande. Så här tvingar du WSL att sluta använda: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1011,7 +1011,7 @@ Mer information finns på https://aka.ms/wslinstall</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Sparse vhdx stöds endast på WSL2.</value>
+    <value>Sparse VHD stöds endast på WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Det finns inte stöd för att köra WSL som lokalt system.</value>
@@ -1060,7 +1060,7 @@ Mer information finns på https://aka.ms/wslinstall</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Det här ser ut som en VHDX-fil. Använd --vhd för att importera en VHDX i stället för en tjära.</value>
+    <value>Det här ser ut som en VHD-fil. Använd --vhd för att importera en virtuell hårddisk i stället för en tjära.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">

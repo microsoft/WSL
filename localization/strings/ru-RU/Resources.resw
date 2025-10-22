@@ -460,7 +460,7 @@
                 Указывает версию, используемую для нового дистрибутива.
 
             --vhd-size &lt;MemoryString&gt;
-                Указывает размер диска для хранения распределения.
+                Указывает размер диска для хранения дистрибутива.
 
             --web-download
                 Скачать дистрибутив из Интернета вместо Microsoft Store.
@@ -473,7 +473,7 @@
                 Переместить дистрибутив в новое местоположение.
 
             --set-sparse, -s &lt;true|false&gt;
-                Задать для VHDX дистрибутива значение "разреженный", чтобы обеспечить автоматическое освобождение дискового пространства.
+                Задать для VHD дистрибутива значение "разреженный", чтобы обеспечить автоматическое освобождение дискового пространства.
 
             --set-default-user &lt;Username&gt;
                 Задать пользователя по умолчанию для дистрибутива.
@@ -553,11 +553,11 @@
                 Указывает версию, используемую для нового дистрибутива.
 
             --vhd
-                Указывает, что предоставленный файл является VHDX-файлом, а не TAR-файлом.
-                Эта операция создает копию VHDX-файла в указанном расположении установки.
+                Указывает, что предоставленный файл является файлом VHD или VHDX, а не TAR-файлом.
+                Эта операция создает копию VHD-файла в указанном расположении установки.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Импортирует указанный VHDX-файл в качестве нового дистрибутива.
+        Импортирует указанный VHD-файл в качестве нового дистрибутива.
         Этот виртуальный жесткий диск должен быть отформатирован с типом файловой системы ext4.
 
     --list, -l [параметры]
@@ -1010,7 +1010,7 @@
     <value>Просмотреть документы</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Не удалось завершить операцию, так как VHDX сейчас используется. Чтобы принудительно остановить использование WSL, выполните команду wsl.exe --shutdown</value>
+    <value>Не удалось завершить операцию, так как VHD сейчас используется. Чтобы принудительно остановить использование WSL, выполните команду wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1018,7 +1018,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Разреженный VHDX поддерживается только в WSL2.</value>
+    <value>Разреженный VHD поддерживается только в WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Запуск WSL в виде локальной системы не поддерживается.</value>
@@ -1067,7 +1067,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Похоже, это VHDX-файл. Используйте --vhd для импорта VHDX вместо TAR.</value>
+    <value>Похоже, это VHD-файл. Используйте --vhd для импорта VHD вместо tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">

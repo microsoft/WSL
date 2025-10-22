@@ -709,7 +709,7 @@ Systemet må kanskje startes på nytt slik at endringene kan tre i kraft.</value
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageRequiresFileExtensions" xml:space="preserve">
-    <value>The specified file must have the {} or {} file extension.</value>
+    <value>Den angitte filen må ha filendelsen {} eller {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
@@ -1003,7 +1003,7 @@ Faller tilbake til NAT-nettverk.</value>
     <value>Vis dokumenter</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Operasjonen kan ikke fullføres fordi VHDX-filen er i bruk. Slik tvinger du WSL til å stoppe bruk: wsl.exe --shutdown</value>
+    <value>Operasjonen kan ikke fullføres fordi VHD-en er i bruk. Slik tvinger du WSL til å stoppe: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1011,7 +1011,7 @@ Faller tilbake til NAT-nettverk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Sparse vhdx støttes bare på WSL2.</value>
+    <value>Sparse VHD støttes bare på WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Kjøring av WSL som lokalt system støttes ikke.</value>
@@ -1060,7 +1060,7 @@ Faller tilbake til NAT-nettverk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Dette ser ut som en VDHX-fil. Bruk --vhd til å importere en VHDX i stedet for en tar.</value>
+    <value>Dette ser ut som en VHD-fil. Bruk --vhd til å importere en VHD i stedet for en tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1112,7 +1112,7 @@ Feilkode: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparsom VHD-støtte er deaktivert på grunn av potensiell dataskade.
-Hvis du vil tvinge en distribusjon til å bruke en sparsom vhd, kan du kjøre:
+Hvis du vil tvinge en distribusjon til å bruke en sparsom VHD, kan du kjøre:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

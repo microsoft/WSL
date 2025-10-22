@@ -402,7 +402,7 @@ Argomenti per l'esecuzione di file binari Linux:
 Opzioni:
     --cd &lt;Directory&gt;
         Imposta la directory specificata come directory di lavoro corrente.
-        Se si usa ~, verrà usato il percorso home dell'utente Linux. Se il percorso inizia
+        Se viene usato ~, verrà usato il percorso home dell'utente Linux. Se il percorso inizia
         con un carattere /, verrà interpretato come un percorso Linux assoluto.
         In caso contrario, il valore deve essere un percorso assoluto di Windows.
 
@@ -472,7 +472,7 @@ Argomenti per la gestione del sottosistema Windows per Linux:
                 Sposta la distribuzione in una nuova posizione.
 
             --set-sparse, -s &lt;true|false&gt;
-                Imposta il vhdx della distribuzione su sparse, consentendo il recupero automatico dello spazio su disco.
+                Imposta il VHD della distribuzione su sparse, consentendo il recupero automatico dello spazio su disco.
 
             --set-default-user &lt;Username&gt;
                 Imposta l'utente predefinito della distribuzione.
@@ -552,11 +552,11 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
                 Specifica la versione da usare per la nuova distribuzione.
 
             --vhd
-                Specifica che il file fornito è un file con estensione vhdx, non un file TAR.
-                Questa operazione crea una copia del file con estensione vhdx nel percorso di installazione specificato.
+                Specifica che il file fornito è un file con estensione vhd o vhdx, non un file TAR.
+                Questa operazione crea una copia del file VHD nel percorso di installazione specificato.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importa il file con estensione vhdx specificato come nuova distribuzione.
+        Importa il file VHD specificato come nuova distribuzione.
         Questo disco rigido virtuale deve essere formattato con il tipo di file system ext4.
 
     --list, -l [Options]
@@ -577,7 +577,7 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
                 Mostra informazioni dettagliate su tutte le distribuzioni.
 
             --online, -o
-                Visualizza un elenco di distribuzioni disponibili per l'installazione con 'wsl--install'.
+                Visualizza un elenco di distribuzioni disponibili per l'installazione con 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
         Imposta la distribuzione come predefinita.

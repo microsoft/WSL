@@ -715,7 +715,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageRequiresFileExtensions" xml:space="preserve">
-    <value>The specified file must have the {} or {} file extension.</value>
+    <value>指定的文件必须具有 {} 或 {} 文件扩展名。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
@@ -1009,7 +1009,7 @@ Windows: {}</value>
     <value>请参阅文档</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>无法完成该操作，因为 vhdx 当前正在使用中。若要强制 WSL 停止使用： wsl.exe --shutdown</value>
+    <value>无法完成该操作，因为 VHD 当前正在使用中。强制 WSL 停止使用: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1017,7 +1017,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>仅 WSL2 支持稀疏 vhdx。</value>
+    <value>仅 WSL2 支持稀疏 VHD。</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>不支持将 WSL 作为本地系统运行。</value>
@@ -1066,7 +1066,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>这似乎是 VHDX 文件。使用 --vhd 导入 VHDX 而不是 tar。</value>
+    <value>这看起来像一个 VHD 文件。使用 --vhd 导入 VHD，而不是导入 tar。</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1118,7 +1118,7 @@ Windows: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>由于潜在的数据损坏，目前已禁用稀疏 VHD 支持。
-要强制发行版使用稀疏 vhd，请运行:
+要强制发行版使用稀疏 VHD，请运行:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

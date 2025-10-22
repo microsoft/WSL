@@ -383,7 +383,7 @@ Uso:
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
     <value>Copyright (c) Microsoft Corporation. Todos os direitos reservados.
-Para obter informações sobre a privacidade desse produto, visite https://aka.ms/privacy.
+Para obter informações sobre a privacidade deste produto, visite https://aka.ms/privacy.
 
 Uso: wsl.exe [Argumento] [Opções...] [Linha de comando]
 
@@ -408,13 +408,13 @@ Opções:
         Caso contrário, o valor deverá ser um caminho do Windows absoluto.
 
     --distribution, -d &lt;DistroName&gt;
-        Executar a distribuição especificada.
+        Executa a distribuição especificada.
 
     --distribution-id &lt;DistroGuid&gt;
         Executa a ID da distribuição especificada.
 
     --user, -u &lt;UserName&gt;
-        Executar como o usuário especificado.
+        Executa como o usuário especificado.
 
     --system
         Inicia um shell para a distribuição do sistema.
@@ -429,7 +429,7 @@ Argumentos para gerenciar o Subsistema do Windows para Linux:
 
     --install [Distribuição] [Opções...]
         Instala uma distribuição do Subsistema do Windows para Linux.
-        Para uma lista de distribuições válidas, use 'wsl.exe --list --online'.
+        Para uma lista de distribuições válidas, use ''wsl.exe --list --online''.
 
         Opções:
             --enable-wsl1
@@ -466,14 +466,14 @@ Argumentos para gerenciar o Subsistema do Windows para Linux:
                 Baixa a distribuição da internet em vez da Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Altera opções específicas da distribuição.
+        Altera as opções específicas da distribuição.
 
         Opções:
             --move &lt;Location&gt;
                 Move a distribuição para um novo local.
 
             --set-sparse, -s &lt;true|false&gt;
-                Define o vhdx da distribuição como esparso, permitindo que o espaço em disco seja recuperado automaticamente.
+                Defina o VHD de distribuição como esparso, permitindo que o espaço em disco seja recuperado automaticamente.
 
             --set-default-user &lt;Username&gt;
                 Define o usuário padrão da distribuição.
@@ -553,12 +553,12 @@ Argumentos para gerenciar as distribuições no Subsistema do Windows para Linux
                 Especifica a versão a ser usada para a nova distribuição.
 
             --vhd
-                Especifica que o arquivo fornecido é um arquivo .vhdx, e não um arquivo tar.
-                Essa operação faz uma cópia do arquivo .vhdx no local de instalação especificado.
+                Especifica que o arquivo fornecido é um arquivo .vhd ou .vhdx, não um arquivo tar.
+                Esta operação faz uma cópia do arquivo VHD no local de instalação especificado.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importa o arquivo .vhdx especificado como uma nova distribuição.
-        Esse disco rígido virtual deve ser formatado com o tipo de sistema de arquivos ext4.
+        Importa o arquivo VHD especificado como uma nova distribuição.
+        Este disco rígido virtual deve ser formatado com o tipo de sistema de arquivos ext4.
 
     --list, -l [Opções]
         Lista as distribuições.
@@ -578,7 +578,7 @@ Argumentos para gerenciar as distribuições no Subsistema do Windows para Linux
                 Mostra informações detalhadas sobre todas as distribuições.
 
             --online, -o
-                Exibe uma lista de distribuições disponíveis para instalação com 'wsl.exe --install'.
+                Exibe uma lista de distribuições disponíveis para instalação com ''wsl.exe --install''.
 
     --set-default, -s &lt;Distro&gt;
         Define a distribuição como o padrão.

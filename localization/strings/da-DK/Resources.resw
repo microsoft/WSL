@@ -466,7 +466,7 @@ Argumenter til administration af Windows-undersystem til Linux:
                 Flyt distributionen til en ny placering.
 
             --set-sparse, -s &lt;true|false&gt;
-                Angiv vhdx for distribution til sparse, hvilket gør det muligt at frigøre diskplads automatisk.
+                Angiv VHD for distribution til sparse, hvilket gør det muligt at frigøre diskplads automatisk.
 
             --set-default-user &lt;Username&gt;
                 Angiv standardbrugeren af distributionen.
@@ -546,11 +546,11 @@ Argumenter for administration af distributioner i Windows-undersystem til Linux:
                 Angiver den version, der skal bruges til den nye distribution.
 
             --vhd
-                Angiver, at den angivne fil er en .vhdx-fil, ikke en tar-fil.
-                Denne handling opretter en kopi af .vhdx-filen på den angivne installationsplacering.
+                Angiver, at den angivne fil er en .vhd- eller.vhdx-fil, ikke en tar-fil.
+                Denne handling opretter en kopi af VHD-filen på den angivne installationsplacering.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importerer den angivne .vhdx-fil som en ny distribution.
+        Importerer den angivne VHD-fil som en ny distribution.
         Denne virtuelle harddisk skal være formateret med ext4-filsystemtypen.
 
     --list, -l [Options]
@@ -705,11 +705,11 @@ Systemet skal muligvis genstartes, så ændringerne kan træde i kraft.</value>
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageRequiresFileExtension" xml:space="preserve">
-    <value>The specified file must have the {} file extension.</value>
+    <value>Den angivne fil skal have filtypenavnet {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageRequiresFileExtensions" xml:space="preserve">
-    <value>The specified file must have the {} or {} file extension.</value>
+    <value>Den angivne fil skal have filtypenavnet {} eller {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
@@ -1003,7 +1003,7 @@ Går tilbage til NAT-netværk.</value>
     <value>Se dokumenter</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Handlingen kunne ikke fuldføres, fordi vhdx er i brug i øjeblikket. Sådan tvinges WSL til at stoppe brug: wsl.exe --shutdown</value>
+    <value>Handlingen kunne ikke fuldføres, fordi VHD'en i øjeblikket er i brug. For at tvinge WSL til at stoppe skal du bruge: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1011,7 +1011,7 @@ Går tilbage til NAT-netværk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Sparse vhdx understøttes kun på WSL2.</value>
+    <value>Sparse VHD understøttes kun på WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Kørsel af WSL som lokalt system understøttes ikke.</value>
@@ -1060,7 +1060,7 @@ Går tilbage til NAT-netværk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Dette ligner en VHDX-fil. Brug --vhd til at importere en VHDX i stedet for en tar.</value>
+    <value>Dette ligner en VHD-fil. Brug --vhd til at importere en VHD i stedet for en tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
