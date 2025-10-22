@@ -704,8 +704,13 @@ Systemet kan behöva startas om så att ändringarna kan börja gälla.</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Den angivna filen måste ha filnamnstillägget .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Den angivna filen måste ha filnamnstillägget {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Den angivna filen måste ha filnamnstillägget {} eller {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Det gick inte att hitta VmSwitch {}. Tillgängliga växlar: {}</value>
@@ -1108,7 +1113,7 @@ Felkod: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Stöd för dynamiskt expanderbar VHD är för närvarande inaktiverat på grund av potentiell datakorruption.
 Om du vill tvinga en distribution att använda en dynamiskt expanderbar VHD kör du:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

@@ -710,8 +710,13 @@ Windows 버전: {}</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>지정한 파일의 확장명은 .vhdx여야 합니다.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>지정한 파일에는 {} 파일 확장명이 있어야 합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>지정한 파일에는 {} 또는 {} 파일 확장명이 있어야 합니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>VmSwitch '{}'을(를) 찾을 수 없습니다. 사용 가능한 스위치: {}</value>
@@ -1004,7 +1009,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <value>문서 보기</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>vhdx가 현재 사용 중이므로 작업을 완료할 수 없습니다. WSL을 강제로 사용 중지하려면: wsl.exe --shutdown</value>
+    <value>VHD가 현재 사용 중이므로 작업을 완료할 수 없습니다. WSL을 강제로 사용 중지하려면: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1061,7 +1066,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>VHDX 파일인 것 같습니다. --vhd 사용하여 tar 대신 VHDX를 가져옵니다.</value>
+    <value>VHD 파일인 것 같습니다. --vhd 사용하여 tar 대신 VHD를 가져옵니다.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1114,7 +1119,7 @@ NAT 네트워킹으로 대체합니다.</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>데이터 손상 가능성으로 인해 스파스 VHD 지원은 현재 비활성화되어 있습니다.
 배포 시 강제로 스파스 VHD를 사용하도록 하려면 다음을 실행하세요.
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

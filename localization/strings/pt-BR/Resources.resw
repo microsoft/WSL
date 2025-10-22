@@ -633,7 +633,7 @@ Tempo de compilação: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Os módulos de kernel personalizados vhd em {} não foram encontrados: '{}'.</value>
+    <value>O VHD dos módulos de kernel personalizados em {} não foi encontrado: '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -711,8 +711,13 @@ Talvez seja necessário reiniciar o sistema para que as alterações entrem em v
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>O arquivo especificado deve ter a extensão de arquivo .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>O arquivo especificado deve ter a extensão de arquivo {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>O arquivo especificado deve ter a extensão de arquivo {} ou {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>O VmSwitch '{}' não foi encontrado. Switches disponíveis: {}</value>
@@ -1005,7 +1010,7 @@ Voltando à rede NAT.</value>
     <value>Ver Documentos</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Não foi possível concluir a operação porque o vhdx está em uso no momento. Para forçar o WSL a interromper o uso: wsl.exe --shutdown</value>
+    <value>Não foi possível concluir a operação porque o VHD está em uso no momento. Para forçar o WSL a interromper o uso: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1062,7 +1067,7 @@ Voltando à rede NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Parece um arquivo VHDX. Use --vhd para importar um VHDX em vez de um tar.</value>
+    <value>Parece um arquivo VHD. Use --vhd para importar um VHD em vez de um tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1113,9 +1118,9 @@ Código de erro: {}</value>
     <value>Devido a um problema de compatibilidade atual com o Cliente do Acesso Global Seguro, o Túnel DNS está desabilitado.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>O suporte ao VHD esparso está desabilitado no momento devido à possível corrupção de dados.
-Para forçar uma distribuição a usar um VHD esparso, execute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <value>O suporte a VHD esparso está atualmente desativado devido a possível corrupção de dados.
+Para forçar uma distribuição a usar um vhd esparso, execute:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

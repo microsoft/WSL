@@ -704,8 +704,13 @@ Het systeem moet mogelijk opnieuw worden opgestart, zodat de wijzigingen van kra
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Het opgegeven bestand moet de bestandsextensie .vhdx hebben.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Het opgegeven bestand moet de bestandsextensie {} hebben.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Het opgegeven bestand moet de bestandsextensie {} of {} hebben.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Kan de VmSwitch {} niet vinden. Beschikbare switches: {}</value>
@@ -998,7 +1003,7 @@ Terugvallen op NAT-netwerken.</value>
     <value>Documenten weergeven</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>De bewerking kan niet worden voltooid omdat de VHDX momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
+    <value>De bewerking kan niet worden voltooid omdat de VHD momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
