@@ -523,6 +523,7 @@ inline auto EnableSystemd(const std::string& extraConfig = "")
 std::wstring EscapePath(std::wstring_view Path);
 
 void StopWslService();
+void StopWslaService();
 
 std::optional<GUID> GetDistributionId(LPCWSTR Name);
 wil::unique_hkey OpenDistributionKey(LPCWSTR Name);

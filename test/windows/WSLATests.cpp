@@ -821,7 +821,7 @@ class WSLATests
         });
 
         // Stop the service
-        StopWslService();
+        StopWslaService();
 
         // Verify that the thread is unstuck
         stuckThread.join();

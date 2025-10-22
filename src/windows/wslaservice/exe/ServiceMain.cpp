@@ -45,7 +45,7 @@ class WslaService : public Windows::Internal::Service<WslaService, Windows::Inte
 public:
     static wchar_t* GetName()
     {
-        return const_cast<LPWSTR>(L"WslaService");
+        return const_cast<LPWSTR>(L"WSLAService");
     }
 
     static void OnSessionChanged(DWORD eventType, DWORD sessionId);
@@ -74,7 +74,7 @@ try
     // Don't kill the process on unknown C++ exceptions.
     wil::g_fResultFailFastUnknownExceptions = false;
 
-    wsl::windows::common::security::ApplyProcessMitigationPolicies();
+    //wsl::windows::common::security::ApplyProcessMitigationPolicies();
 
     // Initialize Winsock.
     WSADATA Data;
