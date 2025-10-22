@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains resource declarations for wslservice.exe
+    This file contains resource declarations for wslaservice.exe
 
 --*/
 
