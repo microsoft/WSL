@@ -376,16 +376,16 @@ Användning:
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
     <value>Copyright (c) Microsoft Corporation. Med ensamrätt.
-Sekretessinformation för den här produkten finns på https://aka.ms/privacy.
+Sekretessinformation om den här produkten finns i https://aka.ms/privacy.
 
-Användning: wsl.exe [Argument] [Options...] [CommandLine]
+Usage: wsl.exe [Argument] [Options...] [CommandLine]
 
 Argument för att köra Linux-binärfiler:
 
     Om ingen kommandorad anges startar wsl.exe standardgränssnittet.
 
     --exec, -e &lt;CommandLine&gt;
-        Kör det angivna kommandot utan att använda standardgränssnittet för Linux.
+        Kör det angivna kommandot utan.
 
     --shell-type &lt;standard|login|none&gt;
         Kör det angivna kommandot med den angivna gränssnittstypen.
@@ -396,18 +396,18 @@ Argument för att köra Linux-binärfiler:
 Alternativ:
     --cd &lt;Directory&gt;
         Anger den angivna katalogen som aktuell arbetskatalog.
-        Om ~ används kommer Linux-användarens hemsökväg att användas. Om sökvägen börjar
-        med ett /-tecken tolkas det som en absolut Linux-sökväg.
+        Om ~ används används Linux-användarens hemsökväg. Om sökvägen börjar
+        med ett/-tecken tolkas den som en absolut Linux-sökväg.
         Annars måste värdet vara en absolut Windows-sökväg.
 
     --distribution, -d &lt;DistroName&gt;
         Kör den angivna distributionen.
 
     --distribution-id &lt;DistroGuid&gt;
-        Kör det angivna distributions-ID:t.
+         Kör det angivna distributions-ID:t.
 
     --user, -u &lt;UserName&gt;
-        Kör som den angivna användaren.
+        Kör som angiven användare.
 
     --system
         Startar ett gränssnitt för systemdistributionen.
@@ -420,9 +420,9 @@ Argument för att hantera Windows-undersystem för Linux:
     --debug-shell
         Öppna ett WSL2-felsökningsgränssnitt i diagnostiksyfte.
 
-    --install [Distro] [Options...]
-        Installera ett Windows-undersystem för Linux distribution.
-        Om du vill ha en lista över giltiga distributioner använder du 'wsl.exe --list --online'.
+    --install [Distro] [Alternativ...]
+        Installera en Windows-undersystem för Linux distribution.
+         Använd 'wsl.exe --list --online' för en lista över giltiga distributioner'.
 
         Alternativ:
             --enable-wsl1
@@ -441,10 +441,10 @@ Argument för att hantera Windows-undersystem för Linux:
                 Ange installationssökvägen för distributionen.
 
             --name &lt;Name&gt;
-                Ange ett namn på distributionen.
+                 Ange namnet på distributionen.
 
             --no-distribution
-                Installera endast de valfria komponenter som krävs, ingen distribution installeras.
+                Installera endast nödvändiga valfria komponenter, installerar inte någon distribution.
 
             --no-launch, -n
                 Starta inte distributionen efter installationen.
@@ -453,23 +453,23 @@ Argument för att hantera Windows-undersystem för Linux:
                 Anger vilken version som ska användas för den nya distributionen.
 
             --vhd-size &lt;MemoryString&gt;
-                Anger storleken på disken för att lagra distributionen.
+                Anger storleken på den disk som distributionen ska lagras på.
 
             --web-download
                 Ladda ned distributionen från Internet i stället för Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Ändrar distributionsspecifika alternativ.
+        Distributionsalternativ för ändringar.
 
         Alternativ:
             --move &lt;Location&gt;
                 Flytta distributionen till en ny plats.
 
             --set-sparse, -s &lt;true|false&gt;
-                Ange att vhdx-distributionen ska vara sparsam, vilket gör att diskutrymmet automatiskt kan frigöras.
+                Ange att den virtuella hårddisken för distribution ska vara sparse, vilket gör att diskutrymmet kan frigöras automatiskt.
 
             --set-default-user &lt;Username&gt;
-                Ange standardanvändaren för distributionen.
+                Ange standardanvändaren för fördelningen.
 
             --resize &lt;MemoryString&gt;
                 Ändra storlek på disken för fördelningen till den angivna storleken.
@@ -488,57 +488,57 @@ Argument för att hantera Windows-undersystem för Linux:
                 Montera disken med ett anpassat namn för monteringspunkten.
 
             --type &lt;Type&gt;
-                Filsystem som ska användas vid montering av en disk, om inget anges används ext4 som standard.
+                Filsystem som ska användas vid montering av en disk,  om inget standardvärde anges till ext4.
 
             --options &lt;Options&gt;
-                Fler monteringsalternativ.
+                Ytterligare monteringsalternativ.
 
             --partition &lt;Index&gt;
-                Index för partitionen som ska monteras, om inget anges är standardvärdet hela disken.
+                Index för partitionen som ska monteras, om det inte anges som standard för hela disken.
 
     --set-default-version &lt;Version&gt;
         Ändrar standardinstallationsversionen för nya distributioner.
 
     --shutdown
-        Avslutar omedelbart alla distributioner som körs och WSL 2
-        den virtuella datorn med förenklat verktyg.
+        Avslutar omedelbart alla distributioner som körs och den virtuella WSL 2-
+        lightweight utility virtual machine.
 
         Alternativ:
             --force
                 Avsluta den virtuella WSL 2-datorn även om en åtgärd pågår. Kan orsaka dataförlust.
 
     --status
-        Visa statusen för Windows-undersystem för Linux.
+        Visa status för Windows-undersystem för Linux.
 
     --unmount [Disk]
         Demonterar och kopplar bort en disk från alla WSL2-distributioner.
-        Demonterar och kopplar bort alla diskar om de anropas utan argument.
+        Demonterar och kopplar bort alla diskar om det anropas utan argument.
 
     --uninstall
-        Avinstallerar Windows-undersystem för Linux-paketet från den här datorn.
+        Avinstallerar Windows-undersystem för Linux paketet från den här datorn.
 
     --update
         Uppdatera Windows-undersystem för Linux-paketet.
 
         Alternativ:
             --pre-release
-                Ladda ned en förhandsversion om den är tillgänglig.
+                Ladda ned en förhandsversion om tillgänglig.
 
     --version, -v
-        Övrig versionsinformation.
+        Visa versionsinformation.
 
-Argument för att hantera distributioner i Windows-undersystem för Linux:
+Arguments for managing Argument för att hantera distributioner i Windows-undersystem för Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        Exporterar fördelningen till en TAR-fil.
+        Exporterar distributionen till en tar-fil.
         Filnamnet kan vara - för stdout.
 
         Alternativ:
             --format &lt;Format&gt;
-                Anger exportformatet. Värden som stöds: tar, tar.gz, tar.xz, vhd.
+                S Anger exportformatet. Värden som stöds: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        Importerar den angivna tar-filen som en ny distribution.
+         Importerar den angivna tar-filen som en ny distribution.
         Filnamnet kan vara - för stdin.
 
         Alternativ:
@@ -546,20 +546,20 @@ Argument för att hantera distributioner i Windows-undersystem för Linux:
                 Anger vilken version som ska användas för den nya distributionen.
 
             --vhd
-                Anger att den angivna filen är en VHDX-fil, inte en TAR-fil.
-                Den här åtgärden gör en kopia av VHDX-filen på den angivna installationsplatsen.
+                Anger att den angivna filen är en VHD- eller VHDX-fil, inte en tar-fil.
+                ThDen här åtgärden gör en kopia av VHD-filen på den angivna installationsplatsen.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importerar den angivna VHDX-filen som en ny distribution.
-        Den här virtuella hårddisken måste vara formaterad med filsystemtypen ext4.
+         Importerar den angivna VHD-filen som en ny distribution.
+        Den här virtuella hårddisken måste formateras med filsystemtypen ext4.
 
     --list, -l [Options]
-        Listar distributioner.
+        Visar distributioner.
 
         Alternativ:
             --all
-                Lista alla distributioner, inklusive distributioner som
-                håller på att installeras eller avinstalleras.
+                 Lista alla distributioner, inklusive distributioner som
+                 håller på att installeras eller avinstalleras.
 
             --running
                 Lista endast distributioner som körs för närvarande.
@@ -574,10 +574,10 @@ Argument för att hantera distributioner i Windows-undersystem för Linux:
                 Visar en lista över tillgängliga distributioner för installation med 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
-        Anger fördelningen som standard.
+        Anger fördelningen som standard
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        Ändrar den angivna distributionens version.
+        Ändrar versionen av den angivna distributionen.
 
     --terminate, -t &lt;Distro&gt;
         Avslutar den angivna distributionen.

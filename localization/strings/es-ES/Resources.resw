@@ -1017,7 +1017,7 @@ Revirtiendo a las redes NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Vhdx disperso solo se admite en WSL2.</value>
+    <value>El VHD disperso solo se admite en WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>No se admite la ejecución de WSL como sistema local.</value>
@@ -1066,7 +1066,7 @@ Revirtiendo a las redes NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Parece un archivo VHDX. Use --vhd para importar un VHDX en lugar de una tar.</value>
+    <value>Parece un archivo VHD. Usa --vhd para importar un VHD en lugar de una tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">

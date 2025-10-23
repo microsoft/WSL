@@ -466,7 +466,7 @@ Argumenty zarządzania podsystemem Windows dla systemu Linux:
                 Przenosi dystrybucję do nowej lokalizacji.
 
             --set-sparse, -s &lt;true|false&gt;
-                Ustawia dysk vhdx dystrybucji jako rozrzedzony, dzięki czemu miejsce na dysku jest automatycznie odzyskiwane.
+                Ustawia dysk VHD dystrybucji jako rozrzedzony, dzięki czemu miejsce na dysku jest automatycznie odzyskiwane.
 
             --set-default-user &lt;Username&gt;
                 Ustawia domyślnego użytkownika dystrybucji.
@@ -546,11 +546,11 @@ Argumenty zarządzania dystrybucjami w Podsystemie Windows dla systemu Linux:
                 Określa wersję do użycia dla nowej dystrybucji.
 
             --vhd
-                Określa, że podany plik jest plikiem vhdx, a nie plikiem tar.
-                Ta operacja tworzy kopię pliku vhdx w określonej lokalizacji instalacji.
+                Określa, że podany plik jest plikiem .vhd lub .vhdx, a nie plikiem tar.
+                Ta operacja tworzy kopię pliku VHD w określonej lokalizacji instalacji.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importuje określony plik .vhdx jako nową dystrybucję.
+        Importuje określony plik VHD jako nową dystrybucję.
         Ten wirtualny dysk twardy musi być sformatowany przy użyciu typu systemu plików ext4.
 
     --list, -l [Options]
@@ -1011,7 +1011,7 @@ Powrót do sieci NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Rozrzedzony dysk vhdx jest obsługiwany tylko w systemie WSL2.</value>
+    <value>Rozrzedzony dysk VHD jest obsługiwany tylko w systemie WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Uruchamianie podsystemu WSL jako systemu lokalnego nie jest obsługiwane.</value>

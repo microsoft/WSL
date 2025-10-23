@@ -546,11 +546,11 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
                 Määrittää uudelle jakelulle käytettävän version.
 
             --vhd
-                Määrittää, että annettu tiedosto on .vhdx-tiedosto, ei tar-tiedosto.
-                Tämä toiminto tekee .vhdx-tiedostosta kopion määritetyssä asennussijainnissa.
+                Määrittää, että annettu tiedosto on .vhd- tai .vhdx-tiedosto, ei tar-tiedosto.
+                Tämä toiminto tekee VHD-tiedostosta kopion määritetyssä asennussijainnissa.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Tuo määritetyn .vhdx-tiedoston uutena jakeluna.
+        Tuo määritetyn VHD-tiedoston uutena jakeluna.
         Tämä virtuaalikiintolevy on alustettava ext4-tiedostojärjestelmän tyypillä.
 
     --list, -l [Asetukset]
@@ -571,7 +571,7 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
                 Näytä yksityiskohtaiset tiedot kaikista jakeluista.
 
             --online, -o
-                Näyttää luettelon asennettavissa olevista jakeluista argumentilla 'wsl.exe --install'.
+                Näyttää luettelon asennettavissa olevista jakeluista argumentilla wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
         Määrittää jakelun oletukseksi.

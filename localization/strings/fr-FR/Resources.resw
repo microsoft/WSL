@@ -383,13 +383,13 @@ Utilisation :
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
     <value>Copyright (c) Microsoft Corporation. Tous droits réservés.
-Pour plus d'informations sur la confidentialité de ce produit, veuillez consulter https://aka.ms/privacy.
+Pour plus d’informations sur la confidentialité de ce produit, veuillez consulter https://aka.ms/privacy.
 
-Utilisation : wsl.exe [Argument] [Options...] [CommandLine]
+Utilisation : wsl.exe [Argument] [Options...] [Ligne de commande]
 
-Arguments pour l’exécution de fichiers binaires Linux :
+Arguments pour l’exécution des fichiers binaires Linux :
 
-    Si aucune ligne de commande n'est fournie, wsl.exe lance l’interpréteur de commandes par défaut.
+    Si aucune ligne de commande n’est fournie, wsl.exe lance l’interpréteur de commandes par défaut.
 
     --exec, -e &lt;CommandLine&gt;
         Exécute la commande spécifiée sans utiliser l’interpréteur de commandes Linux par défaut.
@@ -398,12 +398,12 @@ Arguments pour l’exécution de fichiers binaires Linux :
         Exécute la commande spécifiée avec le type d’interpréteur de commandes fourni.
 
     --
-        Passe la ligne de commande restante « en l'état ».
+        Passe la ligne de commande restante « en l’état ».
 
 Options :
     --cd &lt;Directory&gt;
         Définit le répertoire spécifié comme répertoire de travail actuel.
-        Si ~ est utilisé, le chemin d'accès personnel de l'utilisateur Linux est utilisé. Si le chemin commence
+        Si ~ est utilisé, le chemin d’accès personnel de l’utilisateur Linux est utilisé. Si le chemin commence
         par un caractère /, il est interprété en tant que chemin d’accès Linux absolu.
         Sinon, la valeur doit être un chemin Windows absolu.
 
@@ -414,7 +414,7 @@ Options :
         Exécute l’ID de distribution spécifié.
 
     --user, -u &lt;UserName&gt;
-        Exécute en tant que l'utilisateur spécifié.
+        Exécute en tant que l’utilisateur spécifié.
 
     --system
         Lance un interpréteur de commandes pour la distribution du système.
@@ -422,7 +422,7 @@ Options :
 Arguments pour la gestion du sous-système Windows pour Linux :
 
     --help
-        Affiche les informations d'utilisation.
+        Affiche les informations d’utilisation.
 
     --debug-shell
         Ouvre un interpréteur de commandes de débogage WSL2 pour le diagnostic.
@@ -439,7 +439,7 @@ Arguments pour la gestion du sous-système Windows pour Linux :
                 Crée un disque de taille fixe pour stocker la distribution.
 
             --from-file &lt;Path&gt;
-                Installe une distribution à partir d'un fichier local.
+                Installe une distribution à partir d’un fichier local.
 
             --legacy
                 Utilise le manifeste de distribution hérité.
@@ -473,10 +473,10 @@ Arguments pour la gestion du sous-système Windows pour Linux :
                 Déplace la distribution vers un nouvel emplacement.
 
             --set-sparse, -s &lt;true|false&gt;
-                Définit le vhdx de la distribution pour qu’il soit clairsemé. Cela permet de récupérer automatiquement de l’espace disque.
+                Définit le disque dur virtuel de la distribution pour qu’il soit clairsemé. Cela permet de récupérer automatiquement de l’espace disque.
 
             --set-default-user &lt;Username&gt;
-                Définit l'utilisateur par défaut de la distribution.
+                Définit l’utilisateur par défaut de la distribution.
 
             --resize &lt;MemoryString&gt;
                 Redimensionne le disque de la distribution à la taille spécifiée.
@@ -542,7 +542,7 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
 
         Options :
             --format &lt;Format&gt;
-                Spécifie le format d'exportation. Valeurs prises en charge : tar, tar.gz, tar.xz, vhd.
+                Spécifie le format d’exportation. Valeurs prises en charge : tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
         Importe le fichier tar spécifié en tant que nouvelle distribution.
@@ -553,11 +553,11 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
                 Spécifie la version à utiliser pour la nouvelle distribution.
 
             --vhd
-                Spécifie que le fichier fourni est un fichier .vhdx, et non un fichier tar.
-                Cette opération effectue une copie du fichier .vhdx à l’emplacement d’installation spécifié.
+                Spécifie que le fichier fourni est un fichier .vhd ou .vhdx, et non un fichier tar.
+                Cette opération effectue une copie du fichier VHD à l’emplacement d’installation spécifié.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importe le fichier .vhdx spécifié en tant que nouvelle distribution.
+        Importe le fichier VHD spécifié en tant que nouvelle distribution.
         Ce disque dur virtuel doit être formaté avec le type de système de fichiers ext4.
 
     --list, -l [Options]
@@ -590,7 +590,7 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
         Met fin à la distribution spécifiée.
 
     --unregister &lt;Distro&gt;
-        Annule l'inscription de la distribution et supprime le système de fichiers racine.</value>
+        Annule l’inscription de la distribution et supprime le système de fichiers racine.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -1018,7 +1018,7 @@ Retour à la mise en réseau NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Le vhdx partiellement alloué est pris en charge uniquement sur WSL2.</value>
+    <value>Le VHD partiellement alloué est pris en charge uniquement sur WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>L’exécution de WSL en tant que système local n’est pas prise en charge.</value>
@@ -1067,7 +1067,7 @@ Retour à la mise en réseau NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Cela ressemble à un fichier VHDX. Utilisez --vhd pour importer un VHDX au lieu d’un tar.</value>
+    <value>Cela ressemble à un fichier VHD. Utilisez --vhd pour importer un VHD au lieu d’un tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">

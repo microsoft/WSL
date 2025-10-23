@@ -407,16 +407,16 @@
         否则，该值必须是绝对 Windows 路径。
 
     --distribution, -d &lt;DistroName&gt;
-        运行指定的分发版。
+        运行指定的发行版。
 
     --distribution-id &lt;DistroGuid&gt;
-        运行指定的分发版 ID。
+        运行指定的发行版 ID。
 
     --user, -u &lt;UserName&gt;
         以指定用户身份运行。
 
     --system
-        为系统分发版启动 shell。
+        为系统发行版启动 shell。
 
 用于管理适用于 Linux 的 Windows 子系统的参数:
 
@@ -427,61 +427,61 @@
         出于诊断目的打开 WSL2 调试 shell。
 
     --install [Distro] [Options...]
-        安装适用于 Linux 的 Windows 子系统分发版。
-        有关有效分发版的列表，请使用 'wsl.exe --list --online'。
+        安装适用于 Linux 的 Windows 子系统发行版。
+        有关有效发行版的列表，请使用 'wsl.exe --list --online'。
 
         选项:
             --enable-wsl1
                 启用 WSL1 支持。
 
             --fixed-vhd
-                创建固定大小的磁盘来存储分发版。
+                创建固定大小的磁盘来存储发行版。
 
             --from-file &lt;Path&gt;
-                从本地文件安装分发版。
+                从本地文件安装发行版。
 
             --legacy
-                使用旧分发版清单。
+                使用旧发行版清单。
 
             --location &lt;Location&gt;
-                设置分发版的安装路径。
+                设置发行版的安装路径。
 
             --name &lt;Name&gt;
-                设置分发版的名称。
+                设置发行版的名称。
 
             --no-distribution
-                仅安装所需的可选组件，不安装分发版。
+                仅安装所需的可选组件，不安装发行版。
 
             --no-launch, -n
-                安装后不要启动分发版。
+                安装后不要启动发行版。
 
             --version &lt;Version&gt;
                 指定要用于新分发的版本。
 
             --vhd-size &lt;MemoryString&gt;
-                指定用于存储分发版的磁盘的大小。
+                指定用于存储发行版的磁盘的大小。
 
             --web-download
-                从 Internet 而不是 Microsoft Store 下载分发版。
+                从 Internet 而不是 Microsoft Store 下载发行版。
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
         更改发行版特定选项。
 
         选项:
             --move &lt;Location&gt;
-                将分发版移到新位置。
+                将发行版移到新位置。
 
             --set-sparse, -s &lt;true|false&gt;
-                将发行版的 vhdx 设置为稀疏，从而允许自动回收磁盘空间。
+                将发行版的 VHD 设置为稀疏，从而允许自动回收磁盘空间。
 
             --set-default-user &lt;Username&gt;
-                设置分发版的默认用户。
+                设置发行版的默认用户。
 
             --resize &lt;MemoryString&gt;
-                将分发版的磁盘大小调整为指定大小。
+                将发行版的磁盘大小调整为指定大小。
 
     --mount &lt;Disk&gt;
-        在所有 WSL 2 分发版中附加和装载物理磁盘或虚拟磁盘。
+        在所有 WSL 2 发行版中附加和装载物理磁盘或虚拟磁盘。
 
         选项:
             --vhd
@@ -503,10 +503,10 @@
                 要装载的分区的索引(如果未指定)默认为整个磁盘。
 
     --set-default-version &lt;Version&gt;
-        更改新分发版的默认安装版本。
+        更改新发行版的默认安装版本。
 
     --shutdown
-        立即终止所有正在运行的分发版和 WSL 2
+        立即终止所有正在运行的发行版和 WSL 2
         轻型实用工具虚拟机。
 
         选项:
@@ -517,7 +517,7 @@
         显示适用于 Linux 的 Windows 子系统状态。
 
     --unmount [磁盘]
-        从所有 WSL2 分发版中卸载和分离磁盘。
+        从所有 WSL2 发行版中卸载和分离磁盘。
         如果在没有参数的情况下调用，则卸载和分离所有磁盘。
 
     --uninstall
@@ -533,10 +533,10 @@
     --version, -v
         显示版本信息。
 
-用于在适用于 Linux 的 Windows 子系统中管理分发版的参数:
+用于在适用于 Linux 的 Windows 子系统中管理发行版的参数:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [选项]
-        将分发版导出到 tar 文件。
+        将发行版导出到 tar 文件。
         文件名可以是 - for stdout。
 
         选项:
@@ -544,7 +544,7 @@
                 指定导出格式。支持的值: tar、tar.gz、tar.xz、vhd。
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [选项]
-        将指定的 tar 文件作为新分发版导入。
+        将指定的 tar 文件作为新发行版导入。
         文件名可以是 - for stdin。
 
         选项:
@@ -552,44 +552,44 @@
                 指定要用于新分发的版本。
 
             --vhd
-                指定所提供的文件是 .vhdx 文件，而不是 tar 文件。
-                此操作在指定的安装位置创建 .vhdx 文件的副本。
+                指定所提供的文件是 .vhd 还是 .vhdx 文件，而不是 tar 文件。
+                此操作在指定的安装位置创建 VHD 文件的副本。
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        将指定的 .vhdx 文件作为新分发版导入。
+        将指定的 VHD 文件作为新发行版导入。
         必须使用 ext4 文件系统类型设置此虚拟硬盘的格式。
 
     --list, -l [选项]
-        列出分发版。
+        列出发行版。
 
         选项:
             --all
-                列出所有分发版，包括当前
-                正在安装或卸载的分发版。
+                列出所有发行版，包括当前
+                正在安装或卸载的发行版。
 
             --running
-                仅列出当前正在运行的分发版。
+                仅列出当前正在运行的发行版。
 
             --quiet, -q
-                仅显示分发版名称。
+                仅显示发行版名称。
 
             --verbose, -v
-                显示有关所有分发版的详细信息。
+                显示有关所有发行版的详细信息。
 
             --online, -o
-                显示适合通过 'wsl --install' 安装的可用分发版列表。
+                显示适合通过 'wsl --install' 安装的可用发行版列表。
 
     --set-default, -s &lt;Distro&gt;
         将分布版设置为默认值。
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
-        更改指定分发版的版本。
+        更改指定发行版的版本。
 
     --terminate, -t &lt;Distro&gt;
-        终止指定的分发版。
+        终止指定的发行版。
 
     --unregister &lt;Distro&gt;
-        取消注册分发版并删除根文件系统。</value>
+        取消注册发行版并删除根文件系统。</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
