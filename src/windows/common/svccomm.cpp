@@ -876,6 +876,16 @@ GUID wsl::windows::common::SvcComm::GetDistributionId(_In_ LPCWSTR Name, _In_ UL
     return DistroId;
 }
 
+GUID wsl::windows::common::SvcComm::GetDistributionRuntimeId(_In_opt_ LPCGUID DistroGuid) const
+{
+    ClientExecutionContext context;
+
+    GUID RuntimeId;
+    THROW_IF_FAILED(m_userSession->GetDistributionRuntimeId(DistroGuid, context.OutError(), &RuntimeId));
+
+    return RuntimeId;
+}
+
 GUID wsl::windows::common::SvcComm::ImportDistributionInplace(_In_ LPCWSTR Name, _In_ LPCWSTR VhdPath) const
 {
     ClientExecutionContext context;
