@@ -1017,7 +1017,7 @@ Fallback alla rete NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>VHDX di tipo sparse supportato solo in WSL2.</value>
+    <value>Disco rigido virtuale di tipo sparse supportato solo in WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>L'esecuzione di WSL come sistema locale non è supportata.</value>
@@ -1066,7 +1066,7 @@ Fallback alla rete NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Sembra un file VHDX. Usa --vhd per importare un VHDX anziché un tar.</value>
+    <value>Questo sembra un file disco rigido virtuale. Usa --vhd per importare un disco rigido virtuale anziché un tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1117,9 +1117,9 @@ Codice errore: {}</value>
     <value>A causa di un problema di compatibilità con Accesso globale sicuro, il tunneling DNS è attualmente disabilitato.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Il supporto VHD di tipo Sparse è attualmente disabilitato a causa di un potenziale danneggiamento dei dati.
-Per forzare l'uso di un disco rigido virtuale di tipo Sparse in una distribuzione, esegui:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
+    <value>Il supporto disco rigido virtuale di tipo sparse attualmente è disabilitato a causa di un potenziale danneggiamento dei dati.
+Per forzare una distribuzione per usare un disco rigido virtuale sparse, esegui:
+wsl.exe --manage &lt;NomeDistribuzione&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

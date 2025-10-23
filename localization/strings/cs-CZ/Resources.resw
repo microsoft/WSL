@@ -626,7 +626,7 @@ Potvrzení změn: {}
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Vhd vlastních modulů jádra v {} se nenašel: {}.</value>
+    <value>VHD vlastních modulů jádra v {} se nenašel: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -1003,7 +1003,7 @@ Návrat k sítím NAT.</value>
     <value>Zobrazit dokumentaci</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Operaci nešlo dokončit, protože se vhdx právě používá. Vynucení ukončení používání WSL: wsl.exe --shutdown</value>
+    <value>Operaci nešlo dokončit, protože se VHD právě používá. Vynucení ukončení používání WSL: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1011,7 +1011,7 @@ Návrat k sítím NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Zhuštěný soubor vhdx je podporován pouze pro WSL2.</value>
+    <value>Zhuštěný VHD je podporován pouze pro WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Spouštění WSL jako místního systému se nepodporuje.</value>
@@ -1112,7 +1112,7 @@ Kód chyby: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Podpora prořídlého VHD je v současné době zakázána z důvodu možného poškození dat.
-Pokud chcete distribuci vynutit použití prořídlého vhd, spusťte:
+Pokud chcete distribuci vynutit použití prořídlého VHD, spusťte:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
