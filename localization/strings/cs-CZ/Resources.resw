@@ -466,7 +466,7 @@ Argumenty pro správu Subsystému Windows pro Linux:
                 Přesuňte distribuci do nového umístění.
 
             --set-sparse, -s &lt;true|false&gt;
-                Nastaví vhdx distribuce na zhuštěný, což umožní automatické uvolnění místa na disku.
+                Nastavte virtuální pevný disk distribuce na zhuštěný, což umožní automatické uvolnění místa na disku.
 
             --set-default-user &lt;Username&gt;
                 Nastaví výchozího uživatele distribuce.
@@ -546,11 +546,11 @@ Argumenty pro správu distribucí v Subsystému Windows pro Linux:
                 Určuje verzi, která se má použít pro novou distribuci.
 
             --vhd
-                Určuje, že zadaný soubor je soubor .vhdx, nikoli soubor tar.
-                Tato operace vytvoří kopii souboru .vhdx v zadaném umístění instalace.
+                Určuje, že poskytnutý soubor je soubor .vhd nebo .vhdx, nikoli soubor tar.
+                Tato operace vytvoří kopii souboru VHD v zadaném umístění instalace.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importuje zadaný soubor .vhdx jako novou distribuci.
+        Importuje zadaný soubor .VHD jako novou distribuci.
         Tento virtuální pevný disk musí být naformátovaný typem systému souborů ext4.
 
     --list, -l [Options]
@@ -1060,7 +1060,7 @@ Návrat k sítím NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Vypadá to na soubor VHD. Použijte --vhd k importu virtuálního pevného disku místo dehtu.</value>
+    <value>This looks like a VHD file. Use --vhd to import a VHD instead of a tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
