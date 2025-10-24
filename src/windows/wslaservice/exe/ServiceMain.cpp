@@ -26,7 +26,7 @@ using namespace wsl::windows::policies;
 
 wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
-// Declare the LxssUserSession COM class.
+// Declare the WSLAUserSession COM class.
 CoCreatableClassWrlCreatorMapInclude(WSLAUserSession);
 
 struct WslaServiceSecurityPolicy
