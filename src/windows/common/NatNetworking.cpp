@@ -6,7 +6,6 @@
 #include "WslCoreHostDnsInfo.h"
 #include "Stringify.h"
 #include "WslCoreFirewallSupport.h"
-#include "WslCoreVm.h"
 #include "hcs.hpp"
 
 using namespace wsl::core::networking;
@@ -672,7 +671,7 @@ wsl::windows::common::hcs::unique_hcn_network NatNetworking::CreateNetwork(wsl::
     wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
         try
         {
-            wsl::core::networking::ConfigureHyperVFirewall(config.FirewallConfig, c_vmOwner);
+            wsl::core::networking::ConfigureHyperVFirewall(config.FirewallConfig, wsl::windows::common::wslutil::c_vmOwner);
             natNetwork = CreateNetworkInternal(config);
         }
         catch (...)

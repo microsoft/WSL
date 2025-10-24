@@ -1468,7 +1468,7 @@ void WslCoreVm::FreeLun(_In_ ULONG lun)
 std::wstring WslCoreVm::GenerateConfigJson()
 {
     hcs::ComputeSystem systemSettings{};
-    systemSettings.Owner = c_vmOwner;
+    systemSettings.Owner = wsl::windows::common::wslutil::c_vmOwner;
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
     systemSettings.SchemaVersion.Major = 2;
     systemSettings.SchemaVersion.Minor = 3;
@@ -1575,7 +1575,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Set the vmmem suffix which will change the process name in task manager.
     if (helpers::IsVmemmSuffixSupported())
     {
-        vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = c_vmOwner;
+        vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = wsl::windows::common::wslutil::c_vmOwner;
     }
 
     // If nested virtualization was requested, ensure the platform supports it.

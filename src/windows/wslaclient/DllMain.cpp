@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "wslservice.h"
+#include "wslaservice.h"
 #include "WSLAApi.h"
 #include "wslrelay.h"
 #include "wslInstall.h"

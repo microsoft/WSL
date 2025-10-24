@@ -1316,6 +1316,17 @@ void StopWslService()
     StopService(service.get());
 }
 
+void StopWslaService()
+{
+    LogInfo("Stopping WSLAService");
+    const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    VERIFY_IS_NOT_NULL(manager);
+
+    const wil::unique_schandle service{OpenService(manager.get(), L"wslaservice", SERVICE_STOP | SERVICE_QUERY_STATUS)};
+    VERIFY_IS_NOT_NULL(service);
+    StopService(service.get());
+}
+
 wil::unique_handle GetNonElevatedToken()
 {
     const auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);

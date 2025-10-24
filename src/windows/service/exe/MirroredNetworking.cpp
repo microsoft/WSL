@@ -256,7 +256,7 @@ void MirroredNetworking::Initialize()
         m_config.FirewallConfig.Enabled(), m_config.IgnoredPorts, m_runtimeId, m_gnsRpcServer->GetServerUuid(), s_GuestNetworkServiceCallback, this);
     m_ephemeralPortRange = m_guestNetworkService.AllocateEphemeralPortRange();
 
-    networking::ConfigureHyperVFirewall(m_config.FirewallConfig, c_vmOwner);
+    networking::ConfigureHyperVFirewall(m_config.FirewallConfig, wsl::windows::common::wslutil::c_vmOwner);
 
     // must keep all m_networkManager interactions (including) creation queued
     // also must queue GNS callbacks to keep them serialized
