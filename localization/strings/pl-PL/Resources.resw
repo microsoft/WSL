@@ -1060,7 +1060,7 @@ Powrót do sieci NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Wygląda to na plik VHDX. Użyj polecenia --vhd , aby zaimportować plik VHDX zamiast tar.</value>
+    <value>This looks like a VHD file. Use --vhd to import a VHD instead of a tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
