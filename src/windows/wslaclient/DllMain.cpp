@@ -73,7 +73,7 @@ try
     settings.EnableGPU = UserSettings->GPU.Enable;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+    wsl::windows::common::security::ConfigureForCOMImpersonation(virtualMachineInstance.get());
 
     // Register termination callback, if specified
     if (UserSettings->Options.TerminationCallback != nullptr)
