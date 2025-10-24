@@ -31,29 +31,6 @@ struct _WSL_VERSION {
 typedef [system_handle(sh_socket)] HANDLE HVSOCKET_HANDLE;
 
 
-typedef
-struct _WSLA_CREATE_PROCESS_OPTIONS {
-    [string] LPCSTR Executable;
-    ULONG CommandLineCount;
-    [unique, size_is(CommandLineCount)] LPCSTR* CommandLine;
-    ULONG EnvironmentCount;
-    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
-    [unique] LPCSTR CurrentDirectory;
-} WSLA_CREATE_PROCESS_OPTIONS;
-
-typedef struct _WSLA_PROCESS_FD
-{
-    LONG Fd;
-    int Type;
-    [string, unique] LPCSTR Path;
-} WSLA_PROCESS_FD;
-
-typedef
-struct _WSLA_CREATE_PROCESS_RESULT {
-   int Errno;
-   int Pid;
-} WSLA_CREATE_PROCESS_RESULT;
-
 [
     uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
     pointer_default(unique),
@@ -69,37 +46,16 @@ interface ITerminationCallback : IUnknown
     pointer_default(unique),
     object
 ]
-interface IWSLAVirtualMachine : IUnknown
+interface IWSLASession : IUnknown
 {
-    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device, [out] ULONG* Lun);
-    HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
-    HRESULT CreateLinuxProcess([in] const WSLA_CREATE_PROCESS_OPTIONS* Options, [in] ULONG FdCount, [in, unique, size_is(FdCount)] WSLA_PROCESS_FD* Fds, [out, size_is(FdCount)] ULONG* Handles, [out] WSLA_CREATE_PROCESS_RESULT* Result);
-    HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
-    HRESULT Signal([in] LONG Pid, [in] int Signal);
-    HRESULT Shutdown([in] ULONGLONG TimeoutMs);
-    HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
-    HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
-    HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
-    HRESULT Unmount([in] LPCSTR Path);
-    HRESULT DetachDisk([in] ULONG Lun);
-    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
-    HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
+
 }
 
 typedef
-struct _VIRTUAL_MACHINE_SETTINGS {
-    LPCWSTR DisplayName;
-    ULONGLONG MemoryMb;
-    ULONG CpuCount;
-    ULONG BootTimeoutMs;
-    ULONG DmesgOutput;
-    ULONG NetworkingMode;
-    BOOL EnableDnsTunneling;
-    BOOL EnableDebugShell;
-    BOOL EnableEarlyBootDmesg;
-    BOOL EnableGPU;
-} VIRTUAL_MACHINE_SETTINGS;
+struct _WSLA_SESSION_CONFIGURATION {
+    LPCWSTR DisplayName; // App display name
+    LPCWSTR StoragePath; // Used to store container images and scratch
+} WSLA_SESSION_CONFIGURATION;
 
 
 [
@@ -110,5 +66,10 @@ struct _VIRTUAL_MACHINE_SETTINGS {
 interface IWSLAUserSession : IUnknown
 {
     HRESULT GetVersion([out] WSL_VERSION* Error);
-    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine);
+    HRESULT CreateSession([in] const WSLA_SESSION_CONFIGURATION* Settings, [out] IWSLASession** WslaSession);
+    HRESULT ReleaseSession([in] const IWSLASession* WslaSession);
+    HRESULT ListSessions(
+        [out] ULONG* SessionCount,
+        [out, size_is(, *SessionCount)] IWSLASession*** WslaSessions
+    );
 }

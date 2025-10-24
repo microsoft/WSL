@@ -20,7 +20,7 @@ Parses .gitconfig-style properties files.
 #ifdef WIN32
 
 #include <filesystem>
-#include "wslservice.h"
+#include "wslaservice.h"
 #include "ExecutionContext.h"
 
 #endif

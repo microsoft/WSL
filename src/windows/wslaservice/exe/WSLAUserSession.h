@@ -12,9 +12,12 @@ Abstract:
 
 --*/
 #pragma once
-#include "WSLAVirtualMachine.h"
+#include "WSLASession.h"
+//#include "wslaservice.idl" // For WSLA_SESSION_CONFIGURATION and IWSLASession
 
 namespace wsl::windows::service::wsla {
+
+struct IWSLASession;
 
 class WSLAUserSessionImpl
 {
@@ -27,15 +30,19 @@ public:
 
     PSID GetUserSid() const;
 
-    HRESULT CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine);
+    HRESULT WSLACreateSession(const WSLA_SESSION_CONFIGURATION* WslaSessionConfig, IWSLASession** WslaSession);
 
-    void OnVmTerminated(WSLAVirtualMachine* machine);
+    HRESULT WSLAReleaseSession(const IWSLASession* WslaSession);
+
+    HRESULT WSLAListSessions(std::vector<IWSLASession*>& WslaSessions);
+
+    void OnWslaSessionTerminated(WSLASession* WslaSession);
 
 private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 
-    std::recursive_mutex m_virtualMachinesLock;
-    std::vector<WSLAVirtualMachine*> m_virtualMachines;
+    std::recursive_mutex m_wslaSessionsLock;
+    std::vector<WSLASession*> m_wslaSessions;
 };
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLAUserSession
@@ -47,7 +54,9 @@ public:
     WSLAUserSession& operator=(const WSLAUserSession&) = delete;
 
     IFACEMETHOD(GetVersion)(_Out_ WSL_VERSION* Version) override;
-    IFACEMETHOD(CreateVirtualMachine)(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine) override;
+    IFACEMETHOD(WSLACreateSession)(const WSLA_SESSION_CONFIGURATION* WslaSessionConfig, IWSLASession** WslaSession) override;
+    IFACEMETHOD(WSLAReleaseSession)(const IWSLASession* WslaSession) override;
+    IFACEMETHOD(WSLAListSessions)(std::vector<WSLASession*>& Sessions) override;
 
 private:
     std::weak_ptr<WSLAUserSessionImpl> m_session;

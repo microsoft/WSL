@@ -16,7 +16,7 @@ Abstract:
 
 #include <wil/filesystem.h>
 #include <wil/result.h>
-#include "wslservice.h"
+#include "wslaservice.h"
 
 typedef struct _LXSS_STD_HANDLES_INFO
 {
