@@ -131,6 +131,7 @@ enum WslFdType
     WslFdTypeLinuxFileOutput = 8,
     WslFdTypeLinuxFileAppend = 16,
     WslFdTypeLinuxFileCreate = 32,
+    WslFdTypeTerminalControl = 64,
 };
 
 struct WslProcessFileDescriptorSettings
