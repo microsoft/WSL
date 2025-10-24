@@ -18,24 +18,6 @@ Abstract:
 #include "wslrelay.h"
 #include "wslInstall.h"
 
-namespace {
-
-void ConfigureComSecurity(IUnknown* Instance)
-{
-    wil::com_ptr_nothrow<IClientSecurity> clientSecurity;
-    THROW_IF_FAILED(Instance->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
-
-    // Get the current proxy blanket settings.
-    DWORD authnSvc, authzSvc, authnLvl, capabilites;
-    THROW_IF_FAILED(clientSecurity->QueryBlanket(Instance, &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilites));
-
-    // Make sure that dynamic cloaking is used.
-    WI_ClearFlag(capabilites, EOAC_STATIC_CLOAKING);
-    WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
-    THROW_IF_FAILED(clientSecurity->SetBlanket(Instance, authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
-}
-} // namespace
-
 class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
 {
@@ -74,7 +56,7 @@ try
     wil::com_ptr<IWSLAUserSession> session;
 
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
-    ConfigureComSecurity(session.get());
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachineInstance;
 
@@ -91,7 +73,7 @@ try
     settings.EnableGPU = UserSettings->GPU.Enable;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
-    ConfigureComSecurity(virtualMachineInstance.get());
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     // Register termination callback, if specified
     if (UserSettings->Options.TerminationCallback != nullptr)

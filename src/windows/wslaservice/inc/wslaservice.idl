@@ -102,6 +102,23 @@ struct _VIRTUAL_MACHINE_SETTINGS {
 } VIRTUAL_MACHINE_SETTINGS;
 
 
+typedef
+struct _WSLA_SESSION_SETTINGS {
+    LPCWSTR DisplayName;
+    // Details TBD.
+} WSLA_SESSION_SETTINGS;
+
+
+[
+    uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
+    pointer_default(unique),
+    object
+]
+interface IWSLASession : IUnknown
+{
+    HRESULT GetDisplayName([out] LPWSTR* DisplayName);
+}
+
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
     pointer_default(unique),
@@ -111,4 +128,5 @@ interface IWSLAUserSession : IUnknown
 {
     HRESULT GetVersion([out] WSL_VERSION* Error);
     HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine);
+    HRESULT CreateSession([in] const WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
 }

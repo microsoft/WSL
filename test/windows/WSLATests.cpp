@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "WSLAApi.h"
+#include "wslaservice.h"
 
 using namespace wsl::windows::common::registry;
 
@@ -1066,5 +1067,22 @@ class WSLATests
 
         // Validate that xsk_diag is now loaded.
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}), 0);
+    }
+
+    TEST_METHOD(CreateSessionSmokeTest)
+    {
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
+        wil::com_ptr<IWSLASession> session;
+
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
+
+        wil::unique_cotaskmem_string returnedDisplayName;
+        VERIFY_SUCCEEDED(session->GetDisplayName(&returnedDisplayName));
+
+        VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
     }
 };
