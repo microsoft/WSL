@@ -621,7 +621,8 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
     // Check if this is a tty or not
     const WSLA_PROCESS_FD* ttyInput = nullptr;
     const WSLA_PROCESS_FD* ttyOutput = nullptr;
-    auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput);
+    const WSLA_PROCESS_FD* ttyControl = nullptr;
+    auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput, &ttyControl);
     auto [pid, _, childChannel] = Fork(WSLA_FORK::Process);
 
     std::vector<wil::unique_socket> sockets(FdCount);
@@ -812,7 +813,8 @@ try
 }
 CATCH_RETURN();
 
-bool WSLAVirtualMachine::ParseTtyInformation(const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput)
+bool WSLAVirtualMachine::ParseTtyInformation(
+    const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl)
 {
     bool foundNonTtyFd = false;
 
@@ -828,6 +830,11 @@ bool WSLAVirtualMachine::ParseTtyInformation(const WSLA_PROCESS_FD* Fds, ULONG F
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyOutput != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
             *TtyOutput = &Fds[i];
+        }
+        else if (Fds[i].Type == WslFdTypeTerminalControl)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, *TtyControl != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
+            *TtyControl = &Fds[i];
         }
         else
         {

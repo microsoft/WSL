@@ -390,6 +390,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLAOpen,
     LxMessageWSLAUnmount,
     LxMessageWSLADetach,
+    LxMessageWSLATerminalChanged,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -498,6 +499,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLAOpen)
         X(LxMessageWSLAUnmount)
         X(LxMessageWSLADetach)
+        X(LxMessageWSLATerminalChanged)
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1658,8 +1660,11 @@ struct WSLA_TTY_RELAY
     int32_t TtyMaster;
     int32_t TtyInput;
     int32_t TtyOutput;
+    int32_t TtyControl;
+    uint32_t Rows;
+    uint32_t Columns;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput));
+    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput), FIELD(TtyControl), FIELD(Rows), FIELD(Columns));
 };
 
 struct WSLA_ACCEPT
@@ -1828,6 +1833,17 @@ struct WSLA_DETACH
     unsigned int Lun;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Lun));
+};
+
+struct WSLA_TERMINAL_CHANGED
+{
+    static inline auto Type = LxMessageWSLATerminalChanged;
+
+    MESSAGE_HEADER Header;
+    unsigned short Rows;
+    unsigned short Columns;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Rows), FIELD(Columns));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT
