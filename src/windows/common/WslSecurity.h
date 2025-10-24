@@ -88,6 +88,11 @@ std::pair<PSID, std::vector<char>> CreateSid(SID_IDENTIFIER_AUTHORITY Authority,
 wil::unique_handle CreateRestrictedToken(_In_ HANDLE token);
 
 /// <summary>
+/// Configures a COM object for impersonation.
+/// <summary>
+void ConfigureForCOMImpersonation(IUnknown* instance);
+
+/// <summary>
 /// Enables a privilege on the token.
 /// </summary>
 LUID EnableTokenPrivilege(_Inout_ HANDLE token, _In_ LPCWSTR privilegeName);

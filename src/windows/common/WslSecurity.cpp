@@ -99,6 +99,21 @@ wil::unique_handle wsl::windows::common::security::CreateRestrictedToken(_In_ HA
     return restrictedToken;
 }
 
+void wsl::windows::common::security::ConfigureForCOMImpersonation(IUnknown* Instance)
+{
+    wil::com_ptr_nothrow<IClientSecurity> clientSecurity;
+    THROW_IF_FAILED(Instance->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
+
+    // Get the current proxy blanket settings.
+    DWORD authnSvc, authzSvc, authnLvl, capabilites;
+    THROW_IF_FAILED(clientSecurity->QueryBlanket(Instance, &authnSvc, &authzSvc, NULL, &authnLvl, NULL, NULL, &capabilites));
+
+    // Make sure that dynamic cloaking is used.
+    WI_ClearFlag(capabilites, EOAC_STATIC_CLOAKING);
+    WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
+    THROW_IF_FAILED(clientSecurity->SetBlanket(Instance, authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
+}
+
 LUID wsl::windows::common::security::EnableTokenPrivilege(_Inout_ HANDLE token, _In_ LPCWSTR privilegeName)
 {
     // Convert privilege name to an LUID.

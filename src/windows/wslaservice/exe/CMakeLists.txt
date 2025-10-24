@@ -2,12 +2,14 @@ set(SOURCES
     application.manifest
     main.rc
     ServiceMain.cpp
+    WSLASession.cpp
     WSLAUserSession.cpp
     WSLAUserSessionFactory.cpp
     WSLAVirtualMachine.cpp
     )
 
 set(HEADERS
+    WSLASession.h
     WSLAUserSession.h
     WSLAUserSessionFactory.h
     WSLAVirtualMachine.h)

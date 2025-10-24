@@ -11,7 +11,9 @@ Abstract:
     TODO
 
 --*/
+
 #include "WSLAUserSession.h"
+#include "WSLASession.h"
 
 using wsl::windows::service::wsla::WSLAUserSessionImpl;
 
@@ -24,7 +26,7 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
 {
     // Manually signal the VM termination events. This prevents being stuck on an API call that holds the VM lock.
     {
-        std::lock_guard lock(m_virtualMachinesLock);
+        std::lock_guard lock(m_lock);
 
         for (auto* e : m_virtualMachines)
         {
@@ -35,7 +37,7 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
 
 void WSLAUserSessionImpl::OnVmTerminated(WSLAVirtualMachine* machine)
 {
-    std::lock_guard lock(m_virtualMachinesLock);
+    std::lock_guard lock(m_lock);
     auto pred = [machine](const auto* e) { return machine == e; };
 
     // Remove any stale VM reference.
@@ -47,7 +49,7 @@ HRESULT WSLAUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS
     auto vm = wil::MakeOrThrow<WSLAVirtualMachine>(*Settings, GetUserSid(), this);
 
     {
-        std::lock_guard lock(m_virtualMachinesLock);
+        std::lock_guard lock(m_lock);
         m_virtualMachines.emplace_back(vm.Get());
     }
 
@@ -60,6 +62,20 @@ HRESULT WSLAUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS
 PSID WSLAUserSessionImpl::GetUserSid() const
 {
     return m_tokenInfo->User.Sid;
+}
+
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session)
+{
+    auto session = wil::MakeOrThrow<WSLASession>(*Settings);
+
+    {
+        std::lock_guard lock(m_lock);
+        m_sessions.emplace_back(session.Get());
+    }
+
+    THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)Session));
+
+    return S_OK;
 }
 
 wsl::windows::service::wsla::WSLAUserSession::WSLAUserSession(std::weak_ptr<WSLAUserSessionImpl>&& Session) :
@@ -83,5 +99,15 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->CreateVirtualMachine(Settings, VirtualMachine);
+}
+CATCH_RETURN();
+
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session)
+try
+{
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CreateSession(Settings, Session);
 }
 CATCH_RETURN();
