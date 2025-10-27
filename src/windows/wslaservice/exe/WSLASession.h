@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLASession.h
+
+Abstract:
+
+    TODO
+
+--*/
 
 #pragma once
 
