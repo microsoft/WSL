@@ -312,12 +312,6 @@ public:
     {
         SKIP_TEST_ARM64();
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("TODO: debug test for virtiofs");
-            return;
-        }
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests xattr drvfs", L"xattr_drvfs"));
     }
 
@@ -1201,12 +1195,8 @@ class WSL1 : public DrvFsTests
 
 WSL2_DRVFS_TEST_CLASS(Plan9);
 
-// Disabled while an issue with the 6.1 Linux kernel causing disk corruption is investigated.
-// TODO: Enable again once the issue is resolved
-// WSL2_DRVFS_TEST_CLASS(Virtio9p);
+WSL2_DRVFS_TEST_CLASS(Virtio9p);
 
-// Disabled because it causes too much noise.
-// TODO: Enable again once virtiofs is stable
-// WSL2_DRVFS_TEST_CLASS(VirtioFs);
+WSL2_DRVFS_TEST_CLASS(VirtioFs);
 
 } // namespace DrvFsTests
