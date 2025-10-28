@@ -21,7 +21,6 @@ Abstract:
 
 namespace wsl::windows::common {
 
-
 class SvcComm
 {
 public:
