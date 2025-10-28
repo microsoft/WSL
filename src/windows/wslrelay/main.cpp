@@ -40,6 +40,7 @@ try
     wil::unique_handle exitEvent{};
     wil::unique_handle terminalInputHandle{};
     wil::unique_handle terminalOutputHandle{};
+    wil::unique_socket terminalControlHandle{};
     uint32_t port{};
     GUID vmId{};
     bool disableTelemetry = !wsl::shared::OfficialBuild;
@@ -54,6 +55,7 @@ try
     parser.AddArgument(disableTelemetry, wslrelay::disable_telemetry_option);
     parser.AddArgument(Handle{terminalInputHandle}, wslrelay::input_option);
     parser.AddArgument(Handle{terminalOutputHandle}, wslrelay::output_option);
+    parser.AddArgument(Handle<wil::unique_socket>{terminalControlHandle}, wslrelay::control_option);
     parser.Parse();
 
     // Initialize logging.
@@ -145,15 +147,68 @@ try
 
     case wslrelay::RelayMode::InteractiveConsoleRelay:
     {
-        AllocConsole();
-
         THROW_HR_IF(E_INVALIDARG, !terminalInputHandle || !terminalOutputHandle);
+
+        AllocConsole();
+        auto consoleOutputHandle = wil::unique_handle{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr)};
+
+        THROW_LAST_ERROR_IF(!consoleOutputHandle.is_valid());
+
+        auto consoleInputHandle = wil::unique_handle{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr)};
+
+        THROW_LAST_ERROR_IF(!consoleInputHandle.is_valid());
+
+        // Configure console for interactive usage.
+
+        {
+            DWORD OutputMode{};
+            THROW_LAST_ERROR_IF(!::GetConsoleMode(consoleOutputHandle.get(), &OutputMode));
+
+            WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+            THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleOutputHandle.get(), OutputMode));
+        }
+
+        {
+            DWORD InputMode{};
+            THROW_LAST_ERROR_IF(!::GetConsoleMode(consoleInputHandle.get(), &InputMode));
+
+            WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
+            WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
+            THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleInputHandle.get(), InputMode));
+        }
+
+        THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
 
         // Create a thread to relay stdin to the pipe.
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
+
+        std::optional<wsl::shared::SocketChannel> controlChannel;
+        if (terminalControlHandle)
+        {
+            controlChannel.emplace(std::move(terminalControlHandle), "TerminalControl", exitEvent.get());
+        }
+
         std::thread inputThread([&]() {
+            auto updateTerminal = [&]() {
+                if (controlChannel.has_value())
+                {
+                    CONSOLE_SCREEN_BUFFER_INFOEX info{};
+                    info.cbSize = sizeof(info);
+
+                    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(consoleOutputHandle.get(), &info));
+
+                    WSLA_TERMINAL_CHANGED message{};
+                    message.Columns = info.srWindow.Right - info.srWindow.Left + 1;
+                    message.Rows = info.srWindow.Bottom - info.srWindow.Top + 1;
+
+                    controlChannel->SendMessage(message);
+                }
+            };
+
             wsl::windows::common::relay::RelayStandardInput(
-                GetStdHandle(STD_INPUT_HANDLE), terminalInputHandle.get(), []() {}, exitEvent.get());
+                GetStdHandle(STD_INPUT_HANDLE), terminalInputHandle.get(), updateTerminal, exitEvent.get());
         });
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {

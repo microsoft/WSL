@@ -440,17 +440,21 @@ class WSLATests
         auto vm = CreateVm(&settings);
 
         std::vector<const char*> commandLine{"/bin/sh", nullptr};
-        std::vector<WslProcessFileDescriptorSettings> fds(2);
+        std::vector<WslProcessFileDescriptorSettings> fds(3);
         fds[0].Number = 0;
         fds[0].Type = WslFdTypeTerminalInput;
         fds[1].Number = 1;
         fds[1].Type = WslFdTypeTerminalOutput;
+        fds[2].Number = 2;
+        fds[2].Type = WslFdTypeTerminalControl;
 
+        const char* env[] = {"TERM=xterm-256color", nullptr};
         WslCreateProcessSettings WslCreateProcessSettings{};
         WslCreateProcessSettings.Executable = "/bin/sh";
         WslCreateProcessSettings.Arguments = commandLine.data();
         WslCreateProcessSettings.FileDescriptors = fds.data();
         WslCreateProcessSettings.FdCount = static_cast<ULONG>(fds.size());
+        WslCreateProcessSettings.Environment = env;
 
         int pid = -1;
         VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm.get(), &WslCreateProcessSettings, &pid));
@@ -486,11 +490,14 @@ class WSLATests
         // Validate that the interactive process successfully starts
         wil::unique_handle process;
         VERIFY_SUCCEEDED(WslLaunchInteractiveTerminal(
-            WslCreateProcessSettings.FileDescriptors[0].Handle, WslCreateProcessSettings.FileDescriptors[1].Handle, &process));
+            WslCreateProcessSettings.FileDescriptors[0].Handle,
+            WslCreateProcessSettings.FileDescriptors[1].Handle,
+            WslCreateProcessSettings.FileDescriptors[2].Handle,
+            &process));
 
         // Exit the shell
         writeTty("exit\n");
-        VERIFY_ARE_EQUAL(WaitForSingleObject(process.get(), 30 * 1000), WAIT_OBJECT_0);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(process.get(), 30000 * 1000), WAIT_OBJECT_0);
     }
 
     TEST_METHOD(NATNetworking)

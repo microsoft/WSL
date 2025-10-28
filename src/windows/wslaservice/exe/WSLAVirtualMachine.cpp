@@ -608,6 +608,8 @@ try
         {
             Handles[i] =
                 HandleToUlong(wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].get())));
+
+            WSL_LOG("Duplicated", TraceLoggingValue(Handles[i]));
         }
     }
 
@@ -628,9 +630,9 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
-        if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput)
+        if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput ||
+            Fds[i].Type == WslFdTypeTerminalControl)
         {
-            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > WslFdTypeTerminalOutput, "Invalid flags: %i", Fds[i].Type);
             THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Fds[i].Type);
             sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
         }
@@ -638,7 +640,7 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
         {
             THROW_HR_IF_MSG(
                 E_INVALIDARG,
-                WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput),
+                WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput | WslFdTypeTerminalControl),
                 "Invalid flags: %i",
                 Fds[i].Type);
 
@@ -658,10 +660,11 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
     if (interactiveTty)
     {
         auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty);
-        WSLA_TTY_RELAY relayMessage;
+        WSLA_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.TtyInput = ttyInput->Fd;
         relayMessage.TtyOutput = ttyOutput->Fd;
+        relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
         childChannel.SendMessage(relayMessage);
 
         auto result = ExpectClosedChannelOrError(childChannel);

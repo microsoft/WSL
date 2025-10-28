@@ -1837,6 +1837,8 @@ struct WSLA_DETACH
 
 struct WSLA_TERMINAL_CHANGED
 {
+    DECLARE_MESSAGE_CTOR(WSLA_TERMINAL_CHANGED);
+
     static inline auto Type = LxMessageWSLATerminalChanged;
 
     MESSAGE_HEADER Header;

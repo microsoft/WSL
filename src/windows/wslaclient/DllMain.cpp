@@ -227,27 +227,30 @@ HRESULT WslUnmapPort(WslVirtualMachineHandle VirtualMachine, const WslPortMappin
         ->MapPort(UserSettings->AddressFamily, UserSettings->WindowsPort, UserSettings->LinuxPort, true);
 }
 
-HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process)
+HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE Control, HANDLE* Process)
 try
 {
     wsl::windows::common::helpers::SetHandleInheritable(Input);
     wsl::windows::common::helpers::SetHandleInheritable(Output);
+    wsl::windows::common::helpers::SetHandleInheritable(Control);
 
     auto basePath = wsl::windows::common::wslutil::GetMsiPackagePath();
     THROW_HR_IF(E_UNEXPECTED, !basePath.has_value());
 
     auto commandLine = std::format(
-        L"{}/wslrelay.exe --mode {} --input {} --output {}",
+        L"{}/wslrelay.exe --mode {} --input {} --output {} --control {}",
         basePath.value(),
         static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
         HandleToULong(Input),
-        HandleToULong(Output));
+        HandleToULong(Output),
+        HandleToUlong(Control));
 
     WSL_LOG("LaunchWslRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));
 
     wsl::windows::common::SubProcess process{nullptr, commandLine.c_str()};
     process.InheritHandle(Input);
     process.InheritHandle(Output);
+    process.InheritHandle(Control);
     process.SetFlags(CREATE_NEW_CONSOLE);
     process.SetShowWindow(SW_SHOW);
     *Process = process.Start().release();
