@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLASession.coo
+    WSLASession.cpp
 
 Abstract:
 
