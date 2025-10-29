@@ -458,7 +458,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
                     }
                 };
 
-                wsl::windows::common::relay::RelayStandardInput(StdIn, StdInSocket.get(), updateTerminal, ExitHandle);
+                wsl::windows::common::relay::StandardInputRelay(StdIn, StdInSocket.get(), updateTerminal, ExitHandle);
             }).detach();
         }
 

@@ -191,7 +191,7 @@ try
         }
 
         std::thread inputThread([&]() {
-            auto updateTerminal = [&]() {
+            auto updateTerminal = [&controlChannel, &consoleOutputHandle]() {
                 if (controlChannel.has_value())
                 {
                     CONSOLE_SCREEN_BUFFER_INFOEX info{};
@@ -207,7 +207,7 @@ try
                 }
             };
 
-            wsl::windows::common::relay::RelayStandardInput(
+            wsl::windows::common::relay::StandardInputRelay(
                 GetStdHandle(STD_INPUT_HANDLE), terminalInputHandle.get(), updateTerminal, exitEvent.get());
         });
 

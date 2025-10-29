@@ -238,11 +238,15 @@ try
     THROW_HR_IF(E_UNEXPECTED, !basePath.has_value());
 
     auto commandLine = std::format(
-        L"{}/wslrelay.exe --mode {} --input {} --output {} --control {}",
+        L"{}/wslrelay.exe {} {} {} {} {} {} {} {}",
         basePath.value(),
+        wslrelay::mode_option,
         static_cast<int>(wslrelay::RelayMode::InteractiveConsoleRelay),
+        wslrelay::input_option,
         HandleToULong(Input),
+        wslrelay::output_option,
         HandleToULong(Output),
+        wslrelay::control_option,
         HandleToUlong(Control));
 
     WSL_LOG("LaunchWslRelay", TraceLoggingValue(commandLine.c_str(), "cmd"));

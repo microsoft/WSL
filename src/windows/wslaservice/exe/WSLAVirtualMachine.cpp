@@ -608,8 +608,6 @@ try
         {
             Handles[i] =
                 HandleToUlong(wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].get())));
-
-            WSL_LOG("Duplicated", TraceLoggingValue(Handles[i]));
         }
     }
 

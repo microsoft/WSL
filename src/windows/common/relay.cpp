@@ -440,7 +440,7 @@ BOOL GetNextCharacter(_In_ INPUT_RECORD* InputRecord, _Out_ PWCHAR NextCharacter
     return IsNextCharacterValid;
 }
 
-void wsl::windows::common::relay::RelayStandardInput(HANDLE ConsoleHandle, HANDLE OutputHandle, const std::function<void()>& UpdateTerminalSize, HANDLE ExitEvent)
+void wsl::windows::common::relay::StandardInputRelay(HANDLE ConsoleHandle, HANDLE OutputHandle, const std::function<void()>& UpdateTerminalSize, HANDLE ExitEvent)
 try
 {
     if (GetFileType(ConsoleHandle) != FILE_TYPE_CHAR)
