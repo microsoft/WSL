@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "WSLAUserSession.h"
+#include "WSLASession.h"
 
 using wsl::windows::service::wsla::WSLAUserSessionImpl;
 
@@ -28,7 +29,7 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
 
         for (auto* e : m_wslaSessions)
         {
-            e->OnSessionTerminating();
+            //e->OnSessionTerminating();
         }
     }
 }
@@ -42,16 +43,17 @@ void WSLAUserSessionImpl::OnWslaSessionTerminated(WSLASession* session)
     m_wslaSessions.erase(std::remove_if(m_wslaSessions.begin(), m_wslaSessions.end(), pred), m_wslaSessions.end());
 }
 
-HRESULT WSLAUserSessionImpl::WSLACreateSession(const WSLA_SESSION_CONFIGURATION* Settings, IWSLASession** WslaSession)
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
+    const WSLA_SESSION_CONFIGURATION* SessionConfiguration, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 {
-    auto session = wil::MakeOrThrow<WSLASession>(*Settings, GetUserSid(), this);
+    auto session = wil::MakeOrThrow<WSLASession>(*SessionConfiguration);
 
     {
         std::lock_guard lock(m_wslaSessionsLock);
         m_wslaSessions.emplace_back(session.Get());
     }
 
-    session->Start();
+    // session->Start();
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
 
     return S_OK;
@@ -76,12 +78,13 @@ HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSL_VERSI
     return S_OK;
 }
 
-HRESULT wsl::windows::service::wsla::WSLAUserSession::WSLACreateSession(const WSLA_SESSION_CONFIGURATION* Settings, IWSLASession** WslaSession)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(
+    const WSLA_SESSION_CONFIGURATION* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 try
 {
     auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->WSLACreateSession(Settings, WslaSession);
+    return session->CreateSession(Settings, VmSettings, WslaSession);
 }
 CATCH_RETURN();

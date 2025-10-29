@@ -18,7 +18,7 @@ Abstract:
 #include "wslrelay.h"
 #include "wslInstall.h"
 
-namespace {
+/* namespace {
 
 void ConfigureComSecurity(IUnknown* Instance)
 {
@@ -34,7 +34,7 @@ void ConfigureComSecurity(IUnknown* Instance)
     WI_SetFlag(capabilites, EOAC_DYNAMIC_CLOAKING);
     THROW_IF_FAILED(clientSecurity->SetBlanket(Instance, authnSvc, authzSvc, NULL, authnLvl, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, capabilites));
 }
-} // namespace
+} // namespace */
 
 class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
@@ -74,9 +74,10 @@ try
     wil::com_ptr<IWSLAUserSession> session;
 
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
-    ConfigureComSecurity(session.get());
+    // ConfigureComSecurity(session.get());
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-    wil::com_ptr<IWSLAVirtualMachine> virtualMachineInstance;
+    /* wil::com_ptr<IWSLAVirtualMachine> virtualMachineInstance;
 
     VIRTUAL_MACHINE_SETTINGS settings{};
     settings.DisplayName = UserSettings->DisplayName;
@@ -91,7 +92,8 @@ try
     settings.EnableGPU = UserSettings->GPU.Enable;
 
     THROW_IF_FAILED(session->CreateVirtualMachine(&settings, &virtualMachineInstance));
-    ConfigureComSecurity(virtualMachineInstance.get());
+    // ConfigureComSecurity(virtualMachineInstance.get());
+    wsl::windows::common::security::ConfigureForCOMImpersonation(virtualMachineInstance.get());
 
     // Register termination callback, if specified
     if (UserSettings->Options.TerminationCallback != nullptr)
@@ -104,7 +106,7 @@ try
         // Callback instance is now owned by the service.
     }
 
-    *reinterpret_cast<IWSLAVirtualMachine**>(VirtualMachine) = virtualMachineInstance.detach();
+    *reinterpret_cast<IWSLAVirtualMachine**>(VirtualMachine) = virtualMachineInstance.detach();*/
     return S_OK;
 }
 CATCH_RETURN();

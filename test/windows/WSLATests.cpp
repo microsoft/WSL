@@ -1067,4 +1067,22 @@ class WSLATests
         // Validate that xsk_diag is now loaded.
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}), 0);
     }
+
+        TEST_METHOD(CreateSessionSmokeTest)
+    {
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        WSLA_SESSION_CONFIGURATION settings{L"my-display-name"};
+        wil::com_ptr<IWSLASession> session;
+
+        VIRTUAL_MACHINE_SETTINGS vmSettings;
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
+
+        wil::unique_cotaskmem_string returnedDisplayName;
+        VERIFY_SUCCEEDED(session->GetDisplayName(&returnedDisplayName));
+
+        VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
+    }
 };
