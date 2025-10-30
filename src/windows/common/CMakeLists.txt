@@ -9,6 +9,7 @@ set(SOURCES
     helpers.cpp
     interop.cpp
     ExecutionContext.cpp
+    PortableDistribution.cpp
     socket.cpp
     hvsocket.cpp
     Localization.cpp
@@ -69,6 +70,7 @@ set(HEADERS
     HandleConsoleProgressBar.h
     interop.hpp
     ExecutionContext.h
+    PortableDistribution.h
     socket.hpp
     hvsocket.hpp
     LxssMessagePort.h
