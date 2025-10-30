@@ -1078,7 +1078,7 @@ class WSLATests
         WSLA_SESSION_CONFIGURATION settings{L"my-display-name"};
         wil::com_ptr<IWSLASession> session;
 
-        VIRTUAL_MACHINE_SETTINGS vmSettings;
+        VIRTUAL_MACHINE_SETTINGS vmSettings{};
         VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
 
         wil::unique_cotaskmem_string returnedDisplayName;
