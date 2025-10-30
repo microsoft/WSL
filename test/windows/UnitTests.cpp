@@ -211,6 +211,12 @@ class UnitTests
 
         auto revert = EnableSystemd();
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+
+        // Validate that systemd-networkd-wait-online.service is masked.
+        auto [out, _] =
+            LxsstuLaunchWslAndCaptureOutput(L"systemctl status systemd-networkd-wait-online.service  | grep -iF Loaded:");
+
+        VERIFY_ARE_EQUAL(out, L"     Loaded: masked (Reason: Unit systemd-networkd-wait-online.service is masked.)\n");
     }
 
     TEST_METHOD(SystemdUser)
