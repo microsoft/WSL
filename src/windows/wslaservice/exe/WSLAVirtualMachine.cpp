@@ -64,7 +64,7 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
 
         if (m_userSession != nullptr)
         {
-            // m_userSession->OnVmTerminated(this);
+            m_userSession->OnVmTerminated(this);
         }
     }
 

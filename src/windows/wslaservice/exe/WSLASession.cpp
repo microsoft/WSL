@@ -1,22 +1,20 @@
-#include "C:/Users/trivedipooja/source/repos/WSL/src/windows/common/CMakeFiles/common.dir/Debug/cmake_pch.hxx"
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLASession.cpp
+
+Abstract:
+
+    This file contains the implementation of the WSLASession COM class.
+
+--*/
+
 #include "WSLASession.h"
 
-using wsl::windows::service::wsla::WSLASessionImpl;
 using wsl::windows::service::wsla::WSLASession;
-
-WSLASessionImpl::WSLASessionImpl()
-{
-}
-
-
-WSLASessionImpl::~WSLASessionImpl()
-{
-}
-
-wsl::windows::service::wsla::WSLASession::WSLASession(std::weak_ptr<WSLASessionImpl>&& Session) :
-    m_wslaSession(std::move(Session))
-{
-}
 
 HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
 {

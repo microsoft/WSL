@@ -11,44 +11,19 @@ Abstract:
     TODO
 
 --*/
+
 #pragma once
+
 #include "wslaservice.h"
-#include "INetworkingEngine.h"
-#include "hcs.hpp"
-#include "Dmesg.h"
-#include "WSLAApi.h"
-#include "WSLAVirtualMachine.h"
 
 namespace wsl::windows::service::wsla {
-
-class WSLAUserSessionImpl;
-
-class WSLASessionImpl
-{
-public:
-    WSLASessionImpl();
-    //WSLASessionImpl(WSLASessionImpl&&) = default;
-    //WSLASessionImpl& operator=(WSLASessionImpl&&) = default;
-
-    ~WSLASessionImpl();
-
-    /* HRESULT CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine);
-    void OnVmTerminated(WSLAVirtualMachine* machine);
-
-    void OnUserSessionTerminating(); */
-
-
-private:
-    WSLAVirtualMachine* m_vm;
-    // WSLAContainerManager m_containerManager;
-};
 
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASession, IFastRundown>
 
 {
 public:
-    WSLASession(std::weak_ptr<WSLASessionImpl>&& Session);
+    //WSLASession(std::weak_ptr<WSLASessionImpl>&& Session);
     WSLASession(const WSLA_SESSION_CONFIGURATION& SessionConfiguration);
     //WSLASession(const WSLASession&) = delete;
    // WSLASession& operator=(const WSLASession&) = delete;
@@ -69,7 +44,7 @@ public:
 private:
     WSLA_SESSION_CONFIGURATION m_sessionConfig;
 
-    WSLAUserSessionImpl* m_userSession;
-    std::weak_ptr<WSLASessionImpl> m_wslaSession;
+    //WSLAUserSessionImpl* m_userSession;
+    //std::weak_ptr<WSLASessionImpl> m_wslaSession;
 };
 } // namespace wsl::windows::service::wsla

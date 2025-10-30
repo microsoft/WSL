@@ -11,9 +11,10 @@ Abstract:
     TODO
 
 --*/
+
 #pragma once
+#include "WSLAVirtualMachine.h"
 #include "WSLASession.h"
-//#include "wslaservice.idl" // For WSLA_SESSION_CONFIGURATION and IWSLASession
 
 namespace wsl::windows::service::wsla {
 
@@ -28,7 +29,10 @@ public:
 
     PSID GetUserSid() const;
 
+    HRESULT CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine);
     HRESULT CreateSession(const WSLA_SESSION_CONFIGURATION* WslaSessionConfig, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
+
+    void OnVmTerminated(WSLAVirtualMachine* machine);
 
     /* HRESULT ReleaseSession(const IWSLASession* WslaSession);
 
@@ -40,9 +44,10 @@ private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 
     std::recursive_mutex m_wslaSessionsLock;
-    std::vector<WSLASession*> m_wslaSessions;
-
-    // std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_wslaSessions;
+    // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
+    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_wslaSessions;
+    std::recursive_mutex m_lock;
+    std::vector<WSLAVirtualMachine*> m_virtualMachines;
 };
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLAUserSession
@@ -50,10 +55,11 @@ class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLAUserSession
 {
 public:
     WSLAUserSession(std::weak_ptr<WSLAUserSessionImpl>&& Session);
-    //WSLAUserSession(const WSLAUserSession&) = delete;
-    //WSLAUserSession& operator=(const WSLAUserSession&) = delete;
+    WSLAUserSession(const WSLAUserSession&) = delete;
+    WSLAUserSession& operator=(const WSLAUserSession&) = delete;
 
     IFACEMETHOD(GetVersion)(_Out_ WSL_VERSION* Version) override;
+    IFACEMETHOD(CreateVirtualMachine)(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine) override;
     IFACEMETHOD(CreateSession)(const WSLA_SESSION_CONFIGURATION* WslaSessionConfig, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
     //IFACEMETHOD(ReleaseSession)(_In_ const IWSLASession* WslaSession) override;
     //IFACEMETHOD(ListSessions)(_Out_ std::vector<WSLASession*>& Sessions) override;

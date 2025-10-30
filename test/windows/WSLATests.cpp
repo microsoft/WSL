@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "WSLAApi.h"
+#include "wslaservice.h"
 
 using namespace wsl::windows::common::registry;
 
@@ -1068,7 +1069,7 @@ class WSLATests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}), 0);
     }
 
-        TEST_METHOD(CreateSessionSmokeTest)
+    TEST_METHOD(CreateSessionSmokeTest)
     {
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));

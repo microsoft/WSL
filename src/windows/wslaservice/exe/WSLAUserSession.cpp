@@ -25,19 +25,30 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
 {
     // Manually signal the VM termination events. This prevents being stuck on an API call that holds the VM lock.
     {
-        std::lock_guard lock(m_wslaSessionsLock);
+        std::lock_guard lock(m_lock);
 
-        for (auto* e : m_wslaSessions)
+        for (auto* e : m_virtualMachines)
         {
-            //e->OnSessionTerminating();
+            e->OnSessionTerminating();
         }
     }
+
+    // TODO: Signal all sessions about user session termination.
+    /* {
+        std::lock_guard lock(m_wslaSessionsLock);
+
+        for (auto e : m_wslaSessions)
+        {
+            e->OnUserSessionTerminating();
+        }
+    } */
 }
 
 void WSLAUserSessionImpl::OnWslaSessionTerminated(WSLASession* session)
 {
     std::lock_guard lock(m_wslaSessionsLock);
-    auto pred = [session](const auto* e) { return session == e; };
+    // Fix: Compare raw pointer from ComPtr with the given session pointer
+    auto pred = [session](const Microsoft::WRL::ComPtr<WSLASession>& e) { return e.Get() == session; };
 
     // Remove any stale session reference.
     m_wslaSessions.erase(std::remove_if(m_wslaSessions.begin(), m_wslaSessions.end(), pred), m_wslaSessions.end());
@@ -55,6 +66,29 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
 
     // session->Start();
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
+    return S_OK;
+}
+
+void WSLAUserSessionImpl::OnVmTerminated(WSLAVirtualMachine* machine)
+{
+    std::lock_guard lock(m_lock);
+    auto pred = [machine](const auto* e) { return machine == e; };
+
+    // Remove any stale VM reference.
+    m_virtualMachines.erase(std::remove_if(m_virtualMachines.begin(), m_virtualMachines.end(), pred), m_virtualMachines.end());
+}
+
+HRESULT WSLAUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
+{
+    auto vm = wil::MakeOrThrow<WSLAVirtualMachine>(*Settings, GetUserSid(), this);
+
+    {
+        std::lock_guard lock(m_lock);
+        m_virtualMachines.emplace_back(vm.Get());
+    }
+
+    vm->Start();
+    THROW_IF_FAILED(vm.CopyTo(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
 
     return S_OK;
 }
@@ -86,5 +120,15 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->CreateSession(Settings, VmSettings, WslaSession);
+}
+CATCH_RETURN();
+
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
+try
+{
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CreateVirtualMachine(Settings, VirtualMachine);
 }
 CATCH_RETURN();

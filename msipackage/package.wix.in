@@ -263,13 +263,11 @@
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
                     <RegistryValue Value="WSLAVirtualMachine" Type="string" />
                 </RegistryKey>
-                
                 <!-- WSLASession -->
                 <RegistryKey Root="HKCR" Key="CLSID\{4877FEFC-4977-4929-A958-9F36AA1892A4}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
                     <RegistryValue Value="WSLASession" Type="string" />
                 </RegistryKey>
-                
                 <!-- IWSLAUserSession-->
                 <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8760}">
                     <RegistryValue Value="IWSLAUserSession" Type="string" />
@@ -301,7 +299,6 @@
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
-                
                 <File Id="wslaservice.exe" Source="${BIN}/wslaservice.exe"  KeyPath="yes" />
                 <File Id="wslaserviceproxystub.dll" Name="wslaserviceproxystub.dll" Source="${BIN}/wslaserviceproxystub.dll" />
 
