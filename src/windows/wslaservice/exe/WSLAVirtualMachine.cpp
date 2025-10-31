@@ -349,12 +349,12 @@ void WSLAVirtualMachine::ConfigureNetworking()
         std::string socketFdArg;
         std::string dnsFdArg;
         auto prepareCommandLine = [&](const auto& sockets) {
-            socketFdArg = std::to_string(sockets[0].first);
+            socketFdArg = std::to_string(sockets[0].Fd);
             cmd.emplace_back(socketFdArg.c_str());
 
             if (sockets.size() > 1)
             {
-                dnsFdArg = std::to_string(sockets[1].first);
+                dnsFdArg = std::to_string(sockets[1].Fd);
                 cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
                 cmd.emplace_back(dnsFdArg.c_str());
                 cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
@@ -382,9 +382,9 @@ void WSLAVirtualMachine::ConfigureNetworking()
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
             wsl::core::NatNetworking::CreateNetwork(config),
-            std::move(sockets[0].second),
+            std::move(sockets[0].Socket),
             config,
-            sockets.size() > 1 ? std::move(sockets[1].second) : wil::unique_socket{});
+            sockets.size() > 1 ? std::move(sockets[1].Socket) : wil::unique_socket{});
 
         m_networkEngine->Initialize();
 
@@ -601,21 +601,26 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
     return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get()});
 }
 
-std::pair<int, wil::unique_socket> WSLAVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
+WSLAVirtualMachine::ConnectedSocket WSLAVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
 {
     WSLA_ACCEPT message{};
     message.Fd = Fd;
     const auto& response = Channel.Transaction(message);
+    ConnectedSocket socket;
 
-    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
+    socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
 
     // If the FD was unspecified, read the Linux file descriptor from the guest.
     if (Fd == -1)
     {
-        Fd = Channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
+        socket.Fd = Channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
+    }
+    else
+    {
+        socket.Fd = Fd;
     }
 
-    return std::make_pair(Fd, std::move(socket));
+    return socket;
 }
 
 void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
@@ -643,10 +648,10 @@ try
 
     for (size_t i = 0; i < sockets.size(); i++)
     {
-        if (sockets[i].second)
+        if (sockets[i].Socket)
         {
             Handles[i] = HandleToUlong(
-                wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].second.get())));
+                wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].Socket.get())));
         }
     }
 
@@ -654,7 +659,7 @@ try
 }
 CATCH_RETURN();
 
-std::vector<std::pair<int, wil::unique_socket>> WSLAVirtualMachine::CreateLinuxProcessImpl(
+std::vector<WSLAVirtualMachine::ConnectedSocket> WSLAVirtualMachine::CreateLinuxProcessImpl(
     _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options,
     _In_ ULONG FdCount,
     _In_ WSLA_PROCESS_FD* Fds,
@@ -667,7 +672,7 @@ std::vector<std::pair<int, wil::unique_socket>> WSLAVirtualMachine::CreateLinuxP
     auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput);
     auto [pid, _, childChannel] = Fork(WSLA_FORK::Process);
 
-    std::vector<std::pair<int, wil::unique_socket>> sockets(FdCount);
+    std::vector<ConnectedSocket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
         if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput)

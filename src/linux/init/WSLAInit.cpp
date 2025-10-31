@@ -85,7 +85,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_ACCEPT& M
 
     Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
 
-    wil::unique_fd Socket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS, Message.Fd != -1)};
+    wil::unique_fd Socket{
+        UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS, Message.Fd != -1 ? SOCK_CLOEXEC : 0)};
     THROW_LAST_ERROR_IF(!Socket);
 
     if (Message.Fd != -1)

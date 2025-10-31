@@ -117,7 +117,7 @@ private:
     wil::unique_fd m_InteropSocket;
 };
 
-int UtilAcceptVsock(int SocketFd, sockaddr_vm Address, int Timeout = -1, bool SetCloExec = true);
+int UtilAcceptVsock(int SocketFd, sockaddr_vm Address, int Timeout = -1, int SocketFlags = SOCK_CLOEXEC);
 
 int UtilBindVsockAnyPort(struct sockaddr_vm* SocketAddress, int Type);
 

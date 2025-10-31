@@ -197,7 +197,7 @@ InteropServer::~InteropServer()
     Reset();
 }
 
-int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout, bool SetCloExec)
+int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout, int SocketFlags)
 
 /*++
 
@@ -215,7 +215,7 @@ Arguments:
 
     Timeout - Supplies a timeout.
 
-    SetCloExec - True if the SOCK_CLOEXEC flag should be set on the socket.
+    SocketFlags - Supplies the socket flags.
 
 Return Value:
 
@@ -265,7 +265,7 @@ Return Value:
     if (Result != -1)
     {
         socklen_t SocketAddressSize = sizeof(SocketAddress);
-        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SetCloExec ? SOCK_CLOEXEC : 0);
+        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SocketFlags);
     }
 
     if (Result < 0)
