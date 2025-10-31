@@ -16,6 +16,7 @@ Abstract:
 #include "hcs_schema.h"
 #include "NatNetworking.h"
 #include "WSLAUserSession.h"
+#include "DnsResolver.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -324,21 +325,33 @@ void WSLAVirtualMachine::ConfigureNetworking()
     else if (m_settings.NetworkingMode == WslNetworkingModeNAT)
     {
         // Launch GNS
+        // WSLA-TODO: Using fd=4 here seems to hang gns. There's probably a hardcoded file descriptor somewhere that's causing
+        // so using 1000 for now.
+        std::vector<WSLA_PROCESS_FD> fds(1);
+        fds[0].Fd = 1000;
+        fds[0].Type = WslFdType::WslFdTypeDefault;
 
-        WSLA_PROCESS_FD fd{};
-        fd.Fd = 3;
-        fd.Type = WslFdType::WslFdTypeDefault;
+        std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "1000"};
 
-        std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "3"};
+        // If DNS tunnelling is enabled, use an additional for its channel.
+        if (m_settings.EnableDnsTunneling)
+        {
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1001, .Type = WslFdType::WslFdTypeDefault});
+            cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
+            cmd.emplace_back("1001");
+            cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
+            cmd.emplace_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
+
+            THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
+        }
+
         WSLA_CREATE_PROCESS_OPTIONS options{};
         options.Executable = "/init";
         options.CommandLine = cmd.data();
         options.CommandLineCount = static_cast<ULONG>(cmd.size());
 
-        std::vector<HANDLE> socketHandles(2);
-
         WSLA_CREATE_PROCESS_RESULT result{};
-        auto sockets = CreateLinuxProcessImpl(&options, 1, &fd, &result);
+        auto sockets = CreateLinuxProcessImpl(&options, static_cast<DWORD>(fds.size()), fds.data(), &result);
 
         THROW_HR_IF(E_FAIL, result.Errno != 0);
 
@@ -353,7 +366,11 @@ void WSLAVirtualMachine::ConfigureNetworking()
 
         // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
-            m_computeSystem.get(), wsl::core::NatNetworking::CreateNetwork(config), std::move(sockets[0]), config, wil::unique_socket{});
+            m_computeSystem.get(),
+            wsl::core::NatNetworking::CreateNetwork(config),
+            std::move(sockets[0]),
+            config,
+            sockets.size() > 1 ? std::move(sockets[1]) : wil::unique_socket{});
 
         m_networkEngine->Initialize();
 

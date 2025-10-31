@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 #include "WSLAApi.h"
+#include "wslaservice.h"
 
 using namespace wsl::windows::common::registry;
 
@@ -524,6 +525,37 @@ class WSLATests
 
         // Verify that /etc/resolv.conf is configured
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
+    }
+
+    TEST_METHOD(NATNetworkingWithDnsTunneling)
+    {
+        WSL2_TEST_ONLY();
+
+        WslVirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = WslNetworkingModeNAT;
+        settings.Networking.DnsTunneling = true;
+
+        auto vm = CreateVm(&settings);
+
+        // Validate that eth0 has an ip address
+        VERIFY_ARE_EQUAL(
+            RunCommand(
+                vm.get(),
+                {"/bin/bash",
+                 "-c",
+                 "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"}),
+            0);
+
+        // Verify that /etc/resolv.conf is correctly configured.
+        auto [pid, in, out, err] = LaunchCommand(vm.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"});
+
+        auto output = ReadToString((SOCKET)out.get());
+
+        VERIFY_ARE_EQUAL(output, std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
     }
 
     TEST_METHOD(OpenFiles)
@@ -1073,5 +1105,22 @@ class WSLATests
 
         // Validate that xsk_diag is now loaded.
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}), 0);
+    }
+
+    TEST_METHOD(CreateSessionSmokeTest)
+    {
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
+        wil::com_ptr<IWSLASession> session;
+
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
+
+        wil::unique_cotaskmem_string returnedDisplayName;
+        VERIFY_SUCCEEDED(session->GetDisplayName(&returnedDisplayName));
+
+        VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
     }
 };
