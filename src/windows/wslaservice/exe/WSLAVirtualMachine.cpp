@@ -328,30 +328,45 @@ void WSLAVirtualMachine::ConfigureNetworking()
         // WSLA-TODO: Using fd=4 here seems to hang gns. There's probably a hardcoded file descriptor somewhere that's causing
         // so using 1000 for now.
         std::vector<WSLA_PROCESS_FD> fds(1);
-        fds[0].Fd = 1000;
+        fds[0].Fd = -1;
         fds[0].Type = WslFdType::WslFdTypeDefault;
 
-        std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG, "1000"};
+        std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
 
         // If DNS tunnelling is enabled, use an additional for its channel.
         if (m_settings.EnableDnsTunneling)
         {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1001, .Type = WslFdType::WslFdTypeDefault});
-            cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
-            cmd.emplace_back("1001");
-            cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
-            cmd.emplace_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
-
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = -1, .Type = WslFdType::WslFdTypeDefault});
             THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
         }
 
         WSLA_CREATE_PROCESS_OPTIONS options{};
         options.Executable = "/init";
-        options.CommandLine = cmd.data();
-        options.CommandLineCount = static_cast<ULONG>(cmd.size());
+
+        // Because the file descriptors numbers aren't known in advance, the command line needs to be generated after the file
+        // descriptors are allocated.
+
+        std::string socketFdArg;
+        std::string dnsFdArg;
+        auto prepareCommandLine = [&](const auto& sockets) {
+            socketFdArg = std::to_string(sockets[0].first);
+            cmd.emplace_back(socketFdArg.c_str());
+
+            if (sockets.size() > 1)
+            {
+                dnsFdArg = std::to_string(sockets[1].first);
+                cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
+                cmd.emplace_back(dnsFdArg.c_str());
+                cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
+                cmd.emplace_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
+            }
+
+            options.CommandLine = cmd.data();
+            options.CommandLineCount = static_cast<DWORD>(cmd.size());
+        };
 
         WSLA_CREATE_PROCESS_RESULT result{};
-        auto sockets = CreateLinuxProcessImpl(&options, static_cast<DWORD>(fds.size()), fds.data(), &result);
+        auto sockets = CreateLinuxProcessImpl(&options, static_cast<DWORD>(fds.size()), fds.data(), &result, prepareCommandLine);
 
         THROW_HR_IF(E_FAIL, result.Errno != 0);
 
@@ -364,13 +379,12 @@ void WSLAVirtualMachine::ConfigureNetworking()
             config.FirewallConfig.reset();
         }*/
 
-        // TODO: DNS Tunneling support
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
             wsl::core::NatNetworking::CreateNetwork(config),
-            std::move(sockets[0]),
+            std::move(sockets[0].second),
             config,
-            sockets.size() > 1 ? std::move(sockets[1]) : wil::unique_socket{});
+            sockets.size() > 1 ? std::move(sockets[1].second) : wil::unique_socket{});
 
         m_networkEngine->Initialize();
 
@@ -587,13 +601,21 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
     return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get()});
 }
 
-wil::unique_socket WSLAVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
+std::pair<int, wil::unique_socket> WSLAVirtualMachine::ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd)
 {
     WSLA_ACCEPT message{};
     message.Fd = Fd;
     const auto& response = Channel.Transaction(message);
 
-    return wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
+    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
+
+    // If the FD was unspecified, read the Linux file descriptor from the guest.
+    if (Fd == -1)
+    {
+        Fd = Channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
+    }
+
+    return std::make_pair(Fd, std::move(socket));
 }
 
 void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
@@ -621,10 +643,10 @@ try
 
     for (size_t i = 0; i < sockets.size(); i++)
     {
-        if (sockets[i])
+        if (sockets[i].second)
         {
-            Handles[i] =
-                HandleToUlong(wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].get())));
+            Handles[i] = HandleToUlong(
+                wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].second.get())));
         }
     }
 
@@ -632,8 +654,12 @@ try
 }
 CATCH_RETURN();
 
-std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
-    _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ WSLA_PROCESS_FD* Fds, _Out_ WSLA_CREATE_PROCESS_RESULT* Result)
+std::vector<std::pair<int, wil::unique_socket>> WSLAVirtualMachine::CreateLinuxProcessImpl(
+    _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options,
+    _In_ ULONG FdCount,
+    _In_ WSLA_PROCESS_FD* Fds,
+    _Out_ WSLA_CREATE_PROCESS_RESULT* Result,
+    const TPrepareCommandLine& PrepareCommandLine)
 {
     // Check if this is a tty or not
     const WSLA_PROCESS_FD* ttyInput = nullptr;
@@ -641,7 +667,7 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
     auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput);
     auto [pid, _, childChannel] = Fork(WSLA_FORK::Process);
 
-    std::vector<wil::unique_socket> sockets(FdCount);
+    std::vector<std::pair<int, wil::unique_socket>> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
         if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput)
@@ -662,6 +688,8 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
             OpenLinuxFile(childChannel, Fds[i].Path, Fds[i].Type, Fds[i].Fd);
         }
     }
+
+    PrepareCommandLine(sockets);
 
     wsl::shared::MessageWriter<WSLA_EXEC> Message;
 

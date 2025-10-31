@@ -50,6 +50,8 @@ public:
     IFACEMETHOD(MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)) override;
 
 private:
+    using TPrepareCommandLine = std::function<void(const std::vector<std::pair<int, wil::unique_socket>>&)>;
+
     static int32_t MountImpl(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
     static bool ParseTtyInformation(const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput);
@@ -61,12 +63,16 @@ private:
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type);
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
 
-    wil::unique_socket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
-    void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
+    std::pair<int, wil::unique_socket> ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
+    static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
 
-    std::vector<wil::unique_socket> CreateLinuxProcessImpl(
-        _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ WSLA_PROCESS_FD* Fd, _Out_ WSLA_CREATE_PROCESS_RESULT* Result);
+    std::vector<std::pair<int, wil::unique_socket>> CreateLinuxProcessImpl(
+        _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options,
+        _In_ ULONG FdCount,
+        _In_ WSLA_PROCESS_FD* Fd,
+        _Out_ WSLA_CREATE_PROCESS_RESULT* Result,
+        const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags);
 
