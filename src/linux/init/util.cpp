@@ -197,7 +197,7 @@ InteropServer::~InteropServer()
     Reset();
 }
 
-int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout)
+int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout, int SocketFlags)
 
 /*++
 
@@ -214,6 +214,8 @@ Arguments:
         address of the peer socket.
 
     Timeout - Supplies a timeout.
+
+    SocketFlags - Supplies the socket flags.
 
 Return Value:
 
@@ -263,7 +265,7 @@ Return Value:
     if (Result != -1)
     {
         socklen_t SocketAddressSize = sizeof(SocketAddress);
-        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SOCK_CLOEXEC);
+        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SocketFlags);
     }
 
     if (Result < 0)
