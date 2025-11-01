@@ -638,15 +638,16 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
     // Check if this is a tty or not
     const WSLA_PROCESS_FD* ttyInput = nullptr;
     const WSLA_PROCESS_FD* ttyOutput = nullptr;
-    auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput);
+    const WSLA_PROCESS_FD* ttyControl = nullptr;
+    auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput, &ttyControl);
     auto [pid, _, childChannel] = Fork(WSLA_FORK::Process);
 
     std::vector<wil::unique_socket> sockets(FdCount);
     for (size_t i = 0; i < FdCount; i++)
     {
-        if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput)
+        if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput ||
+            Fds[i].Type == WslFdTypeTerminalControl)
         {
-            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Type > WslFdTypeTerminalOutput, "Invalid flags: %i", Fds[i].Type);
             THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Fds[i].Type);
             sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
         }
@@ -654,7 +655,7 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
         {
             THROW_HR_IF_MSG(
                 E_INVALIDARG,
-                WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput),
+                WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput | WslFdTypeTerminalControl),
                 "Invalid flags: %i",
                 Fds[i].Type);
 
@@ -674,10 +675,11 @@ std::vector<wil::unique_socket> WSLAVirtualMachine::CreateLinuxProcessImpl(
     if (interactiveTty)
     {
         auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty);
-        WSLA_TTY_RELAY relayMessage;
+        WSLA_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.TtyInput = ttyInput->Fd;
         relayMessage.TtyOutput = ttyOutput->Fd;
+        relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
         childChannel.SendMessage(relayMessage);
 
         auto result = ExpectClosedChannelOrError(childChannel);
@@ -829,7 +831,8 @@ try
 }
 CATCH_RETURN();
 
-bool WSLAVirtualMachine::ParseTtyInformation(const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput)
+bool WSLAVirtualMachine::ParseTtyInformation(
+    const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl)
 {
     bool foundNonTtyFd = false;
 
@@ -845,6 +848,11 @@ bool WSLAVirtualMachine::ParseTtyInformation(const WSLA_PROCESS_FD* Fds, ULONG F
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyOutput != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
             *TtyOutput = &Fds[i];
+        }
+        else if (Fds[i].Type == WslFdTypeTerminalControl)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, *TtyControl != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
+            *TtyControl = &Fds[i];
         }
         else
         {
