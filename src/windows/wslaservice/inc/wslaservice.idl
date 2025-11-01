@@ -102,13 +102,11 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     BOOL EnableDnsTunnelling;
 } VIRTUAL_MACHINE_SETTINGS;
 
-
 typedef
-struct _WSLA_SESSION_SETTINGS {
-    LPCWSTR DisplayName;
-    // Details TBD.
-} WSLA_SESSION_SETTINGS;
-
+struct _WSLA_SESSION_CONFIGURATION {
+    LPCWSTR DisplayName; // App display name
+    //LPCWSTR StoragePath; // Used to store container images and scratch
+} WSLA_SESSION_CONFIGURATION;
 
 [
     uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
@@ -128,6 +126,11 @@ interface IWSLASession : IUnknown
 interface IWSLAUserSession : IUnknown
 {
     HRESULT GetVersion([out] WSL_VERSION* Error);
+    HRESULT CreateSession([in] const WSLA_SESSION_CONFIGURATION* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out] IWSLASession** WslaSession);
+    /* HRESULT ReleaseSession([in] const IWSLASession* WslaSession);
+    HRESULT ListSessions(
+        [out] ULONG* SessionCount,
+        [out, size_is(, *SessionCount)] IWSLASession*** WslaSessions
+    ); */
     HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine);
-    HRESULT CreateSession([in] const WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
 }

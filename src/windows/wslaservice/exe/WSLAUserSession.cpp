@@ -11,7 +11,6 @@ Abstract:
     TODO
 
 --*/
-
 #include "WSLAUserSession.h"
 #include "WSLASession.h"
 
@@ -33,6 +32,41 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
             e->OnSessionTerminating();
         }
     }
+
+    // TODO: Signal all sessions about user session termination.
+    /* {
+        std::lock_guard lock(m_wslaSessionsLock);
+
+        for (auto e : m_wslaSessions)
+        {
+            e->OnUserSessionTerminating();
+        }
+    } */
+}
+
+void WSLAUserSessionImpl::OnWslaSessionTerminated(WSLASession* session)
+{
+    std::lock_guard lock(m_wslaSessionsLock);
+    // Fix: Compare raw pointer from ComPtr with the given session pointer
+    auto pred = [session](const Microsoft::WRL::ComPtr<WSLASession>& e) { return e.Get() == session; };
+
+    // Remove any stale session reference.
+    m_wslaSessions.erase(std::remove_if(m_wslaSessions.begin(), m_wslaSessions.end(), pred), m_wslaSessions.end());
+}
+
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
+    const WSLA_SESSION_CONFIGURATION* SessionConfiguration, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
+{
+    auto session = wil::MakeOrThrow<WSLASession>(*SessionConfiguration);
+
+    {
+        std::lock_guard lock(m_wslaSessionsLock);
+        m_wslaSessions.emplace_back(session.Get());
+    }
+
+    // session->Start();
+    THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
+    return S_OK;
 }
 
 void WSLAUserSessionImpl::OnVmTerminated(WSLAVirtualMachine* machine)
@@ -64,20 +98,6 @@ PSID WSLAUserSessionImpl::GetUserSid() const
     return m_tokenInfo->User.Sid;
 }
 
-HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session)
-{
-    auto session = wil::MakeOrThrow<WSLASession>(*Settings);
-
-    {
-        std::lock_guard lock(m_lock);
-        m_sessions.emplace_back(session.Get());
-    }
-
-    THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)Session));
-
-    return S_OK;
-}
-
 wsl::windows::service::wsla::WSLAUserSession::WSLAUserSession(std::weak_ptr<WSLAUserSessionImpl>&& Session) :
     m_session(std::move(Session))
 {
@@ -92,6 +112,17 @@ HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSL_VERSI
     return S_OK;
 }
 
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(
+    const WSLA_SESSION_CONFIGURATION* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
+try
+{
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->CreateSession(Settings, VmSettings, WslaSession);
+}
+CATCH_RETURN();
+
 HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
 try
 {
@@ -99,15 +130,5 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->CreateVirtualMachine(Settings, VirtualMachine);
-}
-CATCH_RETURN();
-
-HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session)
-try
-{
-    auto session = m_session.lock();
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-
-    return session->CreateSession(Settings, Session);
 }
 CATCH_RETURN();

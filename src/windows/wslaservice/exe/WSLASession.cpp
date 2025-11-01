@@ -16,12 +16,12 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLASession;
 
-WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings) : m_displayName(Settings.DisplayName)
-{
-}
-
 HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
 {
-    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_displayName.c_str()).release();
+    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_sessionConfig.DisplayName).release();
     return S_OK;
+}
+
+WSLASession::WSLASession(const WSLA_SESSION_CONFIGURATION& SessionConfiguration) : m_sessionConfig(SessionConfiguration)
+{
 }

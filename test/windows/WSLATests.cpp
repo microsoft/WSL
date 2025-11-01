@@ -1113,10 +1113,11 @@ class WSLATests
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
+        WSLA_SESSION_CONFIGURATION settings{L"my-display-name"};
         wil::com_ptr<IWSLASession> session;
 
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
+        VIRTUAL_MACHINE_SETTINGS vmSettings{};
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
 
         wil::unique_cotaskmem_string returnedDisplayName;
         VERIFY_SUCCEEDED(session->GetDisplayName(&returnedDisplayName));
