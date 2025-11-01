@@ -65,6 +65,16 @@ interface ITerminationCallback : IUnknown
 };
 
 [
+    uuid(5038842F-53DB-4F30-A6D0-A41B02C94AC1),
+    pointer_default(unique),
+    object
+]
+interface IProgressCallback : IUnknown
+{
+    HRESULT OnTermination(ULONG Progress, ULONG Total);
+};
+
+[
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
     pointer_default(unique),
     object
@@ -87,7 +97,7 @@ interface IWSLAVirtualMachine : IUnknown
     HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
 }
 
-typedef
+
 struct _VIRTUAL_MACHINE_SETTINGS {
     LPCWSTR DisplayName;
     ULONGLONG MemoryMb;
@@ -103,12 +113,89 @@ struct _VIRTUAL_MACHINE_SETTINGS {
 } VIRTUAL_MACHINE_SETTINGS;
 
 
-typedef
-struct _WSLA_SESSION_SETTINGS {
+
+struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
     // Details TBD.
-} WSLA_SESSION_SETTINGS;
+};
 
+
+struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION 
+{
+    int Dummy; // Dummy value for the .idl file to compile.
+    // Details TBD.
+};
+
+
+struct WSLA_IMAGE_INFORMATION
+{
+    LPWSTR Name;
+    LPWSTR Hash;
+    ULONGLONG Size;
+    ULONGLONG DownloadTimestamp;
+};
+
+struct WSLA_PROCESS_OPTIONS
+{
+    LPCSTR Executable;
+    [unique] LPCSTR CurrentDirectory;
+    [size_is(CommandLineCount)] LPCSTR* CommandLine;
+    ULONG CommandLineCount;
+    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
+    ULONG EnvironmentCount;
+    [unique, size_is(EnvironmentCount)] WSLA_PROCESS_FD *Fds;
+    int FdsCount;
+};
+
+struct WSLA_VOLUME
+{
+    LPCSTR WindowsPath;
+    LPCSTR LinuxPath;
+};
+
+struct WSLA_PORT_MAPPING
+{
+    USHORT WindowsPort;
+    USHORT ContainerPort;
+};
+
+struct WSLA_CONTAINER_OPTIONS
+{
+    LPCWSTR Image;
+    LPCWSTR Name;
+    struct WSLA_PROCESS_OPTIONS* InitProcessOptions;
+    [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
+    ULONG VolumesCount;
+    [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
+    ULONG PortsCount;
+    DWORD Flags; // GPU, Privileged, ...
+    ULONGLONG ShmSize;
+};
+
+enum WSLA_CONTAINER_STATE
+{
+    WslaContainerStateInvalid = 0,
+    WslaContainerStateCreated = 1,
+    WslaContainerStateRunning = 2,
+    WslaContainerStateExited = 3,
+    WslaContainerStateFailed = 4
+};
+
+enum WSLA_PROCESS_STATE
+{
+    WslaProcessStateUknonwn = 0,
+    WslaProcessStateRunning = 1,
+    WslaProcessStateExited = 2,
+    WslaProcessStateSignalled = 3
+};
+
+struct WSLA_CREATED_PROCESS
+{
+    int Pid;
+    [unique, size_is(FdsCount)] ULONG* Fds;
+    ULONG FdsCount;
+    ULONG ExitEvent;
+};
 
 [
     uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
@@ -117,8 +204,40 @@ struct _WSLA_SESSION_SETTINGS {
 ]
 interface IWSLASession : IUnknown
 {
+    // Image management.
+    HRESULT PullImage([in] LPCWSTR Image, [in, unique] struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
+    HRESULT DeleteImage([in] LPCWSTR Image);
+
+    // Container management.
+    HRESULT CreateContainer([in] struct WSLA_CONTAINER_OPTIONS* Options);
+    HRESULT StartContainer([in] LPCSTR Name);
+    HRESULT StopContainer([in] LPCSTR Name);
+    HRESULT DeleteContainer([in] LPCSTR Name);
+    HRESULT GetContainerState([in] LPCSTR Name, [out] enum WSLA_CONTAINER_STATE* State);
+
+    // Anonymous host port allocation.
+    HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
+    HRESULT ReleaseHostPort([in] USHORT HostPort);
+
+    // Process management (nb passing ContainerName = NULL can be used to interact with VM level process for debugging).
+    HRESULT CreateContainerProcess([in, unique] LPCSTR ContainerName, [in] struct WSLA_PROCESS_OPTIONS* Options, [out] struct WSLA_CREATED_PROCESS* Process);
+    HRESULT GetContainerProcessState([in, unique] LPCWSTR ContainerName, [in] int Pid, [out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
+    HRESULT SignalContainerProcess([in, unique] LPCWSTR ContainerName, [in] int Pid, [in] int Signal);
+
+    // Disk management.
+    HRESULT FormatVirtualDisk([in] LPCWSTR Path);
+
+     // To be deleted.
     HRESULT GetDisplayName([out] LPWSTR* DisplayName);
 }
+
+struct WSLA_SESSION_INFORMATION
+{
+    ULONG Id;
+    DWORD CreatorPid;
+    LPSTR DisplayName;
+};
 
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
@@ -128,6 +247,14 @@ interface IWSLASession : IUnknown
 interface IWSLAUserSession : IUnknown
 {
     HRESULT GetVersion([out] WSL_VERSION* Error);
-    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine);
-    HRESULT CreateSession([in] const WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
+    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine); // TODO: remove once new interface is implemented.
+
+    // Session managment.
+    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
+    HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
+    HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
+
+    // TODO: Do we need 'TerminateSession()' ?
 }
+
+
