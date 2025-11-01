@@ -160,8 +160,9 @@ struct Route
     uint8_t SitePrefixLength{};
     uint32_t Metric{};
     uint16_t Family{};
+    std::wstring PreferredSource;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Route, NextHop, DestinationPrefix, SitePrefixLength, Metric, Family);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Route, NextHop, DestinationPrefix, SitePrefixLength, Metric, Family, PreferredSource);
 };
 
 enum class ModifyRequestType
