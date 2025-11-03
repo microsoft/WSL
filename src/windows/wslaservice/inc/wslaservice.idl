@@ -27,12 +27,8 @@ struct _WSL_VERSION {
     ULONG Revision;
 } WSL_VERSION;
 
-
-typedef [system_handle(sh_socket)] HANDLE HVSOCKET_HANDLE;
-
-
 typedef
-struct _WSLA_CREATE_PROCESS_OPTIONS {
+struct _WSLA_CREATE_PROCESS_OPTIONS { // TODO: Delete once the new API is wired.
     [string] LPCSTR Executable;
     ULONG CommandLineCount;
     [unique, size_is(CommandLineCount)] LPCSTR* CommandLine;
@@ -49,7 +45,7 @@ typedef struct _WSLA_PROCESS_FD
 } WSLA_PROCESS_FD;
 
 typedef
-struct _WSLA_CREATE_PROCESS_RESULT {
+struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
    int Errno;
    int Pid;
 } WSLA_CREATE_PROCESS_RESULT;
@@ -74,6 +70,7 @@ interface IProgressCallback : IUnknown
     HRESULT OnTermination(ULONG Progress, ULONG Total);
 };
 
+// TODO: Delete once the new API is wired.
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
     pointer_default(unique),
@@ -97,8 +94,8 @@ interface IWSLAVirtualMachine : IUnknown
     HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
 }
 
-
-struct _VIRTUAL_MACHINE_SETTINGS {
+typedef
+struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
     LPCWSTR DisplayName;
     ULONGLONG MemoryMb;
     ULONG CpuCount;
@@ -120,7 +117,7 @@ struct WSLA_SESSION_SETTINGS {
 };
 
 
-struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION 
+struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
 {
     int Dummy; // Dummy value for the .idl file to compile.
     // Details TBD.
@@ -247,7 +244,7 @@ struct WSLA_SESSION_INFORMATION
 interface IWSLAUserSession : IUnknown
 {
     HRESULT GetVersion([out] WSL_VERSION* Error);
-    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine); // TODO: remove once new interface is implemented.
+    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine); // TODO: Delete once the new API is wired.
 
     // Session managment.
     HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
