@@ -113,7 +113,9 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
 
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
-    // Details TBD.
+    LPCWSTR StoragePath;
+
+    // TODO: Termination callback, flags
 };
 
 
@@ -166,6 +168,7 @@ struct WSLA_CONTAINER_OPTIONS
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
     ULONG PortsCount;
     DWORD Flags; // GPU, Privileged, ...
+    // TODO: List specific GPU devices.
     ULONGLONG ShmSize;
 };
 
@@ -175,12 +178,13 @@ enum WSLA_CONTAINER_STATE
     WslaContainerStateCreated = 1,
     WslaContainerStateRunning = 2,
     WslaContainerStateExited = 3,
-    WslaContainerStateFailed = 4
+    WslaContainerStateFailed = 4,
+    // TODO: More states might be added to reflect all nerdctl's states.
 };
 
 enum WSLA_PROCESS_STATE
 {
-    WslaProcessStateUknonwn = 0,
+    WslaProcessStateUnknown = 0,
     WslaProcessStateRunning = 1,
     WslaProcessStateExited = 2,
     WslaProcessStateSignalled = 3
