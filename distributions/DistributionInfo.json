@@ -138,12 +138,12 @@
                 "FriendlyName": "AlmaLinux OS Kitten 10",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20250415.0/AlmaLinux-Kitten-10_x64_20250415.0.wsl",
-                    "Sha256": "8db3788b5728e58e32a4a96d9aa26974a48bf7936ed376da434c5c441a0fa7bd"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20251030.0/AlmaLinux-Kitten-10_x64_20251030.0.wsl",
+                    "Sha256": "d765d65076b041f3a67ba60edc37d056eeab2a260aed8e077684e05b78ecd9f5"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20250415.0/AlmaLinux-Kitten-10_ARM64_20250415.0.wsl",
-                    "Sha256": "f48a55e9fd4da1b84c2a9e960a9f3bc6e9fa65387ed9181826e1f052b2ce545e"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20251030.0/AlmaLinux-Kitten-10_ARM64_20251030.0.wsl",
+                    "Sha256": "90c30b0adbf8d414c4b0a02eaeb6a5d8e488a2187a67dbaf11f4a3e843baae53"
                 }
             },
             {
@@ -166,8 +166,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.10.01.148042/archlinux-2025.10.01.148042.wsl",
-                    "Sha256": "98a5792935c46476f471854bc93344b2b1d63f7947905ce4dd75d20a546db7ea"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2025.11.01.150831/archlinux-2025.11.01.150831.wsl",
+                    "Sha256": "9dbac892c38c94fd22a8988eff4e072778f3f445378d33a81474a2b88cb04562"
                 }
             }
         ],
