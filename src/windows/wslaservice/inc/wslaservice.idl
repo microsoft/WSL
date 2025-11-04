@@ -121,7 +121,7 @@ struct WSLA_SESSION_SETTINGS {
 struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
 {
     int Dummy; // Dummy value for the .idl file to compile.
-    //TODO: Details TBD.
+    // TODO: Details TBD.
 };
 
 
