@@ -119,8 +119,9 @@ set(HEADERS
     wslutil.cpp
     )
 
+include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
 add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl)
+add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl wslaserviceproxystub)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)

@@ -106,7 +106,6 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
     BOOL EnableDebugShell;
     BOOL EnableEarlyBootDmesg;
     BOOL EnableGPU;
-    BOOL EnableDnsTunnelling;
 } VIRTUAL_MACHINE_SETTINGS;
 
 
