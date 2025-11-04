@@ -99,7 +99,6 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     BOOL EnableDebugShell;
     BOOL EnableEarlyBootDmesg;
     BOOL EnableGPU;
-    BOOL EnableDnsTunnelling;
 } VIRTUAL_MACHINE_SETTINGS;
 
 

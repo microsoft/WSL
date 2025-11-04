@@ -187,6 +187,23 @@ struct Handle
     }
 };
 
+struct Utf8String
+{
+    std::string& Value;
+
+    int operator()(const TChar* Input) const
+    {
+        if (Input == nullptr)
+        {
+            return -1;
+        }
+
+        Value = wsl::shared::string::WideToMultiByte(Input);
+
+        return 1;
+    }
+};
+
 #else
 
 struct UniqueFd
