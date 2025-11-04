@@ -122,7 +122,7 @@ struct WSLA_SESSION_SETTINGS {
 struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
 {
     int Dummy; // Dummy value for the .idl file to compile.
-    // Details TBD.
+    //TODO: Details TBD.
 };
 
 
@@ -217,7 +217,7 @@ interface IWSLASession : IUnknown
     HRESULT DeleteContainer([in] LPCSTR Name);
     HRESULT GetContainerState([in] LPCSTR Name, [out] enum WSLA_CONTAINER_STATE* State);
 
-    // Anonymous host port allocation.
+    // Anonymous host port allocation (P1).
     HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
     HRESULT ReleaseHostPort([in] USHORT HostPort);
 
