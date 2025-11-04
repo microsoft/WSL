@@ -1623,11 +1623,19 @@ int WslaShell(_In_ std::wstring_view commandLine)
     std::vector<ULONG> handles(fds.size());
 
     WSLA_CREATE_PROCESS_RESULT result{};
-    THROW_IF_FAILED(virtualMachine->CreateLinuxProcess(&processOptions, static_cast<ULONG>(fds.size()), fds.data(), handles.data(), &result));
+    auto createProcessResult =
+        virtualMachine->CreateLinuxProcess(&processOptions, static_cast<ULONG>(fds.size()), fds.data(), handles.data(), &result);
 
-    if (result.Errno != 0)
+    if (FAILED(createProcessResult))
     {
-        THROW_HR_WITH_USER_ERROR(E_FAIL, std::format(L"Failed to create process {}, errno = {}", shell.c_str(), result.Errno));
+        if (result.Errno != 0)
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, std::format(L"Failed to create process {}, errno = {}", shell.c_str(), result.Errno));
+        }
+        else
+        {
+            THROW_HR(createProcessResult);
+        }
     }
 
     // Configure console for interactive usage.

@@ -191,9 +191,16 @@ struct Utf8String
 {
     std::string& Value;
 
-    void operator()(const TChar* Input) const
+    int operator()(const TChar* Input) const
     {
+        if (Input == nullptr)
+        {
+            return -1;
+        }
+
         Value = wsl::shared::string::WideToMultiByte(Input);
+
+        return 1;
     }
 };
 
