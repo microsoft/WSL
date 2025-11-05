@@ -24,6 +24,7 @@ Abstract:
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/utsname.h>
+#include <sys/signalfd.h>
 #include <arpa/inet.h>
 
 #include <pty.h>
@@ -636,11 +637,114 @@ void HandleMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, co
     }
 }
 
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_WATCH_PROCESSES& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    // Create a signalfd to watch for SIGCHLD
+    sigset_t mask{};
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    THROW_LAST_ERROR_IF(UtilSaveBlockedSignals(mask) < 0);
+
+    wil::unique_fd signalFd = signalfd(-1, &mask, SFD_CLOEXEC);
+    THROW_LAST_ERROR_IF(signalFd.get() < 0);
+
+    Channel.SendResultMessage<uint32_t>(0);
+
+    // Poll for either a received signal or a new message on the channel.
+    pollfd polls[2]{};
+    polls[0].fd = signalFd.get();
+    polls[0].events = POLLIN;
+    polls[1].fd = Channel.Socket();
+    polls[1].events = POLLIN;
+
+    while (true)
+    {
+        auto result = poll(polls, COUNT_OF(polls), -1);
+        THROW_LAST_ERROR_IF(result < 0);
+
+        // TODO: Check for poll errors
+        if (polls[0].revents & POLLIN)
+        {
+            signalfd_siginfo sigInfo{};
+            auto bytes = TEMP_FAILURE_RETRY(read(signalFd.get(), &sigInfo, sizeof(signalfd_siginfo)));
+
+            THROW_LAST_ERROR_IF(bytes < 0);
+            if (bytes != sizeof(sigInfo))
+            {
+                LOG_ERROR("Unexpected read size: {} (expected {})", bytes, sizeof(sigInfo));
+                THROW_ERRNO(EINVAL);
+            }
+
+            if (sigInfo.ssi_signo != SIGCHLD)
+            {
+                LOG_ERROR("Received unexpected signal from signalfd: {}", sigInfo.ssi_signo);
+                THROW_LAST_ERROR_IF(EINVAL);
+            }
+
+            // We received a SIGCHLD. This means that one or more children processes have exited.
+
+            bool exitedProcess = false; // Sanity check
+
+            while (true)
+            {
+                int status{};
+                result = waitpid(-1, &status, WNOHANG);
+
+                THROW_LAST_ERROR_IF(result < 0);
+
+                if (result == 0)
+                {
+                    break;
+                }
+
+                exitedProcess = true;
+
+                WSLA_PROCESS_EXITED message{};
+                message.Pid = result;
+                if (WIFSIGNALED(status))
+                {
+                    message.Signaled = true;
+                    message.Code = WTERMSIG(status);
+                }
+                else if (WIFEXITED(status))
+                {
+                    message.Code = WEXITSTATUS(status);
+                }
+                else
+                {
+                    LOG_ERROR("Received SIGCHLD for process that was neither signaled nor exited. Pid: {}, Status: {}", result, status)
+                }
+
+                Channel.SendMessage(message);
+            }
+
+            if (!exitedProcess)
+            {
+                LOG_ERROR("Received SIGCHLD but no children have exited");
+            }
+        }
+
+        if (polls[1].revents & POLLIN)
+        {
+            auto [message, _] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
+            if (message == nullptr)
+            {
+                break;
+            }
+            else
+            {
+                LOG_ERROR("Received unexpected message: {}", message->MessageType);
+                THROW_ERRNO(EINVAL);
+            }
+        }
+    }
+}
+
 void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, const gsl::span<gsl::byte>& Buffer)
 {
     try
     {
-        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_WAITPID, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT>(
+        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_WAITPID, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT, WSLA_WATCH_PROCESSES>(
             Channel, Type, Buffer);
     }
     catch (...)
@@ -755,6 +859,11 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     }
 
     THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
+
+    sigset_t mask{};
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    THROW_LAST_ERROR_IF(UtilSaveBlockedSignals(mask) < 0);
 
     //
     // Ensure /dev/console is present and set as the controlling terminal.
