@@ -1116,7 +1116,15 @@ class WSLATests
         WSLA_SESSION_SETTINGS settings{L"my-display-name"};
         wil::com_ptr<IWSLASession> session;
 
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
+        VIRTUAL_MACHINE_SETTINGS vmSettings{};
+        vmSettings.BootTimeoutMs = 30 * 1000;
+        vmSettings.DisplayName = L"WSLA";
+        vmSettings.MemoryMb = 2048;
+        vmSettings.CpuCount = 4;
+        vmSettings.NetworkingMode = WslNetworkingModeNone;
+        vmSettings.EnableDebugShell = true;
+
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
 
         wil::unique_cotaskmem_string returnedDisplayName;
         VERIFY_SUCCEEDED(session->GetDisplayName(&returnedDisplayName));
