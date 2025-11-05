@@ -1541,6 +1541,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.BootTimeoutMs = 30000;
     settings.NetworkingMode = WslNetworkingModeNAT;
     std::string shell = "/bin/bash";
+    std::string fsType = "ext4";
     bool help = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
@@ -1549,6 +1550,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(reinterpret_cast<bool&>(settings.EnableDnsTunneling), L"--dns-tunneling");
     parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
+    parser.AddArgument(Utf8String(fsType), L"--fstype");
     parser.AddArgument(help, L"--help");
 
     parser.Parse();
@@ -1556,7 +1558,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
@@ -1575,7 +1577,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     ULONG Lun{};
     THROW_IF_FAILED(virtualMachine->AttachDisk(vhd.c_str(), true, &diskDevice, &Lun));
 
-    THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
+    THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", fsType.c_str(), "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
