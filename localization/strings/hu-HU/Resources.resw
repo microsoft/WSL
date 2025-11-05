@@ -394,19 +394,19 @@ Linuxos bináris fájlok futtatására szolgáló argumentumok:
         A parancssor fennmaradó részének átadása változtatás nélkül.
 
 Kapcsolók:
-    --cd &lt;Directory&gt;
+    --cd &lt;Könyvtár&gt;
         A megadott könyvtár aktuális munkakönyvtárként való beállítása.
         Tilde (~) karakter használata esetén a rendszer a Linux-felhasználó kezdőkönyvtárának elérési útját használja. Ha az elérési út
         perjel (/) karakterrel kezdődik, a rendszer az elérési utat linuxos abszolút elérési útként értelmezi.
         Ellenkező esetben az értéknek windowsos abszolút elérési útnak kell lennie.
 
-    --distribution, -d &lt;DistroName&gt;
+    --distribution, -d &lt;DisztribúcióNév&gt;
         A megadott disztribúció futtatása.
 
-    --distribution-id &lt;DistroGuid&gt;
+    --distribution-id &lt;DisztribúcióGuid&gt;
         A megadott disztribúcióazonosító futtatása.
 
-    --user, -u &lt;USerName&gt;
+    --user, -u &lt;Felhasználónév&gt;
         Futtatás a megadott felhasználóként.
 
     --system
@@ -431,132 +431,132 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
             --fixed-vhd
                 Rögzített méretű lemez létrehozása a disztribúció tárolásához.
 
-            --from-file &lt;Path&gt;
+            --from-file &lt;ElérésiÚt&gt;
                 Disztribúció telepítése helyi fájlból.
 
             --legacy
                 Az örökölt disztribúciós jegyzékfájl használata.
 
-            --location &lt;Location&gt;
+            --location &lt;Hely&gt;
                 A disztribúció telepítési útvonalának beállítása.
 
-            --name &lt;Name&gt;
-                Állítsa be a disztribúció nevét.
+            --name &lt;Név&gt;
+                A disztribúció nevének beállítása.
 
             --no-distribution
-                Csak a szükséges választható összetevők telepítése, nem telepít disztribúciót.
+                Csak a szükséges választható összetevők telepítése, a disztribúció telepítésének mellőzése.
 
             --no-launch, -n
-                Telepítés után ne indítsa el a disztribúciót.
+                A disztribúció telepítés utáni elindításának mellőzése.
 
-            --version &lt;Version&gt;
+            --version &lt;Verzió&gt;
                 Az új disztribúcióhoz használandó verzió megadása.
 
-            --vhd-size &lt;MemoryString&gt;
-                Megadja a disztribúció tárolására szolgáló lemez méretét.
+            --vhd-size &lt;MemoriaSztring&gt;
+                A disztribúció tárolására szolgáló lemez méretének megadása.
 
             --web-download
-                Töltse le a disztribúciót az internetről a Microsoft Store helyett.
+                A disztribúció letöltése az internetről a Microsoft Store helyett.
 
-    --manage &lt;Distro&gt; &lt;Options...&gt;
-        Disztribúcióspecifikus beállítások módosítása.
+    --manage &lt;Disztribúció&gt; &lt;Kapcsolók...&gt;
+        A disztribúcióspecifikus beállítások módosítása.
 
-        Beállítások:
-            --move &lt;Location&gt;
-                Helyezze át a disztribúciót egy új helyre.
+        Kapcsolók:
+            --move &lt;Hely&gt;
+                A disztribúció áthelyezése egy új helyre.
 
             --set-sparse, -s &lt;true|false&gt;
-                Állítsa a disztribúció vhdx-fájlját ritkítás értékre, így a lemezterület automatikusan visszanyerhető.
+                A disztribúció VHD-fájljának sparse értékre állítása, hogy a lemezterület automatikusan visszanyerhető legyen.
 
-            --set-default-user &lt;Username&gt;
-                Állítsa be a disztribúció alapértelmezett felhasználóját.
+            --set-default-user &lt;Felhasználónév&gt;
+                A disztribúció alapértelmezett felhasználójának beállítása.
 
-            --resize &lt;MemoryString&gt;
+            --resize &lt;MemoriaSztring&gt;
                 A disztribúció lemezének átméretezése a megadott méretre.
 
-    --mount &lt;Disk&gt;
-        Fizikai vagy virtuális lemez csatlakoztatása és felcsatolása az összes WSL 2-disztribúcióban.
+    --mount &lt;Lemez&gt;
+        Fizikai vagy virtuális lemez hozzárendelése és csatlakoztatása az összes WSL 2-disztribúcióban.
 
-        Beállítások:
+        Kapcsolók:
             --vhd
-                Annak megadása, hogy a &lt;Lemez&gt; virtuális merevlemezre hivatkozik.
+                Annak megadása, hogy a &lt;Lemez&gt; virtuális merevlemezre vonatkozik.
 
             --bare
-                Csatlakoztatja a lemezt a WSL2-höz, de nem csatolja fel.
+                A lemezt WSL2-höz való hozzárendelése csatlakoztatás nélkül.
 
-            --name &lt;Name&gt;
-                Felcsatolja a lemezt a csatlakoztatási pont egyéni nevének használatával.
+            --name &lt;Név&gt;
+                A lemez csatlakoztatása egyéni csatlakoztatásipont-név használatával.
 
-            --type &lt;Type&gt;
-                Lemez felcsatolásához használandó fájlrendszer, ha nincs megadva az alapértelmezett érték az ext4.
+            --type &lt;Típus&gt;
+                Lemez csatlakoztatásához használandó fájlrendszer. Ha nincs megadva, az alapértelmezett érték az ext4.
 
-            --options &lt;Options&gt;
-                További felcsatolási lehetőségek.
+            --options &lt;Kapcsolók&gt;
+                További csatlakoztatási lehetőségek.
 
             --partition &lt;Index&gt;
-                A felcsatolni kívánt partíció indexe, ha nincs megadva alapértelmezett érték a teljes lemezre.
+                A csatlakoztatni kívánt partíció indexe. Ha nincs megadva, az alapértelmezett érték a teljes lemez.
 
-    --set-default-version &lt;Version&gt;
+    --set-default-version &lt;Verzió&gt;
         Az új disztribúciók alapértelmezett telepítési verziójának módosítása.
 
     --shutdown
-        Azonnal leállítja az összes futó disztribúciót és a WSL 2
-        egyszerűsített segédprogram virtuális gépet.
+        Az összes futó disztribúció és a WSL 2
+        egyszerűsített segédprogram virtuális gépének azonnali leállítása.
 
-        Beállítások:
+        Kapcsolók:
             --force
-                Leállítja a WSL 2 virtuális gépet, még akkor is, ha egy művelet folyamatban van. Adatvesztést okozhat.
+                A WSL 2 virtuális gép leállítása még akkor is, ha egy művelet folyamatban van. Adatvesztést okozhat.
 
     --status
         A Linuxos Windows-alrendszer állapotának megjelenítése.
 
-    --unmount [Disk]
-        Lemez lecsatolása és leválasztása a WSL2 összes disztribúciójáról.
-        Lecsatolja és leválasztja az összes lemezt, ha argumentum nélkül hívják meg.
+    --unmount [Lemez]
+        Lemez leválasztása és és a hozzárendelés megszüntetése a WSL2 összes disztribúciójára vonatkozóan.
+        Az összes lemez leválasztása és a hozzárendelésük megszüntetése, ha a meghívás argumentum nélkül történik.
 
     --uninstall
-        Eltávolítja a Linuxos Windows-alrendszer csomagot erről a gépről.
+        A Linuxos Windows-alrendszer csomag eltávolítása erről a gépről.
 
     --update
-        A Linuxos Windows-alrendszer csomagjának frissítése.
+        0A Linuxos Windows-alrendszer csomagjának frissítése.
 
-        Beállítások:
+        Kapcsolók:
             --pre-release
-                Ha elérhető, töltsön le egy előzetes verziót.
+                Előzetes verzió letöltése, ha elérhető.
 
     --version, -v
         Verzióinformációk megjelenítése.
 
-A disztribúcióknak a Linuxos Windows-alrendszerben való kezelésére szolgáló argumentumok:
+A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló argumentumok:
 
-    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
-        A disztribúciót exportálja tar kiterjesztésű fájlba.
-        A fájlnév a következő lehet: stdout.
+    --export &lt;Disztribúció&gt; &lt;Fájlnév&gt; [Kapcsolók]
+        A disztribúció exportálása .tar fájlba.
+        A fájlnév stdout esetén kötőjel (-) is lehet.
 
-        Beállítások:
-            --format &lt;Format&gt;
+        Kapcsolók:
+            --format &lt;Formátum&gt;
                 Az exportálási formátum megadása. Támogatott értékek: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
-        A megadott, tar kiterjesztésű fájl importálása új disztribúcióként.
-        A fájlnév a következő lehet: stdin.
+    --import &lt;Disztribúció&gt; &lt;TelepítésiHely&gt; &lt;Fájlnév&gt; [Kapcsolók]
+        A megadott .tar fájl importálása új disztribúcióként.
+        A fájlnév stdin esetén kötőjel (-) is lehet.
 
-        Beállítások:
-            --version &lt;Version&gt;
+        Kapcsolók:
+            --version &lt;Verzió&gt;
                 Az új disztribúcióhoz használandó verzió megadása.
 
             --vhd
-                Azt adja meg, hogy a megadott fájl .vhdx fájl, nem tar fájl.
-                Ez a művelet másolatot készít a .vhdx fájlról a megadott telepítési helyen.
+                Azt adja meg, hogy a megadott fájl .vhd vagy .vhdx fájl, nem .tar fájl.
+                Ez a művelet másolatot készít a VHD-fájlról a megadott telepítési helyen.
 
-    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        A megadott, vhdx kiterjesztésű fájl importálása új disztribúcióként.
+    --import-in-place &lt;Disztribúció&gt; &lt;Fájlnév&gt;
+        A megadott VHD-fájl importálása új disztribúcióként.
         Ezt a virtuális merevlemezt az ext4 fájlrendszertípussal kell formázni.
 
-    --list, -l [Options]
+    --list, -l [Kapcsolók]
         A disztribúciók listázása.
 
-        Beállítások:
+        Kapcsolók:
             --all
                 Az összes disztribúciót listázza, beleértve a
                 jelenleg telepítés vagy eltávolítás alatt állókat is.
@@ -571,18 +571,18 @@ A disztribúcióknak a Linuxos Windows-alrendszerben való kezelésére szolgál
                 Az összes disztribúció részletes adatainak megjelenítése.
 
             --online, -o
-                Megjeleníti a 'wsl.exe --install' paranccsal telepíthető, elérhető disztribúciók listáját.
+                A 'wsl.exe --install' paranccsal telepíthető elérhető disztribúciók listájának megjelenítése.
 
-    --set-default, -s &lt;Distro&gt;
-        Az adott disztribúció beállítása alapértelmezettként.
+    --set-default, -s &lt;Disztribúció&gt;
+        A disztribúció beállítása alapértelmezettként.
 
-    --set-version &lt;Distro&gt; &lt;Version&gt;
+    --set-version &lt;Disztribúció&gt; &lt;Verzió&gt;
         A megadott disztribúció verziójának módosítása.
 
-    --terminate, -t &lt;Distro&gt;
-        Leállítja a megadott disztribúciót.
+    --terminate, -t &lt;Disztribúció&gt;
+        A megadott disztribúció leállítása.
 
-    --unregister &lt;Distro&gt;
+    --unregister &lt;Disztribúció&gt;
         A disztribúció regisztrációjának megszüntetése és a gyökérszintű fájlrendszer törlése.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
@@ -704,8 +704,13 @@ Lehet, hogy újra kell indítani a rendszert, hogy a módosítások érvénybe l
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>A megadott fájlnak .vhdx kiterjesztésűnek kell lennie.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>A megadott fájlnak {} kiterjesztésűnek kell lennie.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>A megadott fájlnak {} vagy {} kiterjesztésűnek kell lennie.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>A(z) {} VmSwitch nem található. Elérhető kapcsolók: {}</value>
@@ -998,7 +1003,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <value>Dokumentumok megtekintése</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>A művelet nem hajtható végre, mert a vhdx jelenleg használatban van. A WSL használatának kényszerítése: wsl.exe --shutdown</value>
+    <value>A művelet nem hajtható végre, mert a virtuális merevlemez jelenleg használatban van. A WSL használatának kényszerítése: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1006,7 +1011,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>A ritka vhdx csak WSL2 esetén támogatott.</value>
+    <value>A ritka VHD csak WSL2 esetén támogatott.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>A WSL helyi rendszerként való futtatása nem támogatott.</value>
@@ -1055,7 +1060,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Ez egy VHDX-fájlnak tűnik. VHDX importálásához használja a --vhd formátumot tar helyett.</value>
+    <value>Ez egy VHD-fájlnak tűnik. VHD importálásához használja a --vhd formátumot tar helyett.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1106,9 +1111,9 @@ Hibakód: {}</value>
     <value>A Globális biztonságos hozzáférés ügyféllel kapcsolatos jelenlegi kompatibilitási probléma miatt a DNS-alagútképzés le van tiltva.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>A ritka VHD-támogatás jelenleg le van tiltva, mivel lehetséges adatsérülés léphet fel.
-A ritka virtuális merevlemez használatának kényszerítéséhez futtassa a következő parancsot:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <value>A ritka VHD-támogatás jelenleg le van tiltva az adatok esetleges sérülése miatt.
+Ha egy disztribúciót ritka VHD használatára szeretne kényszeríteni, futtassa a következőt:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

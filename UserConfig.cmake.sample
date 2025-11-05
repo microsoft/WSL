@@ -30,7 +30,7 @@ message(STATUS "Loading user configuration")
 # set(WSL_BUILD_THIN_PACKAGE true)
 
 # # Uncomment to install the package as part of the build
-# set(WSL_POST_BUILD_COMMAND "powershell;./tools/deploy/deploy-to-host.ps1")
+# set(WSL_POST_BUILD_COMMAND "powershell;-ExecutionPolicy;Bypass;-NoProfile;-NonInteractive;./tools/deploy/deploy-to-host.ps1")
 
 # # Uncomment to reduce the verbosity of the appx package build
 # set(WSL_SILENT_APPX_BUILD true)

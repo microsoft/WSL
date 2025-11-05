@@ -375,63 +375,63 @@ Bruk:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Med enerett.
-Hvis du vil ha informasjon om personvern vedrørende dette produktet, kan du gå til https://aka.ms/privacy.
+    <value>Opphavsrett (c) Microsoft Corporation. Med enerett.
+Hvis du vil ha personverninformasjon om dette produktet, kan du gå til https://aka.ms/privacy.
 
-Bruk: wsl.exe [argument] [alternativer...] [kommandolinje]
+Bruk: wsl.exe [Argument] [Alternativer...] [Kommandolinje]
 
 Argumenter for å kjøre Linux-binærfiler:
 
-    Hvis ingen kommandolinje er angitt, starter wsl.exe standardgrensesnittet.
+Hvis ingen kommandolinje er angitt, starter wsl.exe standardgrensesnittet.
 
-    --exec, -e &lt;CommandLine&gt;
-        Kjører den angitte kommandoen uten å bruke standard Linux-grensesnitt.
+--exec, -e &lt;CommandLine&gt;
+        Utfør den angitte kommandoen uten å bruke standard Linux shell.
 
     --shell-type &lt;standard|login|none&gt;
-        Kjør den spesifiserte kommandoen med den angitte grensesnittypen.
+        Utfør den angitte kommandoen med den angitte skalltypen.
 
-    --
-        Send den gjenstående kommandolinjen slik den er.
+--
+        Sender gjenstående kommandolinje slik den er.
 
-Alternativer:
+Options:
     --cd &lt;Directory&gt;
-        Angir den spesifiserte katalogen som gjeldende arbeidskatalog.
-        Hvis ~ brukes, brukes Linux-brukerens startbane. Hvis banen starter
-        med et /-tegn, blir den tolket som en absolutt Linux-bane.
-        Hvis ikke må verdien være en absolutt Windows-bane.
+        Angir den angitte mappen som gjeldende arbeidsmappe.
+        Hvis ~ brukes, brukes Linux-brukerens hjemmebane. Hvis banen begynner
+        med et /-tegn, tolkes det som en absolutt Linux-bane.
+        Ellers må verdien være en absolutt Windows-bane.
 
-    --distribution, -d &lt;distronavn&gt;
-        Kjør den spesifiserte distribusjonen.
+    --distribution, -d &lt;DistroName&gt;
+        Kjør den angitte distribusjonen.
 
-    --distribution-id &lt;distroguid&gt;
-        Kjør den spesifiserte distribusjon-ID-en.
+    --distribution-id &lt;DistroGuid&gt;
+        Kjør den angitte distribusjons-ID-en.
 
     --user, -u &lt;UserName&gt;
-        Kjør som den spesifiserte brukeren.
+        Kjør som den angitte brukeren.
 
     --system
         Starter et skall for systemdistribusjonen.
 
-Argumenter for å behandle Windows-undersystemet for Linux:
+Argumenter for behandling av Windows-undersystem for Linux:
 
     --help
-        Vis informasjon om bruk.
+        Vis bruksinformasjon.
 
     --debug-shell
-        Åpner et WSL 2-feilsøkingsgrensesnitt for diagnoseformål.
+        Åpne et WSL2 feilsøkingsskal til diagnoseformål.
 
-    --install [Distro] [Options...]
-        Installerer en distribusjon av typen Windows-undersystem for Linux.
-        Hvis du vil ha en liste over gyldige distribusjoner, kan du bruke 'wsl.exe --list --online'.
+    --install [Distro] [Alternativer ...]
+        Installer et Windows-undersystem for Linux-distribusjon.
+        For en liste over gyldige distribusjoner kan du bruke 'wsl.exe --list --online'.
 
         Alternativer:
             --enable-wsl1
                 Aktiver WSL1-støtte.
 
             --fixed-vhd
-                Opprett en disk med fast størrelse for lagring av distribusjonen.
+                Opprett en disk med fast størrelse for å lagre distribusjonen.
 
-            --from-file &lt;bane&gt;
+            --from-file &lt;Path&gt;
                 Installer en distribusjon fra en lokal fil.
 
             --legacy
@@ -440,149 +440,149 @@ Argumenter for å behandle Windows-undersystemet for Linux:
             --location &lt;Location&gt;
                 Angi installasjonsbanen for distribusjonen.
 
-            --name &lt;navn&gt;
+            --name &lt;Name&gt;
                 Angi navnet på distribusjonen.
 
             --no-distribution
-                Installerer bare de nødvendige valgfrie komponentene. Installerer ikke en distribusjon.
+                Installer kun de nødvendige valgfrie komponentene, installerer ikke en distribusjon.
 
             --no-launch, -n
-                Ikke start distribusjonen etter installasjon.
+                Ikke start distribusjonen etter installeringen.
 
-            --version &lt;versjon&gt;
-                Angir hvilken versjon som skal brukes for den nye distribusjonen.
+            --version &lt;Version&gt;
+                Angir versjonen som skal brukes til den nye distribusjonen.
 
             --vhd-size &lt;MemoryString&gt;
-                Angir størrelsen på disken for å lagre distribusjonen.
+                Angir størrelsen på disken som skal lagre distribusjonen.
 
             --web-download
-                Laster ned distribusjonen fra Internett i stedet for fra Microsoft Store.
+                Last ned distribusjonen fra internett i stedet for Microsoft Store.
 
-    --manage &lt;distribusjon&gt; &lt;alternativer ...&gt;
-        Endrer bestemte alternativer for distribusjonen.
+    --manage &lt;Distro&gt; &lt;Options...&gt;
+        Endrer bestemte alternativer for Distro.
 
         Alternativer:
-            --move &lt;plassering&gt;
-                Flytt utrullingen til en ny plassering.
+            --move &lt;Location&gt;
+                Flytt distribusjonen til en ny plassering.
 
-            --set-sparse, -s &lt;sann|usann&gt;
-                Angir at VHDX-filen for distribusjonen skal være plassbesparende, slik at diskplass kan frigjøres automatisk.
+            --set-sparse, -s &lt;true|false&gt;
+                Angi at VHD-en for distro skal være spredt, slik at diskplass kan frigjøres automatisk.
 
-            --set-default-user &lt;brukernavn&gt;
+            --set-default-user &lt;Username&gt;
                 Angi standardbruker for distribusjonen.
 
-            --resize &lt;minnestreng&gt;
-                Endre størrelsen på disken for fordelingen til den angitte størrelsen.
+            --resize &lt;MemoryString&gt;
+                Endre størrelsen på disken i distribusjonen til den angitte størrelsen.
 
-    --mount &lt;disk&gt;
-        Kobler til og monterer en fysisk eller virtuell disk på alle WSL 2-distribusjoner.
+    --mount &lt;Disk&gt;
+        Fester og monterer en fysisk eller virtuell disk i alle WSL 2-distribusjonene.
 
         Alternativer:
             --vhd
-                Angir at &lt;disk&gt; refererer til en virtuell harddisk.
+                Angir at &lt;Disk&gt; refererer til en virtuell harddisk.
 
             --bare
-                Kobler disken til WSL 2, men monterer den ikke.
+                Fest disken til WSL2, men ikke monter den.
 
-            --name &lt;navn&gt;
-                Monterer disken og bruker et egendefinert navn for monteringspunktet.
+            --name &lt;Name&gt;
+                Monter disken med et egendefinert navn på monteringspunktet.
 
-            --type &lt;type&gt;
-                Filsystemet som skal brukes ved montering av en disk. Hvis det ikke angis, brukes ext4 som standard.
+            --type &lt;Type&gt;
+                Filsystem til bruk ved montering av disk, om ikke angitt settes det som standard til ext4.
 
-            --options &lt;alternativer&gt;
+            --options &lt;Options&gt;
                 Flere monteringsalternativer.
 
-            --partition &lt;indeks&gt;
-                Indeksen for partisjonen som skal monteres. Hvis den ikke angis, brukes hele disken som standard.
+            --partition &lt;Index&gt;
+                Indeksen for partisjonen som skal monteres, hvis den ikke er angitt som standard for hele disken.
 
-    --set-default-version &lt;versjon&gt;
+    --set-default-version &lt;Version&gt;
         Endrer standard installasjonsversjon for nye distribusjoner.
 
     --shutdown
-        Avslutter umiddelbart alle kjørende distribusjoner og WSL 2
-        virtuell maskin for lette verktøy.
+        Avslutter umiddelbart alle kjørende distribusjoner og den virtuelle WSL 2
+        lightweight utility-maskinen.
 
         Alternativer:
             --force
                 Avslutt den virtuelle WSL 2-maskinen selv om en operasjon pågår. Kan føre til tap av data.
 
     --status
-        Viser statusen til Windows-undersystem for Linux.
+        Vis statusen for Windows-undersystem for Linux.
 
-    --unmount [disk]
-        Demonterer og kobler fra en disk fra alle WSL 2-distribusjoner.
-        Demonterer og kobler fra alle disker hvis den kalles uten argument.
+    --unmount [Disk]
+        Demonterer og kobler fra en disk fra alle WSL2-distribusjoner.
+        Demonterer og løsner alle disker hvis de kalles uten argument.
 
     --uninstall
-        Avinstallerer Windows-undersystemet for Linux-pakke fra denne maskinen.
+        Avinstallerer Windows-undersystem for Linux-pakken fra denne maskinen.
 
     --update
-        Oppdaterer pakken med Windows-undersystemet for Linux.
+        Oppdaterer Windows-undersystem for Linux-pakken.
 
         Alternativer:
             --pre-release
-                Laster ned en forhåndsversjon hvis den er tilgjengelig.
+                Last ned en forhåndsversjon hvis tilgjengelig.
 
     --version, -v
-        Viser versjonsinformasjon.
+        Vis versjonsinformasjon.
 
 Argumenter for behandling av distribusjoner i Windows-undersystem for Linux:
 
-    --export &lt;distribusjon&gt; &lt;filnavn&gt; [alternativer]
-        Eksporterer distribusjonen til en TAR-fil.
-        Filnavnet kan være - for standard utdata.
+    --export &lt;Distro&gt; &lt;FileName&gt; [Options]
+        Eksporterer distribusjonen til en tjærefil.
+        Filnavnet kan være - for stdout.
 
         Alternativer:
             --format &lt;Format&gt;
-                Angir eksportformatet. Støttede verdier: tar, tar.gz, vhd.
+                Angir eksportformatet. Støttede verdier: tar, tar.gz, tar.xz, vhd.
 
-    --import &lt;distribusjon&gt; &lt;installasjonsplassering&gt; &lt;filnavn&gt; [alternativer]
-        Importerer den angitte TAR-filen som en ny distribusjon.
-        Filnavnet kan være - for standard inndata.
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+        Importerer den angitte tjærefilen som en ny distribusjon.
+        Filnavnet kan være - for stdin.
 
         Alternativer:
-            --version &lt;versjon&gt;
-                Angir hvilken versjon som skal brukes for den nye distribusjonen.
+            --version &lt;Version&gt;
+                Angir versjonen som skal brukes i den nye distribusjonen.
 
             --vhd
-                Angir at den angitte filen er en VHDX-fil, ikke en TAR-fil.
-                Denne operasjonen lager en kopi av VHDX-filen på den angitte installasjonsplasseringen.
+                Angir at den angitte filen er en .vhd- eller .vhdx-fil, ikke en tjærefil.
+                Denne operasjonen lager en kopi av VHD-filen på den angitte installasjonsplasseringen.
 
-    --import-in-place &lt;distribusjon&gt; &lt;filnavn&gt;
-        Importerer den angitte VHDX-filen som en ny distribusjon.
-        Denne virtuelle harddisken må være formatert med filsystemtypen EXT4.
+    --import-in-place &lt;Distro&gt; &lt;FileName&gt;
+        Importerer den angitte VHD-filen som en ny distribusjon.
+        Denne virtuelle harddisken må formateres med filsystemtypen ext4.
 
-    --list, -l [alternativer]
-        Viser en liste over distribusjoner.
+    --list, -l [Options]
+        Viser distribusjoner.
 
         Alternativer:
             --all
-                Viser en liste over alle distribusjoner, inkludert distribusjoner som
-                installeres eller avinstalleres for øyeblikket.
+                Viser alle distribusjoner, inkludert distribusjoner som
+                for øyeblikket installeres eller avinstalleres.
 
             --running
-                Viser en liste over bare distribusjoner som kjører.
+                Viser kun distribusjoner som kjører for øyeblikket.
 
             --quiet, -q
-                Vis bare distribusjonsnavn.
+                Viser bare distribusjonsnavn.
 
             --verbose, -v
-                Vis detaljert informasjon om alle distribusjoner.
+                Viser detaljert informasjon om alle distribusjonene.
 
             --online, -o
-                Viser en liste over distribusjoner som kan installeres med 'wsl.exe --install'.
+                Viser en liste over tilgjengelige distribusjoner for installering med 'wsl.exe --install'.
 
-    --set-default, -s &lt;distribusjon&gt;
+    --set-default, -s &lt;Distro&gt;
         Angir distribusjonen som standard.
 
-    --set-version &lt;distribusjon&gt; &lt;versjon&gt;
-        Endrer versjonen til den angitte distribusjonen.
+    --set-version &lt;Distro&gt; &lt;Version&gt;
+        Endrer versjonen for den angitte distribusjonen.
 
-    --terminate, -t &lt;distribusjon&gt;
+    --terminate, -t &lt;Distro&gt;
         Avslutter den angitte distribusjonen.
 
-    --unregister &lt;distribusjon&gt;
+    --unregister &lt;Distro&gt;
         Avregistrerer distribusjonen og sletter rotfilsystemet.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
@@ -704,8 +704,13 @@ Systemet må kanskje startes på nytt slik at endringene kan tre i kraft.</value
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Den angitte filen må ha filtypen VHDX.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Den angitte filen må ha filtypen {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Den angitte filen må ha filendelsen {} eller {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Finner ikke VmSwitch {}. Tilgjengelige brytere: {}</value>
@@ -998,7 +1003,7 @@ Faller tilbake til NAT-nettverk.</value>
     <value>Vis dokumenter</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Operasjonen kan ikke fullføres fordi VHDX-filen er i bruk. Slik tvinger du WSL til å stoppe bruk: wsl.exe --shutdown</value>
+    <value>Operasjonen kan ikke fullføres fordi VHD-en er i bruk. Slik tvinger du WSL til å stoppe: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1006,7 +1011,7 @@ Faller tilbake til NAT-nettverk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Sparse vhdx støttes bare på WSL2.</value>
+    <value>Sparse VHD støttes bare på WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Kjøring av WSL som lokalt system støttes ikke.</value>
@@ -1055,7 +1060,7 @@ Faller tilbake til NAT-nettverk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Dette ser ut som en VDHX-fil. Bruk --vhd til å importere en VHDX i stedet for en tar.</value>
+    <value>Dette ser ut som en VHD-fil. Bruk --vhd til å importere en VHD i stedet for en tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1107,8 +1112,8 @@ Feilkode: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparsom VHD-støtte er deaktivert på grunn av potensiell dataskade.
-Hvis du vil tvinge en distribusjon til å bruke en sparsom vhd, kan du kjøre:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+Hvis du vil tvinge en distribusjon til å bruke en sparsom VHD, kan du kjøre:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
