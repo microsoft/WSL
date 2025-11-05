@@ -30,13 +30,16 @@ public:
     PSID GetUserSid() const;
 
     HRESULT CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine);
-    HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session);
+    HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
 
     void OnVmTerminated(WSLAVirtualMachine* machine);
 
 private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 
+    std::recursive_mutex m_wslaSessionsLock; 
+    // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
+    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_wslaSessions;
     std::recursive_mutex m_lock;
     std::vector<WSLAVirtualMachine*> m_virtualMachines;
 
@@ -54,7 +57,7 @@ public:
 
     IFACEMETHOD(GetVersion)(_Out_ WSL_VERSION* Version) override;
     IFACEMETHOD(CreateVirtualMachine)(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine) override;
-    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session);
+    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
 
 private:
     std::weak_ptr<WSLAUserSessionImpl> m_session;

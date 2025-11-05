@@ -117,6 +117,7 @@ struct _WSLA_SESSION_SETTINGS {
 interface IWSLASession : IUnknown
 {
     HRESULT GetDisplayName([out] LPWSTR* DisplayName);
+    HRESULT GetVirtualMachine([out] IWSLAVirtualMachine **VirtualMachine);
 }
 
 [
@@ -128,5 +129,5 @@ interface IWSLAUserSession : IUnknown
 {
     HRESULT GetVersion([out] WSL_VERSION* Error);
     HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine);
-    HRESULT CreateSession([in] const WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
+    HRESULT CreateSession([in] const WSLA_SESSION_SETTINGS* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out] IWSLASession** Session);
 }
