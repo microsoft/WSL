@@ -466,7 +466,7 @@ Argumenty zarządzania podsystemem Windows dla systemu Linux:
                 Przenosi dystrybucję do nowej lokalizacji.
 
             --set-sparse, -s &lt;true|false&gt;
-                Ustawia dysk vhdx dystrybucji jako rozrzedzony, dzięki czemu miejsce na dysku jest automatycznie odzyskiwane.
+                Ustawia dysk VHD dystrybucji jako rozrzedzony, dzięki czemu miejsce na dysku jest automatycznie odzyskiwane.
 
             --set-default-user &lt;Username&gt;
                 Ustawia domyślnego użytkownika dystrybucji.
@@ -546,11 +546,11 @@ Argumenty zarządzania dystrybucjami w Podsystemie Windows dla systemu Linux:
                 Określa wersję do użycia dla nowej dystrybucji.
 
             --vhd
-                Określa, że podany plik jest plikiem vhdx, a nie plikiem tar.
-                Ta operacja tworzy kopię pliku vhdx w określonej lokalizacji instalacji.
+                Określa, że podany plik jest plikiem .vhd lub .vhdx, a nie plikiem tar.
+                Ta operacja tworzy kopię pliku VHD w określonej lokalizacji instalacji.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importuje określony plik .vhdx jako nową dystrybucję.
+        Importuje określony plik VHD jako nową dystrybucję.
         Ten wirtualny dysk twardy musi być sformatowany przy użyciu typu systemu plików ext4.
 
     --list, -l [Options]
@@ -704,8 +704,13 @@ Może być konieczne ponowne uruchomienie systemu, aby zmiany zostały wprowadzo
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Określony plik musi mieć rozszerzenie pliku vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Określony plik musi mieć rozszerzenie pliku {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Określony plik musi mieć rozszerzenie pliku {} lub {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Nie znaleziono przełącznika maszyny wirtualnej „{}”. Dostępne przełączniki: {}</value>
@@ -998,7 +1003,7 @@ Powrót do sieci NAT.</value>
     <value>Zobacz dokumenty</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Nie można ukończyć operacji, ponieważ dysk vhdx jest obecnie używany. Aby wymusić zatrzymanie używania protokołu WSL:  wsl.exe --shutdown</value>
+    <value>Nie można ukończyć operacji, ponieważ dysk VHD jest obecnie używany. Aby wymusić zatrzymanie używania protokołu WSL:  wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1006,7 +1011,7 @@ Powrót do sieci NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Rozrzedzony dysk vhdx jest obsługiwany tylko w systemie WSL2.</value>
+    <value>Rozrzedzony dysk VHD jest obsługiwany tylko w systemie WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Uruchamianie podsystemu WSL jako systemu lokalnego nie jest obsługiwane.</value>
@@ -1055,7 +1060,7 @@ Powrót do sieci NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Wygląda to na plik VHDX. Użyj polecenia --vhd , aby zaimportować plik VHDX zamiast tar.</value>
+    <value>This looks like a VHD file. Use --vhd to import a VHD instead of a tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1108,7 +1113,7 @@ Kod błędu: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Obsługa rozrzedzonych dysków VHD jest obecnie wyłączona z powodu potencjalnego uszkodzenia danych.
 Aby wymusić używanie rozrzedzonego dysku VHD przez dystrybucję, uruchom polecenie:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

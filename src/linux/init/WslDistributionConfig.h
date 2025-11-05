@@ -84,8 +84,8 @@ struct WslDistributionConfig
     //
 
     bool GuiAppsEnabled = false;
-    std::optional<int> FeatureFlags = 0;
-    std::optional<LX_MINI_INIT_NETWORKING_MODE> NetworkingMode = LxMiniInitNetworkingModeNone;
+    std::optional<int> FeatureFlags;
+    std::optional<LX_MINI_INIT_NETWORKING_MODE> NetworkingMode;
     std::optional<std::string> VmId;
 
     //
