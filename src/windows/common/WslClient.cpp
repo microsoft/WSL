@@ -1542,6 +1542,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.NetworkingMode = WslNetworkingModeNAT;
     std::string shell = "/bin/bash";
     std::string fsType = "ext4";
+    bool newApi = false;
     bool help = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
@@ -1551,6 +1552,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(fsType), L"--fstype");
+    parser.AddArgument(newApi, L"--new-api");
     parser.AddArgument(help, L"--help");
 
     parser.Parse();
@@ -1558,7 +1560,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--new-api] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
@@ -1570,7 +1572,18 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-    THROW_IF_FAILED(userSession->CreateVirtualMachine(&settings, &virtualMachine));
+    if (newApi)
+    {
+        WSLA_SESSION_SETTINGS sessionSettings{L"my-display-name"};
+        wil::com_ptr<IWSLASession> session;
+        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
+        THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
+    }
+    else
+    {
+        THROW_IF_FAILED(userSession->CreateVirtualMachine(&settings, &virtualMachine));
+    }
+
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::unique_cotaskmem_ansistring diskDevice;
