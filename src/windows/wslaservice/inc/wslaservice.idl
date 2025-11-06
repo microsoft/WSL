@@ -67,7 +67,7 @@ interface ITerminationCallback : IUnknown
 ]
 interface IProgressCallback : IUnknown
 {
-    HRESULT OnTermination(ULONG Progress, ULONG Total);
+    HRESULT OnProgress(ULONG Progress, ULONG Total);
 };
 
 // TODO: Delete once the new API is wired.
@@ -147,13 +147,13 @@ struct WSLA_PROCESS_OPTIONS
 
 struct WSLA_VOLUME
 {
-    LPCSTR WindowsPath;
-    LPCSTR LinuxPath;
+    LPCSTR HostPath;
+    LPCSTR ContainerPathPath;
 };
 
 struct WSLA_PORT_MAPPING
 {
-    USHORT WindowsPort;
+    USHORT HostPort;
     USHORT ContainerPort;
 };
 
@@ -168,6 +168,7 @@ struct WSLA_CONTAINER_OPTIONS
     ULONG PortsCount;
     DWORD Flags; // GPU, Privileged, ...
     // TODO: List specific GPU devices.
+    // TODO: Flags on wether the caller wants to override entrypoint, args, or both.
     ULONGLONG ShmSize;
 };
 
@@ -189,13 +190,21 @@ enum WSLA_PROCESS_STATE
     WslaProcessStateSignalled = 3
 };
 
-struct WSLA_CREATED_PROCESS
+[
+    uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
+    pointer_default(unique),
+    object
+]
+interface IWSLAProcess : IUnknown
 {
-    int Pid;
-    [unique, size_is(FdsCount)] ULONG* Fds;
-    ULONG FdsCount;
-    ULONG ExitEvent;
-};
+    HRESULT Signal([in] int Signal);
+    HRESULT GetExitEvent([out] ULONG* EventHandle);
+    HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
+    HRESULT GetPid([out] int* Pid);
+    HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
+
+    // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
+}
 
 [
     uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
@@ -212,7 +221,7 @@ interface IWSLASession : IUnknown
     // Container management.
     HRESULT CreateContainer([in] struct WSLA_CONTAINER_OPTIONS* Options);
     HRESULT StartContainer([in] LPCSTR Name);
-    HRESULT StopContainer([in] LPCSTR Name);
+    HRESULT StopContainer([in] LPCSTR Name, [in] int Signal, [in] ULONG TimeoutMs);
     HRESULT DeleteContainer([in] LPCSTR Name);
     HRESULT GetContainerState([in] LPCSTR Name, [out] enum WSLA_CONTAINER_STATE* State);
 
@@ -221,9 +230,9 @@ interface IWSLASession : IUnknown
     HRESULT ReleaseHostPort([in] USHORT HostPort);
 
     // Process management (nb passing ContainerName = NULL can be used to interact with VM level process for debugging).
-    HRESULT CreateContainerProcess([in, unique] LPCSTR ContainerName, [in] struct WSLA_PROCESS_OPTIONS* Options, [out] struct WSLA_CREATED_PROCESS* Process);
-    HRESULT GetContainerProcessState([in, unique] LPCWSTR ContainerName, [in] int Pid, [out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
-    HRESULT SignalContainerProcess([in, unique] LPCWSTR ContainerName, [in] int Pid, [in] int Signal);
+    HRESULT CreateContainerProcess([in, unique] LPCSTR ContainerName, [in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+
+    // TODO: an OpenProcess() method can be added later if needed.
 
     // Disk management.
     HRESULT FormatVirtualDisk([in] LPCWSTR Path);
