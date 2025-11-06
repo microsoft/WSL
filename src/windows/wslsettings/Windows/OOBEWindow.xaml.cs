@@ -108,20 +108,25 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         AppWindow.Resize(size);
     }
 
+    private void CleanupEscapeAccelerator()
+    {
+        if (escapeAccelerator != null)
+        {
+            escapeAccelerator.Invoked -= OnCloseKeyboardAcceleratorInvoked;
+            if (page != null)
+            {
+                page.KeyboardAccelerators.Remove(escapeAccelerator);
+            }
+            escapeAccelerator = null;
+        }
+        page = null;
+    }
+
     private void Dispose(bool disposing)
     {
         if (!disposedValue)
         {
-            if (escapeAccelerator != null)
-            {
-                escapeAccelerator.Invoked -= OnCloseKeyboardAcceleratorInvoked;
-                if (page != null)
-                {
-                    page.KeyboardAccelerators.Remove(escapeAccelerator);
-                }
-                escapeAccelerator = null;
-            }
-            page = null;
+            CleanupEscapeAccelerator();
             msgMonitor?.Dispose();
             settings.ColorValuesChanged -= Settings_ColorValuesChanged;
             this.Activated -= OnWindowActivated;
@@ -145,14 +150,7 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
             if (this.Content is Microsoft.UI.Xaml.Controls.Page p)
             {
                 // Clean up any existing accelerator before creating a new one
-                if (escapeAccelerator != null)
-                {
-                    escapeAccelerator.Invoked -= OnCloseKeyboardAcceleratorInvoked;
-                    if (page != null)
-                    {
-                        page.KeyboardAccelerators.Remove(escapeAccelerator);
-                    }
-                }
+                CleanupEscapeAccelerator();
 
                 page = p;
                 escapeAccelerator = new KeyboardAccelerator() { Key = VirtualKey.Escape };
