@@ -182,6 +182,15 @@ enum WSLA_CONTAINER_STATE
     // TODO: More states might be added to reflect all nerdctl's states.
 };
 
+struct WSLA_CONTAINER
+{
+    LPCWSTR Name;
+    LPCWSTR Image;
+    enum WSLA_CONTAINER_STATE State;
+
+    // TODO: Add creation timestamp and other fields that the command line tool might want to display.
+};
+
 enum WSLA_PROCESS_STATE
 {
     WslaProcessStateUnknown = 0,
@@ -215,10 +224,14 @@ interface IWSLAContainer : IUnknown
 {
     HRESULT Start();
     HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
-    HRESULT Delete();
+    HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+
+    // Anonymous host port allocation (P1).
+    //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
+    //HRESULT ReleaseHostPort([in] USHORT HostPort);
 }
 
 [
@@ -230,16 +243,14 @@ interface IWSLASession : IUnknown
 {
     // Image management.
     HRESULT PullImage([in] LPCWSTR Image, [in, unique] struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT ImportImage([in] ULONG Handle, [in] LPCWSTR Image, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] LPCWSTR Image);
 
     // Container management.
-    HRESULT CreateContainer([in] struct WSLA_CONTAINER_OPTIONS* Options);
-    // TODO: Methods to list & open containers.
-
-    // Anonymous host port allocation (P1).
-    HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
-    HRESULT ReleaseHostPort([in] USHORT HostPort);
+    HRESULT CreateContainer([in] struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
+    HRESULT OpenContainer([in] LPCWSTR Name, [out] IWSLAContainer** Container);
+    HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
