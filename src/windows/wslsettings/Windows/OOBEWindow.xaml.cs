@@ -113,6 +113,11 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
             msgMonitor?.Dispose();
             settings.ColorValuesChanged -= Settings_ColorValuesChanged;
             this.Activated -= OnWindowActivated;
+            if (this.Content is Microsoft.UI.Xaml.Controls.Page page)
+            {
+                page.KeyboardAccelerators.Clear();
+            }
+
             disposedValue = true;
         }
     }
