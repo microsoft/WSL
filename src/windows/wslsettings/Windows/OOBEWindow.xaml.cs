@@ -2,8 +2,10 @@
 
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.Graphics;
+using Windows.System;
 using WinUIEx.Messaging;
 using Windows.UI.ViewManagement;
 using Windows.UI.WindowManagement;
@@ -60,6 +62,8 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
                 e.Handled = true;
             }
         };
+
+        this.Activated += OnWindowActivated;
     }
 
     // this handles updating the caption button colors correctly when windows system theme is changed
@@ -108,6 +112,7 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         {
             msgMonitor?.Dispose();
             settings.ColorValuesChanged -= Settings_ColorValuesChanged;
+            this.Activated -= OnWindowActivated;
             disposedValue = true;
         }
     }
@@ -117,5 +122,26 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
+    }
+
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState != WindowActivationState.Deactivated && this.Content != null)
+        {
+            this.Activated -= OnWindowActivated;
+
+            if (this.Content is Microsoft.UI.Xaml.Controls.Page page)
+            {
+                var escapeAccelerator = new KeyboardAccelerator() { Key = VirtualKey.Escape };
+                escapeAccelerator.Invoked += OnCloseKeyboardAcceleratorInvoked;
+                page.KeyboardAccelerators.Add(escapeAccelerator);
+            }
+        }
+    }
+
+    private void OnCloseKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        Close();
+        args.Handled = true;
     }
 }
