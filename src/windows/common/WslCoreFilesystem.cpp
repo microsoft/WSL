@@ -71,9 +71,7 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
 
 wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUAL_DISK_ACCESS_MASK Mask)
 {
-    WI_ASSERT(
-        wsl::shared::string::IsEqual(std::filesystem::path{Path}.extension().c_str(), windows::common::wslutil::c_vhdFileExtension, true) ||
-        wsl::shared::string::IsEqual(std::filesystem::path{Path}.extension().c_str(), windows::common::wslutil::c_vhdxFileExtension, true));
+    WI_ASSERT(wsl::windows::common::wslutil::IsVhdFile(std::filesystem::path{Path}));
 
     // N.B. Specifying unknown for device and vendor means the system will determine the type of VHD.
     VIRTUAL_STORAGE_TYPE storageType{};

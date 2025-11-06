@@ -277,14 +277,6 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
     }
     else
     {
-        // If exporting to a vhd, ensure the filename ends with the vhdx file extension.
-        if (WI_IsFlagSet(flags, LXSS_EXPORT_DISTRO_FLAGS_VHD) &&
-            !wsl::windows::common::string::IsPathComponentEqual(filePath.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension))
-        {
-            wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageRequiresVhdxFileExtension());
-            return -1;
-        }
-
         file.reset(CreateFileW(
             filePath.c_str(), GENERIC_WRITE, (FILE_SHARE_READ | FILE_SHARE_DELETE), nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 
@@ -373,22 +365,10 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     }
     else
     {
-        bool isVhd = wsl::windows::common::string::IsPathComponentEqual(
-            filePath.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension);
-
-        if (WI_IsFlagSet(flags, LXSS_IMPORT_DISTRO_FLAGS_VHD))
+        if (WI_IsFlagClear(flags, LXSS_IMPORT_DISTRO_FLAGS_VHD))
         {
-            // If importing from a vhd, ensure the filename ends with the vhdx file extension.
-            if (!isVhd)
-            {
-                wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageRequiresVhdxFileExtension());
-                return -1;
-            }
-        }
-        else
-        {
-            // Fail if we expect a tar, but the file name has the .vhdx extension.
-            if (isVhd)
+            // Fail if expecting a tar, but the file name has the .vhd or .vhdx extension.
+            if (wsl::windows::common::wslutil::IsVhdFile(filePath))
             {
                 wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessagePassVhdFlag());
                 return -1;
@@ -1561,6 +1541,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.BootTimeoutMs = 30000;
     settings.NetworkingMode = WslNetworkingModeNAT;
     std::string shell = "/bin/bash";
+    std::string fsType = "ext4";
     bool help = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
@@ -1569,6 +1550,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(reinterpret_cast<bool&>(settings.EnableDnsTunneling), L"--dns-tunneling");
     parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
+    parser.AddArgument(Utf8String(fsType), L"--fstype");
     parser.AddArgument(help, L"--help");
 
     parser.Parse();
@@ -1576,7 +1558,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
@@ -1595,7 +1577,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     ULONG Lun{};
     THROW_IF_FAILED(virtualMachine->AttachDisk(vhd.c_str(), true, &diskDevice, &Lun));
 
-    THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
+    THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", fsType.c_str(), "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));

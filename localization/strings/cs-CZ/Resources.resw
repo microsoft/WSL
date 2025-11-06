@@ -466,7 +466,7 @@ Argumenty pro správu Subsystému Windows pro Linux:
                 Přesuňte distribuci do nového umístění.
 
             --set-sparse, -s &lt;true|false&gt;
-                Nastaví vhdx distribuce na zhuštěný, což umožní automatické uvolnění místa na disku.
+                Nastavte virtuální pevný disk distribuce na zhuštěný, což umožní automatické uvolnění místa na disku.
 
             --set-default-user &lt;Username&gt;
                 Nastaví výchozího uživatele distribuce.
@@ -546,11 +546,11 @@ Argumenty pro správu distribucí v Subsystému Windows pro Linux:
                 Určuje verzi, která se má použít pro novou distribuci.
 
             --vhd
-                Určuje, že zadaný soubor je soubor .vhdx, nikoli soubor tar.
-                Tato operace vytvoří kopii souboru .vhdx v zadaném umístění instalace.
+                Určuje, že poskytnutý soubor je soubor .vhd nebo .vhdx, nikoli soubor tar.
+                Tato operace vytvoří kopii souboru VHD v zadaném umístění instalace.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importuje zadaný soubor .vhdx jako novou distribuci.
+        Importuje zadaný soubor .VHD jako novou distribuci.
         Tento virtuální pevný disk musí být naformátovaný typem systému souborů ext4.
 
     --list, -l [Options]
@@ -626,7 +626,7 @@ Potvrzení změn: {}
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Vhd vlastních modulů jádra v {} se nenašel: {}.</value>
+    <value>VHD vlastních modulů jádra v {} se nenašel: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -704,8 +704,13 @@ Může být nutné restartovat systém, aby se změny projevily.</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Zadaný soubor musí mít příponu .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Zadaný soubor musí mít příponu {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Zadaný soubor musí mít příponu {} nebo {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>VmSwitch '{}' nebyl nalezen. Dostupné přepínače: {}</value>
@@ -998,7 +1003,7 @@ Návrat k sítím NAT.</value>
     <value>Zobrazit dokumentaci</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Operaci nešlo dokončit, protože se vhdx právě používá. Vynucení ukončení používání WSL: wsl.exe --shutdown</value>
+    <value>Operaci nešlo dokončit, protože se VHD právě používá. Vynucení ukončení používání WSL: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1006,7 +1011,7 @@ Návrat k sítím NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Zhuštěný soubor vhdx je podporován pouze pro WSL2.</value>
+    <value>Zhuštěný VHD je podporován pouze pro WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Spouštění WSL jako místního systému se nepodporuje.</value>
@@ -1055,7 +1060,7 @@ Návrat k sítím NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Vypadá to na soubor VHDX. Použijte --vhd k importu VHDX místo dehtu.</value>
+    <value>This looks like a VHD file. Use --vhd to import a VHD instead of a tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1107,8 +1112,8 @@ Kód chyby: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Podpora prořídlého VHD je v současné době zakázána z důvodu možného poškození dat.
-Pokud chcete distribuci vynutit použití prořídlého vhd, spusťte:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+Pokud chcete distribuci vynutit použití prořídlého VHD, spusťte:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

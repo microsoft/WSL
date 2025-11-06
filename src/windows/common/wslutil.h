@@ -129,6 +129,8 @@ void InitializeWil();
 
 bool IsRunningInMsix();
 
+bool IsVhdFile(_In_ const std::filesystem::path& path);
+
 bool IsVirtualMachinePlatformInstalled();
 
 std::vector<DWORD> ListRunningProcesses();

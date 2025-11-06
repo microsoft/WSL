@@ -32,6 +32,13 @@ TRACELOGGING_DEFINE_PROVIDER(
     (0xb99cdb5a, 0x039c, 0x5046, 0xe6, 0x72, 0x1a, 0x0d, 0xe0, 0xa4, 0x02, 0x11),
     TraceLoggingOptionMicrosoftTelemetry());
 
+TRACELOGGING_DEFINE_PROVIDER(
+    WslaServiceTelemetryProvider,
+    "Microsoft.Windows.Wsla",
+    // {0383CE62-8F86-4766-AFB2-9D66A7FB1E90}
+    (0x383ce62, 0x8f86, 0x4766, 0xaf, 0xb2, 0x9d, 0x66, 0xa7, 0xfb, 0x1e, 0x90),
+    TraceLoggingOptionMicrosoftTelemetry());
+
 #ifdef DEBUG
 #define HRESULT_STRING_VALUE \
     , TraceLoggingValue(wsl::windows::common::wslutil::ErrorCodeToString(failure->hr).c_str(), "HRESULTString")
