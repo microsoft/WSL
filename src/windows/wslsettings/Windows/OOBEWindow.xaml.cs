@@ -144,6 +144,16 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
 
             if (this.Content is Microsoft.UI.Xaml.Controls.Page p)
             {
+                // Clean up any existing accelerator before creating a new one
+                if (escapeAccelerator != null)
+                {
+                    escapeAccelerator.Invoked -= OnCloseKeyboardAcceleratorInvoked;
+                    if (page != null)
+                    {
+                        page.KeyboardAccelerators.Remove(escapeAccelerator);
+                    }
+                }
+
                 page = p;
                 escapeAccelerator = new KeyboardAccelerator() { Key = VirtualKey.Escape };
                 escapeAccelerator.Invoked += OnCloseKeyboardAcceleratorInvoked;
