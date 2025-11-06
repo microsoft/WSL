@@ -30,6 +30,8 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
     private UISettings settings = new UISettings();
     private WindowMessageMonitor msgMonitor;
     private bool disposedValue;
+    private KeyboardAccelerator escapeAccelerator;
+    private Microsoft.UI.Xaml.Controls.Page page;
 
     public OOBEWindow()
     {
@@ -110,6 +112,16 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
     {
         if (!disposedValue)
         {
+            if (escapeAccelerator != null)
+            {
+                escapeAccelerator.Invoked -= OnCloseKeyboardAcceleratorInvoked;
+                if (page != null)
+                {
+                    page.KeyboardAccelerators.Remove(escapeAccelerator);
+                }
+                escapeAccelerator = null;
+            }
+            page = null;
             msgMonitor?.Dispose();
             settings.ColorValuesChanged -= Settings_ColorValuesChanged;
             this.Activated -= OnWindowActivated;
@@ -130,9 +142,10 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         {
             this.Activated -= OnWindowActivated;
 
-            if (this.Content is Microsoft.UI.Xaml.Controls.Page page)
+            if (this.Content is Microsoft.UI.Xaml.Controls.Page p)
             {
-                var escapeAccelerator = new KeyboardAccelerator() { Key = VirtualKey.Escape };
+                page = p;
+                escapeAccelerator = new KeyboardAccelerator() { Key = VirtualKey.Escape };
                 escapeAccelerator.Invoked += OnCloseKeyboardAcceleratorInvoked;
                 page.KeyboardAccelerators.Add(escapeAccelerator);
             }
