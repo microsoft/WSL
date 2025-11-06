@@ -251,6 +251,7 @@ interface IWSLASession : IUnknown
 
      // To be deleted.
     HRESULT GetDisplayName([out] LPWSTR* DisplayName);
+    HRESULT GetVirtualMachine([out] IWSLAVirtualMachine **VirtualMachine);
 }
 
 struct WSLA_SESSION_INFORMATION
@@ -271,11 +272,9 @@ interface IWSLAUserSession : IUnknown
     HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine); // TODO: Delete once the new API is wired.
 
     // Session managment.
-    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
+    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out]IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
 
     // TODO: Do we need 'TerminateSession()' ?
 }
-
-

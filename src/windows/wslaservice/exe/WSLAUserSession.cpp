@@ -64,16 +64,17 @@ PSID WSLAUserSessionImpl::GetUserSid() const
     return m_tokenInfo->User.Sid;
 }
 
-HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session)
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
+    const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 {
-    auto session = wil::MakeOrThrow<WSLASession>(*Settings);
+    auto session = wil::MakeOrThrow<WSLASession>(*Settings, *this, *VmSettings);
 
     {
-        std::lock_guard lock(m_lock);
-        m_sessions.emplace_back(session.Get());
+        std::lock_guard lock(m_wslaSessionsLock);
+        m_wslaSessions.emplace_back(session.Get());
     }
 
-    THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)Session));
+    THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
 
     return S_OK;
 }
@@ -102,12 +103,13 @@ try
 }
 CATCH_RETURN();
 
-HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** Session)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(
+    const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 try
 {
     auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->CreateSession(Settings, Session);
+    return session->CreateSession(Settings, VmSettings, WslaSession);
 }
 CATCH_RETURN();

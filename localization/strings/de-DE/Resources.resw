@@ -381,7 +381,7 @@ Verbrauch:
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Alle Rechte vorbehalten.
+    <value>Copyright (c) Microsoft Corporation. Alle Rechte vorbehalten.
 Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/privacy.
 
 Syntax: wsl.exe [Argument] [Optionen...] [CommandLine]
@@ -632,7 +632,7 @@ Buildzeit: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Die benutzerdefinierte Kernelmodul-VHD in "{}" wurde nicht gefunden: "{}".</value>
+    <value>Die benutzerdefinierte Kernelmodule-VHD in {} wurde nicht gefunden: „{}“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -710,8 +710,13 @@ Das System muss möglicherweise neu gestartet werden, damit die Änderungen wirk
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Die angegebene Datei muss die Dateierweiterung ".vhdx" aufweisen.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Die angegebene Datei muss die Dateierweiterung {} aufweisen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Die angegebene Datei muss die Dateierweiterung {} oder {} besitzen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>VmSwitch „{}“ wurde nicht gefunden. Verfügbare Switches: {}</value>
@@ -1004,7 +1009,7 @@ Fallback auf NAT-Netzwerk.</value>
     <value>Dokumente anzeigen</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Der Vorgang konnte nicht abgeschlossen werden, da die VHDX zurzeit verwendet wird. So erzwingen Sie, dass WSL die Verwendung beendet: wsl.exe --shutdown</value>
+    <value>Der Vorgang konnte nicht abgeschlossen werden, da die VHD zurzeit verwendet wird. So erzwingen Sie, dass WSL die Verwendung beendet: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1012,7 +1017,7 @@ Fallback auf NAT-Netzwerk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>VHDX mit geringer Dichte wird nur für WSL2 unterstützt.</value>
+    <value>VHD mit geringer Dichte wird nur unter WSL2 unterstützt.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Das Ausführen von WSL als lokales System wird nicht unterstützt.</value>
@@ -1061,7 +1066,7 @@ Fallback auf NAT-Netzwerk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Dies scheint eine VHDX-Datei zu sein. Verwenden Sie --vhd anstelle eines TAR-Archivs, um eine VHDX-Datei zu importieren.</value>
+    <value>Dies sieht wie eine VHD-Datei aus. Verwenden Sie „--vhd “, um eine VHD anstelle eines „tar“ zu importieren.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1113,8 +1118,8 @@ Fehlercode: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Die Unterstützung von Sparse VHD ist derzeit wegen möglicher Datenbeschädigung deaktiviert.
-Um eine Distribution zu zwingen, eine Sparse VHD zu verwenden, führen Sie bitte Folgendes aus:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+Um eine Distribution zu zwingen, eine spärliche VHD zu verwenden, führen Sie bitte Folgendes aus:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

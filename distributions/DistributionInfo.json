@@ -58,21 +58,21 @@
         ],
         "SUSE": [
             {
-                "Name": "SUSE-Linux-Enterprise-15-SP6",
-                "FriendlyName": "SUSE Linux Enterprise 15 SP6",
-                "Default": false,
-                "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250618.0/SUSE-Linux-Enterprise-15-SP6-15.6.x86_64-23.23-Build23.23.wsl",
-                    "Sha256": "0x8f1101972eab1e503993a183e34851920935988f2d5dd1574e336e470101e0e6"
-                }
-            },
-            {
                 "Name": "SUSE-Linux-Enterprise-15-SP7",
                 "FriendlyName": "SUSE Linux Enterprise 15 SP7",
-                "Default": true,
+                "Default": false,
                 "Amd64Url": {
                     "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250903.0/SUSE-Linux-Enterprise-15-SP7-15.7.x86_64-27.32-Build27.32.wsl",
                     "Sha256": "0x1e53279af609b9d67b108bc31f1318c3317338595298ef8dfbf7a5728ab8a093"
+                }
+            },
+            {
+                "Name": "SUSE-Linux-Enterprise-16.0",
+                "FriendlyName": "SUSE Linux Enterprise 16.0",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20251104.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.3-Build1.3.wsl",
+                    "Sha256": "0xb91f901ba96910fa65218ef0e6aaae7b9980bd11fed63cb3507878aa8915d726"
                 }
             }
         ],
@@ -138,12 +138,12 @@
                 "FriendlyName": "AlmaLinux OS Kitten 10",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20250415.0/AlmaLinux-Kitten-10_x64_20250415.0.wsl",
-                    "Sha256": "8db3788b5728e58e32a4a96d9aa26974a48bf7936ed376da434c5c441a0fa7bd"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20251030.0/AlmaLinux-Kitten-10_x64_20251030.0.wsl",
+                    "Sha256": "d765d65076b041f3a67ba60edc37d056eeab2a260aed8e077684e05b78ecd9f5"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20250415.0/AlmaLinux-Kitten-10_ARM64_20250415.0.wsl",
-                    "Sha256": "f48a55e9fd4da1b84c2a9e960a9f3bc6e9fa65387ed9181826e1f052b2ce545e"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10-kitten.20251030.0/AlmaLinux-Kitten-10_ARM64_20251030.0.wsl",
+                    "Sha256": "90c30b0adbf8d414c4b0a02eaeb6a5d8e488a2187a67dbaf11f4a3e843baae53"
                 }
             },
             {
@@ -166,16 +166,29 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://geo.mirror.pkgbuild.com/wsl/2025.10.01.148042/archlinux-2025.10.01.148042.wsl",
-                    "Sha256": "98a5792935c46476f471854bc93344b2b1d63f7947905ce4dd75d20a546db7ea"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2025.11.01.150831/archlinux-2025.11.01.150831.wsl",
+                    "Sha256": "9dbac892c38c94fd22a8988eff4e072778f3f445378d33a81474a2b88cb04562"
                 }
             }
         ],
         "Fedora": [
             {
+                "Name": "FedoraLinux-43",
+                "FriendlyName": "Fedora Linux 43",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Container/x86_64/images/Fedora-WSL-Base-43-1.6.x86_64.wsl",
+                    "Sha256": "220780af9cf225e9645313b4c7b0457a26a38a53285eb203b2ab6188d54d5b82"
+                },
+                "Arm64Url": {
+                    "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Container/aarch64/images/Fedora-WSL-Base-43-1.6.aarch64.wsl",
+                    "Sha256": "7eef7a83260218d8c878b3c7bbdaf11772103145184d0c65df27557f4cd49548"
+                }
+            },
+            {
                 "Name": "FedoraLinux-42",
                 "FriendlyName": "Fedora Linux 42",
-                "Default": true,
+                "Default": false,
                 "Amd64Url": {
                     "Url": "https://download.fedoraproject.org/pub/fedora/linux/releases/42/Container/x86_64/images/Fedora-WSL-Base-42-1.1.x86_64.tar.xz",
                     "Sha256": "99fb3d05d78ca17c6815bb03cf528da8ef82ebc6260407f2b09461e0da8a1b8d"
