@@ -148,7 +148,7 @@ struct WSLA_PROCESS_OPTIONS
 struct WSLA_VOLUME
 {
     LPCSTR HostPath;
-    LPCSTR ContainerPathPath;
+    LPCSTR ContainerHostPath;
 };
 
 struct WSLA_PORT_MAPPING
@@ -207,6 +207,21 @@ interface IWSLAProcess : IUnknown
 }
 
 [
+    uuid(7577FE8D-DE85-471E-B870-11669986F332),
+    pointer_default(unique),
+    object
+]
+interface IWSLAContainer : IUnknown
+{
+    HRESULT Start();
+    HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
+    HRESULT Delete();
+    HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
+    HRESULT GetInitProcess([out] IWSLAProcess** Process);
+    HRESULT Exec([in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+}
+
+[
     uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
     pointer_default(unique),
     object
@@ -220,17 +235,14 @@ interface IWSLASession : IUnknown
 
     // Container management.
     HRESULT CreateContainer([in] struct WSLA_CONTAINER_OPTIONS* Options);
-    HRESULT StartContainer([in] LPCSTR Name);
-    HRESULT StopContainer([in] LPCSTR Name, [in] int Signal, [in] ULONG TimeoutMs);
-    HRESULT DeleteContainer([in] LPCSTR Name);
-    HRESULT GetContainerState([in] LPCSTR Name, [out] enum WSLA_CONTAINER_STATE* State);
+    // TODO: Methods to list & open containers.
 
     // Anonymous host port allocation (P1).
     HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
     HRESULT ReleaseHostPort([in] USHORT HostPort);
 
-    // Process management (nb passing ContainerName = NULL can be used to interact with VM level process for debugging).
-    HRESULT CreateContainerProcess([in, unique] LPCSTR ContainerName, [in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    // Create a process at the VM level. This is meant for debugging.
+    HRESULT CreateRootNamespaceProcess([in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
