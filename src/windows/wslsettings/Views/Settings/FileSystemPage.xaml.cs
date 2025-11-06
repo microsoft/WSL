@@ -1,5 +1,6 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
+using CommunityToolkit.WinUI.Controls;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -26,6 +27,8 @@ public sealed partial class FileSystemPage : Page
                 FrameworkElementAutomationPeer.FromElement(Settings_ErrorTryAgainLater).RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
             }
         });
+
+        this.Loaded += OnPageLoaded;
     }
 
     override protected void OnNavigatedFrom(NavigationEventArgs e)
@@ -52,5 +55,16 @@ public sealed partial class FileSystemPage : Page
 
         TextBox? textBox = sender as TextBox;
         ViewModel.SetDefaultVHDSize_ResetEnabled(textBox!.Text);
+    }
+
+    private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        var expander = this.FindName("DefaultVHDSizeExpander") as SettingsExpander;
+        var textBox = this.FindName("DefaultVHDSizeTextBox") as TextBox;
+
+        if (expander != null && textBox != null)
+        {
+            RuntimeHelper.SetupSettingsExpanderFocusManagement(expander, textBox);
+        }
     }
 }
