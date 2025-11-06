@@ -64,4 +64,4 @@ package/x64
 /appx-logs.txt
 tools/clang-format.exe
 /linux-crashes
-doc/site/
+doc/site/.nuget/
