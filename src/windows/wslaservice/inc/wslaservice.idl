@@ -101,7 +101,6 @@ struct _VIRTUAL_MACHINE_SETTINGS {
     BOOL EnableGPU;
 } VIRTUAL_MACHINE_SETTINGS;
 
-
 typedef
 struct _WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;

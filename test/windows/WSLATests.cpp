@@ -1113,7 +1113,7 @@ class WSLATests
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
+        WSLA_SESSION_SETTINGS settings{L"create-session-smoke-test"};
         wil::com_ptr<IWSLASession> session;
 
         VIRTUAL_MACHINE_SETTINGS vmSettings{};

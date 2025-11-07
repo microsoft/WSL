@@ -113,3 +113,6 @@ try
     return session->CreateSession(Settings, VmSettings, WslaSession);
 }
 CATCH_RETURN();
+
+
+

@@ -58,7 +58,7 @@ try
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-    wil::com_ptr<IWSLAVirtualMachine> virtualMachineInstance;
+    /* wil::com_ptr<IWSLAVirtualMachine> virtualMachineInstance;
 
     VIRTUAL_MACHINE_SETTINGS settings{};
     settings.DisplayName = UserSettings->DisplayName;
@@ -86,7 +86,7 @@ try
         // Callback instance is now owned by the service.
     }
 
-    *reinterpret_cast<IWSLAVirtualMachine**>(VirtualMachine) = virtualMachineInstance.detach();
+    *reinterpret_cast<IWSLAVirtualMachine**>(VirtualMachine) = virtualMachineInstance.detach();*/
     return S_OK;
 }
 CATCH_RETURN();
