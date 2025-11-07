@@ -1204,6 +1204,13 @@ bool wsl::windows::common::wslutil::IsRunningInMsix()
         return false;
     }
 }
+
+bool wsl::windows::common::wslutil::IsVhdFile(_In_ const std::filesystem::path& path)
+{
+    return wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdFileExtension) ||
+           wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdxFileExtension);
+}
+
 std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
 {
     std::vector<DWORD> pids(1024);

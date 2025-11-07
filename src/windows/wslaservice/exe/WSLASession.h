@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include "wslaservice.h"
+#include "WSLAVirtualMachine.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -23,28 +24,15 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
 
 {
 public:
-    //WSLASession(std::weak_ptr<WSLASessionImpl>&& Session);
-    WSLASession(const WSLA_SESSION_CONFIGURATION& SessionConfiguration);
-    //WSLASession(const WSLASession&) = delete;
-   // WSLASession& operator=(const WSLASession&) = delete;
-
-    /* void Start();
-    void OnUserSessionTerminating();
-
-    IFACEMETHOD(WSLAStartContainer)(_In_ WSLA_CONTAINER_OPTIONS* ContainerOptions, _Out_ IWSLAContainer** Container) override;
-    IFACEMETHOD(WSLAStopContainer)(_In_ LPCSTR ContainerId) override;
-    IFACEMETHOD(WSLARestartContainer)(_In_ WSLA_CONTAINER_OPTIONS* ContainerOptions, _In_ LPCSTR ContainerId, _Out_ IWSLAContainer** Container) override;
-    IFACEMETHOD(WSLAGetContainerState)(_In_ LPCSTR ContainerId, _Out_ IWSLAContainer** Container) override;
-    IFACEMETHOD(WSLAListContainers)(_In_ WSLA_CONTAINER_OPTIONS* ContainerOptions, _In_ LPCSTR ContainerId, _Out_ ContainerState& State) override; */
-    // TODO: add more interface methods here
-
-    
+    WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings);
     IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName);
+    IFACEMETHOD(GetVirtualMachine)(IWSLAVirtualMachine** VirtualMachine);
 
 private:
-    WSLA_SESSION_CONFIGURATION m_sessionConfig;
-
-    //WSLAUserSessionImpl* m_userSession;
-    //std::weak_ptr<WSLASessionImpl> m_wslaSession;
+    WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
+    WSLAUserSessionImpl& m_userSession;
+    WSLAVirtualMachine m_virtualMachine;
+    std::wstring m_displayName;
 };
+
 } // namespace wsl::windows::service::wsla

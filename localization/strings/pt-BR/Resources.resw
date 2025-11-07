@@ -383,7 +383,7 @@ Uso:
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
     <value>Copyright (c) Microsoft Corporation. Todos os direitos reservados.
-Para obter informações sobre a privacidade desse produto, visite https://aka.ms/privacy.
+Para obter informações sobre a privacidade deste produto, visite https://aka.ms/privacy.
 
 Uso: wsl.exe [Argumento] [Opções...] [Linha de comando]
 
@@ -408,13 +408,13 @@ Opções:
         Caso contrário, o valor deverá ser um caminho do Windows absoluto.
 
     --distribution, -d &lt;DistroName&gt;
-        Executar a distribuição especificada.
+        Executa a distribuição especificada.
 
     --distribution-id &lt;DistroGuid&gt;
         Executa a ID da distribuição especificada.
 
     --user, -u &lt;UserName&gt;
-        Executar como o usuário especificado.
+        Executa como o usuário especificado.
 
     --system
         Inicia um shell para a distribuição do sistema.
@@ -429,7 +429,7 @@ Argumentos para gerenciar o Subsistema do Windows para Linux:
 
     --install [Distribuição] [Opções...]
         Instala uma distribuição do Subsistema do Windows para Linux.
-        Para uma lista de distribuições válidas, use 'wsl.exe --list --online'.
+        Para uma lista de distribuições válidas, use ''wsl.exe --list --online''.
 
         Opções:
             --enable-wsl1
@@ -466,14 +466,14 @@ Argumentos para gerenciar o Subsistema do Windows para Linux:
                 Baixa a distribuição da internet em vez da Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
-        Altera opções específicas da distribuição.
+        Altera as opções específicas da distribuição.
 
         Opções:
             --move &lt;Location&gt;
                 Move a distribuição para um novo local.
 
             --set-sparse, -s &lt;true|false&gt;
-                Define o vhdx da distribuição como esparso, permitindo que o espaço em disco seja recuperado automaticamente.
+                Defina o VHD de distribuição como esparso, permitindo que o espaço em disco seja recuperado automaticamente.
 
             --set-default-user &lt;Username&gt;
                 Define o usuário padrão da distribuição.
@@ -553,12 +553,12 @@ Argumentos para gerenciar as distribuições no Subsistema do Windows para Linux
                 Especifica a versão a ser usada para a nova distribuição.
 
             --vhd
-                Especifica que o arquivo fornecido é um arquivo .vhdx, e não um arquivo tar.
-                Essa operação faz uma cópia do arquivo .vhdx no local de instalação especificado.
+                Especifica que o arquivo fornecido é um arquivo .vhd ou .vhdx, não um arquivo tar.
+                Esta operação faz uma cópia do arquivo VHD no local de instalação especificado.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importa o arquivo .vhdx especificado como uma nova distribuição.
-        Esse disco rígido virtual deve ser formatado com o tipo de sistema de arquivos ext4.
+        Importa o arquivo VHD especificado como uma nova distribuição.
+        Este disco rígido virtual deve ser formatado com o tipo de sistema de arquivos ext4.
 
     --list, -l [Opções]
         Lista as distribuições.
@@ -578,7 +578,7 @@ Argumentos para gerenciar as distribuições no Subsistema do Windows para Linux
                 Mostra informações detalhadas sobre todas as distribuições.
 
             --online, -o
-                Exibe uma lista de distribuições disponíveis para instalação com 'wsl.exe --install'.
+                Exibe uma lista de distribuições disponíveis para instalação com ''wsl.exe --install''.
 
     --set-default, -s &lt;Distro&gt;
         Define a distribuição como o padrão.
@@ -633,7 +633,7 @@ Tempo de compilação: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Os módulos de kernel personalizados vhd em {} não foram encontrados: '{}'.</value>
+    <value>O VHD dos módulos de kernel personalizados em {} não foi encontrado: '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -711,8 +711,13 @@ Talvez seja necessário reiniciar o sistema para que as alterações entrem em v
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>O arquivo especificado deve ter a extensão de arquivo .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>O arquivo especificado deve ter a extensão de arquivo {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>O arquivo especificado deve ter a extensão de arquivo {} ou {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>O VmSwitch '{}' não foi encontrado. Switches disponíveis: {}</value>
@@ -1005,7 +1010,7 @@ Voltando à rede NAT.</value>
     <value>Ver Documentos</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Não foi possível concluir a operação porque o vhdx está em uso no momento. Para forçar o WSL a interromper o uso: wsl.exe --shutdown</value>
+    <value>Não foi possível concluir a operação porque o VHD está em uso no momento. Para forçar o WSL a interromper o uso: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1013,7 +1018,7 @@ Voltando à rede NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Há suporte para vhdx esparso somente no WSL2.</value>
+    <value>O VHD esparso é compatível apenas com o WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>A execução do WSL como sistema local não é suportada.</value>
@@ -1062,7 +1067,7 @@ Voltando à rede NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Parece um arquivo VHDX. Use --vhd para importar um VHDX em vez de um tar.</value>
+    <value>Parece um arquivo VHD. Use --vhd para importar um VHD em vez de um tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1113,9 +1118,9 @@ Código de erro: {}</value>
     <value>Devido a um problema de compatibilidade atual com o Cliente do Acesso Global Seguro, o Túnel DNS está desabilitado.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>O suporte ao VHD esparso está desabilitado no momento devido à possível corrupção de dados.
+    <value>O suporte a VHD esparso está atualmente desativado devido a possível corrupção de dados.
 Para forçar uma distribuição a usar um VHD esparso, execute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

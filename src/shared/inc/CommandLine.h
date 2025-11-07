@@ -162,9 +162,10 @@ struct AbsolutePath
     }
 };
 
+template <typename THandle = wil::unique_handle>
 struct Handle
 {
-    wil::unique_handle& output;
+    THandle& output;
 
     int operator()(const TChar* input) const
     {
@@ -173,7 +174,31 @@ struct Handle
             return -1;
         }
 
-        output.reset(ULongToHandle(wcstoul(input, nullptr, 0)));
+        if constexpr (std::is_same_v<THandle, wil::unique_socket>)
+        {
+            output.reset(reinterpret_cast<SOCKET>(ULongToHandle(wcstoul(input, nullptr, 0))));
+        }
+        else
+        {
+            output.reset(ULongToHandle(wcstoul(input, nullptr, 0)));
+        }
+
+        return 1;
+    }
+};
+
+struct Utf8String
+{
+    std::string& Value;
+
+    int operator()(const TChar* Input) const
+    {
+        if (Input == nullptr)
+        {
+            return -1;
+        }
+
+        Value = wsl::shared::string::WideToMultiByte(Input);
 
         return 1;
     }

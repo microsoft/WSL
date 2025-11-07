@@ -466,7 +466,7 @@ Linux için Windows Alt Sistemini yönetmeyi sağlayan bağımsız değişkenler
                 Dağıtımı yeni bir konuma taşır.
 
             --set-sparse, -s &lt;true|false&gt;
-                Dağıtım vhdx'inin aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
+                Dağıtım VHD'inin aralıklı olacak şekilde ayarlar ve böylece disk alanının otomatik olarak geri kazanılmasını sağlar.
 
             --set-default-user &lt;Username&gt;
                 Dağıtımın varsayılan kullanıcısını ayarlar.
@@ -537,7 +537,7 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
             --format &lt;Format&gt;
                 Dışarı aktarma biçimini belirtir. Desteklenen değerler: tar, tar.gz, vhd.
 
-    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
+    --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Seçenekler]
         Belirtilen tar dosyasını yeni bir dağıtım olarak içeri aktarır.
         Dosya adı - for stdin olabilir.
 
@@ -546,11 +546,11 @@ Linux için Windows Alt Sistemi'nde dağıtımı yönetmek için bağımsız de�
                 Yeni dağıtım için kullanılacak sürümü belirtir.
 
             --vhd
-                Sağlanan dosyanın tar dosyası değil, .vhdx dosyası olduğunu belirtir.
-                Bu işlem, belirtilen yükleme konumunda .vhdx dosyasının bir kopyasını oluşturur.
+                Sağlanan dosyanın tar dosyası değil, .vhd veya .vhdx dosyası olduğunu belirtir.
+                Bu işlem, belirtilen yükleme konumunda VHD dosyasının bir kopyasını oluşturur.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Belirtilen .vhdx dosyasını yeni bir dağıtım olarak içeri aktarır.
+        Belirtilen VHD dosyasını yeni bir dağıtım olarak içeri aktarır.
         Bu sanal sabit diskin ext4 dosya sistemi türüyle biçimlendirilmesi gerekir.
 
     --list, -l [Seçenekler]
@@ -626,7 +626,7 @@ Derleme zamanı: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>{} içinde vhd özel çekirdek modülleri bulunamadı: '{}'.</value>
+    <value>{} içinde özel çekirdek modülleri VHD'si bulunamadı: '{}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -704,8 +704,13 @@ Değişikliklerin etkili olması için sistemin yeniden başlatılması gerekebi
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Belirtilen dosyanın .vhdx dosya uzantısı olmalıdır.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Belirtilen dosyada {} dosya uzantısı olmalıdır.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Belirtilen dosyada {} veya {} dosya uzantısı olmalıdır.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>'{}' VmSwitch bulunamadı. Uygun anahtarlar: {}</value>
@@ -998,7 +1003,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <value>Belgeleri Göster</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>vhdx şu anda kullanımda olduğundan işlem tamamlanamadı. WSL'yi durmaya zorlamak için şunu kullanın: wsl.exe --shutdown</value>
+    <value>İşlem tamamlanamadı çünkü VHD şu anda kullanımda. WSL'yi durmaya zorlamak için şu komutu kullanın: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1006,7 +1011,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Seyrek vhdx yalnızca WSL2'de desteklenir.</value>
+    <value>Seyrek VHD yalnızca WSL2'de desteklenir.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>WSL'nin yerel sistem olarak çalıştırılması desteklenmez.</value>
@@ -1055,7 +1060,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Bu bir VHDX dosyası gibi görünüyor. Katran --vhd VHDX içeri aktarın.</value>
+    <value>Bu bir VHD dosyası gibi görünüyor. Katran --vhd VHD içeri aktarın.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1106,9 +1111,9 @@ Hata kodu: {}</value>
     <value>Küresel Güvenli Erişim İstemcisiyle ilgili mevcut bir uyumluluk sorunu nedeniyle DNS Tünelleme devre dışı bırakıldı.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Seyrek VHD desteği olası veri bozulması nedeniyle şu anda devre dışıdır.
+    <value>Seyrek VHD desteği olası veri bozulması nedeniyle şu anda devre dışı bırakılmıştır.
 Bir dağıtımı seyrek VHD kullanmaya zorlamak için lütfen şu komutu çalıştırın:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

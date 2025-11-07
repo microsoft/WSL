@@ -131,6 +131,7 @@ enum WslFdType
     WslFdTypeLinuxFileOutput = 8,
     WslFdTypeLinuxFileAppend = 16,
     WslFdTypeLinuxFileCreate = 32,
+    WslFdTypeTerminalControl = 64,
 };
 
 struct WslProcessFileDescriptorSettings
@@ -174,7 +175,7 @@ struct WslPortMappingSettings
     int AddressFamily;
 };
 
-HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE* Process);
+HRESULT WslLaunchInteractiveTerminal(HANDLE Input, HANDLE Output, HANDLE TerminalControl, HANDLE* Process);
 
 HRESULT WslWaitForLinuxProcess(WslVirtualMachineHandle VirtualMachine, int32_t Pid, uint64_t TimeoutMs, struct WslWaitResult* Result);
 

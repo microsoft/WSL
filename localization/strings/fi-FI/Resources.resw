@@ -546,11 +546,11 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
                 Määrittää uudelle jakelulle käytettävän version.
 
             --vhd
-                Määrittää, että annettu tiedosto on .vhdx-tiedosto, ei tar-tiedosto.
-                Tämä toiminto tekee .vhdx-tiedostosta kopion määritetyssä asennussijainnissa.
+                Määrittää, että annettu tiedosto on .vhd- tai .vhdx-tiedosto, ei tar-tiedosto.
+                Tämä toiminto tekee VHD-tiedostosta kopion määritetyssä asennussijainnissa.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Tuo määritetyn .vhdx-tiedoston uutena jakeluna.
+        Tuo määritetyn VHD-tiedoston uutena jakeluna.
         Tämä virtuaalikiintolevy on alustettava ext4-tiedostojärjestelmän tyypillä.
 
     --list, -l [Asetukset]
@@ -571,7 +571,7 @@ Argumentit Windows-alijärjestelmän Linuxille jakelujen hallintaan:
                 Näytä yksityiskohtaiset tiedot kaikista jakeluista.
 
             --online, -o
-                Näyttää luettelon asennettavissa olevista jakeluista argumentilla 'wsl.exe --install'.
+                Näyttää luettelon asennettavissa olevista jakeluista argumentilla wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
         Määrittää jakelun oletukseksi.
@@ -704,8 +704,13 @@ Järjestelmä on ehkä käynnistettävä uudelleen, jotta muutokset tulevat voim
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Määritetyn tiedoston tiedostotunnisteen on oltava .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Määritetyllä tiedostolla on oltava tiedostotunniste {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Määritetyllä tiedostolla on oltava tiedostotunniste {} tai {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>VmSwitch-kohdetta {} ei löytynyt. Käytettävissä olevat valitsimet: {}</value>
@@ -998,7 +1003,7 @@ Palataan nat-verkkopalveluun.</value>
     <value>Näytä asiakirjat</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Toimintoa ei voitu suorittaa loppuun, koska vhdx on parhaillaan käytössä. WSL:n käytön lopettaminen: wsl.exe --shutdown</value>
+    <value>Toimintoa ei voitu suorittaa loppuun, koska VHD on parhaillaan käytössä. WSL:n käytön lopettaminen: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1006,7 +1011,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Harvaa vhdx:ää tuetaan vain WSL2:ssa.</value>
+    <value>Harvaa virtuaalikiintolevyä tuetaan vain WSL2:ssa.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>WSL:n suorittamista paikallisena järjestelmänä ei tueta.</value>
@@ -1055,7 +1060,7 @@ Palataan nat-verkkopalveluun.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Tämä näyttää VHDX-tiedostolta. --vhd näppäimellä voit tuoda VHDX:n tar-tiedoston sijaan.</value>
+    <value>Tämä näyttää VHD-tiedostolta. --vhd -näppäimellä voit tuoda VHD:n tar-tiedoston sijaan.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1108,7 +1113,7 @@ Virhekoodi: {}</value>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Harva virtuaalikiintolevyn tuki on tällä hetkellä poistettu käytöstä tietojen mahdollisen vioittumisen vuoksi.
 Jos haluat pakottaa jakelun käyttämään harvaa virtuaalikiintolevyä, suorita seuraavasti:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

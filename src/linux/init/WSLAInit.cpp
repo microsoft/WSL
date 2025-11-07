@@ -85,10 +85,19 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_ACCEPT& M
 
     Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
 
-    wil::unique_fd Socket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
+    wil::unique_fd Socket{
+        UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS, Message.Fd != -1 ? SOCK_CLOEXEC : 0)};
     THROW_LAST_ERROR_IF(!Socket);
 
-    THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
+    if (Message.Fd != -1)
+    {
+        THROW_LAST_ERROR_IF(dup2(Socket.get(), Message.Fd) < 0);
+    }
+    else
+    {
+        Channel.SendResultMessage<int32_t>(Socket.get());
+        Socket.release();
+    }
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
@@ -159,12 +168,16 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY
 {
     THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
 
-    pollfd pollDescriptors[2];
+    wsl::shared::SocketChannel TerminalControlChannel({Message.TtyControl}, "TerminalControl");
+
+    pollfd pollDescriptors[3];
 
     pollDescriptors[0].fd = Message.TtyInput;
     pollDescriptors[0].events = POLLIN;
     pollDescriptors[1].fd = Message.TtyMaster;
     pollDescriptors[1].events = POLLIN;
+    pollDescriptors[2].fd = Message.TtyControl;
+    pollDescriptors[2].events = POLLIN;
 
     std::vector<gsl::byte> pendingStdin;
     std::vector<gsl::byte> buffer;
@@ -267,6 +280,30 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY
                 LOG_ERROR("write failed {}", errno);
                 CLOSE(pollDescriptors[1].fd);
                 pollDescriptors[1].fd = -1;
+            }
+        }
+
+        // Process message from the terminal control channel.
+        if (pollDescriptors[2].revents & (POLLIN | POLLHUP | POLLERR))
+        {
+            auto [ttyMessage, _] = TerminalControlChannel.ReceiveMessageOrClosed<WSLA_TERMINAL_CHANGED>();
+
+            //
+            // A zero-byte read means that the control channel has been closed
+            // and that the relay process should exit.
+            //
+
+            if (ttyMessage == nullptr)
+            {
+                break;
+            }
+
+            winsize terminal{};
+            terminal.ws_col = ttyMessage->Columns;
+            terminal.ws_row = ttyMessage->Rows;
+            if (ioctl(Message.TtyMaster, TIOCSWINSZ, &terminal))
+            {
+                LOG_ERROR("ioctl({}, TIOCSWINSZ) failed {}", Message.TtyMaster, errno);
             }
         }
     }

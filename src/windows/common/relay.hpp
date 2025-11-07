@@ -43,6 +43,8 @@ bool InterruptableWait(_In_ HANDLE WaitObject, _In_ const std::vector<HANDLE>& E
 DWORD
 InterruptableWrite(_In_ HANDLE OutputHandle, _In_ gsl::span<const gsl::byte> Buffer, _In_ const std::vector<HANDLE>& ExitHandles, _In_ LPOVERLAPPED Overlapped);
 
+void StandardInputRelay(HANDLE ConsoleHandle, HANDLE OutputHandle, const std::function<void()>& UpdateTerminalSize, HANDLE ExitEvent);
+
 enum class RelayFlags
 {
     None = 0,

@@ -441,17 +441,21 @@ class WSLATests
         auto vm = CreateVm(&settings);
 
         std::vector<const char*> commandLine{"/bin/sh", nullptr};
-        std::vector<WslProcessFileDescriptorSettings> fds(2);
+        std::vector<WslProcessFileDescriptorSettings> fds(3);
         fds[0].Number = 0;
         fds[0].Type = WslFdTypeTerminalInput;
         fds[1].Number = 1;
         fds[1].Type = WslFdTypeTerminalOutput;
+        fds[2].Number = 2;
+        fds[2].Type = WslFdTypeTerminalControl;
 
+        const char* env[] = {"TERM=xterm-256color", nullptr};
         WslCreateProcessSettings WslCreateProcessSettings{};
         WslCreateProcessSettings.Executable = "/bin/sh";
         WslCreateProcessSettings.Arguments = commandLine.data();
         WslCreateProcessSettings.FileDescriptors = fds.data();
         WslCreateProcessSettings.FdCount = static_cast<ULONG>(fds.size());
+        WslCreateProcessSettings.Environment = env;
 
         int pid = -1;
         VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm.get(), &WslCreateProcessSettings, &pid));
@@ -487,11 +491,14 @@ class WSLATests
         // Validate that the interactive process successfully starts
         wil::unique_handle process;
         VERIFY_SUCCEEDED(WslLaunchInteractiveTerminal(
-            WslCreateProcessSettings.FileDescriptors[0].Handle, WslCreateProcessSettings.FileDescriptors[1].Handle, &process));
+            WslCreateProcessSettings.FileDescriptors[0].Handle,
+            WslCreateProcessSettings.FileDescriptors[1].Handle,
+            WslCreateProcessSettings.FileDescriptors[2].Handle,
+            &process));
 
         // Exit the shell
         writeTty("exit\n");
-        VERIFY_ARE_EQUAL(WaitForSingleObject(process.get(), 30 * 1000), WAIT_OBJECT_0);
+        VERIFY_ARE_EQUAL(WaitForSingleObject(process.get(), 30000 * 1000), WAIT_OBJECT_0);
     }
 
     TEST_METHOD(NATNetworking)
@@ -518,6 +525,37 @@ class WSLATests
 
         // Verify that /etc/resolv.conf is configured
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
+    }
+
+    TEST_METHOD(NATNetworkingWithDnsTunneling)
+    {
+        WSL2_TEST_ONLY();
+
+        WslVirtualMachineSettings settings{};
+        settings.CPU.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.Memory.MemoryMb = 2048;
+        settings.Options.BootTimeoutMs = 30 * 1000;
+        settings.Networking.Mode = WslNetworkingModeNAT;
+        settings.Networking.DnsTunneling = true;
+
+        auto vm = CreateVm(&settings);
+
+        // Validate that eth0 has an ip address
+        VERIFY_ARE_EQUAL(
+            RunCommand(
+                vm.get(),
+                {"/bin/bash",
+                 "-c",
+                 "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"}),
+            0);
+
+        // Verify that /etc/resolv.conf is correctly configured.
+        auto [pid, in, out, err] = LaunchCommand(vm.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"});
+
+        auto output = ReadToString((SOCKET)out.get());
+
+        VERIFY_ARE_EQUAL(output, std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
     }
 
     TEST_METHOD(OpenFiles)
@@ -1075,10 +1113,17 @@ class WSLATests
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        WSLA_SESSION_CONFIGURATION settings{L"my-display-name"};
+        WSLA_SESSION_SETTINGS settings{L"create-session-smoke-test"};
         wil::com_ptr<IWSLASession> session;
 
         VIRTUAL_MACHINE_SETTINGS vmSettings{};
+        vmSettings.BootTimeoutMs = 30 * 1000;
+        vmSettings.DisplayName = L"WSLA";
+        vmSettings.MemoryMb = 2048;
+        vmSettings.CpuCount = 4;
+        vmSettings.NetworkingMode = WslNetworkingModeNone;
+        vmSettings.EnableDebugShell = true;
+
         VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
 
         wil::unique_cotaskmem_string returnedDisplayName;
