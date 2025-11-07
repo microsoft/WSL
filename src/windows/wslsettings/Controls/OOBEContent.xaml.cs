@@ -1,7 +1,8 @@
-﻿// Copyright (c) Microsoft Corporation
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.UI.ViewManagement;
 
 namespace WslSettings.Controls
 {
@@ -10,6 +11,15 @@ namespace WslSettings.Controls
         public OOBEContent()
         {
             this.InitializeComponent();
+
+            // Adjust hero image height based on text scaling for better accessibility
+            var settings = new UISettings();
+            double textScaleFactor = settings.TextScaleFactor;
+            double baseImageHeight = 280.0;
+
+            // Reduce image height when text scaling increases to preserve content space
+            // Use inverse relationship: as text gets larger, image gets proportionally smaller
+            HeroImageHeight = Math.Max(baseImageHeight / textScaleFactor, 200.0);
         }
 
         public string Title

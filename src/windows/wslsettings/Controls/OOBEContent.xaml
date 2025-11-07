@@ -19,7 +19,7 @@
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel
-                Margin="32,24"
+                Margin="{StaticResource ContentPageMargin}"
                 VerticalAlignment="Top"
                 Orientation="Vertical"
                 Spacing="12">
