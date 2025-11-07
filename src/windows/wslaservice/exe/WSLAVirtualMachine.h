@@ -17,6 +17,7 @@ Abstract:
 #include "hcs.hpp"
 #include "Dmesg.h"
 #include "WSLAApi.h"
+#include "WSLAProcess.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -28,6 +29,8 @@ class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
 {
 public:
     WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, WSLAUserSessionImpl* UserSession);
+
+    // TODO: Clear processes on exit
     ~WSLAVirtualMachine();
 
     void Start();
@@ -48,6 +51,8 @@ public:
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
     IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
     IFACEMETHOD(MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)) override;
+
+    void OnProcessReleased(int Pid);
 
 private:
     struct ConnectedSocket
@@ -98,6 +103,7 @@ private:
     bool m_running = false;
     PSID m_userSid{};
     std::wstring m_debugShellPipe;
+    std::vector<WSLAProcess*> m_trackedProcesses;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;

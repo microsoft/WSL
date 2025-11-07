@@ -46,9 +46,9 @@ HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** process)
 HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
 try
 {
-    auto process = wil::MakeOrThrow<WSLAProcess>();
+    //auto process = wil::MakeOrThrow<WSLAProcess>();
 
-    process.CopyTo(__uuidof(IWSLAProcess), (void**)Process);
+    //process.CopyTo(__uuidof(IWSLAProcess), (void**)Process);
 
     return S_OK;
 }

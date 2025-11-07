@@ -1108,3 +1108,11 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+void WSLAVirtualMachine::OnProcessReleased(int Pid)
+{
+    std::lock_guard lock{m_lock};
+
+    auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
+    WI_VERIFY(erased == 1);
+}
