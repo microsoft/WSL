@@ -24,8 +24,26 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
 {
 public:
     WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings);
-    IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName);
-    IFACEMETHOD(GetVirtualMachine)(IWSLAVirtualMachine** VirtualMachine);
+
+    IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName) override;
+
+    // Image management.
+    IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(ImportImage)(_In_ ULONG Handle, _In_ LPCWSTR Image, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
+    IFACEMETHOD(DeleteImage)(_In_ LPCWSTR Image) override;
+
+    // Container management.
+    IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
+    IFACEMETHOD(OpenContainer)(_In_ LPCWSTR Name, _In_ IWSLAContainer** Container) override;
+    IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
+
+    // VM management.
+    IFACEMETHOD(GetVirtualMachine)(IWSLAVirtualMachine** VirtualMachine) override;
+    IFACEMETHOD(CreateRootNamespaceProcess)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** VirtualMachine) override;
+
+    // Disk management.
+    IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
 private:
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not

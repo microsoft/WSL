@@ -1131,4 +1131,41 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
     }
+
+    TEST_METHOD(WiringSmokeTest)
+    {
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
+        wil::com_ptr<IWSLASession> session;
+
+        VIRTUAL_MACHINE_SETTINGS vmSettings{};
+        vmSettings.BootTimeoutMs = 30 * 1000;
+        vmSettings.DisplayName = L"WSLA";
+        vmSettings.MemoryMb = 2048;
+        vmSettings.CpuCount = 4;
+        vmSettings.NetworkingMode = WslNetworkingModeNone;
+        vmSettings.EnableDebugShell = true;
+
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
+
+        wil::com_ptr<IWSLAContainer> container;
+        WSLA_CONTAINER_OPTIONS containerOptions{};
+        containerOptions.Image = "dummy";
+        containerOptions.Name = "dummy";
+        VERIFY_SUCCEEDED(session->CreateContainer(&containerOptions, &container));
+
+        wil::com_ptr<IWSLAProcess> process;
+        WSLA_PROCESS_OPTIONS processOptions{};
+        processOptions.Executable = "dummy";
+        VERIFY_SUCCEEDED(container->Exec(&processOptions, &process));
+
+        wil::unique_handle exitEvent;
+        VERIFY_SUCCEEDED(process->GetExitEvent(reinterpret_cast<ULONG*>(exitEvent.addressof())));
+
+        // Verify that the event handle is valid.
+        VERIFY_ARE_EQUAL(WaitForSingleObject(exitEvent.get(), 0), WAIT_TIMEOUT);
+    }
 };
