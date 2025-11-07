@@ -12,8 +12,10 @@ Abstract:
 
 --*/
 
+#include "precomp.h"
 #include "WSLASession.h"
 #include "WSLAUserSession.h"
+#include "WSLAContainer.h"
 
 using wsl::windows::service::wsla::WSLASession;
 
@@ -32,8 +34,61 @@ HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
     return S_OK;
 }
 
+HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
+{
+    return E_NOTIMPL;
+}
+
+HRESULT WSLASession::ImportImage(ULONG Handle, LPCWSTR Image, IProgressCallback* ProgressCallback)
+{
+    return E_NOTIMPL;
+}
+
+HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+{
+    return E_NOTIMPL;
+}
+
+HRESULT WSLASession::DeleteImage(LPCWSTR Image)
+{
+    return E_NOTIMPL;
+}
+
+HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* Options, IWSLAContainer** Container)
+try
+{
+    // Basic instanciation for testing.
+    // TODO: Implement.
+
+    auto container = wil::MakeOrThrow<WSLAContainer>();
+    container.CopyTo(__uuidof(IWSLAContainer), (void**)Container);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::OpenContainer(LPCWSTR Name, IWSLAContainer** Container)
+{
+    return E_NOTIMPL;
+}
+
+HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Images, ULONG* Count)
+{
+    return E_NOTIMPL;
+}
+
 HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
 {
     THROW_IF_FAILED(m_virtualMachine.QueryInterface(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
     return S_OK;
+}
+
+HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** VirtualMachine)
+{
+    return E_NOTIMPL;
+}
+
+HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
+{
+    return E_NOTIMPL;
 }

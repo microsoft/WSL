@@ -2,6 +2,8 @@ set(SOURCES
     application.manifest
     main.rc
     ServiceMain.cpp
+    WSLAContainer.cpp
+    WSLAProcess.cpp
     WSLASession.cpp
     WSLAUserSession.cpp
     WSLAUserSessionFactory.cpp
@@ -9,6 +11,8 @@ set(SOURCES
     )
 
 set(HEADERS
+    WSLAContainer.h
+    WSLAProcess.h
     WSLASession.h
     WSLAUserSession.h
     WSLAUserSessionFactory.h

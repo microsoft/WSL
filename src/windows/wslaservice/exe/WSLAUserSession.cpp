@@ -113,3 +113,12 @@ try
     return session->CreateSession(Settings, VmSettings, WslaSession);
 }
 CATCH_RETURN();
+
+HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_INFORMATION** Sessions, ULONG* SessionsCount)
+{
+    return E_NOTIMPL;
+}
+HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
+{
+    return E_NOTIMPL;
+}

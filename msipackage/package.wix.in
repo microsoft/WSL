@@ -252,6 +252,18 @@
                     <RegistryValue Name="LocalService" Value="WSLAService" Type="string" />
                 </RegistryKey>
 
+                <!-- WSLAContainer -->
+                <RegistryKey Root="HKCR" Key="CLSID\{B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4}">
+                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
+                    <RegistryValue Value="WSLAContainer" Type="string" />
+                </RegistryKey>
+
+                <!-- WSLAProcess -->
+                <RegistryKey Root="HKCR" Key="CLSID\{AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B}">
+                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
+                    <RegistryValue Value="WSLAProcess" Type="string" />
+                </RegistryKey>
+
                 <!-- WSLAUserSession -->
                 <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
@@ -263,7 +275,6 @@
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
                     <RegistryValue Value="WSLAVirtualMachine" Type="string" />
                 </RegistryKey>
-
                 <!-- WSLASession -->
                 <RegistryKey Root="HKCR" Key="CLSID\{4877FEFC-4977-4929-A958-9F36AA1892A4}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
@@ -286,9 +297,33 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLAContainer-->
+                <RegistryKey Root="HKCR" Key="Interface\{7577FE8D-DE85-471E-B870-11669986F332}">
+                    <RegistryValue Value="IWSLAContainer" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLAProcess-->
+                <RegistryKey Root="HKCR" Key="Interface\{1AD163CD-393D-4B33-83A2-8A3F3F23E608}">
+                    <RegistryValue Value="IWSLAProcess" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- ITerminationCallback-->
                 <RegistryKey Root="HKCR" Key="Interface\{7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE}">
                     <RegistryValue Value="ITerminationCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IProgressCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{5038842F-53DB-4F30-A6D0-A41B02C94AC1}">
+                    <RegistryValue Value="IProgressCallback" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
                     </RegistryKey>

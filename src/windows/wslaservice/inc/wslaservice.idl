@@ -159,8 +159,8 @@ struct WSLA_PORT_MAPPING
 
 struct WSLA_CONTAINER_OPTIONS
 {
-    LPCWSTR Image;
-    LPCWSTR Name;
+    LPCSTR Image;
+    LPCSTR Name;
     struct WSLA_PROCESS_OPTIONS* InitProcessOptions;
     [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
     ULONG VolumesCount;
@@ -227,7 +227,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
-    HRESULT Exec([in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
 
     // Anonymous host port allocation (P1).
     //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
@@ -242,18 +242,18 @@ interface IWSLAContainer : IUnknown
 interface IWSLASession : IUnknown
 {
     // Image management.
-    HRESULT PullImage([in] LPCWSTR Image, [in, unique] struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT PullImage([in] LPCWSTR Image, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT ImportImage([in] ULONG Handle, [in] LPCWSTR Image, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] LPCWSTR Image);
 
     // Container management.
-    HRESULT CreateContainer([in] struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
+    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
     HRESULT OpenContainer([in] LPCWSTR Name, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in] struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    HRESULT CreateRootNamespaceProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
