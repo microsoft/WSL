@@ -347,6 +347,17 @@ try
             TraceLoggingValue(message->Pid, "Pid"),
             TraceLoggingValue(message->Code, "Code"),
             TraceLoggingValue(message->Signaled, "Signaled"));
+
+
+        // Signal the exited process, if it's been monitored.
+        {
+            std::lock_guard lock{m_lock};
+
+            for (auto &e: m_trackedProcesses)
+            {
+            
+            }
+        }
     }
 }
 CATCH_LOG();
@@ -679,10 +690,12 @@ void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, cons
     THROW_HR_IF_MSG(E_FAIL, result != 0, "Failed to open %hs (flags: %u), %i", Path, Flags, result);
 }
 
-HRESULT WSLAVirtualMachine::CreateLinuxProcessImpl(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process)
+HRESULT WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process)
 try
 {
     CreateLinuxProcessImpl(*Options).CopyTo(Process);
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -773,7 +786,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(_
         socketMap.emplace(fd, std::move(socket));
     }
 
-    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(socketMap));
+    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(socketMap), pid, this);
 
     {
         std::lock_guard lock{m_lock};

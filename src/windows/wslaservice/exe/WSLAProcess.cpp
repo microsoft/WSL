@@ -50,17 +50,21 @@ try
 {
     // m_handles is immutable, so m_mutex doesn't need to be acquired.
 
-    auto it = m_handles.find(Index);
-    if (it == m_handles.end())
-    {
-        RETURN_HR(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-    }
-
-    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(it->second.get()));
+    auto& socket = GetSocket(Index);
+    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(socket.get())));
 
     return S_OK;
 }
 CATCH_RETURN();
+
+wil::unique_socket& WSLAProcess::GetSocket(int Index)
+{
+    // m_handles is immutable, so m_mutex doesn't need to be acquired.
+    auto it = m_handles.find(Index);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_handles.end());
+
+    return it->second;
+}
 
 HRESULT WSLAProcess::GetPid(int* Pid)
 try
