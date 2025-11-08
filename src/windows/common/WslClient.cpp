@@ -1596,6 +1596,31 @@ int WslaShell(_In_ std::wstring_view commandLine)
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
 
+    {
+        auto cmd = "/bin/ls";
+        WSLA_CREATE_PROCESS_OPTIONS processOptions{};
+        processOptions.Executable = cmd;
+        processOptions.CommandLine = &cmd;
+        processOptions.CommandLineCount = 1;
+        processOptions.Environment = nullptr;
+        processOptions.CurrentDirectory = "/";
+
+        ULONG dummy;
+        WSLA_CREATE_PROCESS_RESULT result{};
+        auto createProcessResult = virtualMachine->CreateLinuxProcess(&processOptions, 0, nullptr, &dummy, &result);
+        if (FAILED(createProcessResult))
+        {
+            if (result.Errno != 0)
+            {
+                THROW_HR_WITH_USER_ERROR(E_FAIL, std::format(L"Failed to create process {}, errno = {}", shell.c_str(), result.Errno));
+            }
+            else
+            {
+                THROW_HR(createProcessResult);
+            }
+        }
+    }
+
     std::vector<const char*> shellCommandLine{shell.c_str()};
     std::vector<const char*> env{"TERM=xterm-256color"};
 

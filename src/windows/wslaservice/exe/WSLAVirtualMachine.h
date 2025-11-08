@@ -83,6 +83,8 @@ private:
 
     HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags);
 
+    void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
+
     struct AttachedDisk
     {
         std::filesystem::path Path;
@@ -91,6 +93,8 @@ private:
     };
 
     VIRTUAL_MACHINE_SETTINGS m_settings;
+    std::thread m_processExitThread;
+
     GUID m_vmId{};
     std::wstring m_vmIdString;
     wsl::windows::common::helpers::WindowsVersion m_windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();

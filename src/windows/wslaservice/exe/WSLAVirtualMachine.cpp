@@ -102,6 +102,11 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
         }
         CATCH_LOG()
     }
+
+    if (m_processExitThread.joinable())
+    {
+        m_processExitThread.join();
+    }
 }
 
 void WSLAVirtualMachine::Start()
@@ -315,7 +320,36 @@ void WSLAVirtualMachine::Start()
 
         wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
     }
+
+    auto [_, __, childChannel] = Fork(WSLA_FORK::Thread);
+
+    WSLA_WATCH_PROCESSES watchMessage{};
+    childChannel.SendMessage(watchMessage);
+
+    THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
+
+    m_processExitThread = std::thread(std::bind(&WSLAVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
 }
+
+void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
+try
+{
+    while (true)
+    {
+        auto [message, _] = Channel.ReceiveMessageOrClosed<WSLA_PROCESS_EXITED>();
+        if (message == nullptr)
+        {
+            break; // Channel has been closed, exit
+        }
+
+        WSL_LOG(
+            "ProcessExited",
+            TraceLoggingValue(message->Pid, "Pid"),
+            TraceLoggingValue(message->Code, "Code"),
+            TraceLoggingValue(message->Signaled, "Signaled"));
+    }
+}
+CATCH_LOG();
 
 void WSLAVirtualMachine::ConfigureNetworking()
 {
