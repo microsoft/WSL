@@ -1607,31 +1607,20 @@ int WslaShell(_In_ std::wstring_view commandLine)
     fds[2].Fd = 2;
     fds[2].Type = WslFdTypeTerminalControl;
 
-    WSLA_CREATE_PROCESS_OPTIONS processOptions{};
+    WSLA_PROCESS_OPTIONS processOptions{};
     processOptions.Executable = shell.c_str();
     processOptions.CommandLine = shellCommandLine.data();
     processOptions.CommandLineCount = static_cast<ULONG>(shellCommandLine.size());
     processOptions.Environment = env.data();
     processOptions.EnvironmentCount = static_cast<ULONG>(env.size());
     processOptions.CurrentDirectory = "/";
+    processOptions.Fds = fds.data();
+    processOptions.FdsCount = static_cast<DWORD>(fds.size());
 
     std::vector<ULONG> handles(fds.size());
 
-    WSLA_CREATE_PROCESS_RESULT result{};
-    auto createProcessResult =
-        virtualMachine->CreateLinuxProcess(&processOptions, static_cast<ULONG>(fds.size()), fds.data(), handles.data(), &result);
-
-    if (FAILED(createProcessResult))
-    {
-        if (result.Errno != 0)
-        {
-            THROW_HR_WITH_USER_ERROR(E_FAIL, std::format(L"Failed to create process {}, errno = {}", shell.c_str(), result.Errno));
-        }
-        else
-        {
-            THROW_HR(createProcessResult);
-        }
-    }
+    Microsoft::WRL::ComPtr<IWSLAProcess> process;
+    THROW_IF_FAILED(virtualMachine->CreateLinuxProcess(&processOptions, &process));
 
     // Configure console for interactive usage.
 
@@ -1688,9 +1677,14 @@ int WslaShell(_In_ std::wstring_view commandLine)
         wsl::windows::common::relay::InterruptableRelay(UlongToHandle(handles[1]), Stdout);
     }
 
-    ULONG exitState{};
+    wil::unique_event exitEvent;
+    THROW_IF_FAILED(process->GetExitEvent(reinterpret_cast<ULONG*>(exitEvent.addressof())));
+
+    exitEvent.wait();
+
+    WSLA_PROCESS_STATE state{};
     int exitCode{};
-    THROW_IF_FAILED(virtualMachine->WaitPid(result.Pid, 0, &exitState, &exitCode));
+    THROW_IF_FAILED(process->GetState(&state, &exitCode));
 
     wprintf(L"%hs exited with: %i", shell.c_str(), exitCode);
 

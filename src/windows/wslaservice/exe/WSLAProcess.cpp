@@ -18,7 +18,7 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLAProcess;
 
-WSLAProcess::WSLAProcess(std::map<int, wil::unique_handle>&& handles, int pid, WSLAVirtualMachine* virtualMachine) :
+WSLAProcess::WSLAProcess(std::map<int, wil::unique_socket>&& handles, int pid, WSLAVirtualMachine* virtualMachine) :
     m_handles(std::move(handles)), m_pid(pid), m_virtualMachine(virtualMachine)
 {
 }

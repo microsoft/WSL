@@ -21,6 +21,7 @@ Abstract:
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
 using helpers::WindowsVersion;
+using wsl::windows::service::wsla::WSLAProcess;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
@@ -325,8 +326,6 @@ void WSLAVirtualMachine::ConfigureNetworking()
     else if (m_settings.NetworkingMode == WslNetworkingModeNAT)
     {
         // Launch GNS
-        // WSLA-TODO: Using fd=4 here seems to hang gns. There's probably a hardcoded file descriptor somewhere that's causing
-        // so using 1000 for now.
         std::vector<WSLA_PROCESS_FD> fds(1);
         fds[0].Fd = -1;
         fds[0].Type = WslFdType::WslFdTypeDefault;
@@ -340,21 +339,27 @@ void WSLAVirtualMachine::ConfigureNetworking()
             THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
         }
 
-        WSLA_CREATE_PROCESS_OPTIONS options{};
+        WSLA_PROCESS_OPTIONS options{};
         options.Executable = "/init";
+        options.Fds = fds.data();
+        options.FdsCount = static_cast<DWORD>(fds.size());
 
         // Because the file descriptors numbers aren't known in advance, the command line needs to be generated after the file
         // descriptors are allocated.
 
         std::string socketFdArg;
         std::string dnsFdArg;
+        int gnsChannelFd = -1;
+        int dnsChannelFd = -1;
         auto prepareCommandLine = [&](const auto& sockets) {
-            socketFdArg = std::to_string(sockets[0].Fd);
+            gnsChannelFd = sockets[0].Fd;
+            socketFdArg = std::to_string(gnsChannelFd);
             cmd.emplace_back(socketFdArg.c_str());
 
             if (sockets.size() > 1)
             {
-                dnsFdArg = std::to_string(sockets[1].Fd);
+                dnsChannelFd = sockets[1].Fd;
+                dnsFdArg = std::to_string(dnsChannelFd);
                 cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
                 cmd.emplace_back(dnsFdArg.c_str());
                 cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
@@ -366,7 +371,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
         };
 
         WSLA_CREATE_PROCESS_RESULT result{};
-        auto sockets = CreateLinuxProcessImpl(&options, static_cast<DWORD>(fds.size()), fds.data(), &result, prepareCommandLine);
+        auto process = CreateLinuxProcessImpl(options, prepareCommandLine);
 
         THROW_HR_IF(E_FAIL, result.Errno != 0);
 
@@ -382,9 +387,9 @@ void WSLAVirtualMachine::ConfigureNetworking()
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
             wsl::core::NatNetworking::CreateNetwork(config),
-            std::move(sockets[0].Socket),
+            std::move(process->GetSocket(gnsChannelFd)),
             config,
-            sockets.size() > 1 ? std::move(sockets[1].Socket) : wil::unique_socket{});
+            dnsChannelFd != -1 ? std::move(process->GetSocket(dnsChannelFd)) : wil::unique_socket{});
 
         m_networkEngine->Initialize();
 
@@ -606,8 +611,8 @@ WSLAVirtualMachine::ConnectedSocket WSLAVirtualMachine::ConnectSocket(wsl::share
     WSLA_ACCEPT message{};
     message.Fd = Fd;
     const auto& response = Channel.Transaction(message);
-    ConnectedSocket socket;
 
+    ConnectedSocket socket;
     socket.Socket = wsl::windows::common::hvsocket::Connect(m_vmId, response.Result);
 
     // If the FD was unspecified, read the Linux file descriptor from the guest.
@@ -640,58 +645,43 @@ void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, cons
     THROW_HR_IF_MSG(E_FAIL, result != 0, "Failed to open %hs (flags: %u), %i", Path, Flags, result);
 }
 
-HRESULT WSLAVirtualMachine::CreateLinuxProcess(
-    _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, ULONG FdCount, WSLA_PROCESS_FD* Fds, _Out_ ULONG* Handles, _Out_ WSLA_CREATE_PROCESS_RESULT* Result)
+HRESULT WSLAVirtualMachine::CreateLinuxProcessImpl(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process)
 try
 {
-    auto sockets = CreateLinuxProcessImpl(Options, FdCount, Fds, Result);
-
-    for (size_t i = 0; i < sockets.size(); i++)
-    {
-        if (sockets[i].Socket)
-        {
-            Handles[i] = HandleToUlong(
-                wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(sockets[i].Socket.get())));
-        }
-    }
-
-    return S_OK;
+    CreateLinuxProcessImpl(*Options).CopyTo(Process);
 }
 CATCH_RETURN();
 
-std::vector<WSLAVirtualMachine::ConnectedSocket> WSLAVirtualMachine::CreateLinuxProcessImpl(
-    _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options,
-    _In_ ULONG FdCount,
-    _In_ WSLA_PROCESS_FD* Fds,
-    _Out_ WSLA_CREATE_PROCESS_RESULT* Result,
-    const TPrepareCommandLine& PrepareCommandLine)
+Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(_In_ const WSLA_PROCESS_OPTIONS& Options, const TPrepareCommandLine& PrepareCommandLine)
 {
     // Check if this is a tty or not
     const WSLA_PROCESS_FD* ttyInput = nullptr;
     const WSLA_PROCESS_FD* ttyOutput = nullptr;
     const WSLA_PROCESS_FD* ttyControl = nullptr;
-    auto interactiveTty = ParseTtyInformation(Fds, FdCount, &ttyInput, &ttyOutput, &ttyControl);
+    auto interactiveTty = ParseTtyInformation(Options.Fds, Options.FdsCount, &ttyInput, &ttyOutput, &ttyControl);
     auto [pid, _, childChannel] = Fork(WSLA_FORK::Process);
 
-    std::vector<ConnectedSocket> sockets(FdCount);
-    for (size_t i = 0; i < FdCount; i++)
+    std::vector<WSLAVirtualMachine::ConnectedSocket> sockets;
+    for (size_t i = 0; i < Options.FdsCount; i++)
     {
-        if (Fds[i].Type == WslFdTypeDefault || Fds[i].Type == WslFdTypeTerminalInput || Fds[i].Type == WslFdTypeTerminalOutput ||
-            Fds[i].Type == WslFdTypeTerminalControl)
+        if (Options.Fds[i].Type == WslFdTypeDefault || Options.Fds[i].Type == WslFdTypeTerminalInput ||
+            Options.Fds[i].Type == WslFdTypeTerminalOutput || Options.Fds[i].Type == WslFdTypeTerminalControl)
         {
-            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Fds[i].Type);
-            sockets[i] = ConnectSocket(childChannel, static_cast<int32_t>(Fds[i].Fd));
+            THROW_HR_IF_MSG(
+                E_INVALIDARG, Options.Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Options.Fds[i].Type);
+            sockets.emplace_back(ConnectSocket(childChannel, static_cast<int32_t>(Options.Fds[i].Fd)));
         }
         else
         {
             THROW_HR_IF_MSG(
                 E_INVALIDARG,
-                WI_IsAnyFlagSet(Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput | WslFdTypeTerminalControl),
+                WI_IsAnyFlagSet(Options.Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput | WslFdTypeTerminalControl),
                 "Invalid flags: %i",
-                Fds[i].Type);
+                Options.Fds[i].Type);
 
-            THROW_HR_IF_MSG(E_INVALIDARG, Fds[i].Path == nullptr, "Fd[%zu] has a null path but flags: %i", i, Fds[i].Type);
-            OpenLinuxFile(childChannel, Fds[i].Path, Fds[i].Type, Fds[i].Fd);
+            THROW_HR_IF_MSG(
+                E_INVALIDARG, Options.Fds[i].Path == nullptr, "Fd[%zu] has a null path but flags: %i", i, Options.Fds[i].Type);
+            OpenLinuxFile(childChannel, Options.Fds[i].Path, Options.Fds[i].Type, Options.Fds[i].Fd);
         }
     }
 
@@ -699,10 +689,10 @@ std::vector<WSLAVirtualMachine::ConnectedSocket> WSLAVirtualMachine::CreateLinux
 
     wsl::shared::MessageWriter<WSLA_EXEC> Message;
 
-    Message.WriteString(Message->ExecutableIndex, Options->Executable);
-    Message.WriteString(Message->CurrentDirectoryIndex, Options->CurrentDirectory ? Options->CurrentDirectory : "/");
-    Message.WriteStringArray(Message->CommandLineIndex, Options->CommandLine, Options->CommandLineCount);
-    Message.WriteStringArray(Message->EnvironmentIndex, Options->Environment, Options->EnvironmentCount);
+    Message.WriteString(Message->ExecutableIndex, Options.Executable);
+    Message.WriteString(Message->CurrentDirectoryIndex, Options.CurrentDirectory ? Options.CurrentDirectory : "/");
+    Message.WriteStringArray(Message->CommandLineIndex, Options.CommandLine, Options.CommandLineCount);
+    Message.WriteStringArray(Message->EnvironmentIndex, Options.Environment, Options.EnvironmentCount);
 
     // If this is an interactive tty, we need a relay process
     if (interactiveTty)
@@ -718,16 +708,16 @@ std::vector<WSLAVirtualMachine::ConnectedSocket> WSLAVirtualMachine::CreateLinux
         auto result = ExpectClosedChannelOrError(childChannel);
         if (result != 0)
         {
-            Result->Errno = result;
-            THROW_HR(E_FAIL);
+            // TODO: Report errno to caller.
+            THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
 
         grandChildChannel.SendMessage<WSLA_EXEC>(Message.Span());
         result = ExpectClosedChannelOrError(grandChildChannel);
         if (result != 0)
         {
-            Result->Errno = result;
-            THROW_HR(E_FAIL);
+            // TODO: Report errno to caller.
+            THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
 
         pid = grandChildPid;
@@ -738,14 +728,25 @@ std::vector<WSLAVirtualMachine::ConnectedSocket> WSLAVirtualMachine::CreateLinux
         auto result = ExpectClosedChannelOrError(childChannel);
         if (result != 0)
         {
-            Result->Errno = result;
-            THROW_HR(E_FAIL);
+            // TODO: Report errno to caller.
+            THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
     }
 
-    Result->Errno = 0;
-    Result->Pid = pid;
-    return sockets;
+    std::map<int, wil::unique_socket> socketMap;
+    for (auto& [fd, socket] : sockets)
+    {
+        socketMap.emplace(fd, std::move(socket));
+    }
+
+    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(socketMap));
+
+    {
+        std::lock_guard lock{m_lock};
+        m_trackedProcesses.emplace_back(process.Get());
+    }
+
+    return process;
 }
 
 int32_t WSLAVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
