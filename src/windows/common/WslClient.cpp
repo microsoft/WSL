@@ -1617,10 +1617,16 @@ int WslaShell(_In_ std::wstring_view commandLine)
     processOptions.Fds = fds.data();
     processOptions.FdsCount = static_cast<DWORD>(fds.size());
 
-    std::vector<ULONG> handles(fds.size());
-
     Microsoft::WRL::ComPtr<IWSLAProcess> process;
     THROW_IF_FAILED(virtualMachine->CreateLinuxProcess(&processOptions, &process));
+
+    wil::unique_handle processInput;
+    wil::unique_handle processOutput;
+    wil::unique_socket processTerminalControl;
+
+    THROW_IF_FAILED(process->GetStdHandle(0, reinterpret_cast<ULONG*>(&processInput)));
+    THROW_IF_FAILED(process->GetStdHandle(1, reinterpret_cast<ULONG*>(&processOutput)));
+    THROW_IF_FAILED(process->GetStdHandle(2, reinterpret_cast<ULONG*>(&processTerminalControl)));
 
     // Configure console for interactive usage.
 
@@ -1649,7 +1655,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         // Create a thread to relay stdin to the pipe.
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
-        wsl::shared::SocketChannel controlChannel{wil::unique_socket(handles[2]), "TerminalControl", exitEvent.get()};
+        wsl::shared::SocketChannel controlChannel{std::move(processTerminalControl), "TerminalControl", exitEvent.get()};
 
         std::thread inputThread([&]() {
             auto updateTerminal = [&controlChannel, &Stdout]() {
@@ -1665,7 +1671,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
                 controlChannel.SendMessage(message);
             };
 
-            wsl::windows::common::relay::StandardInputRelay(Stdin, UlongToHandle(handles[0]), updateTerminal, exitEvent.get());
+            wsl::windows::common::relay::StandardInputRelay(Stdin, processInput.get(), updateTerminal, exitEvent.get());
         });
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1674,7 +1680,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         });
 
         // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(UlongToHandle(handles[1]), Stdout);
+        wsl::windows::common::relay::InterruptableRelay(processOutput.get(), Stdout);
     }
 
     wil::unique_event exitEvent;

@@ -25,7 +25,6 @@ WSLAProcess::WSLAProcess(std::map<int, wil::unique_socket>&& handles, int pid, W
 
 WSLAProcess::~WSLAProcess()
 {
-
     m_virtualMachine->OnProcessReleased(m_pid);
 }
 
@@ -71,7 +70,7 @@ try
 {
     // m_pid is immutable, so m_mutex doesn't need to be acquired.
 
-    // TODO: Container processes should return the container pid, and not root namespace pid.
+    // TODO: Container processes should return the container pid, and not the root namespace pid.
     *Pid = m_pid;
     return S_OK;
 }

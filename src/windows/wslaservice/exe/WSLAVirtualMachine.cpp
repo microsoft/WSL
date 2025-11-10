@@ -348,14 +348,25 @@ try
             TraceLoggingValue(message->Code, "Code"),
             TraceLoggingValue(message->Signaled, "Signaled"));
 
-
         // Signal the exited process, if it's been monitored.
         {
             std::lock_guard lock{m_lock};
 
-            for (auto &e: m_trackedProcesses)
+            bool found = false;
+            for (auto& e : m_trackedProcesses)
             {
-            
+                if (e->GetPid() == message->Pid)
+                {
+                    WI_ASSERT(!found);
+
+                    try
+                    {
+                        e->OnTerminated(message->Signaled, message->Code);
+                    }
+                    CATCH_LOG();
+
+                    found = true;
+                }
             }
         }
     }
@@ -922,7 +933,6 @@ bool WSLAVirtualMachine::ParseTtyInformation(
         if (Fds[i].Type == WslFdTypeTerminalInput)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyInput != nullptr, "Only one TtyInput fd can be passed. Index=%lu", i);
-
             *TtyInput = &Fds[i];
         }
         else if (Fds[i].Type == WslFdTypeTerminalOutput)
@@ -942,7 +952,9 @@ bool WSLAVirtualMachine::ParseTtyInformation(
     }
 
     THROW_HR_IF_MSG(
-        E_INVALIDARG, foundNonTtyFd && (*TtyOutput != nullptr || *TtyInput != nullptr), "Found mixed tty & non tty fds");
+        E_INVALIDARG,
+        foundNonTtyFd && (*TtyOutput != nullptr || *TtyInput != nullptr || *TtyControl != nullptr),
+        "Found mixed tty & non tty fds");
 
     return !foundNonTtyFd && FdCount > 0;
 }

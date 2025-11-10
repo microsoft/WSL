@@ -83,7 +83,7 @@ struct WSLA_PROCESS_OPTIONS
     ULONG CommandLineCount;
     [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
     ULONG EnvironmentCount;
-    [unique, size_is(EnvironmentCount)] WSLA_PROCESS_FD *Fds;
+    [unique, size_is(FdsCount)] WSLA_PROCESS_FD *Fds;
     int FdsCount;
 };
 

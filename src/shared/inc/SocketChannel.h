@@ -58,6 +58,8 @@ public:
     {
         m_name = std::move(other.m_name);
         m_socket = std::move(other.m_socket);
+        m_received_messages = other.m_received_messages;
+        m_sent_messages = other.m_sent_messages;
 
 #ifdef WIN32
         m_exitEvent = std::move(other.m_exitEvent);
