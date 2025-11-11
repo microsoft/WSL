@@ -83,10 +83,12 @@ HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
     return S_OK;
 }
 
-HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** VirtualMachine)
+HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
+try
 {
-    return E_NOTIMPL;
+    return m_virtualMachine.CreateLinuxProcess(Options, Process);
 }
+CATCH_RETURN();
 
 HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
 {

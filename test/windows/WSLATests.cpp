@@ -16,8 +16,10 @@ Abstract:
 #include "Common.h"
 #include "WSLAApi.h"
 #include "wslaservice.h"
+#include "WSLAProcessWrapper.h"
 
 using namespace wsl::windows::common::registry;
+using wsl::windows::common::WSLAProcessWrapper;
 
 using unique_vm = wil::unique_any<WslVirtualMachineHandle, decltype(WslReleaseVirtualMachine), &WslReleaseVirtualMachine>;
 
@@ -1132,7 +1134,7 @@ class WSLATests
         VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
     }
 
-    TEST_METHOD(WiringSmokeTest)
+    wil::com_ptr<IWSLASession> CreateSession()
     {
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
@@ -1151,6 +1153,28 @@ class WSLATests
 
         VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
 
+        // TODO: remove once the VM is wired to mount its rootfs inside WSLASession
+        wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
+        VERIFY_SUCCEEDED(session->GetVirtualMachine(&virtualMachine));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(virtualMachine.get());
+
+        wil::unique_cotaskmem_ansistring diskDevice;
+        ULONG Lun{};
+        THROW_IF_FAILED(virtualMachine->AttachDisk(testVhd.c_str(), true, &diskDevice, &Lun));
+
+        THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
+
+        return session;
+    }
+
+    TEST_METHOD(WiringSmokeTest)
+    {
+        auto session = CreateSession();
         wil::com_ptr<IWSLAContainer> container;
         WSLA_CONTAINER_OPTIONS containerOptions{};
         containerOptions.Image = "dummy";
@@ -1167,5 +1191,32 @@ class WSLATests
 
         // Verify that the event handle is valid.
         VERIFY_ARE_EQUAL(WaitForSingleObject(exitEvent.get(), 0), WAIT_TIMEOUT);
+    }
+
+    TEST_METHOD(CreateRootNamespaceProcess)
+    {
+        auto session = CreateSession();
+
+        // Simple case
+        {
+            WSLAProcessWrapper wrapper(
+                session.get(), std::string("/bin/sh"), std::vector<std::string>{"/bin/sh", "-c", "echo OK"});
+
+            auto result = wrapper.LaunchAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 0);
+            VERIFY_ARE_EQUAL(result.Output[0], "OK\n");
+            VERIFY_ARE_EQUAL(result.Output[1], "");
+        }
+
+        // Stdout + stderr
+        {
+            WSLAProcessWrapper wrapper(
+                session.get(), std::string("/bin/sh"), std::vector<std::string>{"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"});
+
+            auto result = wrapper.LaunchAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 0);
+            VERIFY_ARE_EQUAL(result.Output[0], "stdout\n");
+            VERIFY_ARE_EQUAL(result.Output[1], "stderr\n");
+        }
     }
 };

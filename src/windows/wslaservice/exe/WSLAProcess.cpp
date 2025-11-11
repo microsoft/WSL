@@ -50,8 +50,11 @@ try
     // m_handles is immutable, so m_mutex doesn't need to be acquired.
 
     auto& socket = GetSocket(Index);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !socket.is_valid());
+
     *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(socket.get())));
 
+    socket.reset();
     return S_OK;
 }
 CATCH_RETURN();

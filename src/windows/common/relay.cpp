@@ -16,6 +16,7 @@ Abstract:
 #include "relay.hpp"
 #pragma hdrstop
 
+using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
 
@@ -924,3 +925,76 @@ try
     }
 }
 CATCH_LOG()
+
+void MultiHandleWait::AddHandle(std::unique_ptr<IOHandle>&& handle)
+{
+    m_handles.emplace_back(std::move(handle));
+}
+
+void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
+{
+    std::optional<std::chrono::steady_clock::time_point> deadline;
+
+    if (Timeout.has_value())
+    {
+        deadline = std::chrono::steady_clock::now() + Timeout.value();
+    }
+
+    // Run until all handles are completed.
+
+    bool updateHandles = true;
+
+    while (!m_handles.empty())
+    {
+        // Schedule IO on each handle until all are either pending, or completed.
+        for (auto i = 0; i < m_handles.size(); i++)
+        {
+            while (m_handles[i]->GetState() == IOHandleStatus::Standby)
+            {
+                m_handles[i]->Schedule();
+            }
+        }
+
+        // Remove completed handles from m_handles.
+        m_handles.erase(
+            std::remove_if(
+                m_handles.begin(), m_handles.end(), [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; }),
+            m_handles.end());
+
+        if (m_handles.empty())
+        {
+            break;
+        }
+
+        // Wait for the next operation to complete.
+        std::vector<HANDLE> waitHandles;
+        for (const auto& e : m_handles)
+        {
+            waitHandles.emplace_back(e->GetHandle());
+        }
+
+        DWORD waitTimeout = INFINITE;
+        if (deadline.has_value())
+        {
+            auto miliseconds =
+                std::chrono::duration_cast<std::chrono::milliseconds>(deadline.value() - std::chrono::steady_clock::now()).count();
+
+            waitTimeout = static_cast<DWORD>(std::max(0LL, miliseconds));
+        }
+
+        auto result = WaitForMultipleObjects(static_cast<DWORD>(waitHandles.size()), waitHandles.data(), false, waitTimeout);
+        if (result == WAIT_TIMEOUT)
+        {
+            THROW_WIN32(ERROR_TIMEOUT);
+        }
+        else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
+        {
+            auto index = result - WAIT_OBJECT_0;
+            m_handles[index]->Collect();
+        }
+        else
+        {
+            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
+        }
+    }
+}

@@ -152,4 +152,162 @@ private:
     std::function<void()> m_onDestroy;
 };
 
+enum class IOHandleStatus
+{
+    Standby,
+    Pending,
+    Completed
+};
+
+class IOHandle
+{
+public:
+    virtual bool Schedule() = 0;
+    virtual void Collect() = 0;
+    virtual HANDLE GetHandle() = 0;
+
+    IOHandleStatus GetState() const
+    {
+        return State;
+    }
+
+protected:
+    IOHandleStatus State = IOHandleStatus::Standby;
+};
+
+struct EventHandle : IOHandle
+{
+    wil::unique_handle Handle;
+    std::function<void()> OnSignalled;
+
+    EventHandle(wil::unique_handle&& Handle, std::function<void()>&& OnSignalled) :
+        Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
+    {
+    }
+
+    bool Schedule() override
+    {
+        State = IOHandleStatus::Pending;
+        return true; // Event handle don't need to be explicitely scheduled.
+    }
+
+    void Collect() override
+    {
+        State = IOHandleStatus::Completed;
+        OnSignalled();
+    }
+
+    HANDLE GetHandle() override
+    {
+        return Handle.get();
+    }
+};
+
+struct ReadHandle : IOHandle
+{
+    wil::unique_handle Handle;
+    std::function<void(const gsl::span<char>& Buffer)> OnRead;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    bool Scheduled = false;
+    std::vector<char> Buffer;
+
+    NON_COPYABLE(ReadHandle);
+    NON_MOVABLE(ReadHandle);
+
+    ReadHandle(wil::unique_handle&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
+        Handle(std::move(Handle)), OnRead(OnRead), Buffer(LX_RELAY_BUFFER_SIZE)
+    {
+        Overlapped.hEvent = Event.get();
+    }
+
+    ~ReadHandle()
+    {
+        if (State == IOHandleStatus::Pending)
+        {
+            DWORD bytesRead{};
+            LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(reinterpret_cast<HANDLE>(Handle.get()), &Overlapped));
+            LOG_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true));
+        }
+    }
+
+    bool Schedule() override
+    {
+        WI_ASSERT(State == IOHandleStatus::Standby);
+
+        Event.ResetEvent();
+
+        // Schedule the read.
+        DWORD bytesRead{};
+        if (ReadFile(Handle.get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesRead, &Overlapped))
+        {
+            // Signal the read.
+            OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
+
+            // ReadFile completed immediately, process the result right away.
+            if (bytesRead == 0)
+            {
+                State = IOHandleStatus::Completed;
+                return true; // Handle is completely read, don't try again.
+            }
+
+            return false; // Read was done synchronously, remain in 'standby' state.
+        }
+        else
+        {
+            auto error = GetLastError();
+            if (error == ERROR_HANDLE_EOF || error == ERROR_BROKEN_PIPE)
+            {
+                State = IOHandleStatus::Completed;
+                return false;
+            }
+
+            THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.get());
+
+            // The read is pending, update to 'Pending'
+            State = IOHandleStatus::Pending;
+            return true;
+        }
+    }
+
+    void Collect() override
+    {
+        WI_ASSERT(State == IOHandleStatus::Pending);
+
+        // Transition back to standby
+        State = IOHandleStatus::Standby;
+
+        // Complete the read.
+        DWORD bytesRead{};
+        THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, false));
+
+        // Signal the read.
+        OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
+
+        // Transition to Complete if this was a zero byte read.
+        if (bytesRead == 0)
+        {
+            State = IOHandleStatus::Completed;
+        }
+    }
+
+    HANDLE GetHandle() override
+    {
+        return Overlapped.hEvent;
+    }
+};
+
+class MultiHandleWait
+{
+public:
+    MultiHandleWait() = default;
+
+    void AddHandle(std::unique_ptr<IOHandle>&& handle);
+
+    void Run(std::optional<std::chrono::milliseconds> Timeout);
+
+private:
+    std::vector<std::unique_ptr<IOHandle>> m_handles;
+};
+
 } // namespace wsl::windows::common::relay

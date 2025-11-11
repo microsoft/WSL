@@ -689,10 +689,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_WATCH_PRO
             {
                 int status{};
                 result = waitpid(-1, &status, WNOHANG);
+                if (result < 0 && errno != ECHILD)
+                {
+                    THROW_LAST_ERROR();
+                }
 
-                THROW_LAST_ERROR_IF(result < 0);
-
-                if (result == 0)
+                if (result <= 0)
                 {
                     break;
                 }
