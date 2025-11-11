@@ -335,7 +335,7 @@ void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Cha
 try
 {
     // TODO: Terminate the VM if this thread exits unexpectedly.
-    while (true) 
+    while (true)
     {
         auto [message, _] = Channel.ReceiveMessageOrClosed<WSLA_PROCESS_EXITED>();
         if (message == nullptr)

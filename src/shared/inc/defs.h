@@ -23,12 +23,12 @@ Abstract:
 #endif
 
 #define NON_COPYABLE(Type) \
-Type(const Type&) = delete; \
-Type& operator=(const Type&) = delete;
+    Type(const Type&) = delete; \
+    Type& operator=(const Type&) = delete;
 
 #define NON_MOVABLE(Type) \
-Type(Type&&) = delete; \
-Type& operator=(Type&&) = delete;
+    Type(Type&&) = delete; \
+    Type& operator=(Type&&) = delete;
 
 namespace wsl::shared {
 
