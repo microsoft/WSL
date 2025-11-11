@@ -5,6 +5,17 @@
 #include <string>
 
 namespace wsl::windows::common {
+
+enum class FDFlags
+{
+    None = 0,
+    Stdin = 1,
+    Stdout = 2,
+    Stderr = 4,
+};
+
+DEFINE_ENUM_FLAG_OPERATORS(FDFlags);
+
 class WSLAProcessWrapper
 {
 public:
@@ -15,11 +26,11 @@ public:
         std::vector<std::string> Output;
     };
 
-    WSLAProcessWrapper(IWSLASession* Session, std::string&& Executable, std::vector<std::string>&& Arguments);
+    WSLAProcessWrapper(IWSLASession* Session, std::string&& Executable, std::vector<std::string>&& Arguments, FDFlags Flags = FDFlags::Stdout | FDFlags::Stderr);
 
     IWSLAProcess& Launch();
 
-    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE);
+    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::IOHandle>>&& ExtraHandles = {});
     ProcessResult LaunchAndCaptureOutput(DWORD TimeoutMs = INFINITE);
 
 private:

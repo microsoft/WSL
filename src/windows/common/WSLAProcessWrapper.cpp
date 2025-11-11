@@ -4,7 +4,7 @@
 
 using wsl::windows::common::WSLAProcessWrapper;
 
-WSLAProcessWrapper::WSLAProcessWrapper(IWSLASession* Session, std::string&& Executable, std::vector<std::string>&& Arguments) :
+WSLAProcessWrapper::WSLAProcessWrapper(IWSLASession* Session, std::string&& Executable, std::vector<std::string>&& Arguments, FDFlags Flags) :
     m_executable(std::move(Executable)), m_arguments(std::move(Arguments))
 {
     m_launch = [Session](const WSLA_PROCESS_OPTIONS* Options) {
@@ -14,9 +14,21 @@ WSLAProcessWrapper::WSLAProcessWrapper(IWSLASession* Session, std::string&& Exec
         return process;
     };
 
-    // Add fd for stdout & stderr.
-    m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeDefault, .Path = nullptr});
-    m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeDefault, .Path = nullptr});
+    // Add standard Fds.
+    if (WI_IsFlagSet(Flags, FDFlags::Stdin))
+    {
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeDefault, .Path = nullptr});
+    }
+
+    if (WI_IsFlagSet(Flags, FDFlags::Stdout))
+    {
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeDefault, .Path = nullptr});
+    }
+
+    if (WI_IsFlagSet(Flags, FDFlags::Stdout))
+    {
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeDefault, .Path = nullptr});
+    }
 }
 
 IWSLAProcess& WSLAProcessWrapper::Launch()
@@ -39,7 +51,7 @@ IWSLAProcess& WSLAProcessWrapper::Launch()
     return *m_process.Get();
 }
 
-WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD TimeoutMs)
+WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::IOHandle>>&& ExtraHandles)
 {
     THROW_HR_IF(E_UNEXPECTED, !m_process);
 
@@ -50,24 +62,31 @@ WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD
     // Add a callback on IO for each std handle.
     for (size_t i = 0; i < m_fds.size(); i++)
     {
+        if (m_fds[i].Fd == 0)
+        {
+            continue; // Don't try to read from stdin
+        }
+
         result.Output.emplace_back();
 
         wil::unique_handle stdHandle;
         THROW_IF_FAILED(m_process->GetStdHandle(m_fds[i].Fd, reinterpret_cast<ULONG*>(&stdHandle)));
 
-        auto ioCallback = [Index = i, &result](const gsl::span<char>& Content) {
-            WSL_LOG("Output", TraceLoggingValue(Content.data(), "Content"), TraceLoggingValue(Content.size(), "Size"));
-
+        auto ioCallback = [Index = result.Output.size() - 1, &result](const gsl::span<char>& Content) {
             result.Output[Index].insert(result.Output[Index].end(), Content.begin(), Content.end());
         };
 
         io.AddHandle(std::make_unique<relay::ReadHandle>(std::move(stdHandle), std::move(ioCallback)));
     }
 
+    for (auto& e : ExtraHandles)
+    {
+        io.AddHandle(std::move(e));
+    }
+
     // Add a callback for when the process exits.
     wil::unique_handle exitEvent;
     THROW_IF_FAILED(m_process->GetExitEvent(reinterpret_cast<ULONG*>(&exitEvent)));
-    WSL_LOG("AcquiredHandle", TraceLoggingValue(exitEvent.get(), "Handle"));
 
     auto exitCallback = [&]() {
         WSLA_PROCESS_STATE state{};

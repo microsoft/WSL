@@ -19,7 +19,10 @@ Abstract:
 #include "WSLAProcessWrapper.h"
 
 using namespace wsl::windows::common::registry;
+using wsl::windows::common::FDFlags;
 using wsl::windows::common::WSLAProcessWrapper;
+using wsl::windows::common::relay::IOHandle;
+using wsl::windows::common::relay::WriteHandle;
 
 using unique_vm = wil::unique_any<WslVirtualMachineHandle, decltype(WslReleaseVirtualMachine), &WslReleaseVirtualMachine>;
 
@@ -1204,6 +1207,7 @@ class WSLATests
 
             auto result = wrapper.LaunchAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Code, 0);
+            VERIFY_ARE_EQUAL(result.Signalled, false);
             VERIFY_ARE_EQUAL(result.Output[0], "OK\n");
             VERIFY_ARE_EQUAL(result.Output[1], "");
         }
@@ -1211,12 +1215,58 @@ class WSLATests
         // Stdout + stderr
         {
             WSLAProcessWrapper wrapper(
-                session.get(), std::string("/bin/sh"), std::vector<std::string>{"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"});
+                session.get(),
+                std::string("/bin/sh"),
+                std::vector<std::string>{"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"});
 
             auto result = wrapper.LaunchAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Code, 0);
+            VERIFY_ARE_EQUAL(result.Signalled, false);
             VERIFY_ARE_EQUAL(result.Output[0], "stdout\n");
             VERIFY_ARE_EQUAL(result.Output[1], "stderr\n");
+        }
+
+        // Write a large stdin buffer and expect it back on stdout.
+        {
+            std::vector<char> largeBuffer;
+            std::string pattern = "ExpectedBufferContent";
+
+            for (size_t i = 0; i < 1024 * 1024; i++)
+            {
+                largeBuffer.insert(largeBuffer.end(), pattern.begin(), pattern.end());
+            }
+
+            WSLAProcessWrapper wrapper(
+                session.get(),
+                std::string("/bin/sh"),
+                std::vector<std::string>{"/bin/sh", "-c", "cat && (echo completed 1>& 2)"},
+                FDFlags::Stdin | FDFlags::Stdout | FDFlags::Stderr);
+
+            wil::unique_handle stdinHandle;
+            VERIFY_SUCCEEDED(wrapper.Launch().GetStdHandle(0, reinterpret_cast<ULONG*>(&stdinHandle)));
+            std::unique_ptr<IOHandle> writeStdin(new WriteHandle(std::move(stdinHandle), largeBuffer));
+
+            std::vector<std::unique_ptr<IOHandle>> extraHandles;
+            extraHandles.emplace_back(std::move(writeStdin));
+            auto result = wrapper.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
+
+            VERIFY_IS_TRUE(std::equal(largeBuffer.begin(), largeBuffer.end(), result.Output[0].begin(), result.Output[0].end()));
+            VERIFY_ARE_EQUAL(result.Output[1], "completed\n");
+        }
+
+        // Create a stuck process and kill it.
+        {
+            WSLAProcessWrapper wrapper(
+                session.get(), std::string("/bin/cat"), std::vector<std::string>{"/bin/cat"}, FDFlags::Stdin | FDFlags::Stdout | FDFlags::Stderr);
+
+            // Send SIGKILL(9) to the process.
+            VERIFY_SUCCEEDED(wrapper.Launch().Signal(9));
+
+            auto result = wrapper.WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 9);
+            VERIFY_ARE_EQUAL(result.Signalled, true);
+            VERIFY_ARE_EQUAL(result.Output[0], "");
+            VERIFY_ARE_EQUAL(result.Output[1], "");
         }
     }
 };
