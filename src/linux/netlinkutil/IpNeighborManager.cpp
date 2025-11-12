@@ -65,23 +65,41 @@ bool ParseArpReply(const T& ArpReply, uint16_t ProtocolType, const Neighbor& Sou
     Target.ipAddress.ConvertToBytes(TargetIp.data());
 
     if (ArpReply.Destination != Source.macAddress)
+    {
         return false;
+    }
     if (ArpReply.EthernetType != htons(ETH_P_ARP))
+    {
         return false;
+    }
     if (ArpReply.HardwareType != htons(ARPHRD_ETHER))
+    {
         return false;
+    }
     if (ArpReply.ProtocolType != htons(ProtocolType))
+    {
         return false;
+    }
     if (ArpReply.HardwareAddressLength != sizeof(ArpReply.SenderHardwareAddress))
+    {
         return false;
+    }
     if (ArpReply.ProtocolAddressLength != sizeof(ArpReply.SenderIpAddress))
+    {
         return false;
+    }
     if (ArpReply.Operation != htons(ARPOP_REPLY))
+    {
         return false;
+    }
     if (ArpReply.TargetHardwareAddress != Source.macAddress)
+    {
         return false;
+    }
     if (ArpReply.TargetIpAddress != SourceIp)
+    {
         return false;
+    }
 
     Target.macAddress = ArpReply.SenderHardwareAddress;
     return true;
@@ -129,7 +147,9 @@ bool IpNeighborManager::PerformNeighborDiscovery(Neighbor& Local, Neighbor& Neig
         while (std::chrono::steady_clock::now() < expiry)
         {
             if (!wait_for_read(packet_socket.get(), std::chrono::duration_cast<std::chrono::milliseconds>(expiry - std::chrono::steady_clock::now())))
+            {
                 continue;
+            }
             int bytes_read = Syscall(read, packet_socket.get(), &ArpReply, ArpPacketSize);
             if (bytes_read != ArpPacketSize)
             {
@@ -138,12 +158,16 @@ bool IpNeighborManager::PerformNeighborDiscovery(Neighbor& Local, Neighbor& Neig
             if (Local.getFamily() == AF_INET)
             {
                 if (ParseArpReply(ArpReply.IPv4, ETH_P_IP, Local, Neighbor))
+                {
                     return true;
+                }
             }
             else
             {
                 if (ParseArpReply(ArpReply.IPv6, ETH_P_IPV6, Local, Neighbor))
+                {
                     return true;
+                }
             }
         }
     }

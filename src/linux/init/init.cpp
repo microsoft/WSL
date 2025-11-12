@@ -221,6 +221,7 @@ int WslEntryPoint(int Argc, char* Argv[])
         {
             // Handle the special case for import result messages, everything else is sent to the binfmt interpreter.
             if (Pid == 1 && strcmp(BaseName, "init") == 0 && Argc == 3 && strcmp(Argv[1], LX_INIT_IMPORT_MESSAGE_ARG) == 0)
+            {
                 try
                 {
                     wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
@@ -230,7 +231,8 @@ int WslEntryPoint(int Argc, char* Argv[])
                     read(STDIN_FILENO, buffer, sizeof(buffer));
                     exit(0);
                 }
-            CATCH_RETURN_ERRNO()
+                CATCH_RETURN_ERRNO()
+            }
 
             ExitCode = CreateNtProcess(Argc - 1, &Argv[1]);
         }

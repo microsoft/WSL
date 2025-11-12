@@ -25,7 +25,9 @@ public:
     {
         std::unique_lock lck(m_mtx);
         while (m_value.has_value())
+        {
             m_cv.wait(lck);
+        }
         m_value = value;
         m_cv.notify_all();
     }
@@ -39,7 +41,9 @@ public:
     {
         std::unique_lock lck(m_mtx);
         while (!m_value.has_value())
+        {
             m_cv.wait(lck);
+        }
         auto return_value = m_value.value();
         m_value.reset();
         m_cv.notify_all();
@@ -57,8 +61,12 @@ public:
     {
         std::unique_lock lck(m_mtx);
         while (!m_value.has_value())
+        {
             if (m_cv.wait_for(lck, timeout) == std::cv_status::timeout)
+            {
                 return std::nullopt;
+            }
+        }
         auto return_value = m_value.value();
         m_value.reset();
         m_cv.notify_all();

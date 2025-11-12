@@ -282,17 +282,20 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // N.B. wslhost.exe is launched at medium integrity level and its lifetime
     //      is tied to the lifetime of the utility VM.
     if (m_vmConfig.EnableDebugConsole || !m_vmConfig.DebugConsoleLogFile.empty())
+    {
         try
         {
             m_vmConfig.EnableDebugConsole = true;
             m_comPipe0 = wsl::windows::common::helpers::GetUniquePipeName();
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // If the system supports virtio console serial ports, use dmesg capture for telemetry and/or debug output.
     // Legacy serial is much slower, so this is not enabled without virtio console support.
     m_vmConfig.EnableDebugShell &= IsVirtioSerialConsoleSupported();
     if (IsVirtioSerialConsoleSupported())
+    {
         try
         {
             bool enableTelemetry = TraceLoggingProviderEnabled(g_hTraceLoggingProvider, WINEVENT_LEVEL_INFO, 0);
@@ -309,9 +312,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             // Initialize the guest telemetry logger.
             m_gnsTelemetryLogger = GuestTelemetryLogger::Create(VmId, m_vmExitEvent);
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     if (m_vmConfig.EnableDebugConsole)
+    {
         try
         {
             // If specified, create a file to log the debug console output.
@@ -328,7 +333,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             wsl::windows::common::helpers::LaunchDebugConsole(
                 m_comPipe0.c_str(), !!m_dmesgCollector, m_restrictedToken.get(), logFile ? logFile.get() : nullptr, !m_vmConfig.EnableTelemetry);
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Create the utility VM and store the runtime ID.
     std::wstring json = GenerateConfigJson();
@@ -400,12 +406,14 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         THROW_IF_FAILED(wil::ExpandEnvironmentStringsW(L"%SystemRoot%\\System32\\lxss\\lib", path));
 
         if (wsl::windows::common::filesystem::FileExists(path.c_str()))
+        {
             try
             {
                 addShare(TEXT(LXSS_GPU_INBOX_LIB_SHARE), path.c_str());
                 m_enableInboxGpuLibs = true;
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
 #ifdef WSL_GPU_LIB_PATH
 
@@ -482,6 +490,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     //      the user does not have write access.
     ULONG swapLun = ULONG_MAX;
     if ((m_systemDistroDeviceId != ULONG_MAX) && (m_vmConfig.SwapSizeBytes > 0))
+    {
         try
         {
             {
@@ -524,7 +533,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
             swapLun = AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Validate that the requesting network mode is supported.
     //
@@ -777,11 +787,13 @@ WslCoreVm::~WslCoreVm() noexcept
             // If the notification did not arrive within the timeout, the VM is
             // forcefully terminated.
             if (forcedTerminate)
+            {
                 try
                 {
                     wsl::windows::common::hcs::TerminateComputeSystem(m_system.get());
                 }
-            CATCH_LOG()
+                CATCH_LOG()
+            }
         }
 
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
@@ -840,33 +852,40 @@ WslCoreVm::~WslCoreVm() noexcept
         }
 
         if (WI_IsFlagSet(Entry.second.Flags, DiskStateFlags::AccessGranted))
+        {
             try
             {
                 wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Entry.first.Path.c_str());
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
     });
 
     // Delete the swap vhd if one was created.
     if (m_swapFileCreated)
+    {
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
             LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_vmConfig.SwapFilePath.c_str()));
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Delete the temp folder if it was created.
     if (m_tempDirectoryCreated)
+    {
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
             wil::RemoveDirectoryRecursive(m_tempPath.c_str());
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Delete the mstsc.exe local devices key if one was created.
     if (m_localDevicesKeyCreated)
+    {
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
@@ -874,7 +893,8 @@ WslCoreVm::~WslCoreVm() noexcept
             const auto key = wsl::windows::common::registry::CreateKey(userKey.get(), c_localDevicesKey, KEY_SET_VALUE);
             THROW_IF_WIN32_ERROR(::RegDeleteKeyValueW(key.get(), nullptr, m_machineId.c_str()));
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     WSL_LOG("TerminateVmStop");
 }
@@ -1621,6 +1641,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // N.B. This is done because arm64 and some older amd64 processors do not support nested virtualization.
     //      Nested virtualization not supported on Windows 10.
     if (m_vmConfig.EnableNestedVirtualization)
+    {
         try
         {
             std::vector<std::string> processorFeatures{};
@@ -1638,7 +1659,8 @@ std::wstring WslCoreVm::GenerateConfigJson()
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
             }
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
 #ifdef _AMD64_
 
@@ -1881,12 +1903,14 @@ void WslCoreVm::InitializeGuest()
     if (LXSS_ENABLE_GUI_APPS())
     {
         if (m_vmConfig.EnableVirtio)
+        {
             try
             {
                 MountSharedMemoryDevice(c_virtiofsClassId, L"wslg", L"wslg", WSLG_SHARED_MEMORY_SIZE_MB);
                 m_sharedMemoryRoot = std::format(L"WSL\\{}\\wslg", m_machineId);
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
         try
         {
