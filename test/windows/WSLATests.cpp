@@ -232,6 +232,7 @@ class WSLATests
     }
 
     /*
+    TODO: Implement once available.
     TEST_METHOD(TerminationCallback)
     {
         WSL2_TEST_ONLY();
@@ -380,8 +381,6 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
-        settings.NetworkingMode = WslNetworkingModeNAT;
-        settings.EnableDnsTunneling = true;
 
         auto session = CreateSession(settings);
 
@@ -484,19 +483,21 @@ class WSLATests
         }
     }
 
-    /*
     TEST_METHOD(NATPortMapping)
     {
         WSL2_TEST_ONLY();
 
-        WslVirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
         settings.DisplayName = L"WSLA";
-        settings.Memory.MemoryMb = 2048;
-        settings.Options.BootTimeoutMs = 30 * 1000;
-        settings.Networking.Mode = WslNetworkingModeNAT;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.NetworkingMode = WslNetworkingModeNAT;
 
-        auto vm = CreateVm(&settings);
+        auto session = CreateSession(settings);
+
+        wil::com_ptr<IWSLAVirtualMachine> vm;
+        VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
 
         auto waitForOutput = [](HANDLE Handle, const char* Content) {
             std::string output;
@@ -531,10 +532,10 @@ class WSLATests
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
-            auto [pid, in, out, err] = LaunchCommand(vm.get(), {"/bin/bash", "-c", cmd.c_str()});
-            waitForOutput(err.get(), "listening on");
+            auto process = WSLAProcessLauncher("/bin/bash", {"/bin/bash", "-c", cmd}).Launch(*session);
+            waitForOutput(process.GetStdHandle(2).get(), "listening on");
 
-            return pid;
+            return process;
         };
 
         auto connectAndRead = [&](short port, int family) -> std::string {
@@ -613,9 +614,11 @@ class WSLATests
         // Create a forking relay and stress test
         VERIFY_SUCCEEDED(WslMapPort(vm.get(), &port));
 
-        auto [pid, in, out, err] =
-            LaunchCommand(vm.get(), {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"});
-        waitForOutput(err.get(), "listening on");
+        auto process =
+            WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
+                .Launch(*session);
+
+        waitForOutput(process.GetStdHandle(2).get(), "listening on");
 
         for (auto i = 0; i < 100; i++)
         {
@@ -629,31 +632,20 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        WslVirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
         settings.DisplayName = L"WSLA";
-        settings.Memory.MemoryMb = 2048;
-        settings.Options.BootTimeoutMs = 30 * 1000;
-        settings.Networking.Mode = WslNetworkingModeNone;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
 
-        auto vm = CreateVm(&settings);
+        auto session = CreateSession(settings);
 
-        auto [pid, stdinFd, _, __] = LaunchCommand(vm.get(), {"/bin/cat"});
-
-        // Create a 'stuck' thread, waiting for cat to exit
-
-        std::thread stuckThread([&]() {
-            WslWaitResult result{};
-            WslWaitForLinuxProcess(vm.get(), pid, INFINITE, &result);
-        });
+        // Create a 'stuck' process
+        auto process = WSLAProcessLauncher{"/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout}.Launch(*session);
 
         // Stop the service
         StopWslaService();
-
-        // Verify that the thread is unstuck
-        stuckThread.join();
     }
-    */
 
     TEST_METHOD(WindowsMounts)
     {
@@ -764,6 +756,7 @@ class WSLATests
     }
 
     /*
+    TODO: Enable once GPU is available in new api
     TEST_METHOD(GPU)
     {
         WSL2_TEST_ONLY();
