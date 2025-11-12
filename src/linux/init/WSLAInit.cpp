@@ -55,6 +55,7 @@ extern int g_LogFd;
 struct WSLAState
 {
     std::optional<std::filesystem::path> ModulesMountPoint;
+    std::vector<int> CloseOnForkFds;
 };
 
 static WSLAState g_state;

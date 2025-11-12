@@ -52,7 +52,7 @@ class WSLATests
         return true;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(const VIRTUAL_MACHINE_SETTINGS& vmSettings)
+    wil::com_ptr<IWSLASession> CreateSession(const VIRTUAL_MACHINE_SETTINGS& vmSettings, const std::optional<std::wstring>& vhd = {})
     {
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
@@ -71,7 +71,7 @@ class WSLATests
 
         wil::unique_cotaskmem_ansistring diskDevice;
         ULONG Lun{};
-        THROW_IF_FAILED(virtualMachine->AttachDisk(testVhd.c_str(), true, &diskDevice, &Lun));
+        THROW_IF_FAILED(virtualMachine->AttachDisk(vhd.value_or(testVhd).c_str(), true, &diskDevice, &Lun));
 
         THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
         THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
@@ -116,8 +116,8 @@ class WSLATests
                     "Command: %hs didn't get signalled as expected. ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
                     cmd.c_str(),
                     result.Code,
-                    result.Output[0].c_str(),
-                    result.Output[1].c_str());
+                    result.Output[1].c_str(),
+                    result.Output[2].c_str());
             }
             else
             {
@@ -125,8 +125,8 @@ class WSLATests
                     "Command: %hs didn't received an unexpected signal: %i. Stdout: '%hs', Stderr: '%hs'",
                     cmd.c_str(),
                     result.Code,
-                    result.Output[0].c_str(),
-                    result.Output[1].c_str());
+                    result.Output[1].c_str(),
+                    result.Output[2].c_str());
             }
         }
 
@@ -138,8 +138,8 @@ class WSLATests
                 cmd.c_str(),
                 expectResult,
                 result.Code,
-                result.Output[0].c_str(),
-                result.Output[1].c_str());
+                result.Output[1].c_str(),
+                result.Output[2].c_str());
         }
 
         return result;
@@ -752,10 +752,10 @@ class WSLATests
         settings.BootTimeoutMs = 30 * 1000;
 
         auto session = CreateSession(settings);
-        auto result = ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo /proc/self/fd/* && readlink /proc/self/fd/*"}, 0);
+        auto result = ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
 
-        // Note: fd/0 is opened readlink to read the actual content of /proc/fd.
-        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1\nsocket:[*]\n"))
+        // Note: fd/0 is opened by readlink to read the actual content of /proc/self/fd.
+        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\nsocket:[*]\nsocket:[*]\n"))
         {
             LogInfo("Found additional fds: %hs", result.Output[1].c_str());
             VERIFY_FAIL();
@@ -863,8 +863,6 @@ class WSLATests
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
 
-        auto session = CreateSession(settings);
-
         // Use the system distro vhd for modprobe & lsmod.
 
 #ifdef WSL_SYSTEM_DISTRO_PATH
@@ -875,6 +873,7 @@ class WSLATests
         auto rootfs = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
 
 #endif
+        auto session = CreateSession(settings, rootfs);
 
         // Sanity check.
         ExpectCommandResult(session.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}, 1);

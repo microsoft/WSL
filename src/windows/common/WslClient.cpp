@@ -20,6 +20,7 @@ Abstract:
 #include <conio.h>
 #include "wslaservice.h"
 #include "WSLAApi.h"
+#include "WSLAProcessLauncher.h"
 
 #define BASH_PATH L"/bin/bash"
 
@@ -28,9 +29,11 @@ using winrt::Windows::Management::Deployment::DeploymentOptions;
 using wsl::shared::Localization;
 using wsl::windows::common::ClientExecutionContext;
 using wsl::windows::common::Context;
+using wsl::windows::common::WSLAProcessLauncher;
 using namespace wsl::windows::common;
 using namespace wsl::shared;
 using namespace wsl::windows::common::distribution;
+using wsl::windows::common::ProcessFlags;
 
 static bool g_promptBeforeExit = false;
 
@@ -1542,7 +1545,6 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.NetworkingMode = WslNetworkingModeNAT;
     std::string shell = "/bin/bash";
     std::string fsType = "ext4";
-    bool newApi = false;
     bool help = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
@@ -1552,9 +1554,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(fsType), L"--fstype");
-    parser.AddArgument(newApi, L"--new-api");
     parser.AddArgument(help, L"--help");
-
     parser.Parse();
 
     if (help)
@@ -1572,17 +1572,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-    if (newApi)
-    {
-        WSLA_SESSION_SETTINGS sessionSettings{L"my-display-name"};
-        wil::com_ptr<IWSLASession> session;
-        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
-        THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
-    }
-    else
-    {
-        THROW_IF_FAILED(userSession->CreateVirtualMachine(&settings, &virtualMachine));
-    }
+    WSLA_SESSION_SETTINGS sessionSettings{L"my-display-name"};
+    wil::com_ptr<IWSLASession> session;
+    THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
+    THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
@@ -1596,37 +1589,12 @@ int WslaShell(_In_ std::wstring_view commandLine)
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
     THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
 
-    std::vector<const char*> shellCommandLine{shell.c_str()};
-    std::vector<const char*> env{"TERM=xterm-256color"};
+    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
+    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeTerminalInput});
+    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeTerminalOutput});
+    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeTerminalControl});
 
-    std::vector<WSLA_PROCESS_FD> fds(3);
-    fds[0].Fd = 0;
-    fds[0].Type = WslFdTypeTerminalInput;
-    fds[1].Fd = 1;
-    fds[1].Type = WslFdTypeTerminalOutput;
-    fds[2].Fd = 2;
-    fds[2].Type = WslFdTypeTerminalControl;
-
-    WSLA_PROCESS_OPTIONS processOptions{};
-    processOptions.Executable = shell.c_str();
-    processOptions.CommandLine = shellCommandLine.data();
-    processOptions.CommandLineCount = static_cast<ULONG>(shellCommandLine.size());
-    processOptions.Environment = env.data();
-    processOptions.EnvironmentCount = static_cast<ULONG>(env.size());
-    processOptions.CurrentDirectory = "/";
-    processOptions.Fds = fds.data();
-    processOptions.FdsCount = static_cast<DWORD>(fds.size());
-
-    Microsoft::WRL::ComPtr<IWSLAProcess> process;
-    //THROW_IF_FAILED(virtualMachine->CreateLinuxProcess(&processOptions, &process));
-
-    wil::unique_handle processInput;
-    wil::unique_handle processOutput;
-    wil::unique_socket processTerminalControl;
-
-    THROW_IF_FAILED(process->GetStdHandle(0, reinterpret_cast<ULONG*>(&processInput)));
-    THROW_IF_FAILED(process->GetStdHandle(1, reinterpret_cast<ULONG*>(&processOutput)));
-    THROW_IF_FAILED(process->GetStdHandle(2, reinterpret_cast<ULONG*>(&processTerminalControl)));
+    auto process = launcher.Launch(*session);
 
     // Configure console for interactive usage.
 
@@ -1655,7 +1623,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
         // Create a thread to relay stdin to the pipe.
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
-        wsl::shared::SocketChannel controlChannel{std::move(processTerminalControl), "TerminalControl", exitEvent.get()};
+        wsl::shared::SocketChannel controlChannel{
+            wil::unique_socket{(SOCKET)process.GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
 
         std::thread inputThread([&]() {
             auto updateTerminal = [&controlChannel, &Stdout]() {
@@ -1671,7 +1640,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
                 controlChannel.SendMessage(message);
             };
 
-            wsl::windows::common::relay::StandardInputRelay(Stdin, processInput.get(), updateTerminal, exitEvent.get());
+            wsl::windows::common::relay::StandardInputRelay(Stdin, process.GetStdHandle(0).get(), updateTerminal, exitEvent.get());
         });
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1680,21 +1649,16 @@ int WslaShell(_In_ std::wstring_view commandLine)
         });
 
         // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(processOutput.get(), Stdout);
+        wsl::windows::common::relay::InterruptableRelay(process.GetStdHandle(1).get(), Stdout);
     }
 
-    wil::unique_event exitEvent;
-    THROW_IF_FAILED(process->GetExitEvent(reinterpret_cast<ULONG*>(exitEvent.addressof())));
+    process.GetExitEvent().wait();
 
-    exitEvent.wait();
+    auto [code, signalled] = process.GetExitState();
+    wprintf(L"%hs exited with: %i%hs", shell.c_str(), code, signalled ? " (signalled)" : "");
 
-    WSLA_PROCESS_STATE state{};
-    int exitCode{};
-    THROW_IF_FAILED(process->GetState(&state, &exitCode));
+    return code;
 
-    wprintf(L"%hs exited with: %i", shell.c_str(), exitCode);
-
-    return exitCode;
 }
 
 int WslMain(_In_ std::wstring_view commandLine)
