@@ -1658,7 +1658,6 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wprintf(L"%hs exited with: %i%hs", shell.c_str(), code, signalled ? " (signalled)" : "");
 
     return code;
-
 }
 
 int WslMain(_In_ std::wstring_view commandLine)

@@ -752,7 +752,8 @@ class WSLATests
         settings.BootTimeoutMs = 30 * 1000;
 
         auto session = CreateSession(settings);
-        auto result = ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
+        auto result = ExpectCommandResult(
+            session.get(), {"/bin/bash", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
 
         // Note: fd/0 is opened by readlink to read the actual content of /proc/self/fd.
         if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\nsocket:[*]\nsocket:[*]\n"))
