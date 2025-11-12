@@ -1180,10 +1180,10 @@ std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder()
 
 void WSLAVirtualMachine::CreateVmSavedStateFile()
 {
-    const auto filename = std::format(L"{}{}-{}{}", 
-        SAVED_STATE_FILE_PREFIX, 
+    const auto filename = std::format(L"{}{}-{}{}",
+        SAVED_STATE_FILE_PREFIX,
         std::time(nullptr), 
-        m_vmIdString, 
+        m_vmIdString,
         SAVED_STATE_FILE_EXTENSION);
 
     auto savedStateFile = m_crashDumpFolder / filename;
@@ -1229,7 +1229,7 @@ void WSLAVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
         std::wofstream outputFile(filePath.wstring());
         THROW_HR_IF(E_UNEXPECTED, !outputFile.is_open());
 
-        outputFile << crashLog; 
+        outputFile << crashLog;
         THROW_HR_IF(E_UNEXPECTED, outputFile.fail());
     }
 
