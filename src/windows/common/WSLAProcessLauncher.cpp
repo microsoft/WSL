@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAProcessLauncher.cpp
+
+Abstract:
+
+    WSLAProcessLauncher implementation.
+
+--*/
+
 #include <precomp.h>
 #include "WSLAProcessLauncher.h"
 #include "WSLAApi.h"

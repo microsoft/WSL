@@ -1,3 +1,19 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAProcessLauncher.h
+
+Abstract:
+
+    Helper class to launch and wait for WSLA processes.
+    This is designed to function both for VM level and container level processes.
+    This class is also designed to work both from client & server side.
+
+--*/
+
 #pragma once
 #include "wslaservice.h"
 #include <variant>
