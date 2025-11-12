@@ -75,9 +75,10 @@ private:
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
 
-    static std::filesystem::path GetCrashDumpFolder(std::wstring vmIdString);
+    static std::filesystem::path GetCrashDumpFolder();
     void CreateVmSavedStateFile();
-    void WriteCrashLog(std::wstring crashLog);
+    void EnforceVmSavedStateFileLimit();
+    void WriteCrashLog(const std::wstring& crashLog);
 
     std::vector<ConnectedSocket> CreateLinuxProcessImpl(
         _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options,

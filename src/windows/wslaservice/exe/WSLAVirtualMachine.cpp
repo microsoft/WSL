@@ -26,6 +26,8 @@ using helpers::WindowsVersion;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 constexpr auto MAX_VM_CRASH_FILES = 3;
+constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
+constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
 WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
     m_settings(Settings), m_userSid(UserSid), m_userSession(Session)
@@ -33,7 +35,7 @@ WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings,
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
 
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
-    m_crashDumpFolder = GetCrashDumpFolder(m_vmIdString);
+    m_crashDumpFolder = GetCrashDumpFolder();
 
     if (Settings.EnableDebugShell)
     {
@@ -482,9 +484,10 @@ void WSLAVirtualMachine::OnCrash(_In_ const HCS_EVENT* Event)
 
     const auto crashReport = wsl::shared::FromJson<wsl::windows::common::hcs::CrashReport>(Event->EventData);
 
-    if (crashReport.GuestCrashSaveInfo.has_value() && crashReport.GuestCrashSaveInfo->Status.has_value())
+    if (crashReport.GuestCrashSaveInfo.has_value() && crashReport.GuestCrashSaveInfo->SaveStateFile.has_value())
     {
-        m_vmSavedStateCaptured = SUCCEEDED(crashReport.GuestCrashSaveInfo->Status.value());
+        m_vmSavedStateCaptured = true;
+        EnforceVmSavedStateFileLimit();
     }
 
     if (!m_crashLogCaptured && !crashReport.CrashLog.empty())
@@ -1168,37 +1171,24 @@ try
 }
 CATCH_RETURN();
 
-std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder(std::wstring vmIdString)
+std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder()
 {
     auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    auto runAsUser = wil::impersonate_token(userToken.get());
-
     auto tempPath = wsl::windows::common::filesystem::GetTempFolderPath(userToken.get());
     return tempPath / L"wsla-crashes";
 }
 
 void WSLAVirtualMachine::CreateVmSavedStateFile()
 {
-    constexpr auto c_extension = L".vmrs";
-    constexpr auto c_prefix = L"saved-state-";
-    const auto filename = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), m_vmIdString, c_extension);
+    const auto filename = std::format(L"{}{}-{}{}", 
+        SAVED_STATE_FILE_PREFIX, 
+        std::time(nullptr), 
+        m_vmIdString, 
+        SAVED_STATE_FILE_EXTENSION);
+
     auto savedStateFile = m_crashDumpFolder / filename;
 
-    std::error_code error;
-    std::filesystem::create_directories(m_crashDumpFolder, error);
-    if (error.value())
-    {
-        THROW_WIN32_MSG(error.value(), "Failed to create folder: %ls", m_crashDumpFolder.c_str());
-    }
-
-    auto pred = [&c_extension, &c_prefix](const auto& e) {
-        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
-               e.path().extension() == c_extension && e.path().has_filename() &&
-               e.path().filename().wstring().find(c_prefix) == 0 && e.file_size() > 0;
-    };
-
-    const auto maxSavedSateFiles = MAX_VM_CRASH_FILES;
-    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES + 1, pred);
+    wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
 
     wil::unique_handle file{CreateFileW(savedStateFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
     THROW_LAST_ERROR_IF(!file);
@@ -1207,7 +1197,18 @@ void WSLAVirtualMachine::CreateVmSavedStateFile()
     m_vmSavedStateFile = savedStateFile;
 }
 
-void WSLAVirtualMachine::WriteCrashLog(std::wstring crashLog)
+void wsl::windows::service::wsla::WSLAVirtualMachine::EnforceVmSavedStateFileLimit()
+{
+    auto pred = [](const auto& e) {
+        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
+               e.path().extension() == SAVED_STATE_FILE_EXTENSION && e.path().has_filename() &&
+               e.path().filename().wstring().find(SAVED_STATE_FILE_PREFIX) == 0 && e.file_size() > 0;
+    };
+
+    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES + 1, pred);
+}
+
+void WSLAVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
 {
     constexpr auto c_extension = L".txt";
     constexpr auto c_prefix = L"kernel-panic-";
@@ -1225,13 +1226,13 @@ void WSLAVirtualMachine::WriteCrashLog(std::wstring crashLog)
     wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES, pred);
 
     {
-        wil::unique_handle file{CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
-        THROW_LAST_ERROR_IF(!file);
-    }
-    {
         std::wofstream outputFile(filePath.wstring());
-        THROW_HR_IF(E_UNEXPECTED, !outputFile || !(outputFile << crashLog));
+        THROW_HR_IF(E_UNEXPECTED, !outputFile.is_open());
+
+        outputFile << crashLog; 
+        THROW_HR_IF(E_UNEXPECTED, outputFile.fail());
     }
 
+    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
     m_crashLogCaptured = true;
 }

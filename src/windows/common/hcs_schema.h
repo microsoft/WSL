@@ -22,6 +22,12 @@ Abstract:
         Json[#Value] = (Object).Value.value(); \
     }
 
+#define ASSIGN_IF_PRESENT(Json, Object, Value) \
+    if (Json.contains(#Value)) \
+    { \
+        (Object).Value = Json.at(#Value).get_to((Object).Value); \
+    }
+
 namespace wsl::windows::common::hcs {
 
 enum class ModifyRequestType
@@ -510,10 +516,8 @@ inline void to_json(nlohmann::json& j, const GuestErrorSaveReport& g)
 
 inline void from_json(const nlohmann::json& j, GuestErrorSaveReport& r)
 {
-    if (j.contains("SaveStateFile"))
-        r.SaveStateFile = j.at("SaveStateFile").get<std::wstring>();
-    if (j.contains("Status"))
-        r.Status = j.at("Status").get<int32_t>();
+    ASSIGN_IF_PRESENT(j, r, SaveStateFile);
+    ASSIGN_IF_PRESENT(j, r, Status);
 }
 
 struct CrashReport
@@ -531,10 +535,8 @@ inline void to_json(nlohmann::json& j, const CrashReport& c)
 
 inline void from_json(const nlohmann::json& j, CrashReport& c)
 {
-    if (j.contains("CrashLog"))
-        c.CrashLog = j.at("CrashLog").get<std::wstring>();
-    if (j.contains("GuestCrashSaveInfo"))
-        c.GuestCrashSaveInfo = j.at("GuestCrashSaveInfo").get<GuestErrorSaveReport>();
+    ASSIGN_IF_PRESENT(j, c, CrashLog);
+    ASSIGN_IF_PRESENT(j, c, GuestCrashSaveInfo);
 }
 
 enum class NotificationType
@@ -564,18 +566,12 @@ struct GuestCrashAttribution
 inline void to_json(nlohmann::json& j, const GuestCrashAttribution& g)
 {
     j = nlohmann::json::object();
-    if (g.CrashParameters.has_value())
-    {
-        j["CrashParameters"] = g.CrashParameters.value();
-    }
+    OMIT_IF_EMPTY(j, g, CrashParameters)
 }
 
 inline void from_json(const nlohmann::json& j, GuestCrashAttribution& g)
 {
-    if (j.contains("CrashParameters"))
-    {
-        g.CrashParameters = j.at("CrashParameters").get<std::vector<uint64_t>>();
-    }
+    ASSIGN_IF_PRESENT(j, g, CrashParameters);
 }
 
 // Attribution record (trimmed to GuestCrash only for now)
@@ -587,18 +583,12 @@ struct AttributionRecord
 inline void to_json(nlohmann::json& j, const AttributionRecord& a)
 {
     j = nlohmann::json::object();
-    if (a.GuestCrash.has_value())
-    {
-        j["GuestCrash"] = a.GuestCrash.value();
-    }
+    OMIT_IF_EMPTY(j, a, GuestCrash)
 }
 
 inline void from_json(const nlohmann::json& j, AttributionRecord& a)
 {
-    if (j.contains("GuestCrash"))
-    {
-        a.GuestCrash = j.at("GuestCrash").get<GuestCrashAttribution>();
-    }
+    ASSIGN_IF_PRESENT(j, a, GuestCrash);
 }
 
 struct SystemExitStatus
@@ -618,10 +608,8 @@ inline void to_json(nlohmann::json& j, const SystemExitStatus& s)
 inline void from_json(const nlohmann::json& j, SystemExitStatus& s)
 {
     s.Status = j.at("Status").get<int32_t>();
-    if (j.contains("ExitType"))
-        s.ExitType = j.at("ExitType").get<NotificationType>();
-    if (j.contains("Attribution"))
-        s.Attribution = j.at("Attribution").get<std::vector<AttributionRecord>>();
+    ASSIGN_IF_PRESENT(j, s, ExitType);
+    ASSIGN_IF_PRESENT(j, s, Attribution);
 }
 
 } // namespace wsl::windows::common::hcs
