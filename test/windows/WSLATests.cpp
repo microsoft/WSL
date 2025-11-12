@@ -19,8 +19,9 @@ Abstract:
 #include "WSLAProcessWrapper.h"
 
 using namespace wsl::windows::common::registry;
-using wsl::windows::common::FDFlags;
-using wsl::windows::common::WSLAProcessWrapper;
+using wsl::windows::common::ProcessFlags;
+using wsl::windows::common::RunningWSLAProcess;
+using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
 
@@ -93,14 +94,14 @@ class WSLATests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
-    WSLAProcessWrapper::ProcessResult RunCommand(IWSLASession* session, const std::vector<std::string>& command, int timeout = 600000)
+    RunningWSLAProcess::ProcessResult RunCommand(IWSLASession* session, const std::vector<std::string>& command, int timeout = 600000)
     {
-        WSLAProcessWrapper process(session, std::string(command[0]), std::vector<std::string>(command));
+        WSLAProcessLauncher process(command[0], command);
 
-        return process.LaunchAndCaptureOutput();
+        return process.Launch(*session).WaitAndCaptureOutput();
     }
 
-    WSLAProcessWrapper::ProcessResult ExpectCommandResult(
+    RunningWSLAProcess::ProcessResult ExpectCommandResult(
         IWSLASession* session, const std::vector<std::string>& command, int expectResult, bool expectSignal = false, int timeout = 600000)
     {
         auto result = RunCommand(session, command, timeout);
@@ -1108,16 +1109,16 @@ class WSLATests
         // Simple case
         {
             auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo OK"}, 0);
-            VERIFY_ARE_EQUAL(result.Output[0], "OK\n");
-            VERIFY_ARE_EQUAL(result.Output[1], "");
+            VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "");
         }
 
         // Stdout + stderr
         {
 
             auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"}, 0);
-            VERIFY_ARE_EQUAL(result.Output[0], "stdout\n");
-            VERIFY_ARE_EQUAL(result.Output[1], "stderr\n");
+            VERIFY_ARE_EQUAL(result.Output[1], "stdout\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "stderr\n");
         }
 
         // Write a large stdin buffer and expect it back on stdout.
@@ -1130,41 +1131,56 @@ class WSLATests
                 largeBuffer.insert(largeBuffer.end(), pattern.begin(), pattern.end());
             }
 
-            WSLAProcessWrapper wrapper(
-                session.get(),
-                std::string("/bin/sh"),
-                std::vector<std::string>{"/bin/sh", "-c", "cat && (echo completed 1>& 2)"},
-                FDFlags::Stdin | FDFlags::Stdout | FDFlags::Stderr);
+            WSLAProcessLauncher launcher(
+                "/bin/sh", {"/bin/sh", "-c", "cat && (echo completed 1>& 2)"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto process = launcher.Launch(*session);
 
             wil::unique_handle stdinHandle;
-            VERIFY_SUCCEEDED(wrapper.Launch().GetStdHandle(0, reinterpret_cast<ULONG*>(&stdinHandle)));
+            VERIFY_SUCCEEDED(process.Get().GetStdHandle(0, reinterpret_cast<ULONG*>(&stdinHandle)));
             std::unique_ptr<OverlappedIOHandle> writeStdin(new WriteHandle(std::move(stdinHandle), largeBuffer));
 
             std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
             extraHandles.emplace_back(std::move(writeStdin));
-            auto result = wrapper.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
+            auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
 
-            VERIFY_IS_TRUE(std::equal(largeBuffer.begin(), largeBuffer.end(), result.Output[0].begin(), result.Output[0].end()));
-            VERIFY_ARE_EQUAL(result.Output[1], "completed\n");
+            VERIFY_IS_TRUE(std::equal(largeBuffer.begin(), largeBuffer.end(), result.Output[1].begin(), result.Output[1].end()));
+            VERIFY_ARE_EQUAL(result.Output[2], "completed\n");
         }
 
         // Create a stuck process and kill it.
         {
-            WSLAProcessWrapper wrapper(
-                session.get(), std::string("/bin/cat"), std::vector<std::string>{"/bin/cat"}, FDFlags::Stdin | FDFlags::Stdout | FDFlags::Stderr);
+            WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto process = launcher.Launch(*session);
 
             // Send SIGKILL(9) to the process.
-            VERIFY_SUCCEEDED(wrapper.Launch().Signal(9));
+            VERIFY_SUCCEEDED(process.Get().Signal(9));
 
-            auto result = wrapper.WaitAndCaptureOutput();
+            auto result = process.WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Code, 9);
             VERIFY_ARE_EQUAL(result.Signalled, true);
-            VERIFY_ARE_EQUAL(result.Output[0], "");
             VERIFY_ARE_EQUAL(result.Output[1], "");
+            VERIFY_ARE_EQUAL(result.Output[2], "");
         }
 
         // Validate that errno is correctly propagated
         {
+            WSLAProcessLauncher launcher("doesnotexist", {});
+
+            auto [hresult, error, process] = launcher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+            VERIFY_ARE_EQUAL(error, 2); // ENOENT
+            VERIFY_IS_FALSE(process.has_value());
+        }
+
+        {
+            WSLAProcessLauncher launcher("/", {});
+
+            auto [hresult, error, process] = launcher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+            VERIFY_ARE_EQUAL(error, 13); // EACCESS
+            VERIFY_IS_FALSE(process.has_value());
         }
     }
 };

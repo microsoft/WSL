@@ -2,40 +2,37 @@
 #include "WSLAProcessWrapper.h"
 #include "WSLAApi.h"
 
-using wsl::windows::common::WSLAProcessWrapper;
+using wsl::windows::common::RunningWSLAProcess;
+using wsl::windows::common::WSLAProcessLauncher;
 
-WSLAProcessWrapper::WSLAProcessWrapper(IWSLASession* Session, std::string&& Executable, std::vector<std::string>&& Arguments, FDFlags Flags) :
-    m_executable(std::move(Executable)), m_arguments(std::move(Arguments))
+WSLAProcessLauncher::WSLAProcessLauncher(
+    const std::string& Executable, const std::vector<std::string>& Arguments, const std::vector<std::string>& Environment, ProcessFlags Flags) :
+    m_executable(Executable), m_arguments(Arguments), m_environment(Environment)
 {
-    m_launch = [Session](const WSLA_PROCESS_OPTIONS* Options) {
-        Microsoft::WRL::ComPtr<IWSLAProcess> process;
-        int Errno = -1;
-        THROW_IF_FAILED_MSG(Session->CreateRootNamespaceProcess(Options, &process, &Errno), "Errno: %i", Errno);
-
-        return process;
-    };
-
     // Add standard Fds.
-    if (WI_IsFlagSet(Flags, FDFlags::Stdin))
+    if (WI_IsFlagSet(Flags, ProcessFlags::Stdin))
     {
         m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeDefault, .Path = nullptr});
     }
 
-    if (WI_IsFlagSet(Flags, FDFlags::Stdout))
+    if (WI_IsFlagSet(Flags, ProcessFlags::Stdout))
     {
         m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeDefault, .Path = nullptr});
     }
 
-    if (WI_IsFlagSet(Flags, FDFlags::Stdout))
+    if (WI_IsFlagSet(Flags, ProcessFlags::Stdout))
     {
         m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeDefault, .Path = nullptr});
     }
 }
 
-IWSLAProcess& WSLAProcessWrapper::Launch()
+std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> WSLAProcessLauncher::CreateProcessOptions()
 {
     std::vector<const char*> commandLine;
     std::ranges::transform(m_arguments, std::back_inserter(commandLine), [](const std::string& e) { return e.c_str(); });
+
+    std::vector<const char*> environment;
+    std::ranges::transform(m_environment, std::back_inserter(environment), [](const std::string& e) { return e.c_str(); });
 
     WSLA_PROCESS_OPTIONS options{};
     options.Executable = m_executable.c_str();
@@ -43,20 +40,55 @@ IWSLAProcess& WSLAProcessWrapper::Launch()
     options.CommandLineCount = static_cast<DWORD>(commandLine.size());
     options.Fds = m_fds.data();
     options.FdsCount = static_cast<DWORD>(m_fds.size());
+    options.Environment = environment.data();
+    options.EnvironmentCount = static_cast<DWORD>(environment.size());
 
-    // TODO: Environment support
-
-    m_process = m_launch(&options);
-    wsl::windows::common::security::ConfigureForCOMImpersonation(m_process.Get());
-
-    return *m_process.Get();
+    return std::make_tuple(options, std::move(commandLine), std::move(environment));
 }
 
-WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
+RunningWSLAProcess WSLAProcessLauncher::Launch(IWSLASession& Session)
 {
-    THROW_HR_IF(E_UNEXPECTED, !m_process);
+    auto [hresult, error, process] = LaunchNoThrow(Session);
+    if (FAILED(hresult))
+    {
+        auto commandLine = wsl::shared::string::Join(m_arguments, ' ');
+        THROW_HR_MSG(hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
+    }
 
-    WSLAProcessWrapper::ProcessResult result;
+    return process.value();
+}
+
+std::tuple<HRESULT, int, std::optional<RunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)
+{
+    auto [options, commandLine, env] = CreateProcessOptions();
+    // TODO: Environment support
+
+    wil::com_ptr<IWSLAProcess> process;
+    int error = -1;
+    auto result = Session.CreateRootNamespaceProcess(&options, &process, &error);
+    if (FAILED(result))
+    {
+        return std::make_tuple(result, error, std::optional<RunningWSLAProcess>());
+    }
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
+
+    return {S_OK, 0, RunningWSLAProcess{std::move(process), std::move(m_fds)}};
+}
+
+IWSLAProcess& RunningWSLAProcess::Get()
+{
+    return *m_process.get();
+}
+
+RunningWSLAProcess::RunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds) :
+    m_process(std::move(process)), m_fds(std::move(fds))
+{
+}
+
+RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
+{
+    RunningWSLAProcess::ProcessResult result;
 
     relay::MultiHandleWait io;
 
@@ -68,12 +100,12 @@ WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD
             continue; // Don't try to read from stdin
         }
 
-        result.Output.emplace_back();
+        result.Output.emplace(m_fds[i].Fd, std::string{});
 
         wil::unique_handle stdHandle;
         THROW_IF_FAILED(m_process->GetStdHandle(m_fds[i].Fd, reinterpret_cast<ULONG*>(&stdHandle)));
 
-        auto ioCallback = [Index = result.Output.size() - 1, &result](const gsl::span<char>& Content) {
+        auto ioCallback = [Index = m_fds[i].Fd, &result](const gsl::span<char>& Content) {
             result.Output[Index].insert(result.Output[Index].end(), Content.begin(), Content.end());
         };
 
@@ -112,10 +144,4 @@ WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD
     io.Run(std::chrono::milliseconds(TimeoutMs));
 
     return result;
-}
-
-WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::LaunchAndCaptureOutput(DWORD TimeoutMs)
-{
-    Launch();
-    return WaitAndCaptureOutput(TimeoutMs);
 }
