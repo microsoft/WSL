@@ -34,7 +34,7 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     svccommio.cpp
-    WSLAProcessWrapper.cpp
+    WSLAProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -106,7 +106,7 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     svccommio.hpp
-    WSLAProcessWrapper.h
+    WSLAProcessLauncher.h
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h

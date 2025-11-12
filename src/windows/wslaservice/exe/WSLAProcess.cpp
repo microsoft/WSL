@@ -64,7 +64,7 @@ wil::unique_socket& WSLAProcess::GetSocket(int Index)
     std::lock_guard lock{m_mutex};
 
     auto it = m_handles.find(Index);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_handles.end());
+    THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_handles.end(), "Pid: %i, Fd: %i", m_pid, Index);
 
     return it->second;
 }

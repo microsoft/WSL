@@ -244,13 +244,15 @@ interface IWSLASession : IUnknown
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
-    // TODO: Add a way to communicate errno to the caller on failure.
     HRESULT CreateRootNamespaceProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
     // Disk management.
     HRESULT FormatVirtualDisk([in] LPCWSTR Path);
+
+    // Terminate the VM and containers.
+    HRESULT Shutdown([in] ULONG TimeoutMs);
 
      // To be deleted.
     HRESULT GetDisplayName([out] LPWSTR* DisplayName);

@@ -999,7 +999,6 @@ void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         }
         else
         {
-            __debugbreak();
             THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
         }
     }

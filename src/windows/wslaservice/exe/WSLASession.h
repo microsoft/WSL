@@ -45,11 +45,14 @@ public:
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
+    IFACEMETHOD(Shutdown(_In_ ULONG)) override;
+
 private:
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl& m_userSession;
-    WSLAVirtualMachine m_virtualMachine;
+    std::optional<WSLAVirtualMachine> m_virtualMachine;
     std::wstring m_displayName;
+    std::mutex m_lock;
 };
 
 } // namespace wsl::windows::service::wsla
