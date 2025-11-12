@@ -47,7 +47,7 @@ CATCH_RETURN();
 HRESULT WSLAProcess::GetStdHandle(ULONG Index, ULONG* Handle)
 try
 {
-    // m_handles is immutable, so m_mutex doesn't need to be acquired.
+    std::lock_guard lock{m_mutex};
 
     auto& socket = GetSocket(Index);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !socket.is_valid());
@@ -61,7 +61,8 @@ CATCH_RETURN();
 
 wil::unique_socket& WSLAProcess::GetSocket(int Index)
 {
-    // m_handles is immutable, so m_mutex doesn't need to be acquired.
+    std::lock_guard lock{m_mutex};
+
     auto it = m_handles.find(Index);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_handles.end());
 

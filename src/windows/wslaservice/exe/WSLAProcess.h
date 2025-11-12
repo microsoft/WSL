@@ -39,7 +39,7 @@ public:
     int GetPid() const;
 
 private:
-    std::mutex m_mutex;
+    std::recursive_mutex m_mutex;
     std::map<int, wil::unique_socket> m_handles;
     int m_pid = -1;
     int m_exitedCode = -1;

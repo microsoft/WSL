@@ -159,221 +159,77 @@ enum class IOHandleStatus
     Completed
 };
 
-class IOHandle
+class OverlappedIOHandle
 {
 public:
-    virtual ~IOHandle()
-    {
-    }
+    NON_COPYABLE(OverlappedIOHandle)
+    NON_MOVABLE(OverlappedIOHandle)
+
+    OverlappedIOHandle() = default;
+    virtual ~OverlappedIOHandle() = default;
     virtual void Schedule() = 0;
     virtual void Collect() = 0;
-    virtual HANDLE GetHandle() = 0;
-
-    IOHandleStatus GetState() const
-    {
-        return State;
-    }
+    virtual HANDLE GetHandle() const = 0;
+    IOHandleStatus GetState() const;
 
 protected:
     IOHandleStatus State = IOHandleStatus::Standby;
 };
 
-struct EventHandle : IOHandle // TODO: move to .cpp
+class EventHandle : public OverlappedIOHandle
 {
+public:
+    NON_COPYABLE(EventHandle)
+    NON_MOVABLE(EventHandle)
+
+    EventHandle(wil::unique_handle&& EventHandle, std::function<void()>&& OnSignalled);
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
     wil::unique_handle Handle;
     std::function<void()> OnSignalled;
-
-    NON_COPYABLE(EventHandle);
-    NON_MOVABLE(EventHandle);
-
-    EventHandle(wil::unique_handle&& Handle, std::function<void()>&& OnSignalled) :
-        Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
-    {
-    }
-
-    void Schedule() override
-    {
-        State = IOHandleStatus::Pending;
-    }
-
-    void Collect() override
-    {
-        State = IOHandleStatus::Completed;
-        OnSignalled();
-    }
-
-    HANDLE GetHandle() override
-    {
-        return Handle.get();
-    }
 };
 
-struct ReadHandle : IOHandle // TODO: move to .cpp
+class ReadHandle : public OverlappedIOHandle
 {
+public:
+    NON_COPYABLE(ReadHandle);
+    NON_MOVABLE(ReadHandle);
+
+    ReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
+    ~ReadHandle();
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
     wil::unique_handle Handle;
     std::function<void(const gsl::span<char>& Buffer)> OnRead;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
-    std::vector<char> Buffer;
-
-    NON_COPYABLE(ReadHandle);
-    NON_MOVABLE(ReadHandle);
-
-    ReadHandle(wil::unique_handle&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
-        Handle(std::move(Handle)), OnRead(OnRead), Buffer(LX_RELAY_BUFFER_SIZE)
-    {
-        Overlapped.hEvent = Event.get();
-    }
-
-    ~ReadHandle()
-    {
-        if (State == IOHandleStatus::Pending)
-        {
-            DWORD bytesRead{};
-            LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(reinterpret_cast<HANDLE>(Handle.get()), &Overlapped));
-            LOG_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true));
-        }
-    }
-
-    void Schedule() override
-    {
-        WI_ASSERT(State == IOHandleStatus::Standby);
-
-        Event.ResetEvent();
-
-        // Schedule the read.
-        DWORD bytesRead{};
-        if (ReadFile(Handle.get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesRead, &Overlapped))
-        {
-            // Signal the read.
-            OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
-
-            // ReadFile completed immediately, process the result right away.
-            if (bytesRead == 0)
-            {
-                State = IOHandleStatus::Completed;
-                return; // Handle is completely read, don't try again.
-            }
-
-            // Read was done synchronously, remain in 'standby' state.
-        }
-        else
-        {
-            auto error = GetLastError();
-            if (error == ERROR_HANDLE_EOF || error == ERROR_BROKEN_PIPE)
-            {
-                State = IOHandleStatus::Completed;
-                return;
-            }
-
-            THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.get());
-
-            // The read is pending, update to 'Pending'
-            State = IOHandleStatus::Pending;
-        }
-    }
-
-    void Collect() override
-    {
-        WI_ASSERT(State == IOHandleStatus::Pending);
-
-        // Transition back to standby
-        State = IOHandleStatus::Standby;
-
-        // Complete the read.
-        DWORD bytesRead{};
-        THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, false));
-
-        // Signal the read.
-        OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
-
-        // Transition to Complete if this was a zero byte read.
-        if (bytesRead == 0)
-        {
-            State = IOHandleStatus::Completed;
-        }
-    }
-
-    HANDLE GetHandle() override
-    {
-        return Overlapped.hEvent;
-    }
+    std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
 };
 
-struct WriteHandle : IOHandle // TODO: move to .cpp
+class WriteHandle : public OverlappedIOHandle
 {
+public:
+    NON_COPYABLE(WriteHandle);
+    NON_MOVABLE(WriteHandle);
+
+    WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer);
+    ~WriteHandle();
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
     wil::unique_handle Handle;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     const std::vector<char>& Buffer;
     DWORD Offset = 0;
-
-    NON_COPYABLE(WriteHandle);
-    NON_MOVABLE(WriteHandle);
-
-    WriteHandle(wil::unique_handle&& Handle, const std::vector<char>& Buffer) : Handle(std::move(Handle)), Buffer(Buffer)
-    {
-        Overlapped.hEvent = Event.get();
-    }
-
-    ~WriteHandle()
-    {
-        if (State == IOHandleStatus::Pending)
-        {
-            DWORD bytesRead{};
-            LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(reinterpret_cast<HANDLE>(Handle.get()), &Overlapped));
-            LOG_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true));
-        }
-    }
-
-    void Schedule() override
-    {
-        WI_ASSERT(State == IOHandleStatus::Standby);
-
-        Event.ResetEvent();
-
-        // Schedule the write.
-        DWORD bytesWritten{};
-        if (WriteFile(Handle.get(), Buffer.data() + Offset, static_cast<DWORD>(Buffer.size() - Offset), &bytesWritten, &Overlapped))
-        {
-            Offset += bytesWritten;
-            if (Offset >= Buffer.size())
-            {
-                State = IOHandleStatus::Completed;
-            }
-        }
-        else
-        {
-            auto error = GetLastError();
-            THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.get());
-
-            // The write is pending, update to 'Pending'
-            State = IOHandleStatus::Pending;
-        }
-    }
-
-    void Collect() override
-    {
-        WI_ASSERT(State == IOHandleStatus::Pending);
-
-        // Transition back to standby
-        State = IOHandleStatus::Standby;
-
-        // Complete the write.
-        DWORD bytesWritten{};
-        THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesWritten, false));
-
-        Offset += bytesWritten;
-        if (Offset >= Buffer.size())
-        {
-            State = IOHandleStatus::Completed;
-        }
-    }
-
-    HANDLE GetHandle() override
-    {
-        return Overlapped.hEvent;
-    }
 };
 
 class MultiHandleWait
@@ -381,12 +237,11 @@ class MultiHandleWait
 public:
     MultiHandleWait() = default;
 
-    void AddHandle(std::unique_ptr<IOHandle>&& handle);
-
+    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
     void Run(std::optional<std::chrono::milliseconds> Timeout);
 
 private:
-    std::vector<std::unique_ptr<IOHandle>> m_handles;
+    std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;
 };
 
 } // namespace wsl::windows::common::relay

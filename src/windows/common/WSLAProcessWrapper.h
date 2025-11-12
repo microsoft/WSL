@@ -30,7 +30,7 @@ public:
 
     IWSLAProcess& Launch();
 
-    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::IOHandle>>&& ExtraHandles = {});
+    ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
     ProcessResult LaunchAndCaptureOutput(DWORD TimeoutMs = INFINITE);
 
 private:

@@ -21,7 +21,7 @@ Abstract:
 using namespace wsl::windows::common::registry;
 using wsl::windows::common::FDFlags;
 using wsl::windows::common::WSLAProcessWrapper;
-using wsl::windows::common::relay::IOHandle;
+using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
 
 using unique_vm = wil::unique_any<WslVirtualMachineHandle, decltype(WslReleaseVirtualMachine), &WslReleaseVirtualMachine>;
@@ -1244,9 +1244,9 @@ class WSLATests
 
             wil::unique_handle stdinHandle;
             VERIFY_SUCCEEDED(wrapper.Launch().GetStdHandle(0, reinterpret_cast<ULONG*>(&stdinHandle)));
-            std::unique_ptr<IOHandle> writeStdin(new WriteHandle(std::move(stdinHandle), largeBuffer));
+            std::unique_ptr<OverlappedIOHandle> writeStdin(new WriteHandle(std::move(stdinHandle), largeBuffer));
 
-            std::vector<std::unique_ptr<IOHandle>> extraHandles;
+            std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
             extraHandles.emplace_back(std::move(writeStdin));
             auto result = wrapper.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
 

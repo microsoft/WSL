@@ -51,7 +51,7 @@ IWSLAProcess& WSLAProcessWrapper::Launch()
     return *m_process.Get();
 }
 
-WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::IOHandle>>&& ExtraHandles)
+WSLAProcessWrapper::ProcessResult WSLAProcessWrapper::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
 {
     THROW_HR_IF(E_UNEXPECTED, !m_process);
 
