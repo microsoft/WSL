@@ -82,7 +82,6 @@ RunningWSLAProcess WSLAProcessLauncher::Launch(IWSLASession& Session)
 std::tuple<HRESULT, int, std::optional<RunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)
 {
     auto [options, commandLine, env] = CreateProcessOptions();
-    // TODO: Environment support
 
     wil::com_ptr<IWSLAProcess> process;
     int error = -1;
