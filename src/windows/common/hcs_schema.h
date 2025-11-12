@@ -439,6 +439,19 @@ struct Scsi
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(Scsi, Attachments);
 };
 
+struct DebugOptions
+{
+    std::optional<std::wstring> BugcheckSavedStateFileName;
+    std::optional<std::wstring> ShutdownOrResetSavedStateFileName;
+};
+
+inline void to_json(nlohmann::json& j, const DebugOptions& d)
+{
+    j = nlohmann::json::object();
+    OMIT_IF_EMPTY(j, d, BugcheckSavedStateFileName);
+    OMIT_IF_EMPTY(j, d, ShutdownOrResetSavedStateFileName);
+}
+
 struct Devices
 {
     std::optional<VirtioSerial> VirtioSerial;
@@ -467,8 +480,9 @@ struct VirtualMachine
     Chipset Chipset;
     Topology ComputeTopology;
     Devices Devices;
+    DebugOptions DebugOptions;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualMachine, StopOnReset, Chipset, ComputeTopology, Devices);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualMachine, StopOnReset, Chipset, ComputeTopology, Devices, DebugOptions);
 };
 
 struct ComputeSystem
@@ -481,12 +495,134 @@ struct ComputeSystem
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ComputeSystem, Owner, ShouldTerminateOnLastHandleClosed, SchemaVersion, VirtualMachine)
 };
 
+struct GuestErrorSaveReport
+{
+    std::optional<std::wstring> SaveStateFile;
+    std::optional<long> Status;
+};
+
+inline void to_json(nlohmann::json& j, const GuestErrorSaveReport& g)
+{
+    j = nlohmann::json::object();
+    OMIT_IF_EMPTY(j, g, SaveStateFile);
+    OMIT_IF_EMPTY(j, g, Status);
+}
+
+inline void from_json(const nlohmann::json& j, GuestErrorSaveReport& r)
+{
+    if (j.contains("SaveStateFile"))
+        r.SaveStateFile = j.at("SaveStateFile").get<std::wstring>();
+    if (j.contains("Status"))
+        r.Status = j.at("Status").get<int32_t>();
+}
+
 struct CrashReport
 {
     std::wstring CrashLog;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CrashReport, CrashLog);
+    std::optional<GuestErrorSaveReport> GuestCrashSaveInfo;
 };
+
+inline void to_json(nlohmann::json& j, const CrashReport& c)
+{
+    j = nlohmann::json::object();
+    j.at("CrashLog") = c.CrashLog;
+    OMIT_IF_EMPTY(j, c, GuestCrashSaveInfo);
+}
+
+inline void from_json(const nlohmann::json& j, CrashReport& c)
+{
+    if (j.contains("CrashLog"))
+        c.CrashLog = j.at("CrashLog").get<std::wstring>();
+    if (j.contains("GuestCrashSaveInfo"))
+        c.GuestCrashSaveInfo = j.at("GuestCrashSaveInfo").get<GuestErrorSaveReport>();
+}
+
+enum class NotificationType
+{
+    None,
+    GracefulExit,
+    ForcedExit,
+    UnexpectedExit,
+    Unknown
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    NotificationType,
+    {
+        {NotificationType::None, "None"},
+        {NotificationType::GracefulExit, "GracefulExit"},
+        {NotificationType::ForcedExit, "ForcedExit"},
+        {NotificationType::UnexpectedExit, "UnexpectedExit"},
+        {NotificationType::Unknown, "Unknown"},
+    })
+
+struct GuestCrashAttribution
+{
+    std::optional<std::vector<uint64_t>> CrashParameters;
+};
+
+inline void to_json(nlohmann::json& j, const GuestCrashAttribution& g)
+{
+    j = nlohmann::json::object();
+    if (g.CrashParameters.has_value())
+    {
+        j["CrashParameters"] = g.CrashParameters.value();
+    }
+}
+
+inline void from_json(const nlohmann::json& j, GuestCrashAttribution& g)
+{
+    if (j.contains("CrashParameters"))
+    {
+        g.CrashParameters = j.at("CrashParameters").get<std::vector<uint64_t>>();
+    }
+}
+
+// Attribution record (trimmed to GuestCrash only for now)
+struct AttributionRecord
+{
+    std::optional<GuestCrashAttribution> GuestCrash;
+};
+
+inline void to_json(nlohmann::json& j, const AttributionRecord& a)
+{
+    j = nlohmann::json::object();
+    if (a.GuestCrash.has_value())
+    {
+        j["GuestCrash"] = a.GuestCrash.value();
+    }
+}
+
+inline void from_json(const nlohmann::json& j, AttributionRecord& a)
+{
+    if (j.contains("GuestCrash"))
+    {
+        a.GuestCrash = j.at("GuestCrash").get<GuestCrashAttribution>();
+    }
+}
+
+struct SystemExitStatus
+{
+    int32_t Status;
+    std::optional<NotificationType> ExitType;
+    std::optional<std::vector<AttributionRecord>> Attribution;
+};
+
+inline void to_json(nlohmann::json& j, const SystemExitStatus& s)
+{
+    j = nlohmann::json{{"Status", s.Status}};
+    OMIT_IF_EMPTY(j, s, ExitType);
+    OMIT_IF_EMPTY(j, s, Attribution);
+}
+
+inline void from_json(const nlohmann::json& j, SystemExitStatus& s)
+{
+    s.Status = j.at("Status").get<int32_t>();
+    if (j.contains("ExitType"))
+        s.ExitType = j.at("ExitType").get<NotificationType>();
+    if (j.contains("Attribution"))
+        s.Attribution = j.at("Attribution").get<std::vector<AttributionRecord>>();
+}
 
 } // namespace wsl::windows::common::hcs
 
