@@ -83,10 +83,10 @@ HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
     return S_OK;
 }
 
-HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
+HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
-    return m_virtualMachine.CreateLinuxProcess(Options, Process);
+    return m_virtualMachine.CreateLinuxProcess(Options, Process, Errno);
 }
 CATCH_RETURN();
 

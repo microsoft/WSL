@@ -428,7 +428,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
         };
 
         WSLA_CREATE_PROCESS_RESULT result{};
-        auto process = CreateLinuxProcessImpl(options, prepareCommandLine);
+        auto process = CreateLinuxProcessImpl(options, nullptr, prepareCommandLine);
 
         THROW_HR_IF(E_FAIL, result.Errno != 0);
 
@@ -702,17 +702,27 @@ void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, cons
     THROW_HR_IF_MSG(E_FAIL, result != 0, "Failed to open %hs (flags: %u), %i", Path, Flags, result);
 }
 
-HRESULT WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process)
+HRESULT WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)
 try
 {
-    CreateLinuxProcessImpl(*Options).CopyTo(Process);
+    CreateLinuxProcessImpl(*Options, Errno).CopyTo(Process);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(_In_ const WSLA_PROCESS_OPTIONS& Options, const TPrepareCommandLine& PrepareCommandLine)
+Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
+    _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
+    auto setErrno = [Errno](int Error) {
+        if (Errno != nullptr)
+        {
+            *Errno = Error;
+        }
+    };
+
+    setErrno(-1);
+
     // Check if this is a tty or not
     const WSLA_PROCESS_FD* ttyInput = nullptr;
     const WSLA_PROCESS_FD* ttyOutput = nullptr;
@@ -767,7 +777,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(_
         auto result = ExpectClosedChannelOrError(childChannel);
         if (result != 0)
         {
-            // TODO: Report errno to caller.
+            setErrno(result);
             THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
 
@@ -775,7 +785,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(_
         result = ExpectClosedChannelOrError(grandChildChannel);
         if (result != 0)
         {
-            // TODO: Report errno to caller.
+            setErrno(result);
             THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
 
@@ -787,7 +797,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(_
         auto result = ExpectClosedChannelOrError(childChannel);
         if (result != 0)
         {
-            // TODO: Report errno to caller.
+            setErrno(result);
             THROW_HR_MSG(E_FAIL, "errno: %i", result);
         }
     }

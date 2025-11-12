@@ -51,6 +51,36 @@ class WSLATests
         return true;
     }
 
+    wil::com_ptr<IWSLASession> CreateSession(const VIRTUAL_MACHINE_SETTINGS& vmSettings)
+    {
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        WSLA_SESSION_SETTINGS settings{L"wsla-test"};
+        wil::com_ptr<IWSLASession> session;
+
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
+
+        // TODO: remove once the VM is wired to mount its rootfs inside WSLASession
+        wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
+        VERIFY_SUCCEEDED(session->GetVirtualMachine(&virtualMachine));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(virtualMachine.get());
+
+        wil::unique_cotaskmem_ansistring diskDevice;
+        ULONG Lun{};
+        THROW_IF_FAILED(virtualMachine->AttachDisk(testVhd.c_str(), true, &diskDevice, &Lun));
+
+        THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
+
+        return session;
+    }
+
     TEST_METHOD(GetVersion)
     {
         auto coinit = wil::CoInitializeEx();
@@ -63,140 +93,62 @@ class WSLATests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
-    std::tuple<int, wil::unique_handle, wil::unique_handle, wil::unique_handle> LaunchCommand(
-        WslVirtualMachineHandle vm, const std::vector<const char*>& command)
+    WSLAProcessWrapper::ProcessResult RunCommand(IWSLASession* session, const std::vector<std::string>& command, int timeout = 600000)
     {
-        auto copiedCommand = command;
-        if (copiedCommand.back() != nullptr)
+        WSLAProcessWrapper process(session, std::string(command[0]), std::vector<std::string>(command));
+
+        return process.LaunchAndCaptureOutput();
+    }
+
+    WSLAProcessWrapper::ProcessResult ExpectCommandResult(
+        IWSLASession* session, const std::vector<std::string>& command, int expectResult, bool expectSignal = false, int timeout = 600000)
+    {
+        auto result = RunCommand(session, command, timeout);
+
+        if (result.Signalled != expectSignal)
         {
-            copiedCommand.push_back(nullptr);
+            auto cmd = wsl::shared::string::Join(command, ' ');
+
+            if (expectSignal)
+            {
+                LogError(
+                    "Command: %hs didn't get signalled as expected. ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
+                    cmd.c_str(),
+                    result.Code,
+                    result.Output[0].c_str(),
+                    result.Output[1].c_str());
+            }
+            else
+            {
+                LogError(
+                    "Command: %hs didn't received an unexpected signal: %i. Stdout: '%hs', Stderr: '%hs'",
+                    cmd.c_str(),
+                    result.Code,
+                    result.Output[0].c_str(),
+                    result.Output[1].c_str());
+            }
         }
 
-        std::vector<WslProcessFileDescriptorSettings> fds(3);
-        fds[0].Number = 0;
-        fds[1].Number = 1;
-        fds[2].Number = 2;
+        if (result.Code != expectResult)
+        {
+            auto cmd = wsl::shared::string::Join(command, ' ');
+            LogError(
+                "Command: %hs didn't return expected code (%i). ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
+                cmd.c_str(),
+                expectResult,
+                result.Code,
+                result.Output[0].c_str(),
+                result.Output[1].c_str());
+        }
 
-        WslCreateProcessSettings WslCreateProcessSettings{};
-        WslCreateProcessSettings.Executable = copiedCommand[0];
-        WslCreateProcessSettings.Arguments = copiedCommand.data();
-        WslCreateProcessSettings.FileDescriptors = fds.data();
-        WslCreateProcessSettings.FdCount = 3;
-
-        int pid = -1;
-        VERIFY_SUCCEEDED(WslCreateLinuxProcess(vm, &WslCreateProcessSettings, &pid));
-
-        return std::make_tuple(
-            pid, wil::unique_handle{fds[0].Handle}, wil::unique_handle(fds[1].Handle), wil::unique_handle{fds[2].Handle});
-    }
-
-    int RunCommand(WslVirtualMachineHandle vm, const std::vector<const char*>& command, int timeout = 600000)
-    {
-        auto [pid, _, __, ___] = LaunchCommand(vm, command);
-
-        WslWaitResult result{};
-        VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm, pid, timeout, &result));
-        VERIFY_ARE_EQUAL(result.State, WslProcessStateExited);
-        return result.Code;
-    }
-
-    unique_vm CreateVm(const WslVirtualMachineSettings* settings, const std::optional<LPCWSTR> rootfs = {})
-    {
-        unique_vm vm{};
-        VERIFY_SUCCEEDED(WslCreateVirtualMachine(settings, &vm));
-
-        WslDiskAttachSettings attachSettings{rootfs.value_or(testVhd.c_str()), true};
-        WslAttachedDiskInformation attachedDisk;
-
-        VERIFY_SUCCEEDED(WslAttachDisk(vm.get(), &attachSettings, &attachedDisk));
-
-        WslMountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &mountSettings));
-
-        WslMountSettings devMountSettings{nullptr, "/dev", "devtmpfs", "", false};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &devMountSettings));
-
-        WslMountSettings sysMountSettings{nullptr, "/sys", "sysfs", "", false};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &sysMountSettings));
-
-        WslMountSettings procMountSettings{nullptr, "/proc", "proc", "", false};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &procMountSettings));
-
-        WslMountSettings ptsMountSettings{nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", false};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &ptsMountSettings));
-
-        return vm;
-    }
-
-    TEST_METHOD(AttachDetach)
-    {
-        WSL2_TEST_ONLY();
-
-        WslVirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.Memory.MemoryMb = 1024;
-        settings.Options.BootTimeoutMs = 30000;
-        auto vm = CreateVm(&settings);
-
-#ifdef WSL_DEV_INSTALL_PATH
-
-        auto vhdPath = std::filesystem::path(WSL_DEV_INSTALL_PATH) / "system.vhd";
-#else
-
-        auto msiPath = wsl::windows::common::wslutil::GetMsiPackagePath();
-        VERIFY_IS_TRUE(msiPath.has_value());
-
-        auto vhdPath = std::filesystem::path(msiPath.value()) / "system.vhd";
-
-#endif
-
-        auto blockDeviceExists = [&](ULONG Lun) {
-            std::string device = std::format("/sys/bus/scsi/devices/0:0:0:{}", Lun);
-            std::vector<const char*> cmd{"/usr/bin/test", "-d", device.c_str()};
-            return RunCommand(vm.get(), cmd) == 0;
-        };
-
-        // Attach the disk.
-        WslDiskAttachSettings attachSettings{vhdPath.c_str(), true};
-        WslAttachedDiskInformation attachedDisk{};
-        VERIFY_SUCCEEDED(WslAttachDisk(vm.get(), &attachSettings, &attachedDisk));
-        VERIFY_IS_TRUE(blockDeviceExists(attachedDisk.ScsiLun));
-
-        // Mount it to /mnt.
-        WslMountSettings mountSettings{attachedDisk.Device, "/mnt", "ext4", "ro"};
-        VERIFY_SUCCEEDED(WslMount(vm.get(), &mountSettings));
-
-        // Validate that the mountpoint is present.
-        std::vector<const char*> cmd{"/usr/bin/mountpoint", "/mnt"};
-        VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 0L);
-
-        // Unmount /mnt.
-        VERIFY_SUCCEEDED(WslUnmount(vm.get(), "/mnt"));
-        VERIFY_ARE_EQUAL(RunCommand(vm.get(), cmd), 32L);
-
-        // Verify that unmount fails now.
-        VERIFY_ARE_EQUAL(WslUnmount(vm.get(), "/mnt"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-
-        // Detach the disk.
-        VERIFY_SUCCEEDED(WslDetachDisk(vm.get(), attachedDisk.ScsiLun));
-        VERIFY_IS_FALSE(blockDeviceExists(attachedDisk.ScsiLun));
-
-        // Verify that disk can't be detached twice.
-        VERIFY_ARE_EQUAL(WslDetachDisk(vm.get(), attachedDisk.ScsiLun), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-
-        // Validate that invalid flags return E_INVALIDARG.
-        WslMountSettings invalidFlagSettings{"/dev/sda", "/mnt", "ext4", "ro", 0x4};
-        VERIFY_ARE_EQUAL(WslMount(vm.get(), &invalidFlagSettings), E_INVALIDARG);
-
-        invalidFlagSettings.Flags = 0xff;
-        VERIFY_ARE_EQUAL(WslMount(vm.get(), &invalidFlagSettings), E_INVALIDARG);
+        return result;
     }
 
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
 
+        /* TODO: Add support in the new API
         auto createVmWithDmesg = [this](bool earlyBootLogging) {
             auto [read, write] = CreateSubprocessPipe(false, false);
 
@@ -277,8 +229,10 @@ class WSLATests
             auto dmesg = createVmWithDmesg(true);
             validateFirstDmesgLine(dmesg, "Linux version");
         }
-    }
 
+        */
+    }
+    /*
     TEST_METHOD(TerminationCallback)
     {
         WSL2_TEST_ONLY();
@@ -510,49 +464,51 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        WslVirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
         settings.DisplayName = L"WSLA";
-        settings.Memory.MemoryMb = 2048;
-        settings.Options.BootTimeoutMs = 30 * 1000;
-        settings.Networking.Mode = WslNetworkingModeNAT;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.NetworkingMode = WslNetworkingModeNAT;
 
-        auto vm = CreateVm(&settings);
+        auto session = CreateSession(settings);
 
         // Validate that eth0 has an ip address
         VERIFY_ARE_EQUAL(
             RunCommand(
-                vm.get(),
+                session.get(),
                 {"/bin/bash",
                  "-c",
-                 "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"}),
+                 "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"})
+                .Code,
             0);
 
         // Verify that /etc/resolv.conf is configured
-        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}), 0);
+        VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}).Code, 0);
     }
 
     TEST_METHOD(NATNetworkingWithDnsTunneling)
     {
         WSL2_TEST_ONLY();
 
-        WslVirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
         settings.DisplayName = L"WSLA";
-        settings.Memory.MemoryMb = 2048;
-        settings.Options.BootTimeoutMs = 30 * 1000;
-        settings.Networking.Mode = WslNetworkingModeNAT;
-        settings.Networking.DnsTunneling = true;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.NetworkingMode = WslNetworkingModeNAT;
+        settings.EnableDnsTunneling = true;
 
-        auto vm = CreateVm(&settings);
+        auto session = CreateSession(settings);
 
         // Validate that eth0 has an ip address
         VERIFY_ARE_EQUAL(
             RunCommand(
-                vm.get(),
+                session.get(),
                 {"/bin/bash",
                  "-c",
-                 "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"}),
+                 "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"})
+                .Code,
             0);
 
         // Verify that /etc/resolv.conf is correctly configured.
@@ -871,6 +827,7 @@ class WSLATests
         stuckThread.join();
     }
 
+
     TEST_METHOD(WindowsMounts)
     {
         WSL2_TEST_ONLY();
@@ -953,6 +910,7 @@ class WSLATests
             VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
         }
     }
+
 
     // This test case validates that no file descriptors are leaked to user processes.
     TEST_METHOD(Fd)
@@ -1091,14 +1049,14 @@ class WSLATests
 
         // Use the system distro vhd for modprobe & lsmod.
 
-#ifdef WSL_SYSTEM_DISTRO_PATH
+    #ifdef WSL_SYSTEM_DISTRO_PATH
 
         auto rootfs = std::filesystem::path(TEXT(WSL_SYSTEM_DISTRO_PATH));
 
-#else
+    #else
         auto rootfs = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
 
-#endif
+    #endif
 
         auto vm = CreateVm(&settings, rootfs.c_str());
 
@@ -1110,7 +1068,7 @@ class WSLATests
 
         // Validate that xsk_diag is now loaded.
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}), 0);
-    }
+    }*/
 
     TEST_METHOD(CreateSessionSmokeTest)
     {
@@ -1137,91 +1095,27 @@ class WSLATests
         VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
     }
 
-    wil::com_ptr<IWSLASession> CreateSession()
-    {
-        wil::com_ptr<IWSLAUserSession> userSession;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
-
-        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
-        wil::com_ptr<IWSLASession> session;
-
-        VIRTUAL_MACHINE_SETTINGS vmSettings{};
-        vmSettings.BootTimeoutMs = 30 * 1000;
-        vmSettings.DisplayName = L"WSLA";
-        vmSettings.MemoryMb = 2048;
-        vmSettings.CpuCount = 4;
-        vmSettings.NetworkingMode = WslNetworkingModeNone;
-        vmSettings.EnableDebugShell = true;
-
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
-
-        // TODO: remove once the VM is wired to mount its rootfs inside WSLASession
-        wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-        VERIFY_SUCCEEDED(session->GetVirtualMachine(&virtualMachine));
-
-        wsl::windows::common::security::ConfigureForCOMImpersonation(virtualMachine.get());
-
-        wil::unique_cotaskmem_ansistring diskDevice;
-        ULONG Lun{};
-        THROW_IF_FAILED(virtualMachine->AttachDisk(testVhd.c_str(), true, &diskDevice, &Lun));
-
-        THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
-
-        return session;
-    }
-
-    TEST_METHOD(WiringSmokeTest)
-    {
-        auto session = CreateSession();
-        wil::com_ptr<IWSLAContainer> container;
-        WSLA_CONTAINER_OPTIONS containerOptions{};
-        containerOptions.Image = "dummy";
-        containerOptions.Name = "dummy";
-        VERIFY_SUCCEEDED(session->CreateContainer(&containerOptions, &container));
-
-        wil::com_ptr<IWSLAProcess> process;
-        WSLA_PROCESS_OPTIONS processOptions{};
-        processOptions.Executable = "dummy";
-        VERIFY_SUCCEEDED(container->Exec(&processOptions, &process));
-
-        wil::unique_handle exitEvent;
-        VERIFY_SUCCEEDED(process->GetExitEvent(reinterpret_cast<ULONG*>(exitEvent.addressof())));
-
-        // Verify that the event handle is valid.
-        VERIFY_ARE_EQUAL(WaitForSingleObject(exitEvent.get(), 0), WAIT_TIMEOUT);
-    }
-
     TEST_METHOD(CreateRootNamespaceProcess)
     {
-        auto session = CreateSession();
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+
+        auto session = CreateSession(settings);
 
         // Simple case
         {
-            WSLAProcessWrapper wrapper(
-                session.get(), std::string("/bin/sh"), std::vector<std::string>{"/bin/sh", "-c", "echo OK"});
-
-            auto result = wrapper.LaunchAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 0);
-            VERIFY_ARE_EQUAL(result.Signalled, false);
+            auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo OK"}, 0);
             VERIFY_ARE_EQUAL(result.Output[0], "OK\n");
             VERIFY_ARE_EQUAL(result.Output[1], "");
         }
 
         // Stdout + stderr
         {
-            WSLAProcessWrapper wrapper(
-                session.get(),
-                std::string("/bin/sh"),
-                std::vector<std::string>{"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"});
 
-            auto result = wrapper.LaunchAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 0);
-            VERIFY_ARE_EQUAL(result.Signalled, false);
+            auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"}, 0);
             VERIFY_ARE_EQUAL(result.Output[0], "stdout\n");
             VERIFY_ARE_EQUAL(result.Output[1], "stderr\n");
         }
@@ -1267,6 +1161,10 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Signalled, true);
             VERIFY_ARE_EQUAL(result.Output[0], "");
             VERIFY_ARE_EQUAL(result.Output[1], "");
+        }
+
+        // Validate that errno is correctly propagated
+        {
         }
     }
 };

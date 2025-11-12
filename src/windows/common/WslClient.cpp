@@ -1618,7 +1618,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     processOptions.FdsCount = static_cast<DWORD>(fds.size());
 
     Microsoft::WRL::ComPtr<IWSLAProcess> process;
-    THROW_IF_FAILED(virtualMachine->CreateLinuxProcess(&processOptions, &process));
+    //THROW_IF_FAILED(virtualMachine->CreateLinuxProcess(&processOptions, &process));
 
     wil::unique_handle processInput;
     wil::unique_handle processOutput;

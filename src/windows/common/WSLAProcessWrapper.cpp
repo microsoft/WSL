@@ -9,7 +9,8 @@ WSLAProcessWrapper::WSLAProcessWrapper(IWSLASession* Session, std::string&& Exec
 {
     m_launch = [Session](const WSLA_PROCESS_OPTIONS* Options) {
         Microsoft::WRL::ComPtr<IWSLAProcess> process;
-        THROW_IF_FAILED(Session->CreateRootNamespaceProcess(Options, &process));
+        int Errno = -1;
+        THROW_IF_FAILED_MSG(Session->CreateRootNamespaceProcess(Options, &process, &Errno), "Errno: %i", Errno);
 
         return process;
     };
