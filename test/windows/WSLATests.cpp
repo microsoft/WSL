@@ -881,6 +881,8 @@ class WSLATests
 
     TEST_METHOD(CreateSessionSmokeTest)
     {
+        WSL2_TEST_ONLY();
+
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
@@ -906,6 +908,8 @@ class WSLATests
 
     TEST_METHOD(CreateRootNamespaceProcess)
     {
+        WSL2_TEST_ONLY();
+
         VIRTUAL_MACHINE_SETTINGS settings{};
         settings.CpuCount = 4;
         settings.DisplayName = L"WSLA";
