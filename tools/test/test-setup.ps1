@@ -59,7 +59,7 @@ if ($Package) {
             )
 
         $exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
-        if ($exitCode -Ne 0)
+        if ($exitCode -NotIn (0, 1605))
         {
             Write-Host "Failed to remove package: $exitCode"
             exit 1
