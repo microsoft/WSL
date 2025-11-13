@@ -3,6 +3,7 @@
 using CommunityToolkit.WinUI.Controls;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -74,6 +75,9 @@ public class RuntimeHelper
     {
         var expander = parent.FindName(expanderName) as Microsoft.UI.Xaml.FrameworkElement;
         var textBox = parent.FindName(textBoxName) as Microsoft.UI.Xaml.Controls.Control;
+
+        Debug.Assert(expander != null, $"Expander '{expanderName}' not found");
+        Debug.Assert(textBox != null, $"TextBox '{textBoxName}' not found");
 
         if (expander != null && textBox != null)
         {
