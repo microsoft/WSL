@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Target Name="WSLForApps_ErrorNoPlatform" BeforeTargets="BeforeBuild" Condition="'$(WSLForApps-Platform)' == ''">
+        <Error Text="wslaclient.dll could not be copied because the AnyCPU platform is being used. Please specify a platform to copy this file, using either RuntimeIdentifier, an architecture specific Platform, or explicitly with WSLForApps-Platform." />
+    </Target>
+
+    <ItemGroup>
+        <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\lib\$(WSLForApps-Platform)\wslaclient.dll" />
+    </ItemGroup>
+</Project>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <ItemDefinitionGroup>
+        <PropertyGroup Condition="'$(WSLForApps-Platform)' == ''">
+            <WSLForApps-Platform>$(Platform)</WSLForApps-Platform>
+        </PropertyGroup>
+        <ClCompile>
+            <AdditionalIncludeDirectories>
+                $(MSBuildThisFileDirectory)..\..\include;
+                %(AdditionalIncludeDirectories)
+            </AdditionalIncludeDirectories>
+        </ClCompile>
+        <Link>
+            <AdditionalDependencies>
+                wslaclient.lib;
+                %(AdditionalDependencies)
+            </AdditionalDependencies>
+            <AdditionalLibraryDirectories>
+                $(MSBuildThisFileDirectory)..\..\lib\$(Platform);
+                %(AdditionalLibraryDirectories)
+            </AdditionalLibraryDirectories>
+        </Link>
+    </ItemDefinitionGroup>
+</Project>

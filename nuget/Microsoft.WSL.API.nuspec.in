@@ -13,9 +13,10 @@
   </metadata>
   <files>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\wslaclient\WSLAApi.h" target="include"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\wslaclient.lib" target="lib\x64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\wslaclient.dll" target="lib\x64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\wslaclient.lib" target="lib\arm64"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\wslaclient.dll" target="lib\arm64"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\wslaclient.lib" target="runtimes\win-x64\native"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\x64\Release\wslaclient.dll" target="runtimes\win-x64\native"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\wslaclient.lib" target="runtimes\win-arm64\native"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\bin\arm64\Release\wslaclient.dll" target="runtimes\win-arm64\native"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\Microsoft.WSL.Api\**"/>
   </files>
 </package>
