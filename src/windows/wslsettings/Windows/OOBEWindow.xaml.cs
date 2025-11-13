@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -41,6 +41,7 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
 
         // Theme change code picked from https://github.com/microsoft/WinUI-Gallery/pull/1239
         settings.ColorValuesChanged += Settings_ColorValuesChanged; // cannot use FrameworkElement.ActualThemeChanged event
+        settings.TextScaleFactorChanged += Settings_TextScaleFactorChanged;
 
         WindowManager.Get(this).IsMinimizable = false;
         WindowManager.Get(this).IsMaximizable = false;
@@ -77,6 +78,16 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         });
     }
 
+    // This handles text scaling changes for accessibility
+    private void Settings_TextScaleFactorChanged(UISettings sender, object args)
+    {
+        // This calls comes off-thread, hence we will need to dispatch it to current app's thread
+        dispatcherQueue.TryEnqueue(() =>
+        {
+            ResizeWindow();
+        });
+    }
+
     private void Window_SizeChanged(object sender, WindowSizeChangedEventArgs args)
     {
         var dpi = GetDpiForWindow(hWnd);
@@ -97,9 +108,15 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
 
     private void ResizeWindow()
     {
-        float scalingFactor = (float)currentDPI / DefaultDPI;
-        int width = (int)(ExpectedWidth * scalingFactor);
-        int height = (int)(ExpectedHeight * scalingFactor);
+        float dpiScalingFactor = (float)currentDPI / DefaultDPI;
+        float textScalingFactor = (float)settings.TextScaleFactor;
+
+        // Combine DPI scaling and text scaling for accessibility
+        float combinedScalingFactor = dpiScalingFactor * textScalingFactor;
+
+        int width = (int)(ExpectedWidth * combinedScalingFactor);
+        int height = (int)(ExpectedHeight * combinedScalingFactor);
+
         SizeInt32 size;
         size.Width = width;
         size.Height = height;
@@ -112,6 +129,7 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         {
             msgMonitor?.Dispose();
             settings.ColorValuesChanged -= Settings_ColorValuesChanged;
+            settings.TextScaleFactorChanged -= Settings_TextScaleFactorChanged;
             this.Activated -= OnWindowActivated;
             if (this.Content is Microsoft.UI.Xaml.Controls.Page page)
             {
