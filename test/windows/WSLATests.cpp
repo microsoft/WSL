@@ -122,7 +122,7 @@ class WSLATests
             else
             {
                 LogError(
-                    "Command: %hs didn't received an unexpected signal: %i. Stdout: '%hs', Stderr: '%hs'",
+                    "Command: %hs didn't receive an unexpected signal: %i. Stdout: '%hs', Stderr: '%hs'",
                     cmd.c_str(),
                     result.Code,
                     result.Output[1].c_str(),
@@ -443,12 +443,12 @@ class WSLATests
             VERIFY_ARE_EQUAL(read(), std::format("{}{}", content, content));
 
             // Truncate the file
-            auto trunProcess = createProcess(
+            auto truncProcess = createProcess(
                 {"/bin/cat"},
                 {{0, WslFdTypeDefault, nullptr}, {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/output"}});
 
-            VERIFY_IS_TRUE(WriteFile(trunProcess->GetStdHandle(0).get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
-            VERIFY_ARE_EQUAL(trunProcess->WaitAndCaptureOutput().Code, 0);
+            VERIFY_IS_TRUE(WriteFile(truncProcess->GetStdHandle(0).get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
+            VERIFY_ARE_EQUAL(truncProcess->WaitAndCaptureOutput().Code, 0);
 
             VERIFY_ARE_EQUAL(read(), content);
         }
@@ -951,6 +951,7 @@ class WSLATests
             std::unique_ptr<OverlappedIOHandle> writeStdin(new WriteHandle(process.GetStdHandle(0), largeBuffer));
             std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
             extraHandles.emplace_back(std::move(writeStdin));
+
             auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
 
             VERIFY_IS_TRUE(std::equal(largeBuffer.begin(), largeBuffer.end(), result.Output[1].begin(), result.Output[1].end()));

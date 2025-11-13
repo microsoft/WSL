@@ -34,7 +34,7 @@ WSLAProcessLauncher::WSLAProcessLauncher(
         m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeDefault, .Path = nullptr});
     }
 
-    if (WI_IsFlagSet(Flags, ProcessFlags::Stdout))
+    if (WI_IsFlagSet(Flags, ProcessFlags::Stderr))
     {
         m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeDefault, .Path = nullptr});
     }

@@ -947,8 +947,6 @@ void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 
     // Run until all handles are completed.
 
-    bool updateHandles = true;
-
     while (!m_handles.empty())
     {
         // Schedule IO on each handle until all are either pending, or completed.
@@ -961,10 +959,7 @@ void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         }
 
         // Remove completed handles from m_handles.
-        m_handles.erase(
-            std::remove_if(
-                m_handles.begin(), m_handles.end(), [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; }),
-            m_handles.end());
+        std::erase_if(m_handles, [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; });
 
         if (m_handles.empty())
         {
@@ -1093,7 +1088,14 @@ void ReadHandle::Collect()
 
     // Complete the read.
     DWORD bytesRead{};
-    THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, false));
+    if (!GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, false))
+    {
+        auto error = GetLastError();
+        THROW_WIN32_IF(error, error != ERROR_HANDLE_EOF && error != ERROR_BROKEN_PIPE);
+
+        // We received ERROR_HANDLE_EOF or ERROR_BROKEN_PIPE. Validate that this was indeed a zero byte read.
+        WI_ASSERT(bytesRead == 0);
+    }
 
     // Signal the read.
     OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));

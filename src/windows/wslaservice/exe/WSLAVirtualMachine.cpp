@@ -427,10 +427,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
             options.CommandLineCount = static_cast<DWORD>(cmd.size());
         };
 
-        WSLA_CREATE_PROCESS_RESULT result{};
         auto process = CreateLinuxProcessImpl(options, nullptr, prepareCommandLine);
-
-        THROW_HR_IF(E_FAIL, result.Errno != 0);
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
@@ -814,6 +811,8 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
         std::lock_guard lock{m_lock};
         m_trackedProcesses.emplace_back(process.Get());
     }
+
+    setErrno(0);
 
     return process;
 }
