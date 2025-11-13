@@ -24,7 +24,7 @@ parameters:
     type: object
     default:
       - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings.dll,wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,lxutil.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings.dll,wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage"
