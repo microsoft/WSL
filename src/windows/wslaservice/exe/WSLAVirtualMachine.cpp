@@ -35,6 +35,7 @@ WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings,
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
 
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+    m_userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     m_crashDumpFolder = GetCrashDumpFolder();
 
     if (Settings.EnableDebugShell)
@@ -425,6 +426,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
 }
 
 void CALLBACK WSLAVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
+try
 {
     if (Event->Type == HcsEventSystemExited)
     {
@@ -435,6 +437,7 @@ void CALLBACK WSLAVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void*
         reinterpret_cast<WSLAVirtualMachine*>(Context)->OnCrash(Event);
     }
 }
+CATCH_LOG();
 
 void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 {
@@ -1173,19 +1176,15 @@ CATCH_RETURN();
 
 std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder()
 {
-    auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    auto tempPath = wsl::windows::common::filesystem::GetTempFolderPath(userToken.get());
+    auto tempPath = wsl::windows::common::filesystem::GetTempFolderPath(m_userToken.get());
     return tempPath / L"wsla-crashes";
 }
 
 void WSLAVirtualMachine::CreateVmSavedStateFile()
 {
-    const auto filename = std::format(
-        L"{}{}-{}{}",
-        SAVED_STATE_FILE_PREFIX,
-        std::time(nullptr), 
-        m_vmIdString,
-        SAVED_STATE_FILE_EXTENSION);
+    auto runAsUser = wil::impersonate_token(m_userToken.get());
+
+    const auto filename = std::format(L"{}{}-{}{}", SAVED_STATE_FILE_PREFIX, std::time(nullptr), m_vmIdString, SAVED_STATE_FILE_EXTENSION);
 
     auto savedStateFile = m_crashDumpFolder / filename;
 
@@ -1211,6 +1210,8 @@ void wsl::windows::service::wsla::WSLAVirtualMachine::EnforceVmSavedStateFileLim
 
 void WSLAVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
 {
+    auto runAsUser = wil::impersonate_token(m_userToken.get());
+
     constexpr auto c_extension = L".txt";
     constexpr auto c_prefix = L"kernel-panic-";
     const auto filename = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), m_vmIdString, c_extension);

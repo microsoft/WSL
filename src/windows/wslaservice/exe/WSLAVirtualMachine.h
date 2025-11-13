@@ -75,7 +75,7 @@ private:
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
 
-    static std::filesystem::path GetCrashDumpFolder();
+    std::filesystem::path GetCrashDumpFolder();
     void CreateVmSavedStateFile();
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
@@ -103,6 +103,7 @@ private:
     int m_coldDiscardShiftSize{};
     bool m_running = false;
     PSID m_userSid{};
+    wil::unique_handle m_userToken;
     std::wstring m_debugShellPipe;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
