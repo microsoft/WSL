@@ -89,6 +89,11 @@ HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
 HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
+    if (Errno != nullptr)
+    {
+        *Errno = -1; // Make sure not to return 0 if something fails.
+    }
+
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
 

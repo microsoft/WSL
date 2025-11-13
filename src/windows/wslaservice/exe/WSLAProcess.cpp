@@ -25,16 +25,37 @@ WSLAProcess::WSLAProcess(std::map<int, wil::unique_socket>&& handles, int pid, W
 
 WSLAProcess::~WSLAProcess()
 {
-    m_virtualMachine->OnProcessReleased(m_pid);
+    std::lock_guard lock{m_mutex};
+    if (m_virtualMachine != nullptr)
+    {
+        m_virtualMachine->OnProcessReleased(m_pid);
+    }
+}
+
+void WSLAProcess::OnVmTerminated()
+{
+    WI_ASSERT(m_virtualMachine != nullptr);
+
+    std::lock_guard lock{m_mutex};
+    m_virtualMachine = nullptr;
+
+    // Make sure that the process is in a terminated state, so users don't think that it might still be running.
+    if (m_state == WslaProcessStateRunning)
+    {
+        m_state = WslaProcessStateSignalled;
+        m_exitedCode = 9; // SIGKILL
+    }
 }
 
 HRESULT WSLAProcess::Signal(int Signal)
+try
 {
     std::lock_guard lock{m_mutex};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_state != WslaProcessStateRunning || m_virtualMachine == nullptr);
 
     return m_virtualMachine->Signal(m_pid, Signal);
 }
+CATCH_RETURN();
 
 HRESULT WSLAProcess::GetExitEvent(ULONG* Event)
 try
@@ -100,6 +121,8 @@ CATCH_RETURN();
 
 void WSLAProcess::OnTerminated(bool Signalled, int Code)
 {
+    WI_ASSERT(m_virtualMachine != nullptr);
+
     {
         std::lock_guard lock{m_mutex};
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_state != WslaProcessStateRunning);

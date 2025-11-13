@@ -317,7 +317,7 @@ class WSLATests
         // Exit the shell
         writeTty("exit\n");
 
-        VERIFY_IS_TRUE(process.GetExitEvent().wait(30 * 100));
+        VERIFY_IS_TRUE(process.GetExitEvent().wait(30 * 1000));
     }
 
     TEST_METHOD(NATNetworking)
@@ -964,6 +964,9 @@ class WSLATests
 
             auto process = launcher.Launch(*session);
 
+            // Try to send invalid signal to the process
+            VERIFY_ARE_EQUAL(process.Get().Signal(9999), E_FAIL);
+
             // Send SIGKILL(9) to the process.
             VERIFY_SUCCEEDED(process.Get().Signal(9));
 
@@ -972,6 +975,9 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Signalled, true);
             VERIFY_ARE_EQUAL(result.Output[1], "");
             VERIFY_ARE_EQUAL(result.Output[2], "");
+
+            // Validate that process can't be signalled after it exited.
+            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
         // Validate that errno is correctly propagated
@@ -991,6 +997,38 @@ class WSLATests
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
             VERIFY_ARE_EQUAL(error, 13); // EACCESS
             VERIFY_IS_FALSE(process.has_value());
+        }
+
+        {
+            WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto process = launcher.Launch(*session);
+            auto dummyHandle = process.GetStdHandle(1);
+
+            // Verify that the same handle can only be acquired once.
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(1, reinterpret_cast<ULONG*>(&dummyHandle)), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Verify that trying to acquire a std handle that doesn't exist fails as expected.
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            // Validate that the process object correctly handle requests after the VM has terminated.
+            VERIFY_SUCCEEDED(session->Shutdown(30 * 1000));
+            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+
+        {
+            
+            // Validate that new processes cannot be created after the VM is terminated.
+            const char* executable = "dummy";
+            WSLA_PROCESS_OPTIONS options{};
+            options.CommandLine = &executable;
+            options.Executable = executable;
+            options.CommandLineCount = 1;
+
+            wil::com_ptr<IWSLAProcess> process;
+            int error{};
+            VERIFY_ARE_EQUAL(session->CreateRootNamespaceProcess(&options, &process, &error), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(error, -1);
         }
     }
 };

@@ -35,6 +35,7 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code) override;
 
     void OnTerminated(bool Signalled, int Code);
+    void OnVmTerminated();
     wil::unique_socket& GetSocket(int Index);
     int GetPid() const;
 

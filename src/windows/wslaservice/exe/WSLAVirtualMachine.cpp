@@ -107,6 +107,13 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     {
         m_processExitThread.join();
     }
+
+    // Clear the state of all remaining processes now that the VM has exited.
+    // The WSLAProcess object reference will be released when the last COM reference is closed.
+    for (auto &e: m_trackedProcesses)
+    {
+        e->OnVmTerminated();
+    }
 }
 
 void WSLAVirtualMachine::Start()
@@ -718,8 +725,6 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
         }
     };
 
-    setErrno(-1);
-
     // Check if this is a tty or not
     const WSLA_PROCESS_FD* ttyInput = nullptr;
     const WSLA_PROCESS_FD* ttyOutput = nullptr;
@@ -1184,5 +1189,5 @@ void WSLAVirtualMachine::OnProcessReleased(int Pid)
     std::lock_guard lock{m_lock};
 
     auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
-    WI_VERIFY(erased == 1);
+    WI_VERIFY(erased <= 1);
 }
