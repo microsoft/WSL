@@ -110,7 +110,7 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
 
     // Clear the state of all remaining processes now that the VM has exited.
     // The WSLAProcess object reference will be released when the last COM reference is closed.
-    for (auto &e: m_trackedProcesses)
+    for (auto& e : m_trackedProcesses)
     {
         e->OnVmTerminated();
     }
