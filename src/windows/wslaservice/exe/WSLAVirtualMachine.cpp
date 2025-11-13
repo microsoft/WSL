@@ -253,6 +253,7 @@ void WSLAVirtualMachine::Start()
         THROW_HR(E_NOTIMPL);
         auto bootThis = hcs::UefiBootEntry{};
         bootThis.DeviceType = hcs::UefiBootDevice::VmbFs;
+        // bootThis.VmbFsRootPath = m_rootFsPath.c_str();
         bootThis.DevicePath = L"\\" LXSS_VM_MODE_KERNEL_NAME;
         bootThis.OptionalData = kernelCmdLine;
         hcs::Uefi uefiSettings{};
@@ -437,7 +438,7 @@ try
         reinterpret_cast<WSLAVirtualMachine*>(Context)->OnCrash(Event);
     }
 }
-CATCH_LOG();
+CATCH_LOG(); 
 
 void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 {
@@ -1153,10 +1154,15 @@ try
     }
 
     // Mount the packaged libraries.
+
 #ifdef WSL_GPU_LIB_PATH
+
     auto packagedLibPath = std::filesystem::path(TEXT(WSL_GPU_LIB_PATH));
+
 #else
+
     auto packagedLibPath = wslutil::GetBasePath() / L"lib";
+
 #endif
 
     auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
