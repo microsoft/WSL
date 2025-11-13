@@ -40,7 +40,7 @@ Note: To build and deploy faster during development, see options in `UserConfig.
 
 ## Deploying WSL 
 
-Once the build is complete, you can install WSL by installing the MSI package found under `bin\<platform>\<target>\wsl.msi`, or by running `powershell tools\deploy\deploy-to-host.ps1`.
+Once the build is complete, you can install WSL by installing the MSI package found under `bin\<platform>\<target>\` (`wsl.msi` and `wsla.msi`), or by running `powershell tools\deploy\deploy-to-host.ps1`.
 
 To deploy on a Hyper-V virtual machine, you can use `powershell tools\deploy\deploy-to-vm.ps1 -VmName <vm> -Username <username> -Password <password>`
 

@@ -2,6 +2,8 @@
 
 [cmdletbinding(PositionalBinding = $false)]
 param (
+    [ValidateSet("wsl", "wsla")]
+    [string[]]$Target = ("wsl", "wsla"),
     [ValidateSet("X64", "arm64")][string]$Platform = "X64",
     [ValidateSet("Debug", "Release")][string]$BuildType = "Debug",
     [string]$BuildOutputPath = [string](Get-Location),
@@ -12,34 +14,47 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-$PackagePath = "$BuildOutputPath\bin\$Platform\$BuildType\wsl.msi"
-
-# msiexec.exe doesn't like symlinks, so use the canonical path
-$Target = (Get-ChildItem $PackagePath)[0].Target
-if ($Target)
+function Install-MSI
 {
-    $PackagePath = $Target
+    param (
+        [Parameter(Mandatory)]
+        [ValidateSet("wsl", "wsla")]
+        [string]$Package
+    )
+
+    $PackagePath = "$BuildOutputPath\bin\$Platform\$BuildType\$Package.msi"
+
+    # msiexec.exe doesn't like symlinks, so use the canonical path
+    $Target = (Get-ChildItem $PackagePath)[0].Target
+    if ($Target)
+    {
+        $PackagePath = $Target
+    }
+
+    Write-Host -ForegroundColor Green "Installing: $PackagePath "
+
+    $MSIArguments = @(
+        "/i"
+        $PackagePath
+        "/qn"
+        "/norestart"
+    )
+
+    if ($MsiArgs)
+    {
+        $MSIArguments += $MsiArgs
+    }
+
+    $exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
+    if ($exitCode -Ne 0)
+    {
+        Write-Host "Failed to install package: $exitCode"
+        exit 1
+    }
+
+    Write-Host -ForegroundColor Green "Package $PackagePath installed successfully"
 }
 
-Write-Host -ForegroundColor Green "Installing: $PackagePath "
-
-$MSIArguments = @(
-    "/i"
-    $PackagePath
-    "/qn"
-    "/norestart"
-)
-
-if ($MsiArgs)
-{
-    $MSIArguments += $MsiArgs
+foreach ($t in $Target) {
+    Install-MSI -Package $t
 }
-
-$exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
-if ($exitCode -Ne 0)
-{
-    Write-Host "Failed to install package: $exitCode"
-    exit 1
-}
-
-Write-Host -ForegroundColor Green "Package $PackagePath installed successfully"

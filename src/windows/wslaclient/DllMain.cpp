@@ -100,7 +100,7 @@ try
             }
         };
 
-        const auto downloadPath = wsl::windows::common::wslutil::DownloadFileImpl(PackageUrl, L"wsl.msi", callback);
+        const auto downloadPath = wsl::windows::common::wslutil::DownloadFileImpl(PackageUrl, L"wsla.msi", callback);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(downloadPath); });
 
