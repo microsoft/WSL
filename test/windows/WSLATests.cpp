@@ -1017,7 +1017,7 @@ class WSLATests
         }
 
         {
-            
+
             // Validate that new processes cannot be created after the VM is terminated.
             const char* executable = "dummy";
             WSLA_PROCESS_OPTIONS options{};
