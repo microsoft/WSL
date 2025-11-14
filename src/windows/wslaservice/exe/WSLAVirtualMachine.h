@@ -84,13 +84,6 @@ private:
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
 
-    std::vector<ConnectedSocket> CreateLinuxProcessImpl(
-        _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options,
-        _In_ ULONG FdCount,
-        _In_ WSLA_PROCESS_FD* Fd,
-        _Out_ WSLA_CREATE_PROCESS_RESULT* Result,
-        const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
-
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
