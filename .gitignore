@@ -9,7 +9,6 @@ tmp
 *.user
 *.csproj
 *.vcxproj
-*.targets
 *.filters
 *.pdb
 *.lib
@@ -41,7 +40,6 @@ linux/init
 initrd/init
 bin/
 *.nupkg
-build/
 generated/
 *.nuspec
 test/linux/unit_tests/wsl_unit_tests
