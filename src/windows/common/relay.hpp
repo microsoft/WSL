@@ -152,4 +152,96 @@ private:
     std::function<void()> m_onDestroy;
 };
 
+enum class IOHandleStatus
+{
+    Standby,
+    Pending,
+    Completed
+};
+
+class OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(OverlappedIOHandle)
+    NON_MOVABLE(OverlappedIOHandle)
+
+    OverlappedIOHandle() = default;
+    virtual ~OverlappedIOHandle() = default;
+    virtual void Schedule() = 0;
+    virtual void Collect() = 0;
+    virtual HANDLE GetHandle() const = 0;
+    IOHandleStatus GetState() const;
+
+protected:
+    IOHandleStatus State = IOHandleStatus::Standby;
+};
+
+class EventHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(EventHandle)
+    NON_MOVABLE(EventHandle)
+
+    EventHandle(wil::unique_handle&& EventHandle, std::function<void()>&& OnSignalled);
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    wil::unique_handle Handle;
+    std::function<void()> OnSignalled;
+};
+
+class ReadHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(ReadHandle);
+    NON_MOVABLE(ReadHandle);
+
+    ReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
+    ~ReadHandle();
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    wil::unique_handle Handle;
+    std::function<void(const gsl::span<char>& Buffer)> OnRead;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
+};
+
+class WriteHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(WriteHandle);
+    NON_MOVABLE(WriteHandle);
+
+    WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer);
+    ~WriteHandle();
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    wil::unique_handle Handle;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    const std::vector<char>& Buffer;
+    DWORD Offset = 0;
+};
+
+class MultiHandleWait
+{
+public:
+    MultiHandleWait() = default;
+
+    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
+    void Run(std::optional<std::chrono::milliseconds> Timeout);
+
+private:
+    std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;
+};
+
 } // namespace wsl::windows::common::relay

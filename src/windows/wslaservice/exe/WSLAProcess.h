@@ -17,11 +17,14 @@ Abstract:
 
 namespace wsl::windows::service::wsla {
 
+class WSLAVirtualMachine;
+
 class DECLSPEC_UUID("AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B") WSLAProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAProcess, IFastRundown>
 {
 public:
-    WSLAProcess() = default; // TODO
+    WSLAProcess(std::map<int, wil::unique_socket>&& handles, int pid, WSLAVirtualMachine* virtualMachine);
+    ~WSLAProcess();
     WSLAProcess(const WSLAProcess&) = delete;
     WSLAProcess& operator=(const WSLAProcess&) = delete;
 
@@ -31,8 +34,18 @@ public:
     IFACEMETHOD(GetPid)(_Out_ int* Pid) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code) override;
 
+    void OnTerminated(bool Signalled, int Code);
+    void OnVmTerminated();
+    wil::unique_socket& GetSocket(int Index);
+    int GetPid() const;
+
 private:
-    std::vector<wil::unique_handle> m_handles;
+    std::recursive_mutex m_mutex;
+    std::map<int, wil::unique_socket> m_handles;
+    int m_pid = -1;
+    int m_exitedCode = -1;
+    WSLA_PROCESS_STATE m_state = WslaProcessStateRunning;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    WSLAVirtualMachine* m_virtualMachine{};
 };
 } // namespace wsl::windows::service::wsla

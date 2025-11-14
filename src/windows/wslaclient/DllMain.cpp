@@ -113,59 +113,6 @@ HRESULT WslMount(WslVirtualMachineHandle VirtualMachine, const WslMountSettings*
 
 HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, WslCreateProcessSettings* UserSettings, int32_t* Pid)
 {
-    WSLA_CREATE_PROCESS_OPTIONS options{};
-
-    auto Count = [](const auto* Ptr) -> ULONG {
-        if (Ptr == nullptr)
-        {
-            return 0;
-        }
-
-        ULONG Result = 0;
-
-        while (*Ptr != nullptr)
-        {
-            Result++;
-            Ptr++;
-        }
-
-        return Result;
-    };
-
-    options.Executable = UserSettings->Executable;
-    options.CommandLine = UserSettings->Arguments;
-    options.CommandLineCount = Count(options.CommandLine);
-    options.Environment = UserSettings->Environment;
-    options.EnvironmentCount = Count(options.Environment);
-    options.CurrentDirectory = UserSettings->CurrentDirectory;
-
-    WSLA_CREATE_PROCESS_RESULT result{};
-
-    std::vector<WSLA_PROCESS_FD> inputFd(UserSettings->FdCount);
-    for (size_t i = 0; i < UserSettings->FdCount; i++)
-    {
-        inputFd[i] = {
-            UserSettings->FileDescriptors[i].Number,
-            UserSettings->FileDescriptors[i].Type,
-            (char*)UserSettings->FileDescriptors[i].Path};
-    }
-
-    std::vector<ULONG> fds(UserSettings->FdCount);
-    if (fds.empty())
-    {
-        fds.resize(1); // COM doesn't like null pointers.
-    }
-
-    RETURN_IF_FAILED(reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
-                         ->CreateLinuxProcess(&options, UserSettings->FdCount, inputFd.data(), fds.data(), &result));
-
-    for (size_t i = 0; i < UserSettings->FdCount; i++)
-    {
-        UserSettings->FileDescriptors[i].Handle = UlongToHandle(fds[i]);
-    }
-
-    *Pid = result.Pid;
-
     return S_OK;
 }
 

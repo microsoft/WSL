@@ -22,10 +22,10 @@ using wsl::windows::service::wsla::WSLASession;
 WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
     m_sessionSettings(Settings),
     m_userSession(userSessionImpl),
-    m_virtualMachine(VmSettings, userSessionImpl.GetUserSid(), &userSessionImpl),
+    m_virtualMachine(std::make_optional<WSLAVirtualMachine>(VmSettings, userSessionImpl.GetUserSid(), &userSessionImpl)),
     m_displayName(Settings.DisplayName)
 {
-    m_virtualMachine.Start();
+    m_virtualMachine->Start();
 }
 
 HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
@@ -79,16 +79,42 @@ HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Images, ULONG* Count)
 
 HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
 {
-    THROW_IF_FAILED(m_virtualMachine.QueryInterface(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
+
+    THROW_IF_FAILED(m_virtualMachine->QueryInterface(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
     return S_OK;
 }
 
-HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** VirtualMachine)
+HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
+try
 {
-    return E_NOTIMPL;
+    if (Errno != nullptr)
+    {
+        *Errno = -1; // Make sure not to return 0 if something fails.
+    }
+
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
+
+    return m_virtualMachine->CreateLinuxProcess(Options, Process, Errno);
 }
+CATCH_RETURN();
 
 HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
 {
     return E_NOTIMPL;
 }
+
+HRESULT WSLASession::Shutdown(ULONG Timeout)
+try
+{
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
+
+    THROW_IF_FAILED(m_virtualMachine->Shutdown(Timeout));
+
+    m_virtualMachine.reset();
+    return S_OK;
+}
+CATCH_RETURN();

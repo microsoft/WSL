@@ -27,16 +27,6 @@ struct _WSL_VERSION {
     ULONG Revision;
 } WSL_VERSION;
 
-typedef
-struct _WSLA_CREATE_PROCESS_OPTIONS { // TODO: Delete once the new API is wired.
-    [string] LPCSTR Executable;
-    ULONG CommandLineCount;
-    [unique, size_is(CommandLineCount)] LPCSTR* CommandLine;
-    ULONG EnvironmentCount;
-    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
-    [unique] LPCSTR CurrentDirectory;
-} WSLA_CREATE_PROCESS_OPTIONS;
-
 typedef struct _WSLA_PROCESS_FD
 {
     LONG Fd;
@@ -70,54 +60,6 @@ interface IProgressCallback : IUnknown
     HRESULT OnProgress(ULONG Progress, ULONG Total);
 };
 
-// TODO: Delete once the new API is wired.
-[
-    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
-    pointer_default(unique),
-    object
-]
-interface IWSLAVirtualMachine : IUnknown
-{
-    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device, [out] ULONG* Lun);
-    HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
-    HRESULT CreateLinuxProcess([in] const WSLA_CREATE_PROCESS_OPTIONS* Options, [in] ULONG FdCount, [in, unique, size_is(FdCount)] WSLA_PROCESS_FD* Fds, [out, size_is(FdCount)] ULONG* Handles, [out] WSLA_CREATE_PROCESS_RESULT* Result);
-    HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
-    HRESULT Signal([in] LONG Pid, [in] int Signal);
-    HRESULT Shutdown([in] ULONGLONG TimeoutMs);
-    HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
-    HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
-    HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
-    HRESULT Unmount([in] LPCSTR Path);
-    HRESULT DetachDisk([in] ULONG Lun);
-    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
-    HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
-}
-
-typedef
-struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
-    LPCWSTR DisplayName;
-    ULONGLONG MemoryMb;
-    ULONG CpuCount;
-    ULONG BootTimeoutMs;
-    ULONG DmesgOutput;
-    ULONG NetworkingMode;
-    BOOL EnableDnsTunneling;
-    BOOL EnableDebugShell;
-    BOOL EnableEarlyBootDmesg;
-    BOOL EnableGPU;
-} VIRTUAL_MACHINE_SETTINGS;
-
-
-
-struct WSLA_SESSION_SETTINGS {
-    LPCWSTR DisplayName;
-    LPCWSTR StoragePath;
-
-    // TODO: Termination callback, flags
-};
-
-
 struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
 {
     int Dummy; // Dummy value for the .idl file to compile.
@@ -141,7 +83,7 @@ struct WSLA_PROCESS_OPTIONS
     ULONG CommandLineCount;
     [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
     ULONG EnvironmentCount;
-    [unique, size_is(EnvironmentCount)] WSLA_PROCESS_FD *Fds;
+    [unique, size_is(FdsCount)] WSLA_PROCESS_FD *Fds;
     int FdsCount;
 };
 
@@ -215,6 +157,55 @@ interface IWSLAProcess : IUnknown
     // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
 }
 
+
+// TODO: Delete once the new API is wired.
+[
+    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
+    pointer_default(unique),
+    object
+]
+interface IWSLAVirtualMachine : IUnknown
+{
+    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device, [out] ULONG* Lun);
+    HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
+    HRESULT CreateLinuxProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
+    HRESULT Signal([in] LONG Pid, [in] int Signal);
+    HRESULT Shutdown([in] ULONGLONG TimeoutMs);
+    HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
+    HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
+    HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
+    HRESULT Unmount([in] LPCSTR Path);
+    HRESULT DetachDisk([in] ULONG Lun);
+    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
+    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
+    HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
+}
+
+typedef
+struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
+    LPCWSTR DisplayName;
+    ULONGLONG MemoryMb;
+    ULONG CpuCount;
+    ULONG BootTimeoutMs;
+    ULONG DmesgOutput;
+    ULONG NetworkingMode;
+    BOOL EnableDnsTunneling;
+    BOOL EnableDebugShell;
+    BOOL EnableEarlyBootDmesg;
+    BOOL EnableGPU;
+} VIRTUAL_MACHINE_SETTINGS;
+
+
+
+struct WSLA_SESSION_SETTINGS {
+    LPCWSTR DisplayName;
+    LPCWSTR StoragePath;
+
+    // TODO: Termination callback, flags
+};
+
+
 [
     uuid(7577FE8D-DE85-471E-B870-11669986F332),
     pointer_default(unique),
@@ -227,7 +218,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
-    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // Anonymous host port allocation (P1).
     //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
@@ -253,12 +244,15 @@ interface IWSLASession : IUnknown
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    HRESULT CreateRootNamespaceProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
     // Disk management.
     HRESULT FormatVirtualDisk([in] LPCWSTR Path);
+
+    // Terminate the VM and containers.
+    HRESULT Shutdown([in] ULONG TimeoutMs);
 
      // To be deleted.
     HRESULT GetDisplayName([out] LPWSTR* DisplayName);

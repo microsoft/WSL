@@ -17,6 +17,7 @@ Abstract:
 #include "hcs.hpp"
 #include "Dmesg.h"
 #include "WSLAApi.h"
+#include "WSLAProcess.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -28,6 +29,8 @@ class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
 {
 public:
     WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, WSLAUserSessionImpl* UserSession);
+
+    // TODO: Clear processes on exit
     ~WSLAVirtualMachine();
 
     void Start();
@@ -35,8 +38,7 @@ public:
 
     IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)) override;
     IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)) override;
-    IFACEMETHOD(CreateLinuxProcess(
-        _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options, _In_ ULONG FdCount, _In_ WSLA_PROCESS_FD* Fd, _Out_ ULONG* Handles, _Out_ WSLA_CREATE_PROCESS_RESULT* Result)) override;
+    IFACEMETHOD(CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
@@ -48,6 +50,8 @@ public:
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
     IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
     IFACEMETHOD(MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)) override;
+
+    void OnProcessReleased(int Pid);
 
 private:
     struct ConnectedSocket
@@ -74,14 +78,12 @@ private:
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
 
-    std::vector<ConnectedSocket> CreateLinuxProcessImpl(
-        _In_ const WSLA_CREATE_PROCESS_OPTIONS* Options,
-        _In_ ULONG FdCount,
-        _In_ WSLA_PROCESS_FD* Fd,
-        _Out_ WSLA_CREATE_PROCESS_RESULT* Result,
-        const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
+    Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
+        _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags);
+
+    void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
 
     struct AttachedDisk
     {
@@ -91,6 +93,8 @@ private:
     };
 
     VIRTUAL_MACHINE_SETTINGS m_settings;
+    std::thread m_processExitThread;
+
     GUID m_vmId{};
     std::wstring m_vmIdString;
     wsl::windows::common::helpers::WindowsVersion m_windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
@@ -98,6 +102,7 @@ private:
     bool m_running = false;
     PSID m_userSid{};
     std::wstring m_debugShellPipe;
+    std::vector<WSLAProcess*> m_trackedProcesses;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
