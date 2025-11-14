@@ -5,6 +5,6 @@
     </Target>
 
     <ItemGroup>
-        <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\lib\$(WSLForApps-Platform)\wslaclient.dll" />
+        <ReferenceCopyLocalPaths Include="$(MSBuildThisFileDirectory)..\runtimes\win-$(WSLForApps-Platform)\wslaclient.dll" />
     </ItemGroup>
 </Project>

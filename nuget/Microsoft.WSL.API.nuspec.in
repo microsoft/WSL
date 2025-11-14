@@ -10,6 +10,7 @@
     <tags>WSL</tags>
     <language>en-us</language>
     <license type="expression">MIT</license>
+    <readme>docs\README.MD</readme>
   </metadata>
   <files>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\wslaclient\WSLAApi.h" target="include"/>

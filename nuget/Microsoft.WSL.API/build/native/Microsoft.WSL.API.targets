@@ -16,7 +16,7 @@
                 %(AdditionalDependencies)
             </AdditionalDependencies>
             <AdditionalLibraryDirectories>
-                $(MSBuildThisFileDirectory)..\..\lib\$(Platform);
+                $(MSBuildThisFileDirectory)..\..\runtimes\win-$(Platform);
                 %(AdditionalLibraryDirectories)
             </AdditionalLibraryDirectories>
         </Link>
