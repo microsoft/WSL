@@ -69,6 +69,7 @@ private:
 
     void ConfigureNetworking();
     void OnExit(_In_ const HCS_EVENT* Event);
+    void OnCrash(_In_ const HCS_EVENT* Event);
 
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type);
@@ -77,6 +78,11 @@ private:
     ConnectedSocket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
+
+    std::filesystem::path GetCrashDumpFolder();
+    void CreateVmSavedStateFile();
+    void EnforceVmSavedStateFileLimit();
+    void WriteCrashLog(const std::wstring& crashLog);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
@@ -101,10 +107,17 @@ private:
     int m_coldDiscardShiftSize{};
     bool m_running = false;
     PSID m_userSid{};
+    wil::unique_handle m_userToken;
     std::wstring m_debugShellPipe;
     std::vector<WSLAProcess*> m_trackedProcesses;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
+
+    std::filesystem::path m_vmSavedStateFile;
+    std::filesystem::path m_crashDumpFolder;
+    bool m_vmSavedStateCaptured = false;
+    bool m_crashLogCaptured = false;
+
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};

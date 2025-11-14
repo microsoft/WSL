@@ -13,6 +13,8 @@ Abstract:
 --*/
 
 #include "WSLAVirtualMachine.h"
+#include <format>
+#include <filesystem>
 #include "hcs_schema.h"
 #include "NatNetworking.h"
 #include "WSLAUserSession.h"
@@ -24,10 +26,18 @@ using helpers::WindowsVersion;
 using wsl::windows::service::wsla::WSLAProcess;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
+constexpr auto MAX_VM_CRASH_FILES = 3;
+constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
+constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
+
 WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
     m_settings(Settings), m_userSid(UserSid), m_userSession(Session)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
+
+    m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+    m_userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    m_crashDumpFolder = GetCrashDumpFolder();
 
     if (Settings.EnableDebugShell)
     {
@@ -103,6 +113,17 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
         CATCH_LOG()
     }
 
+    try
+    {
+        // If the VM did not crash, the saved state file should be empty, so we can remove it.
+        if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
+        {
+            WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
+            std::filesystem::remove(m_vmSavedStateFile);
+        }
+    }
+    CATCH_LOG()
+
     if (m_processExitThread.joinable())
     {
         m_processExitThread.join();
@@ -122,7 +143,8 @@ void WSLAVirtualMachine::Start()
     systemSettings.Owner = L"WSL";
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
     systemSettings.SchemaVersion.Major = 2;
-    systemSettings.SchemaVersion.Minor = 3;
+    systemSettings.SchemaVersion.Minor = 7;
+
     hcs::VirtualMachine vmSettings{};
     vmSettings.StopOnReset = true;
     vmSettings.Chipset.UseUtc = true;
@@ -267,12 +289,20 @@ void WSLAVirtualMachine::Start()
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
 
+    CreateVmSavedStateFile();
+    WI_ASSERT(!m_vmSavedStateFile.empty());
+
+    // Prepare debug options: create saved state (.vmrs) file and grant vmwp access.
+    hcs::DebugOptions debugOptions{};
+    debugOptions.BugcheckSavedStateFileName = m_vmSavedStateFile;
+
+    vmSettings.DebugOptions = std::move(debugOptions);
+
     systemSettings.VirtualMachine = std::move(vmSettings);
     auto json = wsl::shared::ToJsonW(systemSettings);
 
     WSL_LOG("CreateWSLAVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
 
-    m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_computeSystem = hcs::CreateComputeSystem(m_vmIdString.c_str(), json.c_str());
 
     auto runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
@@ -463,12 +493,18 @@ void WSLAVirtualMachine::ConfigureNetworking()
 }
 
 void CALLBACK WSLAVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
+try
 {
-    if (Event->Type == HcsEventSystemExited || Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
+    if (Event->Type == HcsEventSystemExited)
     {
         reinterpret_cast<WSLAVirtualMachine*>(Context)->OnExit(Event);
     }
+    if (Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
+    {
+        reinterpret_cast<WSLAVirtualMachine*>(Context)->OnCrash(Event);
+    }
 }
+CATCH_LOG()
 
 void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 {
@@ -477,21 +513,56 @@ void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 
     m_vmExitEvent.SetEvent();
 
-    std::lock_guard lock(m_lock);
+    const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
+
+    WslVirtualMachineTerminationReason reason = WslVirtualMachineTerminationReasonUnknown;
+
+    if (exitStatus.ExitType.has_value())
+    {
+        switch (exitStatus.ExitType.value())
+        {
+        case hcs::NotificationType::ForcedExit:
+        case hcs::NotificationType::GracefulExit:
+            reason = WslVirtualMachineTerminationReasonShutdown;
+            break;
+        case hcs::NotificationType::UnexpectedExit:
+            reason = WslVirtualMachineTerminationReasonCrashed;
+            break;
+        default:
+            reason = WslVirtualMachineTerminationReasonUnknown;
+            break;
+        }
+    }
+
     if (m_terminationCallback)
     {
-        // TODO: parse json and give a better error.
-        WslVirtualMachineTerminationReason reason = WslVirtualMachineTerminationReasonUnknown;
-        if (Event->Type == HcsEventSystemExited)
-        {
-            reason = WslVirtualMachineTerminationReasonShutdown;
-        }
-        else if (Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
-        {
-            reason = WslVirtualMachineTerminationReasonCrashed;
-        }
-
         LOG_IF_FAILED(m_terminationCallback->OnTermination(static_cast<ULONG>(reason), Event->EventData));
+    }
+}
+
+void WSLAVirtualMachine::OnCrash(_In_ const HCS_EVENT* Event)
+{
+    WSL_LOG(
+        "WSLAGuestCrash",
+        TraceLoggingValue(Event->EventData, "details"),
+        TraceLoggingValue(static_cast<int>(Event->Type), "type"));
+
+    if (m_crashLogCaptured && m_vmSavedStateCaptured)
+    {
+        return;
+    }
+
+    const auto crashReport = wsl::shared::FromJson<wsl::windows::common::hcs::CrashReport>(Event->EventData);
+
+    if (crashReport.GuestCrashSaveInfo.has_value() && crashReport.GuestCrashSaveInfo->SaveStateFile.has_value())
+    {
+        m_vmSavedStateCaptured = true;
+        EnforceVmSavedStateFileLimit();
+    }
+
+    if (!m_crashLogCaptured && !crashReport.CrashLog.empty())
+    {
+        WriteCrashLog(crashReport.CrashLog);
     }
 }
 
@@ -1184,10 +1255,74 @@ try
 }
 CATCH_RETURN();
 
+std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder()
+{
+    auto tempPath = wsl::windows::common::filesystem::GetTempFolderPath(m_userToken.get());
+    return tempPath / L"wsla-crashes";
+}
+
+void WSLAVirtualMachine::CreateVmSavedStateFile()
+{
+    auto runAsUser = wil::impersonate_token(m_userToken.get());
+
+    const auto filename = std::format(L"{}{}-{}{}", SAVED_STATE_FILE_PREFIX, std::time(nullptr), m_vmIdString, SAVED_STATE_FILE_EXTENSION);
+
+    auto savedStateFile = m_crashDumpFolder / filename;
+
+    wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
+
+    wil::unique_handle file{CreateFileW(savedStateFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
+    THROW_LAST_ERROR_IF(!file);
+
+    hcs::GrantVmAccess(m_vmIdString.c_str(), savedStateFile.c_str());
+    m_vmSavedStateFile = savedStateFile;
+}
+
+void wsl::windows::service::wsla::WSLAVirtualMachine::EnforceVmSavedStateFileLimit()
+{
+    auto pred = [](const auto& e) {
+        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
+               e.path().extension() == SAVED_STATE_FILE_EXTENSION && e.path().has_filename() &&
+               e.path().filename().wstring().find(SAVED_STATE_FILE_PREFIX) == 0 && e.file_size() > 0;
+    };
+
+    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES + 1, pred);
+}
+
+void WSLAVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
+{
+    auto runAsUser = wil::impersonate_token(m_userToken.get());
+
+    constexpr auto c_extension = L".txt";
+    constexpr auto c_prefix = L"kernel-panic-";
+    const auto filename = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), m_vmIdString, c_extension);
+    auto filePath = m_crashDumpFolder / filename;
+
+    WI_ASSERT(std::filesystem::exists(m_crashDumpFolder));
+    WI_ASSERT(std::filesystem::is_directory(m_crashDumpFolder));
+
+    auto pred = [&c_extension, &c_prefix](const auto& e) {
+        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
+               e.path().extension() == c_extension && e.path().has_filename() && e.path().filename().wstring().find(c_prefix) == 0;
+    };
+
+    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES, pred);
+
+    {
+        std::wofstream outputFile(filePath.wstring());
+        THROW_HR_IF(E_UNEXPECTED, !outputFile.is_open());
+
+        outputFile << crashLog;
+        THROW_HR_IF(E_UNEXPECTED, outputFile.fail());
+    }
+
+    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
+    m_crashLogCaptured = true;
+}
+
 void WSLAVirtualMachine::OnProcessReleased(int Pid)
 {
     std::lock_guard lock{m_lock};
 
     auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
-    WI_VERIFY(erased <= 1);
 }
