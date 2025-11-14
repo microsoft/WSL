@@ -425,6 +425,7 @@ add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslaclient)
+add_subdirectory(src/windows/wsladiag)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)
