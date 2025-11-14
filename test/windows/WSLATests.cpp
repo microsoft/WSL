@@ -887,7 +887,7 @@ class WSLATests
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
+        WSLA_SESSION_SETTINGS settings{L"WSLA Test Session"};
         wil::com_ptr<IWSLASession> session;
 
         VIRTUAL_MACHINE_SETTINGS vmSettings{};
@@ -903,7 +903,7 @@ class WSLATests
         wil::unique_cotaskmem_string returnedDisplayName;
         VERIFY_SUCCEEDED(session->GetDisplayName(&returnedDisplayName));
 
-        VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
+        VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"WSLA Test Session"));
     }
 
     TEST_METHOD(CreateRootNamespaceProcess)
