@@ -584,28 +584,10 @@ try
 {
     THROW_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~(WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs)));
 
-    {
-        std::lock_guard lock{m_lock};
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
-        THROW_HR_IF(E_FAIL, MountImpl(m_initChannel, Source, Target, Type, Options, Flags) != 0);
-    }
-
-    // This block is there to validate service process creation logic.
-    // TODO: Remove once this can easily be moved to WSLATests.cpp.
-    if (WI_IsFlagSet(Flags, WslMountFlagsChroot))
-    {
-        ServiceProcessLauncher launcher{
-            "/bin/sh", {"/bin/sh", "--version"}, {}, ProcessFlags::Stdin | common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
-
-        auto output = launcher.Launch(*this).WaitAndCaptureOutput();
-
-        WSL_LOG(
-            "REMOVE_ME_SH_VERSION",
-            TraceLoggingValue(output.Output[1].c_str(), "stdout"),
-            TraceLoggingValue(output.Output[2].c_str(), "stderr"),
-            TraceLoggingValue(output.Code, "code"));
-    }
+    THROW_HR_IF(E_FAIL, MountImpl(m_initChannel, Source, Target, Type, Options, Flags) != 0);
 
     return S_OK;
 }
