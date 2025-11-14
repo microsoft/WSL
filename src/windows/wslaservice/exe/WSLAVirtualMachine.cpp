@@ -438,7 +438,7 @@ try
         reinterpret_cast<WSLAVirtualMachine*>(Context)->OnCrash(Event);
     }
 }
-CATCH_LOG(); 
+CATCH_LOG()
 
 void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 {
