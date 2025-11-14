@@ -1545,6 +1545,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.NetworkingMode = WslNetworkingModeNAT;
     std::string shell = "/bin/bash";
     std::string fsType = "ext4";
+    std::wstring containerRootVhd;
+    bool testRootfs = false;
     bool help = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
@@ -1554,13 +1556,15 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(fsType), L"--fstype");
+    parser.AddArgument(testRootfs, L"--wsla-test-rootfs");
+    parser.AddArgument(containerRootVhd, L"--container-vhd");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--new-api] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--wsla-test-rootfs] [--container-vhd </path/to/vhd>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
@@ -1572,7 +1576,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-    WSLA_SESSION_SETTINGS sessionSettings{L"my-display-name"};
+    WSLA_SESSION_SETTINGS sessionSettings{L"WSLA Test Session"};
     wil::com_ptr<IWSLASession> session;
     THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
     THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
@@ -1583,11 +1587,36 @@ int WslaShell(_In_ std::wstring_view commandLine)
     ULONG Lun{};
     THROW_IF_FAILED(virtualMachine->AttachDisk(vhd.c_str(), true, &diskDevice, &Lun));
 
-    THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", fsType.c_str(), "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
-    THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
-    THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
-    THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
-    THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
+    if (testRootfs)
+    {
+        THROW_HR_IF(E_INVALIDARG, containerRootVhd.empty());
+
+        shell = "/bin/sh";
+
+        THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/lsw", "squashfs", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
+
+        wsl::windows::common::WSLAProcessLauncher mountProcessLauncher{shell, {shell, "/etc/lsw-mount.sh"}};
+        auto mountProcess = mountProcessLauncher.Launch(*session);
+        THROW_HR_IF(E_FAIL, mountProcess.WaitAndCaptureOutput().Code != 0);
+
+        // mount container data disk
+        wil::unique_cotaskmem_ansistring containerVhdDevice;
+        ULONG containerVhdLun{};
+        THROW_IF_FAILED(virtualMachine->AttachDisk(containerRootVhd.c_str(), false, &containerVhdDevice, &containerVhdLun));
+        THROW_IF_FAILED(virtualMachine->Mount(containerVhdDevice.get(), "/root", "ext4", "rw", WslMountFlagsNone));
+
+        wsl::windows::common::WSLAProcessLauncher initProcessLauncher{shell, {shell, "/etc/lsw-init.sh"}};
+        auto initProcess = initProcessLauncher.Launch(*session);
+        THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
+    }
+    else
+    {
+        THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", fsType.c_str(), "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
+        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
+    }
 
     wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeTerminalInput});
