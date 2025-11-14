@@ -2460,6 +2460,8 @@ void WslCoreVm::RegisterCallbacks(_In_ const std::function<void(ULONG)>& DistroE
                     if (header->MessageType == LxMiniInitMessageChildExit)
                     {
                         const auto* exitMessage = gslhelpers::try_get_struct<LX_MINI_INIT_CHILD_EXIT_MESSAGE>(message);
+                        WSL_LOG("ProcessExited", TraceLoggingValue(exitMessage->ChildPid, "pid"));
+
                         if (exitMessage)
                         {
                             exitCallback(exitMessage->ChildPid);

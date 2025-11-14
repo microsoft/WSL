@@ -391,6 +391,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLAUnmount,
     LxMessageWSLADetach,
     LxMessageWSLATerminalChanged,
+    LxMessageWSLAWatchProcesses,
+    LxMessageWSLAProcessExited
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -500,6 +502,9 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLAUnmount)
         X(LxMessageWSLADetach)
         X(LxMessageWSLATerminalChanged)
+        X(LxMessageWSLAWatchProcesses)
+        X(LxMessageWSLAProcessExited)
+
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
     }
@@ -1846,6 +1851,30 @@ struct WSLA_TERMINAL_CHANGED
     unsigned short Columns;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Rows), FIELD(Columns));
+};
+
+struct WSLA_WATCH_PROCESSES
+{
+    DECLARE_MESSAGE_CTOR(WSLA_WATCH_PROCESSES);
+
+    static inline auto Type = LxMessageWSLAWatchProcesses;
+
+    MESSAGE_HEADER Header;
+
+    PRETTY_PRINT(FIELD(Header));
+};
+
+struct WSLA_PROCESS_EXITED
+{
+    DECLARE_MESSAGE_CTOR(WSLA_PROCESS_EXITED);
+
+    MESSAGE_HEADER Header;
+    static inline auto Type = LxMessageWSLAProcessExited;
+    uint32_t Pid;
+    uint32_t Code;
+    bool Signaled;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Code), FIELD(Signaled));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

@@ -16,8 +16,14 @@ Abstract:
 #include "relay.hpp"
 #pragma hdrstop
 
+using wsl::windows::common::relay::EventHandle;
+using wsl::windows::common::relay::IOHandleStatus;
+using wsl::windows::common::relay::MultiHandleWait;
+using wsl::windows::common::relay::OverlappedIOHandle;
+using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
+using wsl::windows::common::relay::WriteHandle;
 
 namespace {
 
@@ -924,3 +930,249 @@ try
     }
 }
 CATCH_LOG()
+
+void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle)
+{
+    m_handles.emplace_back(std::move(handle));
+}
+
+void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
+{
+    std::optional<std::chrono::steady_clock::time_point> deadline;
+
+    if (Timeout.has_value())
+    {
+        deadline = std::chrono::steady_clock::now() + Timeout.value();
+    }
+
+    // Run until all handles are completed.
+
+    while (!m_handles.empty())
+    {
+        // Schedule IO on each handle until all are either pending, or completed.
+        for (auto i = 0; i < m_handles.size(); i++)
+        {
+            while (m_handles[i]->GetState() == IOHandleStatus::Standby)
+            {
+                m_handles[i]->Schedule();
+            }
+        }
+
+        // Remove completed handles from m_handles.
+        std::erase_if(m_handles, [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; });
+
+        if (m_handles.empty())
+        {
+            break;
+        }
+
+        // Wait for the next operation to complete.
+        std::vector<HANDLE> waitHandles;
+        for (const auto& e : m_handles)
+        {
+            waitHandles.emplace_back(e->GetHandle());
+        }
+
+        DWORD waitTimeout = INFINITE;
+        if (deadline.has_value())
+        {
+            auto miliseconds =
+                std::chrono::duration_cast<std::chrono::milliseconds>(deadline.value() - std::chrono::steady_clock::now()).count();
+
+            waitTimeout = static_cast<DWORD>(std::max(0LL, miliseconds));
+        }
+
+        auto result = WaitForMultipleObjects(static_cast<DWORD>(waitHandles.size()), waitHandles.data(), false, waitTimeout);
+        if (result == WAIT_TIMEOUT)
+        {
+            THROW_WIN32(ERROR_TIMEOUT);
+        }
+        else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
+        {
+            auto index = result - WAIT_OBJECT_0;
+            m_handles[index]->Collect();
+        }
+        else
+        {
+            THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
+        }
+    }
+}
+
+IOHandleStatus OverlappedIOHandle::GetState() const
+{
+    return State;
+}
+
+EventHandle::EventHandle(wil::unique_handle&& Handle, std::function<void()>&& OnSignalled) :
+    Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
+{
+}
+
+void EventHandle::Schedule()
+{
+    State = IOHandleStatus::Pending;
+}
+
+void EventHandle::Collect()
+{
+    State = IOHandleStatus::Completed;
+    OnSignalled();
+}
+
+HANDLE EventHandle::GetHandle() const
+{
+    return Handle.get();
+}
+
+ReadHandle::ReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
+    Handle(std::move(MovedHandle)), OnRead(OnRead)
+{
+    Overlapped.hEvent = Event.get();
+}
+
+ReadHandle::~ReadHandle()
+{
+    if (State == IOHandleStatus::Pending)
+    {
+        DWORD bytesRead{};
+        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(Handle.get(), &Overlapped));
+        LOG_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true));
+    }
+}
+
+void ReadHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    Event.ResetEvent();
+
+    // Schedule the read.
+    DWORD bytesRead{};
+    if (ReadFile(Handle.get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesRead, &Overlapped))
+    {
+        // Signal the read.
+        OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
+
+        // ReadFile completed immediately, process the result right away.
+        if (bytesRead == 0)
+        {
+            State = IOHandleStatus::Completed;
+            return; // Handle is completely read, don't try again.
+        }
+
+        // Read was done synchronously, remain in 'standby' state.
+    }
+    else
+    {
+        auto error = GetLastError();
+        if (error == ERROR_HANDLE_EOF || error == ERROR_BROKEN_PIPE)
+        {
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
+        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.get());
+
+        // The read is pending, update to 'Pending'
+        State = IOHandleStatus::Pending;
+    }
+}
+
+void ReadHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    // Transition back to standby
+    State = IOHandleStatus::Standby;
+
+    // Complete the read.
+    DWORD bytesRead{};
+    if (!GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, false))
+    {
+        auto error = GetLastError();
+        THROW_WIN32_IF(error, error != ERROR_HANDLE_EOF && error != ERROR_BROKEN_PIPE);
+
+        // We received ERROR_HANDLE_EOF or ERROR_BROKEN_PIPE. Validate that this was indeed a zero byte read.
+        WI_ASSERT(bytesRead == 0);
+    }
+
+    // Signal the read.
+    OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
+
+    // Transition to Complete if this was a zero byte read.
+    if (bytesRead == 0)
+    {
+        State = IOHandleStatus::Completed;
+    }
+}
+
+HANDLE ReadHandle::GetHandle() const
+{
+    return Event.get();
+}
+
+WriteHandle::WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer) :
+    Handle(std::move(MovedHandle)), Buffer(Buffer)
+{
+    Overlapped.hEvent = Event.get();
+}
+
+WriteHandle::~WriteHandle()
+{
+    if (State == IOHandleStatus::Pending)
+    {
+        DWORD bytesRead{};
+        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(Handle.get(), &Overlapped));
+        LOG_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true));
+    }
+}
+
+void WriteHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    Event.ResetEvent();
+
+    // Schedule the write.
+    DWORD bytesWritten{};
+    if (WriteFile(Handle.get(), Buffer.data() + Offset, static_cast<DWORD>(Buffer.size() - Offset), &bytesWritten, &Overlapped))
+    {
+        Offset += bytesWritten;
+        if (Offset >= Buffer.size())
+        {
+            State = IOHandleStatus::Completed;
+        }
+    }
+    else
+    {
+        auto error = GetLastError();
+        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.get());
+
+        // The write is pending, update to 'Pending'
+        State = IOHandleStatus::Pending;
+    }
+}
+
+void WriteHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    // Transition back to standby
+    State = IOHandleStatus::Standby;
+
+    // Complete the write.
+    DWORD bytesWritten{};
+    THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesWritten, false));
+
+    Offset += bytesWritten;
+    if (Offset >= Buffer.size())
+    {
+        State = IOHandleStatus::Completed;
+    }
+}
+
+HANDLE WriteHandle::GetHandle() const
+{
+    return Event.get();
+}

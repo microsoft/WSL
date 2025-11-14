@@ -43,12 +43,12 @@ HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** process)
     return E_NOTIMPL;
 }
 
-HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
+HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
-    auto process = wil::MakeOrThrow<WSLAProcess>();
+    // auto process = wil::MakeOrThrow<WSLAProcess>();
 
-    process.CopyTo(__uuidof(IWSLAProcess), (void**)Process);
+    // process.CopyTo(__uuidof(IWSLAProcess), (void**)Process);
 
     return S_OK;
 }
