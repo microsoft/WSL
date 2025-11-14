@@ -91,26 +91,6 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WslAttachDisk(WslVirtualMachineHandle VirtualMachine, const WslDiskAttachSettings* Settings, WslAttachedDiskInformation* AttachedDisk)
-{
-    wil::unique_cotaskmem_ansistring device;
-    RETURN_IF_FAILED(reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
-                         ->AttachDisk(Settings->WindowsPath, Settings->ReadOnly, &device, &AttachedDisk->ScsiLun));
-
-    auto deviceSize = strlen(device.get());
-    WI_VERIFY(deviceSize < sizeof(WslAttachedDiskInformation::Device));
-
-    strncpy(AttachedDisk->Device, device.get(), sizeof(WslAttachedDiskInformation::Device));
-
-    return S_OK;
-}
-
-HRESULT WslMount(WslVirtualMachineHandle VirtualMachine, const WslMountSettings* Settings)
-{
-    return reinterpret_cast<IWSLAVirtualMachine*>(VirtualMachine)
-        ->Mount(Settings->Device, Settings->Target, Settings->Type, Settings->Options, Settings->Flags);
-}
-
 HRESULT WslCreateLinuxProcess(WslVirtualMachineHandle VirtualMachine, WslCreateProcessSettings* UserSettings, int32_t* Pid)
 {
     return S_OK;

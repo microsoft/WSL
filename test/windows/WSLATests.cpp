@@ -52,8 +52,10 @@ class WSLATests
         return true;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(const VIRTUAL_MACHINE_SETTINGS& vmSettings, const std::optional<std::wstring>& vhd = {})
+    wil::com_ptr<IWSLASession> CreateSession(VIRTUAL_MACHINE_SETTINGS& vmSettings)
     {
+        vmSettings.RootVhdType = "ext4";
+
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
@@ -62,23 +64,6 @@ class WSLATests
         wil::com_ptr<IWSLASession> session;
 
         VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
-
-        // TODO: remove once the VM is wired to mount its rootfs inside WSLASession
-        wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-        VERIFY_SUCCEEDED(session->GetVirtualMachine(&virtualMachine));
-
-        wsl::windows::common::security::ConfigureForCOMImpersonation(virtualMachine.get());
-
-        wil::unique_cotaskmem_ansistring diskDevice;
-        ULONG Lun{};
-        THROW_IF_FAILED(virtualMachine->AttachDisk(vhd.value_or(testVhd).c_str(), true, &diskDevice, &Lun));
-
-        THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", "ext4", "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
-
         return session;
     }
 
@@ -159,6 +144,7 @@ class WSLATests
             settings.BootTimeoutMs = 30 * 1000;
             settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
             settings.EnableEarlyBootDmesg = earlyBootLogging;
+            settings.RootVhd = testVhd.c_str();
 
             std::vector<char> dmesgContent;
             auto readDmesg = [read = read.get(), &dmesgContent]() mutable {
@@ -275,6 +261,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -330,6 +317,7 @@ class WSLATests
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.NetworkingMode = WslNetworkingModeNAT;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -355,6 +343,7 @@ class WSLATests
         settings.BootTimeoutMs = 30 * 1000;
         settings.NetworkingMode = WslNetworkingModeNAT;
         settings.EnableDnsTunneling = true;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -381,6 +370,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -493,6 +483,7 @@ class WSLATests
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.NetworkingMode = WslNetworkingModeNAT;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -637,6 +628,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -656,6 +648,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -742,6 +735,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
         auto result = ExpectCommandResult(
@@ -856,6 +850,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
         // Use the system distro vhd for modprobe & lsmod.
 
@@ -867,7 +862,9 @@ class WSLATests
         auto rootfs = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
 
 #endif
-        auto session = CreateSession(settings, rootfs);
+        settings.RootVhd = rootfs.c_str();
+
+        auto session = CreateSession(settings);
 
         // Sanity check.
         ExpectCommandResult(session.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}, 1);
@@ -879,33 +876,6 @@ class WSLATests
         ExpectCommandResult(session.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}, 0);
     }
 
-    TEST_METHOD(CreateSessionSmokeTest)
-    {
-        WSL2_TEST_ONLY();
-
-        wil::com_ptr<IWSLAUserSession> userSession;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
-
-        WSLA_SESSION_SETTINGS settings{L"my-display-name"};
-        wil::com_ptr<IWSLASession> session;
-
-        VIRTUAL_MACHINE_SETTINGS vmSettings{};
-        vmSettings.BootTimeoutMs = 30 * 1000;
-        vmSettings.DisplayName = L"WSLA";
-        vmSettings.MemoryMb = 2048;
-        vmSettings.CpuCount = 4;
-        vmSettings.NetworkingMode = WslNetworkingModeNone;
-        vmSettings.EnableDebugShell = true;
-
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
-
-        wil::unique_cotaskmem_string returnedDisplayName;
-        VERIFY_SUCCEEDED(session->GetDisplayName(&returnedDisplayName));
-
-        VERIFY_ARE_EQUAL(returnedDisplayName.get(), std::wstring(L"my-display-name"));
-    }
-
     TEST_METHOD(CreateRootNamespaceProcess)
     {
         WSL2_TEST_ONLY();
@@ -915,6 +885,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
