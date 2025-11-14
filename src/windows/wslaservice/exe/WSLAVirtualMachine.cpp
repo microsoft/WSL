@@ -17,6 +17,7 @@ Abstract:
 #include "NatNetworking.h"
 #include "WSLAUserSession.h"
 #include "DnsResolver.h"
+#include "ServiceProcessLauncher.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -434,7 +435,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
             options.CommandLineCount = static_cast<DWORD>(cmd.size());
         };
 
-        auto process = CreateLinuxProcessImpl(options, nullptr, prepareCommandLine);
+        auto process = CreateLinuxProcess(options, nullptr, prepareCommandLine);
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
@@ -448,9 +449,9 @@ void WSLAVirtualMachine::ConfigureNetworking()
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
             wsl::core::NatNetworking::CreateNetwork(config),
-            std::move(process->GetSocket(gnsChannelFd)),
+            wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()},
             config,
-            dnsChannelFd != -1 ? std::move(process->GetSocket(dnsChannelFd)) : wil::unique_socket{});
+            dnsChannelFd != -1 ? wil::unique_socket{(SOCKET)process->GetStdHandle(dnsChannelFd).release()} : wil::unique_socket{});
 
         m_networkEngine->Initialize();
 
@@ -583,10 +584,28 @@ try
 {
     THROW_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~(WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs)));
 
-    std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+    {
+        std::lock_guard lock{m_lock};
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
 
-    THROW_HR_IF(E_FAIL, MountImpl(m_initChannel, Source, Target, Type, Options, Flags) != 0);
+        THROW_HR_IF(E_FAIL, MountImpl(m_initChannel, Source, Target, Type, Options, Flags) != 0);
+    }
+
+    // This block is there to validate service process creation logic.
+    // TODO: Remove once this can easily be moved to WSLATests.cpp.
+    if (WI_IsFlagSet(Flags, WslMountFlagsChroot))
+    {
+        ServiceProcessLauncher launcher{
+            "/bin/sh", {"/bin/sh", "--version"}, {}, ProcessFlags::Stdin | common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
+
+        auto output = launcher.Launch(*this).WaitAndCaptureOutput();
+
+        WSL_LOG(
+            "REMOVE_ME_SH_VERSION",
+            TraceLoggingValue(output.Output[1].c_str(), "stdout"),
+            TraceLoggingValue(output.Output[2].c_str(), "stderr"),
+            TraceLoggingValue(output.Code, "code"));
+    }
 
     return S_OK;
 }
@@ -709,14 +728,13 @@ void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, cons
 HRESULT WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)
 try
 {
-    CreateLinuxProcessImpl(*Options, Errno).CopyTo(Process);
+    CreateLinuxProcess(*Options, Errno).CopyTo(Process);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
-    _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     auto setErrno = [Errno](int Error) {
         if (Errno != nullptr)
@@ -804,13 +822,13 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
         }
     }
 
-    std::map<int, wil::unique_socket> socketMap;
+    std::map<int, wil::unique_handle> stdHandles;
     for (auto& [fd, socket] : sockets)
     {
-        socketMap.emplace(fd, std::move(socket));
+        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(socket.release()));
     }
 
-    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(socketMap), pid, this);
+    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(stdHandles), pid, this);
 
     {
         std::lock_guard lock{m_lock};

@@ -28,9 +28,16 @@ class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
 
 {
 public:
+    struct ConnectedSocket
+    {
+        int Fd;
+        wil::unique_socket Socket;
+    };
+
+    using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
+
     WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, WSLAUserSessionImpl* UserSession);
 
-    // TODO: Clear processes on exit
     ~WSLAVirtualMachine();
 
     void Start();
@@ -53,15 +60,10 @@ public:
 
     void OnProcessReleased(int Pid);
 
+    Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
+        _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
+
 private:
-    struct ConnectedSocket
-    {
-        int Fd;
-        wil::unique_socket Socket;
-    };
-
-    using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
-
     static int32_t MountImpl(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
     static bool ParseTtyInformation(
@@ -77,9 +79,6 @@ private:
     ConnectedSocket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
-
-    Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
-        _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags);
 

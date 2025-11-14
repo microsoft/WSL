@@ -182,13 +182,13 @@ public:
     NON_COPYABLE(EventHandle)
     NON_MOVABLE(EventHandle)
 
-    EventHandle(wil::unique_handle&& EventHandle, std::function<void()>&& OnSignalled);
+    EventHandle(wil::unique_event&& EventHandle, std::function<void()>&& OnSignalled);
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
-    wil::unique_handle Handle;
+    wil::unique_event Handle;
     std::function<void()> OnSignalled;
 };
 

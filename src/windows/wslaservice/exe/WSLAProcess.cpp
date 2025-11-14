@@ -18,7 +18,7 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLAProcess;
 
-WSLAProcess::WSLAProcess(std::map<int, wil::unique_socket>&& handles, int pid, WSLAVirtualMachine* virtualMachine) :
+WSLAProcess::WSLAProcess(std::map<int, wil::unique_handle>&& handles, int pid, WSLAVirtualMachine* virtualMachine) :
     m_handles(std::move(handles)), m_pid(pid), m_virtualMachine(virtualMachine)
 {
 }
@@ -70,17 +70,17 @@ try
 {
     std::lock_guard lock{m_mutex};
 
-    auto& socket = GetSocket(Index);
+    auto& socket = GetStdHandle(Index);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !socket.is_valid());
 
-    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(socket.get())));
+    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(socket.get()));
 
     socket.reset();
     return S_OK;
 }
 CATCH_RETURN();
 
-wil::unique_socket& WSLAProcess::GetSocket(int Index)
+wil::unique_handle& WSLAProcess::GetStdHandle(int Index)
 {
     std::lock_guard lock{m_mutex};
 
@@ -88,6 +88,11 @@ wil::unique_socket& WSLAProcess::GetSocket(int Index)
     THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_handles.end(), "Pid: %i, Fd: %i", m_pid, Index);
 
     return it->second;
+}
+
+wil::unique_event& WSLAProcess::GetExitEvent()
+{
+    return m_exitEvent;
 }
 
 HRESULT WSLAProcess::GetPid(int* Pid)
