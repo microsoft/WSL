@@ -23,7 +23,7 @@ class DECLSPEC_UUID("AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B") WSLAProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAProcess, IFastRundown>
 {
 public:
-    WSLAProcess(std::map<int, wil::unique_socket>&& handles, int pid, WSLAVirtualMachine* virtualMachine);
+    WSLAProcess(std::map<int, wil::unique_handle>&& handles, int pid, WSLAVirtualMachine* virtualMachine);
     ~WSLAProcess();
     WSLAProcess(const WSLAProcess&) = delete;
     WSLAProcess& operator=(const WSLAProcess&) = delete;
@@ -36,12 +36,13 @@ public:
 
     void OnTerminated(bool Signalled, int Code);
     void OnVmTerminated();
-    wil::unique_socket& GetSocket(int Index);
+    wil::unique_handle& GetStdHandle(int Index);
+    wil::unique_event& GetExitEvent();
     int GetPid() const;
 
 private:
     std::recursive_mutex m_mutex;
-    std::map<int, wil::unique_socket> m_handles;
+    std::map<int, wil::unique_handle> m_handles;
     int m_pid = -1;
     int m_exitedCode = -1;
     WSLA_PROCESS_STATE m_state = WslaProcessStateRunning;

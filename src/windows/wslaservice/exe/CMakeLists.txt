@@ -2,6 +2,7 @@ set(SOURCES
     application.manifest
     main.rc
     ServiceMain.cpp
+    ServiceProcessLauncher.h
     WSLAContainer.cpp
     WSLAProcess.cpp
     WSLASession.cpp
@@ -11,6 +12,7 @@ set(SOURCES
     )
 
 set(HEADERS
+    ServiceProcessLauncher.cpp
     WSLAContainer.h
     WSLAProcess.h
     WSLASession.h
