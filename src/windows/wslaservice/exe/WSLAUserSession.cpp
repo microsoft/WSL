@@ -116,8 +116,18 @@ CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_INFORMATION** Sessions, ULONG* SessionsCount)
 {
-    return E_NOTIMPL;
+    if (!Sessions || !SessionsCount)
+    {
+        return E_INVALIDARG;
+    }
+
+    // For now, return an empty list. We'll populate this from m_sessions later.
+    *Sessions = nullptr;
+    *SessionsCount = 0;
+
+    return S_OK;
 }
+
 HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
 {
     return E_NOTIMPL;
