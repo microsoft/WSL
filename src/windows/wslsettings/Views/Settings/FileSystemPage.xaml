@@ -18,12 +18,12 @@
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
             Visibility="{x:Bind ViewModel.SettingsContentVisibility, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
-                <ctControls:SettingsExpander x:Uid="Settings_DefaultVHDSize">
+                <ctControls:SettingsExpander x:Name="DefaultVHDSizeExpander" x:Uid="Settings_DefaultVHDSize">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.DefaultVHDSize, Mode=OneWay, Converter={StaticResource MegabyteStringConverter}}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_DefaultVHDSizeTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="DefaultVHDSizeTextBox" x:Uid="Settings_DefaultVHDSizeTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.DefaultVHDSize, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource MegabyteNumberConverter}}" TextChanged="DefaultVHDSizeTextBox_TextChanged"/>
                                 <Button x:Uid="Settings_DefaultVHDSizeResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Command="{x:Bind ViewModel.DefaultVHDSize_ResetCommand}" IsEnabled="{x:Bind ViewModel.DefaultVHDSize_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

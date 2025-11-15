@@ -18,12 +18,12 @@
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
             Visibility="{x:Bind ViewModel.SettingsContentVisibility, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
-                <ctControls:SettingsExpander x:Uid="Settings_ProcCount">
+                <ctControls:SettingsExpander x:Name="ProcCountExpander" x:Uid="Settings_ProcCount">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.ProcCount, Mode=OneWay}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_ProcCountTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="ProcCountTextBox" x:Uid="Settings_ProcCountTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.ProcCount, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" TextChanged="ProcCountTextBox_TextChanged"/>
                                 <Button x:Uid="Settings_ProcCountResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Command="{x:Bind ViewModel.ProcCount_ResetCommand}" IsEnabled="{x:Bind ViewModel.ProcCount_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -32,12 +32,12 @@
                         </ctControls:SettingsCard>
                     </ctControls:SettingsExpander.Items>
                 </ctControls:SettingsExpander>
-                <ctControls:SettingsExpander x:Uid="Settings_MemorySize">
+                <ctControls:SettingsExpander x:Name="MemorySizeExpander" x:Uid="Settings_MemorySize">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.MemorySize, Mode=OneWay, Converter={StaticResource MegabyteStringConverter}}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_MemorySizeTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="MemorySizeTextBox" x:Uid="Settings_MemorySizeTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.MemorySize, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource MegabyteNumberConverter}}" TextChanged="MemorySizeTextBox_TextChanged"/>
                                 <Button x:Uid="Settings_MemorySizeResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Command="{x:Bind ViewModel.MemorySize_ResetCommand}" IsEnabled="{x:Bind ViewModel.MemorySize_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -46,12 +46,12 @@
                         </ctControls:SettingsCard>
                     </ctControls:SettingsExpander.Items>
                 </ctControls:SettingsExpander>
-                <ctControls:SettingsExpander x:Uid="Settings_SwapSize">
+                <ctControls:SettingsExpander x:Name="SwapSizeExpander" x:Uid="Settings_SwapSize">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.SwapSize, Mode=OneWay, Converter={StaticResource MegabyteStringConverter}}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_SwapSizeTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="SwapSizeTextBox" x:Uid="Settings_SwapSizeTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.SwapSize, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Converter={StaticResource MegabyteNumberConverter}}" TextChanged="SwapSizeTextBox_TextChanged"/>
                                 <Button x:Uid="Settings_SwapSizeResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Command="{x:Bind ViewModel.SwapSize_ResetCommand}" IsEnabled="{x:Bind ViewModel.SwapSize_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -60,12 +60,12 @@
                         </ctControls:SettingsCard>
                     </ctControls:SettingsExpander.Items>
                 </ctControls:SettingsExpander>
-                <ctControls:SettingsExpander x:Uid="Settings_SwapFilePath">
+                <ctControls:SettingsExpander x:Name="SwapFilePathExpander" x:Uid="Settings_SwapFilePath">
                     <TextBlock Style="{StaticResource TextBlockFilePathStyle}" Text="{x:Bind ViewModel.SwapFilePath, Mode=OneWay}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_SwapFilePathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="SwapFilePathTextBox" x:Uid="Settings_SwapFilePathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.SwapFilePath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
                                 <Button x:Uid="Settings_SwapFilePathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Click="SwapFilePath_Click"/>

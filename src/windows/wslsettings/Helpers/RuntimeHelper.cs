@@ -1,7 +1,9 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
+using CommunityToolkit.WinUI.Controls;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -46,5 +48,40 @@ public class RuntimeHelper
 
         FindNextElementOptions fneo = new() { SearchRoot = button.XamlRoot.Content };
         FocusManager.TryMoveFocus(FocusNavigationDirection.Previous, fneo);
+    }
+
+    public static void SetupSettingsExpanderFocusManagement(Microsoft.UI.Xaml.FrameworkElement expander, Microsoft.UI.Xaml.Controls.Control firstFocusableElement)
+    {
+        if (expander is CommunityToolkit.WinUI.Controls.SettingsExpander settingsExpander)
+        {
+            settingsExpander.RegisterPropertyChangedCallback(CommunityToolkit.WinUI.Controls.SettingsExpander.IsExpandedProperty, (sender, dp) =>
+            {
+                if (sender is CommunityToolkit.WinUI.Controls.SettingsExpander se && se.IsExpanded)
+                {
+                    System.EventHandler<object>? layoutHandler = null;
+                    layoutHandler = (s, e) =>
+                    {
+                        se.LayoutUpdated -= layoutHandler;
+                        firstFocusableElement.Focus(Microsoft.UI.Xaml.FocusState.Keyboard);
+                    };
+
+                    se.LayoutUpdated += layoutHandler;
+                }
+            });
+        }
+    }
+
+    public static void SetupExpanderFocusManagementByName(Microsoft.UI.Xaml.FrameworkElement parent, string expanderName, string textBoxName)
+    {
+        var expander = parent.FindName(expanderName) as Microsoft.UI.Xaml.FrameworkElement;
+        var textBox = parent.FindName(textBoxName) as Microsoft.UI.Xaml.Controls.Control;
+
+        Debug.Assert(expander != null, $"Expander '{expanderName}' not found");
+        Debug.Assert(textBox != null, $"TextBox '{textBoxName}' not found");
+
+        if (expander != null && textBox != null)
+        {
+            SetupSettingsExpanderFocusManagement(expander, textBox);
+        }
     }
 }

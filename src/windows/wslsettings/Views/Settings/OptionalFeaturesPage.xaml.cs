@@ -26,6 +26,14 @@ public sealed partial class OptionalFeaturesPage : Page
                 FrameworkElementAutomationPeer.FromElement(Settings_ErrorTryAgainLater).RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
             }
         });
+
+        this.Loaded += OnPageLoaded;
+    }
+
+    private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "SystemdSettingsExpander", "InitTextBox");
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "VMIdleTimeoutExpander", "VMIdleTimeoutTextBox");
     }
 
     override protected void OnNavigatedFrom(NavigationEventArgs e)

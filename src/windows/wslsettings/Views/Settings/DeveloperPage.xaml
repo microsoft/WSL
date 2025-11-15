@@ -25,12 +25,12 @@
                 <ctControls:SettingsCard x:Uid="Settings_HWPerfCounters">
                     <ToggleSwitch x:Uid="Settings_HWPerfCountersToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnHWPerfCounters, Mode=TwoWay}"/>
                 </ctControls:SettingsCard>
-                <ctControls:SettingsExpander x:Uid="Settings_CustomKernelPath">
+                <ctControls:SettingsExpander x:Name="CustomKernelPathExpander" x:Uid="Settings_CustomKernelPath">
                     <TextBlock Style="{StaticResource TextBlockFilePathStyle}" Text="{x:Bind ViewModel.CustomKernelPath, Mode=OneWay}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_CustomKernelPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="CustomKernelPathTextBox" x:Uid="Settings_CustomKernelPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.CustomKernelPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
                                 <Button x:Uid="Settings_CustomKernelPathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Click="CustomKernelPath_Click"/>
@@ -38,12 +38,12 @@
                         </ctControls:SettingsCard>
                     </ctControls:SettingsExpander.Items>
                 </ctControls:SettingsExpander>
-                <ctControls:SettingsExpander x:Uid="Settings_CustomKernelModulesPath">
+                <ctControls:SettingsExpander x:Name="CustomKernelModulesPathExpander" x:Uid="Settings_CustomKernelModulesPath">
                     <TextBlock Style="{StaticResource TextBlockFilePathStyle}" Text="{x:Bind ViewModel.CustomKernelModulesPath, Mode=OneWay}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_CustomKernelModulesPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="CustomKernelModulesPathTextBox" x:Uid="Settings_CustomKernelModulesPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.CustomKernelModulesPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
                                 <Button x:Uid="Settings_CustomKernelModulesPathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Click="CustomKernelModulesPath_Click"/>
@@ -51,7 +51,7 @@
                         </ctControls:SettingsCard>
                     </ctControls:SettingsExpander.Items>
                 </ctControls:SettingsExpander>
-                <ctControls:SettingsExpander x:Uid="Settings_CustomSystemDistroPath">
+                <ctControls:SettingsExpander x:Name="CustomSystemDistroPathExpander" x:Uid="Settings_CustomSystemDistroPath">
                     <ctControls:SettingsExpander.Description>
                         <controls:HyperlinkTextBlock x:Uid="Settings_CustomSystemDistroPathDescription"/>
                     </ctControls:SettingsExpander.Description>
@@ -59,7 +59,7 @@
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_CustomSystemDistroPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="CustomSystemDistroPathTextBox" x:Uid="Settings_CustomSystemDistroPathTextBox" Style="{StaticResource TextBoxFilePathStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.CustomSystemDistroPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
                                 <Button x:Uid="Settings_CustomSystemDistroPathBrowseButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Click="CustomSystemDistroPath_Click"/>
