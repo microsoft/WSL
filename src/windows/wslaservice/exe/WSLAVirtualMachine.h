@@ -83,6 +83,7 @@ private:
     void CreateVmSavedStateFile();
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
+    void CollectCrashDumps(wil::unique_socket&& listenSocket) const;
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
@@ -117,6 +118,9 @@ private:
     std::filesystem::path m_crashDumpFolder;
     bool m_vmSavedStateCaptured = false;
     bool m_crashLogCaptured = false;
+
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
 
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};

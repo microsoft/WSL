@@ -27,8 +27,10 @@ using wsl::windows::service::wsla::WSLAProcess;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 constexpr auto MAX_VM_CRASH_FILES = 3;
+constexpr auto MAX_CRASH_DUMPS = 10;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
+constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
 
 WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
     m_settings(Settings), m_userSid(UserSid), m_userSession(Session)
@@ -1325,4 +1327,58 @@ void WSLAVirtualMachine::OnProcessReleased(int Pid)
     std::lock_guard lock{m_lock};
 
     auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
+}
+
+void WSLAVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket) const
+{
+    wsl::windows::common::wslutil::SetThreadDescription(L"CrashDumpCollection");
+
+    while (!m_terminatingEvent.is_signaled())
+    {
+        try
+        {
+            auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+
+            THROW_LAST_ERROR_IF(
+                setsockopt(listenSocket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&RECEIVE_TIMEOUT, sizeof(RECEIVE_TIMEOUT)) == SOCKET_ERROR);
+
+            auto channel = wsl::shared::SocketChannel{std::move(socket), "crash_dump", m_terminatingEvent.get()};
+
+            const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
+            const char* process = reinterpret_cast<const char*>(&message.Buffer);
+
+            constexpr auto dumpExtension = ".dmp";
+            constexpr auto dumpPrefix = "wsl-crash";
+
+            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
+
+            std::replace_if(filename.begin(), filename.end(), [](auto e) { return !std::isalnum(e) && e != '.' && e != '-'; }, '_');
+
+            auto fullPath = m_crashDumpFolder / filename;
+
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
+            wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
+
+            // Only delete files that:
+            // - have the temporary flag set
+            // - start with 'wsl-crash'
+            // - end in .dmp
+            //
+            // This logic is here to prevent accidental user file deletion
+            auto pred = [&dumpExtension, &dumpPrefix](const auto& e) {
+                return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
+                       e.path().extension() == dumpExtension && e.path().has_filename() &&
+                       e.path().filename().string().find(dumpPrefix) == 0;
+            };
+
+            wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_CRASH_DUMPS, pred);
+
+            wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
+            THROW_LAST_ERROR_IF(!file);
+
+            channel.SendResultMessage<std::int32_t>(0);
+            wsl::windows::common::relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+        }
+        CATCH_LOG();
+    }
 }
