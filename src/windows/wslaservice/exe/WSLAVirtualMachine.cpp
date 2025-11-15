@@ -332,15 +332,8 @@ void WSLAVirtualMachine::Start()
 
 #endif
 
-    wil::unique_cotaskmem_ansistring device;
-    ULONG lun{};
-    THROW_IF_FAILED(AttachDisk(kernelModulesPath.c_str(), true, &device, &lun));
-
-    THROW_HR_IF_MSG(
-        E_FAIL,
-        MountImpl(m_initChannel, device.get(), "", "ext4", "ro", WSLA_MOUNT::KernelModules) != 0,
-        "Failed to mount the kernel modules from: %hs",
-        device.get());
+    auto [_, device] = AttachDisk(kernelModulesPath.c_str(), true);
+    Mount(m_initChannel, device.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     // Configure GPU if requested.
     if (m_settings.EnableGPU)
@@ -359,7 +352,9 @@ void WSLAVirtualMachine::Start()
         wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
     }
 
-    auto [_, __, childChannel] = Fork(WSLA_FORK::Thread);
+    ConfigureMounts();
+
+    auto [__, ___, childChannel] = Fork(WSLA_FORK::Thread);
 
     WSLA_WATCH_PROCESSES watchMessage{};
     childChannel.SendMessage(watchMessage);
@@ -367,6 +362,19 @@ void WSLAVirtualMachine::Start()
     THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
 
     m_processExitThread = std::thread(std::bind(&WSLAVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
+}
+
+void WSLAVirtualMachine::ConfigureMounts()
+{
+    auto [_, device] = AttachDisk(m_settings.RootVhd, true);
+
+    Mount(m_initChannel, device.c_str(), "/mnt", m_settings.RootVhdType, "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs);
+    Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
+    Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
+    Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
+    Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
+
+    // TODO: Mount storage VHD here.
 }
 
 void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
@@ -567,10 +575,11 @@ void WSLAVirtualMachine::OnCrash(_In_ const HCS_EVENT* Event)
     }
 }
 
-HRESULT WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)
-try
+std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly)
 {
-    *Device = nullptr;
+    ULONG Lun{};
+    std::string Device;
+
     auto result = wil::ResultFromException([&]() {
         std::lock_guard lock{m_lock};
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
@@ -589,17 +598,16 @@ try
             grantDiskAccess();
         }
 
-        *Lun = 0;
-        while (m_attachedDisks.find(*Lun) != m_attachedDisks.end())
+        while (m_attachedDisks.find(Lun) != m_attachedDisks.end())
         {
-            (*Lun)++;
+            Lun++;
         }
 
         bool vhdAdded = false;
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             if (vhdAdded)
             {
-                wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), *Lun);
+                wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), Lun);
             }
 
             if (disk.AccessGranted)
@@ -609,12 +617,12 @@ try
         });
 
         auto result =
-            wil::ResultFromException([&]() { wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly); });
+            wil::ResultFromException([&]() { wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, Lun, ReadOnly); });
 
         if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && !disk.AccessGranted)
         {
             grantDiskAccess();
-            wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly);
+            wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, Lun, ReadOnly);
         }
         else
         {
@@ -626,7 +634,7 @@ try
         WSLA_GET_DISK message{};
         message.Header.MessageSize = sizeof(message);
         message.Header.MessageType = WSLA_GET_DISK::Type;
-        message.ScsiLun = *Lun;
+        message.ScsiLun = Lun;
         const auto& response = m_initChannel.Transaction(message);
 
         THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to attach disk, init returned: %lu", response.Result);
@@ -634,35 +642,19 @@ try
         cleanup.release();
 
         disk.Device = response.Buffer;
-        m_attachedDisks.emplace(*Lun, std::move(disk));
-
-        *Device = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(response.Buffer).release();
+        Device = disk.Device;
+        m_attachedDisks.emplace(Lun, std::move(disk));
     });
 
     WSL_LOG(
         "WSLAAttachDisk",
         TraceLoggingValue(Path, "Path"),
         TraceLoggingValue(ReadOnly, "ReadOnly"),
-        TraceLoggingValue(*Device == nullptr ? "<null>" : *Device, "Device"),
+        TraceLoggingValue(Device.c_str(), "Device"),
         TraceLoggingValue(result, "Result"));
 
-    return result;
+    return {Lun, Device};
 }
-CATCH_RETURN();
-
-HRESULT WSLAVirtualMachine::Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)
-try
-{
-    THROW_HR_IF(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~(WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs)));
-
-    std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
-
-    THROW_HR_IF(E_FAIL, MountImpl(m_initChannel, Source, Target, Type, Options, Flags) != 0);
-
-    return S_OK;
-}
-CATCH_RETURN();
 
 HRESULT WSLAVirtualMachine::Unmount(_In_ const char* Path)
 try
@@ -893,7 +885,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     return process;
 }
 
-int32_t WSLAVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
+void WSLAVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
 {
     static_assert(WslMountFlagsNone == WSLA_MOUNT::None);
     static_assert(WslMountFlagsChroot == WSLA_MOUNT::Chroot);
@@ -925,7 +917,7 @@ int32_t WSLAVirtualMachine::MountImpl(shared::SocketChannel& Channel, LPCSTR Sou
         TraceLoggingValue(Flags, "Flags"),
         TraceLoggingValue(response.Result, "Result"));
 
-    return response.Result;
+    THROW_HR_IF(E_FAIL, response.Result != 0);
 }
 
 int32_t WSLAVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel)
@@ -1175,7 +1167,7 @@ try
     auto mountOptions =
         std::format("msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, fd, fd, shareNameUtf8);
 
-    THROW_HR_IF(E_FAIL, MountImpl(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags) != 0);
+    Mount(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags);
 
     deleteOnFailure.release();
     return S_OK;
@@ -1250,7 +1242,7 @@ try
         options += ":" + inboxLibMountPoint.value();
     }
 
-    RETURN_IF_FAILED(Mount("none", LibrariesMountPoint, "overlay", options.c_str(), Flags));
+    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), Flags);
     return S_OK;
 }
 CATCH_RETURN();
