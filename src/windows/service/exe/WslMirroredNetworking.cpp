@@ -208,6 +208,94 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessIpAddressChange()
     }
 }
 
+// Helper function to find the source address on the same subnet as the next-hop.
+// Uses longest prefix match to select the most specific matching subnet when multiple addresses match.
+static std::optional<SOCKADDR_INET> FindSourceAddressForNextHop(
+    const SOCKADDR_INET& nextHop,
+    const std::set<wsl::core::networking::EndpointIpAddress>& addresses)
+{
+    std::optional<SOCKADDR_INET> bestMatch;
+    unsigned char longestPrefix = 0;
+
+    for (const auto& addr : addresses)
+    {
+        // Skip if address family doesn't match
+        if (addr.Address.si_family != nextHop.si_family)
+        {
+            continue;
+        }
+
+        // Skip if this prefix is shorter than our best match
+        if (addr.PrefixLength < longestPrefix)
+        {
+            continue;
+        }
+
+        bool matches = false;
+
+        if (nextHop.si_family == AF_INET)
+        {
+            // Handle IPv4 prefix matching with mask generation
+            uint32_t mask;
+            if (addr.PrefixLength == 0)
+            {
+                // Match any address (0.0.0.0/0)
+                mask = 0;
+            }
+            else if (addr.PrefixLength >= 32)
+            {
+                // Exact match required
+                mask = 0xFFFFFFFF;
+            }
+            else
+            {
+                // Generate mask for prefix length (e.g., /24 -> 0xFFFFFF00)
+                mask = 0xFFFFFFFF << (32 - addr.PrefixLength);
+            }
+
+            // Compare network portions (convert to host byte order for masking)
+            uint32_t addrNetwork = ntohl(addr.Address.Ipv4.sin_addr.S_un.S_addr) & mask;
+            uint32_t nextHopNetwork = ntohl(nextHop.Ipv4.sin_addr.S_un.S_addr) & mask;
+
+            matches = (addrNetwork == nextHopNetwork);
+        }
+        else if (nextHop.si_family == AF_INET6)
+        {
+            // Optimized IPv6 prefix matching using byte-by-byte comparison with memcmp and partial byte masking
+            matches = true;
+            int remainingBits = addr.PrefixLength;
+            const uint8_t* addrBytes = addr.Address.Ipv6.sin6_addr.u.Byte;
+            const uint8_t* nextHopBytes = nextHop.Ipv6.sin6_addr.u.Byte;
+
+            // Process full bytes first (faster than bit-by-bit)
+            int fullBytes = remainingBits / 8;
+            if (fullBytes > 0 && memcmp(addrBytes, nextHopBytes, fullBytes) != 0)
+            {
+                matches = false;
+            }
+            else if (remainingBits % 8 != 0)
+            {
+                // Handle partial byte at the end
+                int partialBits = remainingBits % 8;
+                uint8_t mask = 0xFF << (8 - partialBits);
+                if ((addrBytes[fullBytes] & mask) != (nextHopBytes[fullBytes] & mask))
+                {
+                    matches = false;
+                }
+            }
+        }
+
+        if (matches)
+        {
+            // Found a better match (longer prefix)
+            bestMatch = addr.Address;
+            longestPrefix = addr.PrefixLength;
+        }
+    }
+
+    return bestMatch;
+}
+
 _Requires_lock_held_(m_networkLock)
 void wsl::core::networking::WslMirroredNetworkManager::ProcessRouteChange()
 {
@@ -374,6 +462,15 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessRouteChange()
                 ZeroMemory(&newRoute.NextHop, sizeof newRoute.NextHop);
                 newRoute.NextHop.si_family = route.NextHop.si_family;
                 newRoute.NextHopString = windows::common::string::SockAddrInetToWstring(newRoute.NextHop);
+
+                // Find and set the preferred source address from the same subnet as the next-hop
+                // This ensures correct source address selection for multi-IP interfaces
+                auto sourceAddr = FindSourceAddressForNextHop(route.NextHop, endpoint.Network->IpAddresses);
+                if (sourceAddr.has_value())
+                {
+                    newRoute.PreferredSource = sourceAddr.value();
+                    newRoute.PreferredSourceString = windows::common::string::SockAddrInetToWstring(newRoute.PreferredSource);
+                }
 
                 // force a copy so the route strings are re-calculated in the new EndpointRoute object
                 newRoutes.emplace_back(std::move(newRoute));
