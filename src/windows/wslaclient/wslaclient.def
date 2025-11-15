@@ -3,8 +3,6 @@ LIBRARY wslaclient
 EXPORTS
     WslGetVersion
     WslCreateVirtualMachine
-    WslAttachDisk
-    WslMount
     WslCreateLinuxProcess
     WslWaitForLinuxProcess
     WslSignalLinuxProcess

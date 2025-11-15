@@ -96,31 +96,12 @@ struct WslDiskAttachSettings
     bool ReadOnly;
 };
 
-struct WslAttachedDiskInformation
-{
-    ULONG ScsiLun;
-    char Device[10];
-};
-
-HRESULT WslAttachDisk(WslVirtualMachineHandle VirtualMachine, const struct WslDiskAttachSettings* Settings, struct WslAttachedDiskInformation* AttachedDisk);
-
 enum WslMountFlags
 {
     WslMountFlagsNone = 0,
     WslMountFlagsChroot = 1,
     WslMountFlagsWriteableOverlayFs = 2,
 };
-
-struct WslMountSettings
-{
-    const char* Device;
-    const char* Target;
-    const char* Type;
-    const char* Options;
-    uint32_t Flags;
-};
-
-HRESULT WslMount(WslVirtualMachineHandle VirtualMachine, const struct WslMountSettings* Settings);
 
 enum WslFdType
 {

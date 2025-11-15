@@ -166,8 +166,6 @@ interface IWSLAProcess : IUnknown
 ]
 interface IWSLAVirtualMachine : IUnknown
 {
-    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device, [out] ULONG* Lun);
-    HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
     HRESULT CreateLinuxProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
     HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
     HRESULT Signal([in] LONG Pid, [in] int Signal);
@@ -194,6 +192,8 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
     BOOL EnableDebugShell;
     BOOL EnableEarlyBootDmesg;
     BOOL EnableGPU;
+    LPCWSTR RootVhd; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
+    LPCSTR RootVhdType; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
 } VIRTUAL_MACHINE_SETTINGS;
 
 

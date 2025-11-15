@@ -36,8 +36,6 @@ public:
     void Start();
     void OnSessionTerminating();
 
-    IFACEMETHOD(AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly, _Out_ LPSTR* Device, _Out_ ULONG* Lun)) override;
-    IFACEMETHOD(Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags)) override;
     IFACEMETHOD(CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
@@ -62,12 +60,15 @@ private:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    static int32_t MountImpl(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
+
+    static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
     static bool ParseTtyInformation(
         const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl);
 
     void ConfigureNetworking();
+    void ConfigureMounts();
     void OnExit(_In_ const HCS_EVENT* Event);
     void OnCrash(_In_ const HCS_EVENT* Event);
 
