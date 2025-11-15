@@ -101,6 +101,7 @@ private:
 
     VIRTUAL_MACHINE_SETTINGS m_settings;
     std::thread m_processExitThread;
+    std::thread m_crashDumpCollectionThread;
 
     GUID m_vmId{};
     std::wstring m_vmIdString;
@@ -118,9 +119,6 @@ private:
     std::filesystem::path m_crashDumpFolder;
     bool m_vmSavedStateCaptured = false;
     bool m_crashLogCaptured = false;
-
-    wil::srwlock m_lock;
-    _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
 
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
