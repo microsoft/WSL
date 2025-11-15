@@ -40,7 +40,12 @@ $FilePatterns = "\.(h|cpp|hpp|c|hxx)$"
 
 $IgnoreFolders = "(out|.git|.vs|.vscode|bin|CMakeFiles|generated|debug|x64|packages|_deps)$"
 
-$RepoRoot = (Resolve-Path "$PSScriptRoot")
+# Handle both execution methods: direct PowerShell and powershell.exe script invocation
+if ([string]::IsNullOrEmpty($PSScriptRoot)) {
+    $RepoRoot = (Get-Location).Path
+} else {
+    $RepoRoot = (Resolve-Path "$PSScriptRoot")
+}
 
 <#
 .SYNOPSIS
@@ -170,9 +175,9 @@ function Format-Directory {
         $FilesToFormat = @()
         if ((Get-Item -Path $Path) -is [System.IO.DirectoryInfo]) {
             Get-ChildItem -Path $Path -File `
-            | Where-Object { $_ -match $FilePatterns } `
+            | Where-Object { $_.Name -match $FilePatterns } `
             | ForEach-Object {
-                $FilePath = "$Path\$_"
+                $FilePath = "$Path\$($_.Name)"
                 if (($null -eq $ModifiedFiles) -or ($ModifiedFiles -contains $FilePath)) {
                     if (!($FilePath -match "Intermediate")) {
                         $FilesToFormat += $FilePath
@@ -180,9 +185,9 @@ function Format-Directory {
                 }
             }
             Get-ChildItem -Path $Path -Directory `
-            | Where-Object { $_ -notmatch $IgnoreFolders } `
+            | Where-Object { $_.Name -notmatch $IgnoreFolders } `
             | ForEach-Object {
-                $SubResult = (Format-Directory -Path "$Path\$_" `
+                $SubResult = (Format-Directory -Path "$Path\$($_.Name)" `
                         -ClangFormat $ClangFormat `
                         -RepoRoot $RepoRoot `
                         -FilePatterns $FilePatterns `

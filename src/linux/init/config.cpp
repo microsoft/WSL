@@ -955,6 +955,7 @@ try
     //
 
     if (Config.InitPid.has_value())
+    {
         try
         {
             std::string LinkPath = std::format(WSL_INTEROP_SOCKET_FORMAT, WSL_TEMP_FOLDER, 1, WSL_INTEROP_SOCKET);
@@ -963,7 +964,8 @@ try
                 LOG_ERROR("symlink({}, {}) failed {}", InteropServer.Path(), LinkPath.c_str(), errno);
             }
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     UtilCreateWorkerThread(
         "Interop", [InteropChannel = std::move(InteropChannel), InteropServer = std::move(InteropServer), Elevated, &Config]() mutable {

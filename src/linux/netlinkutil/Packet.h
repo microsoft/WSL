@@ -31,10 +31,14 @@ public:
     bool adjust_head(long count)
     {
         if ((count + data_offset) < 0)
+        {
             return false;
+        }
 
         if ((count + data_offset) > data_end_offset)
+        {
             return false;
+        }
 
         data_offset += count;
         return true;
@@ -43,9 +47,13 @@ public:
     bool adjust_tail(long count)
     {
         if ((count + data_end_offset) < data_offset)
+        {
             return false;
+        }
         if ((count + data_end_offset) > Buffer.size())
+        {
             Buffer.resize(count + data_end_offset);
+        }
 
         data_end_offset += count;
         return true;
