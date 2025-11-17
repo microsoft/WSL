@@ -559,7 +559,6 @@ class WSLATests
         // Validate that the same port can't be bound twice
         VERIFY_ARE_EQUAL(vm->MapPort(AF_INET, 1234, 80, false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
-
         // Check simple case
         listen(80, "port80", false);
         expectContent(1234, AF_INET, "port80");
