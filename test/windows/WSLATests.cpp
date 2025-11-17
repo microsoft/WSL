@@ -744,8 +744,6 @@ class WSLATests
         }
     }
 
-    /*
-    TODO: Enable once GPU is available in new api
     TEST_METHOD(GPU)
     {
         WSL2_TEST_ONLY();
@@ -756,6 +754,7 @@ class WSLATests
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.EnableGPU = true;
+        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -765,25 +764,13 @@ class WSLATests
         // Validate that the GPU device is available.
         ExpectCommandResult(session.get(), {"/bin/bash", "-c", "test -c /dev/dxg"}, 0);
 
-
-        // Validate that invalid flags return E_INVALIDARG
-        {
-            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsChroot), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", static_cast<WslMountFlags>(1024)), E_INVALIDARG);
-        }
-
-        // Validate GPU mounts
-        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsNone));
-
         auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
             auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
-            auto [pid, in, out, err] = LaunchCommand(vm.get(), {"/bin/bash", "-c", cmd.c_str()});
+            WSLAProcessLauncher launcher{"/bin/bash", {"/bin/bash", "-c", cmd}};
 
-            auto output = ReadToString((SOCKET)out.get());
-            auto error = ReadToString((SOCKET)err.get());
-
-            WslWaitResult result{};
-            VERIFY_SUCCEEDED(WslWaitForLinuxProcess(vm.get(), pid, INFINITE, &result));
+            auto result = launcher.Launch(*session).WaitAndCaptureOutput();
+            const auto& output = result.Output[1];
+            const auto& error = result.Output[2];
             if (result.Code != (options.has_value() ? 0 : 1))
             {
                 LogError("%hs failed. code=%i, output: %hs, error: %hs", cmd.c_str(), result.Code, output.c_str(), error.c_str());
@@ -802,39 +789,24 @@ class WSLATests
             "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
         expectMount("/usr/lib/wsl/lib", "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
 
-        // Validate that the mount points arenot writeable.
-        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}), 1L);
-        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}), 1L);
-
-        // Create a writeable mount point.
-        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib-rw", "/usr/lib/wsl/drivers-rw", WslMountFlagsWriteableOverlayFs));
-        expectMount(
-            "/usr/lib/wsl/drivers-rw",
-            "/usr/lib/wsl/drivers-rw "
-            "none*overlay*rw,relatime,lowerdir=/usr/lib/wsl/drivers-rw,upperdir=/usr/lib/wsl/drivers-rw-rw/rw/upper,workdir=/usr/"
-            "lib/wsl/drivers-rw-rw/rw/work*");
-        expectMount(
-            "/usr/lib/wsl/lib-rw",
-            "/usr/lib/wsl/lib-rw none*overlay "
-            "rw,relatime,lowerdir=/usr/lib/wsl/lib-rw,upperdir=/usr/lib/wsl/lib-rw-rw/rw/upper,workdir=/usr/lib/wsl/lib-rw-rw/rw/"
-            "work*");
-
-        // Verify that the mountpoints are actually writeable.
-        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib-rw/test"}), 0L);
-        VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers-rw/test"}), 0L);
+        // Validate that the mount points are not writeable.
+        VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 1L);
+        VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 1L);
 
         // Validate that trying to mount the shares without GPU support disabled fails.
         {
-            settings.GPU.Enable = false;
-            auto vm = CreateVm(&settings);
+            settings.EnableGPU = false;
 
-            VERIFY_ARE_EQUAL(
-                WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsNone),
-                HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
+            session = CreateSession(settings);
+
+            wil::com_ptr<IWSLAVirtualMachine> vm;
+            VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
+
+            // Validate that the GPU device is not available.
+            expectMount("/usr/lib/wsl/drivers", {});
+            expectMount("/usr/lib/wsl/lib", {});
         }
     }
-
-    */
 
     TEST_METHOD(Modules)
     {
