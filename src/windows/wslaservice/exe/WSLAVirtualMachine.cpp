@@ -421,11 +421,11 @@ CATCH_LOG();
 
 void WSLAVirtualMachine::ConfigureNetworking()
 {
-    if (m_settings.NetworkingMode == WslNetworkingModeNone)
+    if (m_settings.NetworkingMode == WSLANetworkingModeNone)
     {
         return;
     }
-    else if (m_settings.NetworkingMode == WslNetworkingModeNAT)
+    else if (m_settings.NetworkingMode == WSLANetworkingModeNAT)
     {
         // Launch GNS
         std::vector<WSLA_PROCESS_FD> fds(1);
@@ -523,7 +523,7 @@ void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
 
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
-    WslVirtualMachineTerminationReason reason = WslVirtualMachineTerminationReasonUnknown;
+    auto reason = WSLAlVirtualMachineTerminationReasonUnknown;
 
     if (exitStatus.ExitType.has_value())
     {
@@ -531,20 +531,20 @@ void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
         {
         case hcs::NotificationType::ForcedExit:
         case hcs::NotificationType::GracefulExit:
-            reason = WslVirtualMachineTerminationReasonShutdown;
+            reason = WSLAVirtualMachineTerminationReasonShutdown;
             break;
         case hcs::NotificationType::UnexpectedExit:
-            reason = WslVirtualMachineTerminationReasonCrashed;
+            reason = WSLAVirtualMachineTerminationReasonCrashed;
             break;
         default:
-            reason = WslVirtualMachineTerminationReasonUnknown;
+            reason = WSLAlVirtualMachineTerminationReasonUnknown;
             break;
         }
     }
 
     if (m_terminationCallback)
     {
-        LOG_IF_FAILED(m_terminationCallback->OnTermination(static_cast<ULONG>(reason), Event->EventData));
+        LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, Event->EventData));
     }
 }
 
