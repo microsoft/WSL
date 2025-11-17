@@ -28,9 +28,16 @@ class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
 
 {
 public:
+    struct ConnectedSocket
+    {
+        int Fd;
+        wil::unique_socket Socket;
+    };
+
+    using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
+
     WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, WSLAUserSessionImpl* UserSession);
 
-    // TODO: Clear processes on exit
     ~WSLAVirtualMachine();
 
     void Start();
@@ -51,15 +58,10 @@ public:
 
     void OnProcessReleased(int Pid);
 
+    Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
+        _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
+
 private:
-    struct ConnectedSocket
-    {
-        int Fd;
-        wil::unique_socket Socket;
-    };
-
-    using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
-
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
 
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);

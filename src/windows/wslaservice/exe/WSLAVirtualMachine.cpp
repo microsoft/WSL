@@ -19,6 +19,7 @@ Abstract:
 #include "NatNetworking.h"
 #include "WSLAUserSession.h"
 #include "DnsResolver.h"
+#include "ServiceProcessLauncher.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -472,7 +473,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
             options.CommandLineCount = static_cast<DWORD>(cmd.size());
         };
 
-        auto process = CreateLinuxProcessImpl(options, nullptr, prepareCommandLine);
+        auto process = CreateLinuxProcess(options, nullptr, prepareCommandLine);
 
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
@@ -486,9 +487,9 @@ void WSLAVirtualMachine::ConfigureNetworking()
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
             wsl::core::NatNetworking::CreateNetwork(config),
-            std::move(process->GetSocket(gnsChannelFd)),
+            wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()},
             config,
-            dnsChannelFd != -1 ? std::move(process->GetSocket(dnsChannelFd)) : wil::unique_socket{});
+            dnsChannelFd != -1 ? wil::unique_socket{(SOCKET)process->GetStdHandle(dnsChannelFd).release()} : wil::unique_socket{});
 
         m_networkEngine->Initialize();
 
@@ -772,14 +773,13 @@ void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, cons
 HRESULT WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)
 try
 {
-    CreateLinuxProcessImpl(*Options, Errno).CopyTo(Process);
+    CreateLinuxProcess(*Options, Errno).CopyTo(Process);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
-    _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     auto setErrno = [Errno](int Error) {
         if (Errno != nullptr)
@@ -867,13 +867,13 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
         }
     }
 
-    std::map<int, wil::unique_socket> socketMap;
+    std::map<int, wil::unique_handle> stdHandles;
     for (auto& [fd, socket] : sockets)
     {
-        socketMap.emplace(fd, std::move(socket));
+        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(socket.release()));
     }
 
-    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(socketMap), pid, this);
+    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(stdHandles), pid, this);
 
     {
         std::lock_guard lock{m_lock};
