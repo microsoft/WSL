@@ -25,8 +25,6 @@ using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
 
-using unique_vm = wil::unique_any<WslVirtualMachineHandle, decltype(WslReleaseVirtualMachine), &WslReleaseVirtualMachine>;
-
 class WSLATests
 {
     WSL_TEST_CLASS(WSLATests)
@@ -69,10 +67,12 @@ class WSLATests
 
     TEST_METHOD(GetVersion)
     {
-        auto coinit = wil::CoInitializeEx();
-        WSL_VERSION_INFORMATION version{};
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
 
-        VERIFY_SUCCEEDED(WslGetVersion(&version));
+        WSLA_VERSION version{};
+
+        VERIFY_SUCCEEDED(userSession->GetVersion(&version));
 
         VERIFY_ARE_EQUAL(version.Major, WSL_PACKAGE_VERSION_MAJOR);
         VERIFY_ARE_EQUAL(version.Minor, WSL_PACKAGE_VERSION_MINOR);
@@ -316,7 +316,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
-        settings.NetworkingMode = WslNetworkingModeNAT;
+        settings.NetworkingMode = WSLANetworkingModeNAT;
         settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
@@ -341,7 +341,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
-        settings.NetworkingMode = WslNetworkingModeNAT;
+        settings.NetworkingMode = WSLANetworkingModeNAT;
         settings.EnableDnsTunneling = true;
         settings.RootVhd = testVhd.c_str();
 
@@ -482,7 +482,7 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
-        settings.NetworkingMode = WslNetworkingModeNAT;
+        settings.NetworkingMode = WSLANetworkingModeNAT;
         settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
@@ -554,11 +554,10 @@ class WSLATests
         };
 
         // Map port
-        WslPortMappingSettings port{1234, 80, AF_INET};
-        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &port));
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, false));
 
         // Validate that the same port can't be bound twice
-        VERIFY_ARE_EQUAL(WslMapPort(vm.get(), &port), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        VERIFY_ARE_EQUAL(vm->MapPort(AF_INET, 1234, 80, false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Check simple case
         listen(80, "port80", false);
@@ -572,38 +571,34 @@ class WSLATests
         expectContent(1234, AF_INET, "");
 
         // Add a ipv6 binding
-        WslPortMappingSettings portv6{1234, 80, AF_INET6};
-        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &portv6));
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1234, 80, false));
 
         // Validate that ipv6 bindings work as well.
         listen(80, "port80ipv6", true);
         expectContent(1234, AF_INET6, "port80ipv6");
 
         // Unmap the ipv4 port
-        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &port));
-        expectNotBound(1234, AF_INET);
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, true));
 
         // Verify that a proper error is returned if the mapping doesn't exist
-        VERIFY_ARE_EQUAL(WslUnmapPort(vm.get(), &port), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(vm->MapPort(AF_INET, 1234, 80, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Unmap the v6 port
-        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &portv6));
-        expectNotBound(1234, AF_INET6);
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1234, 80, true));
 
         // Map another port as v6 only
-        WslPortMappingSettings portv6Only{1235, 81, AF_INET6};
-        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &portv6Only));
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1235, 81, false));
 
         listen(81, "port81ipv6", true);
         expectContent(1235, AF_INET6, "port81ipv6");
         expectNotBound(1235, AF_INET);
 
-        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &portv6Only));
-        VERIFY_ARE_EQUAL(WslUnmapPort(vm.get(), &portv6Only), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1235, 81, true));
+        VERIFY_ARE_EQUAL(vm->MapPort(AF_INET6, 1235, 81, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         expectNotBound(1235, AF_INET6);
 
         // Create a forking relay and stress test
-        VERIFY_SUCCEEDED(WslMapPort(vm.get(), &port));
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, false));
 
         auto process =
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
@@ -616,7 +611,7 @@ class WSLATests
             expectContent(1234, AF_INET, "OK");
         }
 
-        VERIFY_SUCCEEDED(WslUnmapPort(vm.get(), &port));
+        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, true));
     }
 
     TEST_METHOD(StuckVmTermination)
@@ -683,45 +678,45 @@ class WSLATests
 
         // Validate writeable mount.
         {
-            VERIFY_SUCCEEDED(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", false));
+            VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
             expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
 
             // Validate that mount can't be stacked on each other
-            VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that folder is writeable from linux
             ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo -n content > /win-path/file.txt && sync"}, 0);
             VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
 
-            VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
+            VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
             expectMount("/win-path", {});
         }
 
         // Validate read-only mount.
         {
-            VERIFY_SUCCEEDED(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
             expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
 
             // Validate that folder is not writeable from linux
             ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
-            VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
+            VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
             expectMount("/win-path", {});
         }
 
         // Validate various error paths
         {
-            VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), L"relative-path", "/win-path", true), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(WslMountWindowsFolder(vm.get(), L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
-            VERIFY_ARE_EQUAL(WslUnmountWindowsFolder(vm.get(), "/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            VERIFY_ARE_EQUAL(WslUnmountWindowsFolder(vm.get(), "/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(vm->MountWindowsFolder(L"relative-path", "/win-path", true), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(vm->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(vm->UnmountWindowsFolder("/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(vm->UnmountWindowsFolder("/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             // Validate that folders that are manually unmounted from the guest are handled properly
-            VERIFY_SUCCEEDED(WslMountWindowsFolder(vm.get(), testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
             expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
 
             ExpectCommandResult(session.get(), {"/usr/bin/umount", "/win-path"}, 0);
-            VERIFY_SUCCEEDED(WslUnmountWindowsFolder(vm.get(), "/win-path"));
+            VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
         }
     }
 

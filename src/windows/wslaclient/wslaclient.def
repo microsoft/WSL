@@ -1,22 +1,6 @@
 LIBRARY wslaclient
 
 EXPORTS
-    WslGetVersion
-    WslCreateVirtualMachine
-    WslCreateLinuxProcess
-    WslWaitForLinuxProcess
-    WslSignalLinuxProcess
-    WslReleaseVirtualMachine
-    WslShutdownVirtualMachine
-    WslLaunchInteractiveTerminal
-    WslLaunchDebugShell
-    WslMapPort
-    WslUnmapPort
-    WslDetachDisk
-    WslUnmount
     WslQueryMissingComponents
     WslInstallComponents
     WslSetPackageUrl
-    WslMountWindowsFolder
-    WslUnmountWindowsFolder
-    WslMountGpuLibraries

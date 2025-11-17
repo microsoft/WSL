@@ -1542,7 +1542,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.DisplayName = L"WSLA";
     settings.MemoryMb = 1024;
     settings.BootTimeoutMs = 30000;
-    settings.NetworkingMode = WslNetworkingModeNAT;
+    settings.NetworkingMode = WSLANetworkingModeNAT;
     std::string shell = "/bin/bash";
     std::string fsType = "ext4";
     bool help = false;

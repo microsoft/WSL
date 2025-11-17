@@ -21,11 +21,11 @@ cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLAUse
 cpp_quote("#endif")
 
 typedef
-struct _WSL_VERSION {
+struct _WSLA_VERSION {
     ULONG Major;
     ULONG Minor;
     ULONG Revision;
-} WSL_VERSION;
+} WSLA_VERSION;
 
 typedef struct _WSLA_PROCESS_FD
 {
@@ -40,6 +40,13 @@ struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
    int Pid;
 } WSLA_CREATE_PROCESS_RESULT;
 
+typedef enum _WSLAVirtualMachineTerminationReason
+{
+    WSLAlVirtualMachineTerminationReasonUnknown,
+    WSLAVirtualMachineTerminationReasonShutdown,
+    WSLAVirtualMachineTerminationReasonCrashed,
+} WSLAVirtualMachineTerminationReason;
+
 [
     uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
     pointer_default(unique),
@@ -47,7 +54,7 @@ struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
 ]
 interface ITerminationCallback : IUnknown
 {
-    HRESULT OnTermination(ULONG Reason, LPCWSTR Details);
+    HRESULT OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details);
 };
 
 [
@@ -180,6 +187,12 @@ interface IWSLAVirtualMachine : IUnknown
     HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
 }
 
+typedef enum _WSLANetworkingMode
+{
+    WSLANetworkingModeNone,
+    WSLANetworkingModeNAT
+} WSLANetworkingMode;
+
 typedef
 struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
     LPCWSTR DisplayName;
@@ -187,7 +200,7 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
     ULONG CpuCount;
     ULONG BootTimeoutMs;
     ULONG DmesgOutput;
-    ULONG NetworkingMode;
+    WSLANetworkingMode NetworkingMode;
     BOOL EnableDnsTunneling;
     BOOL EnableDebugShell;
     BOOL EnableEarlyBootDmesg;
@@ -273,7 +286,7 @@ struct WSLA_SESSION_INFORMATION
 ]
 interface IWSLAUserSession : IUnknown
 {
-    HRESULT GetVersion([out] WSL_VERSION* Error);
+    HRESULT GetVersion([out] WSLA_VERSION* Version);
     HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine); // TODO: Delete once the new API is wired.
 
     // Session managment.
