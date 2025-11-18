@@ -204,6 +204,9 @@ void WSLAVirtualMachine::Start()
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
+    // Enable crash dump collection.
+    kernelCmdLine += L" " WSL_ENABLE_CRASH_DUMP_ENV L"=1";
+
     wil::unique_handle dmesgOutput;
     if (m_settings.DmesgOutput != 0)
     {

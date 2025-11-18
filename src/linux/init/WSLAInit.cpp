@@ -16,6 +16,7 @@ Abstract:
 #include "SocketChannel.h"
 #include "message.h"
 #include "localhost.h"
+#include "common.h"
 #include <utmp.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
@@ -51,6 +52,9 @@ extern int SetCloseOnExec(int Fd, bool Enable);
 int Chroot(const char* Target);
 
 extern int g_LogFd;
+
+static bool g_EnableCrashDumpCollection = false;
+extern void EnableCrashDumpCollection();
 
 struct WSLAState
 {
@@ -496,6 +500,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
+
+            // Reconfigure crash dump collection after chroot so symlink & core_pattern resolve correctly.
+            if (g_EnableCrashDumpCollection)
+            {
+                EnableCrashDumpCollection();
+            }
         }
 
         response.Result = 0;
@@ -794,6 +804,21 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     if (UtilMount(nullptr, "/sys", "sysfs", 0, nullptr) < 0)
     {
         return -1;
+    }
+
+    // Ensure /init is present and bind-mounted.
+    THROW_LAST_ERROR_IF(MountInit(LX_INIT_PATH) < 0);
+
+    // Enable crash dump collection if requested.
+    if (getenv(WSL_ENABLE_CRASH_DUMP_ENV))
+    {
+        g_EnableCrashDumpCollection = true;
+        EnableCrashDumpCollection();
+
+        if (unsetenv(WSL_ENABLE_CRASH_DUMP_ENV) < 0)
+        {
+            LOG_ERROR("unsetenv failed {}", errno);
+        }
     }
 
     //
