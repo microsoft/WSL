@@ -368,7 +368,7 @@ void WSLAVirtualMachine::ConfigureMounts()
 {
     auto [_, device] = AttachDisk(m_settings.RootVhd, true);
 
-    Mount(m_initChannel, device.c_str(), "/mnt", m_settings.RootVhdType, "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs);
+    Mount(m_initChannel, device.c_str(), "/mnt", m_settings.RootVhdType, "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
     Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
@@ -431,14 +431,14 @@ void WSLAVirtualMachine::ConfigureNetworking()
         // Launch GNS
         std::vector<WSLA_PROCESS_FD> fds(1);
         fds[0].Fd = -1;
-        fds[0].Type = WslFdType::WslFdTypeDefault;
+        fds[0].Type = WSLAFdType::WSLAFdTypeDefault;
 
         std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
 
         // If DNS tunnelling is enabled, use an additional for its channel.
         if (m_settings.EnableDnsTunneling)
         {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = -1, .Type = WslFdType::WslFdTypeDefault});
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
             THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
         }
 
@@ -755,10 +755,10 @@ WSLAVirtualMachine::ConnectedSocket WSLAVirtualMachine::ConnectSocket(wsl::share
 
 void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)
 {
-    static_assert(WslFdTypeLinuxFileInput == WslaOpenFlagsRead);
-    static_assert(WslFdTypeLinuxFileOutput == WslaOpenFlagsWrite);
-    static_assert(WslFdTypeLinuxFileAppend == WslaOpenFlagsAppend);
-    static_assert(WslFdTypeLinuxFileCreate == WslaOpenFlagsCreate);
+    static_assert(WSLAFdTypeLinuxFileInput == WslaOpenFlagsRead);
+    static_assert(WSLAFdTypeLinuxFileOutput == WslaOpenFlagsWrite);
+    static_assert(WSLAFdTypeLinuxFileAppend == WslaOpenFlagsAppend);
+    static_assert(WSLAFdTypeLinuxFileCreate == WslaOpenFlagsCreate);
 
     shared::MessageWriter<WSLA_OPEN> message;
     message->Fd = Fd;
@@ -798,8 +798,8 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     std::vector<WSLAVirtualMachine::ConnectedSocket> sockets;
     for (size_t i = 0; i < Options.FdsCount; i++)
     {
-        if (Options.Fds[i].Type == WslFdTypeDefault || Options.Fds[i].Type == WslFdTypeTerminalInput ||
-            Options.Fds[i].Type == WslFdTypeTerminalOutput || Options.Fds[i].Type == WslFdTypeTerminalControl)
+        if (Options.Fds[i].Type == WSLAFdTypeDefault || Options.Fds[i].Type == WSLAFdTypeTerminalInput ||
+            Options.Fds[i].Type == WSLAFdTypeTerminalOutput || Options.Fds[i].Type == WSLAFdTypeTerminalControl)
         {
             THROW_HR_IF_MSG(
                 E_INVALIDARG, Options.Fds[i].Path != nullptr, "Fd[%zu] has a non-null path but flags: %i", i, Options.Fds[i].Type);
@@ -809,7 +809,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
         {
             THROW_HR_IF_MSG(
                 E_INVALIDARG,
-                WI_IsAnyFlagSet(Options.Fds[i].Type, WslFdTypeTerminalInput | WslFdTypeTerminalOutput | WslFdTypeTerminalControl),
+                WI_IsAnyFlagSet(Options.Fds[i].Type, WSLAFdTypeTerminalInput | WSLAFdTypeTerminalOutput | WSLAFdTypeTerminalControl),
                 "Invalid flags: %i",
                 Options.Fds[i].Type);
 
@@ -887,9 +887,9 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
 
 void WSLAVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
 {
-    static_assert(WslMountFlagsNone == WSLA_MOUNT::None);
-    static_assert(WslMountFlagsChroot == WSLA_MOUNT::Chroot);
-    static_assert(WslMountFlagsWriteableOverlayFs == WSLA_MOUNT::OverlayFs);
+    static_assert(WSLAMountFlagsNone == WSLA_MOUNT::None);
+    static_assert(WSLAMountFlagsChroot == WSLA_MOUNT::Chroot);
+    static_assert(WSLAMountFlagsWriteableOverlayFs == WSLA_MOUNT::OverlayFs);
 
     wsl::shared::MessageWriter<WSLA_MOUNT> message;
 
@@ -1008,17 +1008,17 @@ bool WSLAVirtualMachine::ParseTtyInformation(
 
     for (ULONG i = 0; i < FdCount; i++)
     {
-        if (Fds[i].Type == WslFdTypeTerminalInput)
+        if (Fds[i].Type == WSLAFdTypeTerminalInput)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyInput != nullptr, "Only one TtyInput fd can be passed. Index=%lu", i);
             *TtyInput = &Fds[i];
         }
-        else if (Fds[i].Type == WslFdTypeTerminalOutput)
+        else if (Fds[i].Type == WSLAFdTypeTerminalOutput)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyOutput != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
             *TtyOutput = &Fds[i];
         }
-        else if (Fds[i].Type == WslFdTypeTerminalControl)
+        else if (Fds[i].Type == WSLAFdTypeTerminalControl)
         {
             THROW_HR_IF_MSG(E_INVALIDARG, *TtyControl != nullptr, "Only one TtyOutput fd can be passed. Index=%lu", i);
             *TtyControl = &Fds[i];
@@ -1112,10 +1112,10 @@ CATCH_RETURN();
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
 {
-    return MountWindowsFolderImpl(WindowsPath, LinuxPath, ReadOnly, WslMountFlagsNone);
+    return MountWindowsFolderImpl(WindowsPath, LinuxPath, ReadOnly, WSLAMountFlagsNone);
 }
 
-HRESULT WSLAVirtualMachine::MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags)
+HRESULT WSLAVirtualMachine::MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WSLAMountFlags Flags)
 try
 {
     std::filesystem::path Path(WindowsPath);
@@ -1199,7 +1199,7 @@ CATCH_RETURN();
 HRESULT WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)
 try
 {
-    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WslMountFlagsWriteableOverlayFs), "Unexpected flags: %lu", Flags);
+    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLAMountFlagsWriteableOverlayFs), "Unexpected flags: %lu", Flags);
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);
 
@@ -1209,7 +1209,7 @@ try
 
     // Mount drivers.
     RETURN_IF_FAILED(MountWindowsFolderImpl(
-        std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, true, static_cast<WslMountFlags>(Flags)));
+        std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, true, static_cast<WSLAMountFlags>(Flags)));
 
     // Mount the inbox libraries.
     auto inboxLibPath = std::format(L"{}\\System32\\lxss\\lib", windowsPath);

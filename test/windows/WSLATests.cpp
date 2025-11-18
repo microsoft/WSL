@@ -266,9 +266,9 @@ class WSLATests
         auto session = CreateSession(settings);
 
         WSLAProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, ProcessFlags::None);
-        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeTerminalInput});
-        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeTerminalOutput});
-        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeTerminalControl});
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
 
         auto process = launcher.Launch(*session);
 
@@ -377,7 +377,7 @@ class WSLATests
         struct FileFd
         {
             int Fd;
-            WslFdType Flags;
+            WSLAFdType Flags;
             const char* Path;
         };
 
@@ -396,7 +396,8 @@ class WSLATests
         };
 
         {
-            auto process = createProcess({"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WslFdTypeDefault, nullptr}});
+            auto process =
+                createProcess({"/bin/cat"}, {{0, WSLAFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WSLAFdTypeDefault, nullptr}});
 
             VERIFY_ARE_EQUAL(process->WaitAndCaptureOutput().Output[1], "cat\n");
         }
@@ -404,15 +405,16 @@ class WSLATests
         {
 
             auto read = [&]() {
-                auto process = createProcess({"/bin/cat"}, {{0, WslFdTypeLinuxFileInput, "/tmp/output"}, {1, WslFdTypeDefault, nullptr}});
+                auto process =
+                    createProcess({"/bin/cat"}, {{0, WSLAFdTypeLinuxFileInput, "/tmp/output"}, {1, WSLAFdTypeDefault, nullptr}});
                 return process->WaitAndCaptureOutput().Output[1];
             };
 
             // Write to a new file.
             auto process = createProcess(
                 {"/bin/cat"},
-                {{0, WslFdTypeDefault, nullptr},
-                 {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileCreate), "/tmp/output"}});
+                {{0, WSLAFdTypeDefault, nullptr},
+                 {1, static_cast<WSLAFdType>(WSLAFdTypeLinuxFileOutput | WSLAFdTypeLinuxFileCreate), "/tmp/output"}});
 
             constexpr auto content = "TestOutput";
             VERIFY_IS_TRUE(WriteFile(process->GetStdHandle(0).get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
@@ -424,8 +426,8 @@ class WSLATests
             // Append content to the same file
             auto appendProcess = createProcess(
                 {"/bin/cat"},
-                {{0, WslFdTypeDefault, nullptr},
-                 {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput | WslFdTypeLinuxFileAppend), "/tmp/output"}});
+                {{0, WSLAFdTypeDefault, nullptr},
+                 {1, static_cast<WSLAFdType>(WSLAFdTypeLinuxFileOutput | WSLAFdTypeLinuxFileAppend), "/tmp/output"}});
 
             VERIFY_IS_TRUE(WriteFile(appendProcess->GetStdHandle(0).get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
             VERIFY_ARE_EQUAL(appendProcess->WaitAndCaptureOutput().Code, 0);
@@ -435,7 +437,7 @@ class WSLATests
             // Truncate the file
             auto truncProcess = createProcess(
                 {"/bin/cat"},
-                {{0, WslFdTypeDefault, nullptr}, {1, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/output"}});
+                {{0, WSLAFdTypeDefault, nullptr}, {1, static_cast<WSLAFdType>(WSLAFdTypeLinuxFileOutput), "/tmp/output"}});
 
             VERIFY_IS_TRUE(WriteFile(truncProcess->GetStdHandle(0).get(), content, static_cast<DWORD>(strlen(content)), nullptr, nullptr));
             VERIFY_ARE_EQUAL(truncProcess->WaitAndCaptureOutput().Code, 0);
@@ -445,19 +447,19 @@ class WSLATests
 
         // Test various error paths
         {
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), "/tmp/DoesNotExist"}}, E_FAIL);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeDefault), "should-be-null"}}, E_INVALIDARG);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeDefault | WslFdTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
-            createProcess({"/bin/cat"}, {{0, static_cast<WslFdType>(WslFdTypeLinuxFileInput | WslFdTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WSLAFdType>(WSLAFdTypeLinuxFileOutput), "/tmp/DoesNotExist"}}, E_FAIL);
+            createProcess({"/bin/cat"}, {{0, static_cast<WSLAFdType>(WSLAFdTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WSLAFdType>(WSLAFdTypeDefault), "should-be-null"}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WSLAFdType>(WSLAFdTypeDefault | WSLAFdTypeLinuxFileOutput), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WSLAFdType>(WSLAFdTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
+            createProcess({"/bin/cat"}, {{0, static_cast<WSLAFdType>(WSLAFdTypeLinuxFileInput | WSLAFdTypeLinuxFileAppend), nullptr}}, E_INVALIDARG);
         }
 
         // Validate that read & write modes are respected
         {
             auto process = createProcess(
                 {"/bin/cat"},
-                {{0, WslFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WslFdTypeLinuxFileInput, "/tmp/output"}, {2, WslFdTypeDefault, nullptr}});
+                {{0, WSLAFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WSLAFdTypeLinuxFileInput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
 
             auto result = process->WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: write error: Bad file descriptor\n");
@@ -465,7 +467,7 @@ class WSLATests
         }
 
         {
-            auto process = createProcess({"/bin/cat"}, {{0, WslFdTypeLinuxFileOutput, "/tmp/output"}, {2, WslFdTypeDefault, nullptr}});
+            auto process = createProcess({"/bin/cat"}, {{0, WSLAFdTypeLinuxFileOutput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
             auto result = process->WaitAndCaptureOutput();
 
             VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: standard output: Bad file descriptor\n");
@@ -768,12 +770,12 @@ class WSLATests
 
         // Validate that invalid flags return E_INVALIDARG
         {
-            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsChroot), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", static_cast<WslMountFlags>(1024)), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsChroot), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", static_cast<WSLAMountFlags>(1024)), E_INVALIDARG);
         }
 
         // Validate GPU mounts
-        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsNone));
+        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsNone));
 
         auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
             auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
@@ -807,7 +809,7 @@ class WSLATests
         VERIFY_ARE_EQUAL(RunCommand(vm.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}), 1L);
 
         // Create a writeable mount point.
-        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib-rw", "/usr/lib/wsl/drivers-rw", WslMountFlagsWriteableOverlayFs));
+        VERIFY_SUCCEEDED(WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib-rw", "/usr/lib/wsl/drivers-rw", WSLAMountFlagsWriteableOverlayFs));
         expectMount(
             "/usr/lib/wsl/drivers-rw",
             "/usr/lib/wsl/drivers-rw "
@@ -829,7 +831,7 @@ class WSLATests
             auto vm = CreateVm(&settings);
 
             VERIFY_ARE_EQUAL(
-                WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WslMountFlagsNone),
+                WslMountGpuLibraries(vm.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsNone),
                 HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE));
         }
     }
