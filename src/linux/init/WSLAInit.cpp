@@ -18,6 +18,7 @@ Abstract:
 #include "localhost.h"
 #include "common.h"
 #include <utmp.h>
+#include <unistd.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
@@ -54,7 +55,7 @@ int Chroot(const char* Target);
 extern int g_LogFd;
 
 static bool g_EnableCrashDumpCollection = false;
-extern void EnableCrashDumpCollection();
+extern void WSLAEnableCrashDumpCollection();
 
 struct WSLAState
 {
@@ -62,6 +63,19 @@ struct WSLAState
 };
 
 static WSLAState g_state;
+
+void WSLAEnableCrashDumpCollection()
+{
+    if (symlink("/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0)
+    {
+        LOG_ERROR("symlink({}, {}) failed {}", "/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH, errno);
+        return;
+    }
+
+    // If the first character is a pipe, then the kernel will interpret this path as a command.
+    constexpr auto core_pattern = "|/" LX_INIT_WSL_CAPTURE_CRASH " %t %E %p %s";
+    WriteToFile("/proc/sys/kernel/core_pattern", core_pattern);
+}
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
 {
@@ -504,7 +518,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
             // Reconfigure crash dump collection after chroot so symlink & core_pattern resolve correctly.
             if (g_EnableCrashDumpCollection)
             {
-                EnableCrashDumpCollection();
+                WSLAEnableCrashDumpCollection();
             }
         }
 
@@ -810,7 +824,7 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     if (getenv(WSL_ENABLE_CRASH_DUMP_ENV))
     {
         g_EnableCrashDumpCollection = true;
-        EnableCrashDumpCollection();
+        WSLAEnableCrashDumpCollection();
 
         if (unsetenv(WSL_ENABLE_CRASH_DUMP_ENV) < 0)
         {

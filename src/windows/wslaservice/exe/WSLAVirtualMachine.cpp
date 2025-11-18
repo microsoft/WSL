@@ -131,6 +131,11 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
         m_processExitThread.join();
     }
 
+    if (m_crashDumpCollectionThread.joinable())
+    {
+        m_crashDumpCollectionThread.join();
+    }
+
     // Clear the state of all remaining processes now that the VM has exited.
     // The WSLAProcess object reference will be released when the last COM reference is closed.
     for (auto& e : m_trackedProcesses)
