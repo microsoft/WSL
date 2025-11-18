@@ -313,12 +313,6 @@ void WSLAVirtualMachine::Start()
     auto runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
     WI_ASSERT(IsEqualGUID(m_vmId, runtimeId));
 
-    auto crashDumpSocket = wsl::windows::common::hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
-    THROW_LAST_ERROR_IF(!crashDumpSocket);
-
-    m_crashDumpCollectionThread =
-        std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
-
     wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
 
     wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
@@ -327,6 +321,12 @@ void WSLAVirtualMachine::Start()
     auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
     auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
     m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
+
+    auto crashDumpSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
+    THROW_LAST_ERROR_IF(!crashDumpSocket);
+
+    m_crashDumpCollectionThread =
+        std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
 
     ConfigureNetworking();
 
