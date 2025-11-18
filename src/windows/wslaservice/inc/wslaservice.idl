@@ -27,10 +27,30 @@ struct _WSLA_VERSION {
     ULONG Revision;
 } WSLA_VERSION;
 
+typedef enum _WSLAFdType
+{
+    WSLAFdTypeDefault = 0,
+    WSLAFdTypeTerminalInput = 1,
+    WSLAFdTypeTerminalOutput = 2,
+    WSLAFdTypeLinuxFileInput = 4,
+    WSLAFdTypeLinuxFileOutput = 8,
+    WSLAFdTypeLinuxFileAppend = 16,
+    WSLAFdTypeLinuxFileCreate = 32,
+    WSLAFdTypeTerminalControl = 64,
+} WSLAFdType;
+
+typedef enum _WSLAProcessState
+{
+    WSLAProcessStateUnknown,
+    WSLAProcessStateRunning,
+    WSLAProcessStateExited,
+    WSLAProcessStateSignaled
+} WSLAProcessState;
+
 typedef struct _WSLA_PROCESS_FD
 {
     LONG Fd;
-    int Type;
+    WSLAFdType Type;
     [string, unique] LPCSTR Path;
 } WSLA_PROCESS_FD;
 

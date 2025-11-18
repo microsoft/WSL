@@ -21,6 +21,13 @@ Abstract:
 
 namespace wsl::windows::service::wsla {
 
+enum WSLAMountFlags
+{
+    WSLAMountFlagsNone = 0,
+    WSLAMountFlagsChroot = 1,
+    WSLAMountFlagsWriteableOverlayFs = 2,
+};
+
 class WSLAUserSessionImpl;
 
 class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
@@ -90,7 +97,7 @@ private:
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
-    HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WslMountFlags Flags);
+    HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WSLAMountFlags Flags);
 
     void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
 

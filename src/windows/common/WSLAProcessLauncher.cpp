@@ -27,17 +27,17 @@ WSLAProcessLauncher::WSLAProcessLauncher(
     // Add standard Fds.
     if (WI_IsFlagSet(Flags, ProcessFlags::Stdin))
     {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeDefault, .Path = nullptr});
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault, .Path = nullptr});
     }
 
     if (WI_IsFlagSet(Flags, ProcessFlags::Stdout))
     {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeDefault, .Path = nullptr});
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault, .Path = nullptr});
     }
 
     if (WI_IsFlagSet(Flags, ProcessFlags::Stderr))
     {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeDefault, .Path = nullptr});
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault, .Path = nullptr});
     }
 }
 
@@ -96,7 +96,7 @@ RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD
     // Add a callback on IO for each std handle.
     for (size_t i = 0; i < m_fds.size(); i++)
     {
-        if (m_fds[i].Fd == 0 || m_fds[i].Type != WslFdTypeDefault)
+        if (m_fds[i].Fd == 0 || m_fds[i].Type != WSLAFdTypeDefault)
         {
             continue; // Don't try to read from stdin or non hvsocket fds.
         }

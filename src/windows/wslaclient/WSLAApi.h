@@ -21,35 +21,6 @@ Abstract:
 extern "C" {
 #endif
 
-typedef void* WslVirtualMachineHandle;
-
-enum WslMountFlags
-{
-    WslMountFlagsNone = 0,
-    WslMountFlagsChroot = 1,
-    WslMountFlagsWriteableOverlayFs = 2,
-};
-
-enum WslFdType
-{
-    WslFdTypeDefault = 0,
-    WslFdTypeTerminalInput = 1,
-    WslFdTypeTerminalOutput = 2,
-    WslFdTypeLinuxFileInput = 4,
-    WslFdTypeLinuxFileOutput = 8,
-    WslFdTypeLinuxFileAppend = 16,
-    WslFdTypeLinuxFileCreate = 32,
-    WslFdTypeTerminalControl = 64,
-};
-
-enum WslProcessState
-{
-    WslProcessStateUnknown,
-    WslProcessStateRunning,
-    WslProcessStateExited,
-    WslProcessStateSignaled
-};
-
 enum WslInstallComponent
 {
     WslInstallComponentNone = 0,
