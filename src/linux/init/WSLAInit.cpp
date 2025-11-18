@@ -806,9 +806,6 @@ int WSLAEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
-    // Ensure /init is present and bind-mounted.
-    THROW_LAST_ERROR_IF(MountInit(LX_INIT_PATH) < 0);
-
     // Enable crash dump collection if requested.
     if (getenv(WSL_ENABLE_CRASH_DUMP_ENV))
     {
