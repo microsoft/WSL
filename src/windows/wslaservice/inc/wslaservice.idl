@@ -204,7 +204,6 @@ interface IWSLAVirtualMachine : IUnknown
     HRESULT DetachDisk([in] ULONG Lun);
     HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
-    HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
 }
 
 typedef enum _WSLANetworkingMode

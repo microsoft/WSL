@@ -374,6 +374,11 @@ void WSLAVirtualMachine::ConfigureMounts()
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
 
+    if (m_settings.EnableGPU) // TODO: re-think how GPU settings should work at the session level API.
+    {
+        MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsNone);
+    }
+
     // TODO: Mount storage VHD here.
 }
 
@@ -1196,19 +1201,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)
-try
+void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)
 {
-    RETURN_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLAMountFlagsWriteableOverlayFs), "Unexpected flags: %lu", Flags);
-
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);
 
     auto [channel, _, __] = Fork(WSLA_FORK::Thread);
 
     auto windowsPath = wil::GetWindowsDirectoryW<std::wstring>();
 
     // Mount drivers.
-    RETURN_IF_FAILED(MountWindowsFolderImpl(
+    THROW_IF_FAILED(MountWindowsFolderImpl(
         std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, true, static_cast<WSLAMountFlags>(Flags)));
 
     // Mount the inbox libraries.
@@ -1217,7 +1219,7 @@ try
     if (std::filesystem::is_directory(inboxLibPath))
     {
         inboxLibMountPoint = std::format("{}/inbox", LibrariesMountPoint);
-        RETURN_IF_FAILED(MountWindowsFolder(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), true));
+        THROW_IF_FAILED(MountWindowsFolder(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), true));
     }
 
     // Mount the packaged libraries.
@@ -1233,7 +1235,7 @@ try
 #endif
 
     auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
-    RETURN_IF_FAILED(MountWindowsFolder(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), true));
+    THROW_IF_FAILED(MountWindowsFolder(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), true));
 
     // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
     std::string options = "lowerdir=" + packagedLibMountPoint;
@@ -1243,9 +1245,7 @@ try
     }
 
     Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), Flags);
-    return S_OK;
 }
-CATCH_RETURN();
 
 std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder()
 {

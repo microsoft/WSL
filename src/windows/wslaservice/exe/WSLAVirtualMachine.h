@@ -61,7 +61,7 @@ public:
     IFACEMETHOD(DetachDisk(_In_ ULONG Lun)) override;
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
     IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
-    IFACEMETHOD(MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)) override;
+    void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags);
 
     void OnProcessReleased(int Pid);
 
