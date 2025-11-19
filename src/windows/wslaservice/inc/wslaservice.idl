@@ -117,7 +117,8 @@ struct WSLA_PROCESS_OPTIONS
 struct WSLA_VOLUME
 {
     LPCSTR HostPath;
-    LPCSTR ContainerHostPath;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
 };
 
 struct WSLA_PORT_MAPPING
@@ -125,6 +126,13 @@ struct WSLA_PORT_MAPPING
     USHORT HostPort;
     USHORT ContainerPort;
 };
+
+enum WSLA_CONTAINER_FLAGS
+{
+    WSLA_CONTAINER_FLAG_ENABLE_GPU = 0x0,
+    WSLA_CONTAINER_FLAG_USE_HOST_NETWORKING = 0x1
+} ;
+
 
 struct WSLA_CONTAINER_OPTIONS
 {

@@ -54,13 +54,13 @@ HRESULT WSLASession::DeleteImage(LPCWSTR Image)
     return E_NOTIMPL;
 }
 
-HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* Options, IWSLAContainer** Container)
+HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container)
 try
 {
-    // Basic instanciation for testing.
-    // TODO: Implement.
-
-    auto container = wil::MakeOrThrow<WSLAContainer>();
+    RETURN_HR_IF_NULL(E_POINTER, containerOptions);
+    // TODO: Log entrance into the function.
+    m_containerId++;
+    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine);
     container.CopyTo(__uuidof(IWSLAContainer), (void**)Container);
 
     return S_OK;
