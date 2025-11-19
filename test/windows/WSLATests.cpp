@@ -969,4 +969,58 @@ class WSLATests
             VERIFY_ARE_EQUAL(error, -1);
         }
     }
+
+    TEST_METHOD(CrashDumpCollection)
+    {
+
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
+
+        auto session = CreateSession(settings);
+        int processId = 0;
+
+         // Create a stuck process and crash it.
+        {
+            WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto process = launcher.Launch(*session);
+
+            // Get the process id. This is need to identify the crash dump file.
+            VERIFY_SUCCEEDED(process.Get().GetPid(&processId));
+
+            // Send SIGSEV(11) to crash the process.
+            VERIFY_SUCCEEDED(process.Get().Signal(11));
+
+            auto result = process.WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 11);
+            VERIFY_ARE_EQUAL(result.Signalled, true);
+            VERIFY_ARE_EQUAL(result.Output[1], "");
+            VERIFY_ARE_EQUAL(result.Output[2], "");
+
+            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+
+        auto tempFolder = std::filesystem::temp_directory_path();
+        auto crashDumpsDir = tempFolder / "wsla-crashes";
+        VERIFY_IS_TRUE(std::filesystem::exists(crashDumpsDir));
+
+        // Check if file exists in crash dumps directory matching pattern: wsl-crash-*-pid-_usr_bin_cat-11.dmp exists
+        bool dumpFound = false;
+        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
+
+        for (const auto& entry : std::filesystem::directory_iterator(crashDumpsDir))
+        {
+            if (PathMatchSpecA(entry.path().filename().string().c_str(), expectedPattern.c_str()))
+            {
+                dumpFound = true;
+                break;
+            }
+        }
+        
+        VERIFY_IS_TRUE(dumpFound);
+    }
 };
