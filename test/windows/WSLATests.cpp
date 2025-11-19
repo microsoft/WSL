@@ -983,7 +983,7 @@ class WSLATests
         auto session = CreateSession(settings);
         int processId = 0;
 
-         // Create a stuck process and crash it.
+        // Create a stuck process and crash it.
         {
             WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
@@ -1004,11 +1004,11 @@ class WSLATests
             VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
-        auto tempFolder = std::filesystem::temp_directory_path();
-        auto crashDumpsDir = tempFolder / "wsla-crashes";
+        auto crashDumpsDir = std::filesystem::temp_directory_path() / "wsla-crashes";
         VERIFY_IS_TRUE(std::filesystem::exists(crashDumpsDir));
 
-        // Check if file exists in crash dumps directory matching pattern: wsl-crash-*-pid-_usr_bin_cat-11.dmp exists
+        // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
+        // Check if file exists in crash dumps directory matching the pattern.
         bool dumpFound = false;
         std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
 
@@ -1020,7 +1020,7 @@ class WSLATests
                 break;
             }
         }
-        
+
         VERIFY_IS_TRUE(dumpFound);
     }
 };
