@@ -210,9 +210,6 @@ void WSLAVirtualMachine::Start()
     // Enable timesync workaround to sync on resume from sleep in modern standby.
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
-    // Enable crash dump collection.
-    kernelCmdLine += L" " WSL_ENABLE_CRASH_DUMP_ENV L"=1";
-
     wil::unique_handle dmesgOutput;
     if (m_settings.DmesgOutput != 0)
     {
@@ -323,16 +320,17 @@ void WSLAVirtualMachine::Start()
 
     wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
 
-    // Create a socket listening for connections from mini_init.
-    auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
-    auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
-    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
-
+    // Create a socket listening for crash dumps.
     auto crashDumpSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
     THROW_LAST_ERROR_IF(!crashDumpSocket);
 
     m_crashDumpCollectionThread =
         std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
+
+    // Create a socket listening for connections from mini_init.
+    auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
+    auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
+    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
 
     ConfigureNetworking();
 

@@ -54,7 +54,6 @@ int Chroot(const char* Target);
 
 extern int g_LogFd;
 
-static bool g_EnableCrashDumpCollection = false;
 extern void WSLAEnableCrashDumpCollection();
 
 struct WSLAState
@@ -516,10 +515,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
 
             // Reconfigure crash dump collection after chroot so symlink & core_pattern resolve correctly.
-            if (g_EnableCrashDumpCollection)
-            {
-                WSLAEnableCrashDumpCollection();
-            }
+            WSLAEnableCrashDumpCollection();
         }
 
         response.Result = 0;
@@ -820,17 +816,8 @@ int WSLAEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
-    // Enable crash dump collection if requested.
-    if (getenv(WSL_ENABLE_CRASH_DUMP_ENV))
-    {
-        g_EnableCrashDumpCollection = true;
-        WSLAEnableCrashDumpCollection();
-
-        if (unsetenv(WSL_ENABLE_CRASH_DUMP_ENV) < 0)
-        {
-            LOG_ERROR("unsetenv failed {}", errno);
-        }
-    }
+    // Enable crash dump collection.
+    WSLAEnableCrashDumpCollection();
 
     //
     // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
