@@ -16,6 +16,7 @@ Abstract:
 #include "WSLAProcessLauncher.h"
 #include "WSLAApi.h"
 
+using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::RunningWSLAProcess;
 using wsl::windows::common::WSLAProcessLauncher;
 
@@ -26,17 +27,17 @@ WSLAProcessLauncher::WSLAProcessLauncher(
     // Add standard Fds.
     if (WI_IsFlagSet(Flags, ProcessFlags::Stdin))
     {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeDefault, .Path = nullptr});
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault, .Path = nullptr});
     }
 
     if (WI_IsFlagSet(Flags, ProcessFlags::Stdout))
     {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeDefault, .Path = nullptr});
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault, .Path = nullptr});
     }
 
     if (WI_IsFlagSet(Flags, ProcessFlags::Stderr))
     {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeDefault, .Path = nullptr});
+        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault, .Path = nullptr});
     }
 }
 
@@ -67,43 +68,23 @@ std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const cha
     return std::make_tuple(options, std::move(commandLine), std::move(environment));
 }
 
-RunningWSLAProcess WSLAProcessLauncher::Launch(IWSLASession& Session)
+RunningWSLAProcess::RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds) : m_fds(std::move(fds))
 {
-    auto [hresult, error, process] = LaunchNoThrow(Session);
-    if (FAILED(hresult))
-    {
-        auto commandLine = wsl::shared::string::Join(m_arguments, ' ');
-        THROW_HR_MSG(hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
-    }
-
-    return process.value();
 }
 
-std::tuple<HRESULT, int, std::optional<RunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)
+std::pair<int, bool> RunningWSLAProcess::GetExitState()
 {
-    auto [options, commandLine, env] = CreateProcessOptions();
+    WSLA_PROCESS_STATE state{};
+    int code{};
+    GetState(&state, &code);
 
-    wil::com_ptr<IWSLAProcess> process;
-    int error = -1;
-    auto result = Session.CreateRootNamespaceProcess(&options, &process, &error);
-    if (FAILED(result))
-    {
-        return std::make_tuple(result, error, std::optional<RunningWSLAProcess>());
-    }
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        state != WslaProcessStateSignalled && state != WslaProcessStateExited,
+        "Process is not exited. State: %i",
+        state);
 
-    wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
-
-    return {S_OK, 0, RunningWSLAProcess{std::move(process), std::move(m_fds)}};
-}
-
-IWSLAProcess& RunningWSLAProcess::Get()
-{
-    return *m_process.get();
-}
-
-RunningWSLAProcess::RunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds) :
-    m_process(std::move(process)), m_fds(std::move(fds))
-{
+    return {code, state == WslaProcessStateSignalled};
 }
 
 RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
@@ -115,15 +96,14 @@ RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD
     // Add a callback on IO for each std handle.
     for (size_t i = 0; i < m_fds.size(); i++)
     {
-        if (m_fds[i].Fd == 0 || m_fds[i].Type != WslFdTypeDefault)
+        if (m_fds[i].Fd == 0 || m_fds[i].Type != WSLAFdTypeDefault)
         {
             continue; // Don't try to read from stdin or non hvsocket fds.
         }
 
         result.Output.emplace(m_fds[i].Fd, std::string{});
 
-        wil::unique_handle stdHandle;
-        THROW_IF_FAILED(m_process->GetStdHandle(m_fds[i].Fd, reinterpret_cast<ULONG*>(&stdHandle)));
+        auto stdHandle = GetStdHandle(m_fds[i].Fd);
 
         auto ioCallback = [Index = m_fds[i].Fd, &result](const gsl::span<char>& Content) {
             result.Output[Index].insert(result.Output[Index].end(), Content.begin(), Content.end());
@@ -138,35 +118,55 @@ RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD
     }
 
     // Add a callback for when the process exits.
-    wil::unique_handle exitEvent;
-    THROW_IF_FAILED(m_process->GetExitEvent(reinterpret_cast<ULONG*>(&exitEvent)));
+    auto exitCallback = [&]() { std::tie(result.Code, result.Signalled) = GetExitState(); };
 
-    auto exitCallback = [&]() {
-        WSLA_PROCESS_STATE state{};
-        THROW_IF_FAILED(m_process->GetState(&state, &result.Code));
-
-        if (state == WslaProcessStateExited)
-        {
-            result.Signalled = false;
-        }
-        else if (state == WslaProcessStateSignalled)
-        {
-            result.Signalled = true;
-        }
-        else
-        {
-            THROW_HR_MSG(E_UNEXPECTED, "Unexpected process state: %i", state);
-        }
-    };
-
-    io.AddHandle(std::make_unique<relay::EventHandle>(std::move(exitEvent), std::move(exitCallback)));
+    io.AddHandle(std::make_unique<relay::EventHandle>(GetExitEvent(), std::move(exitCallback)));
 
     io.Run(std::chrono::milliseconds(TimeoutMs));
 
     return result;
 }
 
-wil::unique_handle RunningWSLAProcess::GetStdHandle(int Index)
+ClientRunningWSLAProcess WSLAProcessLauncher::Launch(IWSLASession& Session)
+{
+    auto [hresult, error, process] = LaunchNoThrow(Session);
+    if (FAILED(hresult))
+    {
+        auto commandLine = wsl::shared::string::Join(m_arguments, ' ');
+        THROW_HR_MSG(hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
+    }
+
+    return process.value();
+}
+
+std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)
+{
+    auto [options, commandLine, env] = CreateProcessOptions();
+
+    wil::com_ptr<IWSLAProcess> process;
+    int error = -1;
+    auto result = Session.CreateRootNamespaceProcess(&options, &process, &error);
+    if (FAILED(result))
+    {
+        return std::make_tuple(result, error, std::optional<ClientRunningWSLAProcess>());
+    }
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
+
+    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), std::move(m_fds)}};
+}
+
+IWSLAProcess& ClientRunningWSLAProcess::Get()
+{
+    return *m_process.get();
+}
+
+ClientRunningWSLAProcess::ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds) :
+    RunningWSLAProcess(std::move(fds)), m_process(std::move(process))
+{
+}
+
+wil::unique_handle ClientRunningWSLAProcess::GetStdHandle(int Index)
 {
     wil::unique_handle handle;
     THROW_IF_FAILED_MSG(m_process->GetStdHandle(Index, reinterpret_cast<ULONG*>(&handle)), "Failed to get handle: %i", Index);
@@ -174,7 +174,7 @@ wil::unique_handle RunningWSLAProcess::GetStdHandle(int Index)
     return handle;
 }
 
-wil::unique_event RunningWSLAProcess::GetExitEvent()
+wil::unique_event ClientRunningWSLAProcess::GetExitEvent()
 {
     wil::unique_event event;
     THROW_IF_FAILED(m_process->GetExitEvent(reinterpret_cast<ULONG*>(&event)));
@@ -182,18 +182,7 @@ wil::unique_event RunningWSLAProcess::GetExitEvent()
     return event;
 }
 
-std::pair<int, bool> RunningWSLAProcess::GetExitState()
+void ClientRunningWSLAProcess::GetState(WSLA_PROCESS_STATE* State, int* Code)
 {
-    WSLA_PROCESS_STATE state{};
-    int code{};
-
-    THROW_IF_FAILED(m_process->GetState(&state, &code));
-
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        state != WslaProcessStateSignalled && state != WslaProcessStateExited,
-        "Process is not exited. State: %i",
-        state);
-
-    return {code, state == WslaProcessStateSignalled};
+    THROW_IF_FAILED(m_process->GetState(State, Code));
 }

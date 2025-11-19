@@ -84,7 +84,7 @@ wsl::windows::service::wsla::WSLAUserSession::WSLAUserSession(std::weak_ptr<WSLA
 {
 }
 
-HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSL_VERSION* Version)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSLA_VERSION* Version)
 {
     Version->Major = WSL_PACKAGE_VERSION_MAJOR;
     Version->Minor = WSL_PACKAGE_VERSION_MINOR;

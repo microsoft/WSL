@@ -55,7 +55,7 @@ public:
     WSLAUserSession(const WSLAUserSession&) = delete;
     WSLAUserSession& operator=(const WSLAUserSession&) = delete;
 
-    IFACEMETHOD(GetVersion)(_Out_ WSL_VERSION* Version) override;
+    IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
     IFACEMETHOD(CreateVirtualMachine)(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine) override; // TODO: Remove virtual machine awareness from WSLAUserSession
     IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
