@@ -791,7 +791,7 @@ private:
             } Data;
         } Reparse{};
 
-        constexpr ULONG ReparseBufferSize = REPARSE_DATA_BUFFER_HEADER_SIZE + sizeof(ULONG);
+        const ULONG ReparseBufferSize = REPARSE_DATA_BUFFER_HEADER_SIZE + sizeof(ULONG);
 
         //
         // The data length is the buffer size excluding the header.

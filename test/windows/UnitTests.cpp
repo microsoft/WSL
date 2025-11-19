@@ -322,8 +322,9 @@ class UnitTests
         auto cleanup = EnableSystemd("initTimeout=0");
 
         // Wait for systemd to be started
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Validate that the X11 socket has not been deleted
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
@@ -2797,7 +2798,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
 
-        auto cleanupName = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+        auto cleanupName = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
             LxsstuLaunchWsl(std::format(L"--unregister {}", name));
             std::filesystem::remove_all(testFolder);
         });
@@ -2873,9 +2874,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         WslShutdown();
 
         auto cleanupName =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
 
-        auto validateDistro = [](LPCWSTR size, LPCWSTR expectedSize, LPCWSTR expectedError = nullptr) {
+        auto validateDistro = [name](LPCWSTR size, LPCWSTR expectedSize, LPCWSTR expectedError = nullptr) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --resize {}", name, size), expectedError ? -1 : 0);
             if (expectedError)
             {
@@ -3578,8 +3579,8 @@ localhostForwarding=true
 
         constexpr auto TestUser = L"testuser";
 
-        auto cleanup =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"-u root userdel -f {}", TestUser)); });
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [TestUser]() { LxsstuLaunchWsl(std::format(L"-u root userdel -f {}", TestUser)); });
 
         ULONG Uid{};
         ULONG Gid{};
@@ -3665,8 +3666,9 @@ localhostForwarding=true
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroRootfsPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
+                LxsstuLaunchWsl(
+                    std::format(
+                        L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
                 0L);
         }
 
@@ -3719,7 +3721,7 @@ localhostForwarding=true
         constexpr auto testTar = L"exported-distro.tar";
         constexpr auto tmpDistroName = L"tmpdistro";
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [tmpDistroName]() {
             DeleteFile(testTar);
             LxsstuLaunchWsl(std::format(L"--unregister {}", tmpDistroName));
         });
@@ -3950,7 +3952,7 @@ VERSION_ID="Invalid|Format"
             constexpr auto testDistroName = L"test-oobe-import";
 
             std::filesystem::create_directory(testDir);
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, testDistroName]() {
                 LxsstuLaunchWsl(std::format(L"--unregister {}", testDistroName));
                 std::error_code error;
                 std::filesystem::remove_all(testDir, error);
@@ -4511,7 +4513,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"custom-terminal-profile";
             constexpr auto tarName = L"custom-terminal-profile.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4553,7 +4555,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"custom-terminal-profile-bad-json";
             constexpr auto tarName = L"custom-terminal-profile-bad-json.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4581,7 +4583,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"custom-terminal-profile-hide";
             constexpr auto tarName = L"custom-terminal-profile-hide.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4625,7 +4627,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"no-terminal-profile";
             constexpr auto tarName = L"no-terminal-profile.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4647,7 +4649,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"no-shortcut";
             constexpr auto tarName = L"no-shortcut.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -6146,8 +6148,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     TEST_METHOD(ImportExportStdout)
     {
         constexpr auto test_distro = L"import-test-distro";
-        auto cleanup =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [test_distro]() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
 
         // The below logline makes it easier to find the bsdtar output when debugging this test case.
         fprintf(stderr, "Starting ImportExportStdout test case\n");
@@ -6261,8 +6263,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
         VERIFY_ARE_NOT_EQUAL(
-            dmesg.find(
-                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            dmesg.find(L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
             std::wstring::npos);
     }
 
