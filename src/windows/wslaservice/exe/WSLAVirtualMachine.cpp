@@ -379,7 +379,11 @@ void WSLAVirtualMachine::ConfigureMounts()
         MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsNone);
     }
 
-    // TODO: Mount storage VHD here.
+    if (m_settings.ContainerRootVhd) // TODO: re-think how container root settings should work at the session level API.
+    {
+        auto [_, containerRootDevice] = AttachDisk(m_settings.ContainerRootVhd, false);
+        Mount(m_initChannel, containerRootDevice.c_str(), "/root", "ext4", "rw", 0);
+    }
 }
 
 void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)

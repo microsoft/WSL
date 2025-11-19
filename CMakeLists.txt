@@ -65,6 +65,7 @@ find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
+find_nuget_package(Microsoft.WSL.WSLATestDistro WSLA_TEST_DISTRO /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(StrawberryPerl PERL /)
 find_nuget_package(vswhere VSWHERE /tools)
@@ -373,6 +374,7 @@ endif()
 
 if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smaller
     add_compile_definitions(WSL_SYSTEM_DISTRO_PATH="${WSL_DEV_BINARY_PATH}/system.vhd"
+                            WSLA_TEST_DISTRO_PATH="${WSL_DEV_BINARY_PATH}/wslatestrootfs.vhd"
                             WSL_KERNEL_PATH="${WSL_DEV_BINARY_PATH}/kernel"
                             WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/modules.vhd"
                             WSL_DEV_INSTALL_PATH="${WSL_DEV_BINARY_PATH}"
