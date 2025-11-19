@@ -411,7 +411,7 @@ class WSLATests
             auto [hresult, _, process] = launcher.LaunchNoThrow(*session);
             VERIFY_ARE_EQUAL(hresult, expectedError);
 
-            return process;
+            return std::move(process);
         };
 
         {
