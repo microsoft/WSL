@@ -322,9 +322,8 @@ class UnitTests
         auto cleanup = EnableSystemd("initTimeout=0");
 
         // Wait for systemd to be started
-        VERIFY_NO_THROW(
-            wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Validate that the X11 socket has not been deleted
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
@@ -3666,9 +3665,8 @@ localhostForwarding=true
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroRootfsPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(
-                    std::format(
-                        L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
+                LxsstuLaunchWsl(std::format(
+                    L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
                 0L);
         }
 
@@ -6263,7 +6261,8 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
         VERIFY_ARE_NOT_EQUAL(
-            dmesg.find(L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            dmesg.find(
+                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
             std::wstring::npos);
     }
 
