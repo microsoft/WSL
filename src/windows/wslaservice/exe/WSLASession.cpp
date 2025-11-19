@@ -25,6 +25,11 @@ WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionI
     m_virtualMachine(std::make_optional<WSLAVirtualMachine>(VmSettings, userSessionImpl.GetUserSid(), &userSessionImpl)),
     m_displayName(Settings.DisplayName)
 {
+    if (Settings.TerminationCallback != nullptr)
+    {
+        m_virtualMachine->RegisterCallback(Settings.TerminationCallback);
+    }
+
     m_virtualMachine->Start();
 }
 

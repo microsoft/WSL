@@ -197,7 +197,6 @@ interface IWSLAVirtualMachine : IUnknown
     HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
     HRESULT Signal([in] LONG Pid, [in] int Signal);
     HRESULT Shutdown([in] ULONGLONG TimeoutMs);
-    HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
     HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
     HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
     HRESULT Unmount([in] LPCSTR Path);
@@ -233,6 +232,7 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
+    [unique] ITerminationCallback* TerminationCallback;
 
     // TODO: Termination callback, flags
 };

@@ -54,7 +54,6 @@ public:
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
-    IFACEMETHOD(RegisterCallback(_In_ ITerminationCallback* callback)) override;
     IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
     IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
     IFACEMETHOD(Unmount(_In_ const char* Path)) override;
@@ -64,6 +63,7 @@ public:
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags);
 
     void OnProcessReleased(int Pid);
+    void RegisterCallback(_In_ ITerminationCallback* callback);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});

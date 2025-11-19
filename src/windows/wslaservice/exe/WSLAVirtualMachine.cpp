@@ -992,8 +992,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAVirtualMachine::RegisterCallback(ITerminationCallback* callback)
-try
+void WSLAVirtualMachine::RegisterCallback(ITerminationCallback* callback)
 {
     std::lock_guard lock(m_lock);
 
@@ -1001,10 +1000,7 @@ try
 
     // N.B. this calls AddRef() on the callback
     m_terminationCallback = callback;
-
-    return S_OK;
 }
-CATCH_RETURN();
 
 bool WSLAVirtualMachine::ParseTtyInformation(
     const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl)

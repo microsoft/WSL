@@ -38,13 +38,13 @@ private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 
     std::recursive_mutex m_wslaSessionsLock;
-    // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
-    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_wslaSessions;
     std::recursive_mutex m_lock;
-    std::vector<WSLAVirtualMachine*> m_virtualMachines; // TODO: Remove virtual machine awareness from WSLAUserSession
 
     // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
     std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_sessions;
+
+    // N.B. m_virtualMachines needs to be destroyed before m_session because OnVmTerminated() accesses m_virtualMachines.
+    std::vector<WSLAVirtualMachine*> m_virtualMachines; // TODO: Remove virtual machine awareness from WSLAUserSession
 };
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLAUserSession

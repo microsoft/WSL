@@ -71,7 +71,7 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
 
     {
         std::lock_guard lock(m_wslaSessionsLock);
-        m_wslaSessions.emplace_back(session.Get());
+        m_sessions.emplace_back(session.Get());
     }
 
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
