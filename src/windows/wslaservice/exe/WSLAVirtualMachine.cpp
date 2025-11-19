@@ -1360,6 +1360,13 @@ void WSLAVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket) co
 
             auto fullPath = m_crashDumpFolder / filename;
 
+            WSL_LOG(
+                "WSLALinuxCrash",
+                TraceLoggingValue(fullPath.c_str(), "FullPath"),
+                TraceLoggingValue(message.Pid, "Pid"),
+                TraceLoggingValue(message.Signal, "Signal"),
+                TraceLoggingValue(process, "process"));
+
             auto runAsUser = wil::impersonate_token(m_userToken.get());
             wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
 
