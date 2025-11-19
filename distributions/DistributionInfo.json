@@ -125,12 +125,12 @@
                 "FriendlyName": "AlmaLinux OS 9",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.6.20250522.0/AlmaLinux-9.6_x64_20250522.0.wsl",
-                    "Sha256": "e0f6acf1ce5aff80f2e60d3d8191c0a3857720149a7e5521b96e11777cdd2779"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20251119.0/AlmaLinux-9.7_x64_20251119.0.wsl",
+                    "Sha256": "0a6588f4f723fcb3edbc37dd3e3e13be8ffe0a5027e47513e3d4d2a4451794e7"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.6.20250522.0/AlmaLinux-9.6_ARM64_20250522.0.wsl",
-                    "Sha256": "58d1cc623c4570307825036460e51a406bdcf53b4b5a4148cf644f5f68ce48dd"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v9.7.20251119.0/AlmaLinux-9.7_ARM64_20251119.0.wsl",
+                    "Sha256": "b3e2632efe029a81db1ae7a914ea3b7e9e6e20d8c71c158270c331e6fea39bf8"
                 }
             },
             {
