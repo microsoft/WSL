@@ -1542,7 +1542,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.DisplayName = L"WSLA";
     settings.MemoryMb = 1024;
     settings.BootTimeoutMs = 30000;
-    settings.NetworkingMode = WslNetworkingModeNAT;
+    settings.NetworkingMode = WSLANetworkingModeNAT;
     std::string shell = "/bin/bash";
     std::string fsType = "ext4";
     std::wstring containerRootVhd;
@@ -1578,14 +1578,12 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
     WSLA_SESSION_SETTINGS sessionSettings{L"WSLA Test Session"};
     wil::com_ptr<IWSLASession> session;
+    settings.RootVhd = vhd.c_str();
+    settings.RootVhdType = fsType.c_str();
     THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
     THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
-
-    wil::unique_cotaskmem_ansistring diskDevice;
-    ULONG Lun{};
-    THROW_IF_FAILED(virtualMachine->AttachDisk(vhd.c_str(), true, &diskDevice, &Lun));
 
     if (testRootfs)
     {
@@ -1609,19 +1607,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
         auto initProcess = initProcessLauncher.Launch(*session);
         THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
     }
-    else
-    {
-        THROW_IF_FAILED(virtualMachine->Mount(diskDevice.get(), "/mnt", fsType.c_str(), "ro", WslMountFlagsChroot | WslMountFlagsWriteableOverlayFs));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev", "devtmpfs", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/sys", "sysfs", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/proc", "proc", "", 0));
-        THROW_IF_FAILED(virtualMachine->Mount(nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0));
-    }
-
     wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WslFdTypeTerminalInput});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WslFdTypeTerminalOutput});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WslFdTypeTerminalControl});
+    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
 
     auto process = launcher.Launch(*session);
 

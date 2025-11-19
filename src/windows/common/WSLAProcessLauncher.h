@@ -42,16 +42,31 @@ public:
         std::map<int, std::string> Output;
     };
 
-    RunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds);
+    RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds);
     ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
-    wil::unique_handle GetStdHandle(int Index);
-    wil::unique_event GetExitEvent();
-    IWSLAProcess& Get();
+    virtual wil::unique_handle GetStdHandle(int Index) = 0;
+    virtual wil::unique_event GetExitEvent() = 0;
     std::pair<int, bool> GetExitState();
+
+protected:
+    virtual void GetState(WSLA_PROCESS_STATE* State, int* Code) = 0;
+
+    std::vector<WSLA_PROCESS_FD> m_fds;
+};
+
+class ClientRunningWSLAProcess : public RunningWSLAProcess
+{
+public:
+    ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds);
+    wil::unique_handle GetStdHandle(int Index) override;
+    wil::unique_event GetExitEvent() override;
+    IWSLAProcess& Get();
+
+protected:
+    void GetState(WSLA_PROCESS_STATE* State, int* Code) override;
 
 private:
     wil::com_ptr<IWSLAProcess> m_process;
-    std::vector<WSLA_PROCESS_FD> m_fds;
 };
 
 class WSLAProcessLauncher
@@ -69,10 +84,10 @@ public:
     void AddFd(WSLA_PROCESS_FD Fd);
 
     // TODO: Add overloads for IWSLAContainer once implemented.
-    RunningWSLAProcess Launch(IWSLASession& Session);
-    std::tuple<HRESULT, int, std::optional<RunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
+    ClientRunningWSLAProcess Launch(IWSLASession& Session);
+    std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
 
-private:
+protected:
     std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();
 
     std::vector<WSLA_PROCESS_FD> m_fds;
