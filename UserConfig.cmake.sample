@@ -18,7 +18,6 @@ message(STATUS "Loading user configuration")
 # file(CREATE_LINK "${MSAL_SOURCE_DIR}/${TARGET_PLATFORM}/msal.wsl.proxy.exe" "${WSL_DEV_BINARY_PATH}/msal.wsl.proxy.exe" SYMBOLIC)
 # file(CREATE_LINK "${BIN}/wsldevicehost.dll" "${WSL_DEV_BINARY_PATH}/wsldevicehost.exe" SYMBOLIC)
 # file(CREATE_LINK "${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}" "${WSL_DEV_BINARY_PATH}/lib" SYMBOLIC)
-# file(COPY_FILE "${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd" "${WSL_DEV_BINARY_PATH}/wslatestrootfs.vhd" ONLY_IF_DIFFERENT)
 
 # foreach(LANG ${SUPPORTED_LANGS})
 #    file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/${LANG}" "${WSL_DEV_BINARY_PATH}/${LANG}" SYMBOLIC)

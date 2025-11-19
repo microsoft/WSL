@@ -382,6 +382,14 @@ void WSLAVirtualMachine::ConfigureMounts()
     if (m_settings.ContainerRootVhd) // TODO: re-think how container root settings should work at the session level API.
     {
         auto [_, containerRootDevice] = AttachDisk(m_settings.ContainerRootVhd, false);
+
+        if (m_settings.FormatContainerRootVhd)
+        {
+            ServiceProcessLauncher formatProcessLauncher{"/usr/sbin/mkfs.ext4", {"/usr/sbin/mkfs.ext4", containerRootDevice.c_str()}};
+            auto formatProcess = formatProcessLauncher.Launch(*this);
+            THROW_HR_IF(E_FAIL, formatProcess.WaitAndCaptureOutput().Code != 0);
+        }
+
         Mount(m_initChannel, containerRootDevice.c_str(), "/root", "ext4", "rw", 0);
     }
 }

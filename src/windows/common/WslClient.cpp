@@ -1580,7 +1580,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
         {
             auto token = wil::open_current_access_token();
             auto tokenInfo = wil::get_token_information<TOKEN_USER>(token.get());
-            wsl::core::filesystem::CreateVhd(containerRootVhd.c_str(), 5368709120 /* 5 GB */, tokenInfo->User.Sid, TRUE, FALSE);
+            wsl::core::filesystem::CreateVhd(containerRootVhd.c_str(), 5368709120 /* 5 GB */, tokenInfo->User.Sid, FALSE, FALSE);
+            settings.FormatContainerRootVhd = TRUE;
         }
     }
 
