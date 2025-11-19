@@ -38,10 +38,13 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
 void WSLAUserSessionImpl::OnVmTerminated(WSLAVirtualMachine* machine)
 {
     std::lock_guard lock(m_lock);
-    auto pred = [machine](const auto* e) { return machine == e; };
 
     // Remove any stale VM reference.
-    m_virtualMachines.erase(std::remove_if(m_virtualMachines.begin(), m_virtualMachines.end(), pred), m_virtualMachines.end());
+    if (!m_virtualMachines.empty())
+    {
+        auto pred = [machine](const auto* e) { return machine == e; };
+        m_virtualMachines.erase(std::remove_if(m_virtualMachines.begin(), m_virtualMachines.end(), pred), m_virtualMachines.end());
+    }
 }
 
 HRESULT WSLAUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
