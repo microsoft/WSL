@@ -1652,7 +1652,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
         kernelCmdLine += L" swiotlb=force";
     }
 
-    if (m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported())
+    if (helpers::IsVirtioSerialConsoleSupported())
     {
         vmSettings.Devices.VirtioSerial.emplace();
     }
