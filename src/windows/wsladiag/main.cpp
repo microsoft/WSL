@@ -26,7 +26,7 @@ int wsladiag_main(std::wstring_view commandLine)
     wslutil::ConfigureCrt();
     wslutil::InitializeWil();
 
-    WslTraceLoggingInitialize(LxssTelemetryProvider, !wsl::shared::OfficialBuild);
+    WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
 
     wslutil::SetCrtEncoding(_O_U8TEXT);
@@ -79,51 +79,71 @@ int wsladiag_main(std::wstring_view commandLine)
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        WSLA_SESSION_INFORMATION* sessions = nullptr;
-        ULONG sessionCount = 0;
+        wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
 
-        THROW_IF_FAILED(userSession->ListSessions(&sessions, &sessionCount));
+        THROW_IF_FAILED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
-        auto cleanupSessions = wil::scope_exit([&]() {
-            if (sessions != nullptr)
+        // Free inner CoTaskMem-allocated strings before the array is freed.
+        auto cleanupInnerStrings = wil::scope_exit([&]() {
+            for (ULONG i = 0; i < sessions.size(); ++i)
             {
-                // Free the CoTaskMem-allocated memory
-                for (ULONG i = 0; i < sessionCount; i++)
+                if (sessions[i].DisplayName != nullptr)
                 {
-                    if (sessions[i].DisplayName != nullptr)
-                    {
-                        CoTaskMemFree(sessions[i].DisplayName);
-                    }
+                    CoTaskMemFree(sessions[i].DisplayName);
+                    sessions[i].DisplayName = nullptr;
                 }
-                CoTaskMemFree(sessions);
             }
         });
 
-        if (sessionCount == 0)
+        auto Utf8ToDisplayName = [](const char* utf8) -> std::wstring {
+            if (!utf8)
+            {
+                return L"<unnamed>";
+            }
+
+            const int length = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
+            if (length <= 0)
+            {
+                return L"<unnamed>";
+            }
+
+            // length includes the null terminator
+            std::wstring result(length, L'\0');
+
+            const int written = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, result.data(), length);
+            if (written <= 0)
+            {
+                return L"<unnamed>";
+            }
+
+            // MultiByteToWideChar returns the number of wide chars written including the terminating NUL.
+            // Resize to drop the trailing NUL only when the result is sane; otherwise return the fallback.
+            if (written > 0 && written <= length)
+            {
+                WI_ASSERT(result[written - 1] == L'\0');
+                result.resize(written - 1); // drop trailing NUL
+                return result;
+            }
+
+            return L"<unnamed>";
+        };
+
+        if (sessions.size() == 0)
         {
             wslutil::PrintMessage(L"No WSLA sessions found.\n", stdout);
         }
         else
         {
-            wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:\n", sessionCount, sessionCount > 1 ? L"s" : L""), stdout);
+            wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:\n", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
 
             wslutil::PrintMessage(L"ID\tCreator PID\tDisplay Name\n", stdout);
             wslutil::PrintMessage(L"--\t-----------\t------------\n", stdout);
 
-            for (ULONG i = 0; i < sessionCount; i++)
+            for (ULONG i = 0; i < sessions.size(); ++i)
             {
                 const auto& session = sessions[i];
 
-                            std::wstring displayName = L"<unnamed>";
-                if (session.DisplayName != nullptr)
-                {
-                    const int length = MultiByteToWideChar(CP_UTF8, 0, session.DisplayName, -1, nullptr, 0);
-                    if (length > 0)
-                    {
-                        displayName.resize(length - 1);
-                        MultiByteToWideChar(CP_UTF8, 0, session.DisplayName, -1, displayName.data(), length);
-                    }
-                }
+                const std::wstring displayName = Utf8ToDisplayName(session.DisplayName);
 
                 wslutil::PrintMessage(std::format(L"{}\t{}\t\t{}\n", session.Id, session.CreatorPid, displayName), stdout);
             }
@@ -134,7 +154,17 @@ int wsladiag_main(std::wstring_view commandLine)
     catch (...)
     {
         const auto hr = wil::ResultFromCaughtException();
-        wslutil::PrintMessage(std::format(L"Error listing WSLA sessions: 0x{:08x}\n", static_cast<unsigned int>(hr)), stderr);
+        const std::wstring hrMessage = wslutil::ErrorCodeToString(hr);
+
+        if (!hrMessage.empty())
+        {
+            wslutil::PrintMessage(std::format(L"Error listing WSLA sessions: 0x{:08x} - {}\n", static_cast<unsigned int>(hr), hrMessage), stderr);
+        }
+        else
+        {
+            wslutil::PrintMessage(std::format(L"Error listing WSLA sessions: 0x{:08x}\n", static_cast<unsigned int>(hr)), stderr);
+        }
+
         return 1;
     }
 }
