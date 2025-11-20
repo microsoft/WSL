@@ -144,6 +144,5 @@ private:
     std::map<std::string, std::wstring> m_plan9Mounts;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
-    WSLAUserSessionImpl* m_userSession;
 };
 } // namespace wsl::windows::service::wsla

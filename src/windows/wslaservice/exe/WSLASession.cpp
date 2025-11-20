@@ -41,12 +41,10 @@ WSLASession::~WSLASession()
 
     std::lock_guard lock{m_lock};
 
-    // N.B. Since we currently allow clients to acquire a reference to WSLAVirtualMachine(), it's possible
-    // for m_virtualMachine to outlive the session if the client keeps the reference long enough.
-    // TODO: Remove this logic once GetVirtualMachine() is removed
     if (m_virtualMachine)
     {
         m_virtualMachine->OnSessionTerminated();
+        m_virtualMachine.Reset();
     }
 
     if (m_userSession != nullptr)

@@ -32,7 +32,7 @@ constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 
 WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
-    m_settings(Settings), m_userSid(UserSid), m_userSession(Session)
+    m_settings(Settings), m_userSid(UserSid)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
 
@@ -57,11 +57,10 @@ HRESULT WSLAVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
 
 void WSLAVirtualMachine::OnSessionTerminated()
 {
+    // This method is called when the WSLA session is terminated.
+    // When that happens, signal the terminating event to cancel any pending operation
+
     std::lock_guard mutex(m_lock);
-    WI_ASSERT(m_userSession != nullptr);
-
-    m_userSession = nullptr;
-
     if (m_vmTerminatingEvent.is_signaled())
     {
         return;
