@@ -1272,7 +1272,10 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
                        e.path().filename().string().find(dumpPrefix) == 0;
             };
 
-            wsl::windows::common::wslutil::EnforceFileLimit(m_vmConfig.CrashDumpFolder.c_str(), m_vmConfig.MaxCrashDumpCount, pred);
+            if (m_vmConfig.MaxCrashDumpCount > 0)
+            {
+                wsl::windows::common::wslutil::EnforceFileLimit(m_vmConfig.CrashDumpFolder.c_str(), m_vmConfig.MaxCrashDumpCount, pred);
+            }
 
             wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
             THROW_LAST_ERROR_IF(!file);
@@ -2381,7 +2384,10 @@ void WslCoreVm::OnCrash(_In_ LPCWSTR Details)
                    e.path().extension() == c_extension && e.path().has_filename() && e.path().filename().wstring().find(c_prefix) == 0;
         };
 
-        wsl::windows::common::wslutil::EnforceFileLimit(m_vmConfig.CrashDumpFolder.c_str(), m_vmConfig.MaxCrashDumpCount, pred);
+        if (m_vmConfig.MaxCrashDumpCount > 0)
+        {
+            wsl::windows::common::wslutil::EnforceFileLimit(m_vmConfig.CrashDumpFolder.c_str(), m_vmConfig.MaxCrashDumpCount, pred);
+        }
 
         {
             std::wofstream outputFile(tracePath.wstring());
