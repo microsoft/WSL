@@ -93,6 +93,7 @@ private:
     void CreateVmSavedStateFile();
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
+    void CollectCrashDumps(wil::unique_socket&& listenSocket) const;
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
@@ -110,6 +111,7 @@ private:
 
     VIRTUAL_MACHINE_SETTINGS m_settings;
     std::thread m_processExitThread;
+    std::thread m_crashDumpCollectionThread;
 
     GUID m_vmId{};
     std::wstring m_vmIdString;

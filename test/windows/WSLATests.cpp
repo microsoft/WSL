@@ -969,4 +969,81 @@ class WSLATests
             VERIFY_ARE_EQUAL(error, -1);
         }
     }
+
+    TEST_METHOD(CrashDumpCollection)
+    {
+        WSL2_TEST_ONLY();
+
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
+
+        auto session = CreateSession(settings);
+        int processId = 0;
+
+        // Cache the existing crash dumps so we can check that a new one is created.
+        auto crashDumpsDir = std::filesystem::temp_directory_path() / "wsla-crashes";
+        std::set<std::filesystem::path> existingDumps;
+
+        if (std::filesystem::exists(crashDumpsDir))
+        {
+            existingDumps = {std::filesystem::directory_iterator(crashDumpsDir), std::filesystem::directory_iterator{}};
+        }
+
+        // Create a stuck process and crash it.
+        {
+            WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto process = launcher.Launch(*session);
+
+            // Get the process id. This is need to identify the crash dump file.
+            VERIFY_SUCCEEDED(process.Get().GetPid(&processId));
+
+            // Send SIGSEV(11) to crash the process.
+            VERIFY_SUCCEEDED(process.Get().Signal(11));
+
+            auto result = process.WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 11);
+            VERIFY_ARE_EQUAL(result.Signalled, true);
+            VERIFY_ARE_EQUAL(result.Output[1], "");
+            VERIFY_ARE_EQUAL(result.Output[2], "");
+
+            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+
+        // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
+        // Check if a new file was added in crashDumpsDir matching the pattern and not in existingDumps.
+        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
+
+        auto dumpFile = wsl::shared::retry::RetryWithTimeout<std::filesystem::path>(
+            [crashDumpsDir, expectedPattern, existingDumps]() {
+                for (const auto& entry : std::filesystem::directory_iterator(crashDumpsDir))
+                {
+                    const auto& filePath = entry.path();
+                    if (existingDumps.find(filePath) == existingDumps.end() &&
+                        PathMatchSpecA(filePath.filename().string().c_str(), expectedPattern.c_str()))
+                    {
+                        return filePath;
+                    }
+                }
+
+                throw wil::ResultException(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            },
+            std::chrono::milliseconds{100},
+            std::chrono::seconds{10});
+
+        // Ensure that the dump file is cleaned up after test completion.
+        auto cleanup = wil::scope_exit([&] {
+            if (std::filesystem::exists(dumpFile))
+            {
+                std::filesystem::remove(dumpFile);
+            }
+        });
+
+        VERIFY_IS_TRUE(std::filesystem::exists(dumpFile));
+        VERIFY_IS_TRUE(std::filesystem::file_size(dumpFile) > 0);
+    }
 };
