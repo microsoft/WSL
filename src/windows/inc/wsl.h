@@ -40,6 +40,8 @@ Abstract:
 #define WSL_INSTALL_ARG_FIXED_VHD L"--fixed-vhd"
 #define WSL_INSTALL_ARG_FROM_FILE_OPTION L'f'
 #define WSL_INSTALL_ARG_FROM_FILE_LONG L"--from-file"
+#define WSL_INSTALL_ARG_FS_MOUNT_OPTIONS L"--fs-mount-options"
+#define WSL_INSTALL_ARG_FS_TYPE L"--fs-type"
 #define WSL_INSTALL_ARG_LEGACY_LONG L"--legacy"
 #define WSL_INSTALL_ARG_LOCATION_OPTION L'l'
 #define WSL_INSTALL_ARG_LOCATION_LONG L"--location"
