@@ -86,6 +86,7 @@ public:
     // TODO: Add overloads for IWSLAContainer once implemented.
     ClientRunningWSLAProcess Launch(IWSLASession& Session);
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
+    std::string FormatResult(const RunningWSLAProcess::ProcessResult& result);
 
 protected:
     std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();

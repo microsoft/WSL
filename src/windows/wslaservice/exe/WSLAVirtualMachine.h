@@ -58,7 +58,6 @@ public:
     IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
     IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
     IFACEMETHOD(Unmount(_In_ const char* Path)) override;
-    IFACEMETHOD(DetachDisk(_In_ ULONG Lun)) override;
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
     IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags);
@@ -68,9 +67,10 @@ public:
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
-private:
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
+    void DetachDisk(_In_ ULONG Lun);
 
+private:
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
     static bool ParseTtyInformation(
