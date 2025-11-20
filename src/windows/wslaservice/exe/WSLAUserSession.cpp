@@ -42,8 +42,7 @@ void WSLAUserSessionImpl::OnVmTerminated(WSLAVirtualMachine* machine)
     // Remove any stale VM reference.
     if (!m_virtualMachines.empty())
     {
-        auto pred = [machine](const auto* e) { return machine == e; };
-        m_virtualMachines.erase(std::remove_if(m_virtualMachines.begin(), m_virtualMachines.end(), pred), m_virtualMachines.end());
+        std::erase_if(m_virtualMachines, [machine](const auto* e) { return machine == e; });
     }
 }
 
