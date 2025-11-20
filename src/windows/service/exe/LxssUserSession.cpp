@@ -385,6 +385,8 @@ HRESULT STDMETHODCALLTYPE LxssUserSession::RegisterDistribution(
     _In_ LPCWSTR TargetDirectory,
     _In_ ULONG Flags,
     _In_ ULONG64 VhdSize,
+    _In_ LPCWSTR FsType,
+    _In_ LPCWSTR FsMountOptions,
     _In_opt_ LPCWSTR PackageFamilyName,
     _Out_ LPWSTR* InstalledDistributionName,
     _Out_ LXSS_ERROR_INFO* Error,
@@ -397,7 +399,7 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->RegisterDistribution(
-        DistributionName, Version, FileHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, PackageFamilyName, InstalledDistributionName, pDistroGuid);
+        DistributionName, Version, FileHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, FsType, FsMountOptions, PackageFamilyName, InstalledDistributionName, pDistroGuid);
 }
 CATCH_RETURN()
 
@@ -417,6 +419,8 @@ try
         TargetDirectory,
         0,
         0,
+        nullptr,
+        nullptr,
         packageFamilyName.empty() ? nullptr : packageFamilyName.c_str(),
         nullptr,
         nullptr,
@@ -432,6 +436,8 @@ HRESULT STDMETHODCALLTYPE LxssUserSession::RegisterDistributionPipe(
     _In_ LPCWSTR TargetDirectory,
     _In_ ULONG Flags,
     _In_ ULONG64 VhdSize,
+    _In_ LPCWSTR FsType,
+    _In_ LPCWSTR FsMountOptions,
     _In_opt_ LPCWSTR PackageFamilyName,
     _Out_ LPWSTR* InstalledDistributionName,
     _Out_ LXSS_ERROR_INFO* Error,
@@ -444,7 +450,7 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->RegisterDistribution(
-        DistributionName, Version, PipeHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, PackageFamilyName, InstalledDistributionName, pDistroGuid);
+        DistributionName, Version, PipeHandle, ErrorHandle, TargetDirectory, Flags, VhdSize, FsType, FsMountOptions, PackageFamilyName, InstalledDistributionName, pDistroGuid);
 }
 CATCH_RETURN()
 
@@ -1401,6 +1407,8 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
         LX_UID_ROOT,
         nullptr,
         path.filename().c_str(),
+        nullptr,
+        nullptr,
         false);
 
     auto configuration = s_GetDistributionConfiguration(registration);
@@ -1453,6 +1461,8 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
     _In_ LPCWSTR TargetDirectory,
     _In_ ULONG Flags,
     _In_ ULONG64 VhdSize,
+    _In_ LPCWSTR FsType,
+    _In_ LPCWSTR FsMountOptions,
     _In_opt_ LPCWSTR PackageFamilyName,
     _Out_opt_ LPWSTR* InstalledDistributionName,
     _Out_ GUID* pDistroGuid)
@@ -1598,6 +1608,8 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 LX_UID_ROOT,
                 PackageFamilyName,
                 vhdName.c_str(),
+                FsType,
+                FsMountOptions,
                 WI_IsFlagClear(Flags, LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE));
 
             configuration = s_GetDistributionConfiguration(registration, DistributionName == nullptr);
@@ -2723,7 +2735,7 @@ void LxssUserSessionImpl::_CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ cons
     const auto basePath = wsl::windows::common::filesystem::GetLegacyBasePath(UserToken.get());
 
     DistributionRegistration::Create(
-        UserToken, LxssKey, LXSS_LEGACY_DISTRO_GUID, LXSS_LEGACY_INSTALL_NAME, LXSS_DISTRO_VERSION_LEGACY, basePath.c_str(), configFlags, defaultUid, nullptr, LXSS_VM_MODE_VHD_NAME, false);
+        UserToken, LxssKey, LXSS_LEGACY_DISTRO_GUID, LXSS_LEGACY_INSTALL_NAME, LXSS_DISTRO_VERSION_LEGACY, basePath.c_str(), configFlags, defaultUid, nullptr, LXSS_VM_MODE_VHD_NAME, nullptr, nullptr, false);
 
     _SetDistributionInstalled(UserToken, LxssKey, LXSS_LEGACY_DISTRO_GUID);
 }
@@ -4425,6 +4437,8 @@ LxssUserSessionImpl::s_GetDistributionConfiguration(const DistributionRegistrati
 
     // Read the vhd file name and append to the base path.
     configuration.VhdFilePath = configuration.BasePath / Distro.Read(Property::VhdFileName);
+    configuration.FsType = Distro.Read(Property::FsType);
+    configuration.FsMountOptions = Distro.Read(Property::FsMountOptions);
     configuration.Flags = Distro.Read(Property::Flags);
 
     configuration.OsVersion = Distro.Read(Property::OsVersion).value_or(L"");

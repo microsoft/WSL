@@ -68,6 +68,8 @@ DistributionRegistration DistributionRegistration::Create(
     ULONG DefaultUID,
     LPCWSTR PackageFamilyName,
     LPCWSTR VhdFileName,
+    LPCWSTR FsType,
+    LPCWSTR FsMountOptions,
     bool EnableOobe)
 {
     const auto runAsUser = wil::impersonate_token(UserToken.get());
@@ -121,6 +123,16 @@ DistributionRegistration DistributionRegistration::Create(
     if (ARGUMENT_PRESENT(VhdFileName))
     {
         distribution.Write(Property::VhdFileName, VhdFileName);
+    }
+
+    if (ARGUMENT_PRESENT(FsType))
+    {
+        distribution.Write(Property::FsType, FsType);
+    }
+
+    if (ARGUMENT_PRESENT(FsMountOptions))
+    {
+        distribution.Write(Property::FsMountOptions, FsMountOptions);
     }
 
     // Dismiss the scope exit member so the key is persisted.
