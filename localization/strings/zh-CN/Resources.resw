@@ -442,6 +442,13 @@
             --from-file &lt;Path&gt;
                 从本地文件安装发行版。
 
+            --fs-type
+                指定用于分发版根目录的文件系统类型。
+                默认为 ext4。
+
+            --fs-mount-options
+                指定根目录文件系统的其他装载选项。
+
             --legacy
                 使用旧发行版清单。
 

@@ -136,7 +136,7 @@ int EnableInterface(int Socket, const char* Name);
 
 int ExportToSocket(const char* Source, int Socket, int ErrorSocket, unsigned int flags);
 
-int FormatDevice(unsigned int Lun);
+int FormatDevice(unsigned int Lun, const char* FsType);
 
 std::string GetLunDeviceName(unsigned int Lun);
 
@@ -901,7 +901,7 @@ Return Value:
     return Result;
 }
 
-int FormatDevice(unsigned int Lun)
+int FormatDevice(unsigned int Lun, const char* FsType)
 
 /*++
 
@@ -914,6 +914,7 @@ Routine Description:
 Arguments:
 
     Lun - Supplies the LUN number of the SCSI device.
+    FsType - The filesystem type to format the device with.
 
 Return Value:
 
@@ -927,7 +928,16 @@ try
 
     WaitForBlockDevice(DevicePath.c_str());
 
-    std::string CommandLine = std::format("/usr/sbin/mkfs.ext4 -G 4096 '{}'", DevicePath);
+    std::string CommandLine;
+    std::string FsType_s = std::string(FsType);
+    if (FsType_s == "ext4")
+    {
+        CommandLine = std::format("/usr/sbin/mkfs.ext4 -G 4096 '{}'", DevicePath);
+    }
+    else if (FsType_s == "btrfs")
+    {
+        CommandLine = std::format("/usr/sbin/mkfs.btrfs '{}'", DevicePath);
+    }
     if (UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0)
     {
         return -1;
@@ -2738,13 +2748,14 @@ void ProcessImportExportMessage(gsl::span<gsl::byte> Buffer, wsl::shared::Socket
             ListenSocket = UtilListenVsockAnyPort(&ListenAddress, 2, true);
             THROW_LAST_ERROR_IF(!ListenSocket);
 
-            if (Message->Header.MessageType == LxMiniInitMessageImport)
-            {
-                THROW_LAST_ERROR_IF(FormatDevice(Message->DeviceId) < 0);
-            }
-
             auto* FsType = wsl::shared::string::FromSpan(Buffer, Message->FsTypeOffset);
             auto* MountOptions = wsl::shared::string::FromSpan(Buffer, Message->MountOptionsOffset);
+
+            if (Message->Header.MessageType == LxMiniInitMessageImport)
+            {
+                THROW_LAST_ERROR_IF(FormatDevice(Message->DeviceId, FsType) < 0);
+            }
+
             THROW_LAST_ERROR_IF(MountDevice(Message->MountDeviceType, Message->DeviceId, DISTRO_PATH, FsType, Message->Flags, MountOptions) < 0);
 
             Result = 0;

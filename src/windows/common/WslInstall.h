@@ -38,7 +38,9 @@ public:
         _In_ bool fixedVhd,
         _In_ const std::optional<std::wstring>& localName,
         _In_ const std::optional<std::wstring>& location,
-        _In_ const std::optional<uint64_t>& vhdSize);
+        _In_ const std::optional<uint64_t>& vhdSize,
+        _In_ const std::optional<std::wstring>& fsType,
+        _In_ const std::optional<std::wstring>& fsMountOptions);
 
     static std::pair<bool, std::vector<std::wstring>> CheckForMissingOptionalComponents(_In_ bool requireWslOptionalComponent);
 
@@ -50,5 +52,7 @@ public:
         const std::optional<std::wstring>& name,
         const std::optional<std::wstring>& location,
         const std::optional<uint64_t>& vhdSize,
-        const bool fixedVhd);
+        const bool fixedVhd,
+        const std::optional<std::wstring>& fsType,
+        const std::optional<std::wstring>& fsMountOptions);
 };

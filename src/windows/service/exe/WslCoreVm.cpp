@@ -1199,8 +1199,9 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
     message->DeviceId = lun;
     message->Flags = flags;
-    message.WriteString(message->FsTypeOffset, "ext4");
-    message.WriteString(message->MountOptionsOffset, "discard,errors=remount-ro,data=ordered");
+    // TODO: add configuration for fsType and mountOptions
+    message.WriteString(message->FsTypeOffset, Configuration.FsType);
+    message.WriteString(message->MountOptionsOffset, Configuration.FsMountOptions);
     message.WriteString(message->VmIdOffset, m_machineId);
     message.WriteString(message->DistributionNameOffset, Configuration.Name);
     message.WriteString(message->SharedMemoryRootOffset, sharedMemoryRoot);

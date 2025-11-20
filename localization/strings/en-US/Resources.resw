@@ -436,6 +436,13 @@ Arguments for managing Windows Subsystem for Linux:
             --from-file &lt;Path&gt;
                 Install a distribution from a local file.
 
+            --fs-type
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options
+                Specify additional mount options for the filesystem.
+
             --legacy
                 Use the legacy distribution manifest.
 
