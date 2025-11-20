@@ -594,7 +594,10 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
 
 void wsl::windows::common::wslutil::EnforceFileLimit(LPCWSTR Path, size_t Limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred)
 {
-    WI_ASSERT(Limit > 0);
+    if (Limit <= 0)
+    {
+        return;
+    }
 
     std::map<std::filesystem::file_time_type, std::filesystem::path> files;
     for (auto const& e : std::filesystem::directory_iterator{Path})
