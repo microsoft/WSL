@@ -48,7 +48,7 @@ public:
     ~WSLAVirtualMachine();
 
     void Start();
-    void OnSessionTerminating();
+    void OnSessionTerminated();
 
     IFACEMETHOD(CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
@@ -119,6 +119,8 @@ private:
     PSID m_userSid{};
     wil::unique_handle m_userToken;
     std::wstring m_debugShellPipe;
+
+    std::mutex m_trackedProcessesLock;
     std::vector<WSLAProcess*> m_trackedProcesses;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;

@@ -21,16 +21,38 @@ using wsl::windows::service::wsla::WSLASession;
 
 WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
     m_sessionSettings(Settings),
-    m_userSession(userSessionImpl),
-    m_virtualMachine(std::make_optional<WSLAVirtualMachine>(VmSettings, userSessionImpl.GetUserSid(), &userSessionImpl)),
+    m_userSession(&userSessionImpl),
+    m_virtualMachine(wil::MakeOrThrow<WSLAVirtualMachine>(VmSettings, userSessionImpl.GetUserSid(), &userSessionImpl)),
     m_displayName(Settings.DisplayName)
 {
+    WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
+
     if (Settings.TerminationCallback != nullptr)
     {
         m_virtualMachine->RegisterCallback(Settings.TerminationCallback);
     }
 
     m_virtualMachine->Start();
+}
+
+WSLASession::~WSLASession()
+{
+    WSL_LOG("SessionTerminated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
+
+    std::lock_guard lock{m_lock};
+
+    // N.B. Since we currently allow clients to acquire a reference to WSLAVirtualMachine(), it's possible
+    // for m_virtualMachine to outlive the session if the client keeps the reference long enough.
+    // TODO: Remove this logic once GetVirtualMachine() is removed
+    if (m_virtualMachine)
+    {
+        m_virtualMachine->OnSessionTerminated();
+    }
+
+    if (m_userSession != nullptr)
+    {
+        m_userSession->OnSessionTerminated(this);
+    }
 }
 
 HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
@@ -85,7 +107,7 @@ HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Images, ULONG* Count)
 HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
 {
     std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     THROW_IF_FAILED(m_virtualMachine->QueryInterface(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
     return S_OK;
@@ -100,7 +122,7 @@ try
     }
 
     std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->CreateLinuxProcess(Options, Process, Errno);
 }
@@ -111,15 +133,24 @@ HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
     return E_NOTIMPL;
 }
 
+void WSLASession::OnUserSessionTerminating()
+{
+    std::lock_guard lock{m_lock};
+    WI_ASSERT(m_userSession != nullptr);
+
+    m_userSession = nullptr;
+    m_virtualMachine.Reset();
+}
+
 HRESULT WSLASession::Shutdown(ULONG Timeout)
 try
 {
     std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     THROW_IF_FAILED(m_virtualMachine->Shutdown(Timeout));
 
-    m_virtualMachine.reset();
+    m_virtualMachine.Reset();
     return S_OK;
 }
 CATCH_RETURN();

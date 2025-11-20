@@ -306,7 +306,6 @@ struct WSLA_SESSION_INFORMATION
 interface IWSLAUserSession : IUnknown
 {
     HRESULT GetVersion([out] WSLA_VERSION* Version);
-    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine); // TODO: Delete once the new API is wired.
 
     // Session managment.
     HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out]IWSLASession** Session);

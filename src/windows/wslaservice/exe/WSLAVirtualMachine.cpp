@@ -55,10 +55,12 @@ HRESULT WSLAVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
     return S_OK;
 }
 
-void WSLAVirtualMachine::OnSessionTerminating()
+void WSLAVirtualMachine::OnSessionTerminated()
 {
-    m_userSession = nullptr;
     std::lock_guard mutex(m_lock);
+    WI_ASSERT(m_userSession != nullptr);
+
+    m_userSession = nullptr;
 
     if (m_vmTerminatingEvent.is_signaled())
     {
@@ -72,15 +74,6 @@ void WSLAVirtualMachine::OnSessionTerminating()
 
 WSLAVirtualMachine::~WSLAVirtualMachine()
 {
-    {
-        std::lock_guard mutex(m_lock);
-
-        if (m_userSession != nullptr)
-        {
-            m_userSession->OnVmTerminated(this);
-        }
-    }
-
     WSL_LOG("WSLATerminateVmStart", TraceLoggingValue(m_running, "running"));
 
     m_initChannel.Close();
@@ -402,7 +395,7 @@ try
 
         // Signal the exited process, if it's been monitored.
         {
-            std::lock_guard lock{m_lock};
+            std::lock_guard lock{m_trackedProcessesLock};
 
             bool found = false;
             for (auto& e : m_trackedProcesses)
@@ -881,7 +874,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     auto process = wil::MakeOrThrow<WSLAProcess>(std::move(stdHandles), pid, this);
 
     {
-        std::lock_guard lock{m_lock};
+        std::lock_guard lock{m_trackedProcessesLock};
         m_trackedProcesses.emplace_back(process.Get());
     }
 
@@ -1310,7 +1303,7 @@ void WSLAVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
 
 void WSLAVirtualMachine::OnProcessReleased(int Pid)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard lock{m_trackedProcessesLock};
 
     auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
 }
