@@ -1078,6 +1078,8 @@ class WSLATests
         auto absoluteVhdPath = std::filesystem::absolute(formatedVhd).wstring();
         VERIFY_SUCCEEDED(session->FormatVirtualDisk(absoluteVhdPath.c_str()));
 
-        VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+        // Validate error paths.
+        VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"DoesNotExist.vhdx"), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     }
 };

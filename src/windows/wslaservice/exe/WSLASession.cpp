@@ -105,10 +105,12 @@ CATCH_RETURN();
 HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
 try
 {
+    THROW_HR_IF_MSG(E_INVALIDARG, !std::filesystem::path(Path).is_absolute(), "FormatVirtualDisk called with a relative path: %ls", Path);
+
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
 
-    // Attach the disk to the VM.
+    // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
     auto [lun, device] = m_virtualMachine->AttachDisk(Path, false);
 
     // N.B. DetachDisk calls sync() before detaching.
