@@ -1014,7 +1014,6 @@ class WSLATests
             VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
-
         // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
         // Check if a new file was added in crashDumpsDir matching the pattern and not in existingDumps.
         std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
@@ -1036,7 +1035,6 @@ class WSLATests
             std::chrono::milliseconds{100},
             std::chrono::seconds{10});
 
-        
         // Ensure that the dump file is cleaned up after test completion.
         auto cleanup = wil::scope_exit([&] {
             if (std::filesystem::exists(dumpFile))
