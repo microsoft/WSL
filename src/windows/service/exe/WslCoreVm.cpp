@@ -285,8 +285,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // If the system supports virtio console serial ports, use dmesg capture for telemetry and/or debug output.
     // Legacy serial is much slower, so this is not enabled without virtio console support.
-    m_vmConfig.EnableDebugShell &= helpers::IsVirtioSerialConsoleSupported();
-    if (m_vmConfig.EnableDebugShell)
+    auto enableVirtioSerial = m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported();
+    m_vmConfig.EnableDebugShell &= enableVirtioSerial;
+    if (enableVirtioSerial)
     {
         try
         {
@@ -1651,7 +1652,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
         kernelCmdLine += L" swiotlb=force";
     }
 
-    if (helpers::IsVirtioSerialConsoleSupported())
+    if (m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported())
     {
         vmSettings.Devices.VirtioSerial.emplace();
     }
