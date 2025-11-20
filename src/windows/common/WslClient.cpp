@@ -1531,10 +1531,14 @@ int WslaShell(_In_ std::wstring_view commandLine)
 #ifdef WSLA_TEST_DISTRO_PATH
 
     std::wstring vhd = TEXT(WSLA_TEST_DISTRO_PATH);
+    std::string shell = "/bin/sh";
+    std::string fsType = "squashfs";
 
 #else
 
     std::wstring vhd = wsl::windows::common::wslutil::GetMsiPackagePath().value() + L"/system.vhd";
+    std::string shell = "/bin/bash";
+    std::string fsType = "ext4";
 
 #endif
 
@@ -1544,8 +1548,6 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.MemoryMb = 1024;
     settings.BootTimeoutMs = 30000;
     settings.NetworkingMode = WSLANetworkingModeNAT;
-    std::string shell = "/bin/bash";
-    std::string fsType = "ext4";
     std::wstring containerRootVhd;
     bool help = false;
 
@@ -1572,8 +1574,6 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     if (!containerRootVhd.empty())
     {
-        shell = "/bin/sh";
-        fsType = "squashfs";
         settings.ContainerRootVhd = containerRootVhd.c_str();
 
         if (!std::filesystem::exists(containerRootVhd))

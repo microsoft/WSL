@@ -380,7 +380,7 @@ if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smal
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
 endif()
 
-if (NOT ${OFFICIAL_BUILD} AND ${TARGET_PLATFORM} STREQUAL "x64")
+if (NOT DEFINED OFFICIAL_BUILD AND ${TARGET_PLATFORM} STREQUAL "x64")
     add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd")
 endif()
 
