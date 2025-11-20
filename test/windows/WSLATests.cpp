@@ -972,6 +972,7 @@ class WSLATests
 
     TEST_METHOD(CrashDumpCollection)
     {
+        WSL2_TEST_ONLY();
 
         VIRTUAL_MACHINE_SETTINGS settings{};
         settings.CpuCount = 4;
