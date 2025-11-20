@@ -221,6 +221,7 @@ int WslEntryPoint(int Argc, char* Argv[])
         {
             // Handle the special case for import result messages, everything else is sent to the binfmt interpreter.
             if (Pid == 1 && strcmp(BaseName, "init") == 0 && Argc == 3 && strcmp(Argv[1], LX_INIT_IMPORT_MESSAGE_ARG) == 0)
+            {
                 try
                 {
                     wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
@@ -230,7 +231,8 @@ int WslEntryPoint(int Argc, char* Argv[])
                     read(STDIN_FILENO, buffer, sizeof(buffer));
                     exit(0);
                 }
-            CATCH_RETURN_ERRNO()
+                CATCH_RETURN_ERRNO()
+            }
 
             ExitCode = CreateNtProcess(Argc - 1, &Argv[1]);
         }
@@ -326,6 +328,10 @@ int GenerateSystemdUnits(int Argc, char** Argv)
             ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
             File.reset();
         }
+
+        // Mask systemd-networkd-wait-online.service since WSL always ensures that networking is configured during boot.
+        // That unit can cause systemd boot timeouts since WSL's network interface is unmanaged by systemd.
+        THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/systemd-networkd-wait-online.service", installPath).c_str()) < 0);
 
         // Only create the wslg unit if both enabled in wsl.conf, and if the wslg folder actually exists.
         if (enableGuiApps && access("/mnt/wslg/runtime-dir", F_OK) == 0)

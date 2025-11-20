@@ -378,11 +378,13 @@ wsl::windows::common::SvcComm::LaunchProcess(
         //
 
         if ((WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_ENABLE_INTEROP)) && (ServerPortHandle))
+        {
             try
             {
                 InitializeInterop(ServerPortHandle.get(), DistributionId);
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
         ServerPortHandle.reset();
 
@@ -473,11 +475,13 @@ wsl::windows::common::SvcComm::LaunchProcess(
         //
 
         if (WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_ENABLE_INTEROP))
+        {
             try
             {
                 SpawnWslHost(InteropSocket.get(), DistributionId, &InstanceId);
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
         //
         // Begin reading messages from the utility vm.
