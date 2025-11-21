@@ -676,6 +676,8 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
         TraceLoggingValue(Device.c_str(), "Device"),
         TraceLoggingValue(result, "Result"));
 
+    THROW_IF_FAILED(result);
+
     return {Lun, Device};
 }
 
@@ -697,14 +699,13 @@ try
 }
 CATCH_RETURN()
 
-HRESULT WSLAVirtualMachine::DetachDisk(_In_ ULONG Lun)
-try
+void WSLAVirtualMachine::DetachDisk(_In_ ULONG Lun)
 {
     std::lock_guard lock{m_lock};
 
     // Find the disk
     auto it = m_attachedDisks.find(Lun);
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_attachedDisks.end());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_attachedDisks.end());
 
     // Detach it from the guest
     WSLA_DETACH message;
@@ -718,10 +719,7 @@ try
     m_attachedDisks.erase(it);
 
     hcs::RemoveScsiDisk(m_computeSystem.get(), Lun);
-
-    return S_OK;
 }
-CATCH_RETURN()
 
 std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(enum WSLA_FORK::ForkType Type)
 {

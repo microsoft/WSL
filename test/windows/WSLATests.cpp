@@ -17,6 +17,7 @@ Abstract:
 #include "WSLAApi.h"
 #include "wslaservice.h"
 #include "WSLAProcessLauncher.h"
+#include "WslCoreFilesystem.h"
 
 using namespace wsl::windows::common::registry;
 using wsl::windows::common::ProcessFlags;
@@ -61,6 +62,8 @@ class WSLATests
         wil::com_ptr<IWSLASession> session;
 
         VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, &vmSettings, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
         return session;
     }
 
@@ -1061,5 +1064,38 @@ class WSLATests
 
         VERIFY_IS_TRUE(std::filesystem::exists(dumpFile));
         VERIFY_IS_TRUE(std::filesystem::file_size(dumpFile) > 0);
+    }
+
+    TEST_METHOD(VhdFormatting)
+    {
+        WSL2_TEST_ONLY();
+
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
+
+        auto session = CreateSession(settings);
+
+        constexpr auto formatedVhd = L"test-format-vhd.vhdx";
+
+        // TODO: Replace this by a proper SDK method once it exists
+        auto tokenInfo = wil::get_token_information<TOKEN_USER>();
+        wsl::core::filesystem::CreateVhd(formatedVhd, 100 * 1024 * 1024, tokenInfo->User.Sid, false, false);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_FAILED(session->Shutdown(30 * 1000));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(formatedVhd));
+        });
+
+        // Format the disk.
+        auto absoluteVhdPath = std::filesystem::absolute(formatedVhd).wstring();
+        VERIFY_SUCCEEDED(session->FormatVirtualDisk(absoluteVhdPath.c_str()));
+
+        // Validate error paths.
+        VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"DoesNotExist.vhdx"), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     }
 };

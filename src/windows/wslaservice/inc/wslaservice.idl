@@ -200,7 +200,6 @@ interface IWSLAVirtualMachine : IUnknown
     HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
     HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
     HRESULT Unmount([in] LPCSTR Path);
-    HRESULT DetachDisk([in] ULONG Lun);
     HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
 }

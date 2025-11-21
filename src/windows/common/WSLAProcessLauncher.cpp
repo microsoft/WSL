@@ -87,6 +87,20 @@ std::pair<int, bool> RunningWSLAProcess::GetExitState()
     return {code, state == WslaProcessStateSignalled};
 }
 
+std::string WSLAProcessLauncher::FormatResult(const RunningWSLAProcess::ProcessResult& result)
+{
+    auto stdOut = result.Output.find(1);
+    auto stdErr = result.Output.find(2);
+
+    return std::format(
+        "{} [{}] exited with: {}. Stdout: '{}', Stderr: '{}'",
+        m_executable,
+        wsl::shared::string::Join(m_arguments, ','),
+        result.Code,
+        stdOut != result.Output.end() ? stdOut->second : "<none>",
+        stdErr != result.Output.end() ? stdErr->second : "<none>");
+}
+
 RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
 {
     RunningWSLAProcess::ProcessResult result;
