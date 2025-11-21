@@ -15,14 +15,14 @@ static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 VirtioNetworking::VirtioNetworking(
     GnsChannel&& gnsChannel,
     bool enableLocalhostRelay,
-    AddGuestDeviceRoutine addGuestDeviceRoutine,
+    AddGuestDeviceCallback addGuestDeviceCallback,
     ModifyOpenPortsCallback modifyOpenPortsCallback,
     GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback) :
-    m_addGuestDeviceRoutine(std::move(addGuestDeviceRoutine)),
+    m_addGuestDeviceCallback(std::move(addGuestDeviceCallback)),
     m_gnsChannel(std::move(gnsChannel)),
-    m_enableLocalhostRelay(enableLocalhostRelay),
     m_modifyOpenPortsCallback(std::move(modifyOpenPortsCallback)),
-    m_guestInterfaceStateChangeCallback(std::move(guestInterfaceStateChangeCallback))
+    m_guestInterfaceStateChangeCallback(std::move(guestInterfaceStateChangeCallback)),
+    m_enableLocalhostRelay(enableLocalhostRelay)
 {
 }
 
@@ -73,7 +73,7 @@ try
     }
 
     // Add virtio net adapter to guest
-    m_adapterId = m_addGuestDeviceRoutine(c_virtioNetworkClsid, c_virtioNetworkDeviceId, L"eth0", device_options.str().c_str());
+    m_adapterId = m_addGuestDeviceCallback(c_virtioNetworkClsid, c_virtioNetworkDeviceId, L"eth0", device_options.str().c_str());
 
     auto lock = m_lock.lock_exclusive();
 
@@ -121,7 +121,7 @@ CATCH_LOG()
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
-    m_localhostAdapterId = m_addGuestDeviceRoutine(
+    m_localhostAdapterId = m_addGuestDeviceCallback(
         c_virtioNetworkClsid, c_virtioNetworkDeviceId, c_loopbackDeviceName, L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55");
 
     hns::HNSEndpoint endpointProperties;

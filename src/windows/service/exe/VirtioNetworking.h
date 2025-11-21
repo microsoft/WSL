@@ -9,7 +9,7 @@
 
 namespace wsl::core {
 
-using AddGuestDeviceRoutine = std::function<GUID(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options)>;
+using AddGuestDeviceCallback = std::function<GUID(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options)>;
 using ModifyOpenPortsCallback = std::function<int(const GUID& clsid, PCWSTR tag, const SOCKADDR_INET& addr, int protocol, bool isOpen)>;
 using GuestInterfaceStateChangeCallback = std::function<void(const std::string& name, bool isUp)>;
 
@@ -19,7 +19,7 @@ public:
     VirtioNetworking(
         GnsChannel&& gnsChannel,
         bool enableLocalhostRelay,
-        AddGuestDeviceRoutine addGuestDeviceRoutine,
+        AddGuestDeviceCallback addGuestDeviceCallback,
         ModifyOpenPortsCallback modifyOpenPortsCallback,
         GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback);
     ~VirtioNetworking() = default;
@@ -50,7 +50,7 @@ private:
 
     mutable wil::srwlock m_lock;
 
-    AddGuestDeviceRoutine m_addGuestDeviceRoutine;
+    AddGuestDeviceCallback m_addGuestDeviceCallback;
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
