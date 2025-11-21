@@ -23,7 +23,7 @@ const std::string nerdctlPath = "/usr/bin/nerdctl";
 // Constants for required default arguments for "nerdctl run..."
 static std::vector<std::string> defaultNerdctlRunArgs{
     "--pull=never",
-    "--host=net", // TODO: default for now, change later
+    "--net=host", // TODO: default for now, change later
     "--ulimit nofile=65536:65536"};
 
 HRESULT WSLAContainer::Start()
