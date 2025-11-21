@@ -84,10 +84,15 @@ HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOpti
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
+
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+
     // TODO: Log entrance into the function.
     m_containerId++;
-    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine);
-    container.CopyTo(__uuidof(IWSLAContainer), (void**)Container);
+    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
+    THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
     return S_OK;
 }
