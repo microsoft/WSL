@@ -607,7 +607,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
-                auto virtioNetworkingEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), m_vmConfig);
+                auto virtioNetworkingEngine =
+                    std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay);
                 virtioNetworkingEngine->OnAddGuestDevice([&](const GUID& Clsid, const GUID& DeviceId, PCWSTR Tag, PCWSTR Options) {
                     auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
                     return AddHdvShareWithOptions(DeviceId, Clsid, Tag, {}, Options, 0, m_userToken.get());

@@ -12,8 +12,8 @@ using wsl::core::VirtioNetworking;
 
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
-VirtioNetworking::VirtioNetworking(GnsChannel&& gnsChannel, const Config& config) :
-    m_gnsChannel(std::move(gnsChannel)), m_config(config)
+VirtioNetworking::VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay) :
+    m_gnsChannel(std::move(gnsChannel)), m_enableLocalhostRelay(enableLocalhostRelay)
 {
 }
 
@@ -121,7 +121,7 @@ try
         UpdateDns(std::move(dnsSettings));
     }
 
-    if (m_config.EnableLocalhostRelay)
+    if (m_enableLocalhostRelay)
     {
         SetupLoopbackDevice();
     }
@@ -181,7 +181,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         }
     }
 
-    if (m_config.EnableLocalhostRelay && (unspecified || loopback))
+    if (m_enableLocalhostRelay && (unspecified || loopback))
     {
         SOCKADDR_INET localAddr = addr;
         if (!loopback)
