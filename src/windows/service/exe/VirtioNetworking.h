@@ -16,7 +16,6 @@ using GuestInterfaceStateChangeCallback = std::function<void(const std::string& 
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay);
     VirtioNetworking(
         GnsChannel&& gnsChannel,
         bool enableLocalhostRelay,
@@ -51,7 +50,7 @@ private:
 
     mutable wil::srwlock m_lock;
 
-    std::optional<AddGuestDeviceRoutine> m_addGuestDeviceRoutine;
+    AddGuestDeviceRoutine m_addGuestDeviceRoutine;
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
@@ -60,8 +59,8 @@ private:
     GUID m_adapterId;
     std::optional<NL_NETWORK_CONNECTIVITY_LEVEL_HINT> m_connectivityLevel;
     std::optional<NL_NETWORK_CONNECTIVITY_COST_HINT> m_connectivityCost;
-    std::optional<ModifyOpenPortsCallback> m_modifyOpenPortsCallback;
-    std::optional<GuestInterfaceStateChangeCallback> m_guestInterfaceStateChangeCallback;
+    ModifyOpenPortsCallback m_modifyOpenPortsCallback;
+    GuestInterfaceStateChangeCallback m_guestInterfaceStateChangeCallback;
 
     std::optional<ULONGLONG> m_interfaceLuid;
     ULONG m_networkMtu = 0;

@@ -12,20 +12,15 @@ using wsl::core::VirtioNetworking;
 
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
-VirtioNetworking::VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay) :
-    m_gnsChannel(std::move(gnsChannel)), m_enableLocalhostRelay(enableLocalhostRelay)
-{
-}
-
 VirtioNetworking::VirtioNetworking(
     GnsChannel&& gnsChannel,
     bool enableLocalhostRelay,
     AddGuestDeviceRoutine addGuestDeviceRoutine,
     ModifyOpenPortsCallback modifyOpenPortsCallback,
     GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback) :
+    m_addGuestDeviceRoutine(std::move(addGuestDeviceRoutine)),
     m_gnsChannel(std::move(gnsChannel)),
     m_enableLocalhostRelay(enableLocalhostRelay),
-    m_addGuestDeviceRoutine(std::move(addGuestDeviceRoutine)),
     m_modifyOpenPortsCallback(std::move(modifyOpenPortsCallback)),
     m_guestInterfaceStateChangeCallback(std::move(guestInterfaceStateChangeCallback))
 {
@@ -78,7 +73,7 @@ try
     }
 
     // Add virtio net adapter to guest
-    m_adapterId = (*m_addGuestDeviceRoutine)(c_virtioNetworkClsid, c_virtioNetworkDeviceId, L"eth0", device_options.str().c_str());
+    m_adapterId = m_addGuestDeviceRoutine(c_virtioNetworkClsid, c_virtioNetworkDeviceId, L"eth0", device_options.str().c_str());
 
     auto lock = m_lock.lock_exclusive();
 
@@ -126,7 +121,7 @@ CATCH_LOG()
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
-    m_localhostAdapterId = (*m_addGuestDeviceRoutine)(
+    m_localhostAdapterId = m_addGuestDeviceRoutine(
         c_virtioNetworkClsid, c_virtioNetworkDeviceId, c_loopbackDeviceName, L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55");
 
     hns::HNSEndpoint endpointProperties;
@@ -156,7 +151,7 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
         [&](const SOCKADDR_INET& addr, int protocol, bool allocate) { return HandlePortNotification(addr, protocol, allocate); },
-        [&](_In_ const std::string& interfaceName, _In_ bool up) { (*m_guestInterfaceStateChangeCallback)(interfaceName, up); });
+        [&](_In_ const std::string& interfaceName, _In_ bool up) { m_guestInterfaceStateChangeCallback(interfaceName, up); });
 }
 
 HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
@@ -190,12 +185,12 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
                 localAddr.Ipv6.sin6_port = addr.Ipv6.sin6_port;
             }
         }
-        result = (*m_modifyOpenPortsCallback)(c_virtioNetworkClsid, c_loopbackDeviceName, localAddr, protocol, allocate);
+        result = m_modifyOpenPortsCallback(c_virtioNetworkClsid, c_loopbackDeviceName, localAddr, protocol, allocate);
         LOG_HR_IF_MSG(E_FAIL, result != S_OK, "Failure adding localhost relay port %d", localAddr.Ipv4.sin_port);
     }
     if (!loopback)
     {
-        const int localResult = (*m_modifyOpenPortsCallback)(c_virtioNetworkClsid, L"eth0", addr, protocol, allocate);
+        const int localResult = m_modifyOpenPortsCallback(c_virtioNetworkClsid, L"eth0", addr, protocol, allocate);
         LOG_HR_IF_MSG(E_FAIL, localResult != S_OK, "Failure adding relay port %d", addr.Ipv4.sin_port);
         if (result == 0)
         {
