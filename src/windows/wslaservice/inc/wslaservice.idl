@@ -153,8 +153,8 @@ enum WSLA_CONTAINER_STATE
 
 struct WSLA_CONTAINER
 {
-    LPCWSTR Name;
-    LPCWSTR Image;
+    LPWSTR Name;
+    LPWSTR Image;
     enum WSLA_CONTAINER_STATE State;
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
