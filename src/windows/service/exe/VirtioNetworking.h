@@ -17,11 +17,13 @@ class VirtioNetworking : public INetworkingEngine
 {
 public:
     VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay);
+    VirtioNetworking(
+        GnsChannel&& gnsChannel,
+        bool enableLocalhostRelay,
+        AddGuestDeviceRoutine addGuestDeviceRoutine,
+        ModifyOpenPortsCallback modifyOpenPortsCallback,
+        GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback);
     ~VirtioNetworking() = default;
-
-    VirtioNetworking& OnAddGuestDevice(const AddGuestDeviceRoutine& addGuestDeviceRoutine);
-    VirtioNetworking& OnModifyOpenPorts(const ModifyOpenPortsCallback& modifyOpenPortsCallback);
-    VirtioNetworking& OnGuestInterfaceStateChanged(const GuestInterfaceStateChangeCallback& guestInterfaceStateChangedCallback);
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
     VirtioNetworking(const VirtioNetworking&) = delete;

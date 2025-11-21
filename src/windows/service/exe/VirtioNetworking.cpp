@@ -17,29 +17,23 @@ VirtioNetworking::VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhost
 {
 }
 
-VirtioNetworking& VirtioNetworking::OnAddGuestDevice(const AddGuestDeviceRoutine& addGuestDeviceRoutine)
+VirtioNetworking::VirtioNetworking(
+    GnsChannel&& gnsChannel,
+    bool enableLocalhostRelay,
+    AddGuestDeviceRoutine addGuestDeviceRoutine,
+    ModifyOpenPortsCallback modifyOpenPortsCallback,
+    GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback) :
+    m_gnsChannel(std::move(gnsChannel)),
+    m_enableLocalhostRelay(enableLocalhostRelay),
+    m_addGuestDeviceRoutine(std::move(addGuestDeviceRoutine)),
+    m_modifyOpenPortsCallback(std::move(modifyOpenPortsCallback)),
+    m_guestInterfaceStateChangeCallback(std::move(guestInterfaceStateChangeCallback))
 {
-    m_addGuestDeviceRoutine = addGuestDeviceRoutine;
-    return *this;
-}
-
-VirtioNetworking& VirtioNetworking::OnModifyOpenPorts(const ModifyOpenPortsCallback& modifyOpenPortsCallback)
-{
-    m_modifyOpenPortsCallback = modifyOpenPortsCallback;
-    return *this;
-}
-
-VirtioNetworking& VirtioNetworking::OnGuestInterfaceStateChanged(const GuestInterfaceStateChangeCallback& guestInterfaceStateChangedCallback)
-{
-    m_guestInterfaceStateChangeCallback = guestInterfaceStateChangedCallback;
-    return *this;
 }
 
 void VirtioNetworking::Initialize()
 try
 {
-    THROW_HR_IF(E_NOT_SET, !m_addGuestDeviceRoutine || !m_modifyOpenPortsCallback || !m_guestInterfaceStateChangeCallback);
-
     m_networkSettings = GetHostEndpointSettings();
 
     // TODO: Determine gateway MAC address
