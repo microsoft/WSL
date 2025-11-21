@@ -2029,25 +2029,23 @@ int WslCoreVm::HandleVirtioModifyOpenPorts(_In_ const GUID& Clsid, _In_ PCWSTR T
     const auto server = m_deviceHostSupport->GetRemoteFileSystem(Clsid, c_defaultTag);
     if (server)
     {
-        std::wstring portString(L"tag=");
-        portString += Tag;
-        portString += L";port_number=";
-        portString += std::to_wstring(Addr.Ipv4.sin_port);
+        std::wstring portString = std::format(L"tag={};port_number={}", Tag, Addr.Ipv4.sin_port);
         if (Protocol == IPPROTO_UDP)
         {
             portString += L";udp";
         }
+
         if (!IsOpen)
         {
             portString += L";allocate=false";
         }
         else
         {
-            std::wstring addrStr(L"000.000.000.000\0");
-            RtlIpv4AddressToStringW(&Addr.Ipv4.sin_addr, addrStr.data());
-            portString += L";listen_addr=";
-            portString += addrStr;
+            wchar_t addrStr[16]; // "000.000.000.000" + null terminator
+            RtlIpv4AddressToStringW(&Addr.Ipv4.sin_addr, addrStr);
+            portString += std::format(L";listen_addr={}", addrStr);
         }
+
         LOG_IF_FAILED(server->AddShare(portString.c_str(), nullptr, 0));
     }
     return 0;
