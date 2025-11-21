@@ -138,7 +138,7 @@ struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
     LPCSTR Name;
-    struct WSLA_PROCESS_OPTIONS* InitProcessOptions;
+    struct WSLA_PROCESS_OPTIONS InitProcessOptions;
     [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
     ULONG VolumesCount;
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;

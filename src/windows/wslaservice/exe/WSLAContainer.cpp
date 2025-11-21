@@ -22,9 +22,11 @@ const std::string nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
 static std::vector<std::string> defaultNerdctlRunArgs{
-    "--pull=never",
-    "--host=net", // TODO: default for now, change later
-    "--ulimit nofile=65536:65536"};
+    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+    "-it", // TODO: only enable if fds allow for a tty.
+    "--net=host", // TODO: default for now, change later
+    "--ulimit",
+    "nofile=65536:65536"};
 
 HRESULT WSLAContainer::Start()
 {
@@ -68,16 +70,19 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
 {
     auto args = WSLAContainer::prepareNerdctlRunCommand(containerOptions);
 
-    ServiceProcessLauncher launcher(nerdctlPath, args);
+    ServiceProcessLauncher launcher(nerdctlPath, args, {}, common::ProcessFlags::None);
+    for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)
+    {
+        launcher.AddFd(containerOptions.InitProcessOptions.Fds[i]);
+    }
+
     return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM));
 }
 
 std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options)
 {
-    std::vector<std::string> args;
-
+    std::vector<std::string> args{nerdctlPath};
     args.push_back("run");
-    args.insert(args.end(), defaultNerdctlRunArgs.begin(), defaultNerdctlRunArgs.end());
     args.push_back("--name");
     args.push_back(options.Name);
     if (options.ShmSize > 0)
@@ -92,16 +97,8 @@ std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONT
         // args.push_back(options.GPUOptions.GPUDevices);
     }
 
-    args.insert(args.end(), {"--ulimit", "nofile=65536:65536"});
+    args.insert(args.end(), defaultNerdctlRunArgs.begin(), defaultNerdctlRunArgs.end());
 
-    for (ULONG i = 0; i < options.InitProcessOptions->CommandLineCount; i++)
-    {
-        args.push_back(options.InitProcessOptions->CommandLine[i]);
-    }
-    for (ULONG i = 0; i < options.InitProcessOptions->EnvironmentCount; i++)
-    {
-        args.push_back(options.InitProcessOptions->Environment[i]);
-    }
     for (ULONG i = 0; i < options.VolumesCount; i++)
     {
         std::string mountContainerPath;
@@ -115,13 +112,13 @@ std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONT
 
     args.push_back(options.Image);
 
-    if (options.InitProcessOptions->CommandLineCount)
+    if (options.InitProcessOptions.CommandLineCount)
     {
         args.push_back("--");
     }
-    for (ULONG i = 0; i < options.InitProcessOptions->CommandLineCount; i++)
+    for (ULONG i = 0; i < options.InitProcessOptions.CommandLineCount; i++)
     {
-        args.push_back(options.InitProcessOptions->CommandLine[i]);
+        args.push_back(options.InitProcessOptions.CommandLine[i]);
     }
 
     return args;

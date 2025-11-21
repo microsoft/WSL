@@ -1549,6 +1549,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.BootTimeoutMs = 30000;
     settings.NetworkingMode = WSLANetworkingModeNAT;
     std::wstring containerRootVhd;
+    std::string containerImage;
     bool help = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
@@ -1559,6 +1560,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(fsType), L"--fstype");
     parser.AddArgument(containerRootVhd, L"--container-vhd");
+    parser.AddArgument(Utf8String(containerImage), L"--image");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
@@ -1606,12 +1608,39 @@ int WslaShell(_In_ std::wstring_view commandLine)
         THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
     }
 
-    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+    std::optional<wil::com_ptr<IWSLAContainer>> container;
+    std::optional<wsl::windows::common::ClientRunningWSLAProcess> process;
 
-    auto process = launcher.Launch(*session);
+    if (containerImage.empty())
+    {
+        wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+
+        process = launcher.Launch(*session);
+    }
+    else
+    {
+        std::vector<WSLA_PROCESS_FD> fds{
+            WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput},
+            WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput},
+            WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl},
+        };
+
+        WSLA_CONTAINER_OPTIONS containerOptions{};
+        containerOptions.Image = containerImage.c_str();
+        containerOptions.Name = "test-container";
+        containerOptions.InitProcessOptions.Fds = fds.data();
+        containerOptions.InitProcessOptions.FdsCount = static_cast<DWORD>(fds.size());
+
+        container.emplace();
+        THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
+
+        wil::com_ptr<IWSLAProcess> initProcess;
+        THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
+        process.emplace(std::move(initProcess), std::move(fds));
+    }
 
     // Configure console for interactive usage.
 
@@ -1641,7 +1670,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
         wsl::shared::SocketChannel controlChannel{
-            wil::unique_socket{(SOCKET)process.GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
+            wil::unique_socket{(SOCKET)process->GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
 
         std::thread inputThread([&]() {
             auto updateTerminal = [&controlChannel, &Stdout]() {
@@ -1657,7 +1686,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
                 controlChannel.SendMessage(message);
             };
 
-            wsl::windows::common::relay::StandardInputRelay(Stdin, process.GetStdHandle(0).get(), updateTerminal, exitEvent.get());
+            wsl::windows::common::relay::StandardInputRelay(Stdin, process->GetStdHandle(0).get(), updateTerminal, exitEvent.get());
         });
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1666,12 +1695,12 @@ int WslaShell(_In_ std::wstring_view commandLine)
         });
 
         // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(process.GetStdHandle(1).get(), Stdout);
+        wsl::windows::common::relay::InterruptableRelay(process->GetStdHandle(1).get(), Stdout);
     }
 
-    process.GetExitEvent().wait();
+    process->GetExitEvent().wait();
 
-    auto [code, signalled] = process.GetExitState();
+    auto [code, signalled] = process->GetExitState();
     wprintf(L"%hs exited with: %i%hs", shell.c_str(), code, signalled ? " (signalled)" : "");
 
     return code;
