@@ -29,22 +29,18 @@ public:
 
     PSID GetUserSid() const;
 
-    HRESULT CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine);
     HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
 
-    void OnVmTerminated(WSLAVirtualMachine* machine);
+    void OnSessionTerminated(WSLASession* Session);
 
 private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 
     std::recursive_mutex m_wslaSessionsLock;
-    // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
-    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_wslaSessions;
     std::recursive_mutex m_lock;
-    std::vector<WSLAVirtualMachine*> m_virtualMachines; // TODO: Remove virtual machine awareness from WSLAUserSession
 
     // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
-    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_sessions;
+    std::unordered_set<WSLASession*> m_sessions;
 };
 
 class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLAUserSession
@@ -56,7 +52,6 @@ public:
     WSLAUserSession& operator=(const WSLAUserSession&) = delete;
 
     IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
-    IFACEMETHOD(CreateVirtualMachine)(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine) override; // TODO: Remove virtual machine awareness from WSLAUserSession
     IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASession** Session) override;
