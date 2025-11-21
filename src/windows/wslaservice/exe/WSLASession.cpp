@@ -133,7 +133,7 @@ try
     THROW_HR_IF_MSG(E_INVALIDARG, !std::filesystem::path(Path).is_absolute(), "FormatVirtualDisk called with a relative path: %ls", Path);
 
     std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine.has_value());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
     auto [lun, device] = m_virtualMachine->AttachDisk(Path, false);
@@ -144,7 +144,7 @@ try
     // Format it to ext4.
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
     ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, device});
-    auto result = launcher.Launch(*m_virtualMachine).WaitAndCaptureOutput();
+    auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 
