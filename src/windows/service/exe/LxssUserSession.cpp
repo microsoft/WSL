@@ -2952,11 +2952,13 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         if (PathFileExistsW(Configuration.VhdFilePath.c_str()))
         {
             if (m_utilityVm)
+            {
                 try
                 {
                     m_utilityVm->EjectVhd(Configuration.VhdFilePath.c_str());
                 }
-            CATCH_LOG()
+                CATCH_LOG()
+            }
 
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
@@ -2997,13 +2999,15 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
     // Remove start menu shortcuts for WSLg applications.
     if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_WSLG_SHORTCUTS))
+    {
         try
         {
             const auto dllPath = wsl::windows::common::wslutil::GetBasePath() / WSLG_TS_PLUGIN_DLL;
             static LxssDynamicFunction<decltype(RemoveAppProvider)> removeAppProvider(dllPath.c_str(), "RemoveAppProvider");
             LOG_IF_FAILED(removeAppProvider(Configuration.Name.c_str()));
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // If the basepath is empty, delete it.
     try
@@ -3059,11 +3063,13 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
 
     // Ensure that the default distribution is still valid.
     if (!orphanedDistributions.empty())
+    {
         try
         {
             _GetDefaultDistro(LxssKey);
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     return distributions;
 }

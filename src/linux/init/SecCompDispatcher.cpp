@@ -77,7 +77,9 @@ void SecCompDispatcher::Run()
     for (;;)
     {
         if (!wait_for_fd(m_notifyFd.get(), POLLIN))
+        {
             break;
+        }
 
         // Clear the buffers to make the 5.15 kernel happy.
         notification_buffer.clear();

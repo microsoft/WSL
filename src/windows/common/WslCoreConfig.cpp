@@ -400,6 +400,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 
     // Load NAT configuration from the registry.
     if (NetworkingMode == wsl::core::NetworkingMode::Nat)
+    {
         try
         {
             const auto machineKey = wsl::windows::common::registry::OpenLxssMachineKey();
@@ -410,10 +411,12 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
             const auto userKey = wsl::windows::common::registry::OpenLxssUserKey();
             NatIpAddress = wsl::windows::common::registry::ReadString(userKey.get(), nullptr, c_natIpAddress, L"");
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Due to an issue with Global Secure Access Client, do not use DNS tunneling if the service is present.
     if (EnableDnsTunneling)
+    {
         try
         {
             // Open a handle to the service control manager and check if the inbox service is registered.
@@ -438,7 +441,8 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
                 }
             }
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Ensure that settings are consistent (disable features that require other features that are not present).
     if (EnableSafeMode)

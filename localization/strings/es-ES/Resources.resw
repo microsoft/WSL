@@ -537,7 +537,7 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         Exporta la distribución a un archivo tar.
-        El nombre de archivo puede ser: para stdout.
+        El nombre de archivo puede ser - para stdout.
 
         Opciones:
             --format &lt;Format&gt;
@@ -545,7 +545,7 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Options]
         Importa el archivo tar especificado como una nueva distribución.
-        El nombre de archivo puede ser : para stdin.
+        El nombre de archivo puede ser - para stdin.
 
         Opciones:
             --version &lt;Version&gt;

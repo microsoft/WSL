@@ -25,12 +25,12 @@
                 <ctControls:SettingsCard x:Uid="Settings_HyperVFirewall">
                     <ToggleSwitch x:Uid="Settings_HyperVFirewallToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnHyperVFirewall, Mode=TwoWay}"/>
                 </ctControls:SettingsCard>
-                <ctControls:SettingsExpander x:Uid="Settings_IgnoredPorts">
+                <ctControls:SettingsExpander x:Name="IgnoredPortsExpander" x:Uid="Settings_IgnoredPorts">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.IgnoredPorts, Mode=OneWay}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_IgnoredPortsTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="IgnoredPortsTextBox" x:Uid="Settings_IgnoredPortsTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.IgnoredPorts, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
                                 <Button x:Uid="Settings_IgnoredPortsResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Command="{x:Bind ViewModel.IgnoredPorts_ResetCommand}" IsEnabled="{x:Bind ViewModel.IgnoredPorts_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -48,12 +48,12 @@
                 <ctControls:SettingsCard x:Uid="Settings_AutoProxy">
                     <ToggleSwitch x:Uid="Settings_AutoProxyToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnAutoProxy, Mode=TwoWay}"/>
                 </ctControls:SettingsCard>
-                <ctControls:SettingsExpander x:Uid="Settings_InitialAutoProxyTimeout">
+                <ctControls:SettingsExpander x:Name="InitialAutoProxyTimeoutExpander" x:Uid="Settings_InitialAutoProxyTimeout">
                     <TextBlock Style="{StaticResource TextBlockSettingStyle}" Text="{x:Bind ViewModel.InitialAutoProxyTimeout, Mode=OneWay, Converter={StaticResource MillisecondsStringConverter}}"/>
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="{StaticResource SettingsExpanderItemMargin}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBox x:Uid="Settings_InitialAutoProxyTimeoutTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
+                                <TextBox x:Name="InitialAutoProxyTimeoutTextBox" x:Uid="Settings_InitialAutoProxyTimeoutTextBox" Style="{StaticResource TextBoxSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Text="{x:Bind ViewModel.InitialAutoProxyTimeout, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" TextChanged="InitialAutoProxyTimeoutTextBox_TextChanged"/>
                                 <Button x:Uid="Settings_InitialAutoProxyTimeoutResetButton" Style="{StaticResource ButtonSettingStyle}" Margin="{StaticResource InputControlSpacingMargin}"
                                     Command="{x:Bind ViewModel.InitialAutoProxyTimeout_ResetCommand}" IsEnabled="{x:Bind ViewModel.InitialAutoProxyTimeout_ResetEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

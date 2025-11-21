@@ -80,7 +80,7 @@ namespace LibWsl
 
         internal static bool __TryGetNativeToManagedMapping(IntPtr native, out global::LibWsl.WslConfig managed)
         {
-    
+
             return NativeToManagedMap.TryGetValue(native, out managed);
         }
 
@@ -171,7 +171,7 @@ namespace LibWsl
 
         internal static bool __TryGetNativeToManagedMapping(IntPtr native, out global::LibWsl.WslConfigSetting managed)
         {
-    
+
             return NativeToManagedMap.TryGetValue(native, out managed);
         }
 
