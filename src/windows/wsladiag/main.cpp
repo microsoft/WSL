@@ -95,39 +95,6 @@ int wsladiag_main(std::wstring_view commandLine)
             }
         });
 
-        auto Utf8ToDisplayName = [](const char* utf8) -> std::wstring {
-            if (!utf8)
-            {
-                return L"<unnamed>";
-            }
-
-            const int length = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
-            if (length <= 0)
-            {
-                return L"<unnamed>";
-            }
-
-            // length includes the null terminator
-            std::wstring result(length, L'\0');
-
-            const int written = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, result.data(), length);
-            if (written <= 0)
-            {
-                return L"<unnamed>";
-            }
-
-            // MultiByteToWideChar returns the number of wide chars written including the terminating NUL.
-            // Resize to drop the trailing NUL only when the result is sane; otherwise return the fallback.
-            if (written > 0 && written <= length)
-            {
-                WI_ASSERT(result[written - 1] == L'\0');
-                result.resize(written - 1); // drop trailing NUL
-                return result;
-            }
-
-            return L"<unnamed>";
-        };
-
         if (sessions.size() == 0)
         {
             wslutil::PrintMessage(L"No WSLA sessions found.\n", stdout);
@@ -143,9 +110,19 @@ int wsladiag_main(std::wstring_view commandLine)
             {
                 const auto& session = sessions[i];
 
-                const std::wstring displayName = Utf8ToDisplayName(session.DisplayName);
+                const char* displayName = session.DisplayName;
+                if (displayName == nullptr)
+                {
+                    displayName = "<unnamed>";
+                }
 
-                wslutil::PrintMessage(std::format(L"{}\t{}\t\t{}\n", session.Id, session.CreatorPid, displayName), stdout);
+                wslutil::PrintMessage(
+                    std::format(
+                        L"{}\t{}\t\t{}\n",
+                        session.Id,
+                        session.CreatorPid,
+                        displayName), // std::formatter<char*, wchar_t> does UTF-8 → wide
+                    stdout);
             }
         }
 
