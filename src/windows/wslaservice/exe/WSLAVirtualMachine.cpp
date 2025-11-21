@@ -879,9 +879,9 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     }
 
     std::map<int, wil::unique_handle> stdHandles;
-    for (auto& [fd, socket] : sockets)
+    for (auto& [fd, handle] : sockets)
     {
-        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(socket.release()));
+        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(handle.release()));
     }
 
     auto process = wil::MakeOrThrow<WSLAProcess>(std::move(stdHandles), pid, this);
