@@ -51,7 +51,7 @@ class WSLATests
         return true;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(VIRTUAL_MACHINE_SETTINGS& vmSettings)
+    wil::com_ptr<IWSLASession> CreateSession(VIRTUAL_MACHINE_SETTINGS& vmSettings, const WSLA_SESSION_SETTINGS& sessionSettings = {L"wsla-test"})
     {
         vmSettings.RootVhdType = "ext4";
 
@@ -59,10 +59,9 @@ class WSLATests
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        WSLA_SESSION_SETTINGS settings{L"wsla-test"};
         wil::com_ptr<IWSLASession> session;
 
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
+        VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, &vmSettings, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         return session;
@@ -220,40 +219,57 @@ class WSLATests
         }
     }
 
-    /*
-    TODO: Implement once available.
     TEST_METHOD(TerminationCallback)
     {
         WSL2_TEST_ONLY();
 
-        std::promise<std::pair<WslVirtualMachineTerminationReason, std::wstring>> callbackInfo;
+        class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
+        {
 
-        auto callback = [](void* context, WslVirtualMachineTerminationReason reason, LPCWSTR details) -> HRESULT {
-            auto* future = reinterpret_cast<std::promise<std::pair<WslVirtualMachineTerminationReason, std::wstring>>*>(context);
+        public:
+            CallbackInstance(std::function<void(WSLAVirtualMachineTerminationReason, LPCWSTR)>&& callback) :
+                m_callback(std::move(callback))
+            {
+            }
 
-            future->set_value(std::make_pair(reason, details));
+            HRESULT OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details) override
+            {
+                m_callback(Reason, Details);
+                return S_OK;
+            }
 
-            return S_OK;
+        private:
+            std::function<void(WSLAVirtualMachineTerminationReason, LPCWSTR)> m_callback;
         };
 
-        WslVirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
         settings.DisplayName = L"WSLA";
-        settings.Memory.MemoryMb = 1024;
-        settings.Options.BootTimeoutMs = 30000;
-        settings.Options.TerminationCallback = callback;
-        settings.Options.TerminationContext = &callbackInfo;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
-        auto vm = CreateVm(&settings);
+        std::promise<std::pair<WSLAVirtualMachineTerminationReason, std::wstring>> promise;
 
-        VERIFY_SUCCEEDED(WslShutdownVirtualMachine(vm.get(), 30 * 1000));
+        CallbackInstance callback{[&](WSLAVirtualMachineTerminationReason reason, LPCWSTR details) {
+            promise.set_value(std::make_pair(reason, details));
+        }};
 
-        auto future = callbackInfo.get_future();
-        auto result = future.wait_for(std::chrono::seconds(10));
+        WSLA_SESSION_SETTINGS sessionSettings{L"wsla-test"};
+        sessionSettings.TerminationCallback = &callback;
+
+        auto session = CreateSession(settings, sessionSettings);
+
+        wil::com_ptr<IWSLAVirtualMachine> vm;
+        VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
+        VERIFY_SUCCEEDED(vm->Shutdown(30 * 1000));
+        auto future = promise.get_future();
+        auto result = future.wait_for(std::chrono::seconds(30));
         auto [reason, details] = future.get();
-        VERIFY_ARE_EQUAL(reason, WslVirtualMachineTerminationReasonShutdown);
+        VERIFY_ARE_EQUAL(reason, WSLAVirtualMachineTerminationReasonShutdown);
         VERIFY_ARE_NOT_EQUAL(details, L"");
-    }*/
+    }
 
     TEST_METHOD(InteractiveShell)
     {

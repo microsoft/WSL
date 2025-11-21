@@ -24,6 +24,7 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
 {
 public:
     WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings);
+    ~WSLASession();
 
     IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName) override;
 
@@ -47,10 +48,12 @@ public:
 
     IFACEMETHOD(Shutdown(_In_ ULONG)) override;
 
+    void OnUserSessionTerminating();
+
 private:
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
-    WSLAUserSessionImpl& m_userSession;
-    std::optional<WSLAVirtualMachine> m_virtualMachine;
+    WSLAUserSessionImpl* m_userSession = nullptr;
+    Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::wstring m_displayName;
     std::mutex m_lock;
 };

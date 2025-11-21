@@ -34,7 +34,7 @@ constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
 
 WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
-    m_settings(Settings), m_userSid(UserSid), m_userSession(Session)
+    m_settings(Settings), m_userSid(UserSid)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
 
@@ -57,11 +57,12 @@ HRESULT WSLAVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
     return S_OK;
 }
 
-void WSLAVirtualMachine::OnSessionTerminating()
+void WSLAVirtualMachine::OnSessionTerminated()
 {
-    m_userSession = nullptr;
-    std::lock_guard mutex(m_lock);
+    // This method is called when the WSLA session is terminated.
+    // When that happens, signal the terminating event to cancel any pending operation
 
+    std::lock_guard mutex(m_lock);
     if (m_vmTerminatingEvent.is_signaled())
     {
         return;
@@ -74,15 +75,6 @@ void WSLAVirtualMachine::OnSessionTerminating()
 
 WSLAVirtualMachine::~WSLAVirtualMachine()
 {
-    {
-        std::lock_guard mutex(m_lock);
-
-        if (m_userSession != nullptr)
-        {
-            m_userSession->OnVmTerminated(this);
-        }
-    }
-
     WSL_LOG("WSLATerminateVmStart", TraceLoggingValue(m_running, "running"));
 
     m_initChannel.Close();
@@ -416,7 +408,7 @@ try
 
         // Signal the exited process, if it's been monitored.
         {
-            std::lock_guard lock{m_lock};
+            std::lock_guard lock{m_trackedProcessesLock};
 
             bool found = false;
             for (auto& e : m_trackedProcesses)
@@ -885,15 +877,15 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     }
 
     std::map<int, wil::unique_handle> stdHandles;
-    for (auto& [fd, socket] : sockets)
+    for (auto& [fd, handle] : sockets)
     {
-        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(socket.release()));
+        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(handle.release()));
     }
 
     auto process = wil::MakeOrThrow<WSLAProcess>(std::move(stdHandles), pid, this);
 
     {
-        std::lock_guard lock{m_lock};
+        std::lock_guard lock{m_trackedProcessesLock};
         m_trackedProcesses.emplace_back(process.Get());
     }
 
@@ -1004,8 +996,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAVirtualMachine::RegisterCallback(ITerminationCallback* callback)
-try
+void WSLAVirtualMachine::RegisterCallback(ITerminationCallback* callback)
 {
     std::lock_guard lock(m_lock);
 
@@ -1013,10 +1004,7 @@ try
 
     // N.B. this calls AddRef() on the callback
     m_terminationCallback = callback;
-
-    return S_OK;
 }
-CATCH_RETURN();
 
 bool WSLAVirtualMachine::ParseTtyInformation(
     const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl)
@@ -1326,7 +1314,7 @@ void WSLAVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
 
 void WSLAVirtualMachine::OnProcessReleased(int Pid)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard lock{m_trackedProcessesLock};
 
     auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
 }

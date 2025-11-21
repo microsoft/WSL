@@ -26,6 +26,14 @@ public sealed partial class NetworkingPage : Page
                 FrameworkElementAutomationPeer.FromElement(Settings_ErrorTryAgainLater).RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
             }
         });
+
+        this.Loaded += OnPageLoaded;
+    }
+
+    private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "IgnoredPortsExpander", "IgnoredPortsTextBox");
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "InitialAutoProxyTimeoutExpander", "InitialAutoProxyTimeoutTextBox");
     }
 
     override protected void OnNavigatedFrom(NavigationEventArgs e)

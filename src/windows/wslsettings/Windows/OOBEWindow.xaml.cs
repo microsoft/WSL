@@ -1,9 +1,11 @@
-﻿// Copyright (c) Microsoft Corporation
+﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.Graphics;
+using Windows.System;
 using WinUIEx.Messaging;
 using Windows.UI.ViewManagement;
 using Windows.UI.WindowManagement;
@@ -39,6 +41,7 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
 
         // Theme change code picked from https://github.com/microsoft/WinUI-Gallery/pull/1239
         settings.ColorValuesChanged += Settings_ColorValuesChanged; // cannot use FrameworkElement.ActualThemeChanged event
+        settings.TextScaleFactorChanged += Settings_TextScaleFactorChanged;
 
         WindowManager.Get(this).IsMinimizable = false;
         WindowManager.Get(this).IsMaximizable = false;
@@ -60,6 +63,8 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
                 e.Handled = true;
             }
         };
+
+        this.Activated += OnWindowActivated;
     }
 
     // this handles updating the caption button colors correctly when windows system theme is changed
@@ -70,6 +75,16 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         dispatcherQueue.TryEnqueue(() =>
         {
             TitleBarHelper.ApplySystemThemeToCaptionButtons(this);
+        });
+    }
+
+    // This handles text scaling changes for accessibility
+    private void Settings_TextScaleFactorChanged(UISettings sender, object args)
+    {
+        // This calls comes off-thread, hence we will need to dispatch it to current app's thread
+        dispatcherQueue.TryEnqueue(() =>
+        {
+            ResizeWindow();
         });
     }
 
@@ -93,9 +108,15 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
 
     private void ResizeWindow()
     {
-        float scalingFactor = (float)currentDPI / DefaultDPI;
-        int width = (int)(ExpectedWidth * scalingFactor);
-        int height = (int)(ExpectedHeight * scalingFactor);
+        float dpiScalingFactor = (float)currentDPI / DefaultDPI;
+        float textScalingFactor = (float)settings.TextScaleFactor;
+
+        // Combine DPI scaling and text scaling for accessibility
+        float combinedScalingFactor = dpiScalingFactor * textScalingFactor;
+
+        int width = (int)(ExpectedWidth * combinedScalingFactor);
+        int height = (int)(ExpectedHeight * combinedScalingFactor);
+
         SizeInt32 size;
         size.Width = width;
         size.Height = height;
@@ -108,6 +129,13 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         {
             msgMonitor?.Dispose();
             settings.ColorValuesChanged -= Settings_ColorValuesChanged;
+            settings.TextScaleFactorChanged -= Settings_TextScaleFactorChanged;
+            this.Activated -= OnWindowActivated;
+            if (this.Content is Microsoft.UI.Xaml.Controls.Page page)
+            {
+                page.KeyboardAccelerators.Clear();
+            }
+
             disposedValue = true;
         }
     }
@@ -117,5 +145,26 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
         // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
+    }
+
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState != WindowActivationState.Deactivated && this.Content != null)
+        {
+            this.Activated -= OnWindowActivated;
+
+            if (this.Content is Microsoft.UI.Xaml.Controls.Page page)
+            {
+                var escapeAccelerator = new KeyboardAccelerator() { Key = VirtualKey.Escape };
+                escapeAccelerator.Invoked += OnCloseKeyboardAcceleratorInvoked;
+                page.KeyboardAccelerators.Add(escapeAccelerator);
+            }
+        }
+    }
+
+    private void OnCloseKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        Close();
+        args.Handled = true;
     }
 }

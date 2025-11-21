@@ -346,6 +346,7 @@ bool LxssInstance::RequestStop(_In_ bool Force)
     // Send the message to the init daemon to check if the instance can be terminated.
     bool shutdown = true;
     if (m_InitMessagePort)
+    {
         try
         {
             auto lock = m_InitMessagePort->Lock();
@@ -358,7 +359,8 @@ bool LxssInstance::RequestStop(_In_ bool Force)
             m_InitMessagePort->Receive(&terminateResponse, sizeof(terminateResponse));
             shutdown = terminateResponse.Result;
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     return shutdown;
 }
