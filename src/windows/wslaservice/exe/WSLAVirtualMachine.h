@@ -48,13 +48,12 @@ public:
     ~WSLAVirtualMachine();
 
     void Start();
-    void OnSessionTerminating();
+    void OnSessionTerminated();
 
     IFACEMETHOD(CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
-    IFACEMETHOD(RegisterCallback(_In_ ITerminationCallback* callback)) override;
     IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
     IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
     IFACEMETHOD(Unmount(_In_ const char* Path)) override;
@@ -64,6 +63,7 @@ public:
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags);
 
     void OnProcessReleased(int Pid);
+    void RegisterCallback(_In_ ITerminationCallback* callback);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
@@ -93,6 +93,7 @@ private:
     void CreateVmSavedStateFile();
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
+    void CollectCrashDumps(wil::unique_socket&& listenSocket) const;
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
@@ -110,6 +111,7 @@ private:
 
     VIRTUAL_MACHINE_SETTINGS m_settings;
     std::thread m_processExitThread;
+    std::thread m_crashDumpCollectionThread;
 
     GUID m_vmId{};
     std::wstring m_vmIdString;
@@ -119,6 +121,8 @@ private:
     PSID m_userSid{};
     wil::unique_handle m_userToken;
     std::wstring m_debugShellPipe;
+
+    std::mutex m_trackedProcessesLock;
     std::vector<WSLAProcess*> m_trackedProcesses;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
@@ -142,6 +146,5 @@ private:
     std::map<std::string, std::wstring> m_plan9Mounts;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
-    WSLAUserSessionImpl* m_userSession;
 };
 } // namespace wsl::windows::service::wsla

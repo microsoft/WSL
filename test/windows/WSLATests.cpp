@@ -50,7 +50,7 @@ class WSLATests
         return true;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(VIRTUAL_MACHINE_SETTINGS& vmSettings)
+    wil::com_ptr<IWSLASession> CreateSession(VIRTUAL_MACHINE_SETTINGS& vmSettings, const WSLA_SESSION_SETTINGS& sessionSettings = {L"wsla-test"})
     {
         vmSettings.RootVhdType = "ext4";
 
@@ -58,10 +58,9 @@ class WSLATests
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        WSLA_SESSION_SETTINGS settings{L"wsla-test"};
         wil::com_ptr<IWSLASession> session;
 
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &vmSettings, &session));
+        VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, &vmSettings, &session));
         return session;
     }
 
@@ -217,40 +216,57 @@ class WSLATests
         }
     }
 
-    /*
-    TODO: Implement once available.
     TEST_METHOD(TerminationCallback)
     {
         WSL2_TEST_ONLY();
 
-        std::promise<std::pair<WslVirtualMachineTerminationReason, std::wstring>> callbackInfo;
+        class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
+            : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
+        {
 
-        auto callback = [](void* context, WslVirtualMachineTerminationReason reason, LPCWSTR details) -> HRESULT {
-            auto* future = reinterpret_cast<std::promise<std::pair<WslVirtualMachineTerminationReason, std::wstring>>*>(context);
+        public:
+            CallbackInstance(std::function<void(WSLAVirtualMachineTerminationReason, LPCWSTR)>&& callback) :
+                m_callback(std::move(callback))
+            {
+            }
 
-            future->set_value(std::make_pair(reason, details));
+            HRESULT OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details) override
+            {
+                m_callback(Reason, Details);
+                return S_OK;
+            }
 
-            return S_OK;
+        private:
+            std::function<void(WSLAVirtualMachineTerminationReason, LPCWSTR)> m_callback;
         };
 
-        WslVirtualMachineSettings settings{};
-        settings.CPU.CpuCount = 4;
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
         settings.DisplayName = L"WSLA";
-        settings.Memory.MemoryMb = 1024;
-        settings.Options.BootTimeoutMs = 30000;
-        settings.Options.TerminationCallback = callback;
-        settings.Options.TerminationContext = &callbackInfo;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
 
-        auto vm = CreateVm(&settings);
+        std::promise<std::pair<WSLAVirtualMachineTerminationReason, std::wstring>> promise;
 
-        VERIFY_SUCCEEDED(WslShutdownVirtualMachine(vm.get(), 30 * 1000));
+        CallbackInstance callback{[&](WSLAVirtualMachineTerminationReason reason, LPCWSTR details) {
+            promise.set_value(std::make_pair(reason, details));
+        }};
 
-        auto future = callbackInfo.get_future();
-        auto result = future.wait_for(std::chrono::seconds(10));
+        WSLA_SESSION_SETTINGS sessionSettings{L"wsla-test"};
+        sessionSettings.TerminationCallback = &callback;
+
+        auto session = CreateSession(settings, sessionSettings);
+
+        wil::com_ptr<IWSLAVirtualMachine> vm;
+        VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
+        VERIFY_SUCCEEDED(vm->Shutdown(30 * 1000));
+        auto future = promise.get_future();
+        auto result = future.wait_for(std::chrono::seconds(30));
         auto [reason, details] = future.get();
-        VERIFY_ARE_EQUAL(reason, WslVirtualMachineTerminationReasonShutdown);
+        VERIFY_ARE_EQUAL(reason, WSLAVirtualMachineTerminationReasonShutdown);
         VERIFY_ARE_NOT_EQUAL(details, L"");
-    }*/
+    }
 
     TEST_METHOD(InteractiveShell)
     {
@@ -968,5 +984,82 @@ class WSLATests
             VERIFY_ARE_EQUAL(session->CreateRootNamespaceProcess(&options, &process, &error), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
             VERIFY_ARE_EQUAL(error, -1);
         }
+    }
+
+    TEST_METHOD(CrashDumpCollection)
+    {
+        WSL2_TEST_ONLY();
+
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = testVhd.c_str();
+
+        auto session = CreateSession(settings);
+        int processId = 0;
+
+        // Cache the existing crash dumps so we can check that a new one is created.
+        auto crashDumpsDir = std::filesystem::temp_directory_path() / "wsla-crashes";
+        std::set<std::filesystem::path> existingDumps;
+
+        if (std::filesystem::exists(crashDumpsDir))
+        {
+            existingDumps = {std::filesystem::directory_iterator(crashDumpsDir), std::filesystem::directory_iterator{}};
+        }
+
+        // Create a stuck process and crash it.
+        {
+            WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto process = launcher.Launch(*session);
+
+            // Get the process id. This is need to identify the crash dump file.
+            VERIFY_SUCCEEDED(process.Get().GetPid(&processId));
+
+            // Send SIGSEV(11) to crash the process.
+            VERIFY_SUCCEEDED(process.Get().Signal(11));
+
+            auto result = process.WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 11);
+            VERIFY_ARE_EQUAL(result.Signalled, true);
+            VERIFY_ARE_EQUAL(result.Output[1], "");
+            VERIFY_ARE_EQUAL(result.Output[2], "");
+
+            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+
+        // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
+        // Check if a new file was added in crashDumpsDir matching the pattern and not in existingDumps.
+        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
+
+        auto dumpFile = wsl::shared::retry::RetryWithTimeout<std::filesystem::path>(
+            [crashDumpsDir, expectedPattern, existingDumps]() {
+                for (const auto& entry : std::filesystem::directory_iterator(crashDumpsDir))
+                {
+                    const auto& filePath = entry.path();
+                    if (existingDumps.find(filePath) == existingDumps.end() &&
+                        PathMatchSpecA(filePath.filename().string().c_str(), expectedPattern.c_str()))
+                    {
+                        return filePath;
+                    }
+                }
+
+                throw wil::ResultException(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            },
+            std::chrono::milliseconds{100},
+            std::chrono::seconds{10});
+
+        // Ensure that the dump file is cleaned up after test completion.
+        auto cleanup = wil::scope_exit([&] {
+            if (std::filesystem::exists(dumpFile))
+            {
+                std::filesystem::remove(dumpFile);
+            }
+        });
+
+        VERIFY_IS_TRUE(std::filesystem::exists(dumpFile));
+        VERIFY_IS_TRUE(std::filesystem::file_size(dumpFile) > 0);
     }
 };

@@ -16,7 +16,9 @@ Abstract:
 #include "SocketChannel.h"
 #include "message.h"
 #include "localhost.h"
+#include "common.h"
 #include <utmp.h>
+#include <unistd.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
@@ -52,12 +54,27 @@ int Chroot(const char* Target);
 
 extern int g_LogFd;
 
+extern void WSLAEnableCrashDumpCollection();
+
 struct WSLAState
 {
     std::optional<std::filesystem::path> ModulesMountPoint;
 };
 
 static WSLAState g_state;
+
+void WSLAEnableCrashDumpCollection()
+{
+    if (symlink("/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0)
+    {
+        LOG_ERROR("symlink({}, {}) failed {}", "/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH, errno);
+        return;
+    }
+
+    // If the first character is a pipe, then the kernel will interpret this path as a command.
+    constexpr auto core_pattern = "|/" LX_INIT_WSL_CAPTURE_CRASH " %t %E %p %s";
+    WriteToFile("/proc/sys/kernel/core_pattern", core_pattern);
+}
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_GET_DISK& Message, const gsl::span<gsl::byte>& Buffer)
 {
@@ -496,6 +513,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
+
+            // Reconfigure crash dump collection after chroot so symlink & core_pattern resolve correctly.
+            WSLAEnableCrashDumpCollection();
         }
 
         response.Result = 0;
@@ -795,6 +815,9 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     {
         return -1;
     }
+
+    // Enable crash dump collection.
+    WSLAEnableCrashDumpCollection();
 
     //
     // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.

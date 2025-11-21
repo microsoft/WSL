@@ -2058,6 +2058,7 @@ int wsl::windows::common::WslClient::Main(_In_ LPCWSTR commandLine)
 
     // Print error messages for failures.
     if (FAILED(result))
+    {
         try
         {
             std::wstring errorString{};
@@ -2111,7 +2112,8 @@ int wsl::windows::common::WslClient::Main(_In_ LPCWSTR commandLine)
                 }
             }
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     if (g_promptBeforeExit)
     {
