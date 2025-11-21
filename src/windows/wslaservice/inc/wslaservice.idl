@@ -225,6 +225,8 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
     BOOL EnableGPU;
     LPCWSTR RootVhd; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
     LPCSTR RootVhdType; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
+    LPCWSTR ContainerRootVhd;
+    BOOL FormatContainerRootVhd;
 } VIRTUAL_MACHINE_SETTINGS;
 
 

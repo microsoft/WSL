@@ -21,6 +21,7 @@ Abstract:
 #include "wslaservice.h"
 #include "WSLAApi.h"
 #include "WSLAProcessLauncher.h"
+#include "WslCoreFilesystem.h"
 
 #define BASH_PATH L"/bin/bash"
 
@@ -1527,13 +1528,17 @@ int RunDebugShell()
 // Temporary debugging tool for WSLA
 int WslaShell(_In_ std::wstring_view commandLine)
 {
-#ifdef WSL_SYSTEM_DISTRO_PATH
+#ifdef WSLA_TEST_DISTRO_PATH
 
-    std::wstring vhd = TEXT(WSL_SYSTEM_DISTRO_PATH);
+    std::wstring vhd = TEXT(WSLA_TEST_DISTRO_PATH);
+    std::string shell = "/bin/sh";
+    std::string fsType = "squashfs";
 
 #else
 
     std::wstring vhd = wsl::windows::common::wslutil::GetMsiPackagePath().value() + L"/system.vhd";
+    std::string shell = "/bin/bash";
+    std::string fsType = "ext4";
 
 #endif
 
@@ -1543,8 +1548,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.MemoryMb = 1024;
     settings.BootTimeoutMs = 30000;
     settings.NetworkingMode = WSLANetworkingModeNAT;
-    std::string shell = "/bin/bash";
-    std::string fsType = "ext4";
+    std::wstring containerRootVhd;
     bool help = false;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
@@ -1554,17 +1558,31 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(fsType), L"--fstype");
+    parser.AddArgument(containerRootVhd, L"--container-vhd");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--new-api] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
         return 1;
+    }
+
+    if (!containerRootVhd.empty())
+    {
+        settings.ContainerRootVhd = containerRootVhd.c_str();
+
+        if (!std::filesystem::exists(containerRootVhd))
+        {
+            auto token = wil::open_current_access_token();
+            auto tokenInfo = wil::get_token_information<TOKEN_USER>(token.get());
+            wsl::core::filesystem::CreateVhd(containerRootVhd.c_str(), 5368709120 /* 5 GB */, tokenInfo->User.Sid, FALSE, FALSE);
+            settings.FormatContainerRootVhd = TRUE;
+        }
     }
 
     wil::com_ptr<IWSLAUserSession> userSession;
@@ -1572,7 +1590,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-    WSLA_SESSION_SETTINGS sessionSettings{L"my-display-name"};
+    WSLA_SESSION_SETTINGS sessionSettings{L"WSLA Test Session"};
     wil::com_ptr<IWSLASession> session;
     settings.RootVhd = vhd.c_str();
     settings.RootVhdType = fsType.c_str();
@@ -1580,6 +1598,13 @@ int WslaShell(_In_ std::wstring_view commandLine)
     THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+    if (!containerRootVhd.empty())
+    {
+        wsl::windows::common::WSLAProcessLauncher initProcessLauncher{shell, {shell, "/etc/lsw-init.sh"}};
+        auto initProcess = initProcessLauncher.Launch(*session);
+        THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
+    }
 
     wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});

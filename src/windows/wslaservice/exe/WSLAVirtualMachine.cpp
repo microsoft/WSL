@@ -358,8 +358,6 @@ void WSLAVirtualMachine::Start()
         wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
     }
 
-    ConfigureMounts();
-
     auto [__, ___, childChannel] = Fork(WSLA_FORK::Thread);
 
     WSLA_WATCH_PROCESSES watchMessage{};
@@ -368,6 +366,8 @@ void WSLAVirtualMachine::Start()
     THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
 
     m_processExitThread = std::thread(std::bind(&WSLAVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
+
+    ConfigureMounts();
 }
 
 void WSLAVirtualMachine::ConfigureMounts()
@@ -385,7 +385,19 @@ void WSLAVirtualMachine::ConfigureMounts()
         MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsNone);
     }
 
-    // TODO: Mount storage VHD here.
+    if (m_settings.ContainerRootVhd) // TODO: re-think how container root settings should work at the session level API.
+    {
+        auto [_, containerRootDevice] = AttachDisk(m_settings.ContainerRootVhd, false);
+
+        if (m_settings.FormatContainerRootVhd)
+        {
+            ServiceProcessLauncher formatProcessLauncher{"/usr/sbin/mkfs.ext4", {"/usr/sbin/mkfs.ext4", containerRootDevice}};
+            auto formatProcess = formatProcessLauncher.Launch(*this);
+            THROW_HR_IF(E_FAIL, formatProcess.WaitAndCaptureOutput().Code != 0);
+        }
+
+        Mount(m_initChannel, containerRootDevice.c_str(), "/root", "ext4", "rw", 0);
+    }
 }
 
 void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
