@@ -92,7 +92,7 @@ std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONT
         // args.push_back(options.GPUOptions.GPUDevices);
     }
 
-    args.insert(args.end(), {"--ulimit", "nofile=65536:65536"});
+    // Removed redundant --ulimit nofile=65536:65536 (already in defaultNerdctlRunArgs)
 
     // TODO: need to worry about env variables with dashes in them?
     for (ULONG i = 0; i < options.InitProcessOptions->EnvironmentCount; i++)
