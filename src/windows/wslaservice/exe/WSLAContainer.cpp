@@ -21,12 +21,11 @@ using wsl::windows::service::wsla::WSLAContainer;
 const std::string nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{
-    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-    "-it", // TODO: only enable if fds allow for a tty.
-    "--net=host", // TODO: default for now, change later
-    "--ulimit",
-    "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{       //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+                                                      "-it", // TODO: only enable if fds allow for a tty.
+                                                      "--net=host", // TODO: default for now, change later
+                                                      "--ulimit",
+                                                      "nofile=65536:65536"};
 
 HRESULT WSLAContainer::Start()
 {
