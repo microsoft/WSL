@@ -335,7 +335,7 @@ const std::wstring LxssNetworkingFirewall::s_FriendlyNamePrefix(L"WSLRULE_177744
 
 LxssNetworkingFirewall::LxssNetworkingFirewall()
 {
-    THROW_IF_FAILED(::CoCreateInstance(__uuidof(NetFwPolicy2), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_firewall)));
+    m_firewall = wil::CoCreateInstance<NetFwPolicy2, INetFwPolicy2>(CLSCTX_INPROC_SERVER);
 }
 
 void LxssNetworkingFirewall::CopyPartialArray(SAFEARRAY* Destination, SAFEARRAY* Source, ULONG DestinationIndexStart, ULONG SourceIndexStart, ULONG ElementsToCopy)
@@ -388,8 +388,7 @@ void LxssNetworkingFirewall::CopyPartialArray(SAFEARRAY* Destination, SAFEARRAY*
 
 std::wstring LxssNetworkingFirewall::AddPortRule(const IP_ADDRESS_PREFIX& Address) const
 {
-    Microsoft::WRL::ComPtr<INetFwRule> newRule;
-    THROW_IF_FAILED(::CoCreateInstance(__uuidof(NetFwRule), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&newRule)));
+    auto newRule = wil::CoCreateInstance<NetFwRule, INetFwRule>(CLSCTX_INPROC_SERVER);
 
     // Open a port via the firewall by creating a rule that specifies the local
     // address and the local port to allow. Currently this rule only applies to
@@ -412,9 +411,9 @@ std::wstring LxssNetworkingFirewall::AddPortRule(const IP_ADDRESS_PREFIX& Addres
     THROW_IF_FAILED(newRule->put_Description(s_DefaultRuleDescription.get()));
     THROW_IF_FAILED(newRule->put_Enabled(VARIANT_TRUE));
     // Add the rule to the existing set.
-    Microsoft::WRL::ComPtr<INetFwRules> rules;
+    wil::com_ptr<INetFwRules> rules;
     THROW_IF_FAILED(m_firewall->get_Rules(&rules));
-    THROW_IF_FAILED(rules->Add(newRule.Get()));
+    THROW_IF_FAILED(rules->Add(newRule.get()));
     // Return the unique rule name to the caller.
     return generatedName;
 }
@@ -423,12 +422,11 @@ void LxssNetworkingFirewall::CleanupRemnants()
 {
     auto firewall = std::make_shared<LxssNetworkingFirewall>();
     THROW_HR_IF(E_OUTOFMEMORY, !firewall);
-    Microsoft::WRL::ComPtr<INetFwRules> rules;
+    wil::com_ptr<INetFwRules> rules;
     THROW_IF_FAILED(firewall->m_firewall->get_Rules(&rules));
-    Microsoft::WRL::ComPtr<IUnknown> enumInterface;
-    THROW_IF_FAILED(rules->get__NewEnum(enumInterface.GetAddressOf()));
-    Microsoft::WRL::ComPtr<IEnumVARIANT> rulesEnum;
-    THROW_IF_FAILED(enumInterface.As(&rulesEnum));
+    wil::com_ptr<IUnknown> enumInterface;
+    THROW_IF_FAILED(rules->get__NewEnum(enumInterface.addressof()));
+    auto rulesEnum = enumInterface.query<IEnumVARIANT>();
     // Find any rules with the unique WSL prefix and destroy them.
     for (;;)
     {
@@ -440,7 +438,7 @@ void LxssNetworkingFirewall::CleanupRemnants()
             break;
         }
 
-        Microsoft::WRL::ComPtr<INetFwRule> nextRule;
+        wil::com_ptr<INetFwRule> nextRule;
         THROW_IF_FAILED(next.pdispVal->QueryInterface(IID_PPV_ARGS(&nextRule)));
         wil::unique_bstr nextRuleName;
         THROW_IF_FAILED(nextRule->get_Name(nextRuleName.addressof()));
@@ -558,7 +556,7 @@ void LxssNetworkingFirewall::RemoveExcludedAdapter(const std::wstring& AdapterNa
 
 void LxssNetworkingFirewall::RemovePortRule(const std::wstring& RuleName) const
 {
-    Microsoft::WRL::ComPtr<INetFwRules> rules;
+    wil::com_ptr<INetFwRules> rules;
     THROW_IF_FAILED(m_firewall->get_Rules(&rules));
     THROW_IF_FAILED(rules->Remove(wil::make_bstr_failfast(RuleName.c_str()).get()));
 }
@@ -572,8 +570,7 @@ LxssNetworkingFirewallPort::LxssNetworkingFirewallPort(const std::shared_ptr<Lxs
     return;
 }
 
-LxssNetworkingFirewallPort::LxssNetworkingFirewallPort(
-    const std::shared_ptr<LxssNetworkingFirewall>& Firewall, const Microsoft::WRL::ComPtr<INetFwRule>& Existing) :
+LxssNetworkingFirewallPort::LxssNetworkingFirewallPort(const std::shared_ptr<LxssNetworkingFirewall>& Firewall, const wil::com_ptr<INetFwRule>& Existing) :
     m_firewall(Firewall)
 {
     wil::unique_bstr ruleName;

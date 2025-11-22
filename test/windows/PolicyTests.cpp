@@ -327,7 +327,7 @@ class PolicyTest
             const auto stop = std::chrono::steady_clock::now() + std::chrono::seconds{30};
             for (;;)
             {
-                Microsoft::WRL::ComPtr<ILxssUserSession> session;
+                wil::com_ptr<ILxssUserSession> session;
                 result = CoCreateInstance(CLSID_LxssUserSession, nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&session));
                 if (result == expectedResult || std::chrono::steady_clock::now() > stop)
                 {
