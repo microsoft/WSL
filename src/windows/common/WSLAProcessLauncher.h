@@ -43,6 +43,10 @@ public:
     };
 
     RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds);
+    NON_COPYABLE(RunningWSLAProcess);
+    RunningWSLAProcess(RunningWSLAProcess&&) = default;
+    RunningWSLAProcess& operator=(RunningWSLAProcess&&) = default;
+
     ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;

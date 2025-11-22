@@ -14,7 +14,9 @@ Abstract:
 
 #pragma once
 
+#include "ServiceProcessLauncher.h"
 #include "wslaservice.h"
+#include "WSLAVirtualMachine.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -23,6 +25,10 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 {
 public:
     WSLAContainer() = default; // TODO
+    WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess) :
+        m_parentVM(parentVM), m_containerProcess(std::move(containerProcess))
+    {
+    }
     WSLAContainer(const WSLAContainer&) = delete;
     WSLAContainer& operator=(const WSLAContainer&) = delete;
 
@@ -33,6 +39,12 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
 
+    static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
+
 private:
+    ServiceRunningProcess m_containerProcess;
+    WSLAVirtualMachine* m_parentVM = nullptr;
+
+    static std::vector<std::string> prepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options);
 };
 } // namespace wsl::windows::service::wsla
