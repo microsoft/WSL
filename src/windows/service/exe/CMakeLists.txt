@@ -10,9 +10,7 @@ set(SOURCES
     PluginManager.cpp
     ServiceMain.cpp
     BridgedNetworking.cpp
-    GnsPortTrackerChannel.cpp
     GnsRpcServer.cpp
-    GuestDeviceManager.cpp
     GuestTelemetryLogger.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
@@ -23,7 +21,6 @@ set(SOURCES
     WslMirroredNetworking.cpp
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
-    VirtioNetworking.cpp
     main.rc
     ${CMAKE_CURRENT_BINARY_DIR}/../mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wsleventschema.rc
     application.manifest)
@@ -39,9 +36,7 @@ set(HEADERS
     PluginManager.h
     LxssInstance.h
     BridgedNetworking.h
-    GnsPortTrackerChannel.h
     GnsRpcServer.h
-    GuestDeviceManager.h
     GuestTelemetryLogger.h
     IMirroredNetworkManager.h
     Lifetime.h

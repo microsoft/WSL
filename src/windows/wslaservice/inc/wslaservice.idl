@@ -207,7 +207,8 @@ interface IWSLAVirtualMachine : IUnknown
 typedef enum _WSLANetworkingMode
 {
     WSLANetworkingModeNone,
-    WSLANetworkingModeNAT
+    WSLANetworkingModeNAT,
+    WSLANetworkingModeVirtioProxy
 } WSLANetworkingMode;
 
 typedef

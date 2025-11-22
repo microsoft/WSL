@@ -18,6 +18,8 @@ Abstract:
 #include "Dmesg.h"
 #include "WSLAApi.h"
 #include "WSLAProcess.h"
+#include "GuestDeviceManager.h"
+#include "DnsResolver.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -119,8 +121,9 @@ private:
     int m_coldDiscardShiftSize{};
     bool m_running = false;
     PSID m_userSid{};
-    wil::unique_handle m_userToken;
+    wil::shared_handle m_userToken;
     std::wstring m_debugShellPipe;
+    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
 
     std::mutex m_trackedProcessesLock;
     std::vector<WSLAProcess*> m_trackedProcesses;
