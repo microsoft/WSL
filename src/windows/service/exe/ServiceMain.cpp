@@ -18,7 +18,6 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "LxssIpTables.h"
 #include "LxssUserSessionFactory.h"
-#include "WSLAUserSessionFactory.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
