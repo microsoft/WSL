@@ -540,9 +540,7 @@ wsl::windows::common::SvcComm::SvcComm()
     };
 
     wsl::shared::retry::RetryWithTimeout<void>(
-        [this]() {
-            m_userSession = wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER);
-        },
+        [this]() { m_userSession = wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER); },
         std::chrono::seconds(1),
         std::chrono::minutes(1),
         retry_pred);
