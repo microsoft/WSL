@@ -250,7 +250,9 @@ void WSLAVirtualMachine::Start()
     auto kernelPath = std::filesystem::path(WSL_KERNEL_PATH);
 
 #else
+
     auto kernelPath = std::filesystem::path(basePath) / L"tools" / LXSS_VM_MODE_KERNEL_NAME;
+
 #endif
 
     if constexpr (!wsl::shared::Arm64)
@@ -262,11 +264,9 @@ void WSLAVirtualMachine::Start()
     }
     else
     {
-        // TODO
-        THROW_HR(E_NOTIMPL);
         auto bootThis = hcs::UefiBootEntry{};
         bootThis.DeviceType = hcs::UefiBootDevice::VmbFs;
-        // bootThis.VmbFsRootPath = m_rootFsPath.c_str();
+        bootThis.VmbFsRootPath = (basePath / L"tools").c_str();
         bootThis.DevicePath = L"\\" LXSS_VM_MODE_KERNEL_NAME;
         bootThis.OptionalData = kernelCmdLine;
         hcs::Uefi uefiSettings{};
