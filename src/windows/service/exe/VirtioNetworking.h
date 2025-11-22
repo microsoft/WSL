@@ -6,22 +6,14 @@
 #include "GnsChannel.h"
 #include "WslCoreHostDnsInfo.h"
 #include "GnsPortTrackerChannel.h"
+#include "DeviceHostProxy.h"
 
 namespace wsl::core {
-
-using AddGuestDeviceCallback = std::function<GUID(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options)>;
-using ModifyOpenPortsCallback = std::function<int(const GUID& clsid, PCWSTR tag, const SOCKADDR_INET& addr, int protocol, bool isOpen)>;
-using GuestInterfaceStateChangeCallback = std::function<void(const std::string& name, bool isUp)>;
 
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(
-        GnsChannel&& gnsChannel,
-        bool enableLocalhostRelay,
-        AddGuestDeviceCallback addGuestDeviceCallback,
-        ModifyOpenPortsCallback modifyOpenPortsCallback,
-        GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback);
+    VirtioNetworking(const std::wstring& vmId, const GUID& runtimeId, GnsChannel&& gnsChannel, bool enableLocalhostRelay);
     ~VirtioNetworking() = default;
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -48,9 +40,13 @@ private:
     void UpdateDns(wsl::shared::hns::DNS&& dnsSettings);
     void UpdateMtu();
 
-    mutable wil::srwlock m_lock;
+    GUID AddGuestDevice(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options);
+    int ModifyOpenPorts(const GUID& clsid, PCWSTR tag, const SOCKADDR_INET& addr, int protocol, bool isOpen) const;
 
-    AddGuestDeviceCallback m_addGuestDeviceCallback;
+    mutable wil::srwlock m_lock;
+    mutable wil::srwlock m_guestDeviceLock;
+
+    wil::com_ptr<DeviceHostProxy> m_deviceHostProxy;
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
@@ -59,8 +55,6 @@ private:
     GUID m_adapterId;
     std::optional<NL_NETWORK_CONNECTIVITY_LEVEL_HINT> m_connectivityLevel;
     std::optional<NL_NETWORK_CONNECTIVITY_COST_HINT> m_connectivityCost;
-    ModifyOpenPortsCallback m_modifyOpenPortsCallback;
-    GuestInterfaceStateChangeCallback m_guestInterfaceStateChangeCallback;
 
     std::optional<ULONGLONG> m_interfaceLuid;
     ULONG m_networkMtu = 0;
@@ -73,6 +67,7 @@ private:
     static constexpr GUID c_virtioNetworkClsid = {0x16479D2E, 0xF0C3, 0x4DBA, {0xBF, 0x7A, 0x04, 0xFF, 0xF0, 0x89, 0x2B, 0x07}};
     // F07010D0-0EA9-447F-88EF-BD952A4D2F14
     static constexpr GUID c_virtioNetworkDeviceId = {0xF07010D0, 0x0EA9, 0x447F, {0x88, 0xEF, 0xBD, 0x95, 0x2A, 0x4D, 0x2F, 0x14}};
+    static constexpr LPCWSTR c_defaultTag = L"default";
 };
 
 } // namespace wsl::core

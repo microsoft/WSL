@@ -608,15 +608,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    std::move(gnsChannel),
-                    m_vmConfig.EnableLocalhostRelay,
-                    [this](const GUID& Clsid, const GUID& DeviceId, PCWSTR Tag, PCWSTR Options) {
-                        return HandleVirtioAddGuestDevice(Clsid, DeviceId, Tag, Options);
-                    },
-                    [this](const GUID& Clsid, PCWSTR Tag, const SOCKADDR_INET& Addr, int Protocol, bool IsOpen) {
-                        return HandleVirtioModifyOpenPorts(Clsid, Tag, Addr, Protocol, IsOpen);
-                    },
-                    [](const std::string&, bool) {});
+                    m_machineId, m_runtimeId, std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -2002,53 +1994,6 @@ bool WslCoreVm::IsVhdAttached(_In_ PCWSTR VhdPath)
 {
     auto lock = m_lock.lock_exclusive();
     return m_attachedDisks.contains({DiskType::VHD, VhdPath});
-}
-
-GUID WslCoreVm::HandleVirtioAddGuestDevice(_In_ const GUID& Clsid, _In_ const GUID& DeviceId, _In_ PCWSTR Tag, _In_ PCWSTR Options)
-{
-    auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-    return AddHdvShareWithOptions(DeviceId, Clsid, Tag, {}, Options, 0, m_userToken.get());
-}
-
-int WslCoreVm::HandleVirtioModifyOpenPorts(_In_ const GUID& Clsid, _In_ PCWSTR Tag, _In_ const SOCKADDR_INET& Addr, _In_ int Protocol, _In_ bool IsOpen)
-{
-    if (Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP)
-    {
-        LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported bind protocol %d", Protocol);
-        return 0;
-    }
-    else if (Addr.si_family == AF_INET6)
-    {
-        // The virtio net adapter does not yet support IPv6 packets, so any traffic would arrive via
-        // IPv4. If the caller wants IPv4 they will also likely listen on an IPv4 address, which will
-        // be handled as a separate callback to this same code.
-        return 0;
-    }
-
-    auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-    const auto server = m_deviceHostSupport->GetRemoteFileSystem(Clsid, c_defaultTag);
-    if (server)
-    {
-        std::wstring portString = std::format(L"tag={};port_number={}", Tag, Addr.Ipv4.sin_port);
-        if (Protocol == IPPROTO_UDP)
-        {
-            portString += L";udp";
-        }
-
-        if (!IsOpen)
-        {
-            portString += L";allocate=false";
-        }
-        else
-        {
-            wchar_t addrStr[16]; // "000.000.000.000" + null terminator
-            RtlIpv4AddressToStringW(&Addr.Ipv4.sin_addr, addrStr);
-            portString += std::format(L";listen_addr={}", addrStr);
-        }
-
-        LOG_IF_FAILED(server->AddShare(portString.c_str(), nullptr, 0));
-    }
-    return 0;
 }
 
 WslCoreVm::DiskMountResult WslCoreVm::MountDisk(
