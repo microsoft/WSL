@@ -21,11 +21,12 @@ using wsl::windows::service::wsla::WSLAContainer;
 const std::string nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{       //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "-it", // TODO: only enable if fds allow for a tty.
-                                                      "--net=host", // TODO: default for now, change later
-                                                      "--ulimit",
-                                                      "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{
+    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+    "-it",        // TODO: only enable if fds allow for a tty.
+    "--net=host", // TODO: default for now, change later
+    "--ulimit",
+    "nofile=65536:65536"};
 
 HRESULT WSLAContainer::Start()
 {
@@ -98,6 +99,11 @@ std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONT
 
     args.insert(args.end(), defaultNerdctlRunArgs.begin(), defaultNerdctlRunArgs.end());
 
+    // TODO: need to worry about env variables with dashes in them?
+    for (ULONG i = 0; i < options.InitProcessOptions.EnvironmentCount; i++)
+    {
+        args.insert(args.end(), {"-e", options.InitProcessOptions.Environment[i]});
+    }
     for (ULONG i = 0; i < options.VolumesCount; i++)
     {
         std::string mountContainerPath;
@@ -119,6 +125,8 @@ std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONT
     {
         args.push_back(options.InitProcessOptions.CommandLine[i]);
     }
+
+    // TODO: Implement --entrypoint override if specified in WSLA_CONTAINER_OPTIONS.
 
     return args;
 }
