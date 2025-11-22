@@ -105,6 +105,10 @@ public:
 
     bool IsVhdAttached(_In_ PCWSTR VhdPath);
 
+    GUID HandleVirtioAddGuestDevice(_In_ const GUID& Clsid, _In_ const GUID& DeviceId, _In_ PCWSTR Tag, _In_ PCWSTR Options);
+
+    int HandleVirtioModifyOpenPorts(_In_ const GUID& Clsid, _In_ PCWSTR Tag, _In_ const SOCKADDR_INET& Addr, _In_ int Protocol, _In_ bool IsOpen);
+
     DiskMountResult MountDisk(
         _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options);
 

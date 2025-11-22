@@ -18,6 +18,8 @@ Abstract:
 #include "Dmesg.h"
 #include "WSLAApi.h"
 #include "WSLAProcess.h"
+#include "DeviceHostProxy.h"
+#include "DnsResolver.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -69,6 +71,10 @@ public:
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
     void DetachDisk(_In_ ULONG Lun);
+
+    // VirtioNetworking support
+    GUID HandleVirtioAddGuestDevice(_In_ const GUID& Clsid, _In_ const GUID& DeviceId, _In_ PCWSTR Tag, _In_ PCWSTR Options);
+    int HandleVirtioModifyOpenPorts(_In_ const GUID& Clsid, _In_ PCWSTR Tag, _In_ const SOCKADDR_INET& Addr, _In_ int Protocol, _In_ bool IsOpen);
 
 private:
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
@@ -146,5 +152,9 @@ private:
     std::map<std::string, std::wstring> m_plan9Mounts;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
+
+    // VirtioNetworking support
+    wil::srwlock m_guestDeviceLock;
+    Microsoft::WRL::ComPtr<DeviceHostProxy> m_deviceHostSupport;
 };
 } // namespace wsl::windows::service::wsla

@@ -16,9 +16,9 @@ Abstract:
 #include <format>
 #include <filesystem>
 #include "hcs_schema.h"
+#include "VirtioNetworking.h"
 #include "NatNetworking.h"
 #include "WSLAUserSession.h"
-#include "DnsResolver.h"
 #include "ServiceProcessLauncher.h"
 
 using namespace wsl::windows::common;
@@ -93,6 +93,16 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     }
 
     WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
+
+    // Shutdown DeviceHostProxy before resetting compute system
+    if (m_deviceHostSupport)
+    {
+        try
+        {
+            m_deviceHostSupport->Shutdown();
+        }
+        CATCH_LOG()
+    }
 
     m_computeSystem.reset();
 
@@ -308,6 +318,13 @@ void WSLAVirtualMachine::Start()
     auto runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
     WI_ASSERT(IsEqualGUID(m_vmId, runtimeId));
 
+    // Initialize DeviceHostProxy for virtio device support.
+    // N.B. This is currently only needed for VirtioProxy networking mode but would also be needed for virtiofs.
+    if (m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy)
+    {
+        m_deviceHostSupport = wil::MakeOrThrow<DeviceHostProxy>(m_vmIdString, m_vmId);
+    }
+
     wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
 
     wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
@@ -513,15 +530,62 @@ void WSLAVirtualMachine::ConfigureNetworking()
             wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()},
             config,
             dnsChannelFd != -1 ? wil::unique_socket{(SOCKET)process->GetStdHandle(dnsChannelFd).release()} : wil::unique_socket{});
+    }
+    else if (m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy)
+    {
+        // Launch GNS
+        std::vector<WSLA_PROCESS_FD> fds(1);
+        fds[0].Fd = -1;
+        fds[0].Type = WSLAFdType::WSLAFdTypeDefault;
 
-        m_networkEngine->Initialize();
+        std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
 
-        LaunchPortRelay();
+        // If DNS tunnelling is enabled, use an additional for its channel.
+        THROW_HR_IF_MSG(E_NOTIMPL, m_settings.EnableDnsTunneling, "DNS tunneling not currently supported for VirtioProxy");
+
+        WSLA_PROCESS_OPTIONS options{};
+        options.Executable = "/init";
+        options.Fds = fds.data();
+        options.FdsCount = static_cast<DWORD>(fds.size());
+
+        // Because the file descriptors numbers aren't known in advance, the command line needs to be generated after the file
+        // descriptors are allocated.
+
+        std::string socketFdArg;
+        int gnsChannelFd = -1;
+        auto prepareCommandLine = [&](const auto& sockets) {
+            gnsChannelFd = sockets[0].Fd;
+            socketFdArg = std::to_string(gnsChannelFd);
+            cmd.emplace_back(socketFdArg.c_str());
+            options.CommandLine = cmd.data();
+            options.CommandLineCount = static_cast<DWORD>(cmd.size());
+        };
+
+        auto process = CreateLinuxProcess(options, nullptr, prepareCommandLine);
+
+        // Create GnsChannel for virtio networking
+        auto gnsChannel = wsl::core::GnsChannel(wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()});
+
+        // Use VirtioNetworking
+        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
+            std::move(gnsChannel),
+            true, // enableLocalhostRelay
+            [this](const GUID& Clsid, const GUID& DeviceId, PCWSTR Tag, PCWSTR Options) {
+                return HandleVirtioAddGuestDevice(Clsid, DeviceId, Tag, Options);
+            },
+            [this](const GUID& Clsid, PCWSTR Tag, const SOCKADDR_INET& Addr, int Protocol, bool IsOpen) {
+                return HandleVirtioModifyOpenPorts(Clsid, Tag, Addr, Protocol, IsOpen);
+            },
+            [](const std::string&, bool) {});
     }
     else
     {
         THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %lu", m_settings.NetworkingMode);
     }
+
+    m_networkEngine->Initialize();
+
+    LaunchPortRelay();
 }
 
 void CALLBACK WSLAVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
@@ -1329,6 +1393,73 @@ void WSLAVirtualMachine::OnProcessReleased(int Pid)
     std::lock_guard lock{m_trackedProcessesLock};
 
     auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
+}
+
+GUID WSLAVirtualMachine::HandleVirtioAddGuestDevice(_In_ const GUID& Clsid, _In_ const GUID& DeviceId, _In_ PCWSTR Tag, _In_ PCWSTR Options)
+{
+    auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+
+    // Options are appended to the name with a semi-colon separator.
+    std::wstring nameWithOptions{Tag};
+    if (Options && Options[0] != L'\0')
+    {
+        nameWithOptions += L";";
+        nameWithOptions += Options;
+    }
+
+    auto server = m_deviceHostSupport->GetRemoteFileSystem(Clsid, L"");
+    if (!server)
+    {
+        // Create the COM server for the virtio device
+        auto revert = wil::impersonate_token(m_userToken.get());
+        server = wil::CoCreateInstance<IPlan9FileSystem>(Clsid, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
+        m_deviceHostSupport->AddRemoteFileSystem(Clsid, L"", server);
+    }
+
+    // AddSharePath with empty path for virtio-net devices
+    THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), L"", 0));
+
+    // Add the device to the VM
+    return m_deviceHostSupport->AddNewDevice(DeviceId, server, Tag);
+}
+int WSLAVirtualMachine::HandleVirtioModifyOpenPorts(_In_ const GUID& Clsid, _In_ PCWSTR Tag, _In_ const SOCKADDR_INET& Addr, _In_ int Protocol, _In_ bool IsOpen)
+{
+    if (Protocol != IPPROTO_TCP && Protocol != IPPROTO_UDP)
+    {
+        LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported bind protocol %d", Protocol);
+        return 0;
+    }
+    else if (Addr.si_family == AF_INET6)
+    {
+        // The virtio net adapter does not yet support IPv6 packets
+        return 0;
+    }
+
+    auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+    const auto server = m_deviceHostSupport->GetRemoteFileSystem(Clsid, L"");
+    if (server)
+    {
+        std::wstring portString = std::format(L"tag={};port_number={}", Tag, Addr.Ipv4.sin_port);
+        if (Protocol == IPPROTO_UDP)
+        {
+            portString += L";udp";
+        }
+
+        if (!IsOpen)
+        {
+            portString += L";allocate=false";
+        }
+        else
+        {
+            wchar_t addrStr[16]; // "000.000.000.000" + null terminator
+            RtlIpv4AddressToStringW(&Addr.Ipv4.sin_addr, addrStr);
+            portString += std::format(L";listen_addr={}", addrStr);
+        }
+
+        LOG_IF_FAILED(server->AddShare(portString.c_str(), nullptr, 0));
+    }
+
+    return 0;
 }
 
 void WSLAVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket) const

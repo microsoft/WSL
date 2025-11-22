@@ -12,34 +12,23 @@ using wsl::core::VirtioNetworking;
 
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
-VirtioNetworking::VirtioNetworking(GnsChannel&& gnsChannel, const Config& config) :
-    m_gnsChannel(std::move(gnsChannel)), m_config(config)
+VirtioNetworking::VirtioNetworking(
+    GnsChannel&& gnsChannel,
+    bool enableLocalhostRelay,
+    AddGuestDeviceCallback addGuestDeviceCallback,
+    ModifyOpenPortsCallback modifyOpenPortsCallback,
+    GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback) :
+    m_addGuestDeviceCallback(std::move(addGuestDeviceCallback)),
+    m_gnsChannel(std::move(gnsChannel)),
+    m_modifyOpenPortsCallback(std::move(modifyOpenPortsCallback)),
+    m_guestInterfaceStateChangeCallback(std::move(guestInterfaceStateChangeCallback)),
+    m_enableLocalhostRelay(enableLocalhostRelay)
 {
-}
-
-VirtioNetworking& VirtioNetworking::OnAddGuestDevice(const AddGuestDeviceRoutine& addGuestDeviceRoutine)
-{
-    m_addGuestDeviceRoutine = addGuestDeviceRoutine;
-    return *this;
-}
-
-VirtioNetworking& VirtioNetworking::OnModifyOpenPorts(const ModifyOpenPortsCallback& modifyOpenPortsCallback)
-{
-    m_modifyOpenPortsCallback = modifyOpenPortsCallback;
-    return *this;
-}
-
-VirtioNetworking& VirtioNetworking::OnGuestInterfaceStateChanged(const GuestInterfaceStateChangeCallback& guestInterfaceStateChangedCallback)
-{
-    m_guestInterfaceStateChangeCallback = guestInterfaceStateChangedCallback;
-    return *this;
 }
 
 void VirtioNetworking::Initialize()
 try
 {
-    THROW_HR_IF(E_NOT_SET, !m_addGuestDeviceRoutine || !m_modifyOpenPortsCallback || !m_guestInterfaceStateChangeCallback);
-
     m_networkSettings = GetHostEndpointSettings();
 
     // TODO: Determine gateway MAC address
@@ -84,7 +73,7 @@ try
     }
 
     // Add virtio net adapter to guest
-    m_adapterId = (*m_addGuestDeviceRoutine)(c_virtioNetworkClsid, c_virtioNetworkDeviceId, L"eth0", device_options.str().c_str());
+    m_adapterId = m_addGuestDeviceCallback(c_virtioNetworkClsid, c_virtioNetworkDeviceId, L"eth0", device_options.str().c_str());
 
     auto lock = m_lock.lock_exclusive();
 
@@ -121,7 +110,7 @@ try
         UpdateDns(std::move(dnsSettings));
     }
 
-    if (m_config.EnableLocalhostRelay)
+    if (m_enableLocalhostRelay)
     {
         SetupLoopbackDevice();
     }
@@ -132,7 +121,7 @@ CATCH_LOG()
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
-    m_localhostAdapterId = (*m_addGuestDeviceRoutine)(
+    m_localhostAdapterId = m_addGuestDeviceCallback(
         c_virtioNetworkClsid, c_virtioNetworkDeviceId, c_loopbackDeviceName, L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55");
 
     hns::HNSEndpoint endpointProperties;
@@ -162,7 +151,7 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
         [&](const SOCKADDR_INET& addr, int protocol, bool allocate) { return HandlePortNotification(addr, protocol, allocate); },
-        [&](_In_ const std::string& interfaceName, _In_ bool up) { (*m_guestInterfaceStateChangeCallback)(interfaceName, up); });
+        [&](_In_ const std::string& interfaceName, _In_ bool up) { m_guestInterfaceStateChangeCallback(interfaceName, up); });
 }
 
 HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
@@ -181,7 +170,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         }
     }
 
-    if (m_config.EnableLocalhostRelay && (unspecified || loopback))
+    if (m_enableLocalhostRelay && (unspecified || loopback))
     {
         SOCKADDR_INET localAddr = addr;
         if (!loopback)
@@ -196,12 +185,12 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
                 localAddr.Ipv6.sin6_port = addr.Ipv6.sin6_port;
             }
         }
-        result = (*m_modifyOpenPortsCallback)(c_virtioNetworkClsid, c_loopbackDeviceName, localAddr, protocol, allocate);
+        result = m_modifyOpenPortsCallback(c_virtioNetworkClsid, c_loopbackDeviceName, localAddr, protocol, allocate);
         LOG_HR_IF_MSG(E_FAIL, result != S_OK, "Failure adding localhost relay port %d", localAddr.Ipv4.sin_port);
     }
     if (!loopback)
     {
-        const int localResult = (*m_modifyOpenPortsCallback)(c_virtioNetworkClsid, L"eth0", addr, protocol, allocate);
+        const int localResult = m_modifyOpenPortsCallback(c_virtioNetworkClsid, L"eth0", addr, protocol, allocate);
         LOG_HR_IF_MSG(E_FAIL, localResult != S_OK, "Failure adding relay port %d", addr.Ipv4.sin_port);
         if (result == 0)
         {

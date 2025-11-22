@@ -9,19 +9,20 @@
 
 namespace wsl::core {
 
-using AddGuestDeviceRoutine = std::function<GUID(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options)>;
+using AddGuestDeviceCallback = std::function<GUID(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options)>;
 using ModifyOpenPortsCallback = std::function<int(const GUID& clsid, PCWSTR tag, const SOCKADDR_INET& addr, int protocol, bool isOpen)>;
 using GuestInterfaceStateChangeCallback = std::function<void(const std::string& name, bool isUp)>;
 
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(GnsChannel&& gnsChannel, const Config& config);
+    VirtioNetworking(
+        GnsChannel&& gnsChannel,
+        bool enableLocalhostRelay,
+        AddGuestDeviceCallback addGuestDeviceCallback,
+        ModifyOpenPortsCallback modifyOpenPortsCallback,
+        GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback);
     ~VirtioNetworking() = default;
-
-    VirtioNetworking& OnAddGuestDevice(const AddGuestDeviceRoutine& addGuestDeviceRoutine);
-    VirtioNetworking& OnModifyOpenPorts(const ModifyOpenPortsCallback& modifyOpenPortsCallback);
-    VirtioNetworking& OnGuestInterfaceStateChanged(const GuestInterfaceStateChangeCallback& guestInterfaceStateChangedCallback);
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
     VirtioNetworking(const VirtioNetworking&) = delete;
@@ -49,17 +50,17 @@ private:
 
     mutable wil::srwlock m_lock;
 
-    std::optional<AddGuestDeviceRoutine> m_addGuestDeviceRoutine;
+    AddGuestDeviceCallback m_addGuestDeviceCallback;
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
-    const Config& m_config;
+    bool m_enableLocalhostRelay;
     GUID m_localhostAdapterId;
     GUID m_adapterId;
     std::optional<NL_NETWORK_CONNECTIVITY_LEVEL_HINT> m_connectivityLevel;
     std::optional<NL_NETWORK_CONNECTIVITY_COST_HINT> m_connectivityCost;
-    std::optional<ModifyOpenPortsCallback> m_modifyOpenPortsCallback;
-    std::optional<GuestInterfaceStateChangeCallback> m_guestInterfaceStateChangeCallback;
+    ModifyOpenPortsCallback m_modifyOpenPortsCallback;
+    GuestInterfaceStateChangeCallback m_guestInterfaceStateChangeCallback;
 
     std::optional<ULONGLONG> m_interfaceLuid;
     ULONG m_networkMtu = 0;
