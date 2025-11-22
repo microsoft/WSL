@@ -1108,8 +1108,8 @@ class WSL1 : public DrvFsTests
             else \
             { \
                 VERIFY_ARE_EQUAL(LxsstuInitialize(FALSE), TRUE); \
-                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0); \
                 m_config.reset(new WslConfigChange(LxssGenerateTestConfig({.drvFsMode = DrvFsMode::##_mode##}))); \
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0); \
             } \
 \
             return true; \
