@@ -12,10 +12,12 @@ using wsl::core::VirtioNetworking;
 
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
-VirtioNetworking::VirtioNetworking(const std::wstring& vmId, const GUID& runtimeId, GnsChannel&& gnsChannel, bool enableLocalhostRelay) :
+VirtioNetworking::VirtioNetworking(
+    const std::wstring& vmId, const GUID& runtimeId, GnsChannel&& gnsChannel, bool enableLocalhostRelay, const wil::shared_handle& userToken) :
     m_deviceHostProxy(wil::MakeOrThrow<DeviceHostProxy>(vmId, runtimeId)),
     m_gnsChannel(std::move(gnsChannel)),
-    m_enableLocalhostRelay(enableLocalhostRelay)
+    m_enableLocalhostRelay(enableLocalhostRelay),
+    m_userToken(userToken)
 {
 }
 
@@ -372,19 +374,28 @@ std::optional<ULONGLONG> VirtioNetworking::FindVirtioInterfaceLuid(const SOCKADD
     return ipv4Connected ? VirtioLuid.Value : std::optional<ULONGLONG>();
 }
 
-GUID VirtioNetworking::AddGuestDevice(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options)
+GUID VirtioNetworking::AddGuestDevice(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR path)
 {
     auto lock = m_guestDeviceLock.lock_exclusive();
 
-    // Get or create the Plan9 file system for this device
-    auto server = m_deviceHostProxy->GetRemoteFileSystem(clsid, c_defaultTag);
-    if (!server)
+    wil::com_ptr<IPlan9FileSystem> server;
+
+    // Impersonate the user token when creating/accessing the Plan9 file system
     {
-        server = wil::CoCreateInstance<IPlan9FileSystem>(__uuidof(p9fs::Plan9FileSystem));
-        m_deviceHostProxy->AddRemoteFileSystem(clsid, c_defaultTag, server);
+        auto revert = wil::impersonate_token(m_userToken.get());
+
+        server = m_deviceHostProxy->GetRemoteFileSystem(clsid, c_defaultTag);
+        if (!server)
+        {
+            server = wil::CoCreateInstance<IPlan9FileSystem>(clsid, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
+            m_deviceHostProxy->AddRemoteFileSystem(clsid, c_defaultTag, server);
+        }
+
+        THROW_IF_FAILED(server->AddSharePath(tag, path, 0));
     }
 
-    return m_deviceHostProxy->AddNewDevice(deviceId, server, tag);
+    const std::wstring virtioTag(tag);
+    return m_deviceHostProxy->AddNewDevice(deviceId, server, virtioTag);
 }
 
 int VirtioNetworking::ModifyOpenPorts(const GUID& clsid, PCWSTR tag, const SOCKADDR_INET& addr, int protocol, bool isOpen) const

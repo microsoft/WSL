@@ -606,7 +606,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    m_machineId, m_runtimeId, std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay);
+                    m_machineId, m_runtimeId, std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {

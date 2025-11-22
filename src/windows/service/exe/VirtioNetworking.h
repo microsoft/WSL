@@ -13,7 +13,7 @@ namespace wsl::core {
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(const std::wstring& vmId, const GUID& runtimeId, GnsChannel&& gnsChannel, bool enableLocalhostRelay);
+    VirtioNetworking(const std::wstring& vmId, const GUID& runtimeId, GnsChannel&& gnsChannel, bool enableLocalhostRelay, const wil::shared_handle& userToken);
     ~VirtioNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -40,12 +40,13 @@ private:
     void UpdateDns(wsl::shared::hns::DNS&& dnsSettings);
     void UpdateMtu();
 
-    GUID AddGuestDevice(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options);
+    GUID AddGuestDevice(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR path);
     int ModifyOpenPorts(const GUID& clsid, PCWSTR tag, const SOCKADDR_INET& addr, int protocol, bool isOpen) const;
 
     mutable wil::srwlock m_lock;
     mutable wil::srwlock m_guestDeviceLock;
 
+    wil::shared_handle m_userToken;
     wil::com_ptr<DeviceHostProxy> m_deviceHostProxy;
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
