@@ -4,7 +4,6 @@
 #include "VirtioNetworking.h"
 #include "Stringify.h"
 #include "stringshared.h"
-#include "windowsdefs.h"
 
 using namespace wsl::core::networking;
 using namespace wsl::shared;
@@ -18,6 +17,14 @@ VirtioNetworking::VirtioNetworking(const std::wstring& vmId, const GUID& runtime
     m_gnsChannel(std::move(gnsChannel)),
     m_enableLocalhostRelay(enableLocalhostRelay)
 {
+}
+
+VirtioNetworking::~VirtioNetworking()
+{
+    if (m_deviceHostProxy)
+    {
+        m_deviceHostProxy->Shutdown();
+    }
 }
 
 void VirtioNetworking::Initialize()

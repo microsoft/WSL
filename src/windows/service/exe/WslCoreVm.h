@@ -371,8 +371,6 @@ private:
     _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
-
-    static const std::wstring c_defaultTag;
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(WslCoreVm::DiskStateFlags);

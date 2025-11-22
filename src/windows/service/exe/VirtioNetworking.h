@@ -14,7 +14,7 @@ class VirtioNetworking : public INetworkingEngine
 {
 public:
     VirtioNetworking(const std::wstring& vmId, const GUID& runtimeId, GnsChannel&& gnsChannel, bool enableLocalhostRelay);
-    ~VirtioNetworking() = default;
+    ~VirtioNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
     VirtioNetworking(const VirtioNetworking&) = delete;
@@ -67,7 +67,6 @@ private:
     static constexpr GUID c_virtioNetworkClsid = {0x16479D2E, 0xF0C3, 0x4DBA, {0xBF, 0x7A, 0x04, 0xFF, 0xF0, 0x89, 0x2B, 0x07}};
     // F07010D0-0EA9-447F-88EF-BD952A4D2F14
     static constexpr GUID c_virtioNetworkDeviceId = {0xF07010D0, 0x0EA9, 0x447F, {0x88, 0xEF, 0xBD, 0x95, 0x2A, 0x4D, 0x2F, 0x14}};
-    static constexpr LPCWSTR c_defaultTag = L"default";
 };
 
 } // namespace wsl::core

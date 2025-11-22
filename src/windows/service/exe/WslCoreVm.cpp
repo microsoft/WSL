@@ -78,8 +78,6 @@ using wsl::shared::Localization;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
-const std::wstring WslCoreVm::c_defaultTag = L"default"s;
-
 namespace {
 INT64
 RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)

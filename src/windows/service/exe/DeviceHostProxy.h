@@ -7,6 +7,8 @@
 
 namespace wrl = Microsoft::WRL;
 
+inline constexpr LPCWSTR c_defaultTag = L"default";
+
 class DeviceHostProxy : public wrl::RuntimeClass<wrl::RuntimeClassFlags<wrl::RuntimeClassType::ClassicCom>, IVmDeviceHostSupport, IPlan9FileSystemHost>
 {
 public:
