@@ -154,6 +154,13 @@ public:
     IFACEMETHOD(GetDistributionId)(_In_ LPCWSTR DistributionName, _In_ ULONG Flags, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid) override;
 
     /// <summary>
+    /// Returns the VM Runtime ID for the specified distribution.
+    /// This is the HCS compute system GUID needed for Hyper-V socket connections.
+    /// Returns error if the distribution is not currently running.
+    /// </summary>
+    IFACEMETHOD(GetDistributionRuntimeId)(_In_opt_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pRuntimeId);
+
+    /// <summary>
     /// Registers a distribution from a tar file.
     /// </summary>
     IFACEMETHOD(RegisterDistribution)(
@@ -405,6 +412,14 @@ public:
     /// </summary>
     HRESULT
     GetDistributionId(_In_ LPCWSTR DistributionName, _In_ ULONG Flags, _Out_ GUID* pDistroGuid);
+
+    /// <summary>
+    /// Returns the VM Runtime ID for the specified distribution.
+    /// This is the HCS compute system GUID needed for Hyper-V socket connections.
+    /// Returns error if the distribution is not currently running.
+    /// </summary>
+    HRESULT
+    GetDistributionRuntimeId(_In_opt_ LPCGUID DistroGuid, _Out_ GUID* pRuntimeId);
 
     /// <summary>
     /// Returns the session cookie
