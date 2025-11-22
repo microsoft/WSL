@@ -768,7 +768,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageConfigExpected" xml:space="preserve">
-    <value>{}:{} 中应为 {}</value>
+    <value>应为 {} ：{}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageConfigInvalidEscape" xml:space="preserve">
@@ -776,7 +776,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageConfigUnknownKey" xml:space="preserve">
-    <value>{}:{} 中的键“{}”未知</value>
+    <value>未知键“{}” ：{}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageConfigInvalidInteger" xml:space="preserve">
@@ -1150,7 +1150,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>© Microsoft。保留所有权利。</value>
   </data>
   <data name="Settings_AppDisplayName" xml:space="preserve">
-    <value>适用于 Linux 设置的 Windows 子系统</value>
+    <value>适用于 Linux 的 Windows 子系统设置</value>
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>适用于 Linux 的 Windows 子系统设置允许开发人员使用基于 GUI 的应用程序管理 .wslconfig 文件。</value>
@@ -1371,7 +1371,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>忽略的端口</value>
   </data>
   <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会 Windows 自动转发或考虑。应采用逗号分隔的列表格式，例如： 3000,9000,9090。</value>
+    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会被 Windows 自动转发或考虑。应采用逗号分隔的列表格式，例如： 3000,9000,9090。</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
@@ -1381,7 +1381,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>忽略的端口</value>
   </data>
   <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会在 Windows 中自动转发或考虑。应采用逗号分隔的列表格式，例如 3000,9000,9090。</value>
+    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会被 Windows 自动转发或考虑。应采用逗号分隔的列表格式，例如： 3000,9000,9090。</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>初始自动代理超时</value>
