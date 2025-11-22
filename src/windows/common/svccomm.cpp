@@ -541,15 +541,14 @@ wsl::windows::common::SvcComm::SvcComm()
 
     wsl::shared::retry::RetryWithTimeout<void>(
         [this]() {
-            THROW_IF_FAILED(CoCreateInstance(__uuidof(LxssUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&m_userSession)));
+            m_userSession = wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER);
         },
         std::chrono::seconds(1),
         std::chrono::minutes(1),
         retry_pred);
 
     // Query client security interface.
-    wil::com_ptr_nothrow<IClientSecurity> clientSecurity;
-    THROW_IF_FAILED(m_userSession->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
+    auto clientSecurity = m_userSession.query<IClientSecurity>();
 
     // Get the current proxy blanket settings.
     DWORD authnSvc, authzSvc, authnLvl, capabilities;

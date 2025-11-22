@@ -351,7 +351,7 @@ private:
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;
     SE_SID m_userSid;
-    Microsoft::WRL::ComPtr<DeviceHostProxy> m_deviceHostSupport;
+    wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
     std::shared_ptr<LxssRunningInstance> m_systemDistro;
     _Guarded_by_(m_lock) std::bitset<MAX_VHD_COUNT> m_lunBitmap;
     _Guarded_by_(m_lock) std::map<AttachedDisk, DiskState> m_attachedDisks;
