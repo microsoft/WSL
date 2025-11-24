@@ -63,10 +63,10 @@ set(HEADERS
     disk.hpp
     Distribution.h
     filesystem.hpp
+    HandleConsoleProgressBar.h
     hcs.hpp
     hcs_schema.h
     helpers.hpp
-    HandleConsoleProgressBar.h
     interop.hpp
     ExecutionContext.h
     socket.hpp

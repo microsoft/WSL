@@ -78,6 +78,22 @@ void CoInitializeSecurity();
 
 void ConfigureCrt();
 
+/// <summary>
+/// Creates a COM server with user impersonation.
+/// </summary>
+template <typename Interface>
+wil::com_ptr_t<Interface> CreateComServerAsUser(_In_ REFCLSID RefClsId, _In_ HANDLE UserToken)
+{
+    auto revert = wil::impersonate_token(UserToken);
+    return wil::CoCreateInstance<Interface>(RefClsId, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
+}
+
+template <typename Class, typename Interface>
+wil::com_ptr_t<Interface> CreateComServerAsUser(_In_ HANDLE UserToken)
+{
+    return CreateComServerAsUser<Interface>(__uuidof(Class), UserToken);
+}
+
 std::wstring ConstructPipePath(_In_ std::wstring_view PipeName);
 
 GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> name);

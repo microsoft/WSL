@@ -6,22 +6,14 @@
 #include "GnsChannel.h"
 #include "WslCoreHostDnsInfo.h"
 #include "GnsPortTrackerChannel.h"
+#include "GuestDeviceManager.h"
 
 namespace wsl::core {
-
-using AddGuestDeviceCallback = std::function<GUID(const GUID& clsid, const GUID& deviceId, PCWSTR tag, PCWSTR options)>;
-using ModifyOpenPortsCallback = std::function<int(const GUID& clsid, PCWSTR tag, const SOCKADDR_INET& addr, int protocol, bool isOpen)>;
-using GuestInterfaceStateChangeCallback = std::function<void(const std::string& name, bool isUp)>;
 
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(
-        GnsChannel&& gnsChannel,
-        bool enableLocalhostRelay,
-        AddGuestDeviceCallback addGuestDeviceCallback,
-        ModifyOpenPortsCallback modifyOpenPortsCallback,
-        GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback);
+    VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
     ~VirtioNetworking() = default;
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -43,6 +35,7 @@ private:
     static std::optional<ULONGLONG> FindVirtioInterfaceLuid(const SOCKADDR_INET& virtioAddress, const NL_NETWORK_CONNECTIVITY_HINT& currentConnectivityHint);
 
     HRESULT HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept;
+    int ModifyOpenPorts(_In_ const GUID& clsid, _In_ PCWSTR tag, _In_ const SOCKADDR_INET& addr, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection(NL_NETWORK_CONNECTIVITY_HINT hint) noexcept;
     void SetupLoopbackDevice();
     void UpdateDns(wsl::shared::hns::DNS&& dnsSettings);
@@ -50,17 +43,14 @@ private:
 
     mutable wil::srwlock m_lock;
 
-    AddGuestDeviceCallback m_addGuestDeviceCallback;
+    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
+    wil::shared_handle m_userToken;
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     bool m_enableLocalhostRelay;
     GUID m_localhostAdapterId;
     GUID m_adapterId;
-    std::optional<NL_NETWORK_CONNECTIVITY_LEVEL_HINT> m_connectivityLevel;
-    std::optional<NL_NETWORK_CONNECTIVITY_COST_HINT> m_connectivityCost;
-    ModifyOpenPortsCallback m_modifyOpenPortsCallback;
-    GuestInterfaceStateChangeCallback m_guestInterfaceStateChangeCallback;
 
     std::optional<ULONGLONG> m_interfaceLuid;
     ULONG m_networkMtu = 0;
