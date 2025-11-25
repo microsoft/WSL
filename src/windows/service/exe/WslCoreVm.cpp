@@ -2063,7 +2063,7 @@ WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
     //      (in which case there's no need to remove the device).
     {
         (void)m_guestDeviceManager->AddGuestDevice(
-            VIRTIO_PMEM_DEVICE_ID, VIRTIO_PMEM_CLASS_ID, L"", FilePath, static_cast<UINT32>(flags), m_userToken.get());
+            VIRTIO_PMEM_DEVICE_ID, VIRTIO_PMEM_CLASS_ID, L"", nullptr, FilePath, static_cast<UINT32>(flags), m_userToken.get());
     }
 
     // Wait for the pmem device to appear in the VM at /dev/pmemX. Guess the value of X given the
@@ -2144,8 +2144,14 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
         tag += std::to_wstring(m_virtioFsShares.size());
         WI_ASSERT(!FindVirtioFsShare(tag.c_str(), Admin));
 
-        (void)m_guestDeviceManager->AddHdvShareWithOptions(
-            VIRTIO_VIRTIOFS_DEVICE_ID, Admin ? c_virtiofsAdminClassId : c_virtiofsClassId, tag, key.OptionsString(), sharePath, VIRTIO_FS_FLAGS_TYPE_FILES, UserToken);
+        (void)m_guestDeviceManager->AddGuestDevice(
+            VIRTIO_VIRTIOFS_DEVICE_ID,
+            Admin ? c_virtiofsAdminClassId : c_virtiofsClassId,
+            tag.c_str(),
+            key.OptionsString().c_str(),
+            sharePath.c_str(),
+            VIRTIO_FS_FLAGS_TYPE_FILES,
+            UserToken);
 
         m_virtioFsShares.emplace(std::move(key), tag);
         created = true;

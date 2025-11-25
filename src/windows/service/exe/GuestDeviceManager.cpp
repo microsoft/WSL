@@ -11,21 +11,15 @@ GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ 
 
 _Requires_lock_not_held_(m_lock)
 GUID GuestDeviceManager::AddGuestDevice(
-    _In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken)
+    _In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Options, _In_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken)
 {
     auto guestDeviceLock = m_lock.lock_exclusive();
-    return AddHdvShareWithOptions(DeviceId, ImplementationClsid, AccessName, {}, Path, Flags, UserToken);
+    return AddHdvShareWithOptions(DeviceId, ImplementationClsid, AccessName, Options, Path, Flags, UserToken);
 }
 
 _Requires_lock_held_(m_lock)
 GUID GuestDeviceManager::AddHdvShareWithOptions(
-    _In_ const GUID& DeviceId,
-    _In_ const GUID& ImplementationClsid,
-    _In_ std::wstring_view AccessName,
-    _In_ std::wstring_view Options,
-    _In_ std::wstring_view Path,
-    _In_ UINT32 Flags,
-    _In_ HANDLE UserToken)
+    _In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Options, _In_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken)
 {
     wil::com_ptr<IPlan9FileSystem> server;
 
@@ -33,7 +27,7 @@ GUID GuestDeviceManager::AddHdvShareWithOptions(
     //  "name;key1=value1;key2=value2"
     // The AddSharePath implementation is responsible for separating them out and interpreting them.
     std::wstring nameWithOptions{AccessName};
-    if (!Options.empty())
+    if (ARGUMENT_PRESENT(Options))
     {
         nameWithOptions += L";";
         nameWithOptions += Options;
@@ -46,16 +40,14 @@ GUID GuestDeviceManager::AddHdvShareWithOptions(
         if (!server)
         {
             server = wil::CoCreateInstance<IPlan9FileSystem>(ImplementationClsid, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
-            AddRemoteFileSystem(ImplementationClsid, std::wstring(c_defaultDeviceTag).c_str(), server);
+            AddRemoteFileSystem(ImplementationClsid, c_defaultDeviceTag.c_str(), server);
         }
 
-        const std::wstring SharePath(Path);
-        THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), SharePath.c_str(), Flags));
+        THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), Path, Flags));
     }
 
     // This requires more privileges than the user may have, so impersonation is disabled.
-    const std::wstring VirtioTag(AccessName);
-    return AddNewDevice(DeviceId, server, VirtioTag.c_str());
+    return AddNewDevice(DeviceId, server, AccessName);
 }
 
 GUID GuestDeviceManager::AddNewDevice(_In_ const GUID& deviceId, _In_ const wil::com_ptr<IPlan9FileSystem>& server, _In_ PCWSTR tag)

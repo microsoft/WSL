@@ -72,7 +72,7 @@ try
 
     // Add virtio net adapter to guest
     m_adapterId = m_guestDeviceManager->AddGuestDevice(
-        c_virtioNetworkDeviceId, c_virtioNetworkClsid, L"eth0", device_options.str().c_str(), 0, m_userToken.get());
+        c_virtioNetworkDeviceId, c_virtioNetworkClsid, L"eth0", nullptr, device_options.str().c_str(), 0, m_userToken.get());
 
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_adapterId;
@@ -122,6 +122,7 @@ void VirtioNetworking::SetupLoopbackDevice()
         c_virtioNetworkDeviceId,
         c_virtioNetworkClsid,
         c_loopbackDeviceName,
+        nullptr,
         L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
         0,
         m_userToken.get());
