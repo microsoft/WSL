@@ -142,8 +142,6 @@ public:
 
     void ValidateNetworkingMode();
 
-    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
-
 private:
     struct AttachedDisk
     {
@@ -273,6 +271,7 @@ private:
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
 
     wil::srwlock m_guestDeviceLock;
+    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     _Guarded_by_(m_guestDeviceLock) std::future<bool> m_drvfsInitialResult;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
