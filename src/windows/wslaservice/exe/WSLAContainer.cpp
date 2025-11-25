@@ -21,8 +21,7 @@ using wsl::windows::service::wsla::WSLAContainer;
 const std::string nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{       //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "-it", // TODO: only enable if fds allow for a tty.
+static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
                                                       "--net=host", // TODO: default for now, change later
                                                       "--ulimit",
                                                       "nofile=65536:65536"};
@@ -67,7 +66,35 @@ CATCH_RETURN();
 
 Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM)
 {
-    auto args = WSLAContainer::prepareNerdctlRunCommand(containerOptions);
+
+    bool hasStdin = false;
+    bool hasTty = false;
+    for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)
+    {
+        if (containerOptions.InitProcessOptions.Fds[i].Fd == 0)
+        {
+            hasStdin = true;
+        }
+
+        if (containerOptions.InitProcessOptions.Fds[i].Type == WSLAFdTypeTerminalInput ||
+            containerOptions.InitProcessOptions.Fds[i].Type == WSLAFdTypeTerminalOutput)
+        {
+            hasTty = true;
+        }
+    }
+
+    std::vector<std::string> inputOptions;
+    if (hasStdin)
+    {
+        inputOptions.push_back("-i");
+    }
+
+    if (hasTty)
+    {
+        inputOptions.push_back("-t");
+    }
+
+    auto args = PrepareNerdctlRunCommand(containerOptions, std::move(inputOptions));
 
     ServiceProcessLauncher launcher(nerdctlPath, args, {}, common::ProcessFlags::None);
     for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)
@@ -78,7 +105,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
     return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM));
 }
 
-std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options)
+std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)
 {
     std::vector<std::string> args{nerdctlPath};
     args.push_back("run");
@@ -97,32 +124,40 @@ std::vector<std::string> WSLAContainer::prepareNerdctlRunCommand(const WSLA_CONT
     }
 
     args.insert(args.end(), defaultNerdctlRunArgs.begin(), defaultNerdctlRunArgs.end());
+    args.insert(args.end(), inputOptions.begin(), inputOptions.end());
 
     // TODO: need to worry about env variables with dashes in them?
     for (ULONG i = 0; i < options.InitProcessOptions.EnvironmentCount; i++)
     {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            options.InitProcessOptions.Environment[i][0] == L'-',
+            "Invlaid environment string: %hs",
+            options.InitProcessOptions.Environment[i]);
+
         args.insert(args.end(), {"-e", options.InitProcessOptions.Environment[i]});
     }
-    for (ULONG i = 0; i < options.VolumesCount; i++)
+
+    if (options.InitProcessOptions.Executable != nullptr)
     {
-        std::string mountContainerPath;
-        mountContainerPath = std::string(options.Volumes[i].HostPath) + ":" + std::string(options.Volumes[i].ContainerPath);
-        if (options.Volumes[i].ReadOnly)
-        {
-            mountContainerPath += ":ro";
-        }
-        args.insert(args.end(), {"-v", mountContainerPath});
+        args.push_back("--entrypoint");
+        args.push_back(options.InitProcessOptions.Executable);
     }
+
+    // TODO:
+    // - Implement volume mounts
+    // - Implement port mapping
 
     args.push_back(options.Image);
 
-    if (options.InitProcessOptions.CommandLineCount)
+    if (options.InitProcessOptions.CommandLineCount > 0)
     {
         args.push_back("--");
-    }
-    for (ULONG i = 0; i < options.InitProcessOptions.CommandLineCount; i++)
-    {
-        args.push_back(options.InitProcessOptions.CommandLine[i]);
+
+        for (ULONG i = 0; i < options.InitProcessOptions.CommandLineCount; i++)
+        {
+            args.push_back(options.InitProcessOptions.CommandLine[i]);
+        }
     }
 
     // TODO: Implement --entrypoint override if specified in WSLA_CONTAINER_OPTIONS.

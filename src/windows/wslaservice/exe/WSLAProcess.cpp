@@ -74,6 +74,11 @@ try
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !socket.is_valid());
 
     *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(socket.get()));
+    WSL_LOG(
+        "GetStdHandle",
+        TraceLoggingValue(Index, "fd"),
+        TraceLoggingValue(socket.get(), "handle"),
+        TraceLoggingValue(*Handle, "remoteHandle"));
 
     socket.reset();
     return S_OK;

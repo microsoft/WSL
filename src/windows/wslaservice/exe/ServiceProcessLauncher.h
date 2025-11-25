@@ -24,10 +24,7 @@ class ServiceRunningProcess : public common::RunningWSLAProcess
 {
 public:
     NON_COPYABLE(ServiceRunningProcess);
-    // NON_MOVABLE(ServiceRunningProcess);
-
-    ServiceRunningProcess(ServiceRunningProcess&&) = default;
-    ServiceRunningProcess& operator=(ServiceRunningProcess&&) = default;
+    DEFAULT_MOVABLE(ServiceRunningProcess);
 
     ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLAProcess>& process, std::vector<WSLA_PROCESS_FD>&& fds);
     wil::unique_handle GetStdHandle(int Index) override;

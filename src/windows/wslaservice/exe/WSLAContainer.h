@@ -45,6 +45,6 @@ private:
     ServiceRunningProcess m_containerProcess;
     WSLAVirtualMachine* m_parentVM = nullptr;
 
-    static std::vector<std::string> prepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options);
+    static std::vector<std::string> PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions);
 };
 } // namespace wsl::windows::service::wsla

@@ -104,7 +104,7 @@ struct WSLA_IMAGE_INFORMATION
 
 struct WSLA_PROCESS_OPTIONS
 {
-    LPCSTR Executable;
+    [unique] LPCSTR Executable;
     [unique] LPCSTR CurrentDirectory;
     [size_is(CommandLineCount)] LPCSTR* CommandLine;
     ULONG CommandLineCount;
@@ -129,8 +129,7 @@ struct WSLA_PORT_MAPPING
 
 enum WSLA_CONTAINER_FLAGS
 {
-    WSLA_CONTAINER_FLAG_ENABLE_GPU = 0x0,
-    WSLA_CONTAINER_FLAG_USE_HOST_NETWORKING = 0x1
+    WSLA_CONTAINER_FLAG_ENABLE_GPU = 1
 } ;
 
 
