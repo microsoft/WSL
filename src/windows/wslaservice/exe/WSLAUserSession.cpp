@@ -66,6 +66,7 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 {
     std::lock_guard lock(m_wslaSessionsLock);
 
+    // TODO: ACL check
     // TODO: Check for duplicate on session creation.
     for (auto& e : m_sessions)
     {

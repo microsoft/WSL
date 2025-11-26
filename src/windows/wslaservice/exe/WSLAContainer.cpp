@@ -120,13 +120,11 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
         args.push_back("--gpus");
         // TODO: Parse GPU device list from WSLA_CONTAINER_OPTIONS. For now, just enable all GPUs.
         args.push_back("all");
-        // args.push_back(options.GPUOptions.GPUDevices);
     }
 
     args.insert(args.end(), defaultNerdctlRunArgs.begin(), defaultNerdctlRunArgs.end());
     args.insert(args.end(), inputOptions.begin(), inputOptions.end());
 
-    // TODO: need to worry about env variables with dashes in them?
     for (ULONG i = 0; i < options.InitProcessOptions.EnvironmentCount; i++)
     {
         THROW_HR_IF_MSG(

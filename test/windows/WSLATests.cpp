@@ -1167,7 +1167,7 @@ class WSLATests
         // TODO: Remove once the proper rootfs VHD is available.
         ExpectCommandResult(session.get(), {"/etc/lsw-init.sh"}, 0);
 
-        /*// Test a simple container start.
+        // Test a simple container start.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-simple", "echo", {"OK"});
             auto container = launcher.Launch(*session);
@@ -1182,7 +1182,7 @@ class WSLATests
         {{"testenv=testvalue"}}); auto container = launcher.Launch(*session); auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
-        }*/
+        }
 
         // Validate that starting containers work with the default entrypoint.
 
