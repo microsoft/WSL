@@ -17,6 +17,7 @@ set(SOURCES
     GnsChannel.cpp
     GnsPortTrackerChannel.cpp
     GnsRpcServer.cpp
+    GuestDeviceManager.cpp
     GuestTelemetryLogger.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
@@ -56,6 +57,7 @@ set(HEADERS
     GnsChannel.h
     GnsPortTrackerChannel.h
     GnsRpcServer.h
+    GuestDeviceManager.h
     GuestTelemetryLogger.h
     INetworkingEngine.h
     IMirroredNetworkManager.h

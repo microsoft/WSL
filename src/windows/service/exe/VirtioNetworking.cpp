@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "VirtioNetworking.h"
+#include "GuestDeviceManager.h"
 #include "Stringify.h"
 #include "stringshared.h"
 
@@ -13,15 +14,10 @@ using wsl::core::VirtioNetworking;
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel,
-    bool enableLocalhostRelay,
-    AddGuestDeviceCallback addGuestDeviceCallback,
-    ModifyOpenPortsCallback modifyOpenPortsCallback,
-    GuestInterfaceStateChangeCallback guestInterfaceStateChangeCallback) :
-    m_addGuestDeviceCallback(std::move(addGuestDeviceCallback)),
+    GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    m_guestDeviceManager(std::move(guestDeviceManager)),
+    m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
-    m_modifyOpenPortsCallback(std::move(modifyOpenPortsCallback)),
-    m_guestInterfaceStateChangeCallback(std::move(guestInterfaceStateChangeCallback)),
     m_enableLocalhostRelay(enableLocalhostRelay)
 {
 }
@@ -72,10 +68,11 @@ try
         device_options << L"nameservers=" << dns_servers;
     }
 
-    // Add virtio net adapter to guest
-    m_adapterId = m_addGuestDeviceCallback(c_virtioNetworkClsid, c_virtioNetworkDeviceId, L"eth0", device_options.str().c_str());
-
     auto lock = m_lock.lock_exclusive();
+
+    // Add virtio net adapter to guest
+    m_adapterId = m_guestDeviceManager->AddGuestDevice(
+        c_virtioNetworkDeviceId, c_virtioNetworkClsid, L"eth0", nullptr, device_options.str().c_str(), 0, m_userToken.get());
 
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_adapterId;
@@ -121,8 +118,14 @@ CATCH_LOG()
 
 void VirtioNetworking::SetupLoopbackDevice()
 {
-    m_localhostAdapterId = m_addGuestDeviceCallback(
-        c_virtioNetworkClsid, c_virtioNetworkDeviceId, c_loopbackDeviceName, L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55");
+    m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
+        c_virtioNetworkDeviceId,
+        c_virtioNetworkClsid,
+        c_loopbackDeviceName,
+        nullptr,
+        L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
+        0,
+        m_userToken.get());
 
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_localhostAdapterId;
@@ -151,7 +154,7 @@ void VirtioNetworking::StartPortTracker(wil::unique_socket&& socket)
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
         [&](const SOCKADDR_INET& addr, int protocol, bool allocate) { return HandlePortNotification(addr, protocol, allocate); },
-        [&](_In_ const std::string& interfaceName, _In_ bool up) { m_guestInterfaceStateChangeCallback(interfaceName, up); });
+        [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
 
 HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept
@@ -185,19 +188,63 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
                 localAddr.Ipv6.sin6_port = addr.Ipv6.sin6_port;
             }
         }
-        result = m_modifyOpenPortsCallback(c_virtioNetworkClsid, c_loopbackDeviceName, localAddr, protocol, allocate);
+        result = ModifyOpenPorts(c_virtioNetworkClsid, c_loopbackDeviceName, localAddr, protocol, allocate);
         LOG_HR_IF_MSG(E_FAIL, result != S_OK, "Failure adding localhost relay port %d", localAddr.Ipv4.sin_port);
     }
+
     if (!loopback)
     {
-        const int localResult = m_modifyOpenPortsCallback(c_virtioNetworkClsid, L"eth0", addr, protocol, allocate);
+        const int localResult = ModifyOpenPorts(c_virtioNetworkClsid, L"eth0", addr, protocol, allocate);
         LOG_HR_IF_MSG(E_FAIL, localResult != S_OK, "Failure adding relay port %d", addr.Ipv4.sin_port);
         if (result == 0)
         {
             result = localResult;
         }
     }
+
     return result;
+}
+
+int VirtioNetworking::ModifyOpenPorts(_In_ const GUID& clsid, _In_ PCWSTR tag, _In_ const SOCKADDR_INET& addr, _In_ int protocol, _In_ bool isOpen) const
+{
+    if (protocol != IPPROTO_TCP && protocol != IPPROTO_UDP)
+    {
+        LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported bind protocol %d", protocol);
+        return 0;
+    }
+    else if (addr.si_family == AF_INET6)
+    {
+        // The virtio net adapter does not yet support IPv6 packets, so any traffic would arrive via
+        // IPv4. If the caller wants IPv4 they will also likely listen on an IPv4 address, which will
+        // be handled as a separate callback to this same code.
+        return 0;
+    }
+
+    auto lock = m_lock.lock_exclusive();
+    const auto server = m_guestDeviceManager->GetRemoteFileSystem(clsid, c_defaultDeviceTag);
+    if (server)
+    {
+        std::wstring portString = std::format(L"tag={};port_number={}", tag, addr.Ipv4.sin_port);
+        if (protocol == IPPROTO_UDP)
+        {
+            portString += L";udp";
+        }
+
+        if (!isOpen)
+        {
+            portString += L";allocate=false";
+        }
+        else
+        {
+            wchar_t addrStr[16]; // "000.000.000.000" + null terminator
+            RtlIpv4AddressToStringW(&addr.Ipv4.sin_addr, addrStr);
+            portString += std::format(L";listen_addr={}", addrStr);
+        }
+
+        LOG_IF_FAILED(server->AddShare(portString.c_str(), nullptr, 0));
+    }
+
+    return 0;
 }
 
 void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint)

@@ -29,6 +29,7 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
+#include "GuestDeviceManager.h"
 
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
@@ -107,10 +108,6 @@ public:
 
     bool IsVhdAttached(_In_ PCWSTR VhdPath);
 
-    GUID HandleVirtioAddGuestDevice(_In_ const GUID& Clsid, _In_ const GUID& DeviceId, _In_ PCWSTR Tag, _In_ PCWSTR Options);
-
-    int HandleVirtioModifyOpenPorts(_In_ const GUID& Clsid, _In_ PCWSTR Tag, _In_ const SOCKADDR_INET& Addr, _In_ int Protocol, _In_ bool IsOpen);
-
     DiskMountResult MountDisk(
         _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options);
 
@@ -120,10 +117,8 @@ public:
         ReadOnly = 0x1
     };
 
-    void MountSharedMemoryDevice(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb);
-
     ULONG
-    MountFileAsPersistentMemory(_In_ const GUID& ImplementationClsid, _In_ PCWSTR FilePath, _In_ bool ReadOnly);
+    MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly);
 
     void MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name);
 
@@ -135,7 +130,7 @@ public:
     void SaveAttachedDisksState();
 
     _Requires_lock_held_(m_guestDeviceLock)
-    void VerifyDrvFsServers();
+    void VerifyPlan9Servers();
 
     enum DiskStateFlags
     {
@@ -172,14 +167,6 @@ private:
         DiskStateFlags Flags;
     };
 
-    struct DirectoryObjectLifetime
-    {
-        std::wstring Path;
-        // Directory objects are temporary, even if they have children, so need to keep
-        // any created handles open in order for the directory to remain accessible.
-        std::vector<wil::unique_handle> HierarchyLifetimes;
-    };
-
     struct VirtioFsShare
     {
         VirtioFsShare(PCWSTR Path, PCWSTR Options, bool Admin);
@@ -203,38 +190,12 @@ private:
     void AddPlan9Share(_In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Port, _In_ wsl::windows::common::hcs::Plan9ShareFlags Flags, _In_ HANDLE UserToken, _In_ PCWSTR VirtIoTag);
 
     _Requires_lock_held_(m_guestDeviceLock)
-    GUID AddHdvShare(_In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_opt_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken);
-
-    _Requires_lock_held_(m_guestDeviceLock)
-    GUID AddHdvShareWithOptions(
-        _In_ const GUID& DeviceId,
-        _In_ const GUID& ImplementationClsid,
-        _In_ std::wstring_view AccessName,
-        _In_ std::wstring_view Options,
-        _In_ std::wstring_view Path,
-        _In_ UINT32 Flags,
-        _In_ HANDLE UserToken);
-
-    _Requires_lock_held_(m_guestDeviceLock)
     std::wstring AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken = nullptr);
 
     _Requires_lock_held_(m_lock)
     ULONG AttachDiskLockHeld(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
 
     void CollectCrashDumps(wil::unique_socket&& socket) const;
-
-    template <typename Interface>
-    wil::com_ptr_t<Interface> CreateComServerAsUser(_In_ REFCLSID RefClsId, _In_ HANDLE UserToken)
-    {
-        auto revert = wil::impersonate_token(UserToken);
-        return wil::CoCreateInstance<Interface>(RefClsId, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
-    }
-
-    template <typename Class, typename Interface>
-    wil::com_ptr_t<Interface> CreateComServerAsUser(_In_ HANDLE UserToken)
-    {
-        return CreateComServerAsUser<Interface>(__uuidof(Class), UserToken);
-    }
 
     std::shared_ptr<LxssRunningInstance> CreateInstanceInternal(
         _In_ const GUID& InstanceId,
@@ -244,8 +205,6 @@ private:
         _In_ ULONG64 ClientLifetimeId = 0,
         _In_ bool LaunchSystemDistro = false,
         _Out_opt_ ULONG* ConnectPort = nullptr);
-
-    DirectoryObjectLifetime CreateSectionObjectRoot(_In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken) const;
 
     _Requires_lock_held_(m_lock)
     void EjectVhdLockHeld(_In_ PCWSTR VhdPath);
@@ -281,9 +240,6 @@ private:
     DiskMountResult MountDiskLockHeld(
         _In_ PCWSTR Disk, _In_ DiskType MountDiskType, _In_ ULONG PartitionIndex, _In_opt_ PCWSTR Name, _In_opt_ PCWSTR Type, _In_opt_ PCWSTR Options);
 
-    _Requires_lock_held_(m_guestDeviceLock)
-    void MountSharedMemoryDeviceLockHeld(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb);
-
     void WaitForPmemDeviceInVm(_In_ ULONG PmemId);
 
     void OnCrash(_In_ LPCWSTR Details);
@@ -314,12 +270,14 @@ private:
 
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
 
-    wil::srwlock m_lock;
     wil::srwlock m_guestDeviceLock;
+    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     _Guarded_by_(m_guestDeviceLock) std::future<bool> m_drvfsInitialResult;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_adminDrvfsToken;
     _Guarded_by_(m_guestDeviceLock) std::map<VirtioFsShare, std::wstring> m_virtioFsShares;
+    _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
+    wil::srwlock m_lock;
     _Guarded_by_(m_lock) wil::unique_event m_terminatingEvent { wil::EventOptions::ManualReset };
     _Guarded_by_(m_lock) wil::unique_event m_vmExitEvent { wil::EventOptions::ManualReset };
     wil::unique_event m_vmCrashEvent{wil::EventOptions::ManualReset};
@@ -351,12 +309,9 @@ private:
     wsl::shared::SocketChannel m_miniInitChannel;
     wil::unique_socket m_notifyChannel;
     SE_SID m_userSid;
-    wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
     std::shared_ptr<LxssRunningInstance> m_systemDistro;
     _Guarded_by_(m_lock) std::bitset<MAX_VHD_COUNT> m_lunBitmap;
     _Guarded_by_(m_lock) std::map<AttachedDisk, DiskState> m_attachedDisks;
-    _Guarded_by_(m_guestDeviceLock) std::map<UINT32, wil::com_ptr<IPlan9FileSystem>> m_plan9Servers;
-    _Guarded_by_(m_guestDeviceLock) std::vector<DirectoryObjectLifetime> m_objectDirectories;
     std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> m_kernelVersion;
     std::wstring m_kernelVersionString;
     bool m_seccompAvailable;
@@ -375,8 +330,6 @@ private:
     _Guarded_by_(m_persistentMemoryLock) ULONG m_nextPersistentMemoryId = 0;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
-
-    static const std::wstring c_defaultTag;
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(WslCoreVm::DiskStateFlags);
