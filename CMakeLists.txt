@@ -65,6 +65,7 @@ find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
+find_nuget_package(Microsoft.WSL.WSLATestDistro WSLA_TEST_DISTRO /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(StrawberryPerl PERL /)
 find_nuget_package(vswhere VSWHERE /tools)
@@ -267,15 +268,16 @@ else()
 endif()
 
 # Determine the Visual Studio installation directory which contains LLVM tools
+# N.B. The version is set to VS2022 to ensure local runs match pipeline behavior
 execute_process(
-    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -latest -products * -property installationPath
+    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,18.0)" -products * -property installationPath
     OUTPUT_VARIABLE VS_INSTALL_DIR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     COMMAND_ERROR_IS_FATAL ANY
 )
 
 if (NOT VS_INSTALL_DIR)
-    message(FATAL_ERROR "Could not determine Visual Studio installation directory.")
+    message(FATAL_ERROR "Could not determine Visual Studio 2022 installation directory.")
 endif()
 
 if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
@@ -377,6 +379,10 @@ if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smal
                             WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/modules.vhd"
                             WSL_DEV_INSTALL_PATH="${WSL_DEV_BINARY_PATH}"
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
+endif()
+
+if (NOT DEFINED OFFICIAL_BUILD AND ${TARGET_PLATFORM} STREQUAL "x64")
+    add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd")
 endif()
 
 # Common include paths

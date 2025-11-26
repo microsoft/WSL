@@ -105,6 +105,7 @@ int wsl::windows::common::socket::ReceiveNoThrow(
     Overlapped.hEvent = OverlappedEvent.get();
     DWORD BytesReturned{};
     if (WSARecv(Socket, &VectorBuffer, 1, &BytesReturned, &Flags, &Overlapped, nullptr) != 0)
+    {
         try
         {
             BytesReturned = SOCKET_ERROR;
@@ -117,6 +118,7 @@ int wsl::windows::common::socket::ReceiveNoThrow(
             // Receive will call GetLastError to look for the error code
             SetLastError(wil::ResultFromCaughtException());
         }
+    }
 
     return BytesReturned;
 }

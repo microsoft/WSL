@@ -24,39 +24,22 @@ WSLAUserSessionImpl::WSLAUserSessionImpl(HANDLE Token, wil::unique_tokeninfo_ptr
 
 WSLAUserSessionImpl::~WSLAUserSessionImpl()
 {
-    // Manually signal the VM termination events. This prevents being stuck on an API call that holds the VM lock.
+    // In case there are still COM references on sessions, signal that the user session is terminating
+    // so the sessions are all in a 'terminated' state.
     {
         std::lock_guard lock(m_lock);
 
-        for (auto* e : m_virtualMachines)
+        for (auto& e : m_sessions)
         {
-            e->OnSessionTerminating();
+            e->OnUserSessionTerminating();
         }
     }
 }
 
-void WSLAUserSessionImpl::OnVmTerminated(WSLAVirtualMachine* machine)
+void WSLAUserSessionImpl::OnSessionTerminated(WSLASession* Session)
 {
     std::lock_guard lock(m_lock);
-    auto pred = [machine](const auto* e) { return machine == e; };
-
-    // Remove any stale VM reference.
-    m_virtualMachines.erase(std::remove_if(m_virtualMachines.begin(), m_virtualMachines.end(), pred), m_virtualMachines.end());
-}
-
-HRESULT WSLAUserSessionImpl::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
-{
-    auto vm = wil::MakeOrThrow<WSLAVirtualMachine>(*Settings, GetUserSid(), this);
-
-    {
-        std::lock_guard lock(m_lock);
-        m_virtualMachines.emplace_back(vm.Get());
-    }
-
-    vm->Start();
-    THROW_IF_FAILED(vm.CopyTo(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
-
-    return S_OK;
+    WI_VERIFY(m_sessions.erase(Session) == 1);
 }
 
 PSID WSLAUserSessionImpl::GetUserSid() const
@@ -72,9 +55,12 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
 
     {
         std::lock_guard lock(m_wslaSessionsLock);
+        auto it = m_sessions.emplace(session.Get());
         m_wslaSessions.emplace_back(session);
+    // Client now owns the session.
+    // TODO: Add a flag for the client to specify that the session should outlive its process.
     }
-
+   
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
 
     return S_OK;
@@ -99,7 +85,7 @@ wsl::windows::service::wsla::WSLAUserSession::WSLAUserSession(std::weak_ptr<WSLA
 {
 }
 
-HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSL_VERSION* Version)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSLA_VERSION* Version)
 {
     Version->Major = WSL_PACKAGE_VERSION_MAJOR;
     Version->Minor = WSL_PACKAGE_VERSION_MINOR;
@@ -107,16 +93,6 @@ HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSL_VERSI
 
     return S_OK;
 }
-
-HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateVirtualMachine(const VIRTUAL_MACHINE_SETTINGS* Settings, IWSLAVirtualMachine** VirtualMachine)
-try
-{
-    auto session = m_session.lock();
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-
-    return session->CreateVirtualMachine(Settings, VirtualMachine);
-}
-CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(
     const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)

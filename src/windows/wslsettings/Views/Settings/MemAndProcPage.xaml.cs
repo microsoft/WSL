@@ -27,6 +27,16 @@ public sealed partial class MemAndProcPage : Page
                 FrameworkElementAutomationPeer.FromElement(Settings_ErrorTryAgainLater).RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
             }
         });
+
+        this.Loaded += OnPageLoaded;
+    }
+
+    private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "ProcCountExpander", "ProcCountTextBox");
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "MemorySizeExpander", "MemorySizeTextBox");
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "SwapSizeExpander", "SwapSizeTextBox");
+        RuntimeHelper.SetupExpanderFocusManagementByName(this, "SwapFilePathExpander", "SwapFilePathTextBox");
     }
 
     override protected void OnNavigatedFrom(NavigationEventArgs e)

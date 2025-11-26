@@ -167,16 +167,13 @@ wsl::windows::common::SvcComm::SvcComm()
     };
 
     wsl::shared::retry::RetryWithTimeout<void>(
-        [this]() {
-            THROW_IF_FAILED(CoCreateInstance(__uuidof(LxssUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&m_userSession)));
-        },
+        [this]() { m_userSession = wil::CoCreateInstance<LxssUserSession, ILxssUserSession>(CLSCTX_LOCAL_SERVER); },
         std::chrono::seconds(1),
         std::chrono::minutes(1),
         retry_pred);
 
     // Query client security interface.
-    wil::com_ptr_nothrow<IClientSecurity> clientSecurity;
-    THROW_IF_FAILED(m_userSession->QueryInterface(IID_PPV_ARGS(&clientSecurity)));
+    auto clientSecurity = m_userSession.query<IClientSecurity>();
 
     // Get the current proxy blanket settings.
     DWORD authnSvc, authzSvc, authnLvl, capabilities;
@@ -378,11 +375,13 @@ wsl::windows::common::SvcComm::LaunchProcess(
         //
 
         if ((WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_ENABLE_INTEROP)) && (ServerPortHandle))
+        {
             try
             {
                 InitializeInterop(ServerPortHandle.get(), DistributionId);
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
         ServerPortHandle.reset();
 
@@ -473,11 +472,13 @@ wsl::windows::common::SvcComm::LaunchProcess(
         //
 
         if (WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_ENABLE_INTEROP))
+        {
             try
             {
                 SpawnWslHost(InteropSocket.get(), DistributionId, &InstanceId);
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
         //
         // Begin reading messages from the utility vm.

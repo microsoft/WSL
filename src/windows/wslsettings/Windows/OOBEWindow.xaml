@@ -5,8 +5,8 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
-    MinWidth="480"
-    MinHeight="480"
+    MinWidth="600"
+    MinHeight="600"
     Closed="Window_Closed"
     mc:Ignorable="d">
     <Window.SystemBackdrop>

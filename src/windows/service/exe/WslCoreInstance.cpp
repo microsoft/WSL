@@ -412,13 +412,15 @@ void WslCoreInstance::Initialize()
 
     // Launch the interop server with the user's token.
     if (response.InteropPort != LX_INIT_UTILITY_VM_INVALID_PORT)
+    {
         try
         {
             const wil::unique_socket socket{wsl::windows::common::hvsocket::Connect(m_runtimeId, response.InteropPort)};
             wil::unique_handle info{wsl::windows::common::helpers::LaunchInteropServer(
                 nullptr, reinterpret_cast<HANDLE>(socket.get()), nullptr, nullptr, &m_runtimeId, m_userToken.get())};
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Initialization was successful.
     m_initialized = true;
@@ -463,6 +465,7 @@ bool WslCoreInstance::RequestStop(_In_ bool Force)
     bool shutdown = true;
     std::lock_guard lock(m_lock);
     if (m_initChannel)
+    {
         try
         {
             LX_INIT_TERMINATE_INSTANCE terminateMessage{};
@@ -477,7 +480,8 @@ bool WslCoreInstance::RequestStop(_In_ bool Force)
                 shutdown = message->Result;
             }
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     return shutdown;
 }

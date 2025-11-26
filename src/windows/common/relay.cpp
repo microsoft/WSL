@@ -1004,7 +1004,7 @@ IOHandleStatus OverlappedIOHandle::GetState() const
     return State;
 }
 
-EventHandle::EventHandle(wil::unique_handle&& Handle, std::function<void()>&& OnSignalled) :
+EventHandle::EventHandle(wil::unique_event&& Handle, std::function<void()>&& OnSignalled) :
     Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
 {
 }

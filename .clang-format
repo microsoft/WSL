@@ -58,6 +58,7 @@ IncludeCategories:
   - Regex: '^"(stdafx.h|pch.h|precomp.h)"$'
     Priority: -1
 IndentCaseLabels: false
+InsertBraces: true
 IndentWidth:     4
 IndentWrappedFunctionNames: false
 KeepEmptyLinesAtTheStartOfBlocks: true

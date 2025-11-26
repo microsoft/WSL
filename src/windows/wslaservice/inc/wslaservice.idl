@@ -21,16 +21,36 @@ cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLAUse
 cpp_quote("#endif")
 
 typedef
-struct _WSL_VERSION {
+struct _WSLA_VERSION {
     ULONG Major;
     ULONG Minor;
     ULONG Revision;
-} WSL_VERSION;
+} WSLA_VERSION;
+
+typedef enum _WSLAFdType
+{
+    WSLAFdTypeDefault = 0,
+    WSLAFdTypeTerminalInput = 1,
+    WSLAFdTypeTerminalOutput = 2,
+    WSLAFdTypeLinuxFileInput = 4,
+    WSLAFdTypeLinuxFileOutput = 8,
+    WSLAFdTypeLinuxFileAppend = 16,
+    WSLAFdTypeLinuxFileCreate = 32,
+    WSLAFdTypeTerminalControl = 64,
+} WSLAFdType;
+
+typedef enum _WSLAProcessState
+{
+    WSLAProcessStateUnknown,
+    WSLAProcessStateRunning,
+    WSLAProcessStateExited,
+    WSLAProcessStateSignaled
+} WSLAProcessState;
 
 typedef struct _WSLA_PROCESS_FD
 {
     LONG Fd;
-    int Type;
+    WSLAFdType Type;
     [string, unique] LPCSTR Path;
 } WSLA_PROCESS_FD;
 
@@ -40,6 +60,13 @@ struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
    int Pid;
 } WSLA_CREATE_PROCESS_RESULT;
 
+typedef enum _WSLAVirtualMachineTerminationReason
+{
+    WSLAlVirtualMachineTerminationReasonUnknown,
+    WSLAVirtualMachineTerminationReasonShutdown,
+    WSLAVirtualMachineTerminationReasonCrashed,
+} WSLAVirtualMachineTerminationReason;
+
 [
     uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
     pointer_default(unique),
@@ -47,7 +74,7 @@ struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
 ]
 interface ITerminationCallback : IUnknown
 {
-    HRESULT OnTermination(ULONG Reason, LPCWSTR Details);
+    HRESULT OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details);
 };
 
 [
@@ -85,6 +112,8 @@ struct WSLA_PROCESS_OPTIONS
     ULONG EnvironmentCount;
     [unique, size_is(FdsCount)] WSLA_PROCESS_FD *Fds;
     int FdsCount;
+    ULONG TtyRows; // Only needed when tty fd's are passed.
+    ULONG TtyColumns;
 };
 
 struct WSLA_VOLUME
@@ -126,8 +155,8 @@ enum WSLA_CONTAINER_STATE
 
 struct WSLA_CONTAINER
 {
-    LPCWSTR Name;
-    LPCWSTR Image;
+    LPWSTR Name;
+    LPWSTR Image;
     enum WSLA_CONTAINER_STATE State;
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
@@ -166,21 +195,22 @@ interface IWSLAProcess : IUnknown
 ]
 interface IWSLAVirtualMachine : IUnknown
 {
-    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out] LPSTR* Device, [out] ULONG* Lun);
-    HRESULT Mount([in, unique] LPCSTR Source, [in] LPCSTR Target, [in] LPCSTR Type, [in] LPCSTR Options, [in] ULONG Flags); 
     HRESULT CreateLinuxProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
     HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
     HRESULT Signal([in] LONG Pid, [in] int Signal);
     HRESULT Shutdown([in] ULONGLONG TimeoutMs);
-    HRESULT RegisterCallback([in] ITerminationCallback* terminationCallback);
     HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
     HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
     HRESULT Unmount([in] LPCSTR Path);
-    HRESULT DetachDisk([in] ULONG Lun);
     HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
-    HRESULT MountGpuLibraries([in] LPCSTR LibrariesMountPoint, [in] LPCSTR DriversMountpoint, [in] DWORD Flags);
 }
+
+typedef enum _WSLANetworkingMode
+{
+    WSLANetworkingModeNone,
+    WSLANetworkingModeNAT
+} WSLANetworkingMode;
 
 typedef
 struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
@@ -189,11 +219,15 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
     ULONG CpuCount;
     ULONG BootTimeoutMs;
     ULONG DmesgOutput;
-    ULONG NetworkingMode;
+    WSLANetworkingMode NetworkingMode;
     BOOL EnableDnsTunneling;
     BOOL EnableDebugShell;
     BOOL EnableEarlyBootDmesg;
     BOOL EnableGPU;
+    LPCWSTR RootVhd; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
+    LPCSTR RootVhdType; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
+    LPCWSTR ContainerRootVhd;
+    BOOL FormatContainerRootVhd;
 } VIRTUAL_MACHINE_SETTINGS;
 
 
@@ -201,6 +235,7 @@ struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
+    [unique] ITerminationCallback* TerminationCallback;
 
     // TODO: Termination callback, flags
 };
@@ -273,8 +308,7 @@ struct WSLA_SESSION_INFORMATION
 ]
 interface IWSLAUserSession : IUnknown
 {
-    HRESULT GetVersion([out] WSL_VERSION* Error);
-    HRESULT CreateVirtualMachine([in] const VIRTUAL_MACHINE_SETTINGS* Settings, [out]IWSLAVirtualMachine** VirtualMachine); // TODO: Delete once the new API is wired.
+    HRESULT GetVersion([out] WSLA_VERSION* Version);
 
     // Session managment.
     HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out]IWSLASession** Session);

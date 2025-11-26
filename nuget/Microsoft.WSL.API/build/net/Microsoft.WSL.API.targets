@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup Condition="'$(WSLForApps-Platform)' == ''">
+        <WSLForApps-Platform Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x64</WSLForApps-Platform>
+        <WSLForApps-Platform Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</WSLForApps-Platform>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(WSLForApps-Platform)' == ''">
+        <WSLForApps-Platform Condition="'$(Platform)' != 'AnyCPU'">$(Platform)</WSLForApps-Platform>
+    </PropertyGroup>
+
+    <Import Project="$(MSBuildThisFileDirectory)..\Microsoft.WSL.API.common.targets" />
+
+</Project>
