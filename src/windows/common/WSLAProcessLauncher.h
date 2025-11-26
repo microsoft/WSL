@@ -96,6 +96,8 @@ protected:
     std::string m_executable;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
+    DWORD m_rows = 0;
+    DWORD m_columns = 0;
 };
 
 } // namespace wsl::windows::common

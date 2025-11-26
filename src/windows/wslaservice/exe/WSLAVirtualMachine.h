@@ -82,7 +82,8 @@ private:
     void OnCrash(_In_ const HCS_EVENT* Event);
 
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
-    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type);
+    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(
+        wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type, ULONG TtyRows = 0, ULONG TtyColumns = 0);
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
 
     ConnectedSocket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);

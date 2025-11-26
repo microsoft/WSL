@@ -727,7 +727,8 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
     return Fork(m_initChannel, Type);
 }
 
-std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type)
+std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(
+    wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type, ULONG TtyRows, ULONG TtyColumns)
 {
     uint32_t port{};
     int32_t pid{};
@@ -737,8 +738,8 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
 
         WSLA_FORK message;
         message.ForkType = Type;
-        message.TtyColumns = 80;
-        message.TtyRows = 80;
+        message.TtyColumns = static_cast<uint16_t>(TtyColumns);
+        message.TtyRows = static_cast<uint16_t>(TtyRows);
         const auto& response = Channel.Transaction(message);
         port = response.Port;
         pid = response.Pid;
@@ -857,14 +858,12 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     // If this is an interactive tty, we need a relay process
     if (interactiveTty)
     {
-        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty);
+        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty, Options.TtyRows, Options.TtyColumns);
         WSLA_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.TtyInput = ttyInput->Fd;
         relayMessage.TtyOutput = ttyOutput->Fd;
         relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
-        relayMessage.Rows = Options.TtyRows;
-        relayMessage.Columns = Options.TtyColumns;
         childChannel.SendMessage(relayMessage);
 
         auto result = ExpectClosedChannelOrError(childChannel);
