@@ -1,40 +1,25 @@
 set(SOURCES
     DistributionRegistration.cpp
-    LxssSecurity.cpp
     LxssUserCallback.cpp
     LxssUserSession.cpp
     LxssUserSessionFactory.cpp
     LxssIptables.cpp
-    LxssUserCallback.cpp
     LxssHttpProxy.cpp
     LxssInstance.cpp
     PluginManager.cpp
     ServiceMain.cpp
     BridgedNetworking.cpp
-    DeviceHostProxy.cpp
-    Dmesg.cpp
-    DnsTunnelingChannel.cpp
-    GnsChannel.cpp
-    GnsPortTrackerChannel.cpp
     GnsRpcServer.cpp
-    GuestDeviceManager.cpp
     GuestTelemetryLogger.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
     LxssCreateProcess.cpp
     MirroredNetworking.cpp
-    NatNetworking.cpp
-    RingBuffer.cpp
-    WslCoreFilesystem.cpp
     WslCoreGuestNetworkService.cpp
-    WslCoreHostDnsInfo.cpp
     WslCoreInstance.cpp
     WslMirroredNetworking.cpp
-    WslCoreNetworkEndpointSettings.cpp
-    DnsResolver.cpp
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
-    VirtioNetworking.cpp
     main.rc
     ${CMAKE_CURRENT_BINARY_DIR}/../mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE}/wsleventschema.rc
     application.manifest)
@@ -42,7 +27,6 @@ set(SOURCES
 set(HEADERS
     ../../inc/comservicehelper.h
     DistributionRegistration.h
-    LxssSecurity.h
     LxssUserCallback.h
     LxssUserSession.h
     LxssUserSessionFactory.h
@@ -51,31 +35,17 @@ set(HEADERS
     PluginManager.h
     LxssInstance.h
     BridgedNetworking.h
-    DeviceHostProxy.h
-    Dmesg.h
-    DnsTunnelingChannel.h
-    GnsChannel.h
-    GnsPortTrackerChannel.h
     GnsRpcServer.h
-    GuestDeviceManager.h
     GuestTelemetryLogger.h
-    INetworkingEngine.h
     IMirroredNetworkManager.h
     Lifetime.h
     LxssConsoleManager.h
     LxssCreateProcess.h
     MirroredNetworking.h
-    NatNetworking.h
-    RingBuffer.h
-    WslCoreFilesystem.h
     WslCoreGuestNetworkService.h
-    WslCoreHostDnsInfo.h
     WslCoreInstance.h
-    WslCoreMessageQueue.h
     WslMirroredNetworking.h
     WslCoreNetworkEndpoint.h
-    WslCoreNetworkEndpointSettings.h
-    DnsResolver.h
     WslCoreTcpIpStateTracking.h
     WslCoreVm.h)
 
