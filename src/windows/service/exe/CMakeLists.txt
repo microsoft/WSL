@@ -12,6 +12,7 @@ set(SOURCES
     BridgedNetworking.cpp
     GnsPortTrackerChannel.cpp
     GnsRpcServer.cpp
+    GuestDeviceManager.cpp
     GuestTelemetryLogger.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
@@ -40,6 +41,7 @@ set(HEADERS
     BridgedNetworking.h
     GnsPortTrackerChannel.h
     GnsRpcServer.h
+    GuestDeviceManager.h
     GuestTelemetryLogger.h
     IMirroredNetworkManager.h
     Lifetime.h
