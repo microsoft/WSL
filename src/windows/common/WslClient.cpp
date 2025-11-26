@@ -1551,6 +1551,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     std::wstring containerRootVhd;
     std::string containerImage;
     bool help = false;
+    std::wstring debugShell;
 
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(vhd, L"--vhd");
@@ -1561,6 +1562,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Utf8String(fsType), L"--fstype");
     parser.AddArgument(containerRootVhd, L"--container-vhd");
     parser.AddArgument(Utf8String(containerImage), L"--image");
+    parser.AddArgument(debugShell, L"--debug-shell");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
@@ -1596,16 +1598,24 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wil::com_ptr<IWSLASession> session;
     settings.RootVhd = vhd.c_str();
     settings.RootVhdType = fsType.c_str();
-    THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
-    THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
 
-    wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
-
-    if (!containerRootVhd.empty())
+    if (!debugShell.empty())
     {
-        wsl::windows::common::WSLAProcessLauncher initProcessLauncher{shell, {shell, "/etc/lsw-init.sh"}};
-        auto initProcess = initProcessLauncher.Launch(*session);
-        THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
+        THROW_IF_FAILED(userSession->OpenSessionByName(debugShell.c_str(), &session));
+    }
+    else
+    {
+        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
+        THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        if (!containerRootVhd.empty())
+        {
+            wsl::windows::common::WSLAProcessLauncher initProcessLauncher{shell, {shell, "/etc/lsw-init.sh"}};
+            auto initProcess = initProcessLauncher.Launch(*session);
+            THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
+        }
     }
 
     std::optional<wil::com_ptr<IWSLAContainer>> container;

@@ -319,6 +319,7 @@ interface IWSLAUserSession : IUnknown
     HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out]IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
+    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out]IWSLASession** Session);
 
     // TODO: Do we need 'TerminateSession()' ?
 }

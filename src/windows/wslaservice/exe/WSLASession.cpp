@@ -60,6 +60,11 @@ HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
     return S_OK;
 }
 
+const std::wstring& WSLASession::DisplayName() const
+{
+    return m_displayName;
+}
+
 HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
 {
     return E_NOTIMPL;

@@ -50,11 +50,15 @@ HRESULT WSLAUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ RE
         THROW_HR_IF(CO_E_SERVER_STOPPING, !g_sessions.has_value());
 
         auto session = std::find_if(g_sessions->begin(), g_sessions->end(), [&tokenInfo](auto it) {
-            return EqualSid(it->GetUserSid(), &tokenInfo->User.Sid);
+            return EqualSid(it->GetUserSid(), tokenInfo->User.Sid);
         });
 
         if (session == g_sessions->end())
         {
+            wil::unique_hlocal_string sid;
+            THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSid(tokenInfo->User.Sid, &sid));
+            WSL_LOG("WSLAUserSession created", TraceLoggingValue(sid.get(), "sid"));
+
             session = g_sessions->insert(g_sessions->end(), std::make_shared<WSLAUserSessionImpl>(userToken.get(), std::move(tokenInfo)));
         }
 

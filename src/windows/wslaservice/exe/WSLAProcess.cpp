@@ -44,6 +44,8 @@ void WSLAProcess::OnVmTerminated()
     {
         m_state = WslaProcessStateSignalled;
         m_exitedCode = 9; // SIGKILL
+
+        m_exitEvent.SetEvent();
     }
 }
 

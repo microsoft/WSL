@@ -27,6 +27,7 @@ public:
     ~WSLASession();
 
     IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName) override;
+    const std::wstring& DisplayName() const;
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
