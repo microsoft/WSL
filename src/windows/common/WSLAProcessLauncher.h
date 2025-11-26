@@ -43,6 +43,9 @@ public:
     };
 
     RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds);
+    NON_COPYABLE(RunningWSLAProcess);
+    DEFAULT_MOVABLE(RunningWSLAProcess);
+
     ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
@@ -57,6 +60,9 @@ protected:
 class ClientRunningWSLAProcess : public RunningWSLAProcess
 {
 public:
+    NON_COPYABLE(ClientRunningWSLAProcess);
+    DEFAULT_MOVABLE(ClientRunningWSLAProcess);
+
     ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds);
     wil::unique_handle GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
@@ -68,7 +74,6 @@ protected:
 private:
     wil::com_ptr<IWSLAProcess> m_process;
 };
-
 class WSLAProcessLauncher
 {
 public:
