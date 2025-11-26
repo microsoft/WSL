@@ -12,6 +12,8 @@ set(SOURCES
     ExecutionContext.cpp
     filesystem.cpp
     GnsChannel.cpp
+    GnsPortTrackerChannel.cpp
+    GuestDeviceManager.cpp
     HandleConsoleProgressBar.cpp
     hcs.cpp
     helpers.cpp
@@ -34,6 +36,7 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     svccommio.cpp
+    VirtioNetworking.cpp
     WSLAProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
@@ -82,6 +85,8 @@ set(HEADERS
     ExecutionContext.h
     filesystem.hpp
     GnsChannel.h
+    GnsPortTrackerChannel.h
+    GuestDeviceManager.h
     HandleConsoleProgressBar.h
     hcs.hpp
     hcs_schema.h
@@ -109,6 +114,7 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     svccommio.hpp
+    VirtioNetworking.h
     WSLAProcessLauncher.h
     WslClient.h
     WslCoreConfig.h
