@@ -86,6 +86,9 @@ set(HEADERS
     hcs.hpp
     hcs_schema.h
     helpers.hpp
+    interop.hpp
+    ExecutionContext.h
+    socket.hpp
     hvsocket.hpp
     INetworkingEngine.h
     interop.hpp

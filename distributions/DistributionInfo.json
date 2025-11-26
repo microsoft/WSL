@@ -151,12 +151,12 @@
                 "FriendlyName": "AlmaLinux OS 10",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.0.20250529.0/AlmaLinux-10.0_x64_20250529.0.wsl",
-                    "Sha256": "6775711048b86743588da7173ab45ca449b5c50a72fb87635313f059a9813d4b"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20251124.0/AlmaLinux-10.1_x64_20251124.0.wsl",
+                    "Sha256": "24e8fa286a4081979d97e83a227fb89f332bcf731fe4b422679a3b455ab0be37"
                 },
                 "Arm64Url": {
-                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.0.20250529.0/AlmaLinux-10.0_ARM64_20250529.0.wsl",
-                    "Sha256": "bc424bd9f954d36e871d4d874d35bc25e3ea7bdfe48337c30b927ed73a79b2fa"
+                    "Url": "https://github.com/AlmaLinux/wsl-images/releases/download/v10.1.20251124.0/AlmaLinux-10.1_ARM64_20251124.0.wsl",
+                    "Sha256": "20700a4467214074f8a1a3d4e0e1cad25af36b8127d047ab6d5b4a1355e998b8"
                 }
             }
         ],
