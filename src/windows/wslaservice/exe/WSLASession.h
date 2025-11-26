@@ -58,7 +58,6 @@ private:
     std::wstring m_displayName;
     std::mutex m_lock;
 
-    std::atomic_int m_containerId = 1;
     // TODO: Add container tracking here. Could reuse m_lock for that.
 };
 

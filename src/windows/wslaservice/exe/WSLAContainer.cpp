@@ -18,7 +18,7 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLAContainer;
 
-const std::string nerdctlPath = "/usr/bin/nerdctl";
+constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
 static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
@@ -66,6 +66,8 @@ CATCH_RETURN();
 
 Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM)
 {
+    // TODO: Switch to nerdctl create, and call nerdctl start in Start().
+
     bool hasStdin = false;
     bool hasTty = false;
     for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)

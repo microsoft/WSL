@@ -94,7 +94,6 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // TODO: Log entrance into the function.
-    m_containerId++;
     auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
     THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
