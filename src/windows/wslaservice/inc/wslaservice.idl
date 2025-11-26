@@ -112,6 +112,8 @@ struct WSLA_PROCESS_OPTIONS
     ULONG EnvironmentCount;
     [unique, size_is(FdsCount)] WSLA_PROCESS_FD *Fds;
     int FdsCount;
+    ULONG TtyRows; // Only needed when tty fd's are passed.
+    ULONG TtyColumns;
 };
 
 struct WSLA_VOLUME

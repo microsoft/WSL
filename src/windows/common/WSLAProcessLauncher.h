@@ -82,6 +82,7 @@ public:
         ProcessFlags Flags = ProcessFlags::Stdout | ProcessFlags::Stderr);
 
     void AddFd(WSLA_PROCESS_FD Fd);
+    void SetTtySize(ULONG Rows, ULONG Columns);
 
     // TODO: Add overloads for IWSLAContainer once implemented.
     ClientRunningWSLAProcess Launch(IWSLASession& Session);
@@ -95,6 +96,8 @@ protected:
     std::string m_executable;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
+    DWORD m_rows = 0;
+    DWORD m_columns = 0;
 };
 
 } // namespace wsl::windows::common

@@ -48,6 +48,12 @@ void WSLAProcessLauncher::AddFd(WSLA_PROCESS_FD Fd)
     m_fds.push_back(Fd);
 }
 
+void WSLAProcessLauncher::SetTtySize(ULONG Rows, ULONG Columns)
+{
+    m_rows = Rows;
+    m_columns = Columns;
+}
+
 std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> WSLAProcessLauncher::CreateProcessOptions()
 {
     std::vector<const char*> commandLine;
@@ -64,6 +70,8 @@ std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const cha
     options.FdsCount = static_cast<DWORD>(m_fds.size());
     options.Environment = environment.data();
     options.EnvironmentCount = static_cast<DWORD>(environment.size());
+    options.TtyColumns = m_columns;
+    options.TtyRows = m_rows;
 
     return std::make_tuple(options, std::move(commandLine), std::move(environment));
 }
