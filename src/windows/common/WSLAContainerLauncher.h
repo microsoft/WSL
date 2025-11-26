@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAContainerLauncher.h
+
+Abstract:
+
+    This file contains the definition for WSLAContainerLauncher.
+
+--*/
 #include "WSLAprocessLauncher.h"
 
 namespace wsl::windows::common {

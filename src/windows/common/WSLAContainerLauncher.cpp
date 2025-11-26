@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAContainerLauncher.cpp
+
+Abstract:
+
+    This file contains the implementation for WSLAContainerLauncher.
+
+--*/
 #include "WSLAContainerLauncher.h"
 
 using wsl::windows::common::ClientRunningWSLAProcess;
