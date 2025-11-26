@@ -66,7 +66,6 @@ CATCH_RETURN();
 
 Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM)
 {
-
     bool hasStdin = false;
     bool hasTty = false;
     for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)

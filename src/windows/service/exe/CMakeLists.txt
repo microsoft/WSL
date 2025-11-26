@@ -12,6 +12,7 @@ set(SOURCES
     BridgedNetworking.cpp
     GnsPortTrackerChannel.cpp
     GnsRpcServer.cpp
+    GuestDeviceManager.cpp
     GuestTelemetryLogger.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
@@ -40,6 +41,7 @@ set(HEADERS
     BridgedNetworking.h
     GnsPortTrackerChannel.h
     GnsRpcServer.h
+    GuestDeviceManager.h
     GuestTelemetryLogger.h
     IMirroredNetworkManager.h
     Lifetime.h
@@ -52,8 +54,6 @@ set(HEADERS
     WslCoreNetworkEndpoint.h
     WslCoreTcpIpStateTracking.h
     WslCoreVm.h)
-
-include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
 
 add_executable(wslservice ${SOURCES} ${HEADERS})
 add_dependencies(wslservice wslserviceidl wslservicemc)

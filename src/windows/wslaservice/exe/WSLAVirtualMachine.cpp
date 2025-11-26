@@ -250,7 +250,9 @@ void WSLAVirtualMachine::Start()
     auto kernelPath = std::filesystem::path(WSL_KERNEL_PATH);
 
 #else
+
     auto kernelPath = std::filesystem::path(basePath) / L"tools" / LXSS_VM_MODE_KERNEL_NAME;
+
 #endif
 
     if constexpr (!wsl::shared::Arm64)
@@ -262,11 +264,9 @@ void WSLAVirtualMachine::Start()
     }
     else
     {
-        // TODO
-        THROW_HR(E_NOTIMPL);
         auto bootThis = hcs::UefiBootEntry{};
         bootThis.DeviceType = hcs::UefiBootDevice::VmbFs;
-        // bootThis.VmbFsRootPath = m_rootFsPath.c_str();
+        bootThis.VmbFsRootPath = (basePath / L"tools").c_str();
         bootThis.DevicePath = L"\\" LXSS_VM_MODE_KERNEL_NAME;
         bootThis.OptionalData = kernelCmdLine;
         hcs::Uefi uefiSettings{};
@@ -324,6 +324,15 @@ void WSLAVirtualMachine::Start()
     auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
     m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
 
+    // Create a thread to watch for exited processes.
+    auto [__, ___, childChannel] = Fork(WSLA_FORK::Thread);
+
+    WSLA_WATCH_PROCESSES watchMessage{};
+    childChannel.SendMessage(watchMessage);
+
+    THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
+    m_processExitThread = std::thread(std::bind(&WSLAVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
+
     ConfigureNetworking();
 
     // Mount the kernel modules VHD.
@@ -357,15 +366,6 @@ void WSLAVirtualMachine::Start()
 
         wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
     }
-
-    auto [__, ___, childChannel] = Fork(WSLA_FORK::Thread);
-
-    WSLA_WATCH_PROCESSES watchMessage{};
-    childChannel.SendMessage(watchMessage);
-
-    THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
-
-    m_processExitThread = std::thread(std::bind(&WSLAVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
 
     ConfigureMounts();
 }
@@ -727,7 +727,8 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
     return Fork(m_initChannel, Type);
 }
 
-std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type)
+std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(
+    wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type, ULONG TtyRows, ULONG TtyColumns)
 {
     uint32_t port{};
     int32_t pid{};
@@ -737,8 +738,8 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
 
         WSLA_FORK message;
         message.ForkType = Type;
-        message.TtyColumns = 80;
-        message.TtyRows = 80;
+        message.TtyColumns = static_cast<uint16_t>(TtyColumns);
+        message.TtyRows = static_cast<uint16_t>(TtyRows);
         const auto& response = Channel.Transaction(message);
         port = response.Port;
         pid = response.Pid;
@@ -802,6 +803,11 @@ CATCH_RETURN();
 
 Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
+    // N.B This check is there to prevent processes from being started before the VM is done initializing.
+    // to avoid potential deadlocks, since the processExitThread is required to signal the process exit events.
+    // std::thread::joinable() is const, so this can be called without acquiring the lock.
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_processExitThread.joinable());
+
     auto setErrno = [Errno](int Error) {
         if (Errno != nullptr)
         {
@@ -852,7 +858,7 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     // If this is an interactive tty, we need a relay process
     if (interactiveTty)
     {
-        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty);
+        auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty, Options.TtyRows, Options.TtyColumns);
         WSLA_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
         relayMessage.TtyInput = ttyInput->Fd;

@@ -2448,8 +2448,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Validate that the shortcut is actually in the start menu
         VERIFY_IS_TRUE(shortcutPath.find(startMenu) != std::string::npos);
 
-        Microsoft::WRL::ComPtr<IPersistFile> storage;
-        VERIFY_SUCCEEDED(shellLink->QueryInterface(IID_IPersistFile, &storage));
+        auto storage = shellLink.query<IPersistFile>();
 
         VERIFY_SUCCEEDED(storage->Load(shortcutPath.c_str(), 0));
 

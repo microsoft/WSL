@@ -6,6 +6,7 @@ tmp
 /.vs/
 /.vscode/
 *.sln
+*.slnx
 *.user
 *.csproj
 *.vcxproj
