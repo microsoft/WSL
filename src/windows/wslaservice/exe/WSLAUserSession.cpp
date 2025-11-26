@@ -67,13 +67,12 @@ PSID WSLAUserSessionImpl::GetUserSid() const
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
     const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 {
-    OutputDebugStringW(L"[WSLA] CreateSession called\n"); //temp
     ULONG id = m_nextSessionId++;
     auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this, *VmSettings);
 
     {
         std::lock_guard lock(m_wslaSessionsLock);
-        m_wslaSessions.emplace_back(session.Get());
+        m_wslaSessions.emplace_back(session);
     }
 
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
@@ -83,7 +82,6 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
 
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
 {
-    OutputDebugStringW(L"[WSLA] ListSessions called\n"); // temp
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_wslaSessions.size());
     std::lock_guard lock(m_wslaSessionsLock);
     for (size_t i = 0; i < m_wslaSessions.size(); ++i)
