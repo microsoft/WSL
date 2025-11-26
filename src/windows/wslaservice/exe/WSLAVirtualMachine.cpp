@@ -863,6 +863,8 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
         relayMessage.TtyInput = ttyInput->Fd;
         relayMessage.TtyOutput = ttyOutput->Fd;
         relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
+        relayMessage.Rows = Options.TtyRows;
+        relayMessage.Columns = Options.TtyColumns;
         childChannel.SendMessage(relayMessage);
 
         auto result = ExpectClosedChannelOrError(childChannel);

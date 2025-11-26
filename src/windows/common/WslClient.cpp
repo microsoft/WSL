@@ -1611,6 +1611,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
 
+    // Add the terminal size.
+    CONSOLE_SCREEN_BUFFER_INFOEX Info{};
+    Info.cbSize = sizeof(Info);
+
     auto process = launcher.Launch(*session);
 
     // Configure console for interactive usage.
