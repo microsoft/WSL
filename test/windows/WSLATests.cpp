@@ -1178,8 +1178,9 @@ class WSLATests
 
         // Validate that env is correctly wired.
         {
-            WSLAContainerLauncher launcher("debian:latest", "test-env", "/bin/bash", {"-c", "echo $testenv"},
-        {{"testenv=testvalue"}}); auto container = launcher.Launch(*session); auto process = container.GetInitProcess();
+            WSLAContainerLauncher launcher("debian:latest", "test-env", "/bin/bash", {"-c", "echo $testenv"}, {{"testenv=testvalue"}});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
