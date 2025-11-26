@@ -30,12 +30,13 @@ public:
     PSID GetUserSid() const;
 
     HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
-
+    HRESULT ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount);
+    void OnVmTerminated(WSLAVirtualMachine* machine);
     void OnSessionTerminated(WSLASession* Session);
 
 private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
-
+    ULONG m_nextSessionId = 1;
     std::recursive_mutex m_wslaSessionsLock;
     std::recursive_mutex m_lock;
 

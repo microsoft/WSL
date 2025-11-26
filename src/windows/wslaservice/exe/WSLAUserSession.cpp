@@ -50,16 +50,33 @@ PSID WSLAUserSessionImpl::GetUserSid() const
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
     const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 {
-    auto session = wil::MakeOrThrow<WSLASession>(*Settings, *this, *VmSettings);
+    ULONG id = m_nextSessionId++;
+    auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this, *VmSettings);
 
-    std::lock_guard lock(m_wslaSessionsLock);
-    auto it = m_sessions.emplace(session.Get());
-
+    {
+        std::lock_guard lock(m_wslaSessionsLock);
+        auto it = m_sessions.emplace(session.Get());
+        m_wslaSessions.emplace_back(session);
     // Client now owns the session.
     // TODO: Add a flag for the client to specify that the session should outlive its process.
-
+    }
+   
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
 
+    return S_OK;
+}
+
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
+{
+    auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_wslaSessions.size());
+    std::lock_guard lock(m_wslaSessionsLock);
+    for (size_t i = 0; i < m_wslaSessions.size(); ++i)
+    {
+        output[i].SessionId = m_wslaSessions[i]->GetId();
+        m_wslaSessions[i]->GetDisplayName(&output[i].DisplayName);
+    }
+    *Sessions = output.release();
+    *SessionsCount = static_cast<ULONG>(m_wslaSessions.size());
     return S_OK;
 }
 
@@ -89,9 +106,20 @@ try
 CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_INFORMATION** Sessions, ULONG* SessionsCount)
+
 {
-    return E_NOTIMPL;
+    if (!Sessions || !SessionsCount)
+    {
+        return E_INVALIDARG;
+    }
+
+    // For now, return an empty list. We'll populate this from m_sessions later.
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->ListSessions(Sessions, SessionsCount);
 }
+
 HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
 {
     return E_NOTIMPL;
