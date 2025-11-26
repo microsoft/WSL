@@ -67,7 +67,9 @@ PSID WSLAUserSessionImpl::GetUserSid() const
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
     const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 {
-    auto session = wil::MakeOrThrow<WSLASession>(*Settings, *this, *VmSettings);
+    OutputDebugStringW(L"[WSLA] CreateSession called\n"); //temp
+    ULONG id = m_nextSessionId++;
+    auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this, *VmSettings);
 
     {
         std::lock_guard lock(m_wslaSessionsLock);
@@ -76,6 +78,21 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
 
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
 
+    return S_OK;
+}
+
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
+{
+    OutputDebugStringW(L"[WSLA] ListSessions called\n"); // temp
+    auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_wslaSessions.size());
+    std::lock_guard lock(m_wslaSessionsLock);
+    for (size_t i = 0; i < m_wslaSessions.size(); ++i)
+    {
+        output[i].SessionId = m_wslaSessions[i]->GetId();
+        m_wslaSessions[i]->GetDisplayName(&output[i].DisplayName);
+    }
+    *Sessions = output.release();
+    *SessionsCount = static_cast<ULONG>(m_wslaSessions.size());
     return S_OK;
 }
 
@@ -115,6 +132,7 @@ try
 CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_INFORMATION** Sessions, ULONG* SessionsCount)
+
 {
     if (!Sessions || !SessionsCount)
     {
@@ -122,10 +140,10 @@ HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_
     }
 
     // For now, return an empty list. We'll populate this from m_sessions later.
-    *Sessions = nullptr;
-    *SessionsCount = 0;
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return S_OK;
+    return session->ListSessions(Sessions, SessionsCount);
 }
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)

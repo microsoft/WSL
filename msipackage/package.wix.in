@@ -379,7 +379,6 @@
                 </Component>
             </DirectoryRef>
         <?endif?>
-
         <DirectoryRef Id="TOOLSFOLDER">
             <Component Id="tools" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134733" Bitness="always64" UninstallWhenSuperseded="yes">
                 <File Id="init" Source="${BIN}/init" Checksum="yes" />

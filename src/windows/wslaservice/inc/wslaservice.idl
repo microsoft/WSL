@@ -261,9 +261,9 @@ interface IWSLASession : IUnknown
 
 struct WSLA_SESSION_INFORMATION
 {
-    ULONG Id;
+    ULONG SessionId;
     DWORD CreatorPid;
-    LPSTR DisplayName;
+    LPWSTR DisplayName;
 };
 
 [

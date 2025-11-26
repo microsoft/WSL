@@ -19,7 +19,10 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLASession;
 
-WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
+WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings,
+                                   WSLAUserSessionImpl& userSessionImpl,
+                                   const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
+    m_id(id),
     m_sessionSettings(Settings),
     m_userSession(userSessionImpl),
     m_virtualMachine(std::make_optional<WSLAVirtualMachine>(VmSettings, userSessionImpl.GetUserSid(), &userSessionImpl)),

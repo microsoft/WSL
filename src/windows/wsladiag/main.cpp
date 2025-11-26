@@ -72,6 +72,7 @@ int wsladiag_main(std::wstring_view commandLine)
     }
 
     // --list: Call WSLA service COM interface to retrieve and display sessions.
+    
     try
     {
         wil::com_ptr<IWSLAUserSession> userSession;
@@ -110,19 +111,14 @@ int wsladiag_main(std::wstring_view commandLine)
             {
                 const auto& session = sessions[i];
 
-                const char* displayName = session.DisplayName;
+                const auto * displayName = session.DisplayName;
                 if (displayName == nullptr)
                 {
-                    displayName = "<unnamed>";
+                    displayName = L"<unnamed>";
                 }
 
                 wslutil::PrintMessage(
-                    std::format(
-                        L"{}\t{}\t\t{}\n",
-                        session.Id,
-                        session.CreatorPid,
-                        displayName), // std::formatter<char*, wchar_t> does UTF-8 → wide
-                    stdout);
+                    std::format(L"{}\t{}\t\t{}\n", session.SessionId, session.CreatorPid, static_cast<const wchar_t*>(displayName)), stdout);
             }
         }
 
