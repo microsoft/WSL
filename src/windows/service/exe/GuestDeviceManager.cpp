@@ -52,13 +52,11 @@ GUID GuestDeviceManager::AddHdvShareWithOptions(
 
 GUID GuestDeviceManager::AddNewDevice(_In_ const GUID& deviceId, _In_ const wil::com_ptr<IPlan9FileSystem>& server, _In_ PCWSTR tag)
 {
-    THROW_HR_IF(E_NOT_VALID_STATE, !m_deviceHostSupport);
     return m_deviceHostSupport->AddNewDevice(deviceId, server, tag);
 }
 
 void GuestDeviceManager::AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server)
 {
-    THROW_HR_IF(E_NOT_VALID_STATE, !m_deviceHostSupport);
     m_deviceHostSupport->AddRemoteFileSystem(clsid, tag, server);
 }
 
@@ -134,16 +132,12 @@ GuestDeviceManager::DirectoryObjectLifetime GuestDeviceManager::CreateSectionObj
 
 wil::com_ptr<IPlan9FileSystem> GuestDeviceManager::GetRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag)
 {
-    THROW_HR_IF(E_NOT_VALID_STATE, !m_deviceHostSupport);
     return m_deviceHostSupport->GetRemoteFileSystem(clsid, tag);
 }
 
 void GuestDeviceManager::Shutdown()
 try
 {
-    if (m_deviceHostSupport)
-    {
-        m_deviceHostSupport->Shutdown();
-    }
+    m_deviceHostSupport->Shutdown();
 }
 CATCH_LOG()
