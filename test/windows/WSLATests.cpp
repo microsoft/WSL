@@ -1222,6 +1222,5 @@ class WSLATests
         }
 
 #endif
-
     }
 };
