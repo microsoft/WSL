@@ -22,12 +22,24 @@ Abstract:
 
 namespace wsl::windows::common::distribution {
 
+// Represents a file to be injected into the distribution during installation
+struct InjectedFile
+{
+    std::wstring Source; // "url" or "inline"
+    std::optional<std::wstring> Url; // URL to download from (if Source == "url")
+    std::optional<std::wstring> Sha256; // SHA256 hash for verification (if Source == "url")
+    std::optional<std::wstring> Contents; // Inline file contents (if Source == "inline")
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InjectedFile, Source, Url, Sha256, Contents);
+};
+
 struct DistributionArchive
 {
     std::wstring Url;
     std::wstring Sha256;
+    std::optional<std::map<std::string, InjectedFile>> Files; // Map of file paths to inject
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DistributionArchive, Url, Sha256);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DistributionArchive, Url, Sha256, Files);
 };
 
 struct ModernDistributionVersion
