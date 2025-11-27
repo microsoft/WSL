@@ -2104,6 +2104,8 @@ class NatTests
 
     TEST_METHOD(RemoveAndAddDefaultRoute)
     {
+        WSL2_TEST_ONLY();
+
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Verify that the default routes are set
@@ -2185,6 +2187,8 @@ class NatTests
 
     TEST_METHOD(AddAndRemoveCustomRoute)
     {
+        WSL2_TEST_ONLY();
+
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Add custom routes, one per address family
@@ -2221,6 +2225,8 @@ class NatTests
 
     TEST_METHOD(AddRouteWithMetrics)
     {
+        WSL2_TEST_ONLY();
+
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Add a custom route per address family
@@ -2259,6 +2265,8 @@ class NatTests
 
     TEST_METHOD(ResetRoutes)
     {
+        WSL2_TEST_ONLY();
+
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Add a custom route per address family
@@ -2331,6 +2339,8 @@ class NatTests
 
     TEST_METHOD(ResetRoutesTwice)
     {
+        WSL2_TEST_ONLY();
+
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         auto state = GetIpv4RoutingTableState();
@@ -2361,6 +2371,8 @@ class NatTests
 
     TEST_METHOD(UpdateIpAddress)
     {
+        WSL2_TEST_ONLY();
+
         TestCase({{L"eth0", {{L"192.168.0.2", 24}}, L"192.168.0.1", {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Verify that the IPs are in the preferred state
@@ -2420,6 +2432,8 @@ class NatTests
 
     TEST_METHOD(TemporaryAddress)
     {
+        WSL2_TEST_ONLY();
+
         TestCase({{L"eth0", {}, {}, {{L"fc00::2", 64}}, L"fc00::1"}});
 
         // Make the address public
@@ -2548,6 +2562,22 @@ class NatTests
         VERIFY_ARE_EQUAL(GetMacAddress(), originalMac);
     }
 
+    TEST_METHOD(DnsChange)
+    {
+        WSL2_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
+
+        wsl::shared::hns::DNS dns;
+        dns.ServerList = {L"1.1.1.1"};
+        dns.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
+        RunGns(dns, ModifyRequestType::Update, GuestEndpointResourceType::DNS);
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
+        const std::wstring expected = std::wstring(LX_INIT_RESOLVCONF_FULL_HEADER) + L"nameserver 1.1.1.1\n";
+        VERIFY_ARE_EQUAL(expected, out.c_str());
+    }
+
     TEST_METHOD(HttpProxySimple)
     {
         WINHTTP_PROXY_TEST_ONLY();
@@ -2621,22 +2651,6 @@ class NatTests
         m_config->Update(LxssGenerateTestConfig({.dnsTunneling = true}));
 
         VerifyDnsSuffixes();
-    }
-
-    TEST_METHOD(DnsChange)
-    {
-        WSL2_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
-
-        wsl::shared::hns::DNS dns;
-        dns.ServerList = {L"1.1.1.1"};
-        dns.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
-        RunGns(dns, ModifyRequestType::Update, GuestEndpointResourceType::DNS);
-
-        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
-        const std::wstring expected = std::wstring(LX_INIT_RESOLVCONF_FULL_HEADER) + L"nameserver 1.1.1.1\n";
-        VERIFY_ARE_EQUAL(expected, out.c_str());
     }
 
     TEST_METHOD(DnsChangeMultipleServerAndSearch)
