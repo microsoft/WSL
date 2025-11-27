@@ -1141,7 +1141,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-#ifdef _AMD64_
+#ifdef _ARM64_
 
         LogSkipped("Skipping CreateContainer test case for ARM64");
         return;
