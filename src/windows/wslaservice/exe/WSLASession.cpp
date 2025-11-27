@@ -60,6 +60,11 @@ HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
     return S_OK;
 }
 
+const std::wstring& WSLASession::DisplayName() const
+{
+    return m_displayName;
+}
+
 HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
 {
     return E_NOTIMPL;
@@ -80,14 +85,17 @@ HRESULT WSLASession::DeleteImage(LPCWSTR Image)
     return E_NOTIMPL;
 }
 
-HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* Options, IWSLAContainer** Container)
+HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container)
 try
 {
-    // Basic instanciation for testing.
-    // TODO: Implement.
+    RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
-    auto container = wil::MakeOrThrow<WSLAContainer>();
-    container.CopyTo(__uuidof(IWSLAContainer), (void**)Container);
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    // TODO: Log entrance into the function.
+    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
+    THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
     return S_OK;
 }
