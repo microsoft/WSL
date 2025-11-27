@@ -1141,85 +1141,87 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        if constexpr (wsl::shared::Arm64)
+#ifdef _AMD64_
+
+        LogSkipped("Skipping CreateContainer test case for ARM64");
+        return;
+
+#else
+
+        auto storageVhd = std::filesystem::current_path() / "storage.vhdx";
+
+        // Create a 1G temporary VHD.
+        if (!std::filesystem::exists(storageVhd))
         {
-            LogSkipped("Skipping CreateContainer test case for ARM64");
+            wsl::core::filesystem::CreateVhd(storageVhd.native().c_str(), 1024 * 1024 * 1024, nullptr, true, false);
         }
-        else
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(storageVhd.c_str())); });
+
+        VIRTUAL_MACHINE_SETTINGS settings{};
+        settings.CpuCount = 4;
+        settings.DisplayName = L"WSLA";
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+        settings.RootVhd = TEXT(WSLA_TEST_DISTRO_PATH);
+        settings.RootVhdType = "squashfs";
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.ContainerRootVhd = storageVhd.c_str();
+        settings.FormatContainerRootVhd = true;
+
+        auto session = CreateSession(settings);
+
+        // TODO: Remove once the proper rootfs VHD is available.
+        ExpectCommandResult(session.get(), {"/etc/lsw-init.sh"}, 0);
+
+        // Test a simple container start.
         {
-            auto storageVhd = std::filesystem::current_path() / "storage.vhdx";
+            WSLAContainerLauncher launcher("debian:latest", "test-simple", "echo", {"OK"});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
 
-            // Create a 1G temporary VHD.
-            if (!std::filesystem::exists(storageVhd))
-            {
-                wsl::core::filesystem::CreateVhd(storageVhd.native().c_str(), 1024 * 1024 * 1024, nullptr, true, false);
-            }
-
-            auto cleanup =
-                wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(storageVhd.c_str())); });
-
-            VIRTUAL_MACHINE_SETTINGS settings{};
-            settings.CpuCount = 4;
-            settings.DisplayName = L"WSLA";
-            settings.MemoryMb = 2048;
-            settings.BootTimeoutMs = 30 * 1000;
-            settings.RootVhd = TEXT(WSLA_TEST_DISTRO_PATH);
-            settings.RootVhdType = "squashfs";
-            settings.NetworkingMode = WSLANetworkingModeNAT;
-            settings.ContainerRootVhd = storageVhd.c_str();
-            settings.FormatContainerRootVhd = true;
-
-            auto session = CreateSession(settings);
-
-            // TODO: Remove once the proper rootfs VHD is available.
-            ExpectCommandResult(session.get(), {"/etc/lsw-init.sh"}, 0);
-
-            // Test a simple container start.
-            {
-                WSLAContainerLauncher launcher("debian:latest", "test-simple", "echo", {"OK"});
-                auto container = launcher.Launch(*session);
-                auto process = container.GetInitProcess();
-
-                ValidateProcessOutput(process, {{1, "OK\n"}});
-            }
-
-            // Validate that env is correctly wired.
-            {
-                WSLAContainerLauncher launcher("debian:latest", "test-env", "/bin/bash", {"-c", "echo $testenv"}, {{"testenv=testvalue"}});
-                auto container = launcher.Launch(*session);
-                auto process = container.GetInitProcess();
-
-                ValidateProcessOutput(process, {{1, "testvalue\n"}});
-            }
-
-            // Validate that starting containers work with the default entrypoint.
-
-            // TODO: This is hanging. nerdctl run seems to hang with -i is passed outside of a TTY context.
-            /*
-            {
-                WSLAContainerLauncher launcher(
-                    "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout |
-            ProcessFlags::Stderr); auto container = launcher.Launch(*session); auto process = container.GetInitProcess();
-
-                std::string shellInput = "echo $SHELL\n exit";
-                std::unique_ptr<OverlappedIOHandle> writeStdin(
-                    new WriteHandle(process.GetStdHandle(0), {shellInput.begin(), shellInput.end()}));
-                std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
-                extraHandles.emplace_back(std::move(writeStdin));
-
-                auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
-
-                VERIFY_ARE_EQUAL(result.Output[1], "foo");
-            }*/
-
-            // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
-            {
-                WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
-                auto container = launcher.Launch(*session);
-                auto process = container.GetInitProcess();
-
-                ValidateProcessOutput(process, {{1, ""}});
-            }
+            ValidateProcessOutput(process, {{1, "OK\n"}});
         }
+
+        // Validate that env is correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-env", "/bin/bash", {"-c", "echo $testenv"}, {{"testenv=testvalue"}});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "testvalue\n"}});
+        }
+
+        // Validate that starting containers work with the default entrypoint.
+
+        // TODO: This is hanging. nerdctl run seems to hang with -i is passed outside of a TTY context.
+        /*
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout |
+        ProcessFlags::Stderr); auto container = launcher.Launch(*session); auto process = container.GetInitProcess();
+
+            std::string shellInput = "echo $SHELL\n exit";
+            std::unique_ptr<OverlappedIOHandle> writeStdin(
+                new WriteHandle(process.GetStdHandle(0), {shellInput.begin(), shellInput.end()}));
+            std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+            extraHandles.emplace_back(std::move(writeStdin));
+
+            auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
+
+            VERIFY_ARE_EQUAL(result.Output[1], "foo");
+        }*/
+
+        // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, ""}});
+        }
+
+#endif
+
     }
 };
