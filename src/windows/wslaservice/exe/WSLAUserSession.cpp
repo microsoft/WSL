@@ -73,7 +73,20 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
     for (size_t i = 0; i < m_wslaSessions.size(); ++i)
     {
         output[i].SessionId = m_wslaSessions[i]->GetId();
-        m_wslaSessions[i]->GetDisplayName(&output[i].DisplayName);
+        output[i].CreatorPid = 0; // placeholder until we populate this later
+        PWSTR tempName = nullptr;
+
+        RETURN_IF_FAILED(m_wslaSessions[i]->GetDisplayName(&tempName));
+        if (tempName)
+        {
+            wcscpy_s(output[i].DisplayName, _countof(output[i].DisplayName), tempName);
+            CoTaskMemFree(tempName);
+        }
+        else
+        {
+            output[i].DisplayName[0] = L'\0';
+        }
+     
     }
     *Sessions = output.release();
     *SessionsCount = static_cast<ULONG>(m_wslaSessions.size());
@@ -106,19 +119,19 @@ try
 CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_INFORMATION** Sessions, ULONG* SessionsCount)
-
+try
 {
     if (!Sessions || !SessionsCount)
     {
         return E_INVALIDARG;
     }
 
-    // For now, return an empty list. We'll populate this from m_sessions later.
     auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->ListSessions(Sessions, SessionsCount);
 }
+CATCH_LOG();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
 {

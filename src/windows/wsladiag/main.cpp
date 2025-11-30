@@ -107,12 +107,10 @@ int wsladiag_main(std::wstring_view commandLine)
             wslutil::PrintMessage(L"ID\tCreator PID\tDisplay Name\n", stdout);
             wslutil::PrintMessage(L"--\t-----------\t------------\n", stdout);
 
-            for (ULONG i = 0; i < sessions.size(); ++i)
+            for (const auto& session : sessions)
             {
-                const auto& session = sessions[i];
-
                 const auto * displayName = session.DisplayName;
-                if (displayName == nullptr)
+                if (displayName[0] == L'\0')
                 {
                     displayName = L"<unnamed>";
                 }

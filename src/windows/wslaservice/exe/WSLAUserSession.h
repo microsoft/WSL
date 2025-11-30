@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 #include "WSLAVirtualMachine.h"
 #include "WSLASession.h"
+#include <atomic>
 
 namespace wsl::windows::service::wsla {
 
@@ -36,7 +37,7 @@ public:
 
 private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
-    ULONG m_nextSessionId = 1;
+    std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslaSessionsLock;
     std::recursive_mutex m_lock;
 
