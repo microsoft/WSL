@@ -1163,7 +1163,20 @@ class WSLATests
         settings.DisplayName = L"WSLA";
         settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
+
+        auto installedVhdPath =
+            std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslrootfs.vhd";
+
+#ifdef WSLA_TEST_DISTRO_PATH
+
         settings.RootVhd = TEXT(WSLA_TEST_DISTRO_PATH);
+
+#else
+
+        settings.RootVhd = installedVhdPath.c_str();
+
+#endif
+
         settings.RootVhdType = "squashfs";
         settings.NetworkingMode = WSLANetworkingModeNAT;
         settings.ContainerRootVhd = storageVhd.c_str();
