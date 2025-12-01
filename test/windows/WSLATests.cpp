@@ -1165,9 +1165,9 @@ class WSLATests
         settings.BootTimeoutMs = 30 * 1000;
 
         auto installedVhdPath =
-            std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslrootfs.vhd";
+            std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslarootfs.vhd";
 
-#ifdef WSLA_TEST_DISTRO_PATH
+#ifdef WSL_DEV_INSTALL_PATH
 
         settings.RootVhd = TEXT(WSLA_TEST_DISTRO_PATH);
 
@@ -1205,14 +1205,23 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
 
-        // Validate that starting containers work with the default entrypoint.
-
-        // TODO: This is hanging. nerdctl run seems to hang with -i is passed outside of a TTY context.
-        /*
+        // Validate that starting containers works with the default entrypoint.
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout |
-        ProcessFlags::Stderr); auto container = launcher.Launch(*session); auto process = container.GetInitProcess();
+                "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            // For now, validate that trying to use stdin without a tty returns the appropriate error.
+            auto result = wil::ResultFromException([&]() {
+                auto container = launcher.Launch(*session);
+            });
+
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+
+            // This is hanging. nerdctl run seems to hang with -i is passed outside of a TTY context.
+            // TODO: Restore the test case once this is fixed.
+
+            /*
+            auto process = container.GetInitProcess();
 
             std::string shellInput = "echo $SHELL\n exit";
             std::unique_ptr<OverlappedIOHandle> writeStdin(
@@ -1222,8 +1231,9 @@ class WSLATests
 
             auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
 
-            VERIFY_ARE_EQUAL(result.Output[1], "foo");
-        }*/
+            VERIFY_ARE_EQUAL(result.Output[1], "bash\n");
+            */
+        }
 
         // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
         {
