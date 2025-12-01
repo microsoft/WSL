@@ -280,21 +280,20 @@ class NetworkTests
         std::wstring VmCreatorId;
     };
 
-    GUID AdapterId;
+    GUID m_adapterId;
+    std::optional<WslConfigChange> m_config;
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
 
+        m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
         return true;
     }
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
-        if (LxsstuVmMode())
-        {
-            WslShutdown();
-        }
+        m_config.reset();
 
         VERIFY_NO_THROW(LxsstuUninitialize(false));
 
@@ -315,7 +314,7 @@ class NetworkTests
         const auto guid = wsl::shared::string::ToGuid(out);
         VERIFY_IS_TRUE(guid.has_value());
 
-        AdapterId = guid.value();
+        m_adapterId = guid.value();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ln -f -s /init /gns"), (DWORD)0);
 
         return true;
@@ -931,7 +930,7 @@ class NetworkTests
     {
         DNS_TUNNELING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.dnsTunneling = true}));
 
         VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
     }
@@ -940,7 +939,7 @@ class NetworkTests
     {
         DNS_TUNNELING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.dnsTunneling = true, .dnsTunnelingIpAddress = L"10.255.255.1"}));
+        m_config->Update(LxssGenerateTestConfig({.dnsTunneling = true, .dnsTunnelingIpAddress = L"10.255.255.1"}));
 
         VerifyDnsTunneling(L"10.255.255.1");
     }
@@ -949,7 +948,7 @@ class NetworkTests
     {
         DNS_TUNNELING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.dnsTunneling = true}));
 
         VerifyDnsSuffixes();
     }
@@ -959,7 +958,7 @@ class NetworkTests
         DNS_TUNNELING_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true}));
         WaitForMirroredStateInLinux();
 
         VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
@@ -970,7 +969,7 @@ class NetworkTests
         DNS_TUNNELING_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig(
+        m_config->Update(LxssGenerateTestConfig(
             {.networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true, .dnsTunnelingIpAddress = L"10.255.255.1"}));
         WaitForMirroredStateInLinux();
 
@@ -982,7 +981,7 @@ class NetworkTests
         DNS_TUNNELING_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true}));
         WaitForMirroredStateInLinux();
 
         VerifyDnsSuffixes();
@@ -992,7 +991,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = false}));
         WaitForMirroredStateInLinux();
 
         VerifyDnsSuffixes();
@@ -1004,7 +1003,7 @@ class NetworkTests
 
         // Verify WSL has connectivity in NAT mode when the ICS DNS proxy is turned off (in which case the DNS servers
         // from Windows are mirrored in Linux)
-        WslConfigChange config(LxssGenerateTestConfig({.dnsProxy = false}));
+        m_config->Update(LxssGenerateTestConfig({.dnsProxy = false}));
 
         GuestClient(L"tcp-connect:bing.com:80");
     }
@@ -1275,7 +1274,7 @@ class NetworkTests
     TEST_METHOD(NatHttpProxyVerifyConfigDisabled)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = false}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = false}));
 
         auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(true); });
         SetHttpProxySettings(c_httpProxyString, L"", L"", true);
@@ -1285,7 +1284,7 @@ class NetworkTests
     TEST_METHOD(NatHttpProxySimple)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = true}));
 
         VerifyHttpProxySimple();
     }
@@ -1293,7 +1292,7 @@ class NetworkTests
     TEST_METHOD(NatHttpProxySimpleMachineScope)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = true}));
 
         // verify with machine scope
         VerifyHttpProxySimple(false);
@@ -1302,7 +1301,7 @@ class NetworkTests
     TEST_METHOD(NatNoHttpProxyConfigured)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = true}));
 
         VerifyNoHttpProxyConfigured();
     }
@@ -1310,28 +1309,28 @@ class NetworkTests
     TEST_METHOD(NatHttpProxyWithBypassesConfigured)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyWithBypassesConfigured();
     }
 
     TEST_METHOD(NatHttpProxyChange)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyChange();
     }
 
     TEST_METHOD(NatHttpProxyAndWslEnv)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyAndWslEnv();
     }
 
     TEST_METHOD(NatHttpProxyFilterByNetworkConfiguration)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.autoProxy = true}));
         VerifyHttpProxyFilterByNetworkConfigurationNAT();
     }
 
@@ -1339,7 +1338,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = false}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = false}));
         WaitForMirroredStateInLinux();
 
         auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(true); });
@@ -1352,7 +1351,7 @@ class NetworkTests
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
         WaitForMirroredStateInLinux();
         VerifyHttpProxySimple();
     }
@@ -1362,7 +1361,7 @@ class NetworkTests
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
         WaitForMirroredStateInLinux();
 
         // verify with machine scope
@@ -1374,7 +1373,7 @@ class NetworkTests
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
         WaitForMirroredStateInLinux();
         VerifyNoHttpProxyConfigured();
     }
@@ -1384,7 +1383,7 @@ class NetworkTests
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
         WaitForMirroredStateInLinux();
         VerifyHttpProxyWithBypassesConfigured();
     }
@@ -1394,7 +1393,7 @@ class NetworkTests
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
         WaitForMirroredStateInLinux();
         VerifyHttpProxyChange();
     }
@@ -1403,7 +1402,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
         WaitForMirroredStateInLinux();
         VerifyHttpProxyAndWslEnv();
     }
@@ -1412,7 +1411,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .autoProxy = true}));
 
         VerifyHttpProxyFilterByNetworkConfigurationMirrored();
     }
@@ -1480,7 +1479,7 @@ class NetworkTests
         WSL2_TEST_ONLY();
 
         // Enable accept_local and route_localnet settings for eth0
-        wsl::shared::hns::VmNicCreatedNotification creationNotification{AdapterId};
+        wsl::shared::hns::VmNicCreatedNotification creationNotification{m_adapterId};
         RunGns(creationNotification, LxGnsMessageVmNicCreatedNotification);
 
         // Verify the settings were enabled
@@ -1496,7 +1495,7 @@ class NetworkTests
         WSL2_TEST_ONLY();
 
         // Assume eth0 is the GELNIC
-        wsl::shared::hns::CreateDeviceRequest createDeviceRequest{wsl::shared::hns::DeviceType::Loopback, L"loopback", AdapterId};
+        wsl::shared::hns::CreateDeviceRequest createDeviceRequest{wsl::shared::hns::DeviceType::Loopback, L"loopback", m_adapterId};
         RunGns(createDeviceRequest, LxGnsMessageCreateDeviceRequest);
 
         // Verify the expected ip rules are present
@@ -1607,7 +1606,7 @@ class NetworkTests
             LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto udp | grep local") == (DWORD)0;
 
         // Assume eth0 is the GELNIC
-        wsl::shared::hns::CreateDeviceRequest createDeviceRequest{wsl::shared::hns::DeviceType::Loopback, L"loopback", AdapterId};
+        wsl::shared::hns::CreateDeviceRequest createDeviceRequest{wsl::shared::hns::DeviceType::Loopback, L"loopback", m_adapterId};
         RunGns(createDeviceRequest, LxGnsMessageCreateDeviceRequest);
 
         // Verify that after configurations are applied, the route chosen for 127.0.0.1 tcp/udp is the desired one
@@ -1632,7 +1631,7 @@ class NetworkTests
     {
         WSL2_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig());
+        m_config->Update(LxssGenerateTestConfig());
 
         const auto state = GetInterfaceState(L"eth0");
         VERIFY_IS_FALSE(state.V4Addresses.empty());
@@ -1719,7 +1718,7 @@ class NetworkTests
     TEST_METHOD(NatInvalidRange)
     {
         WSL2_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig());
+        m_config->Update(LxssGenerateTestConfig());
         WriteNatConfiguration(L"InvalidRange", {}, {L"delete"});
         ResetWslNetwork();
         RestartWslService();
@@ -1741,7 +1740,7 @@ class NetworkTests
     TEST_METHOD(NatInvalidGateway)
     {
         WSL2_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig());
+        m_config->Update(LxssGenerateTestConfig());
         WriteNatConfiguration({}, L"InvalidGateway", {});
         ResetWslNetwork();
         RestartWslService();
@@ -1763,7 +1762,7 @@ class NetworkTests
     TEST_METHOD(NatInvalidAddress)
     {
         WSL2_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig());
+        m_config->Update(LxssGenerateTestConfig());
 
         const auto previousConfiguration = GetNatConfiguration();
         WriteNatConfiguration({}, {}, L"InvalidAddress");
@@ -1909,7 +1908,7 @@ class NetworkTests
         }
 
         LogInfo("HostToGuestLoopback (networkingMode=%hs)", ToString(networkingMode));
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = networkingMode, .vmSwitch = L"Default Switch"}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = networkingMode, .vmSwitch = L"Default Switch"}));
         VerifyLoopbackHostToGuest(L"127.0.0.1", IPPROTO_TCP);
         VerifyLoopbackHostToGuest(L"0.0.0.0", IPPROTO_TCP);
     }
@@ -1918,7 +1917,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         // Verify that we have a working connection
@@ -1929,7 +1928,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         if (!HostHasInternetConnectivity(AF_INET))
@@ -1945,7 +1944,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         if (!HostHasInternetConnectivity(AF_INET6))
@@ -2050,7 +2049,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
         std::vector<InterfaceState> interfaceStates = GetAllInterfaceStates();
@@ -2078,7 +2077,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         // Verify loopback connectivity on loopback addresses
@@ -2091,7 +2090,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         // Write a .conf file to conflict with loopback settings.
@@ -2387,7 +2386,7 @@ class NetworkTests
     {
         WSL2_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.kernelCommandLine = L"ipv6.disable=1"}));
+        m_config->Update(LxssGenerateTestConfig({.kernelCommandLine = L"ipv6.disable=1"}));
         WslKeepAlive keepAlive;
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /proc/net/tcp6"), 1L);
@@ -2398,7 +2397,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         {
@@ -2416,7 +2415,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         // Make sure the VM doesn't time out
@@ -2450,7 +2449,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         {
@@ -2468,7 +2467,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         auto tcpPort = BindGuestPort(L"TCP4-LISTEN:1234", true);
@@ -2479,7 +2478,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         auto tcpPort = BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true);
@@ -2490,7 +2489,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         auto bind1 = BindGuestPort(L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
@@ -2520,7 +2519,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         auto tcpPort = BindGuestPort(L"TCP4-LISTEN:0", true);
@@ -2531,7 +2530,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         // Get ephemeral port range
@@ -2635,7 +2634,7 @@ class NetworkTests
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
         // needs to be accessible from the new namespace, so it can't use a 127* IP.
-        WslConfigChange config(LxssGenerateTestConfig({
+        m_config->Update(LxssGenerateTestConfig({
             .guiApplications = true,
             .dnsTunneling = true,
             .dnsTunnelingIpAddress = L"10.255.255.254",
@@ -2663,7 +2662,7 @@ class NetworkTests
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
         // needs to be accessible from the new namespace, so it can't use a 127* IP
-        WslConfigChange config(LxssGenerateTestConfig(
+        m_config->Update(LxssGenerateTestConfig(
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .dnsTunneling = true, .dnsTunnelingIpAddress = L"10.255.255.254"}));
         WaitForMirroredStateInLinux();
 
@@ -2676,7 +2675,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig(
+        m_config->Update(LxssGenerateTestConfig(
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
@@ -2756,7 +2755,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig(
+        m_config->Update(LxssGenerateTestConfig(
             {.guiApplications = true, .networkingMode = wsl::core::NetworkingMode::Mirrored, .hostAddressLoopback = true}));
         WaitForMirroredStateInLinux();
 
@@ -2829,7 +2828,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
@@ -2842,7 +2841,7 @@ class NetworkTests
     {
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         struct NetworkSetting
@@ -3061,7 +3060,7 @@ class NetworkTests
     TEST_METHOD(NatFirewallRulesExpectedBlock)
     {
         HYPERV_FIREWALL_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
+        m_config->Update(LxssGenerateTestConfig({.firewall = true}));
 
         ValidateInitialFirewallState(FirewallObjects::Required);
         FirewallRuleBlockedTests(FirewallTestConnectivity::Blocked);
@@ -3072,7 +3071,7 @@ class NetworkTests
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig({.firewall = false}));
+        m_config->Update(LxssGenerateTestConfig({.firewall = false}));
 
         ValidateInitialFirewallState(FirewallObjects::NotRequired);
         FirewallRuleBlockedTests(FirewallTestConnectivity::Allowed);
@@ -3086,7 +3085,7 @@ class NetworkTests
             HKEY_LOCAL_MACHINE, wsl::windows::policies::c_registryKey, wsl::windows::policies::c_allowCustomFirewallUserSetting, 0);
 
         // the user tries to disable Hyper-V FW in the config file, but the admin disabled user control
-        WslConfigChange config(LxssGenerateTestConfig({.firewall = false}));
+        m_config->Update(LxssGenerateTestConfig({.firewall = false}));
 
         ValidateInitialFirewallState(FirewallObjects::NotRequired);
         FirewallRuleBlockedTests(FirewallTestConnectivity::Blocked);
@@ -3099,7 +3098,7 @@ class NetworkTests
 
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         ValidateInitialFirewallState(FirewallObjects::Required);
@@ -3135,7 +3134,7 @@ class NetworkTests
     TEST_METHOD(NatFirewallRulesExpectedAllow)
     {
         HYPERV_FIREWALL_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
+        m_config->Update(LxssGenerateTestConfig({.firewall = true}));
 
         ValidateInitialFirewallState(FirewallObjects::Required);
         FirewallRuleAllowedTests(FirewallTestConnectivity::Allowed);
@@ -3146,7 +3145,7 @@ class NetworkTests
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig({.firewall = false}));
+        m_config->Update(LxssGenerateTestConfig({.firewall = false}));
 
         ValidateInitialFirewallState(FirewallObjects::NotRequired);
         FirewallRuleAllowedTests(FirewallTestConnectivity::Allowed);
@@ -3159,7 +3158,7 @@ class NetworkTests
 
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         ValidateInitialFirewallState(FirewallObjects::Required);
@@ -3236,7 +3235,7 @@ class NetworkTests
     TEST_METHOD(NatFirewallRulesEnabledSetting)
     {
         HYPERV_FIREWALL_TEST_ONLY();
-        WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
+        m_config->Update(LxssGenerateTestConfig({.firewall = true}));
 
         ValidateInitialFirewallState(FirewallObjects::Required);
         FirewallSettingEnabledTests(true);
@@ -3246,7 +3245,7 @@ class NetworkTests
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
-        WslConfigChange config(LxssGenerateTestConfig({.firewall = false}));
+        m_config->Update(LxssGenerateTestConfig({.firewall = false}));
 
         ValidateInitialFirewallState(FirewallObjects::NotRequired);
         FirewallSettingEnabledTests(false);
@@ -3259,7 +3258,7 @@ class NetworkTests
 
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         ValidateInitialFirewallState(FirewallObjects::Required);
@@ -3295,13 +3294,13 @@ class NetworkTests
         request.ResourceType = type;
         request.Settings = input;
 
-        RunGns(wsl::shared::ToJson(request), AdapterId, LxGnsMessageNotification);
+        RunGns(wsl::shared::ToJson(request), m_adapterId, LxGnsMessageNotification);
     }
 
     template <typename T>
     void RunGns(T& input, const LX_MESSAGE_TYPE messageType)
     {
-        RunGns(wsl::shared::ToJson(input), AdapterId, messageType);
+        RunGns(wsl::shared::ToJson(input), m_adapterId, messageType);
     }
 
     template <typename T>
@@ -3506,7 +3505,7 @@ class NetworkTests
             if (state.Rename)
             {
                 wsl::shared::hns::HNSEndpoint endpoint;
-                endpoint.ID = AdapterId;
+                endpoint.ID = m_adapterId;
                 endpoint.PortFriendlyName = state.Name;
                 RunGns(wsl::shared::ToJson(endpoint));
             }
@@ -3990,7 +3989,7 @@ class NetworkTests
 
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         const auto coInit = wil::CoInitializeEx();
@@ -4035,14 +4034,14 @@ class NetworkTests
         // it returns 1 as that's the lowest 16 bit value (unknown where the upper 16 bits are trimmed)
         // if ManualConnectivityValidation is set true, one can confirm from the stdout captured that the correct result was determined and returned by init.
         constexpr auto testErrorCode = ManualConnectivityValidation ? expectedErrorCode : 1;
-        RunGns("www.msftconnecttest.com", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+        RunGns("www.msftconnecttest.com", m_adapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
     TEST_METHOD(ConnectivityCheckTestNATDefaultSuccess)
     {
         WSL2_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig());
+        m_config->Update(LxssGenerateTestConfig());
         WaitForNATStateInLinux();
 
         const auto coInit = wil::CoInitializeEx();
@@ -4088,7 +4087,7 @@ class NetworkTests
         // if ManualConnectivityValidation is set true, one can confirm from the stdout captured that the correct result was determined and returned by init.
         constexpr auto testErrorCode =
             ManualConnectivityValidation ? expectedErrorCode : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::Success);
-        RunGns("www.msftconnecttest.com", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+        RunGns("www.msftconnecttest.com", m_adapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
     TEST_METHOD(ConnectivityCheckTestMirroredNameResolutionFailure)
@@ -4096,7 +4095,7 @@ class NetworkTests
         WSL2_TEST_ONLY();
         MIRRORED_NETWORKING_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         // Windows
@@ -4116,14 +4115,14 @@ class NetworkTests
         constexpr auto testErrorCode = ManualConnectivityValidation
                                            ? expectedErrorCode
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureGetAddrInfo);
-        RunGns("asdlkfadsf.bbcxzncvb", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+        RunGns("asdlkfadsf.bbcxzncvb", m_adapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
     TEST_METHOD(ConnectivityCheckTestNATNameResolutionFailure)
     {
         WSL2_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig());
+        m_config->Update(LxssGenerateTestConfig());
         WaitForNATStateInLinux();
 
         // Windows
@@ -4143,7 +4142,7 @@ class NetworkTests
         constexpr auto testErrorCode = ManualConnectivityValidation
                                            ? expectedErrorCode
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureGetAddrInfo);
-        RunGns("asdlkfadsf.bbcxzncvb", AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+        RunGns("asdlkfadsf.bbcxzncvb", m_adapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
     TEST_METHOD(ConnectivityCheckTestMirroredNameResolvesButConnectivityFails)
@@ -4153,7 +4152,7 @@ class NetworkTests
 
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
         const auto* ncsiDnsOnlyName = "dns.msftncsi.com";
@@ -4180,14 +4179,14 @@ class NetworkTests
         constexpr auto testErrorCode = ManualConnectivityValidation
                                            ? expectedErrorCode
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureSocketConnect);
-        RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+        RunGns(ncsiDnsOnlyName, m_adapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
     TEST_METHOD(ConnectivityCheckTestNATNameResolvesButConnectivityFails)
     {
         WSL2_TEST_ONLY();
 
-        WslConfigChange config(LxssGenerateTestConfig());
+        m_config->Update(LxssGenerateTestConfig());
         WaitForNATStateInLinux();
 
         const auto* ncsiDnsOnlyName = "dns.msftncsi.com";
@@ -4214,7 +4213,7 @@ class NetworkTests
         constexpr auto testErrorCode = ManualConnectivityValidation
                                            ? expectedErrorCode
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureSocketConnect);
-        RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+        RunGns(ncsiDnsOnlyName, m_adapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 };
 
