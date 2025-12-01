@@ -48,29 +48,29 @@ public:
     ~WSLAVirtualMachine();
 
     void Start();
-    void OnSessionTerminated();
+    void OnSessionTerminating();
 
     IFACEMETHOD(CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)) override;
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
+    IFACEMETHOD(RegisterCallback(_In_ ITerminationCallback* callback)) override;
     IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
     IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
     IFACEMETHOD(Unmount(_In_ const char* Path)) override;
+    IFACEMETHOD(DetachDisk(_In_ ULONG Lun)) override;
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
     IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags);
 
     void OnProcessReleased(int Pid);
-    void RegisterCallback(_In_ ITerminationCallback* callback);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
-    std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
-    void DetachDisk(_In_ ULONG Lun);
-
 private:
+    std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
+
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
     static bool ParseTtyInformation(
@@ -82,8 +82,7 @@ private:
     void OnCrash(_In_ const HCS_EVENT* Event);
 
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
-    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(
-        wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type, ULONG TtyRows = 0, ULONG TtyColumns = 0);
+    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type);
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
 
     ConnectedSocket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
@@ -122,8 +121,6 @@ private:
     PSID m_userSid{};
     wil::unique_handle m_userToken;
     std::wstring m_debugShellPipe;
-
-    std::mutex m_trackedProcessesLock;
     std::vector<WSLAProcess*> m_trackedProcesses;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
@@ -147,5 +144,6 @@ private:
     std::map<std::string, std::wstring> m_plan9Mounts;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
+    WSLAUserSessionImpl* m_userSession;
 };
 } // namespace wsl::windows::service::wsla
