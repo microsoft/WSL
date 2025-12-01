@@ -10,7 +10,6 @@ set(SOURCES
     ServiceMain.cpp
     BridgedNetworking.cpp
     GnsRpcServer.cpp
-    GuestDeviceManager.cpp
     GuestTelemetryLogger.cpp
     Lifetime.cpp
     LxssConsoleManager.cpp
@@ -37,7 +36,6 @@ set(HEADERS
     LxssInstance.h
     BridgedNetworking.h
     GnsRpcServer.h
-    GuestDeviceManager.h
     GuestTelemetryLogger.h
     IMirroredNetworkManager.h
     Lifetime.h
