@@ -298,7 +298,7 @@ struct WSLA_SESSION_INFORMATION
 {
     ULONG SessionId;
     DWORD CreatorPid;
-    LPWSTR DisplayName;
+    wchar_t DisplayName[256];
 };
 
 [

@@ -16,6 +16,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "WSLASession.h"
 #include <atomic>
+#include <vector>
 
 namespace wsl::windows::service::wsla {
 
@@ -40,6 +41,8 @@ private:
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslaSessionsLock;
     std::recursive_mutex m_lock;
+    // Track active sessions for diagnostics / ListSessions.
+    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_wslaSessions;
 
     // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
     std::unordered_set<WSLASession*> m_sessions;

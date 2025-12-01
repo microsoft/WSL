@@ -84,18 +84,6 @@ int wsladiag_main(std::wstring_view commandLine)
 
         THROW_IF_FAILED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
-        // Free inner CoTaskMem-allocated strings before the array is freed.
-        auto cleanupInnerStrings = wil::scope_exit([&]() {
-            for (ULONG i = 0; i < sessions.size(); ++i)
-            {
-                if (sessions[i].DisplayName != nullptr)
-                {
-                    CoTaskMemFree(sessions[i].DisplayName);
-                    sessions[i].DisplayName = nullptr;
-                }
-            }
-        });
-
         if (sessions.size() == 0)
         {
             wslutil::PrintMessage(L"No WSLA sessions found.\n", stdout);
@@ -116,7 +104,7 @@ int wsladiag_main(std::wstring_view commandLine)
                 }
 
                 wslutil::PrintMessage(
-                    std::format(L"{}\t{}\t\t{}\n", session.SessionId, session.CreatorPid, static_cast<const wchar_t*>(displayName)), stdout);
+                    std::format(L"{}\t{}\t\t{}\n", session.SessionId, session.CreatorPid, displayName), stdout);
             }
         }
 

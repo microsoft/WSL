@@ -68,6 +68,7 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::CreateSession(
 
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
 {
+    const auto count = m_wslaSessions.size();
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_wslaSessions.size());
     std::lock_guard lock(m_wslaSessionsLock);
     for (size_t i = 0; i < m_wslaSessions.size(); ++i)
@@ -77,9 +78,10 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
         PWSTR tempName = nullptr;
 
         RETURN_IF_FAILED(m_wslaSessions[i]->GetDisplayName(&tempName));
+
         if (tempName)
         {
-            wcscpy_s(output[i].DisplayName, _countof(output[i].DisplayName), tempName);
+            wcscpy_s(output[i].DisplayName, tempName);
             CoTaskMemFree(tempName);
         }
         else
@@ -89,7 +91,7 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
      
     }
     *Sessions = output.release();
-    *SessionsCount = static_cast<ULONG>(m_wslaSessions.size());
+    *SessionsCount = static_cast<ULONG>(count);
     return S_OK;
 }
 
@@ -129,9 +131,10 @@ try
     auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->ListSessions(Sessions, SessionsCount);
+    RETURN_IF_FAILED(session->ListSessions(Sessions, SessionsCount));
+    return S_OK;
 }
-CATCH_LOG();
+CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
 {
