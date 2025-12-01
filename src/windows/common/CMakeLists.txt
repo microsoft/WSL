@@ -2,16 +2,16 @@ set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     DeviceHostProxy.cpp
-    DeviceHostProxy.h
     disk.cpp
     Distribution.cpp
     Dmesg.cpp
-    Dmesg.h
     DnsResolver.cpp
     DnsTunnelingChannel.cpp
     ExecutionContext.cpp
     filesystem.cpp
     GnsChannel.cpp
+    GnsPortTrackerChannel.cpp
+    GuestDeviceManager.cpp
     HandleConsoleProgressBar.cpp
     hcs.cpp
     helpers.cpp
@@ -34,6 +34,7 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     svccommio.cpp
+    VirtioNetworking.cpp
     WSLAProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
@@ -55,11 +56,11 @@ set(HEADERS
     ../inc/LxssDynamicFunction.h
     ../inc/traceloggingconfig.h
     ../inc/wdk.h
-    ../inc/wslconfig.h
     ../inc/wsl.h
+    ../inc/wslconfig.h
     ../inc/wslhost.h
-    ../inc/WslPluginApi.h
     ../inc/wslpolicies.h
+    ../inc/WslPluginApi.h
     ../inc/wslrelay.h
     ../../shared/inc/CommandLine.h
     ../../shared/inc/defs.h
@@ -75,20 +76,21 @@ set(HEADERS
     ../../shared/inc/stringshared.h
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
+    DeviceHostProxy.h
     disk.hpp
     Distribution.h
+    Dmesg.h
     DnsResolver.h
     DnsTunnelingChannel.h
     ExecutionContext.h
     filesystem.hpp
     GnsChannel.h
+    GnsPortTrackerChannel.h
+    GuestDeviceManager.h
     HandleConsoleProgressBar.h
     hcs.hpp
     hcs_schema.h
     helpers.hpp
-    interop.hpp
-    ExecutionContext.h
-    socket.hpp
     hvsocket.hpp
     INetworkingEngine.h
     interop.hpp
@@ -109,6 +111,7 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     svccommio.hpp
+    VirtioNetworking.h
     WSLAProcessLauncher.h
     WslClient.h
     WslCoreConfig.h
@@ -121,7 +124,7 @@ set(HEADERS
     WslInstall.h
     WslSecurity.h
     WslTelemetry.h
-    wslutil.cpp
+    wslutil.h
     )
 
 include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
