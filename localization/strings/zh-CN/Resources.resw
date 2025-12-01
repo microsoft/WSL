@@ -132,7 +132,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDiskAlreadyAttached" xml:space="preserve">
-    <value>该磁盘“{}”已连接。</value>
+    <value>磁盘“{}”已连接。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDiskAlreadyMounted" xml:space="preserve">
@@ -683,7 +683,7 @@ Windows: {}</value>
     <value>正在导入，这可能需要几分钟时间。</value>
   </data>
   <data name="GuiApplicationsDisabled" xml:space="preserve">
-    <value>通过 {} 或 /etc/wsl.conf 禁用 GUI 应用程序支持。</value>
+    <value>已通过 {} 或 /etc/wsl.conf 禁用 GUI 应用程序支持。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
@@ -822,11 +822,11 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
-    <value>分发名称无效:“{}”。</value>
+    <value>无效分发名称:“{}”。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
-    <value>使用旧分发注册。请考虑改用基于 tar 的分发。</value>
+    <value>正在使用旧分发注册。请考虑改用基于 tar 的分发。</value>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>旧分发注册不支持 --version 参数。</value>
@@ -864,7 +864,7 @@ Windows: {}</value>
     <value>此计算机上不支持嵌套虚拟化。</value>
   </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
-    <value>无法创建地址为“{}”的网络终结点，已分配新地址:“{}”</value>
+    <value>无法创建地址为“{}”的网络端点，已分配新地址:“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToCreateNetwork" xml:space="preserve">
@@ -905,10 +905,10 @@ Windows: {}</value>
     <value>检测到 IPv6 代理配置，但未镜像到 WSL。NAT 模式下的 WSL 不支持 IPv6。</value>
   </data>
   <data name="MessageProxyLoopbackV6SettingsDropped" xml:space="preserve">
-    <value>检测到 localhost IPv6 代理配置，但未镜像到 WSL 中。WSL 不支持 localhost IPv6 代理。</value>
+    <value>检测到 localhost IPv6 代理配置，但未镜像到 WSL。WSL 不支持 localhost IPv6 代理。</value>
   </data>
   <data name="MessageProxyUnexpectedSettingsDropped" xml:space="preserve">
-    <value>尝试解析代理设置时发生意外错误，代理设置未镜像到 WSL 中。</value>
+    <value>尝试解析代理设置时发生意外错误，代理设置未镜像到 WSL。</value>
   </data>
   <data name="MessageRegistryError" xml:space="preserve">
     <value>访问注册表时出错。路径：“{}”。错误： {}</value>
@@ -947,14 +947,14 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDebugShellDisabled" xml:space="preserve">
-    <value>计算机策略禁用调试 shell。</value>
+    <value>计算机策略已禁用调试 shell。</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
     <value>wsl.exe --mount 被计算机策略禁用。</value>
     <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
-    <value>WSL1 被计算机策略禁用。</value>
+    <value>计算机策略已禁用 WSL1。</value>
   </data>
   <data name="MessageUpgradeToWSL2" xml:space="preserve">
     <value>请运行“wsl.exe --set-version {} 2”以升级到 WSL2。</value>
@@ -1070,7 +1070,7 @@ Windows: {}</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
-    <value>未能从以下Microsoft Store安装 {}： {}
+    <value>未能从 Microsoft Store 安装 {}：{}
 正在尝试 Web 下载...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1082,7 +1082,7 @@ Windows: {}</value>
   </data>
   <data name="MessageInstallationCorrupted" xml:space="preserve">
     <value>WSL 安装似乎已损坏 (错误代码： {})。
-按任意键修复 WSL，或 CTRL-C 取消。
+按任意键修复 WSL，或按 CTRL-C 取消。
 此提示将在 60 秒后超时。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1114,7 +1114,7 @@ Windows: {}</value>
     <value>提供的自定义内核模块未指定自定义内核。有关详细信息，请参阅 https://aka.ms/wslcustomkernel。</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
-    <value>由于当前与全球安全访问客户端的兼容性问题，DNS 隧道被禁用。</value>
+    <value>由于当前与全局安全访问客户端的兼容性问题，DNS 隧道被禁用。</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>由于潜在的数据损坏，目前已禁用稀疏 VHD 支持。
@@ -1127,7 +1127,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFstabMountFailed" xml:space="preserve">
-    <value>使用装载 -a 处理 /etc/fstab 失败。</value>
+    <value>使用 mount -a 处理 /etc/fstab 失败。</value>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
     <value>装载分发磁盘时出错，该磁盘作为回退以只读方式装载。
@@ -1138,7 +1138,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
-    <value>出现错误。请稍后再试一次。</value>
+    <value>出现错误。请稍后再试。</value>
   </data>
   <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
     <value>关于</value>
@@ -1160,28 +1160,28 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>自动内存回收</value>
   </data>
   <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
-    <value>检测到空闲 CPU 使用情况后自动释放缓存内存。为缓存的即时释放设置为慢速释放和 dropcache。</value>
+    <value>检测到空闲 CPU 使用情况后自动释放缓存内存。设为 gradual 缓慢释放；设为 dropcache 迅速释放。</value>
   </data>
   <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
     <value>自动内存回收。</value>
   </data>
   <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>检测到空闲 CPU 使用情况后自动释放缓存内存。为缓存的即时释放设置为慢速释放和 dropcache。</value>
+    <value>检测到空闲 CPU 使用情况后自动释放缓存内存。设为 gradual 缓慢释放；设为 dropcache 迅速释放。</value>
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>已启用自动代理</value>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
-    <value>使 WSL 能够使用 Windows 的 HTTP 代理信息。</value>
+    <value>允许 WSL 使用 Windows 的 HTTP 代理信息。</value>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>已启用自动代理。</value>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>使 WSL 能够使用 Windows 的 HTTP 代理信息。</value>
+    <value>允许 WSL 使用 Windows 的 HTTP 代理信息。</value>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
-    <value>尽力进行 DNS 分析</value>
+    <value>尽力进行 DNS 解析</value>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
     <value>仅当 wsl2.dnsTunneling 设置为 true 时适用。设置为 true 时，Windows 将从 DNS 请求中提取问题并尝试解决该问题，忽略未知记录。</value>
@@ -1191,7 +1191,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>尽力进行 DNS 分析。</value>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>仅当 wsl2.dnsTunneling 设置为 true 时才适用。设置为 true 时，Windows 将从 DNS 请求中提取问题并尝试解决该问题，忽略未知记录。</value>
+    <value>仅当 wsl2.dnsTunneling 设置为 true 时适用。设置为 true 时，Windows 将从 DNS 请求中提取问题并尝试解决该问题，忽略未知记录。</value>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>自定义内核</value>
@@ -1230,7 +1230,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>浏览发行版</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>指定 VHD 的路径，该路径将作为自定义系统发行版加载，主要用于为 WSL 中的 GUI 应用提供电源。[在此处详细了解系统发行]。</value>
+    <value>指定一个 VHD 路径，该 VHD 将作为自定义系统发行版加载，主要用于在 WSL 中运行 GUI 应用。[在此处详细了解系统发行]。</value>
     <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
@@ -1241,7 +1241,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>自定义系统发行版</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>指定 VHD 的路径，该路径将作为自定义系统发行版加载，主要用于为 WSL 中的 GUI 应用提供电源。</value>
+    <value>指定一个 VHD 路径，该 VHD 将作为自定义系统发行版加载，主要用于在 WSL 中运行 GUI 应用。</value>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>启用调试控制台</value>
@@ -1259,7 +1259,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>默认 VHD 大小</value>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
-    <value>对于新创建的分发，可扩展 WSL 虚拟硬盘 (VHD) 的默认最大大小。</value>
+    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的分发。</value>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>重设大小</value>
@@ -1268,7 +1268,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>默认 VHD 大小</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD) 仅用于新创建的分发。</value>
+    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的分发。</value>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>开发人员</value>
@@ -1284,20 +1284,20 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>更改 DrvFS 模式</value>
   </data>
   <data name="Settings_DrvFSMode.Description" xml:space="preserve">
-    <value>更改 WSL 中的跨 OS 文件访问实施。</value>
+    <value>更改 WSL 中的跨系统文件访问实现。</value>
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
     <value>已启用 DNS 代理</value>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为 NAT 时适用。布尔值通知 WSL 将 Linux 中的 DNS 服务器配置为主机上的 NAT。设置为 false 将镜像从 Windows 到 Linux 的 DNS 服务器。</value>
+    <value>仅当 wsl2.networkingMode 设置为 NAT 时适用。用于通知 WSL 将 Linux 中的 DNS 服务器配置为主机上的 NAT 的布尔值。设置为 false 将把 Windows 中 DNS 服务器镜像到 Linux。</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>已启用 DNS 代理。</value>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为 NAT 时适用。布尔值通知 WSL 将 Linux 中的 DNS 服务器配置为主机上的 NAT。设置为 false 将镜像从 Windows 到 Linux 的 DNS 服务器。</value>
+    <value>仅当 wsl2.networkingMode 设置为 NAT 时适用。用于通知 WSL 将 Linux 中的 DNS 服务器配置为主机上的 NAT 的布尔值。设置为 false 将把 Windows 中 DNS 服务器镜像到 Linux。</value>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
     <value>已启用 DNS 隧道</value>
@@ -1358,20 +1358,20 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>主机地址环回</value>
   </data>
   <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为镜像时适用。设置为 True 时，将允许容器通过分配给主机的 IP 地址连接到主机或主机连接到容器。请注意，始终可以使用 127.0.0.1 环回地址 - 此选项还允许使用所有额外分配的本地 IP 地址。</value>
+    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。设置为 True 时，将允许容器与主机通过分配给主机的 IP 地址互相连接。请注意，始终可以使用 127.0.0.1 环回地址 - 此选项还允许使用所有额外分配的本地 IP 地址。</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>主机地址环回。</value>
   </data>
   <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为镜像时适用。设置为 True 时，将允许容器通过分配给主机的 IP 地址连接到主机或主机连接到容器。请注意，始终可以使用 127.0.0.1 环回地址 - 此选项还允许使用所有额外分配的本地 IP 地址。</value>
+    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。设置为 True 时，将允许容器与主机通过分配给主机的 IP 地址互相连接。请注意，始终可以使用 127.0.0.1 环回地址 - 此选项还允许使用所有额外分配的本地 IP 地址。</value>
   </data>
   <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
     <value>忽略的端口</value>
   </data>
   <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为镜像时适用。指定 Linux 应用程序可以绑定到的端口，不会在 Windows 中自动转发或考虑这些端口。应以逗号分隔的列表格式化，例如： 3000,9000,9090。</value>
+    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会 Windows 自动转发或考虑。应采用逗号分隔的列表格式，例如：3000,9000,9090。</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
@@ -1381,13 +1381,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>忽略的端口</value>
   </data>
   <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>仅当 wsl2.networkingMode 设置为镜像时适用。指定 Linux 应用程序可以绑定到的端口，不会在 Windows 中自动转发或考虑这些端口。应以逗号分隔的列表格式化，例如 3000、9000、9090。</value>
+    <value>仅当 wsl2.networkingMode 设置为镜像(mirrored)时适用。指定 Linux 应用程序可以绑定的端口，这些端口不会在 Windows 中自动转发或考虑。应采用逗号分隔的列表格式，例如 3000,9000,9090。</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>初始自动代理超时</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
-    <value>仅当 wsl2.autoProxy 设置为 true 时适用。配置在启动 WSL 容器时 WSL 等待检索 HTTP 代理信息) (毫秒。如果在此时间后解析代理设置，则必须重新启动 WSL 实例才能使用检索到的代理设置。</value>
+    <value>仅当 wsl2.autoProxy 设置为 true 时适用。配置启动 WSL 容器时 WSL 等待检索 HTTP 代理信息的时间（以毫秒计）。如果在此时间后解析到代理设置，则必须重新启动 WSL 实例才能使用检索到的代理设置。</value>
     <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
@@ -1397,25 +1397,25 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>初始自动代理超时</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>仅当 wsl2.autoProxy 设置为 true 时才适用。配置启动 WSL 容器时 WSL 等待检索 HTTP 代理信息的时间，以毫秒为单位。如果在此时间后解析代理设置，则必须重新启动 WSL 实例才能使用检索到的代理设置。</value>
+    <value>仅当 wsl2.autoProxy 设置为 true 时才适用。配置启动 WSL 容器时 WSL 等待检索 HTTP 代理信息的时间，以毫秒为单位。如果在此时间后解析到代理设置，则必须重新启动 WSL 实例才能使用检索到的代理设置。</value>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
     <value>内核命令行</value>
   </data>
   <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
-    <value>其他内核命令行参数。</value>
+    <value>额外的内核命令行参数。</value>
   </data>
   <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
     <value>启用 localhost 转发</value>
   </data>
   <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
-    <value>布尔值，指定是否应通过 localhost：port 从主机连接到 WSL 2 VM 中通配符或 localhost 的端口。</value>
+    <value>布尔值，用于指定 WSL 2 VM 中绑定通配符或本地主机的端口是否应允许主机通过`localhost:端口号`进行连接。</value>
   </data>
   <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>启用 localhost 转发。</value>
   </data>
   <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>一个布尔值，指定绑定到 WSL 2 VM 中的通配符或 localhost 的端口是否应可通过 localhost、colon、port 从主机连接。</value>
+    <value>布尔值，用于指定 WSL 2 VM 中绑定通配符或本地主机的端口是否应允许主机通过`localhost:端口号`进行连接。</value>
   </data>
   <data name="Settings_MegabyteStringFormat" xml:space="preserve">
     <value>{0} MB</value>
@@ -1445,13 +1445,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>启用嵌套虚拟化</value>
   </data>
   <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
-    <value>用于打开或关闭嵌套虚拟化的布尔值，使其他嵌套 VM 能够在 WSL 2 内运行。</value>
+    <value>用于打开或关闭嵌套虚拟化的布尔值，使其他嵌套虚拟机能够在 WSL 2 内运行。</value>
   </data>
   <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>启用嵌套虚拟化。</value>
   </data>
   <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>用于打开或关闭嵌套虚拟化的布尔值，使其他嵌套 VM 能够在 WSL 2 内运行。</value>
+    <value>用于打开或关闭嵌套虚拟化的布尔值，使其他嵌套虚拟机能够在 WSL 2 内运行。</value>
   </data>
   <data name="Settings_NetworkingMode.Header" xml:space="preserve">
     <value>网络模式</value>
@@ -1472,7 +1472,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>你可以跨操作系统处理所有文件!</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
-    <value>跨 OS 文件访问</value>
+    <value>跨系统文件访问</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
     <value>从 Linux 访问 Windows 文件</value>
@@ -1515,7 +1515,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>WSL 还包括一种称为镜像模式的新网络模式，该模式添加了 IPv6 支持等高级功能，并且能够访问局域网中的网络应用程序。</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
-    <value>了解有关跨 OS 文件访问的详细信息</value>
+    <value>了解有关跨系统文件访问的详细信息</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslfilesystems</value>
@@ -1552,7 +1552,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
-    <value>安装命名的 WSL 发行版命令</value>
+    <value>安装指定名称的 WSL 发行版命令</value>
   </data>
   <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
     <value>'wsl.exe --install &lt;DistroName&gt;'</value>
@@ -1568,11 +1568,11 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
     <value>Docker Desktop 非常适合与 WSL 配合使用，可帮助你使用 Linux 容器进行开发。
 
-将 Docker Desktop 与 WSL 配合使用的一些优点是:
+一些将 Docker Desktop 与 WSL 配合使用的优点:
 
 • 可以使用相同的 Docker 守护程序和映像在 WSL 或 Windows 中运行 Docker 命令。
 • 可以使用 WSL 中的 Windows 驱动器自动装载功能在 Windows 和 Linux 之间无缝共享文件和文件夹。
-• 由于 WSL 的互操作性，你可以使用首选的 Windows 工具和编辑器处理 Linux 代码和文件，反之亦然。</value>
+• 由于 WSL 的互操作性，你可以使用偏好的 Windows 工具和编辑器处理 Linux 代码和文件，反之亦然。</value>
  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker Desktop 集成</value>
@@ -1754,7 +1754,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>关于</value>
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
-    <value>开发商</value>
+    <value>开发人员</value>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>发行版管理</value>
@@ -1802,7 +1802,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>新增功能</value>
   </data>
   <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
-    <value>跨文件系统工作</value>
+    <value>跨系统文件访问</value>
   </data>
   <data name="Settings_IssuesLink.Content" xml:space="preserve">
     <value>问题</value>
@@ -1857,7 +1857,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>启用 VirtIO</value>
   </data>
   <data name="Settings_Virtio.Description" xml:space="preserve">
-    <value>使用 virtiofs 而不是计划 9 来访问主机文件，加快速度。</value>
+    <value>使用 virtiofs 而不是 plan 9 来访问主机文件，加快速度。</value>
   </data>
   <data name="Settings_Virtio9p.Header" xml:space="preserve">
     <value>启用 Virtio 9p</value>
