@@ -1547,7 +1547,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     settings.DisplayName = L"WSLA";
     settings.MemoryMb = 1024;
     settings.BootTimeoutMs = 30000;
-    settings.NetworkingMode = WSLANetworkingMode::WSLANetworkingModeNAT;
+    settings.NetworkingMode = WSLANetworkingModeNAT;
     std::wstring containerRootVhd;
     bool help = false;
 
