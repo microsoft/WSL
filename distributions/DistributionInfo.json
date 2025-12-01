@@ -166,8 +166,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2025.11.01.150831/archlinux-2025.11.01.150831.wsl",
-                    "Sha256": "9dbac892c38c94fd22a8988eff4e072778f3f445378d33a81474a2b88cb04562"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2025.12.01.153427/archlinux-2025.12.01.153427.wsl",
+                    "Sha256": "8dfe92910a188f191b0af2972bd4bda661178b769ce820a8921e8b7aeae9a517"
                 }
             }
         ],
