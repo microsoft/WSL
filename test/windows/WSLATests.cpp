@@ -1211,9 +1211,7 @@ class WSLATests
                 "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             // For now, validate that trying to use stdin without a tty returns the appropriate error.
-            auto result = wil::ResultFromException([&]() {
-                auto container = launcher.Launch(*session);
-            });
+            auto result = wil::ResultFromException([&]() { auto container = launcher.Launch(*session); });
 
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
 
