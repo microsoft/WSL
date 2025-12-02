@@ -66,7 +66,7 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
         options.InitProcessOptions.Executable = nullptr;
     }
 
-    // TODO: Support volumes, ports, flags, shm size, etc.
+    // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(Session.CreateContainer(&options, &container));
 
