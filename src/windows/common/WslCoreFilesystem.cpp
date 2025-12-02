@@ -29,8 +29,10 @@ wil::unique_hfile wsl::core::filesystem::CreateFile(
 
 void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximumSize, _In_ PSID userSid, _In_ BOOL sparse, _In_ BOOL fixed)
 {
-    WI_ASSERT(wsl::windows::common::string::IsPathComponentEqual(
-        std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
+    THROW_HR_IF(
+        E_INVALIDARG,
+        !wsl::windows::common::string::IsPathComponentEqual(
+            std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
 
     // Disable creation of sparse VHDs while data corruption is being debugged.
     if (sparse)

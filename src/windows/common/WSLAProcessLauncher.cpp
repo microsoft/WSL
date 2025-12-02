@@ -158,7 +158,7 @@ ClientRunningWSLAProcess WSLAProcessLauncher::Launch(IWSLASession& Session)
         THROW_HR_MSG(hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
     }
 
-    return process.value();
+    return std::move(process.value());
 }
 
 std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)

@@ -34,6 +34,7 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     svccommio.cpp
+    WSLAContainerLauncher.cpp
     VirtioNetworking.cpp
     WSLAProcessLauncher.cpp
     WslClient.cpp
@@ -111,6 +112,7 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     svccommio.hpp
+    WSLAContainerLauncher.h
     VirtioNetworking.h
     WSLAProcessLauncher.h
     WslClient.h

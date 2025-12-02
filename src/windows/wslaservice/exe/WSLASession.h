@@ -27,6 +27,7 @@ public:
     ~WSLASession();
 
     IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName) override;
+    const std::wstring& DisplayName() const;
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
@@ -56,6 +57,8 @@ private:
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::wstring m_displayName;
     std::mutex m_lock;
+
+    // TODO: Add container tracking here. Could reuse m_lock for that.
 };
 
 } // namespace wsl::windows::service::wsla

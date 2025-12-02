@@ -104,7 +104,7 @@ struct WSLA_IMAGE_INFORMATION
 
 struct WSLA_PROCESS_OPTIONS
 {
-    LPCSTR Executable;
+    [unique] LPCSTR Executable;
     [unique] LPCSTR CurrentDirectory;
     [size_is(CommandLineCount)] LPCSTR* CommandLine;
     ULONG CommandLineCount;
@@ -119,7 +119,8 @@ struct WSLA_PROCESS_OPTIONS
 struct WSLA_VOLUME
 {
     LPCSTR HostPath;
-    LPCSTR ContainerHostPath;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
 };
 
 struct WSLA_PORT_MAPPING
@@ -128,11 +129,17 @@ struct WSLA_PORT_MAPPING
     USHORT ContainerPort;
 };
 
+enum WSLA_CONTAINER_FLAGS
+{
+    WSLA_CONTAINER_FLAG_ENABLE_GPU = 1
+} ;
+
+
 struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
     LPCSTR Name;
-    struct WSLA_PROCESS_OPTIONS* InitProcessOptions;
+    struct WSLA_PROCESS_OPTIONS InitProcessOptions;
     [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
     ULONG VolumesCount;
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
@@ -315,6 +322,7 @@ interface IWSLAUserSession : IUnknown
     HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out]IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
+    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
 
     // TODO: Do we need 'TerminateSession()' ?
 }
