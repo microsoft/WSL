@@ -22,6 +22,14 @@ VirtioNetworking::VirtioNetworking(
 {
 }
 
+VirtioNetworking::~VirtioNetworking()
+{
+    // Unregister the network notification callback to prevent it from using the GNS channel.
+    m_networkNotifyHandle.reset();
+    // Stop the GNS channel to unblock any stuck communications with the guest.
+    m_gnsChannel.Stop();
+}
+
 void VirtioNetworking::Initialize()
 try
 {
@@ -271,32 +279,25 @@ void VirtioNetworking::UpdateDns(hns::DNS&& dnsSettings)
 
 void VirtioNetworking::UpdateMtu()
 {
-    unique_interface_table interfaceTable{};
-    THROW_IF_WIN32_ERROR(::GetIpInterfaceTable(AF_UNSPEC, &interfaceTable));
-
-    ULONG minMtu = ULONG_MAX;
-    for (ULONG index = 0; index < interfaceTable.get()->NumEntries; index++)
-    {
-        const auto& ipInterface = interfaceTable.get()->Table[index];
-        if (ipInterface.Connected)
-        {
-            minMtu = std::min(ipInterface.NlMtu, minMtu);
-        }
-    }
+    const auto minMtu = GetMinimumConnectedInterfaceMtu();
 
     // Only send the update if the MTU changed.
-    if (minMtu != ULONG_MAX && minMtu != m_networkMtu)
+    if (minMtu && minMtu.value() != m_networkMtu)
     {
+        m_networkMtu = minMtu.value();
+
         hns::ModifyGuestEndpointSettingRequest<hns::NetworkInterface> notification{};
         notification.ResourceType = hns::GuestEndpointResourceType::Interface;
         notification.RequestType = hns::ModifyRequestType::Update;
-        notification.Settings.NlMtu = m_networkMtu;
         notification.Settings.Connected = true;
+        notification.Settings.NlMtu = m_networkMtu;
 
-        WSL_LOG("VirtioNetworking::UpdateMtu", TraceLoggingValue(m_networkMtu, "VirtioMtu"));
+        WSL_LOG(
+            "VirtioNetworking::UpdateMtu",
+            TraceLoggingValue(m_adapterId, "endpointId"),
+            TraceLoggingValue(m_networkMtu, "virtioMtu"));
 
-        // TODO: Why was this commented ?
-        // m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_endpointId);
+        m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId);
     }
 }
 
