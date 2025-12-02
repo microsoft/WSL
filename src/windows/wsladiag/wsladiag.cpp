@@ -92,11 +92,7 @@ int wsladiag_main(std::wstring_view commandLine)
              for (const auto& session : sessions)
             {
                 const auto* displayName = session.DisplayName;
-                if (displayName[0] == L'\0')
-                {
-                    displayName = L"<unnamed>";
-                }
-
+               
                 wslutil::PrintMessage(std::format(L"{}\t{}\t\t{}\n", session.SessionId, session.CreatorPid, displayName), stdout);
             }
         }

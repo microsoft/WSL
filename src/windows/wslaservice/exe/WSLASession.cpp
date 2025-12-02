@@ -64,7 +64,7 @@ void WSLASession::CopyDisplayName(
     _Out_writes_z_(bufferLength) PWSTR buffer,
     size_t bufferLength) const
 {
-    WI_ASSERT(m_displayName.size() + 1 <= bufferLength);
+    THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);
     wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
