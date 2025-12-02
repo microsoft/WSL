@@ -161,7 +161,6 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
         }
     }
 
-    // TODO: Implement --entrypoint override if specified in WSLA_CONTAINER_OPTIONS.
 
     return args;
 }
