@@ -11,7 +11,9 @@ Abstract:
     This file contains the definition for WSLAContainerLauncher.
 
 --*/
-#include "WSLAprocessLauncher.h"
+
+#pragma once
+#include "WSLAProcessLauncher.h"
 
 namespace wsl::windows::common {
 
