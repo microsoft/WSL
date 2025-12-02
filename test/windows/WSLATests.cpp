@@ -145,7 +145,7 @@ class WSLATests
         if (result.Code != expectedResult)
         {
             LogError(
-                "Comman didn't return expected code (%i). ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
+                "Command didn't return expected code (%i). ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
                 expectedResult,
                 result.Code,
                 result.Output[1].c_str(),
