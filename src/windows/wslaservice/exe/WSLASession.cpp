@@ -20,7 +20,13 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLASession;
 
-WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
+WSLASession::WSLASession(
+    ULONG id,
+    const WSLA_SESSION_SETTINGS& Settings,
+    WSLAUserSessionImpl& userSessionImpl,
+    const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
+
+    m_id(id),
     m_sessionSettings(Settings),
     m_userSession(&userSessionImpl),
     m_virtualMachine(wil::MakeOrThrow<WSLAVirtualMachine>(VmSettings, userSessionImpl.GetUserSid(), &userSessionImpl)),
@@ -54,10 +60,12 @@ WSLASession::~WSLASession()
     }
 }
 
-HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
+void WSLASession::CopyDisplayName(
+    _Out_writes_z_(bufferLength) PWSTR buffer,
+    size_t bufferLength) const
 {
-    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_displayName.c_str()).release();
-    return S_OK;
+    WI_ASSERT(m_displayName.size() + 1 <= bufferLength);
+    wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
 const std::wstring& WSLASession::DisplayName() const

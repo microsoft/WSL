@@ -298,15 +298,14 @@ interface IWSLASession : IUnknown
     HRESULT Shutdown([in] ULONG TimeoutMs);
 
      // To be deleted.
-    HRESULT GetDisplayName([out] LPWSTR* DisplayName);
     HRESULT GetVirtualMachine([out] IWSLAVirtualMachine **VirtualMachine);
 }
 
 struct WSLA_SESSION_INFORMATION
 {
-    ULONG Id;
+    ULONG SessionId;
     DWORD CreatorPid;
-    LPSTR DisplayName;
+    wchar_t DisplayName[256];
 };
 
 [

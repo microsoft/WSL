@@ -23,11 +23,16 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASession, IFastRundown>
 {
 public:
-    WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings);
+    WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings);
     ~WSLASession();
 
-    IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName) override;
-    const std::wstring& DisplayName() const;
+    ULONG GetId() const noexcept
+    {
+        return m_id;
+    }
+    void CopyDisplayName(
+        _Out_writes_z_(bufferLength) PWSTR buffer,
+        size_t bufferLength) const;
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
@@ -52,6 +57,7 @@ public:
     void OnUserSessionTerminating();
 
 private:
+    ULONG m_id = 0;
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;

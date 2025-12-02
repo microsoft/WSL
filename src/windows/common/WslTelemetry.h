@@ -28,7 +28,7 @@ extern "C" {
 #endif
 TRACELOGGING_DECLARE_PROVIDER(LxssTelemetryProvider);
 TRACELOGGING_DECLARE_PROVIDER(WslServiceTelemetryProvider);
-TRACELOGGING_DECLARE_PROVIDER(WslaServiceTelemetryProvider);
+TRACELOGGING_DECLARE_PROVIDER(WslaTelemetryProvider);
 #ifdef __cplusplus
 }
 #endif

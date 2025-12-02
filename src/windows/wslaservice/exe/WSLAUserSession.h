@@ -15,6 +15,8 @@ Abstract:
 #pragma once
 #include "WSLAVirtualMachine.h"
 #include "WSLASession.h"
+#include <atomic>
+#include <vector>
 
 namespace wsl::windows::service::wsla {
 
@@ -31,15 +33,16 @@ public:
 
     HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
     HRESULT OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
+    HRESULT ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount);
 
     void OnSessionTerminated(WSLASession* Session);
 
 private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 
-    std::recursive_mutex m_wslaSessionsLock;
+    std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_lock;
-
+    
     // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
     std::unordered_set<WSLASession*> m_sessions;
 };

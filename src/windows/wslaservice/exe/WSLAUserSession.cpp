@@ -49,10 +49,13 @@ PSID WSLAUserSessionImpl::GetUserSid() const
 
 HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
 {
-    auto session = wil::MakeOrThrow<WSLASession>(*Settings, *this, *VmSettings);
-
-    std::lock_guard lock(m_wslaSessionsLock);
-    auto it = m_sessions.emplace(session.Get());
+    ULONG id = m_nextSessionId++;
+    auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this, *VmSettings);
+    {
+        std::lock_guard lock(m_lock);
+        m_sessions.emplace(session.Get());
+       
+    }
 
     // Client now owns the session.
     // TODO: Add a flag for the client to specify that the session should outlive its process.
@@ -64,7 +67,7 @@ HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 
 HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)
 {
-    std::lock_guard lock(m_wslaSessionsLock);
+    std::lock_guard lock(m_lock);
 
     // TODO: ACL check
     // TODO: Check for duplicate on session creation.
@@ -78,6 +81,29 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
     }
 
     return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(
+    _Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
+{
+    std::lock_guard lock(m_lock);
+    auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_sessions.size());
+
+    size_t index = 0;
+    for (auto* session : m_sessions)
+    {
+        output[index].SessionId = session->GetId();
+        output[index].CreatorPid = 0; // placeholder until we populate this later
+
+        session->CopyDisplayName(
+             output[index].DisplayName, 
+             _countof(output[index].DisplayName));
+        
+        ++index;
+    }
+    *Sessions = output.release();
+    *SessionsCount = static_cast<ULONG>(m_sessions.size());
+    return S_OK;
+
 }
 
 wsl::windows::service::wsla::WSLAUserSession::WSLAUserSession(std::weak_ptr<WSLAUserSessionImpl>&& Session) :
@@ -106,9 +132,20 @@ try
 CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_INFORMATION** Sessions, ULONG* SessionsCount)
+try
 {
-    return E_NOTIMPL;
+    if (!Sessions || !SessionsCount)
+    {
+        return E_INVALIDARG;
+    }
+    
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    RETURN_IF_FAILED(session->ListSessions(Sessions, SessionsCount));
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
 {
