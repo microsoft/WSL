@@ -1907,7 +1907,8 @@ Return Value:
     }
 
     LaunchArguments += CommandLine;
-    LogInfo("Test process exited with: %lu", LxsstuLaunchWsl(LaunchArguments.c_str()));
+    DWORD ExitCode = LxsstuLaunchWsl(LaunchArguments.c_str());
+    LogInfo("Test process exited with: %lu", ExitCode);
 
     //
     // Parse the contents of the linux log(s) files and relog.
@@ -1917,8 +1918,10 @@ Return Value:
     {
         THROW_IF_NTSTATUS_FAILED(LxsstuParseLinuxLogFiles(LogFileName, &TestPassed));
 
-        THROW_HR_IF(E_FAIL, !TestPassed);
+        VERIFY_IS_TRUE(TestPassed);
     }
+
+    VERIFY_ARE_EQUAL(0, ExitCode);
 
     return;
 }
