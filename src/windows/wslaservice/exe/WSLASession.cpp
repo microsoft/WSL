@@ -43,7 +43,6 @@ WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionI
     try
     {
         ServiceProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "/etc/lsw-init.sh"}};
-
         auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
 
         THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "Init script failed: %hs", launcher.FormatResult(result).c_str());
@@ -153,7 +152,7 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
                 "Failed to attach vhd: %ls",
                 m_storageVhdPath.c_str());
 
-            // If the VHD wasn'found, create it.
+            // If the VHD wasn't found, create it.
             WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
 
             auto runAsUser = wil::CoImpersonateClient();
