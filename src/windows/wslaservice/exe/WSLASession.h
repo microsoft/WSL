@@ -16,8 +16,6 @@ Abstract:
 
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
-#include "WSLAContainer.h"
-#include "ContainerEventTracker.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -25,15 +23,17 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASession, IFastRundown>
 {
 public:
-    WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl);
 
+    WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl);
     ~WSLASession();
 
-    ULONG GetId() const noexcept;
-
-    const std::wstring& DisplayName() const;
-
-    void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
+    ULONG GetId() const noexcept
+    {
+        return m_id;
+    }
+    void CopyDisplayName(
+        _Out_writes_z_(bufferLength) PWSTR buffer,
+        size_t bufferLength) const;
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
@@ -43,7 +43,7 @@ public:
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
-    IFACEMETHOD(OpenContainer)(_In_ LPCSTR Name, _In_ IWSLAContainer** Container) override;
+    IFACEMETHOD(OpenContainer)(_In_ LPCWSTR Name, _In_ IWSLAContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
 
     // VM management.
@@ -58,27 +58,22 @@ public:
     void OnUserSessionTerminating();
 
 private:
+
     ULONG m_id = 0;
 
     static WSLAVirtualMachine::Settings CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings);
 
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
     void Ext4Format(const std::string& Device);
-    void ClearDeletedContainers();
-    void OnContainerdLog(const gsl::span<char>& Data);
-    void MonitorContainerd(ServiceRunningProcess&& process);
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
-    std::optional<ContainerEventTracker> m_eventTracker;
-    wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
-    std::thread m_containerdThread;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
-    std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
-    wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
-    std::recursive_mutex m_lock;
+    std::mutex m_lock;
+
+    // TODO: Add container tracking here. Could reuse m_lock for that.
 };
 
 } // namespace wsl::windows::service::wsla

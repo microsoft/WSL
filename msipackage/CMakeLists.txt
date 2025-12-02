@@ -1,29 +1,16 @@
 set(BIN ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE})
-
-# For pipeline builds, use PACKAGE_INPUT_DIR if specified (contains signed binaries)
-# For local builds, use bin directory
-if(DEFINED PACKAGE_INPUT_DIR)
-    message(STATUS "Using signed binaries from ${PACKAGE_INPUT_DIR} for MSI packaging")
-else()
-    set(PACKAGE_INPUT_DIR ${BIN})
-endif()
-
 set(OUTPUT_PACKAGE ${BIN}/wsl.msi)
 set(PACKAGE_WIX_IN ${CMAKE_CURRENT_LIST_DIR}/package.wix.in)
 set(PACKAGE_WIX ${BIN}/package.wix)
 set(CAB_CACHE ${BIN}/cab)
-set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wslinstall.dll;wslaservice.exe;wsladiag.exe)
+set(BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;init;initrd.img;wslinstall.dll;wslaserviceproxystub.dll;wslaservice.exe;wsladiag.exe)
+
 if (WSL_BUILD_WSL_SETTINGS)
-    list(APPEND WINDOWS_BINARIES "wslsettings/wslsettings.dll;wslsettings/wslsettings.exe;libwsl.dll")
+    list(APPEND BINARIES_DEPENDENCIES "wslsettings/wslsettings.dll;wslsettings/wslsettings.exe;libwsl.dll")
 endif()
 
 set(BINARIES_DEPENDENCIES)
-foreach(binary ${WINDOWS_BINARIES})
-    list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
-endforeach()
-
-set(LINUX_BINARIES init;initrd.img)
-foreach(binary ${LINUX_BINARIES})
+foreach(binary ${BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")
 endforeach()
 
