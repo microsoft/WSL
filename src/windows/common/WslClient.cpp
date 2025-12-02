@@ -1557,6 +1557,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(reinterpret_cast<bool&>(settings.EnableDnsTunneling), L"--dns-tunneling");
     parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
+    parser.AddArgument(Integer(reinterpret_cast<int&>(settings.NetworkingMode)), L"--networking-mode");
     parser.AddArgument(Utf8String(fsType), L"--fstype");
     parser.AddArgument(containerRootVhd, L"--container-vhd");
     parser.AddArgument(help, L"--help");
@@ -1565,11 +1566,21 @@ int WslaShell(_In_ std::wstring_view commandLine)
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--networking-mode <mode>] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
         return 1;
+    }
+
+    switch (settings.NetworkingMode)
+    {
+    case WSLANetworkingMode::WSLANetworkingModeNone:
+    case WSLANetworkingMode::WSLANetworkingModeNAT:
+    case WSLANetworkingMode::WSLANetworkingModeVirtioProxy:
+        break;
+    default:
+        THROW_HR(E_INVALIDARG);
     }
 
     if (!containerRootVhd.empty())
