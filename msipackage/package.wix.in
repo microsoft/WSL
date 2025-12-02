@@ -27,6 +27,7 @@
                 </File>
 
                 <File Id="wslg.exe" Name="wslg.exe" Source="${BIN}/wslg.exe" />
+                <File Id="wsladiag.exe" Name="wsladiag.exe" Source="${BIN}/wsladiag.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${BIN}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${BIN}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${BIN}/wslserviceproxystub.dll" />
