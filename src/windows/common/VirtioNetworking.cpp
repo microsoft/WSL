@@ -24,6 +24,8 @@ VirtioNetworking::VirtioNetworking(
 
 VirtioNetworking::~VirtioNetworking()
 {
+    // Unregister the network notification callback to prevent it from using the GNS channel.
+    m_networkNotifyHandle.reset();
     // Stop the GNS channel to unblock any stuck communications with the guest.
     m_gnsChannel.Stop();
 }
