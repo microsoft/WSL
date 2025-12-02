@@ -78,7 +78,16 @@ WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SE
     }
     else
     {
+
+#ifdef WSLA_TEST_DISTRO_PATH
+
+        vmSettings.RootVhd = TEXT(WSLA_TEST_DISTRO_PATH);
+
+#else
         vmSettings.RootVhd = std::filesystem::path(common::wslutil::GetMsiPackagePath().value()) / L"wslarootfs.vhd";
+
+#endif
+
         vmSettings.RootVhdType = "squashfs";
     }
 

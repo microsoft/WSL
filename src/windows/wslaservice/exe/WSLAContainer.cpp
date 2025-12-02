@@ -116,7 +116,7 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
     args.push_back(options.Name);
     if (options.ShmSize > 0)
     {
-        args.push_back("--shm-size=" + std::to_string(options.ShmSize) + 'm');
+        args.push_back(std::format("--shm-size={}m", options.ShmSize));
     }
     if (options.Flags & WSLA_CONTAINER_FLAG_ENABLE_GPU)
     {
@@ -133,7 +133,7 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
         THROW_HR_IF_MSG(
             E_INVALIDARG,
             options.InitProcessOptions.Environment[i][0] == L'-',
-            "Invlaid environment string: %hs",
+            "Invalid environment string: %hs",
             options.InitProcessOptions.Environment[i]);
 
         args.insert(args.end(), {"-e", options.InitProcessOptions.Environment[i]});

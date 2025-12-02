@@ -16,9 +16,9 @@ Abstract:
 #include <format>
 #include <filesystem>
 #include "hcs_schema.h"
+#include "VirtioNetworking.h"
 #include "NatNetworking.h"
 #include "WSLAUserSession.h"
-#include "DnsResolver.h"
 #include "ServiceProcessLauncher.h"
 
 using namespace wsl::windows::common;
@@ -84,6 +84,12 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     }
 
     WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
+
+    // Shutdown DeviceHostProxy before resetting compute system
+    if (m_guestDeviceManager)
+    {
+        m_guestDeviceManager->Shutdown();
+    }
 
     m_computeSystem.reset();
 
@@ -300,6 +306,13 @@ void WSLAVirtualMachine::Start()
     auto runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
     WI_ASSERT(IsEqualGUID(m_vmId, runtimeId));
 
+    // Initialize DeviceHostProxy for virtio device support.
+    // N.B. This is currently only needed for VirtioProxy networking mode but would also be needed for virtiofs.
+    if (m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy)
+    {
+        m_guestDeviceManager = std::make_shared<GuestDeviceManager>(m_vmIdString, m_vmId);
+    }
+
     wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
 
     wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
@@ -428,59 +441,71 @@ CATCH_LOG();
 
 void WSLAVirtualMachine::ConfigureNetworking()
 {
-    if (m_settings.NetworkingMode == WSLANetworkingModeNone)
+    switch (m_settings.NetworkingMode)
     {
+    case WSLANetworkingModeNone:
         return;
+    case WSLANetworkingModeNAT:
+    case WSLANetworkingModeVirtioProxy:
+        break;
+    default:
+        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %lu", m_settings.NetworkingMode);
     }
-    else if (m_settings.NetworkingMode == WSLANetworkingModeNAT)
+
+    // Launch GNS
+    std::vector<WSLA_PROCESS_FD> fds(1);
+    fds[0].Fd = -1;
+    fds[0].Type = WSLAFdType::WSLAFdTypeDefault;
+
+    std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
+
+    // If DNS tunnelling is enabled, use an additional for its channel.
+    if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
     {
-        // Launch GNS
-        std::vector<WSLA_PROCESS_FD> fds(1);
-        fds[0].Fd = -1;
-        fds[0].Type = WSLAFdType::WSLAFdTypeDefault;
+        THROW_HR_IF_MSG(
+            E_NOTIMPL,
+            m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy,
+            "DNS tunneling not currently supported for VirtioProxy");
 
-        std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
+        fds.emplace_back(WSLA_PROCESS_FD{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
+        THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
+    }
 
-        // If DNS tunnelling is enabled, use an additional for its channel.
-        if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
+    WSLA_PROCESS_OPTIONS options{};
+    options.Executable = "/init";
+    options.Fds = fds.data();
+    options.FdsCount = static_cast<DWORD>(fds.size());
+
+    // Because the file descriptors numbers aren't known in advance, the command line needs to be generated after the file
+    // descriptors are allocated.
+    std::string socketFdArg;
+    std::string dnsFdArg;
+    int gnsChannelFd = -1;
+    int dnsChannelFd = -1;
+    auto prepareCommandLine = [&](const auto& sockets) {
+        gnsChannelFd = sockets[0].Fd;
+        socketFdArg = std::to_string(gnsChannelFd);
+        cmd.emplace_back(socketFdArg.c_str());
+
+        if (sockets.size() > 1)
         {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
-            THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
+            dnsChannelFd = sockets[1].Fd;
+            dnsFdArg = std::to_string(dnsChannelFd);
+            cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
+            cmd.emplace_back(dnsFdArg.c_str());
+            cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
+            cmd.emplace_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
         }
 
-        WSLA_PROCESS_OPTIONS options{};
-        options.Executable = "/init";
-        options.Fds = fds.data();
-        options.FdsCount = static_cast<DWORD>(fds.size());
+        options.CommandLine = cmd.data();
+        options.CommandLineCount = static_cast<DWORD>(cmd.size());
+    };
 
-        // Because the file descriptors numbers aren't known in advance, the command line needs to be generated after the file
-        // descriptors are allocated.
+    auto process = CreateLinuxProcess(options, nullptr, prepareCommandLine);
+    auto gnsChannel = wsl::core::GnsChannel(wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()});
 
-        std::string socketFdArg;
-        std::string dnsFdArg;
-        int gnsChannelFd = -1;
-        int dnsChannelFd = -1;
-        auto prepareCommandLine = [&](const auto& sockets) {
-            gnsChannelFd = sockets[0].Fd;
-            socketFdArg = std::to_string(gnsChannelFd);
-            cmd.emplace_back(socketFdArg.c_str());
-
-            if (sockets.size() > 1)
-            {
-                dnsChannelFd = sockets[1].Fd;
-                dnsFdArg = std::to_string(dnsChannelFd);
-                cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
-                cmd.emplace_back(dnsFdArg.c_str());
-                cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
-                cmd.emplace_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
-            }
-
-            options.CommandLine = cmd.data();
-            options.CommandLineCount = static_cast<DWORD>(cmd.size());
-        };
-
-        auto process = CreateLinuxProcess(options, nullptr, prepareCommandLine);
-
+    if (m_settings.NetworkingMode == WSLANetworkingModeNAT)
+    {
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
 
@@ -493,18 +518,18 @@ void WSLAVirtualMachine::ConfigureNetworking()
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
             wsl::core::NatNetworking::CreateNetwork(config),
-            wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()},
+            std::move(gnsChannel),
             config,
             dnsChannelFd != -1 ? wil::unique_socket{(SOCKET)process->GetStdHandle(dnsChannelFd).release()} : wil::unique_socket{});
-
-        m_networkEngine->Initialize();
-
-        LaunchPortRelay();
     }
     else
     {
-        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %lu", m_settings.NetworkingMode);
+        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), true, m_guestDeviceManager, m_userToken);
     }
+
+    m_networkEngine->Initialize();
+
+    LaunchPortRelay();
 }
 
 void CALLBACK WSLAVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)

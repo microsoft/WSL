@@ -215,7 +215,8 @@ interface IWSLAVirtualMachine : IUnknown
 typedef enum _WSLANetworkingMode
 {
     WSLANetworkingModeNone,
-    WSLANetworkingModeNAT
+    WSLANetworkingModeNAT,
+    WSLANetworkingModeVirtioProxy
 } WSLANetworkingMode;
 
 typedef enum _WSLAFeatureFlags
@@ -317,7 +318,7 @@ interface IWSLAUserSession : IUnknown
     HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
-    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out]IWSLASession** Session);
+    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
 
     // TODO: Do we need 'TerminateSession()' ?
 }

@@ -16,6 +16,8 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "hcs.hpp"
 #include "Dmesg.h"
+#include "DnsResolver.h"
+#include "GuestDeviceManager.h"
 #include "WSLAApi.h"
 #include "WSLAProcess.h"
 
@@ -134,7 +136,7 @@ private:
     int m_coldDiscardShiftSize{};
     bool m_running = false;
     PSID m_userSid{};
-    wil::unique_handle m_userToken;
+    wil::shared_handle m_userToken;
     std::wstring m_debugShellPipe;
 
     std::mutex m_trackedProcessesLock;
@@ -147,6 +149,7 @@ private:
     bool m_vmSavedStateCaptured = false;
     bool m_crashLogCaptured = false;
 
+    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};

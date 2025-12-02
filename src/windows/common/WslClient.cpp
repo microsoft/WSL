@@ -1556,6 +1556,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");
     parser.AddArgument(storagePath, L"--storage");
+    parser.AddArgument(Integer(reinterpret_cast<int&>(sessionSettings.NetworkingMode)), L"--networking-mode");
     parser.AddArgument(Utf8String(containerImage), L"--image");
     parser.AddArgument(debugShell, L"--debug-shell");
     parser.AddArgument(help, L"--help");
@@ -1564,11 +1565,21 @@ int WslaShell(_In_ std::wstring_view commandLine)
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--networking-mode <mode>] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
         return 1;
+    }
+
+    switch (sessionSettings.NetworkingMode)
+    {
+    case WSLANetworkingMode::WSLANetworkingModeNone:
+    case WSLANetworkingMode::WSLANetworkingModeNAT:
+    case WSLANetworkingMode::WSLANetworkingModeVirtioProxy:
+        break;
+    default:
+        THROW_HR(E_INVALIDARG);
     }
 
     wil::com_ptr<IWSLAUserSession> userSession;
@@ -1577,6 +1588,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
     wil::com_ptr<IWSLASession> session;
+
     if (!rootVhdOverride.empty())
     {
         sessionSettings.RootVhdOverride = rootVhdOverride.c_str();
