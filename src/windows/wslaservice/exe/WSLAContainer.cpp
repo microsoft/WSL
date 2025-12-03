@@ -88,7 +88,6 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
     if (hasStdin)
     {
         // For now return a proper error if the caller tries to pass stdin without a TTY to prevent hangs.
-        THROW_WIN32_IF(ERROR_NOT_SUPPORTED, hasTty == false);
         inputOptions.push_back("-i");
     }
 
