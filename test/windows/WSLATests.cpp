@@ -1238,8 +1238,8 @@ class WSLATests
             // For now, validate that trying to use stdin without a tty returns the appropriate error.
             auto container = launcher.Launch(*session);
 
-            // TODO: nerdctl hangs if stdin is closed without writting to it.
-            // Add test coverage for that usecase once that the hang is fixed.
+            // TODO: nerdctl hangs if stdin is closed without writing to it.
+            // Add test coverage for that usecase once the hang is fixed.
             auto process = container.GetInitProcess();
             auto input = process.GetStdHandle(0);
 
