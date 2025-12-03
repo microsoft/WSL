@@ -27,7 +27,7 @@ WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionI
 {
     WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
-    m_virtualMachine = wil::MakeOrThrow<WSLAVirtualMachine>(CreateVmSettings(Settings), userSessionImpl.GetUserSid(), &userSessionImpl);
+    m_virtualMachine = wil::MakeOrThrow<WSLAVirtualMachine>(CreateVmSettings(Settings), userSessionImpl.GetUserSid());
 
     if (Settings.TerminationCallback != nullptr)
     {
@@ -137,6 +137,7 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
                     m_virtualMachine->DetachDisk(diskLun.value());
                 }
 
+                auto runAsUser = wil::CoImpersonateClient();
                 LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_storageVhdPath.c_str()));
             }
         });

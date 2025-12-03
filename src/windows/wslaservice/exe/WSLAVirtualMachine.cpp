@@ -33,7 +33,7 @@ constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
 
-WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
+WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, PSID UserSid) :
     m_settings(std::move(Settings)), m_userSid(UserSid)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
@@ -200,10 +200,7 @@ void WSLAVirtualMachine::Start()
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
     wil::unique_handle dmesgOutput;
-    if (m_settings.DmesgHandle)
-    {
-        dmesgOutput = std::move(m_settings.DmesgHandle);
-    }
+    dmesgOutput = std::move(m_settings.DmesgHandle);
 
     m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true, std::move(dmesgOutput));
 
@@ -301,7 +298,6 @@ void WSLAVirtualMachine::Start()
     WSL_LOG("CreateWSLAVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
 
     m_computeSystem = hcs::CreateComputeSystem(m_vmIdString.c_str(), json.c_str());
-    m_running = true;
 
     auto runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
     WI_ASSERT(IsEqualGUID(m_vmId, runtimeId));
@@ -316,6 +312,7 @@ void WSLAVirtualMachine::Start()
     wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
 
     wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
+    m_running = true;
 
     // Create a socket listening for crash dumps.
     auto crashDumpSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);

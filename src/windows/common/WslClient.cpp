@@ -1591,14 +1591,13 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     if (!rootVhdOverride.empty())
     {
-        sessionSettings.RootVhdOverride = rootVhdOverride.c_str();
-
         if (rootVhdTypeOverride.empty())
         {
             wprintf(L"--fstype required when --vhd is passed\n");
             return 1;
         }
 
+        sessionSettings.RootVhdOverride = rootVhdOverride.c_str();
         sessionSettings.RootVhdTypeOverride = rootVhdTypeOverride.c_str();
     }
 

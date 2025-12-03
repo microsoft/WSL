@@ -58,7 +58,7 @@ public:
 
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLAVirtualMachine(Settings&& Settings, PSID Sid, WSLAUserSessionImpl* UserSession);
+    WSLAVirtualMachine(Settings&& Settings, PSID Sid);
 
     ~WSLAVirtualMachine();
 
