@@ -118,68 +118,67 @@ WSLASession::~WSLASession()
 
 void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
 {
-    if (Settings.StoragePath != nullptr)
-    {
-        std::filesystem::path storagePath{Settings.StoragePath};
-        THROW_HR_IF_MSG(E_INVALIDARG, !storagePath.is_absolute(), "Storage path is not absolute: %ls", storagePath.c_str());
-
-        m_storageVhdPath = storagePath / "storage.vhdx";
-
-        std::string diskDevice;
-        std::optional<ULONG> diskLun{};
-        bool vhdCreated = false;
-
-        auto deleteVhdOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            if (vhdCreated)
-            {
-                if (diskLun.has_value())
-                {
-                    m_virtualMachine->DetachDisk(diskLun.value());
-                }
-
-                auto runAsUser = wil::CoImpersonateClient();
-                LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_storageVhdPath.c_str()));
-            }
-        });
-
-        auto result =
-            wil::ResultFromException([&]() { diskDevice = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false).second; });
-
-        if (FAILED(result))
-        {
-            THROW_HR_IF_MSG(
-                result,
-                result != HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) && result != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
-                "Failed to attach vhd: %ls",
-                m_storageVhdPath.c_str());
-
-            // If the VHD wasn't found, create it.
-            WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
-
-            auto runAsUser = wil::CoImpersonateClient();
-
-            std::filesystem::create_directories(storagePath);
-            wsl::core::filesystem::CreateVhd(
-                m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, m_userSession->GetUserSid(), false, false);
-            vhdCreated = true;
-
-            // Then attach the new disk.
-            std::tie(diskLun, diskDevice) = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false);
-
-            // Then format it.
-            Ext4Format(diskDevice);
-        }
-
-        // Mount the device to /root.
-        m_virtualMachine->Mount(diskDevice.c_str(), "/root", "ext4", "", 0);
-
-        deleteVhdOnFailure.release();
-    }
-    else
+    if (Settings.StoragePath == nullptr)
     {
         // If no storage path is specified, use a tmpfs for convenience.
         m_virtualMachine->Mount("", "/root", "tmpfs", "", 0);
+        return;
     }
+
+    std::filesystem::path storagePath{Settings.StoragePath};
+    THROW_HR_IF_MSG(E_INVALIDARG, !storagePath.is_absolute(), "Storage path is not absolute: %ls", storagePath.c_str());
+
+    m_storageVhdPath = storagePath / "storage.vhdx";
+
+    std::string diskDevice;
+    std::optional<ULONG> diskLun{};
+    bool vhdCreated = false;
+
+    auto deleteVhdOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (vhdCreated)
+        {
+            if (diskLun.has_value())
+            {
+                m_virtualMachine->DetachDisk(diskLun.value());
+            }
+
+            auto runAsUser = wil::CoImpersonateClient();
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_storageVhdPath.c_str()));
+        }
+    });
+
+    auto result =
+        wil::ResultFromException([&]() { diskDevice = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false).second; });
+
+    if (FAILED(result))
+    {
+        THROW_HR_IF_MSG(
+            result,
+            result != HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) && result != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+            "Failed to attach vhd: %ls",
+            m_storageVhdPath.c_str());
+
+        // If the VHD wasn't found, create it.
+        WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
+
+        auto runAsUser = wil::CoImpersonateClient();
+
+        std::filesystem::create_directories(storagePath);
+        wsl::core::filesystem::CreateVhd(
+            m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, m_userSession->GetUserSid(), false, false);
+        vhdCreated = true;
+
+        // Then attach the new disk.
+        std::tie(diskLun, diskDevice) = m_virtualMachine->AttachDisk(m_storageVhdPath.c_str(), false);
+
+        // Then format it.
+        Ext4Format(diskDevice);
+    }
+
+    // Mount the device to /root.
+    m_virtualMachine->Mount(diskDevice.c_str(), "/root", "ext4", "", 0);
+
+    deleteVhdOnFailure.release();
 }
 
 HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
