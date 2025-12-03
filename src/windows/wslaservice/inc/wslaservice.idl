@@ -20,6 +20,12 @@ cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLAUserSession;")
 cpp_quote("#endif")
 
+#define WSLA_MAX_CONTAINER_NAME_LENGTH 255
+#define WSLA_MAX_IMAGE_NAME_LENGTH 255
+
+cpp_quote("#define WSLA_MAX_CONTAINER_NAME_LENGTH 255")
+cpp_quote("#define WSLA_MAX_IMAGE_NAME_LENGTH 255")
+
 typedef
 struct _WSLA_VERSION {
     ULONG Major;
@@ -96,7 +102,7 @@ struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
 
 struct WSLA_IMAGE_INFORMATION
 {
-    LPWSTR Name;
+    char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     LPWSTR Hash;
     ULONGLONG Size;
     ULONGLONG DownloadTimestamp;
@@ -162,8 +168,8 @@ enum WSLA_CONTAINER_STATE
 
 struct WSLA_CONTAINER
 {
-    LPWSTR Name;
-    LPWSTR Image;
+    char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1];
+    char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     enum WSLA_CONTAINER_STATE State;
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.

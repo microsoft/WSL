@@ -16,6 +16,8 @@ Abstract:
 
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
+#include "WeakRefContainer.h"
+#include "WSLAContainer.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -62,6 +64,7 @@ private:
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
+    WeakRefContainer<WSLAContainer> m_containers;
     std::mutex m_lock;
 
     // TODO: Add container tracking here. Could reuse m_lock for that.

@@ -16,15 +16,37 @@ Abstract:
 #include "WSLAContainer.h"
 #include "WSLAProcess.h"
 
+using wsl::windows::service::wsla::WeakReference;
 using wsl::windows::service::wsla::WSLAContainer;
 
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "--net=host", // TODO: default for now, change later
-                                                      "--ulimit",
-                                                      "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{
+    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+    "--net=host", // TODO: default for now, change later
+    "--ulimit",
+    "nofile=65536:65536"};
+
+WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
+    WeakReference<WSLAContainer>(), m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
+{
+}
+
+WSLAContainer::~WSLAContainer()
+{
+    OnDestroy();
+}
+
+void WSLAContainer::GetName(char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1]) const noexcept
+{
+    WI_VERIFY(strcpy_s(Name, sizeof(Name), m_name.c_str()) == 0);
+}
+
+void WSLAContainer::GetImage(char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1]) const noexcept
+{
+    WI_VERIFY(strcpy_s(Image, WSLA_MAX_IMAGE_NAME_LENGTH + 1, m_image.c_str()) == 0);
+}
 
 HRESULT WSLAContainer::Start()
 {

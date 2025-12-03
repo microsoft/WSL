@@ -220,8 +220,14 @@ try
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
+    THROW_HR_IF(E_INVALIDARG, strlen(containerOptions->Name) > WSLA_MAX_CONTAINER_NAME_LENGTH);
+    THROW_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
+
     // TODO: Log entrance into the function.
     auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
+
+    m_containers.Add(container.Get());
+
     THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
     return S_OK;
@@ -235,7 +241,16 @@ HRESULT WSLASession::OpenContainer(LPCWSTR Name, IWSLAContainer** Container)
 
 HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Images, ULONG* Count)
 {
-    return E_NOTIMPL;
+    auto lockedElements = m_containers.Get();
+
+    auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(lockedElements.elements.size());
+    size_t index = 0;
+    for (const auto &e: lockedElements.elements)
+    {
+        e->GetImage(output[index].Image);
+        e->GetName(output[index].Name);
+        index++;
+    }
 }
 
 HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
