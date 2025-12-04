@@ -44,10 +44,10 @@ typedef __callback VOID(CALLBACK WslaInstallCallback)(
     _In_ WSLA_INSTALL_COMPONENT component,
     _In_ UINT32 progress,
     _In_ UINT32 total,
-    _In_opt PVOID context);
+    _In_opt_ PVOID context);
 
 STDAPI WslaInstallWithDependencies(
-    _In_opt_ __callback progressCallback,
+    _In_opt_ __callback WslaInstallCallback progressCallback,
     _In_opt_ PVOID context);
 
 // Session
@@ -71,11 +71,11 @@ typedef struct WSLA_CREATE_SESSION_OPTIONS
     PVOID terminationCallbackContext;
 } WSLA_CREATE_SESSION_OPTIONS;
 
-DECLARE_HANDLE(WslaSession)
+DECLARE_HANDLE(WslaSession);
 
 STDAPI WslaCreateSession(
     _In_ const WSLA_CREATE_SESSION_OPTIONS* settings,
-    _Out_ WslaSession* sesssion);
+    _Out_ WslaSession* session);
 
 STDAPI WslaReleaseSession(
     _In_ WslaSession session);
@@ -177,9 +177,9 @@ typedef struct WSLA_CONTAINER_PROCESS
 {
     UINT32 pid;
     HANDLE exitEvent;
-    HANDLE stdin;
-    HANDLE stdout;
-    HANDLE stderr;
+    HANDLE stdIn;
+    HANDLE stdOut;
+    HANDLE stdErr;
 } WSLA_CONTAINER_PROCESS;
 
 DECLARE_HANDLE(WslaRuntimeContainer);

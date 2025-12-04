@@ -14,18 +14,20 @@ Abstract:
 
 #include "wsla.h"
 
-HRESULT WslaCanRun(_Out_ BOOL* canRun)
+HRESULT WslaCanRun(
+    _Out_ BOOL* canRun)
 {
     return E_NOTIMPL;
 }
 
-HRESULT WslaGetVersion(_Out_ WSLA_VERSION* version)
+HRESULT WslaGetVersion(
+    _Out_ WSLA_VERSION* version)
 {
     return E_NOTIMPL;
 }
 
 HRESULT WslaInstallWithDependencies(
-    _In_opt_ __callback progressCallback,
+    _In_opt_ __callback WslaInstallCallback progressCallback,
     _In_opt_ PVOID context)
 {
     return E_NOTIMPL;
@@ -136,7 +138,7 @@ HRESULT WslaSignalContainerProcess(
 }
 
 HRESULT WslaCreateVhd(
-    _In_ const WSLA_CREATE_VHD_OPTIONS* options);
+    _In_ const WSLA_CREATE_VHD_OPTIONS* options)
 {
     return E_NOTIMPL;
 }
