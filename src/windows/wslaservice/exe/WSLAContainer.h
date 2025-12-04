@@ -41,7 +41,7 @@ public:
     static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
 
 private:
-    std::string GetNerdctlStatus();
+    std::optional<std::string> GetNerdctlStatus();
 
     ServiceRunningProcess m_containerProcess;
     std::string m_name;

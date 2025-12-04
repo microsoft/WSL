@@ -21,10 +21,11 @@ using wsl::windows::service::wsla::WSLAContainer;
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "--net=host", // TODO: default for now, change later
-                                                      "--ulimit",
-                                                      "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{
+    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+    "--net=host", // TODO: default for now, change later
+    "--ulimit",
+    "nofile=65536:65536"};
 
 WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
     m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
@@ -39,7 +40,8 @@ WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess
         // Remove this logic once the image pull is separated from container creation.
         if (status != "created" && status != "")
         {
-            THROW_HR_MSG(E_UNEXPECTED, "Unexpected nerdctl status '%hs', for container '%hs'", status.c_str(), m_name.c_str());
+            THROW_HR_MSG(
+                E_UNEXPECTED, "Unexpected nerdctl status '%hs', for container '%hs'", status.value_or("<empty>").c_str(), m_name.c_str());
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -224,11 +226,16 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
     return args;
 }
 
-std::string WSLAContainer::GetNerdctlStatus()
+std::optional<std::string> WSLAContainer::GetNerdctlStatus()
 {
     ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "inspect", "-f", "{{.State.Status}}", m_name});
     auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+    if (result.Code != 0)
+    {
+        // Can happen if the container is not found.
+        // TODO: Find a way to validate that the container is indeed not found, and not some other error.
+        return {};
+    }
     auto& status = result.Output[0];
 
     while (!status.empty() && status.back() == '\n')
