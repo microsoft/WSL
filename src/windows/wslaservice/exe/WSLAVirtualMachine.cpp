@@ -36,7 +36,6 @@ constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
 // WSLA-specific virtio device class IDs.
 DEFINE_GUID(WSLA_VIRTIO_NET_CLASS_ID, 0x7B3C9A42, 0x8E1F, 0x4D5A, 0x9F, 0x2E, 0xC4, 0xA7, 0xB8, 0xD3, 0xE6, 0xF1); // {7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}
 
-
 WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, PSID UserSid) :
     m_settings(std::move(Settings)), m_userSid(UserSid)
 {
