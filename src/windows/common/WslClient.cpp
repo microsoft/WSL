@@ -1525,43 +1525,38 @@ int RunDebugShell()
     THROW_HR(HCS_E_CONNECTION_CLOSED);
 }
 
+DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
+
 // Temporary debugging tool for WSLA
 int WslaShell(_In_ std::wstring_view commandLine)
 {
-#ifdef WSLA_TEST_DISTRO_PATH
+    WSLA_SESSION_SETTINGS sessionSettings{};
+    sessionSettings.DisplayName = L"WSLAShell";
+    sessionSettings.CpuCount = 4;
+    sessionSettings.MemoryMb = 4096;
+    sessionSettings.NetworkingMode = WSLANetworkingModeNAT;
+    sessionSettings.BootTimeoutMs = 30 * 1000;
+    sessionSettings.MaximumStorageSizeMb = 4096;
 
-    std::wstring vhd = TEXT(WSLA_TEST_DISTRO_PATH);
     std::string shell = "/bin/sh";
-    std::string fsType = "squashfs";
 
-#else
-
-    std::wstring vhd = wsl::windows::common::wslutil::GetMsiPackagePath().value() + L"/system.vhd";
-    std::string shell = "/bin/bash";
-    std::string fsType = "ext4";
-
-#endif
-
-    VIRTUAL_MACHINE_SETTINGS settings{};
-    settings.CpuCount = 4;
-    settings.DisplayName = L"WSLA";
-    settings.MemoryMb = 1024;
-    settings.BootTimeoutMs = 30000;
-    settings.NetworkingMode = WSLANetworkingModeNAT;
-    std::wstring containerRootVhd;
     std::string containerImage;
     bool help = false;
     std::wstring debugShell;
 
+    std::wstring storagePath;
+    std::wstring rootVhdOverride;
+    std::string rootVhdTypeOverride;
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
-    parser.AddArgument(vhd, L"--vhd");
+    parser.AddArgument(rootVhdOverride, L"--vhd");
     parser.AddArgument(Utf8String(shell), L"--shell");
-    parser.AddArgument(reinterpret_cast<bool&>(settings.EnableDnsTunneling), L"--dns-tunneling");
-    parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
-    parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
-    parser.AddArgument(Integer(reinterpret_cast<int&>(settings.NetworkingMode)), L"--networking-mode");
-    parser.AddArgument(Utf8String(fsType), L"--fstype");
-    parser.AddArgument(containerRootVhd, L"--container-vhd");
+    parser.AddArgument(
+        SetFlag<int, WslaFeatureFlagsDnsTunneling>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--dns-tunneling");
+    parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
+    parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
+    parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");
+    parser.AddArgument(storagePath, L"--storage");
+    parser.AddArgument(Integer(reinterpret_cast<int&>(sessionSettings.NetworkingMode)), L"--networking-mode");
     parser.AddArgument(Utf8String(containerImage), L"--image");
     parser.AddArgument(debugShell, L"--debug-shell");
     parser.AddArgument(help, L"--help");
@@ -1577,7 +1572,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         return 1;
     }
 
-    switch (settings.NetworkingMode)
+    switch (sessionSettings.NetworkingMode)
     {
     case WSLANetworkingMode::WSLANetworkingModeNone:
     case WSLANetworkingMode::WSLANetworkingModeNAT:
@@ -1587,28 +1582,30 @@ int WslaShell(_In_ std::wstring_view commandLine)
         THROW_HR(E_INVALIDARG);
     }
 
-    if (!containerRootVhd.empty())
-    {
-        settings.ContainerRootVhd = containerRootVhd.c_str();
-
-        if (!std::filesystem::exists(containerRootVhd))
-        {
-            auto token = wil::open_current_access_token();
-            auto tokenInfo = wil::get_token_information<TOKEN_USER>(token.get());
-            wsl::core::filesystem::CreateVhd(containerRootVhd.c_str(), 5368709120 /* 5 GB */, tokenInfo->User.Sid, FALSE, FALSE);
-            settings.FormatContainerRootVhd = TRUE;
-        }
-    }
-
     wil::com_ptr<IWSLAUserSession> userSession;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-    WSLA_SESSION_SETTINGS sessionSettings{L"WSLA Test Session"};
     wil::com_ptr<IWSLASession> session;
-    settings.RootVhd = vhd.c_str();
-    settings.RootVhdType = fsType.c_str();
+
+    if (!rootVhdOverride.empty())
+    {
+        if (rootVhdTypeOverride.empty())
+        {
+            wprintf(L"--fstype required when --vhd is passed\n");
+            return 1;
+        }
+
+        sessionSettings.RootVhdOverride = rootVhdOverride.c_str();
+        sessionSettings.RootVhdTypeOverride = rootVhdTypeOverride.c_str();
+    }
+
+    if (!storagePath.empty())
+    {
+        storagePath = std::filesystem::weakly_canonical(storagePath).wstring();
+        sessionSettings.StoragePath = storagePath.c_str();
+    }
 
     if (!debugShell.empty())
     {
@@ -1616,17 +1613,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
     }
     else
     {
-        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
+        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &session));
         THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
-
-        if (!containerRootVhd.empty())
-        {
-            wsl::windows::common::WSLAProcessLauncher initProcessLauncher{shell, {shell, "/etc/lsw-init.sh"}};
-            auto initProcess = initProcessLauncher.Launch(*session);
-            THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
-        }
     }
 
     std::optional<wil::com_ptr<IWSLAContainer>> container;

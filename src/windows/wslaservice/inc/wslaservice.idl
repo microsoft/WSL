@@ -206,7 +206,6 @@ interface IWSLAVirtualMachine : IUnknown
     HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
     HRESULT Signal([in] LONG Pid, [in] int Signal);
     HRESULT Shutdown([in] ULONGLONG TimeoutMs);
-    HRESULT GetDebugShellPipe([out] LPWSTR* pipePath);
     HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
     HRESULT Unmount([in] LPCSTR Path);
     HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
@@ -220,32 +219,29 @@ typedef enum _WSLANetworkingMode
     WSLANetworkingModeVirtioProxy
 } WSLANetworkingMode;
 
-typedef
-struct _VIRTUAL_MACHINE_SETTINGS {  // TODO: Delete once the new API is wired.
-    LPCWSTR DisplayName;
-    ULONGLONG MemoryMb;
-    ULONG CpuCount;
-    ULONG BootTimeoutMs;
-    ULONG DmesgOutput;
-    WSLANetworkingMode NetworkingMode;
-    BOOL EnableDnsTunneling;
-    BOOL EnableDebugShell;
-    BOOL EnableEarlyBootDmesg;
-    BOOL EnableGPU;
-    LPCWSTR RootVhd; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
-    LPCSTR RootVhdType; // Temporary option to provide the root VHD. TODO: Remove once runtime VHD is available.
-    LPCWSTR ContainerRootVhd;
-    BOOL FormatContainerRootVhd;
-} VIRTUAL_MACHINE_SETTINGS;
-
-
+typedef enum _WSLAFeatureFlags
+{
+    WslaFeatureFlagsNone = 0, 
+    WslaFeatureFlagsDnsTunneling = 1, 
+    WslaFeatureFlagsEarlyBootDmesg = 2, 
+    WslaFeatureFlagsGPU = 4, 
+} WSLAFeatureFlags;
 
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
+    ULONGLONG MaximumStorageSizeMb;
+    ULONG CpuCount;
+    ULONG MemoryMb;
+    ULONG BootTimeoutMs;
+    WSLANetworkingMode NetworkingMode;
     [unique] ITerminationCallback* TerminationCallback;
+    ULONG FeatureFlags;
+    ULONG DmesgOutput;
 
-    // TODO: Termination callback, flags
+    // Below options are used for debugging purposes only.
+    [unique] LPCWSTR RootVhdOverride; 
+    [unique] LPCSTR RootVhdTypeOverride;
 };
 
 
@@ -319,7 +315,7 @@ interface IWSLAUserSession : IUnknown
     HRESULT GetVersion([out] WSLA_VERSION* Version);
 
     // Session managment.
-    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [in] const VIRTUAL_MACHINE_SETTINGS* VmSettings, [out]IWSLASession** Session);
+    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
     HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
