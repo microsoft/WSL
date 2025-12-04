@@ -40,6 +40,12 @@
                 <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
                 <?endif?>
 
+
+                <!-- Temporary runtime VHD. TODO: Update once the final VHD is available. -->
+                <?if "${WSL_DEV_BINARY_PATH}" = "" AND "${TARGET_PLATFORM}" = "x64" ?>
+                <File Id="wslarootfs.vhd" Name="wslarootfs.vhd" Source="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd"/>
+                <?endif?>
+
                 <!-- Installation folder -->
                 <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\MSI">
                     <RegistryValue Name="InstallLocation" Value="[INSTALLDIR]" Type="string" />
@@ -334,6 +340,27 @@
                     <RegistryValue Value="IWSLASession" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">
                         <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- wsldevicehost.dll -->
+                <RegistryKey Root="HKCR" Key="AppID\{C457EA11-5486-4174-B90D-089909EDB170}">
+                    <RegistryValue Name="DllSurrogate" Value="" Type="string" />
+                    <RegistryValue Name="AppIDFlags" Value="2048" Type="integer" />
+
+                    <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
+                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                </RegistryKey>
+
+                <!-- WslDeviceHost_VirtioNet -->
+                <RegistryKey Root="HKCR" Key="CLSID\{7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}">
+                    <RegistryValue Value="WslDeviceHost_Net" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 

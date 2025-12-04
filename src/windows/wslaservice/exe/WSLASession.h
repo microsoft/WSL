@@ -23,10 +23,11 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASession, IFastRundown>
 {
 public:
-    WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings);
+    WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl);
     ~WSLASession();
 
     IFACEMETHOD(GetDisplayName)(LPWSTR* DisplayName) override;
+    const std::wstring& DisplayName() const;
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
@@ -51,11 +52,19 @@ public:
     void OnUserSessionTerminating();
 
 private:
+    static WSLAVirtualMachine::Settings CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings);
+
+    void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
+    void Ext4Format(const std::string& Device);
+
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::wstring m_displayName;
+    std::filesystem::path m_storageVhdPath;
     std::mutex m_lock;
+
+    // TODO: Add container tracking here. Could reuse m_lock for that.
 };
 
 } // namespace wsl::windows::service::wsla

@@ -379,10 +379,10 @@ if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smal
                             WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/modules.vhd"
                             WSL_DEV_INSTALL_PATH="${WSL_DEV_BINARY_PATH}"
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
-endif()
 
-if (NOT DEFINED OFFICIAL_BUILD AND ${TARGET_PLATFORM} STREQUAL "x64")
-    add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd")
+    if (NOT OFFICIAL_BUILD AND ${TARGET_PLATFORM} STREQUAL "x64")
+        add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd")
+    endif()
 endif()
 
 # Common include paths

@@ -43,6 +43,9 @@ public:
     };
 
     RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds);
+    NON_COPYABLE(RunningWSLAProcess);
+    DEFAULT_MOVABLE(RunningWSLAProcess);
+
     ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
@@ -57,6 +60,9 @@ protected:
 class ClientRunningWSLAProcess : public RunningWSLAProcess
 {
 public:
+    NON_COPYABLE(ClientRunningWSLAProcess);
+    DEFAULT_MOVABLE(ClientRunningWSLAProcess);
+
     ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds);
     wil::unique_handle GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
@@ -68,7 +74,6 @@ protected:
 private:
     wil::com_ptr<IWSLAProcess> m_process;
 };
-
 class WSLAProcessLauncher
 {
 public:
@@ -82,6 +87,7 @@ public:
         ProcessFlags Flags = ProcessFlags::Stdout | ProcessFlags::Stderr);
 
     void AddFd(WSLA_PROCESS_FD Fd);
+    void SetTtySize(ULONG Rows, ULONG Columns);
 
     // TODO: Add overloads for IWSLAContainer once implemented.
     ClientRunningWSLAProcess Launch(IWSLASession& Session);
@@ -95,6 +101,8 @@ protected:
     std::string m_executable;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
+    DWORD m_rows = 0;
+    DWORD m_columns = 0;
 };
 
 } // namespace wsl::windows::common

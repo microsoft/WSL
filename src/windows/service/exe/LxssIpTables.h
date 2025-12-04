@@ -262,7 +262,7 @@ private:
     /// <summary>
     /// COM firewall instance.
     /// </summary>
-    Microsoft::WRL::ComPtr<INetFwPolicy2> m_firewall;
+    wil::com_ptr<INetFwPolicy2> m_firewall;
 
     /// <summary>
     /// Lock to protect class members.
@@ -295,7 +295,7 @@ public:
     /// <summary>
     /// Constructor to take ownership of an existing rule.
     /// </summary>
-    LxssNetworkingFirewallPort(const std::shared_ptr<LxssNetworkingFirewall>& Firewall, const Microsoft::WRL::ComPtr<INetFwRule>& Existing);
+    LxssNetworkingFirewallPort(const std::shared_ptr<LxssNetworkingFirewall>& Firewall, const wil::com_ptr<INetFwRule>& Existing);
 
     /// <summary>
     /// Destructor.

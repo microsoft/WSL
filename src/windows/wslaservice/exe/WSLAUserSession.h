@@ -29,7 +29,8 @@ public:
 
     PSID GetUserSid() const;
 
-    HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession);
+    HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession);
+    HRESULT OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
 
     void OnSessionTerminated(WSLASession* Session);
 
@@ -52,9 +53,10 @@ public:
     WSLAUserSession& operator=(const WSLAUserSession&) = delete;
 
     IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
-    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession) override;
+    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, IWSLASession** WslaSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASession** Session) override;
+    IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session) override;
 
 private:
     std::weak_ptr<WSLAUserSessionImpl> m_session;

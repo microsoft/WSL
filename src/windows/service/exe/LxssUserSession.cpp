@@ -2674,8 +2674,7 @@ try
     THROW_IF_FAILED(shellLink->SetArguments(commandLine.c_str()));
     THROW_IF_FAILED(shellLink->SetIconLocation(ShortcutIcon, 0));
 
-    Microsoft::WRL::ComPtr<IPersistFile> storage;
-    THROW_IF_FAILED(shellLink->QueryInterface(IID_IPersistFile, &storage));
+    auto storage = shellLink.query<IPersistFile>();
     THROW_IF_FAILED(storage->Save(shortcutPath.c_str(), true));
 
     registration.Write(Property::ShortcutPath, shortcutPath.c_str());

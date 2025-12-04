@@ -1666,10 +1666,8 @@ struct WSLA_TTY_RELAY
     int32_t TtyInput;
     int32_t TtyOutput;
     int32_t TtyControl;
-    uint32_t Rows;
-    uint32_t Columns;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput), FIELD(TtyControl), FIELD(Rows), FIELD(Columns));
+    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput), FIELD(TtyControl));
 };
 
 struct WSLA_ACCEPT

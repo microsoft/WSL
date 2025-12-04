@@ -17,14 +17,19 @@ Abstract:
 #include "WSLAApi.h"
 #include "wslaservice.h"
 #include "WSLAProcessLauncher.h"
+#include "WSLAContainerLauncher.h"
 #include "WslCoreFilesystem.h"
 
 using namespace wsl::windows::common::registry;
 using wsl::windows::common::ProcessFlags;
+using wsl::windows::common::RunningWSLAContainer;
 using wsl::windows::common::RunningWSLAProcess;
+using wsl::windows::common::WSLAContainerLauncher;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
+
+DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 
 class WSLATests
 {
@@ -51,17 +56,25 @@ class WSLATests
         return true;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(VIRTUAL_MACHINE_SETTINGS& vmSettings, const WSLA_SESSION_SETTINGS& sessionSettings = {L"wsla-test"})
+    static WSLA_SESSION_SETTINGS GetDefaultSessionSettings()
     {
-        vmSettings.RootVhdType = "ext4";
+        WSLA_SESSION_SETTINGS settings{};
+        settings.DisplayName = L"wsla-test";
+        settings.CpuCount = 4;
+        settings.MemoryMb = 2024;
+        settings.BootTimeoutMs = 30 * 1000;
+        return settings;
+    }
 
+    wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings = GetDefaultSessionSettings())
+    {
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
         wil::com_ptr<IWSLASession> session;
 
-        VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, &vmSettings, &session));
+        VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         return session;
@@ -132,6 +145,38 @@ class WSLATests
         return result;
     }
 
+    void ValidateProcessOutput(RunningWSLAProcess& process, const std::map<int, std::string>& expectedOutput, int expectedResult = 0)
+    {
+        auto result = process.WaitAndCaptureOutput();
+
+        if (result.Code != expectedResult)
+        {
+            LogError(
+                "Comman didn't return expected code (%i). ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
+                expectedResult,
+                result.Code,
+                result.Output[1].c_str(),
+                result.Output[2].c_str());
+
+            return;
+        }
+
+        for (const auto& [fd, expected] : expectedOutput)
+        {
+            auto it = result.Output.find(fd);
+            if (it == result.Output.end())
+            {
+                LogError("Expected output on fd %i, but none found.", fd);
+                return;
+            }
+
+            if (it->second != expected)
+            {
+                LogError("Unexpected output on fd %i. Expected: '%hs', Actual: '%hs'", fd, expected.c_str(), it->second.c_str());
+            }
+        }
+    }
+
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
@@ -139,14 +184,9 @@ class WSLATests
         auto createVmWithDmesg = [this](bool earlyBootLogging) {
             auto [read, write] = CreateSubprocessPipe(false, false);
 
-            VIRTUAL_MACHINE_SETTINGS settings{};
-            settings.CpuCount = 4;
-            settings.DisplayName = L"WSLA";
-            settings.MemoryMb = 2048;
-            settings.BootTimeoutMs = 30 * 1000;
+            auto settings = GetDefaultSessionSettings();
             settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
-            settings.EnableEarlyBootDmesg = earlyBootLogging;
-            settings.RootVhd = testVhd.c_str();
+            WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
             std::vector<char> dmesgContent;
             auto readDmesg = [read = read.get(), &dmesgContent]() mutable {
@@ -185,7 +225,7 @@ class WSLATests
 
             write.reset();
 
-            ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo DmesgTest > /dev/kmsg"}, 0);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo DmesgTest > /dev/kmsg"}, 0);
 
             VERIFY_ARE_EQUAL(session->Shutdown(30 * 1000), S_OK);
             detach.reset();
@@ -243,23 +283,16 @@ class WSLATests
             std::function<void(WSLAVirtualMachineTerminationReason, LPCWSTR)> m_callback;
         };
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
         std::promise<std::pair<WSLAVirtualMachineTerminationReason, std::wstring>> promise;
 
         CallbackInstance callback{[&](WSLAVirtualMachineTerminationReason reason, LPCWSTR details) {
             promise.set_value(std::make_pair(reason, details));
         }};
 
-        WSLA_SESSION_SETTINGS sessionSettings{L"wsla-test"};
+        WSLA_SESSION_SETTINGS sessionSettings = GetDefaultSessionSettings();
         sessionSettings.TerminationCallback = &callback;
 
-        auto session = CreateSession(settings, sessionSettings);
+        auto session = CreateSession(sessionSettings);
 
         wil::com_ptr<IWSLAVirtualMachine> vm;
         VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
@@ -275,14 +308,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         WSLAProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, ProcessFlags::None);
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
@@ -316,7 +342,7 @@ class WSLATests
         };
 
         // Expect the shell prompt to be displayed
-        validateTtyOutput("#");
+        validateTtyOutput("/ #");
         writeTty("echo OK\n");
         validateTtyOutput(" echo OK\r\nOK");
 
@@ -330,20 +356,15 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
+        auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
         // Validate that eth0 has an ip address
         ExpectCommandResult(
             session.get(),
-            {"/bin/bash",
+            {"/bin/sh",
              "-c",
              "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"},
             0);
@@ -355,21 +376,16 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
+        auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.EnableDnsTunneling = true;
-        settings.RootVhd = testVhd.c_str();
+        WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling);
 
         auto session = CreateSession(settings);
 
         // Validate that eth0 has an ip address
         ExpectCommandResult(
             session.get(),
-            {"/bin/bash",
+            {"/bin/sh",
              "-c",
              "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"},
             0);
@@ -384,14 +400,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         struct FileFd
         {
@@ -411,7 +420,7 @@ class WSLATests
             auto [hresult, _, process] = launcher.LaunchNoThrow(*session);
             VERIFY_ARE_EQUAL(hresult, expectedError);
 
-            return process;
+            return std::move(process);
         };
 
         {
@@ -481,7 +490,7 @@ class WSLATests
                 {{0, WSLAFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WSLAFdTypeLinuxFileInput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
 
             auto result = process->WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: write error: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "cat: write error: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(result.Code, 1);
         }
 
@@ -489,7 +498,7 @@ class WSLATests
             auto process = createProcess({"/bin/cat"}, {{0, WSLAFdTypeLinuxFileOutput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
             auto result = process->WaitAndCaptureOutput();
 
-            VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: standard output: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "cat: read error: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(result.Code, 1);
         }
     }
@@ -498,13 +507,10 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
+        auto settings = GetDefaultSessionSettings();
+        settings.RootVhdOverride = testVhd.c_str(); // socat is required to run this test case.
+        settings.RootVhdTypeOverride = "ext4";
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.RootVhd = testVhd.c_str();
 
         auto session = CreateSession(settings);
 
@@ -544,7 +550,7 @@ class WSLATests
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
-            auto process = WSLAProcessLauncher("/bin/bash", {"/bin/bash", "-c", cmd}).Launch(*session);
+            auto process = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", cmd}).Launch(*session);
             waitForOutput(process.GetStdHandle(2).get(), "listening on");
 
             return process;
@@ -639,14 +645,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         // Create a 'stuck' process
         auto process = WSLAProcessLauncher{"/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout}.Launch(*session);
@@ -659,14 +658,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         wil::com_ptr<IWSLAVirtualMachine> vm;
         VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
@@ -675,7 +667,7 @@ class WSLATests
         auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
             auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
 
-            auto result = ExpectCommandResult(session.get(), {"/bin/bash", "-c", cmd}, options.has_value() ? 0 : 1);
+            auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", cmd}, options.has_value() ? 0 : 1);
 
             const auto& output = result.Output[1];
             const auto& error = result.Output[2];
@@ -706,7 +698,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that folder is writeable from linux
-            ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo -n content > /win-path/file.txt && sync"}, 0);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt && sync"}, 0);
             VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
 
             VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
@@ -719,7 +711,7 @@ class WSLATests
             expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
 
             // Validate that folder is not writeable from linux
-            ExpectCommandResult(session.get(), {"/bin/bash", "-c", "echo -n content > /win-path/file.txt"}, 1);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
             VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
             expectMount("/win-path", {});
@@ -746,19 +738,12 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
-        auto result = ExpectCommandResult(
-            session.get(), {"/bin/bash", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
+        auto session = CreateSession();
+        auto result =
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
 
         // Note: fd/0 is opened by readlink to read the actual content of /proc/self/fd.
-        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\nsocket:[*]\nsocket:[*]\n"))
+        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\n"))
         {
             LogInfo("Found additional fds: %hs", result.Output[1].c_str());
             VERIFY_FAIL();
@@ -769,13 +754,8 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.EnableGPU = true;
-        settings.RootVhd = testVhd.c_str();
+        auto settings = GetDefaultSessionSettings();
+        WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
 
         auto session = CreateSession(settings);
 
@@ -783,10 +763,10 @@ class WSLATests
         VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
 
         // Validate that the GPU device is available.
-        ExpectCommandResult(session.get(), {"/bin/bash", "-c", "test -c /dev/dxg"}, 0);
+        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
         auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
             auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
-            WSLAProcessLauncher launcher{"/bin/bash", {"/bin/bash", "-c", cmd}};
+            WSLAProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", cmd}};
 
             auto result = launcher.Launch(*session).WaitAndCaptureOutput();
             const auto& output = result.Output[1];
@@ -815,7 +795,7 @@ class WSLATests
 
         // Validate that trying to mount the shares without GPU support disabled fails.
         {
-            settings.EnableGPU = false;
+            WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
             session = CreateSession(settings);
 
             wil::com_ptr<IWSLAVirtualMachine> vm;
@@ -831,49 +811,23 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        // Use the system distro vhd for modprobe & lsmod.
-
-#ifdef WSL_SYSTEM_DISTRO_PATH
-
-        auto rootfs = std::filesystem::path(TEXT(WSL_SYSTEM_DISTRO_PATH));
-
-#else
-        auto rootfs = std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
-
-#endif
-        settings.RootVhd = rootfs.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         // Sanity check.
-        ExpectCommandResult(session.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}, 1);
+        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 1);
 
         // Validate that modules can be loaded.
         ExpectCommandResult(session.get(), {"/usr/sbin/modprobe", "xsk_diag"}, 0);
 
         // Validate that xsk_diag is now loaded.
-        ExpectCommandResult(session.get(), {"/bin/bash", "-c", "lsmod | grep ^xsk_diag"}, 0);
+        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
     }
 
     TEST_METHOD(CreateRootNamespaceProcess)
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         // Simple case
         {
@@ -993,14 +947,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
         int processId = 0;
 
         // Cache the existing crash dumps so we can check that a new one is created.
@@ -1035,7 +982,7 @@ class WSLATests
 
         // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
         // Check if a new file was added in crashDumpsDir matching the pattern and not in existingDumps.
-        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
+        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_busybox-11.dmp", processId);
 
         auto dumpFile = wsl::shared::retry::RetryWithTimeout<std::filesystem::path>(
             [crashDumpsDir, expectedPattern, existingDumps]() {
@@ -1070,14 +1017,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        VIRTUAL_MACHINE_SETTINGS settings{};
-        settings.CpuCount = 4;
-        settings.DisplayName = L"WSLA";
-        settings.MemoryMb = 2048;
-        settings.BootTimeoutMs = 30 * 1000;
-        settings.RootVhd = testVhd.c_str();
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         constexpr auto formatedVhd = L"test-format-vhd.vhdx";
 
@@ -1097,5 +1037,95 @@ class WSLATests
         // Validate error paths.
         VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"DoesNotExist.vhdx"), E_INVALIDARG);
         VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+    }
+
+    TEST_METHOD(CreateContainer)
+    {
+        WSL2_TEST_ONLY();
+
+#ifdef _ARM64_
+
+        LogSkipped("Skipping CreateContainer test case for ARM64");
+        return;
+
+#else
+
+        auto storagePath = std::filesystem::current_path() / "test-storage";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code error;
+
+            std::filesystem::remove_all(storagePath, error);
+            if (error)
+            {
+                LogError("Failed to cleanup storage path %ws: %s", storagePath.c_str(), error.message().c_str());
+            }
+        });
+
+        auto installedVhdPath =
+            std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslarootfs.vhd";
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.StoragePath = storagePath.c_str();
+        settings.MaximumStorageSizeMb = 1024;
+
+        auto session = CreateSession(settings);
+
+        // Test a simple container start.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-simple", "echo", {"OK"});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+        }
+
+        // Validate that env is correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-env", "/bin/sh", {"-c", "echo $testenv"}, {{"testenv=testvalue"}});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "testvalue\n"}});
+        }
+
+        // Validate that starting containers works with the default entrypoint and content on stdin
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            // For now, validate that trying to use stdin without a tty returns the appropriate error.
+            auto container = launcher.Launch(*session);
+
+            // TODO: nerdctl hangs if stdin is closed without writing to it.
+            // Add test coverage for that usecase once the hang is fixed.
+            auto process = container.GetInitProcess();
+            auto input = process.GetStdHandle(0);
+
+            std::string shellInput = "foo";
+            std::vector<char> inputBuffer{shellInput.begin(), shellInput.end()};
+
+            std::unique_ptr<OverlappedIOHandle> writeStdin(new WriteHandle(std::move(input), inputBuffer));
+
+            std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+            extraHandles.emplace_back(std::move(writeStdin));
+
+            auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
+
+            VERIFY_ARE_EQUAL(result.Output[2], "");
+            VERIFY_ARE_EQUAL(result.Output[1], "foo");
+        }
+
+        // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, ""}});
+        }
+
+#endif
     }
 };

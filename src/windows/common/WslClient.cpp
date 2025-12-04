@@ -1525,64 +1525,61 @@ int RunDebugShell()
     THROW_HR(HCS_E_CONNECTION_CLOSED);
 }
 
+DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
+
 // Temporary debugging tool for WSLA
 int WslaShell(_In_ std::wstring_view commandLine)
 {
-#ifdef WSLA_TEST_DISTRO_PATH
+    WSLA_SESSION_SETTINGS sessionSettings{};
+    sessionSettings.DisplayName = L"WSLAShell";
+    sessionSettings.CpuCount = 4;
+    sessionSettings.MemoryMb = 4096;
+    sessionSettings.NetworkingMode = WSLANetworkingModeNAT;
+    sessionSettings.BootTimeoutMs = 30 * 1000;
+    sessionSettings.MaximumStorageSizeMb = 4096;
 
-    std::wstring vhd = TEXT(WSLA_TEST_DISTRO_PATH);
     std::string shell = "/bin/sh";
-    std::string fsType = "squashfs";
 
-#else
-
-    std::wstring vhd = wsl::windows::common::wslutil::GetMsiPackagePath().value() + L"/system.vhd";
-    std::string shell = "/bin/bash";
-    std::string fsType = "ext4";
-
-#endif
-
-    VIRTUAL_MACHINE_SETTINGS settings{};
-    settings.CpuCount = 4;
-    settings.DisplayName = L"WSLA";
-    settings.MemoryMb = 1024;
-    settings.BootTimeoutMs = 30000;
-    settings.NetworkingMode = WSLANetworkingModeNAT;
-    std::wstring containerRootVhd;
+    std::string containerImage;
     bool help = false;
+    std::wstring debugShell;
 
+    std::wstring storagePath;
+    std::wstring rootVhdOverride;
+    std::string rootVhdTypeOverride;
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
-    parser.AddArgument(vhd, L"--vhd");
+    parser.AddArgument(rootVhdOverride, L"--vhd");
     parser.AddArgument(Utf8String(shell), L"--shell");
-    parser.AddArgument(reinterpret_cast<bool&>(settings.EnableDnsTunneling), L"--dns-tunneling");
-    parser.AddArgument(Integer(settings.MemoryMb), L"--memory");
-    parser.AddArgument(Integer(settings.CpuCount), L"--cpu");
-    parser.AddArgument(Utf8String(fsType), L"--fstype");
-    parser.AddArgument(containerRootVhd, L"--container-vhd");
+    parser.AddArgument(
+        SetFlag<int, WslaFeatureFlagsDnsTunneling>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--dns-tunneling");
+    parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
+    parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
+    parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");
+    parser.AddArgument(storagePath, L"--storage");
+    parser.AddArgument(Integer(reinterpret_cast<int&>(sessionSettings.NetworkingMode)), L"--networking-mode");
+    parser.AddArgument(Utf8String(containerImage), L"--image");
+    parser.AddArgument(debugShell, L"--debug-shell");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--networking-mode <mode>] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());
         return 1;
     }
 
-    if (!containerRootVhd.empty())
+    switch (sessionSettings.NetworkingMode)
     {
-        settings.ContainerRootVhd = containerRootVhd.c_str();
-
-        if (!std::filesystem::exists(containerRootVhd))
-        {
-            auto token = wil::open_current_access_token();
-            auto tokenInfo = wil::get_token_information<TOKEN_USER>(token.get());
-            wsl::core::filesystem::CreateVhd(containerRootVhd.c_str(), 5368709120 /* 5 GB */, tokenInfo->User.Sid, FALSE, FALSE);
-            settings.FormatContainerRootVhd = TRUE;
-        }
+    case WSLANetworkingMode::WSLANetworkingModeNone:
+    case WSLANetworkingMode::WSLANetworkingModeNAT:
+    case WSLANetworkingMode::WSLANetworkingModeVirtioProxy:
+        break;
+    default:
+        THROW_HR(E_INVALIDARG);
     }
 
     wil::com_ptr<IWSLAUserSession> userSession;
@@ -1590,33 +1587,86 @@ int WslaShell(_In_ std::wstring_view commandLine)
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
-    WSLA_SESSION_SETTINGS sessionSettings{L"WSLA Test Session"};
     wil::com_ptr<IWSLASession> session;
-    settings.RootVhd = vhd.c_str();
-    settings.RootVhdType = fsType.c_str();
-    THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &settings, &session));
-    THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
 
-    wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
-
-    if (!containerRootVhd.empty())
+    if (!rootVhdOverride.empty())
     {
-        wsl::windows::common::WSLAProcessLauncher initProcessLauncher{shell, {shell, "/etc/lsw-init.sh"}};
-        auto initProcess = initProcessLauncher.Launch(*session);
-        THROW_HR_IF(E_FAIL, initProcess.WaitAndCaptureOutput().Code != 0);
+        if (rootVhdTypeOverride.empty())
+        {
+            wprintf(L"--fstype required when --vhd is passed\n");
+            return 1;
+        }
+
+        sessionSettings.RootVhdOverride = rootVhdOverride.c_str();
+        sessionSettings.RootVhdTypeOverride = rootVhdTypeOverride.c_str();
     }
+
+    if (!storagePath.empty())
+    {
+        storagePath = std::filesystem::weakly_canonical(storagePath).wstring();
+        sessionSettings.StoragePath = storagePath.c_str();
+    }
+
+    if (!debugShell.empty())
+    {
+        THROW_IF_FAILED(userSession->OpenSessionByName(debugShell.c_str(), &session));
+    }
+    else
+    {
+        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &session));
+        THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+    }
+
+    std::optional<wil::com_ptr<IWSLAContainer>> container;
+    std::optional<wsl::windows::common::ClientRunningWSLAProcess> process;
+    // Get the terminal size.
+    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
+
+    CONSOLE_SCREEN_BUFFER_INFOEX Info{};
+    Info.cbSize = sizeof(Info);
+    THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
 
     wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+    launcher.SetTtySize(Info.srWindow.Bottom - Info.srWindow.Top + 1, Info.srWindow.Right - Info.srWindow.Left + 1);
 
-    auto process = launcher.Launch(*session);
+    if (containerImage.empty())
+    {
+        wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+
+        process = launcher.Launch(*session);
+    }
+    else
+    {
+        std::vector<WSLA_PROCESS_FD> fds{
+            WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput},
+            WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput},
+            WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl},
+        };
+
+        WSLA_CONTAINER_OPTIONS containerOptions{};
+        containerOptions.Image = containerImage.c_str();
+        containerOptions.Name = "test-container";
+        containerOptions.InitProcessOptions.Fds = fds.data();
+        containerOptions.InitProcessOptions.FdsCount = static_cast<DWORD>(fds.size());
+
+        container.emplace();
+        THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
+
+        wil::com_ptr<IWSLAProcess> initProcess;
+        THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
+        process.emplace(std::move(initProcess), std::move(fds));
+    }
 
     // Configure console for interactive usage.
-
-    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
     {
         DWORD OutputMode{};
         THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OutputMode));
@@ -1641,7 +1691,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
         wsl::shared::SocketChannel controlChannel{
-            wil::unique_socket{(SOCKET)process.GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
+            wil::unique_socket{(SOCKET)process->GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
 
         std::thread inputThread([&]() {
             auto updateTerminal = [&controlChannel, &Stdout]() {
@@ -1657,7 +1707,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
                 controlChannel.SendMessage(message);
             };
 
-            wsl::windows::common::relay::StandardInputRelay(Stdin, process.GetStdHandle(0).get(), updateTerminal, exitEvent.get());
+            wsl::windows::common::relay::StandardInputRelay(Stdin, process->GetStdHandle(0).get(), updateTerminal, exitEvent.get());
         });
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1666,12 +1716,12 @@ int WslaShell(_In_ std::wstring_view commandLine)
         });
 
         // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(process.GetStdHandle(1).get(), Stdout);
+        wsl::windows::common::relay::InterruptableRelay(process->GetStdHandle(1).get(), Stdout);
     }
 
-    process.GetExitEvent().wait();
+    process->GetExitEvent().wait();
 
-    auto [code, signalled] = process.GetExitState();
+    auto [code, signalled] = process->GetExitState();
     wprintf(L"%hs exited with: %i%hs", shell.c_str(), code, signalled ? " (signalled)" : "");
 
     return code;
