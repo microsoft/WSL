@@ -17,6 +17,8 @@ Abstract:
 #include "WSLASession.h"
 #include <atomic>
 #include <vector>
+#include <mutex>
+#include <unordered_set>
 
 namespace wsl::windows::service::wsla {
 
@@ -42,7 +44,7 @@ private:
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_lock;
-    
+
     // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
     std::unordered_set<WSLASession*> m_sessions;
 };

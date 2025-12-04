@@ -31,9 +31,13 @@ public:
     {
         return m_id;
     }
-    void CopyDisplayName(
-        _Out_writes_z_(bufferLength) PWSTR buffer,
-        size_t bufferLength) const;
+
+    const std::wstring& GetDisplayName() const noexcept
+    {
+        return m_displayName;
+    }
+
+    void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
 
     // Image management.
     IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
