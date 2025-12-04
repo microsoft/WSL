@@ -1,0 +1,22 @@
+LIBRARY wslasdk
+
+EXPORTS
+    WslaCanRun
+    WslaGetVersion
+    WslaInstallWithDependencies
+    WslaCreateSession
+    WslaReleaseSession
+    WslaPullContainerImage
+    WslaImportContainerImage
+    WslaListContainerImages
+    WslaDeleteContainerImage
+    WslaCreateNewContainer
+    WslaStartContainer
+    WslaStopContainer
+    WslaDeleteContainer
+    WslaRestartContainer
+    WslaGetContainerState
+    WslaCreateContainerProcess
+    WslaGetContainerProcessResult
+    WslaSignalContainerProcess
+    WslaCreateVhd

@@ -125,7 +125,7 @@ STDAPI WslaListContainerImages(
     _Inout_ WSLA_CONTAINER_IMAGE_INFO* images,
     _Inout_ UINT32* count);
 
-STDAPI WslaDeleteImage(
+STDAPI WslaDeleteContainerImage(
     _In_ WslaSession session,
     _In_ PCSTR imageName);
 
@@ -191,16 +191,16 @@ STDAPI WslaCreateNewContainer(
     _Out_ WSLA_CONTAINER_PROCESS* initProcess);
 
 STDAPI WslaStartContainer(
-    _In_ WslaRuntimeContainer* container);
+    _In_ WslaRuntimeContainer container);
 
 STDAPI WslaStopContainer(
-    _In_ WslaRuntimeContainer* container);
+    _In_ WslaRuntimeContainer container);
 
 STDAPI WslaDeleteContainer(
-    _In_ WslaRuntimeContainer* container);
+    _In_ WslaRuntimeContainer container);
 
 STDAPI WslaRestartContainer(
-    _In_ WslaRuntimeContainer* container);
+    _In_ WslaRuntimeContainer container);
 
 typedef enum WSLA_CONTAINER_STATE
 {
@@ -212,13 +212,13 @@ typedef enum WSLA_CONTAINER_STATE
 } WSLA_CONTAINER_STATE;
 
 STDAPI WslaGetContainerState(
-    _In_ WslaRuntimeContainer* container,
+    _In_ WslaRuntimeContainer container,
     _Out_ WSLA_CONTAINER_STATE* state);
 
 // Container Process
 
 STDAPI WslaCreateContainerProcess(
-    _In_ WslaRuntimeContainer* container,
+    _In_ WslaRuntimeContainer container,
     _In_ const WSLA_CONTAINER_PROCESS_OPTIONS* options,
     _Out_ WSLA_CONTAINER_PROCESS* process);
 
@@ -236,13 +236,13 @@ typedef struct WSLA_CONTAINER_PROCESS_RESULT
     INT32 exitCode;
 } WSLA_CONTAINER_PROCESS_RESULT;
 
-HRESULT WslaGetContainerProcessResult(
+STDAPI WslaGetContainerProcessResult(
     _In_ const WSLA_CONTAINER_PROCESS* process,
     _Out_ WSLA_CONTAINER_PROCESS_RESULT* result);
 
-HRESULT WslaSignalContainerProcess(
-    _In_ const WSLA_CONTAINER_PROCESS* process,
-    _In_ INT32 result);
+STDAPI WslaSignalContainerProcess(
+    _In_ WSLA_CONTAINER_PROCESS* process,
+    _In_ INT32 signal);
 
 // Storage
 
@@ -259,7 +259,7 @@ typedef struct WSLA_CREATE_VHD_OPTIONS
     UINT64 maxSize; // Maximum size in bytes.
 } WSLA_CREATE_VHD_OPTIONS;
 
-STDAPI WSLACreateVhd(
+STDAPI WslaCreateVhd(
     _In_ const WSLA_CREATE_VHD_OPTIONS* options);
 
 EXTERN_C_END
