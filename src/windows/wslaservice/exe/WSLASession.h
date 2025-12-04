@@ -66,8 +66,6 @@ private:
     std::filesystem::path m_storageVhdPath;
     std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
     std::recursive_mutex m_lock;
-
-    // TODO: Add container tracking here. Could reuse m_lock for that.
 };
 
 } // namespace wsl::windows::service::wsla
