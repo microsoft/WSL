@@ -228,16 +228,23 @@ try
 
     THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
-    m_containers.emplace_back(std::move(container));
+    m_containers.emplace(containerOptions->Name, std::move(container));
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::OpenContainer(LPCWSTR Name, IWSLAContainer** Container)
+HRESULT WSLASession::OpenContainer(LPCSTR Name, IWSLAContainer** Container)
+try
 {
-    return E_NOTIMPL;
+    std::lock_guard lock{m_lock};
+    auto it = m_containers.find(Name);
+    RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_containers.end(), "Container not found: '%hs'", Name);
+
+    it->second.CopyTo(__uuidof(IWSLAContainer), (void**)Container);
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Containers, ULONG* Count)
 try
@@ -250,11 +257,11 @@ try
     auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
 
     size_t index = 0;
-    for (const auto& e : m_containers)
+    for (const auto& [name, container] : m_containers)
     {
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
-        THROW_IF_FAILED(e->GetState(&output[index].State));
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, container->Image().c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
+        THROW_IF_FAILED(container->GetState(&output[index].State));
         index++;
     }
 

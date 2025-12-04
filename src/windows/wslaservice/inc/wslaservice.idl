@@ -284,7 +284,7 @@ interface IWSLASession : IUnknown
 
     // Container management.
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
-    HRESULT OpenContainer([in] LPCWSTR Name, [out] IWSLAContainer** Container);
+    HRESULT OpenContainer([in] LPCSTR Name, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.

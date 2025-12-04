@@ -1154,30 +1154,50 @@ class WSLATests
             }
         };
 
-        // Create a stuck container.
-        WSLAContainerLauncher launcher(
-            "debian:latest", "test-container-1", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+        {
+            // Validate that the container list is initially empty.
+            expectContainerList({});
 
-        auto container = launcher.Launch(*session);
+            // Create a stuck container.
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-container-1", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-        // Verify that the container is in running state.
-        VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-        expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
+            auto container = launcher.Launch(*session);
 
-        // Kill the container init process and expect it to be in exited state.
-        auto initProcess = container.GetInitProcess();
-        initProcess.Get().Signal(9);
+            // Verify that the container is in running state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
 
-        // Wait for the process to actually exit.
-        wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                initProcess.GetExitState(); // Throw if the process hasn't exited yet.
-            },
-            std::chrono::milliseconds{100},
-            std::chrono::seconds{30});
+            // Kill the container init process and expect it to be in exited state.
+            auto initProcess = container.GetInitProcess();
+            initProcess.Get().Signal(9);
 
-        // Expect the container to be in exited state.
-        VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
-        expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateExited}});
+            // Wait for the process to actually exit.
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    initProcess.GetExitState(); // Throw if the process hasn't exited yet.
+                },
+                std::chrono::milliseconds{100},
+                std::chrono::seconds{30});
+
+            // Expect the container to be in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+            expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateExited}});
+
+            // Open a new reference to the same container.
+            wil::com_ptr<IWSLAContainer> sameContainer;
+            VERIFY_SUCCEEDED(session->OpenContainer("test-container-1", &sameContainer));
+
+            // Verify that the state matches.
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_SUCCEEDED(sameContainer->GetState(&state));
+            VERIFY_ARE_EQUAL(state, WslaContainerStateExited);
+        }
+
+        // Verify that trying to open a non existing container fails.
+        {
+            wil::com_ptr<IWSLAContainer> sameContainer;
+            VERIFY_ARE_EQUAL(session->OpenContainer("does-not-exist", &sameContainer), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
     }
 };

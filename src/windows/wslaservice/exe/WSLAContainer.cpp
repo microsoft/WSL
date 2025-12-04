@@ -31,11 +31,6 @@ WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess
 {
 }
 
-const std::string& WSLAContainer::Name() const noexcept
-{
-    return m_name;
-}
-
 const std::string& WSLAContainer::Image() const noexcept
 {
     return m_image;
