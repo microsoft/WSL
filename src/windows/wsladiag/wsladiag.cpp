@@ -1,9 +1,15 @@
-﻿/*++
+/*++
+
 Copyright (c) Microsoft. All rights reserved.
+
 Module Name:
-    main.cpp
+
+    wsladiag.cpp
+
 Abstract:
-    Entry point for the wsladiag tool, performs WSL runtime initialization and parses --list/--help.
+
+    TODO
+
 --*/
 
 #include "precomp.h"
@@ -89,10 +95,10 @@ int wsladiag_main(std::wstring_view commandLine)
             wslutil::PrintMessage(L"ID\tCreator PID\tDisplay Name\n", stdout);
             wslutil::PrintMessage(L"--\t-----------\t------------\n", stdout);
 
-             for (const auto& session : sessions)
+            for (const auto& session : sessions)
             {
                 const auto* displayName = session.DisplayName;
-               
+
                 wslutil::PrintMessage(std::format(L"{}\t{}\t\t{}\n", session.SessionId, session.CreatorPid, displayName), stdout);
             }
         }

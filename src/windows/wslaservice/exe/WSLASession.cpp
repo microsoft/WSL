@@ -194,10 +194,10 @@ void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, siz
     wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
-const std::wstring& WSLASession::DisplayName() const
+/** const std::wstring& WSLASession::DisplayName() const
 {
-    return m_displayName;
-}
+   return m_displayName;
+}*/
 
 HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
 {
