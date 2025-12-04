@@ -1129,4 +1129,56 @@ class WSLATests
 
 #endif
     }
+
+    TEST_METHOD(ContainerState)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+
+        auto session = CreateSession(settings);
+
+        auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
+
+            for (size_t i = 0; i < expectedContainers.size(); i++)
+            {
+                const auto& [expectedName, expectedImage, expectedState] = expectedContainers[i];
+                VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
+                VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
+                VERIFY_ARE_EQUAL(expectedState, containers[i].State);
+            }
+        };
+
+        // Create a stuck container.
+        WSLAContainerLauncher launcher(
+            "debian:latest", "test-container-1", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+        auto container = launcher.Launch(*session);
+
+        // Verify that the container is in running state.
+        VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+        expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
+
+        // Kill the container init process and expect it to be in exited state.
+        auto initProcess = container.GetInitProcess();
+        initProcess.Get().Signal(9);
+
+        // Wait for the process to actually exit.
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                initProcess.GetExitState(); // Throw if the process hasn't exited yet.
+            },
+            std::chrono::milliseconds{100},
+            std::chrono::seconds{30});
+
+        // Expect the container to be in exited state.
+        VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+        expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateExited}});
+    }
 };

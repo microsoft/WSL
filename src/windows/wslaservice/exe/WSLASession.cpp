@@ -226,9 +226,9 @@ try
     // TODO: Log entrance into the function.
     auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
 
-    m_containers.Add(container.Get());
-
     THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+
+    m_containers.emplace_back(std::move(container));
 
     return S_OK;
 }
@@ -239,19 +239,30 @@ HRESULT WSLASession::OpenContainer(LPCWSTR Name, IWSLAContainer** Container)
     return E_NOTIMPL;
 }
 
-HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Images, ULONG* Count)
+HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Containers, ULONG* Count)
+try
 {
-    auto lockedElements = m_containers.Get();
+    *Count = 0;
+    *Containers = nullptr;
 
-    auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(lockedElements.elements.size());
+    std::lock_guard lock{m_lock};
+
+    auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
+
     size_t index = 0;
-    for (const auto &e: lockedElements.elements)
+    for (const auto& e : m_containers)
     {
-        e->GetImage(output[index].Image);
-        e->GetName(output[index].Name);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
+        THROW_IF_FAILED(e->GetState(&output[index].State));
         index++;
     }
+
+    *Count = static_cast<ULONG>(m_containers.size());
+    *Containers = output.release();
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
 {

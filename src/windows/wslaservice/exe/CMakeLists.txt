@@ -13,7 +13,6 @@ set(SOURCES
 
 set(HEADERS
     ServiceProcessLauncher.h
-    WeakRefContainer.h
     WSLAContainer.h
     WSLAProcess.h
     WSLASession.h

@@ -162,7 +162,6 @@ enum WSLA_CONTAINER_STATE
     WslaContainerStateCreated = 1,
     WslaContainerStateRunning = 2,
     WslaContainerStateExited = 3,
-    WslaContainerStateFailed = 4,
     // TODO: More states might be added to reflect all nerdctl's states.
 };
 

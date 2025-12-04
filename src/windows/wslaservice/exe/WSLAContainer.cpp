@@ -16,36 +16,29 @@ Abstract:
 #include "WSLAContainer.h"
 #include "WSLAProcess.h"
 
-using wsl::windows::service::wsla::WeakReference;
 using wsl::windows::service::wsla::WSLAContainer;
 
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{
-    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-    "--net=host", // TODO: default for now, change later
-    "--ulimit",
-    "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+                                                      "--net=host", // TODO: default for now, change later
+                                                      "--ulimit",
+                                                      "nofile=65536:65536"};
 
 WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
-    WeakReference<WSLAContainer>(), m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
+    m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
 {
 }
 
-WSLAContainer::~WSLAContainer()
+const std::string& WSLAContainer::Name() const noexcept
 {
-    OnDestroy();
+    return m_name;
 }
 
-void WSLAContainer::GetName(char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1]) const noexcept
+const std::string& WSLAContainer::Image() const noexcept
 {
-    WI_VERIFY(strcpy_s(Name, sizeof(Name), m_name.c_str()) == 0);
-}
-
-void WSLAContainer::GetImage(char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1]) const noexcept
-{
-    WI_VERIFY(strcpy_s(Image, WSLA_MAX_IMAGE_NAME_LENGTH + 1, m_image.c_str()) == 0);
+    return m_image;
 }
 
 HRESULT WSLAContainer::Start()
@@ -65,7 +58,17 @@ HRESULT WSLAContainer::Delete()
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* State)
 {
-    return E_NOTIMPL;
+    if (m_containerProcess.State() == WSLAProcessStateRunning)
+    {
+        *State = WslaContainerStateRunning;
+    }
+    else
+    {
+        // TODO: handle failure to start.
+        *State = WslaContainerStateExited;
+    }
+
+    return S_OK;
 }
 
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
@@ -110,7 +113,6 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
     if (hasStdin)
     {
         // For now return a proper error if the caller tries to pass stdin without a TTY to prevent hangs.
-        THROW_WIN32_IF(ERROR_NOT_SUPPORTED, hasTty == false);
         inputOptions.push_back("-i");
     }
 
@@ -127,7 +129,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
         launcher.AddFd(containerOptions.InitProcessOptions.Fds[i]);
     }
 
-    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM));
+    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM), containerOptions.Name, containerOptions.Image);
 }
 
 std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)

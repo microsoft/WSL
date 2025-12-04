@@ -24,10 +24,9 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>
 {
 public:
-    WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image);
-    ~WSLAContainer();
-
     NON_COPYABLE(WSLAContainer);
+
+    WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image);
 
     IFACEMETHOD(Start)() override;
     IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
@@ -36,8 +35,8 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
 
-    void GetName(char Name[WSLA_MAX_IMAGE_NAME_LENGTH + 1]) const noexcept;
-    void GetImage(char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1]) const noexcept;
+    const std::string& Name() const noexcept;
+    const std::string& Image() const noexcept;
 
     static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
 

@@ -50,6 +50,7 @@ public:
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
     std::pair<int, bool> GetExitState();
+    WSLA_PROCESS_STATE State();
 
 protected:
     virtual void GetState(WSLA_PROCESS_STATE* State, int* Code) = 0;
