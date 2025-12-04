@@ -1230,32 +1230,31 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
 
-        // Validate that starting containers works with the default entrypoint.
+        // Validate that starting containers works with the default entrypoint and content on stdin
         {
             WSLAContainerLauncher launcher(
                 "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             // For now, validate that trying to use stdin without a tty returns the appropriate error.
-            auto result = wil::ResultFromException([&]() { auto container = launcher.Launch(*session); });
+            auto container = launcher.Launch(*session);
 
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
-
-            // This is hanging. nerdctl run seems to hang with -i is passed outside of a TTY context.
-            // TODO: Restore the test case once this is fixed.
-
-            /*
+            // TODO: nerdctl hangs if stdin is closed without writing to it.
+            // Add test coverage for that usecase once the hang is fixed.
             auto process = container.GetInitProcess();
+            auto input = process.GetStdHandle(0);
 
-            std::string shellInput = "echo $SHELL\n exit";
-            std::unique_ptr<OverlappedIOHandle> writeStdin(
-                new WriteHandle(process.GetStdHandle(0), {shellInput.begin(), shellInput.end()}));
+            std::string shellInput = "foo";
+            std::vector<char> inputBuffer{shellInput.begin(), shellInput.end()};
+
+            std::unique_ptr<OverlappedIOHandle> writeStdin(new WriteHandle(std::move(input), inputBuffer));
+
             std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
             extraHandles.emplace_back(std::move(writeStdin));
 
             auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
 
-            VERIFY_ARE_EQUAL(result.Output[1], "bash\n");
-            */
+            VERIFY_ARE_EQUAL(result.Output[2], "");
+            VERIFY_ARE_EQUAL(result.Output[1], "foo");
         }
 
         // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
