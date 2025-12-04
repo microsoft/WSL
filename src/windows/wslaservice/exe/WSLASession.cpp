@@ -218,15 +218,22 @@ try
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
     std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    THROW_HR_IF(E_INVALIDARG, strlen(containerOptions->Name) > WSLA_MAX_CONTAINER_NAME_LENGTH);
-    THROW_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
+    ClearDeletedContainers();
+
+    // Validate that no container with the same name already exists.
+    auto it = m_containers.find(containerOptions->Name);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_containers.end());
+
+    // Validate that name & images are within legnth limits.
+    RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Name) > WSLA_MAX_CONTAINER_NAME_LENGTH);
+    RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     // TODO: Log entrance into the function.
     auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
 
-    THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+    RETURN_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
     m_containers.emplace(containerOptions->Name, std::move(container));
 
@@ -253,6 +260,7 @@ try
     *Containers = nullptr;
 
     std::lock_guard lock{m_lock};
+    ClearDeletedContainers();
 
     auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
 
@@ -346,3 +354,14 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+void WSLASession::ClearDeletedContainers()
+{
+    std::lock_guard lock{m_lock};
+    auto deleted = std::erase_if(m_containers, [](const auto e) { return e.second->State() == WslaContainerStateDeleted; });
+
+    if (deleted > 0)
+    {
+        WSL_LOG("ClearedDeletedContainers", TraceLoggingValue(deleted, "Count"));
+    }
+}

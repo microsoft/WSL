@@ -36,14 +36,19 @@ public:
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
 
     const std::string& Image() const noexcept;
+    WSLA_CONTAINER_STATE State() noexcept;
 
     static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
 
 private:
+    std::string GetNerdctlStatus();
+
     ServiceRunningProcess m_containerProcess;
     std::string m_name;
     std::string m_image;
+    WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
+    std::mutex m_lock;
 
     static std::vector<std::string> PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions);
 };

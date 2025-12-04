@@ -57,6 +57,7 @@ private:
 
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
     void Ext4Format(const std::string& Device);
+    void ClearDeletedContainers();
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl* m_userSession = nullptr;
@@ -64,7 +65,7 @@ private:
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
     std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
-    std::mutex m_lock;
+    std::recursive_mutex m_lock;
 
     // TODO: Add container tracking here. Could reuse m_lock for that.
 };
