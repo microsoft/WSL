@@ -17,9 +17,11 @@ Abstract:
 #include "wslutil.h"
 #include "wslaservice.h"
 #include "WslSecurity.h"
+#include "WSLAProcessLauncher.h"
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
+using wsl::windows::common::WSLAProcessLauncher;
 
 int wsladiag_main(std::wstring_view commandLine)
 {
@@ -43,9 +45,11 @@ int wsladiag_main(std::wstring_view commandLine)
 
     bool help = false;
     bool list = false;
+    std::wstring debugShell;
 
     parser.AddArgument(list, L"--list");
     parser.AddArgument(help, L"--help", L'h'); //  short option is a single wide char
+    parser.AddArgument(debugShell, L"--debug-shell");
     parser.Parse();
 
     auto printUsage = []() {
@@ -53,6 +57,7 @@ int wsladiag_main(std::wstring_view commandLine)
             L"wsladiag - WSLA diagnostics tool\n"
             L"Usage:\n"
             L"  wsladiag --list    List WSLA sessions\n"
+            L"  wsladiag --debug-shell <SessionName>  Open a debug shell in an existing WSLA session\n"
             L"  wsladiag --help    Show this help",
             stderr);
     };
@@ -62,6 +67,59 @@ int wsladiag_main(std::wstring_view commandLine)
     {
         printUsage();
         return 0;
+    }
+
+    if (!debugShell.empty())
+    {
+        wslutil::PrintMessage(std::format(L"[diag] debugShell='{}'\n", debugShell), stdout);
+
+        try
+        {
+            wil::com_ptr<IWSLAUserSession> userSession;
+            THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+
+            wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+            wil::com_ptr<IWSLASession> session;
+
+            // Open the existing session by name/ID from the --debug-shell argument.
+            THROW_IF_FAILED(userSession->OpenSessionByName(debugShell.c_str(), &session));
+
+            wslutil::PrintMessage(L"[diag] OpenSessionByName succeeded\n", stdout);
+
+            std::string shell = "/bin/bash";
+          
+            wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}};
+            launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+            launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+            launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+
+            wslutil::PrintMessage(L"[diag] launching shell process...\n", stdout);
+
+            auto process = launcher.Launch(*session);
+
+            wslutil::PrintMessage(std::format(L"Successfully opened debug shell session handle for '{}'.\n", debugShell), stdout);
+
+            return 0;
+        }
+        catch (...)
+        {
+            const auto hr = wil::ResultFromCaughtException();
+            const std::wstring hrMessage = wslutil::ErrorCodeToString(hr);
+
+            if (!hrMessage.empty())
+            {
+                wslutil::PrintMessage(
+                    std::format(L"Error opening debug shell for '{}': 0x{:08x} - {}\n", debugShell, static_cast<unsigned int>(hr), hrMessage),
+                    stderr);
+            }
+            else
+            {
+                wslutil::PrintMessage(
+                    std::format(L"Error opening debug shell for '{}': 0x{:08x}\n", debugShell, static_cast<unsigned int>(hr)), stderr);
+            }
+            return 1;
+        }
     }
 
     if (!list)
