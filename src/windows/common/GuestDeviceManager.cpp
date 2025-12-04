@@ -70,7 +70,7 @@ void GuestDeviceManager::AddSharedMemoryDevice(_In_ const GUID& ImplementationCl
     static constexpr auto VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT = 16;
     UINT32 flags = (SizeMb << VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT);
     WI_SetFlag(flags, VIRTIO_FS_FLAGS_TYPE_SECTIONS);
-    (void)AddHdvShareWithOptions(VIRTIO_VIRTIOFS_DEVICE_ID, ImplementationClsid, Tag, {}, objectLifetime.Path.c_str(), flags, UserToken);
+    (void)AddHdvShareWithOptions(VIRTIO_FS_DEVICE_ID, ImplementationClsid, Tag, {}, objectLifetime.Path.c_str(), flags, UserToken);
     m_objectDirectories.emplace_back(std::move(objectLifetime));
 }
 
