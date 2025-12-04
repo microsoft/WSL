@@ -21,11 +21,10 @@ using wsl::windows::service::wsla::WSLAContainer;
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{
-    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-    "--net=host", // TODO: default for now, change later
-    "--ulimit",
-    "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+                                                      "--net=host", // TODO: default for now, change later
+                                                      "--ulimit",
+                                                      "nofile=65536:65536"};
 
 WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
     m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
