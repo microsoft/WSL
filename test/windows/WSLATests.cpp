@@ -1247,7 +1247,7 @@ class WSLATests
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
-            // Validate that a container with the same name can be started
+            // Validate that a container with the same name cannot be started
             VERIFY_ARE_EQUAL(
                 WSLAContainerLauncher("debian:latest", "test-unique-name", "echo", {"OK"}).LaunchNoThrow(*session).first,
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));

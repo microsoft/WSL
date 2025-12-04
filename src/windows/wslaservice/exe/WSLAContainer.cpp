@@ -21,10 +21,11 @@ using wsl::windows::service::wsla::WSLAContainer;
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "--net=host", // TODO: default for now, change later
-                                                      "--ulimit",
-                                                      "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{
+    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+    "--net=host", // TODO: default for now, change later
+    "--ulimit",
+    "nofile=65536:65536"};
 
 WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
     m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
@@ -33,11 +34,17 @@ WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess
 
     // TODO: Find a better way to wait for the container to be fully started.
     auto status = GetNerdctlStatus();
-    while (status != "running" && m_containerProcess.State() == WslaContainerStateRunning)
+    while (status != "running")
     {
+        if (status == "exited" || m_containerProcess.State() != WslaProcessStateRunning)
+        {
+            m_state = WslaContainerStateExited;
+            return;
+        }
+
         // TODO: empty string is returned while the container image is still downloading.
         // Remove this logic once the image pull is separated from container creation.
-        if (status != "created" && status != "")
+        if (status.has_value() && status != "created")
         {
             THROW_HR_MSG(
                 E_UNEXPECTED, "Unexpected nerdctl status '%hs', for container '%hs'", status.value_or("<empty>").c_str(), m_name.c_str());
@@ -235,12 +242,14 @@ std::optional<std::string> WSLAContainer::GetNerdctlStatus()
         // TODO: Find a way to validate that the container is indeed not found, and not some other error.
         return {};
     }
-    auto& status = result.Output[0];
+
+    auto& status = result.Output[1];
 
     while (!status.empty() && status.back() == '\n')
     {
         status.pop_back();
     }
 
-    return status;
+    // N.B. nerdctl inspect can return with exit code 0 and no output. Return an empty optional if that happens.
+    return status.empty() ? std::optional<std::string>{} : status;
 }

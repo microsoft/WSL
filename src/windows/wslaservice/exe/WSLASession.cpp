@@ -226,7 +226,7 @@ try
     auto it = m_containers.find(containerOptions->Name);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_containers.end());
 
-    // Validate that name & images are within legnth limits.
+    // Validate that name & images are within length limits.
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Name) > WSLA_MAX_CONTAINER_NAME_LENGTH);
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
@@ -248,7 +248,7 @@ try
     auto it = m_containers.find(Name);
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_containers.end(), "Container not found: '%hs'", Name);
 
-    it->second.CopyTo(__uuidof(IWSLAContainer), (void**)Container);
+    THROW_IF_FAILED(it->second.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
     return S_OK;
 }
 CATCH_RETURN();
