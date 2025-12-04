@@ -47,6 +47,7 @@ public:
     DEFAULT_MOVABLE(RunningWSLAProcess);
 
     ProcessResult WaitAndCaptureOutput(DWORD TimeoutMs = INFINITE, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles = {});
+    std::pair<int, bool> Wait(DWORD TimeoutMs = INFINITE);
     virtual wil::unique_handle GetStdHandle(int Index) = 0;
     virtual wil::unique_event GetExitEvent() = 0;
     std::pair<int, bool> GetExitState();
