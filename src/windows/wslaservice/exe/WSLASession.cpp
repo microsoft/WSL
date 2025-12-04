@@ -20,11 +20,7 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLASession;
 
-WSLASession::WSLASession(
-    ULONG id,
-    const WSLA_SESSION_SETTINGS& Settings,
-    WSLAUserSessionImpl& userSessionImpl,
-    const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
+WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl, const VIRTUAL_MACHINE_SETTINGS& VmSettings) :
 
     m_id(id),
     m_sessionSettings(Settings),
@@ -60,18 +56,16 @@ WSLASession::~WSLASession()
     }
 }
 
-void WSLASession::CopyDisplayName(
-    _Out_writes_z_(bufferLength) PWSTR buffer,
-    size_t bufferLength) const
+void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
 {
     THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);
     wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
-const std::wstring& WSLASession::DisplayName() const
+/** const std::wstring& WSLASession::DisplayName() const
 {
-    return m_displayName;
-}
+   return m_displayName;
+}*/
 
 HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
 {
