@@ -105,6 +105,11 @@ bool TryLoadWinhttpProxyMethods() noexcept
         } \
     }
 
+#define VIRTIOPROXY_TEST_ONLY() \
+    { \
+        WSL2_TEST_ONLY(); \
+    }
+
 static constexpr auto c_wslVmCreatorId = L"\'{40e0ac32-46a5-438a-A0B2-2B479E8F2E90}\'";
 static constexpr auto c_wsaVmCreatorId = L"\'{9E288F02-CE00-4D9E-BE2B-14CE463B0298}\'";
 static constexpr auto c_anyVmCreatorId = L"\'{00000000-0000-0000-0000-000000000000}\'";
@@ -160,9 +165,13 @@ public:
 
 namespace NetworkTests {
 
+class VirtioProxyTests;
+
 class NetworkTests
 {
     WSL_TEST_CLASS(NetworkTests)
+
+    friend class VirtioProxyTests;
 
     static std::wstring SockaddrToString(const SOCKADDR_INET* sockAddr)
     {
@@ -680,7 +689,7 @@ class NetworkTests
         LogInfo("'ip route get 2001::5' - '%ls'", out.c_str());
 
         auto [out5, _5] = LxsstuLaunchWslAndCaptureOutput(L"ip addr show eth0");
-        LogInfo("[TemporaryAddress] ip addr show output: '%ls'", out5.c_str());
+        LogInfo("[TemporaryAddress] ip addr show output:\r\n'%ls'", out5.c_str());
 
         std::wsmatch match;
         std::wregex pattern(L"2001::5 from :: via fc00::1 dev eth0 proto kernel src ([a-f,A-F,0-9,:]+)");
@@ -1128,7 +1137,7 @@ class NetworkTests
     static void VerifyHttpProxyEnvVariables(const std::wstring& proxyString, const std::wstring& bypassString, const std::wstring& pacUrl)
     {
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"printenv");
-        LogInfo("VerifyHttpProxyEnvVariables %ls", out.c_str());
+        LogInfo("VerifyHttpProxyEnvVariables:\r\n%ls", FixLineEndings(out).c_str());
 
         VerifyHttpProxyStringMirrored(proxyString);
         VerifyHttpProxyBypassesMirrored(bypassString);
@@ -3316,6 +3325,25 @@ class NetworkTests
         RunGns(request, LxGnsMessageDeviceSettingRequest);
     }
 
+    // Convert Unix line endings (\n) to Windows line endings (\r\n) for proper console display
+    static std::wstring FixLineEndings(const std::wstring& input)
+    {
+        std::wstring output;
+        for (size_t i = 0; i < input.length(); ++i)
+        {
+            if (input[i] == L'\n')
+            {
+                output += L"\r\n";
+            }
+            else if (input[i] != L'\r')
+            {
+                output += input[i];
+            }
+        }
+
+        return output;
+    }
+
     static RoutingTableState GetRoutingTableState(std::wstring& out, std::wregex& defaultRoutePattern, std::wregex& routePattern)
     {
         RoutingTableState state;
@@ -3344,7 +3372,7 @@ class NetworkTests
     static RoutingTableState GetIpv4RoutingTableState()
     {
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"ip route show");
-        LogInfo("Ip route output: '%ls'", out.c_str());
+        LogInfo("Ip route output:\r\n%ls", FixLineEndings(out).c_str());
 
         std::wregex defaultRoutePattern(L"default via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
         std::wregex routePattern(L"([0-9,.,/]+) via ([0-9,.]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
@@ -3355,7 +3383,7 @@ class NetworkTests
     static RoutingTableState GetIpv6RoutingTableState()
     {
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"ip -6 route show");
-        LogInfo("Ip -6 route output: '%ls'", out.c_str());
+        LogInfo("Ip -6 route output:\r\n%ls", FixLineEndings(out).c_str());
 
         RoutingTableState state;
         std::wregex defaultRoutePattern(L"default via ([a-f,A-F,0-9,:]+) dev ([a-zA-Z0-9]*) *(metric ([0-9]+))?");
@@ -3374,7 +3402,7 @@ class NetworkTests
         // inet6 2001::1:2:3:4/64 scope global
         // valid_lft forever preferred_lft 0sec
         auto [out, warnings] = LxsstuLaunchWslAndCaptureOutput(L"ip addr show " + name);
-        LogInfo("ip addr show output: '%ls'", out.c_str());
+        LogInfo("ip addr show output:\r\n%ls", FixLineEndings(out).c_str());
 
         if (expectedWarnings.empty())
         {
@@ -3689,7 +3717,23 @@ class NetworkTests
         SetEvent(event.get());
         watchdogThread.wait();
 
-        LogInfo("output=\n %S", output.c_str());
+        // Convert narrow string output to wide string for logging, and fix line endings
+        std::wstring wideOutput;
+        wideOutput.reserve(output.length());
+        for (char c : output)
+        {
+            if (c == '\n')
+            {
+                wideOutput += L'\r';
+                wideOutput += L'\n';
+            }
+            else if (c != '\r')
+            {
+                wideOutput += static_cast<wchar_t>(static_cast<unsigned char>(c));
+            }
+        }
+        LogInfo("output=\r\n%ls", wideOutput.c_str());
+
         return (output.find(substr) != std::string::npos);
     }
 
@@ -4296,6 +4340,122 @@ class BridgedTests
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv6/conf/all/disable_ipv6");
         VERIFY_ARE_EQUAL(L"0\n", out);
+    }
+};
+
+class VirtioProxyTests
+{
+    WSL_TEST_CLASS(VirtioProxyTests)
+
+    std::optional<WslConfigChange> m_config;
+
+    TEST_CLASS_SETUP(TestClassSetup)
+    {
+        VERIFY_ARE_EQUAL(LxsstuInitialize(false), TRUE);
+
+        if (LxsstuVmMode())
+        {
+            m_config.emplace(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+        }
+
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        m_config.reset();
+
+        VERIFY_NO_THROW(LxsstuUninitialize(false));
+
+        return true;
+    }
+
+    TEST_METHOD(SmokeTest)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        // Verify that we have a working connection
+        NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
+    }
+
+    TEST_METHOD(InternetConnectivityV4)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
+        {
+            LogSkipped("Host does not have IPv4 internet connectivity. Skipping...");
+            return;
+        }
+
+        NetworkTests::GuestClient(L"tcp4-connect:bing.com:80");
+    }
+
+    TEST_METHOD(InternetConnectivityV6)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        NetworkTests::GuestClient(L"tcp6-connect:bing.com:80");
+    }
+
+    TEST_METHOD(Configuration)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+        VERIFY_IS_FALSE(state.V4Addresses.empty());
+        VERIFY_IS_TRUE(state.Gateway.has_value());
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
+        const std::wregex pattern(L"(.|\\n)*nameserver [0-9. ]+(.|\\n)*");
+
+        VERIFY_IS_TRUE(std::regex_match(out, pattern));
+    }
+
+    TEST_METHOD(GuestPortIsReleased)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        // Make sure the VM doesn't time out
+        WslKeepAlive keepAlive;
+
+        {
+            auto guestProcess = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);
+            NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, false);
+        }
+
+        const wil::unique_socket listenSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+        VERIFY_IS_TRUE(!!listenSocket);
+
+        SOCKADDR_IN Address{};
+        Address.sin_family = AF_INET;
+        Address.sin_port = htons(1234);
+
+        const auto timeout = std::chrono::steady_clock::now() + std::chrono::minutes(2);
+
+        bool bound = false;
+        while (!bound && std::chrono::steady_clock::now() < timeout)
+        {
+            bound = bind(listenSocket.get(), reinterpret_cast<SOCKADDR*>(&Address), sizeof(Address)) != SOCKET_ERROR;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+
+        VERIFY_IS_TRUE(bound);
+    }
+
+    TEST_METHOD(HttpProxySimple)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+        WINHTTP_PROXY_TEST_ONLY();
+
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .autoProxy = true}));
+        NetworkTests::VerifyHttpProxySimple();
     }
 };
 } // namespace NetworkTests
