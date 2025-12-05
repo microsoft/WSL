@@ -33,7 +33,7 @@ private:
     std::vector<WSLA_PROCESS_FD> m_fds;
 };
 
-class WSLAContainerLauncher : public WSLAProcessLauncher
+class WSLAContainerLauncher : private WSLAProcessLauncher
 {
 public:
     NON_COPYABLE(WSLAContainerLauncher);
@@ -51,6 +51,7 @@ public:
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
 
     RunningWSLAContainer Launch(IWSLASession& Session);
+    std::pair<HRESULT, std::optional<RunningWSLAContainer>> LaunchNoThrow(IWSLASession& Session);
 
 private:
     std::string m_image;

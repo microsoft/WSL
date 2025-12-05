@@ -95,6 +95,15 @@ std::pair<int, bool> RunningWSLAProcess::GetExitState()
     return {code, state == WslaProcessStateSignalled};
 }
 
+WSLA_PROCESS_STATE RunningWSLAProcess::State()
+{
+    WSLA_PROCESS_STATE state{};
+    int code{};
+    GetState(&state, &code);
+
+    return state;
+}
+
 std::string WSLAProcessLauncher::FormatResult(const RunningWSLAProcess::ProcessResult& result)
 {
     auto stdOut = result.Output.find(1);

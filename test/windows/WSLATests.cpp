@@ -1042,13 +1042,7 @@ class WSLATests
     TEST_METHOD(CreateContainer)
     {
         WSL2_TEST_ONLY();
-
-#ifdef _ARM64_
-
-        LogSkipped("Skipping CreateContainer test case for ARM64");
-        return;
-
-#else
+        SKIP_TEST_ARM64();
 
         auto storagePath = std::filesystem::current_path() / "test-storage";
 
@@ -1061,9 +1055,6 @@ class WSLATests
                 LogError("Failed to cleanup storage path %ws: %s", storagePath.c_str(), error.message().c_str());
             }
         });
-
-        auto installedVhdPath =
-            std::filesystem::path(wsl::windows::common::wslutil::GetMsiPackagePath().value()) / L"wslarootfs.vhd";
 
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
@@ -1126,6 +1117,179 @@ class WSLATests
             ValidateProcessOutput(process, {{1, ""}});
         }
 
-#endif
+        // Validate error paths
+        {
+            WSLAContainerLauncher launcher("debian:latest", std::string(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), "/bin/cat");
+            auto [hresult, container] = launcher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
+        }
+
+        {
+            WSLAContainerLauncher launcher(std::string(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a'), "dummy", "/bin/cat");
+            auto [hresult, container] = launcher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
+        }
+
+        // TODO: Add logic to detect when starting the container fails, and enable this test case.
+        /*{
+            WSLAContainerLauncher launcher("invalid-image-name", "dummy", "/bin/cat");
+            auto [hresult, container] = launcher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL); // TODO: Have a nicer error code when the image is not found.
+        }*/
+    }
+
+    TEST_METHOD(ContainerState)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto storagePath = std::filesystem::current_path() / "test-storage";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code error;
+
+            std::filesystem::remove_all(storagePath, error);
+            if (error)
+            {
+                LogError("Failed to cleanup storage path %ws: %s", storagePath.c_str(), error.message().c_str());
+            }
+        });
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.StoragePath = storagePath.c_str();
+        settings.MaximumStorageSizeMb = 1024;
+
+        auto session = CreateSession(settings);
+
+        auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
+
+            for (size_t i = 0; i < expectedContainers.size(); i++)
+            {
+                const auto& [expectedName, expectedImage, expectedState] = expectedContainers[i];
+                VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
+                VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
+                VERIFY_ARE_EQUAL(expectedState, containers[i].State);
+            }
+        };
+
+        {
+            // Validate that the container list is initially empty.
+            expectContainerList({});
+
+            // Start one container and wait for it to exit.
+            {
+                WSLAContainerLauncher launcher("debian:latest", "exited-container", "echo", {"OK"});
+                auto container = launcher.Launch(*session);
+                auto process = container.GetInitProcess();
+
+                ValidateProcessOutput(process, {{1, "OK\n"}});
+                expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
+            }
+
+            // Create a stuck container.
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-container-1", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+
+            // Verify that the container is in running state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            expectContainerList(
+                {{"exited-container", "debian:latest", WslaContainerStateExited},
+                 {"test-container-1", "debian:latest", WslaContainerStateRunning}});
+
+            // Kill the container init process and expect it to be in exited state.
+            auto initProcess = container.GetInitProcess();
+            initProcess.Get().Signal(9);
+
+            // Wait for the process to actually exit.
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    initProcess.GetExitState(); // Throw if the process hasn't exited yet.
+                },
+                std::chrono::milliseconds{100},
+                std::chrono::seconds{30});
+
+            // Expect the container to be in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+            expectContainerList(
+                {{"exited-container", "debian:latest", WslaContainerStateExited},
+                 {"test-container-1", "debian:latest", WslaContainerStateExited}});
+
+            // Open a new reference to the same container.
+            wil::com_ptr<IWSLAContainer> sameContainer;
+            VERIFY_SUCCEEDED(session->OpenContainer("test-container-1", &sameContainer));
+
+            // Verify that the state matches.
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_SUCCEEDED(sameContainer->GetState(&state));
+            VERIFY_ARE_EQUAL(state, WslaContainerStateExited);
+
+            VERIFY_SUCCEEDED(container.Get().Delete());
+        }
+
+        // Verify that trying to open a non existing container fails.
+        {
+            wil::com_ptr<IWSLAContainer> sameContainer;
+            VERIFY_ARE_EQUAL(session->OpenContainer("does-not-exist", &sameContainer), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Validate that container names are unique.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-unique-name", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            // Validate that a container with the same name cannot be started
+            VERIFY_ARE_EQUAL(
+                WSLAContainerLauncher("debian:latest", "test-unique-name", "echo", {"OK"}).LaunchNoThrow(*session).first,
+                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+            // Validate that running containers can't be deleted.
+            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Kill the container.
+            auto initProcess = container.GetInitProcess();
+            initProcess.Get().Signal(9);
+
+            auto r = initProcess.WaitAndCaptureOutput();
+            LogInfo("Output: %hs|%hs", r.Output[1].c_str(), r.Output[2].c_str());
+
+            // Wait for the process to actually exit.
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    initProcess.GetExitState(); // Throw if the process hasn't exited yet.
+                },
+                std::chrono::milliseconds{100},
+                std::chrono::seconds{30});
+
+            expectContainerList(
+                {{"exited-container", "debian:latest", WslaContainerStateExited},
+                 {"test-unique-name", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that stopped containers can be deleted.
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            // Verify that deleted containers can't be deleted again.
+            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Verify that deleted containers don't show up in the container list.
+            expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that the same name can be reused now that the container is deleted.
+            WSLAContainerLauncher otherLauncher(
+                "debian:latest", "test-unique-name", "echo", {"OK"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto result = otherLauncher.Launch(*session).GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
+            VERIFY_ARE_EQUAL(result.Code, 0);
+        }
     }
 };

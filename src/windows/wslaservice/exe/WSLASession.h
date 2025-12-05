@@ -16,6 +16,7 @@ Abstract:
 
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
+#include "WSLAContainer.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -37,7 +38,7 @@ public:
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
-    IFACEMETHOD(OpenContainer)(_In_ LPCWSTR Name, _In_ IWSLAContainer** Container) override;
+    IFACEMETHOD(OpenContainer)(_In_ LPCSTR Name, _In_ IWSLAContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
 
     // VM management.
@@ -56,15 +57,15 @@ private:
 
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
     void Ext4Format(const std::string& Device);
+    void ClearDeletedContainers();
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
-    std::mutex m_lock;
-
-    // TODO: Add container tracking here. Could reuse m_lock for that.
+    std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
+    std::recursive_mutex m_lock;
 };
 
 } // namespace wsl::windows::service::wsla
