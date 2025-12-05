@@ -154,46 +154,46 @@ std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
     std::vector<sockaddr_storage> sockets{};
     try
     {
-        // Query IPv4 listening sockets.
         inet_diag_req_v2 message{};
         message.sdiag_protocol = IPPROTO_TCP;
         message.idiag_states = (1 << TCP_LISTEN);
-        message.sdiag_family = AF_INET;
-        {
-            auto onMessage = [&](const NetlinkResponse& response) {
-                for (const auto& e : response.Messages<inet_diag_msg>(SOCK_DIAG_BY_FAMILY))
+
+        auto onMessage = [&](const NetlinkResponse& response) {
+            for (const auto& e : response.Messages<inet_diag_msg>(SOCK_DIAG_BY_FAMILY))
+            {
+                const auto* payload = e.Payload();
+                sockaddr_storage sock{};
+
+                if (payload->idiag_family == AF_INET)
                 {
-                    const auto* payload = e.Payload();
-                    sockaddr_storage sock{};
                     auto* ipv4 = reinterpret_cast<sockaddr_in*>(&sock);
                     ipv4->sin_family = AF_INET;
                     ipv4->sin_addr.s_addr = payload->id.idiag_src[0];
-                    ipv4->sin_port = ntohs(payload->id.idiag_sport);
-                    sockets.emplace_back(sock);
+                    ipv4->sin_port = payload->id.idiag_sport;
                 }
-            };
+                else if (payload->idiag_family == AF_INET6)
+                {
+                    auto* ipv6 = reinterpret_cast<sockaddr_in6*>(&sock);
+                    ipv6->sin6_family = AF_INET6;
+                    static_assert(sizeof(ipv6->sin6_addr.s6_addr32) == sizeof(payload->id.idiag_src));
+                    memcpy(ipv6->sin6_addr.s6_addr32, payload->id.idiag_src, sizeof(ipv6->sin6_addr.s6_addr32));
+                    ipv6->sin6_port = payload->id.idiag_sport;
+                }
 
+                sockets.emplace_back(sock);
+            }
+        };
+
+        // Query IPv4 listening sockets.
+        {
+            message.sdiag_family = AF_INET;
             auto transaction = channel.CreateTransaction(message, SOCK_DIAG_BY_FAMILY, NLM_F_DUMP);
             transaction.Execute(onMessage);
         }
 
         // Query IPv6 listening sockets.
-        message.sdiag_family = AF_INET6;
         {
-            auto onMessage = [&](const NetlinkResponse& response) {
-                for (const auto& e : response.Messages<inet_diag_msg>(SOCK_DIAG_BY_FAMILY))
-                {
-                    const auto* payload = e.Payload();
-                    sockaddr_storage sock{};
-                    auto* ipv6 = reinterpret_cast<sockaddr_in6*>(&sock);
-                    ipv6->sin6_family = AF_INET6;
-                    static_assert(sizeof(ipv6->sin6_addr.s6_addr32) == sizeof(payload->id.idiag_src));
-                    memcpy(ipv6->sin6_addr.s6_addr32, payload->id.idiag_src, sizeof(ipv6->sin6_addr.s6_addr32));
-                    ipv6->sin6_port = ntohs(payload->id.idiag_sport);
-                    sockets.emplace_back(sock);
-                }
-            };
-
+            message.sdiag_family = AF_INET6;
             auto transaction = channel.CreateTransaction(message, SOCK_DIAG_BY_FAMILY, NLM_F_DUMP);
             transaction.Execute(onMessage);
         }
@@ -230,12 +230,12 @@ LX_GNS_PORT_LISTENER_RELAY SockToRelayMessage(const sockaddr_storage& sock)
     {
         auto ipv4 = reinterpret_cast<const sockaddr_in*>(&sock);
         message.Address[0] = ipv4->sin_addr.s_addr;
-        message.Port = ipv4->sin_port;
+        message.Port = ntohs(ipv4->sin_port);
     }
     else if (sock.ss_family == AF_INET6)
     {
         auto ipv6 = reinterpret_cast<const sockaddr_in6*>(&sock);
-        message.Port = ipv6->sin6_port;
+        message.Port = ntohs(ipv6->sin6_port);
         memcpy(message.Address, ipv6->sin6_addr.__in6_union.__s6_addr, sizeof(message.Address));
     }
     return message;
@@ -280,24 +280,11 @@ bool IsSameSockAddr(const sockaddr_storage& left, const sockaddr_storage& right)
     {
         auto leftIpv6 = reinterpret_cast<const sockaddr_in6*>(&left);
         auto rightIpv6 = reinterpret_cast<const sockaddr_in6*>(&right);
-        if (leftIpv6->sin6_port != rightIpv6->sin6_port)
-        {
-            return false;
-        }
-        for (int part = 0; part < 4; ++part)
-        {
-            if (leftIpv6->sin6_addr.__in6_union.__s6_addr32[part] != rightIpv6->sin6_addr.__in6_union.__s6_addr32[part])
-            {
-                return false;
-            }
-        }
-        return true;
+        return (leftIpv6->sin6_port == rightIpv6->sin6_port && memcmp(&leftIpv6->sin6_addr, &rightIpv6->sin6_addr, sizeof(in6_addr)) == 0);
     }
-    else
-    {
-        FATAL_ERROR("Unrecognized socket family {}", left.ss_family);
-        return false;
-    }
+
+    FATAL_ERROR("Unrecognized socket family {}", left.ss_family);
+    return false;
 }
 
 // Monitor listening TCP sockets using sock_diag netlink interface.
