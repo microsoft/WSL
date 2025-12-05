@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    TODO
+    Entry point for the wsladiag tool, performs WSL runtime initialization and parses --list/--help.
 
 --*/
 

@@ -24,10 +24,7 @@ using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
 
-    m_id(id),
-    m_sessionSettings(Settings),
-    m_userSession(&userSessionImpl),
-    m_displayName(Settings.DisplayName)
+    m_id(id), m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
 {
     WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
@@ -183,12 +180,6 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
     m_virtualMachine->Mount(diskDevice.c_str(), "/root", "ext4", "", 0);
 
     deleteVhdOnFailure.release();
-}
-
-HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
-{
-  RETURN_HR_IF_NULL(E_POINTER, DisplayName);
-  return wil::make_cotaskmem_string_nothrow(m_displayName.c_str(), DisplayName);
 }
 
 void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
