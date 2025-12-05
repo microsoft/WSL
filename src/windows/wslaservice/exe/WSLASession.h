@@ -23,7 +23,6 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASession, IFastRundown>
 {
 public:
-
     WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl);
 
     ~WSLASession();
@@ -63,9 +62,8 @@ public:
     void OnUserSessionTerminating();
 
 private:
-
     ULONG m_id = 0;
-    
+
     static WSLAVirtualMachine::Settings CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings);
 
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
