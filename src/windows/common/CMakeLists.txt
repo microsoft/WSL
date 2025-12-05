@@ -16,6 +16,7 @@ set(SOURCES
     helpers.cpp
     interop.cpp
     ExecutionContext.cpp
+    PortableDistribution.cpp
     socket.cpp
     hvsocket.cpp
     Localization.cpp
@@ -90,6 +91,7 @@ set(HEADERS
     helpers.hpp
     interop.hpp
     ExecutionContext.h
+    PortableDistribution.h
     socket.hpp
     hvsocket.hpp
     INetworkingEngine.h
