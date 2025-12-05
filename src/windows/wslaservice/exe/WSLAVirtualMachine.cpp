@@ -33,28 +33,17 @@ constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
 
-WSLAVirtualMachine::WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID UserSid, WSLAUserSessionImpl* Session) :
-    m_settings(Settings), m_userSid(UserSid)
+// WSLA-specific virtio device class IDs.
+DEFINE_GUID(WSLA_VIRTIO_NET_CLASS_ID, 0x7B3C9A42, 0x8E1F, 0x4D5A, 0x9F, 0x2E, 0xC4, 0xA7, 0xB8, 0xD3, 0xE6, 0xF1); // {7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}
+
+WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, PSID UserSid) :
+    m_settings(std::move(Settings)), m_userSid(UserSid)
 {
     THROW_IF_FAILED(CoCreateGuid(&m_vmId));
 
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     m_crashDumpFolder = GetCrashDumpFolder();
-
-    if (Settings.EnableDebugShell)
-    {
-        m_debugShellPipe = wsl::windows::common::wslutil::GetDebugShellPipeName(m_userSid) + m_settings.DisplayName;
-    }
-}
-
-HRESULT WSLAVirtualMachine::GetDebugShellPipe(LPWSTR* pipePath)
-{
-    RETURN_HR_IF(E_INVALIDARG, m_debugShellPipe.empty());
-
-    *pipePath = wil::make_unique_string<wil::unique_cotaskmem_string>(m_debugShellPipe.c_str()).release();
-
-    return S_OK;
 }
 
 void WSLAVirtualMachine::OnSessionTerminated()
@@ -76,6 +65,11 @@ void WSLAVirtualMachine::OnSessionTerminated()
 WSLAVirtualMachine::~WSLAVirtualMachine()
 {
     WSL_LOG("WSLATerminateVmStart", TraceLoggingValue(m_running, "running"));
+    if (!m_computeSystem)
+    {
+        // If m_computeSystem is null, don't try to stop the VM since it never started.
+        return;
+    }
 
     m_initChannel.Close();
 
@@ -209,14 +203,11 @@ void WSLAVirtualMachine::Start()
     kernelCmdLine += L" hv_utils.timesync_implicit=1";
 
     wil::unique_handle dmesgOutput;
-    if (m_settings.DmesgOutput != 0)
-    {
-        dmesgOutput.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(m_settings.DmesgOutput)));
-    }
+    dmesgOutput = std::move(m_settings.DmesgHandle);
 
     m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true, std::move(dmesgOutput));
 
-    if (m_settings.EnableEarlyBootDmesg)
+    if (FeatureEnabled(WslaFeatureFlagsEarlyBootDmesg))
     {
         kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
         vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
@@ -324,6 +315,7 @@ void WSLAVirtualMachine::Start()
     wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
 
     wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
+    m_running = true;
 
     // Create a socket listening for crash dumps.
     auto crashDumpSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
@@ -364,7 +356,7 @@ void WSLAVirtualMachine::Start()
     Mount(m_initChannel, device.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     // Configure GPU if requested.
-    if (m_settings.EnableGPU)
+    if (FeatureEnabled(WslaFeatureFlagsGPU))
     {
         hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
         gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
@@ -385,32 +377,23 @@ void WSLAVirtualMachine::Start()
 
 void WSLAVirtualMachine::ConfigureMounts()
 {
-    auto [_, device] = AttachDisk(m_settings.RootVhd, true);
+    auto [_, device] = AttachDisk(m_settings.RootVhd.c_str(), true);
 
-    Mount(m_initChannel, device.c_str(), "/mnt", m_settings.RootVhdType, "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
+    Mount(m_initChannel, device.c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
     Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
 
-    if (m_settings.EnableGPU) // TODO: re-think how GPU settings should work at the session level API.
+    if (FeatureEnabled(WslaFeatureFlagsGPU)) // TODO: re-think how GPU settings should work at the session level API.
     {
         MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsNone);
     }
+}
 
-    if (m_settings.ContainerRootVhd) // TODO: re-think how container root settings should work at the session level API.
-    {
-        auto [_, containerRootDevice] = AttachDisk(m_settings.ContainerRootVhd, false);
-
-        if (m_settings.FormatContainerRootVhd)
-        {
-            ServiceProcessLauncher formatProcessLauncher{"/usr/sbin/mkfs.ext4", {"/usr/sbin/mkfs.ext4", containerRootDevice}};
-            auto formatProcess = formatProcessLauncher.Launch(*this);
-            THROW_HR_IF(E_FAIL, formatProcess.WaitAndCaptureOutput().Code != 0);
-        }
-
-        Mount(m_initChannel, containerRootDevice.c_str(), "/root", "ext4", "rw", 0);
-    }
+bool WSLAVirtualMachine::FeatureEnabled(WSLAFeatureFlags Value) const
+{
+    return static_cast<ULONG>(m_settings.FeatureFlags) & static_cast<ULONG>(Value);
 }
 
 void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
@@ -477,7 +460,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
 
     // If DNS tunnelling is enabled, use an additional for its channel.
-    if (m_settings.EnableDnsTunneling)
+    if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
     {
         THROW_HR_IF_MSG(
             E_NOTIMPL,
@@ -541,7 +524,8 @@ void WSLAVirtualMachine::ConfigureNetworking()
     }
     else
     {
-        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), true, m_guestDeviceManager, m_userToken);
+        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
+            std::move(gnsChannel), true, m_guestDeviceManager, WSLA_VIRTIO_NET_CLASS_ID, m_userToken);
     }
 
     m_networkEngine->Initialize();
@@ -630,7 +614,7 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
 
     auto result = wil::ResultFromException([&]() {
         std::lock_guard lock{m_lock};
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
 
         AttachedDisk disk{Path};
 
@@ -759,7 +743,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
     int32_t pid{};
     int32_t ptyMaster{};
     {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
 
         WSLA_FORK message;
         message.ForkType = Type;
@@ -937,6 +921,13 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
     return process;
 }
 
+void WSLAVirtualMachine::Mount(LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
+{
+    std::lock_guard lock{m_lock};
+
+    Mount(m_initChannel, Source, Target, Type, Options, Flags);
+}
+
 void WSLAVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
 {
     static_assert(WSLAMountFlagsNone == WSLA_MOUNT::None);
@@ -1010,7 +1001,7 @@ try
 {
     std::lock_guard lock(m_lock);
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
 
     WSLA_SHUTDOWN message{};
     m_initChannel.SendMessage(message);
@@ -1027,7 +1018,7 @@ HRESULT WSLAVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
 try
 {
     std::lock_guard lock(m_lock);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_running);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
 
     WSLA_SIGNAL message;
     message.Pid = Pid;
@@ -1246,7 +1237,7 @@ CATCH_RETURN();
 
 void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)
 {
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !m_settings.EnableGPU);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !FeatureEnabled(WslaFeatureFlagsGPU));
 
     auto [channel, _, __] = Fork(WSLA_FORK::Thread);
 

@@ -47,14 +47,13 @@ PSID WSLAUserSessionImpl::GetUserSid() const
     return m_tokenInfo->User.Sid;
 }
 
-HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
+HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession)
 {
     ULONG id = m_nextSessionId++;
-    auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this, *VmSettings);
-    {
-        std::lock_guard lock(m_lock);
-        m_sessions.emplace(session.Get());
-    }
+    auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this);
+    
+    std::lock_guard lock(m_wslaSessionsLock);
+    auto it = m_sessions.emplace(session.Get());
 
     // Client now owns the session.
     // TODO: Add a flag for the client to specify that the session should outlive its process.
@@ -116,14 +115,13 @@ HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSLA_VERS
     return S_OK;
 }
 
-HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(
-    const WSLA_SESSION_SETTINGS* Settings, const VIRTUAL_MACHINE_SETTINGS* VmSettings, IWSLASession** WslaSession)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession)
 try
 {
     auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->CreateSession(Settings, VmSettings, WslaSession);
+    return session->CreateSession(Settings, WslaSession);
 }
 CATCH_RETURN();
 

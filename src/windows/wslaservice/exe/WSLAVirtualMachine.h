@@ -43,9 +43,22 @@ public:
         wil::unique_socket Socket;
     };
 
+    struct Settings
+    {
+        std::wstring DisplayName;
+        ULONGLONG MemoryMb{};
+        ULONG CpuCount;
+        ULONG BootTimeoutMs{};
+        WSLANetworkingMode NetworkingMode{};
+        WSLAFeatureFlags FeatureFlags{};
+        wil::unique_handle DmesgHandle;
+        std::filesystem::path RootVhd;
+        std::string RootVhdType;
+    };
+
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLAVirtualMachine(const VIRTUAL_MACHINE_SETTINGS& Settings, PSID Sid, WSLAUserSessionImpl* UserSession);
+    WSLAVirtualMachine(Settings&& Settings, PSID Sid);
 
     ~WSLAVirtualMachine();
 
@@ -56,7 +69,6 @@ public:
     IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
     IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
     IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
-    IFACEMETHOD(GetDebugShellPipe(_Out_ LPWSTR* pipePath)) override;
     IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
     IFACEMETHOD(Unmount(_In_ const char* Path)) override;
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
@@ -71,6 +83,7 @@ public:
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
     void DetachDisk(_In_ ULONG Lun);
+    void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
 private:
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
@@ -82,6 +95,7 @@ private:
     void ConfigureMounts();
     void OnExit(_In_ const HCS_EVENT* Event);
     void OnCrash(_In_ const HCS_EVENT* Event);
+    bool FeatureEnabled(WSLAFeatureFlags Flag) const;
 
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(
@@ -112,7 +126,7 @@ private:
         bool AccessGranted = false;
     };
 
-    VIRTUAL_MACHINE_SETTINGS m_settings;
+    Settings m_settings;
     std::thread m_processExitThread;
     std::thread m_crashDumpCollectionThread;
 
