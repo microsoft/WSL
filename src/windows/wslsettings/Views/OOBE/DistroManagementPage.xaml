@@ -10,11 +10,11 @@
         <controls:OOBEContent.PageContent>
             <StackPanel Orientation="Vertical" Spacing="12">
                 <TextBlock x:Uid="Settings_OOBEDistroManagement_InstallableDistrosTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,6"/>
-                <TextBlock x:Uid="Settings_OOBEDistroManagement_InstallableDistrosSample"/>
+                <TextBlock x:Uid="Settings_OOBEDistroManagement_InstallableDistrosSample" TextWrapping="Wrap"/>
                 <TextBlock x:Uid="Settings_OOBEDistroManagement_InstallNamedDistrosTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,24,0,12"/>
-                <TextBlock x:Uid="Settings_OOBEDistroManagement_InstallNamedDistrosSample"/>
+                <TextBlock x:Uid="Settings_OOBEDistroManagement_InstallNamedDistrosSample" TextWrapping="Wrap"/>
                 <TextBlock x:Uid="Settings_OOBEDistroManagement_AvailableDistrosTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,24,0,6"/>
-                <TextBlock x:Uid="Settings_OOBEDistroManagement_AvailableDistrosSample"/>
+                <TextBlock x:Uid="Settings_OOBEDistroManagement_AvailableDistrosSample" TextWrapping="Wrap"/>
                 <HyperlinkButton x:Uid="Settings_OOBEDistroManagementBasicWSLCommandsLink" Style="{StaticResource TextButtonStyle}" Margin="0,12,0,-12"/>
                 <HyperlinkButton x:Uid="Settings_OOBEDistroManagementImportCustomDistroLink" Style="{StaticResource TextButtonStyle}"/>
             </StackPanel>
