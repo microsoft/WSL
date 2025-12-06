@@ -26,36 +26,18 @@ static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO:
                                                       "--ulimit",
                                                       "nofile=65536:65536"};
 
-WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
-    m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
+WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker) :
+    m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id))
 {
     m_state = WslaContainerStateCreated;
 
-    // TODO: Find a better way to wait for the container to be fully started.
-    auto status = GetNerdctlStatus();
-    while (status != "running")
-    {
-        if (status == "exited" || m_containerProcess.State() != WslaProcessStateRunning)
-        {
-            m_state = WslaContainerStateExited;
-            return;
-        }
+    m_trackingReference =
+        tracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainer::OnStateChange, this, std::placeholders::_1));
+}
 
-        // TODO: empty string is returned while the container image is still downloading.
-        // Remove this logic once the image pull is separated from container creation.
-        if (status.has_value() && status != "created")
-        {
-            THROW_HR_MSG(
-                E_UNEXPECTED, "Unexpected nerdctl status '%hs', for container '%hs'", status.value_or("<empty>").c_str(), m_name.c_str());
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-        status = GetNerdctlStatus();
-    }
-
-    // TODO: move to start() once create() and start() are split to different methods.
-    m_state = WslaContainerStateRunning;
+WSLAContainer::~WSLAContainer()
+{
+    m_trackingReference.Reset();
 }
 
 const std::string& WSLAContainer::Image() const noexcept
@@ -63,9 +45,89 @@ const std::string& WSLAContainer::Image() const noexcept
     return m_image;
 }
 
-HRESULT WSLAContainer::Start()
+void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
 {
-    return E_NOTIMPL;
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        m_state != WslaContainerStateCreated,
+        "Cannot start container '%hs', state: %i",
+        m_name.c_str(),
+        m_state);
+
+    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "start", "-a", m_id}, {}, common::ProcessFlags::None);
+    for (auto i = 0; i < Options.InitProcessOptions.FdsCount; i++)
+    {
+        launcher.AddFd(Options.InitProcessOptions.Fds[i]);
+    }
+
+    m_containerProcess = launcher.Launch(*m_parentVM);
+
+    auto newState = WaitForTransition(WslaContainerStateRunning);
+    THROW_HR_IF_MSG(E_FAIL, newState != WslaContainerStateRunning, "Failed to start container '%hs', state: %i", m_name.c_str(), newState);
+}
+
+WSLA_CONTAINER_STATE WSLAContainer::WaitForTransition(WSLA_CONTAINER_STATE expectedState)
+{
+    wil::shared_event transitionEvent;
+
+    {
+        std::lock_guard lock{m_stateLock};
+        if (m_state == expectedState)
+        {
+            return m_state; // Already in expected state, return immediately
+        }
+
+        transitionEvent = m_stateChangeEvent;
+    }
+
+    m_stateChangeEvent.wait();
+    std::lock_guard lock{m_stateLock};
+
+    return m_state;
+}
+
+void WSLAContainer::OnStateChange(ContainerEvent event)
+{
+    std::lock_guard lock{m_stateLock};
+
+    WSLA_CONTAINER_STATE newState{};
+
+    switch (event)
+    {
+    case ContainerEvent::Start:
+        newState = WslaContainerStateRunning;
+        break;
+    case ContainerEvent::Stop:
+    case ContainerEvent::Exit:
+        newState = WslaContainerStateExited;
+        break;
+    case ContainerEvent::Destroy:
+        newState = WslaContainerStateDeleted;
+        break;
+    default:
+        WI_ASSERT(false);
+    }
+
+    if (newState == m_state)
+    {
+        return;
+    }
+
+    WSL_LOG(
+        "ContainerStateChange",
+        TraceLoggingValue(m_name.c_str(), "Name"),
+        TraceLoggingValue(m_id.c_str(), "Id"),
+        TraceLoggingValue((int)m_state, "OldState"),
+        TraceLoggingValue((int)m_state, "NewState"));
+
+    m_state = newState;
+
+    m_stateChangeEvent.SetEvent();
+
+    // Reset the event for the next state change.
+    m_stateChangeEvent = wil::shared_event{wil::EventOptions::None};
 }
 
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
@@ -97,28 +159,27 @@ CATCH_RETURN();
 
 WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
 {
-    std::lock_guard lock{m_lock};
-
-    // If the container is running, refresh the init process state before returning.
-    if (m_state == WslaContainerStateRunning && m_containerProcess.State() != WSLAProcessStateRunning)
-    {
-        m_state = WslaContainerStateExited;
-    }
+    std::lock_guard lock{m_stateLock};
 
     return m_state;
 }
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
+try
 {
     *Result = State();
 
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
 try
 {
-    return m_containerProcess.Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process);
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_containerProcess.has_value());
+    return m_containerProcess->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process);
 }
 CATCH_RETURN();
 
@@ -133,7 +194,8 @@ try
 }
 CATCH_RETURN();
 
-Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM)
+Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
+    const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM, ContainerEventTracker& eventTracker)
 {
     // TODO: Switch to nerdctl create, and call nerdctl start in Start().
 
@@ -166,19 +228,25 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
 
     auto args = PrepareNerdctlRunCommand(containerOptions, std::move(inputOptions));
 
-    ServiceProcessLauncher launcher(nerdctlPath, args, {}, common::ProcessFlags::None);
-    for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)
+    ServiceProcessLauncher launcher(nerdctlPath, args, {});
+    auto result = launcher.Launch(parentVM).WaitAndCaptureOutput();
+
+    // TODO: Have better error codes.
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "Failed to create container: %hs", launcher.FormatResult(result).c_str());
+
+    auto id = result.Output[1];
+    while (!id.empty() && (id.back() == '\n'))
     {
-        launcher.AddFd(containerOptions.InitProcessOptions.Fds[i]);
+        id.pop_back();
     }
 
-    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM), containerOptions.Name, containerOptions.Image);
+    return wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker);
 }
 
 std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)
 {
     std::vector<std::string> args{nerdctlPath};
-    args.push_back("run");
+    args.push_back("create");
     args.push_back("--name");
     args.push_back(options.Name);
     if (options.ShmSize > 0)

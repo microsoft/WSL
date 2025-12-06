@@ -56,6 +56,9 @@ WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionI
             throw;
         }
     }
+
+    // Start the event tracker.
+    m_eventTracker.emplace(*m_virtualMachine.Get());
 }
 
 WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings)
@@ -103,6 +106,11 @@ WSLASession::~WSLASession()
     WSL_LOG("SessionTerminated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
     std::lock_guard lock{m_lock};
+
+    if (m_eventTracker.has_value())
+    {
+        m_eventTracker.reset();
+    }
 
     if (m_virtualMachine)
     {
@@ -231,11 +239,14 @@ try
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     // TODO: Log entrance into the function.
-    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
+    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get(), *m_eventTracker);
 
     RETURN_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
-    m_containers.emplace(containerOptions->Name, std::move(container));
+    auto [newElement, inserted] = m_containers.emplace(containerOptions->Name, std::move(container));
+    WI_ASSERT(inserted);
+
+    newElement->second->Start(*containerOptions);
 
     return S_OK;
 }
