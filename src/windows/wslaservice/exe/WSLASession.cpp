@@ -107,14 +107,17 @@ WSLASession::~WSLASession()
 
     std::lock_guard lock{m_lock};
 
-    if (m_eventTracker.has_value())
-    {
-        m_eventTracker.reset();
-    }
+    // TODO: Stop containers.
+    m_containers.clear();
+    m_eventTracker.reset();
 
     if (m_virtualMachine)
     {
         m_virtualMachine->OnSessionTerminated();
+
+        // TODO: Signal containerd to exit before umounting /root.
+        LOG_IF_FAILED(m_virtualMachine->Unmount("/root"));
+
         m_virtualMachine.Reset();
     }
 

@@ -44,14 +44,13 @@ public:
     static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM, ContainerEventTracker& tracker);
 
 private:
-    void OnStateChange(ContainerEvent event);
-    WSLA_CONTAINER_STATE WaitForTransition(WSLA_CONTAINER_STATE expectedState);
+    void OnEvent(ContainerEvent event);
+    void WaitForContainerEvent();
 
     std::optional<std::string> GetNerdctlStatus();
 
     std::mutex m_lock;
-    std::mutex m_stateLock;
-    wil::shared_event m_stateChangeEvent{wil::EventOptions::None};
+    wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
     std::optional<ServiceRunningProcess> m_containerProcess;
     std::string m_name;
     std::string m_image;

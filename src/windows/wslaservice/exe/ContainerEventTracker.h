@@ -50,10 +50,18 @@ public:
 private:
     void Run(ServiceRunningProcess& process);
 
-    std::map<std::string, std::map<size_t, ContainerStateChangeCallback>> m_callbacks;
+    struct Callback
+    {
+        size_t CallbackId;
+        std::string ContainerId;
+        ContainerStateChangeCallback Callback;
+    };
+
+    std::vector<Callback> m_callbacks;
+
     std::thread m_thread;
     wil::unique_event m_stopEvent{wil::EventOptions::ManualReset};
     std::mutex m_lock;
-    std::atomic<size_t> callbackId;
+    std::atomic<size_t> m_callbackId{0};
 };
 } // namespace wsl::windows::service::wsla

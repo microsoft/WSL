@@ -1011,8 +1011,7 @@ IOHandleStatus OverlappedIOHandle::GetState() const
     return State;
 }
 
-EventHandle::EventHandle(HANDLE Handle, std::function<void()>&& OnSignalled) :
-     Handle(Handle), OnSignalled(std::move(OnSignalled))
+EventHandle::EventHandle(HANDLE Handle, std::function<void()>&& OnSignalled) : Handle(Handle), OnSignalled(std::move(OnSignalled))
 {
 }
 

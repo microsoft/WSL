@@ -30,7 +30,7 @@ void ContainerEventTracker::ContainerTrackingReference::Reset()
 {
     if (m_tracker != nullptr)
     {
-        m_tracker->UnregisterContainerStateUpdates(m_tracker != nullptr);
+        m_tracker->UnregisterContainerStateUpdates(m_id);
         m_tracker = nullptr;
     }
 }
@@ -92,22 +92,17 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     auto innerEventJson = details->get<std::string>();
     auto innerEvent = nlohmann::json::parse(innerEventJson);
 
-    auto containerId = innerEvent.find("container_id");
-    THROW_HR_IF_MSG(E_INVALIDARG, containerId == innerEvent.end(), "Failed to parse json: %hs", innerEventJson.c_str());
-
-    WSL_LOG(
-        "ContainerStateChange",
-        TraceLoggingValue(containerId->get<std::string>().c_str(), "Id"),
-        TraceLoggingValue((int)it->second, "State"));
+    auto containerIdIt = innerEvent.find("container_id");
+    THROW_HR_IF_MSG(E_INVALIDARG, containerIdIt == innerEvent.end(), "Failed to parse json: %hs", innerEventJson.c_str());
 
     std::lock_guard lock{m_lock};
 
-    auto containerEntry = m_callbacks.find(containerId->get<std::string>());
-    if (containerEntry != m_callbacks.end())
+    std::string containerId = containerIdIt->get<std::string>();
+    for (const auto& e : m_callbacks)
     {
-        for (auto& [id, callback] : containerEntry->second)
+        if (e.ContainerId == containerId)
         {
-            callback(it->second);
+            e.Callback(it->second);
         }
     }
 }
@@ -157,9 +152,10 @@ ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::Registe
     const std::string& ContainerId, ContainerStateChangeCallback&& Callback)
 {
     std::lock_guard lock{m_lock};
-    auto id = callbackId++;
 
-    m_callbacks[ContainerId][id] = std::move(Callback);
+    auto id = m_callbackId++;
+    m_callbacks.emplace_back(id, ContainerId, std::move(Callback));
+
     return ContainerTrackingReference{this, id};
 }
 
@@ -167,19 +163,8 @@ void ContainerEventTracker::UnregisterContainerStateUpdates(size_t Id)
 {
     std::lock_guard lock{m_lock};
 
-    for (auto& [containerId, callbacks] : m_callbacks)
-    {
-        auto it = callbacks.find(Id);
-        if (it != callbacks.end())
-        {
-            callbacks.erase(it);
-            if (callbacks.empty())
-            {
-                m_callbacks.erase(containerId);
-            }
-            return;
-        }
-    }
+    auto remove = std::ranges::remove_if(m_callbacks, [Id](auto& entry) { return entry.CallbackId == Id; });
+    WI_ASSERT(remove.size() == 1);
 
-    WI_ASSERT(false);
+    m_callbacks.erase(remove.begin(), remove.end());
 }

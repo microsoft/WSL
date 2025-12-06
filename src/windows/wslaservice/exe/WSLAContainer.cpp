@@ -31,8 +31,7 @@ WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_
 {
     m_state = WslaContainerStateCreated;
 
-    m_trackingReference =
-        tracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainer::OnStateChange, this, std::placeholders::_1));
+    m_trackingReference = tracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainer::OnEvent, this, std::placeholders::_1));
 }
 
 WSLAContainer::~WSLAContainer()
@@ -64,70 +63,30 @@ void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
 
     m_containerProcess = launcher.Launch(*m_parentVM);
 
-    auto newState = WaitForTransition(WslaContainerStateRunning);
-    THROW_HR_IF_MSG(E_FAIL, newState != WslaContainerStateRunning, "Failed to start container '%hs', state: %i", m_name.c_str(), newState);
+    // Wait for either the container to get to into a 'started' state, or the nerdctl process to exit.
+    common::relay::MultiHandleWait wait;
+    wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_containerProcess->GetExitEvent(), [&]() { wait.Cancel(); }));
+    wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_startedEvent.get(), [&]() { wait.Cancel(); }));
+    wait.Run({});
+
+    // TODO: Actually check the nerdctl status there
+    THROW_HR_IF_MSG(E_FAIL, !m_startedEvent.is_signaled(), "Failed to start container '%hs'", m_name.c_str());
+
+    m_state = WslaContainerStateRunning;
 }
 
-WSLA_CONTAINER_STATE WSLAContainer::WaitForTransition(WSLA_CONTAINER_STATE expectedState)
+void WSLAContainer::OnEvent(ContainerEvent event)
 {
-    wil::shared_event transitionEvent;
-
+    if (event == ContainerEvent::Start)
     {
-        std::lock_guard lock{m_stateLock};
-        if (m_state == expectedState)
-        {
-            return m_state; // Already in expected state, return immediately
-        }
-
-        transitionEvent = m_stateChangeEvent;
-    }
-
-    m_stateChangeEvent.wait();
-    std::lock_guard lock{m_stateLock};
-
-    return m_state;
-}
-
-void WSLAContainer::OnStateChange(ContainerEvent event)
-{
-    std::lock_guard lock{m_stateLock};
-
-    WSLA_CONTAINER_STATE newState{};
-
-    switch (event)
-    {
-    case ContainerEvent::Start:
-        newState = WslaContainerStateRunning;
-        break;
-    case ContainerEvent::Stop:
-    case ContainerEvent::Exit:
-        newState = WslaContainerStateExited;
-        break;
-    case ContainerEvent::Destroy:
-        newState = WslaContainerStateDeleted;
-        break;
-    default:
-        WI_ASSERT(false);
-    }
-
-    if (newState == m_state)
-    {
-        return;
+        m_startedEvent.SetEvent();
     }
 
     WSL_LOG(
-        "ContainerStateChange",
+        "ContainerEvent",
         TraceLoggingValue(m_name.c_str(), "Name"),
         TraceLoggingValue(m_id.c_str(), "Id"),
-        TraceLoggingValue((int)m_state, "OldState"),
-        TraceLoggingValue((int)m_state, "NewState"));
-
-    m_state = newState;
-
-    m_stateChangeEvent.SetEvent();
-
-    // Reset the event for the next state change.
-    m_stateChangeEvent = wil::shared_event{wil::EventOptions::None};
+        TraceLoggingValue((int)event, "Event"));
 }
 
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
@@ -159,7 +118,14 @@ CATCH_RETURN();
 
 WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
 {
-    std::lock_guard lock{m_stateLock};
+    std::lock_guard lock{m_lock};
+
+    // If the container is running, refresh the init process state before returning.
+    if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
+    {
+        m_state = WslaContainerStateExited;
+        m_containerProcess.reset();
+    }
 
     return m_state;
 }
