@@ -22,8 +22,9 @@ Abstract:
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
-WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
-    m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
+WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
+
+    m_id(id), m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
 {
     WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
@@ -181,15 +182,20 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
     deleteVhdOnFailure.release();
 }
 
-HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
-{
-    *DisplayName = wil::make_unique_string<wil::unique_cotaskmem_string>(m_displayName.c_str()).release();
-    return S_OK;
-}
-
 const std::wstring& WSLASession::DisplayName() const
 {
     return m_displayName;
+}
+
+ULONG WSLASession::GetId() const noexcept
+{
+    return m_id;
+}
+
+void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
+{
+    THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);
+    wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
 HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
