@@ -65,7 +65,7 @@ ConsoleInput::ConsoleInput(HANDLE Handle, DWORD SavedMode) : m_Handle(Handle), m
     TrySetConsoleMode(Handle, NewMode);
 
     // Set UTF-8 code page
-    SetConsoleCP(CP_UTF8);
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
 }
 
 ConsoleInput::~ConsoleInput()
@@ -73,7 +73,7 @@ ConsoleInput::~ConsoleInput()
     if (m_Handle)
     {
         TrySetConsoleMode(m_Handle, m_SavedMode);
-        SetConsoleCP(m_SavedCodePage);
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedCodePage));
     }
 }
 
@@ -115,7 +115,7 @@ ConsoleOutput::ConsoleOutput(wil::unique_hfile ConsoleHandle, DWORD SavedMode) :
     }
 
     // Set UTF-8 code page
-    SetConsoleOutputCP(CP_UTF8);
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
 }
 
 ConsoleOutput::~ConsoleOutput()
@@ -123,7 +123,7 @@ ConsoleOutput::~ConsoleOutput()
     if (m_ConsoleHandle)
     {
         TrySetConsoleMode(m_ConsoleHandle.get(), m_SavedMode);
-        SetConsoleOutputCP(m_SavedCodePage);
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(m_SavedCodePage));
     }
 }
 
