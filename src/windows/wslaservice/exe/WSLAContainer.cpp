@@ -26,6 +26,43 @@ static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO:
                                                       "--ulimit",
                                                       "nofile=65536:65536"};
 
+WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
+    m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
+{
+    m_state = WslaContainerStateCreated;
+
+    // TODO: Find a better way to wait for the container to be fully started.
+    auto status = GetNerdctlStatus();
+    while (status != "running")
+    {
+        if (status == "exited" || m_containerProcess.State() != WslaProcessStateRunning)
+        {
+            m_state = WslaContainerStateExited;
+            return;
+        }
+
+        // TODO: empty string is returned while the container image is still downloading.
+        // Remove this logic once the image pull is separated from container creation.
+        if (status.has_value() && status != "created")
+        {
+            THROW_HR_MSG(
+                E_UNEXPECTED, "Unexpected nerdctl status '%hs', for container '%hs'", status.value_or("<empty>").c_str(), m_name.c_str());
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        status = GetNerdctlStatus();
+    }
+
+    // TODO: move to start() once create() and start() are split to different methods.
+    m_state = WslaContainerStateRunning;
+}
+
+const std::string& WSLAContainer::Image() const noexcept
+{
+    return m_image;
+}
+
 HRESULT WSLAContainer::Start()
 {
     return E_NOTIMPL;
@@ -37,13 +74,45 @@ HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 }
 
 HRESULT WSLAContainer::Delete()
+try
 {
-    return E_NOTIMPL;
+    std::lock_guard lock{m_lock};
+
+    // Validate that the container is in the exited state.
+    RETURN_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        m_state != WslaContainerStateExited,
+        "Cannot delete container '%hs', state: %i",
+        m_name.c_str(),
+        m_state);
+
+    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "rm", "-f", m_name});
+    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    m_state = WslaContainerStateDeleted;
+    return S_OK;
+}
+CATCH_RETURN();
+
+WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
+{
+    std::lock_guard lock{m_lock};
+
+    // If the container is running, refresh the init process state before returning.
+    if (m_state == WslaContainerStateRunning && m_containerProcess.State() != WSLAProcessStateRunning)
+    {
+        m_state = WslaContainerStateExited;
+    }
+
+    return m_state;
 }
 
-HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* State)
+HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
 {
-    return E_NOTIMPL;
+    *Result = State();
+
+    return S_OK;
 }
 
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
@@ -103,7 +172,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
         launcher.AddFd(containerOptions.InitProcessOptions.Fds[i]);
     }
 
-    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM));
+    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM), containerOptions.Name, containerOptions.Image);
 }
 
 std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)
@@ -160,4 +229,26 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
     }
 
     return args;
+}
+
+std::optional<std::string> WSLAContainer::GetNerdctlStatus()
+{
+    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "inspect", "-f", "{{.State.Status}}", m_name});
+    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
+    if (result.Code != 0)
+    {
+        // Can happen if the container is not found.
+        // TODO: Find a way to validate that the container is indeed not found, and not some other error.
+        return {};
+    }
+
+    auto& status = result.Output[1];
+
+    while (!status.empty() && status.back() == '\n')
+    {
+        status.pop_back();
+    }
+
+    // N.B. nerdctl inspect can return with exit code 0 and no output. Return an empty optional if that happens.
+    return status.empty() ? std::optional<std::string>{} : status;
 }
