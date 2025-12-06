@@ -71,23 +71,50 @@ if ($Package) {
     try {
         if ($AllowUnsigned)
         {
-            # unfortunately -AllowUnsigned isn't supported on vb so we need to manually import the certificate and trust it.
-            (Get-AuthenticodeSignature $Package).SignerCertificate | Export-Certificate -FilePath private-wsl.cert | Out-Null
-            try
-            {
-                Import-Certificate -FilePath .\private-wsl.cert -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+            # Try to add with -AllowUnsigned first (supported in newer PowerShell)
+            try {
+                Add-AppxPackage $Package -AllowUnsigned -ErrorAction Stop
+                $installed = $true
             }
-            finally
-            {
-                Remove-Item -Path .\private-wsl.cert
+            catch {
+                # Fallback: manually import the certificate and trust it
+                try {
+                    $signature = Get-AuthenticodeSignature -LiteralPath $Package
+                    if (-not $signature) {
+                        Write-Error "Failed to get package signature. Cannot import certificate."
+                        exit 1
+                    }
+                    $cert = $signature.SignerCertificate
+                    if ($cert) {
+                        $certPath = Join-Path $env:TEMP "wsl-package-cert.cer"
+                        $cert | Export-Certificate -FilePath $certPath | Out-Null
+                        try {
+                            Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+                        }
+                        finally {
+                            Remove-Item -Path $certPath -ErrorAction SilentlyContinue
+                        }
+                    }
+                }
+                catch {
+                    Write-Error "Failed to import certificate required for package installation: $_"
+                    exit 1
+                }
             }
         }
 
-        Add-AppxPackage $Package
+        if (-not $installed) {
+            Add-AppxPackage $Package -ErrorAction Stop
+        }
     }
     catch {
-        Write-Host $_
-        Get-AppPackageLog -All
+        Write-Host "Error installing package: $_"
+        # Only show recent relevant logs, not all historical logs
+        try {
+            Get-AppPackageLog -ActivityID * | Where-Object {$_.TimeCreated -gt (Get-Date).AddMinutes(-5)} | Select-Object -First 10 | Format-List
+        } catch {
+            Write-Host "Could not retrieve app package logs"
+        }
         exit 1
     }
 }
