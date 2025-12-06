@@ -79,9 +79,14 @@ if ($Package) {
             catch {
                 # Fallback: manually import the certificate and trust it
                 try {
-                    $cert = (Get-AuthenticodeSignature -LiteralPath $Package).SignerCertificate
+                    $signature = Get-AuthenticodeSignature -LiteralPath $Package
+                    if (-not $signature) {
+                        Write-Error "Failed to get package signature. Cannot import certificate."
+                        exit 1
+                    }
+                    $cert = $signature.SignerCertificate
                     if ($cert) {
-                        $certPath = Join-Path $env:TEMP "private-wsl-$([guid]::NewGuid()).cert"
+                        $certPath = Join-Path $env:TEMP "wsl-package-cert.cer"
                         $cert | Export-Certificate -FilePath $certPath | Out-Null
                         try {
                             Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
@@ -92,9 +97,9 @@ if ($Package) {
                     }
                 }
                 catch {
-                    Write-Warning "Could not import certificate: $_"
+                    Write-Error "Failed to import certificate required for package installation: $_"
+                    exit 1
                 }
-                $installed = $false
             }
         }
 
@@ -106,7 +111,7 @@ if ($Package) {
         Write-Host "Error installing package: $_"
         # Only show recent relevant logs, not all historical logs
         try {
-            Get-AppPackageLog -ActivityID * | Where-Object {$_.TimeCreated -gt (Get-Date).AddMinutes(-5)} | Select-Object -First 10
+            Get-AppPackageLog -ActivityID * | Where-Object {$_.TimeCreated -gt (Get-Date).AddMinutes(-5)} | Select-Object -First 10 | Format-List
         } catch {
             Write-Host "Could not retrieve app package logs"
         }
