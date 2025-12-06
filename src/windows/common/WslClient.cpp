@@ -1666,23 +1666,28 @@ int WslaShell(_In_ std::wstring_view commandLine)
         process.emplace(std::move(initProcess), std::move(fds));
     }
 
+    // Save original console modes so they can be restored on exit.
+    DWORD OriginalInputMode{};
+    DWORD OriginalOutputMode{};
+    UINT OriginalOutputCP = GetConsoleOutputCP();
+    THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
+    THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
+
+    auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        SetConsoleMode(Stdin, OriginalInputMode);
+        SetConsoleMode(Stdout, OriginalOutputMode);
+        SetConsoleOutputCP(OriginalOutputCP);
+    });
+
     // Configure console for interactive usage.
-    {
-        DWORD OutputMode{};
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OutputMode));
+    DWORD InputMode = OriginalInputMode;
+    WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
+    WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
+    THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
 
-        WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(Stdout, OutputMode));
-    }
-
-    {
-        DWORD InputMode{};
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &InputMode));
-
-        WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
-        WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
-        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(Stdin, InputMode));
-    }
+    DWORD OutputMode = OriginalOutputMode;
+    WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+    THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
 
     THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
 
