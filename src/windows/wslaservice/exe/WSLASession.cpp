@@ -182,6 +182,16 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
     deleteVhdOnFailure.release();
 }
 
+const std::wstring& WSLASession::DisplayName() const
+{
+    return m_displayName;
+}
+
+ULONG WSLASession::GetId() const noexcept
+{
+    return m_id;
+}
+
 void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
 {
     THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);

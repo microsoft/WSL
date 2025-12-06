@@ -71,7 +71,7 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
     // TODO: Check for duplicate on session creation.
     for (auto& e : m_sessions)
     {
-        if (e->GetDisplayName() == DisplayName)
+        if (e->DisplayName() == DisplayName)
         {
             THROW_IF_FAILED(e->QueryInterface(__uuidof(IWSLASession), (void**)Session));
             return S_OK;

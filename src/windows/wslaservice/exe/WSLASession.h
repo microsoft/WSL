@@ -27,15 +27,9 @@ public:
 
     ~WSLASession();
 
-    ULONG GetId() const noexcept
-    {
-        return m_id;
-    }
+    ULONG GetId() const noexcept;
 
-    const std::wstring& GetDisplayName() const noexcept
-    {
-        return m_displayName;
-    }
+    const std::wstring& DisplayName() const;
 
     void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
 
