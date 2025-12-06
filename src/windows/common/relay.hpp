@@ -183,12 +183,14 @@ public:
     NON_MOVABLE(EventHandle)
 
     EventHandle(wil::unique_event&& EventHandle, std::function<void()>&& OnSignalled);
+    EventHandle(HANDLE EventHandle, std::function<void()>&& OnSignalled);
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
-    wil::unique_event Handle;
+    wil::unique_event OwnedHandle;
+    HANDLE Handle;
     std::function<void()> OnSignalled;
 };
 
@@ -238,10 +240,12 @@ public:
     MultiHandleWait() = default;
 
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
-    void Run(std::optional<std::chrono::milliseconds> Timeout);
+    bool Run(std::optional<std::chrono::milliseconds> Timeout);
+    void Cancel();
 
 private:
     std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;
+    bool m_cancel = false;
 };
 
 } // namespace wsl::windows::common::relay

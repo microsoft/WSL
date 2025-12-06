@@ -107,6 +107,7 @@ Abstract:
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
+        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslaservice.exe") \
     END_TEST_CLASS()
 
 //
