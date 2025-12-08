@@ -507,6 +507,10 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
+        // TODO: Enable again once socat is available in the runtime VHD.
+        LogSkipped("Skipping test since socat is required in the runtime VHD");
+        return;
+
         auto settings = GetDefaultSessionSettings();
         settings.RootVhdOverride = testVhd.c_str(); // socat is required to run this test case.
         settings.RootVhdTypeOverride = "ext4";
