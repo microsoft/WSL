@@ -47,7 +47,7 @@ endif()
 
 set_source_files_properties(${OUTPUT_PACKAGE} PROPERTIES GENERATED TRUE)
 
-if (DEFINED WSL_POST_BUILD_COMMAND AND NOT "${WSL_POST_BUILD_COMMAND}" STREQUAL "")
+if (DEFINED WSL_POST_BUILD_COMMAND)
     add_custom_command(
         TARGET msipackage
         POST_BUILD
