@@ -3767,8 +3767,8 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
-        auto tcpPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true);
-        auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", true);
+        auto udpPort = NetworkTests::BindHostPort(1234, SOCK_DGRAM, IPPROTO_UDP, true);
+        auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);
     }
 
     TEST_METHOD(MultipleGuestBindOnSameTuple)
