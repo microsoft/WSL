@@ -224,9 +224,9 @@ stages:
                                     }
                               ]
 
-                  # Replace the intermediate wslsettings binaries file with the signed versions so that any future steps building wslsettings will use the signed versions
+                  # Replace the wslsettings binaries with signed versions and touch the target to prevent rebuilds
                   - task: PowerShell@2
-                    displayName: 'Replace wslsettings binaries in intermediate folder with signed versions'
+                    displayName: 'Update wslsettings binaries with signed versions'
                     condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
                     inputs:
                       targetType: inline
@@ -234,10 +234,17 @@ stages:
                         $arch = '${{ platform }}'
                         $wslsettingsbinpath = "bin\$arch\release\wslsettings"
                         $wslsettingsobjpath = "src\windows\wslsettings\obj\$arch\release"
-                        # Update the timestamp of wslsettings.exe so that it doesn't get rebuilt
-                        (Get-Item $wslsettingsbinpath\wslsettings.exe).LastWriteTime = Get-Date
+                        # Copy signed binaries to intermediate folder
                         Copy-Item $wslsettingsbinpath\wslsettings.dll $wslsettingsobjpath\wslsettings.dll -Force
                         Copy-Item $wslsettingsbinpath\wslsettings.exe $wslsettingsobjpath\apphost.exe -Force
+                        # Update timestamps on both source and output to prevent MSBuild from detecting changes
+                        $futureTime = (Get-Date).AddHours(1)
+                        (Get-Item $wslsettingsbinpath\wslsettings.exe).LastWriteTime = $futureTime
+                        (Get-Item $wslsettingsbinpath\wslsettings.dll).LastWriteTime = $futureTime
+                        (Get-Item $wslsettingsobjpath\wslsettings.dll).LastWriteTime = $futureTime
+                        (Get-Item $wslsettingsobjpath\apphost.exe).LastWriteTime = $futureTime
+                        # Touch the project file to mark it as up-to-date
+                        (Get-Item "src\windows\wslsettings\wslsettings.csproj").LastWriteTime = (Get-Date).AddSeconds(-10)
 
               - script: cmake --build . --config Release -- -m
                 displayName: "Build installer msix and tests (${{ platform }})"
