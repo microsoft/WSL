@@ -40,6 +40,7 @@ extends:
           enabled: true
       tsa:
         enabled: false
+        configFile: $(Build.SourcesDirectory)\.pipelines\tsaconfig.gdntsa
       evidence:
         enabled: false
     git:

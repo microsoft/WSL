@@ -35,6 +35,7 @@ extends:
           enabled: true
       tsa:
         enabled: false
+        configFile: $(Build.SourcesDirectory)\.pipelines\tsaconfig.gdntsa
     git:
       fetchDepth: -1
       fetchTags: true
