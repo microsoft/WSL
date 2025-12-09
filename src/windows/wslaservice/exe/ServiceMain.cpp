@@ -67,7 +67,7 @@ try
 
     // Initialize telemetry.
     // TODO-WSLA: Create a dedicated WSLA provider
-    WslTraceLoggingInitialize(WslaServiceTelemetryProvider, !wsl::shared::OfficialBuild);
+    WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
 
     WSL_LOG("Service starting", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
