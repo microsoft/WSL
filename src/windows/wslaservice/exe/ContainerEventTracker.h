@@ -40,7 +40,7 @@ public:
 
         ContainerTrackingReference() = default;
         ContainerTrackingReference(ContainerEventTracker* tracker, size_t id);
-        ContainerTrackingReference(ContainerTrackingReference&&);
+        ContainerTrackingReference(ContainerTrackingReference&&) = default;
         ~ContainerTrackingReference();
 
         ContainerTrackingReference& operator=(ContainerTrackingReference&&);

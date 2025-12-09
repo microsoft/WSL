@@ -208,7 +208,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
         inputOptions.push_back("-t");
     }
 
-    auto args = PrepareNerdctlRunCommand(containerOptions, std::move(inputOptions));
+    auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions));
 
     ServiceProcessLauncher launcher(nerdctlPath, args, {});
     auto result = launcher.Launch(parentVM).WaitAndCaptureOutput();
@@ -225,7 +225,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
     return wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker);
 }
 
-std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)
+std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)
 {
     std::vector<std::string> args{nerdctlPath};
     args.push_back("create");

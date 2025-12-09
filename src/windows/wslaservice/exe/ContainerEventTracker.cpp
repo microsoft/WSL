@@ -24,11 +24,6 @@ ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(Co
 {
 }
 
-ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(ContainerEventTracker::ContainerTrackingReference&& other)
-{
-    (*this) = std::move(other);
-}
-
 ContainerEventTracker::ContainerTrackingReference& ContainerEventTracker::ContainerTrackingReference::operator=(ContainerEventTracker::ContainerTrackingReference&& other)
 {
     Reset();
@@ -36,6 +31,7 @@ ContainerEventTracker::ContainerTrackingReference& ContainerEventTracker::Contai
     m_tracker = other.m_tracker;
 
     other.m_tracker = nullptr;
+    other.m_id = {};
 
     return *this;
 }
