@@ -1233,6 +1233,32 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Delete());
         }
 
+        // Test StopContainer
+        {
+            // Create a container
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-container-2", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+
+            // Verify that the container is in running state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(9, 10000));
+
+            expectContainerList(
+                {{"exited-container", "debian:latest", WslaContainerStateExited},
+                 {"test-container-2", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that the container is in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that deleting a container stopped via Stop() works.
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
+        }
+
         // Verify that trying to open a non existing container fails.
         {
             wil::com_ptr<IWSLAContainer> sameContainer;
@@ -1274,8 +1300,15 @@ class WSLATests
                 {{"exited-container", "debian:latest", WslaContainerStateExited},
                  {"test-unique-name", "debian:latest", WslaContainerStateExited}});
 
+            // Verify that calling Stop() on exited containers is a no-op and state remains as WslaContainerStateExited.
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 1000));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
             // Verify that stopped containers can be deleted.
             VERIFY_SUCCEEDED(container.Get().Delete());
+
+            // Verify that stopping a deleted container returns ERROR_INVALID_STATE.
+            VERIFY_ARE_EQUAL(container.Get().Stop(15, 1000), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that deleted containers can't be deleted again.
             VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));

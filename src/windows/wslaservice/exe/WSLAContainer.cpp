@@ -69,9 +69,40 @@ HRESULT WSLAContainer::Start()
 }
 
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
+try
 {
-    return E_NOTIMPL;
+    std::lock_guard lock{m_lock};
+
+    /* 'nerdctl stop ...'
+     *   returns success and <containerId> on stdout if the container is running or already stopped
+     *   returns error "No such container: <containerId>" on stderr if the container is in 'Created' state or does not exist
+     *
+     * For our case, we consider stopping a container that is not running or does not exist as a no-op and return success.
+     * TODO: Discuss and return stdout/stderr or corresponding HRESULT from nerdctl stop for better diagnostics.
+     */
+
+    if (m_state == WslaContainerStateExited)
+    {
+        return S_OK;
+    }
+    // Validate that the container is in the exited state.
+    RETURN_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        m_state != WslaContainerStateRunning,
+        "No such running or exited container '%hs', state: %i",
+        m_name.c_str(),
+        m_state);
+    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "stop", m_name});
+    // TODO: Figure out how we want to handle custom signals and timeout values.
+    // nerdctl stop has a --time and a --signal option that can be used
+    // By default, it uses SIGTERM and a default timeout of 10 seconds.
+    auto result = launcher.Launch(*m_parentVM).Wait();
+    THROW_HR_IF(E_FAIL, result.first != 0);
+
+    m_state = WslaContainerStateExited;
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLAContainer::Delete()
 try
