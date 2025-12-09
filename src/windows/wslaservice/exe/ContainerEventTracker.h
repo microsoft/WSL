@@ -28,6 +28,8 @@ enum class ContainerEvent
     Destroy
 };
 
+constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
+
 class ContainerEventTracker
 {
 public:

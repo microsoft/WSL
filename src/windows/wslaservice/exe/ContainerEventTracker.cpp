@@ -42,6 +42,7 @@ void ContainerEventTracker::ContainerTrackingReference::Reset()
     {
         m_tracker->UnregisterContainerStateUpdates(m_id);
         m_tracker = nullptr;
+        m_id = {};
     }
 }
 
@@ -52,7 +53,7 @@ ContainerEventTracker::ContainerTrackingReference::~ContainerTrackingReference()
 
 ContainerEventTracker::ContainerEventTracker(WSLAVirtualMachine& virtualMachine)
 {
-    ServiceProcessLauncher launcher{"/usr/bin/nerdctl", {"/usr/bin/nerdctl", "events", "--format", "{{json .}}"}, {}, common::ProcessFlags::Stdout};
+    ServiceProcessLauncher launcher{nerdctlPath, {nerdctlPath, "events", "--format", "{{json .}}"}, {}, common::ProcessFlags::Stdout};
 
     // Redirect stderr to /dev/null to avoid pipe deadlocks.
     launcher.AddFd({.Fd = 2, .Type = WSLAFdTypeLinuxFileOutput, .Path = "/dev/null"});
