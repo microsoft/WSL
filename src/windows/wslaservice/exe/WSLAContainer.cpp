@@ -71,9 +71,9 @@ HRESULT WSLAContainer::Start()
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 try
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    if (StateNoLock() == WslaContainerStateExited)
+    if (State() == WslaContainerStateExited)
     {
         return S_OK;
     }
@@ -109,12 +109,12 @@ CATCH_RETURN();
 HRESULT WSLAContainer::Delete()
 try
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // Validate that the container is in the exited state.
     RETURN_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslaContainerStateExited,
+        State() != WslaContainerStateExited,
         "Cannot delete container '%hs', state: %i",
         m_name.c_str(),
         m_state);
@@ -130,14 +130,8 @@ CATCH_RETURN();
 
 WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    // If the container is running, refresh the init process state before returning.
-    return StateNoLock();
-}
-
-WSLA_CONTAINER_STATE WSLAContainer::StateNoLock() noexcept
-{
     // If the container is running, refresh the init process state before returning.
     if (m_state == WslaContainerStateRunning && m_containerProcess.State() != WSLAProcessStateRunning)
     {

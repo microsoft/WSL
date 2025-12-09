@@ -48,7 +48,7 @@ private:
     std::string m_image;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
-    std::mutex m_lock;
+    std::recursive_mutex m_lock;
 
     WSLA_CONTAINER_STATE StateNoLock() noexcept;
     static std::vector<std::string> PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions);
