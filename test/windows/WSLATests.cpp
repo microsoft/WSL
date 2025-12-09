@@ -177,6 +177,60 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ListSessionsReturnsSessionWithDisplayName)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-test-list";
+
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        wil::com_ptr<IWSLASession> session;
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
+
+        // Act: list sessions
+        wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+        ULONG count = 0;
+        VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, &count));
+
+        // Assert
+        VERIFY_ARE_EQUAL(count, 1u);
+        const auto& info = sessions[0];
+
+        // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
+        VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), std::wstring(L"wsla-test-list"));
+    }
+
+    TEST_METHOD(OpenSessionByNameFindsExistingSession)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-open-by-name-test";
+
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        wil::com_ptr<IWSLASession> created;
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &created));
+
+        // Act: open by the same display name
+        wil::com_ptr<IWSLASession> opened;
+        VERIFY_SUCCEEDED(userSession->OpenSessionByName(L"wsla-open-by-name-test", &opened));
+        VERIFY_IS_NOT_NULL(opened.get());
+
+        // And verify we get ERROR_NOT_FOUND for a nonexistent name
+        wil::com_ptr<IWSLASession> notFound;
+        auto hr = userSession->OpenSessionByName(L"this-name-does-not-exist", &notFound);
+        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+    }
+
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
