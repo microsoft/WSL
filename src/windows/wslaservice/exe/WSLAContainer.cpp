@@ -85,7 +85,7 @@ try
     {
         return S_OK;
     }
-    // Validate that the container is in the exited state.
+    // Validate that the container is in the running state.
     RETURN_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
         m_state != WslaContainerStateRunning,
