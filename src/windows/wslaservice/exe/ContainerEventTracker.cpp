@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerEventTracker.cpp
+
+Abstract:
+
+    Contains the implementation of ContainerEventTracker.
+
+--*/
 #include "precomp.h"
 #include "ContainerEventTracker.h"
 #include "WSLAVirtualMachine.h"

@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerEventTracker.h
+
+Abstract:
+
+    Contains the definition for ContainerEventTracker.
+
+--*/
 #pragma once
 
 #include "ServiceProcessLauncher.h"
