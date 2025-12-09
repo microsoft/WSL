@@ -1246,6 +1246,9 @@ class WSLATests
 
             VERIFY_SUCCEEDED(container.Get().Stop(9, 10000));
 
+            // TODO: Once 'container run' is split into 'container create' + 'container start',
+            // validate that Stop() on a container in 'Created' state returns ERROR_INVALID_STATE.
+
             expectContainerList(
                 {{"exited-container", "debian:latest", WslaContainerStateExited},
                  {"test-container-2", "debian:latest", WslaContainerStateExited}});
