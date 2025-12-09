@@ -90,7 +90,7 @@ try
     RETURN_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
         m_state != WslaContainerStateRunning,
-        "No such running or exited container '%hs', state: %i",
+        "Container '%hs' is not in a stoppable state: %i",
         m_name.c_str(),
         m_state);
     ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "stop", m_name});
