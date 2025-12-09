@@ -22,8 +22,9 @@ Abstract:
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
-WSLASession::WSLASession(const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
-    m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
+WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
+
+    m_id(id), m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
 
 {
     WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
@@ -182,10 +183,14 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
     deleteVhdOnFailure.release();
 }
 
-HRESULT WSLASession::GetDisplayName(LPWSTR* DisplayName)
+const std::wstring& WSLASession::DisplayName() const
 {
-    UNREFERENCED_PARAMETER(DisplayName);
-    return E_NOTIMPL;
+    return m_displayName;
+}
+
+ULONG WSLASession::GetId() const noexcept
+{
+    return m_id;
 }
 
 void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
@@ -193,11 +198,6 @@ void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, siz
     THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);
     wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
-
-/** const std::wstring& WSLASession::DisplayName() const
-{
-   return m_displayName;
-}*/
 
 HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
 {
@@ -225,25 +225,66 @@ try
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
     std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    ClearDeletedContainers();
+
+    // Validate that no container with the same name already exists.
+    auto it = m_containers.find(containerOptions->Name);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_containers.end());
+
+    // Validate that name & images are within length limits.
+    RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Name) > WSLA_MAX_CONTAINER_NAME_LENGTH);
+    RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     // TODO: Log entrance into the function.
     auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
-    THROW_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+
+    RETURN_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+
+    m_containers.emplace(containerOptions->Name, std::move(container));
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::OpenContainer(LPCWSTR Name, IWSLAContainer** Container)
+HRESULT WSLASession::OpenContainer(LPCSTR Name, IWSLAContainer** Container)
+try
 {
-    return E_NOTIMPL;
-}
+    std::lock_guard lock{m_lock};
+    auto it = m_containers.find(Name);
+    RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_containers.end(), "Container not found: '%hs'", Name);
 
-HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Images, ULONG* Count)
-{
-    return E_NOTIMPL;
+    THROW_IF_FAILED(it->second.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+    return S_OK;
 }
+CATCH_RETURN();
+
+HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Containers, ULONG* Count)
+try
+{
+    *Count = 0;
+    *Containers = nullptr;
+
+    std::lock_guard lock{m_lock};
+    ClearDeletedContainers();
+
+    auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
+
+    size_t index = 0;
+    for (const auto& [name, container] : m_containers)
+    {
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, container->Image().c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
+        THROW_IF_FAILED(container->GetState(&output[index].State));
+        index++;
+    }
+
+    *Count = static_cast<ULONG>(m_containers.size());
+    *Containers = output.release();
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
 {
@@ -320,3 +361,14 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+void WSLASession::ClearDeletedContainers()
+{
+    std::lock_guard lock{m_lock};
+    auto deleted = std::erase_if(m_containers, [](const auto e) { return e.second->State() == WslaContainerStateDeleted; });
+
+    if (deleted > 0)
+    {
+        WSL_LOG("ClearedDeletedContainers", TraceLoggingValue(deleted, "Count"));
+    }
+}

@@ -53,7 +53,7 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 {
 }
 
-RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
+std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
 {
     WSLA_CONTAINER_OPTIONS options{};
     options.Image = m_image.c_str();
@@ -68,7 +68,19 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(Session.CreateContainer(&options, &container));
+    auto result = Session.CreateContainer(&options, &container);
+    if (FAILED(result))
+    {
+        return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});
+    }
 
-    return RunningWSLAContainer{std::move(container), std::move(m_fds)};
+    return std::make_pair(S_OK, RunningWSLAContainer{std::move(container), std::move(m_fds)});
+}
+
+RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
+{
+    auto [result, container] = LaunchNoThrow(Session);
+    THROW_IF_FAILED(result);
+
+    return std::move(container.value());
 }

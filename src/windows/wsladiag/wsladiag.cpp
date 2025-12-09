@@ -8,7 +8,8 @@ Module Name:
 
 Abstract:
 
-    TODO
+    Entry point for the wsladiag tool, performs WSL runtime initialization and parses --list/--help.
+
 
 --*/
 
@@ -45,11 +46,13 @@ int wsladiag_main(std::wstring_view commandLine)
 
     bool help = false;
     bool list = false;
+
     std::wstring debugShell;
 
     parser.AddArgument(list, L"--list");
     parser.AddArgument(help, L"--help", L'h'); //  short option is a single wide char
     parser.AddArgument(debugShell, L"--debug-shell");
+
     parser.Parse();
 
     auto printUsage = []() {
