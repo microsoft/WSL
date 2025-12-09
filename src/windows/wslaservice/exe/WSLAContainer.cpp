@@ -69,8 +69,17 @@ void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
     wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_startedEvent.get(), [&]() { wait.Cancel(); }));
     wait.Run({});
 
-    // TODO: Actually check the nerdctl status there
-    THROW_HR_IF_MSG(E_FAIL, !m_startedEvent.is_signaled(), "Failed to start container '%hs'", m_name.c_str());
+    if (!m_startedEvent.is_signaled())
+    {
+        auto status = GetNerdctlStatus();
+
+        THROW_HR_IF_MSG(
+            E_FAIL,
+            status != "exited",
+            "Failed to start container %hs, nerdctl status: %hs",
+            m_name.c_str(),
+            status.value_or("<empty>").c_str());
+    }
 
     m_state = WslaContainerStateRunning;
 }
@@ -180,6 +189,8 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
             hasTty = true;
         }
     }
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hasStdin && !hasTty); // Don't support
 
     std::vector<std::string> inputOptions;
     if (hasStdin)
