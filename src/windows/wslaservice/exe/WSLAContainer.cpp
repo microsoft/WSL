@@ -77,7 +77,8 @@ try
      *   returns success and <containerId> on stdout if the container is running or already stopped
      *   returns error "No such container: <containerId>" on stderr if the container is in 'Created' state or does not exist
      *
-     * For our case, we consider stopping a container that is not running or does not exist as a no-op and return success.
+     * For our case, we treat stopping an already-exited container as a no-op and return success.
+     * Stopping a deleted or created container returns ERROR_INVALID_STATE.
      * TODO: Discuss and return stdout/stderr or corresponding HRESULT from nerdctl stop for better diagnostics.
      */
 
