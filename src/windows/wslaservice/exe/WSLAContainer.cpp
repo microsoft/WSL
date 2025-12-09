@@ -73,6 +73,11 @@ try
 {
     std::lock_guard lock{m_lock};
 
+    if (StateNoLock() == WslaContainerStateExited)
+    {
+        return S_OK;
+    }
+
     /* 'nerdctl stop ...'
      *   returns success and <containerId> on stdout if the container is running or already stopped
      *   returns error "No such container: <containerId>" on stderr if the container is in 'Created' state or does not exist
@@ -82,10 +87,6 @@ try
      * TODO: Discuss and return stdout/stderr or corresponding HRESULT from nerdctl stop for better diagnostics.
      */
 
-    if (m_state == WslaContainerStateExited)
-    {
-        return S_OK;
-    }
     // Validate that the container is in the running state.
     RETURN_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
@@ -97,8 +98,8 @@ try
     // TODO: Figure out how we want to handle custom signals and timeout values.
     // nerdctl stop has a --time and a --signal option that can be used
     // By default, it uses SIGTERM and a default timeout of 10 seconds.
-    auto result = launcher.Launch(*m_parentVM).Wait();
-    THROW_HR_IF(E_FAIL, result.first != 0);
+    auto result = launcher.Launch(*m_parentVM).Wait(TimeoutMs);
+    THROW_HR_IF_MSG(E_FAIL, result.first != 0, "%hs", launcher.FormatResult(result.first).c_str());
 
     m_state = WslaContainerStateExited;
     return S_OK;
@@ -131,6 +132,12 @@ WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
 {
     std::lock_guard lock{m_lock};
 
+    // If the container is running, refresh the init process state before returning.
+    return StateNoLock();
+}
+
+WSLA_CONTAINER_STATE WSLAContainer::StateNoLock() noexcept
+{
     // If the container is running, refresh the init process state before returning.
     if (m_state == WslaContainerStateRunning && m_containerProcess.State() != WSLAProcessStateRunning)
     {
