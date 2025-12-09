@@ -190,7 +190,9 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
         }
     }
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hasStdin && !hasTty); // Don't support
+    // Don't support stdin for now since it will hang.
+    // TODO: Remove once stdin is fixed in nerdctl.
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hasStdin && !hasTty);
 
     std::vector<std::string> inputOptions;
     if (hasStdin)
