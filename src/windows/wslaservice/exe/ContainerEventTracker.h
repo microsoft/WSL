@@ -55,12 +55,14 @@ public:
 
     ContainerEventTracker(WSLAVirtualMachine& virtualMachine);
     ~ContainerEventTracker();
-    void OnEvent(const std::string& event);
+
+    void Stop();
 
     ContainerTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback);
     void UnregisterContainerStateUpdates(size_t Id);
 
 private:
+    void OnEvent(const std::string& event);
     void Run(ServiceRunningProcess& process);
 
     struct Callback

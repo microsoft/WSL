@@ -63,7 +63,9 @@ void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
 
     m_containerProcess = launcher.Launch(*m_parentVM);
 
-    // Wait for either the container to get to into a 'started' state, or the nerdctl process to exit.
+    auto cleanup = wil::scope_exit([&]() { m_containerProcess.reset(); });
+
+    // Wait for either the container to get into a 'started' state, or the nerdctl process to exit.
     common::relay::MultiHandleWait wait;
     wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_containerProcess->GetExitEvent(), [&]() { wait.Cancel(); }));
     wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_startedEvent.get(), [&]() { wait.Cancel(); }));
@@ -81,6 +83,7 @@ void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
             status.value_or("<empty>").c_str());
     }
 
+    cleanup.release();
     m_state = WslaContainerStateRunning;
 }
 

@@ -31,6 +31,7 @@ ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(Co
 
 ContainerEventTracker::ContainerTrackingReference& ContainerEventTracker::ContainerTrackingReference::operator=(ContainerEventTracker::ContainerTrackingReference&& other)
 {
+    Reset();
     m_id = other.m_id;
     m_tracker = other.m_tracker;
 
@@ -64,16 +65,22 @@ ContainerEventTracker::ContainerEventTracker(WSLAVirtualMachine& virtualMachine)
     m_thread = std::thread(std::bind(&ContainerEventTracker::Run, this, std::move(process)));
 }
 
-ContainerEventTracker::~ContainerEventTracker()
+void ContainerEventTracker::Stop()
 {
     // N.B. No callback should be left when the tracker is destroyed.
-    WI_ASSERT(m_callbacks.empty());
-
     m_stopEvent.SetEvent();
     if (m_thread.joinable())
     {
         m_thread.join();
     }
+}
+
+ContainerEventTracker::~ContainerEventTracker()
+{
+    // N.B. No callback should be left when the tracker is destroyed.
+    WI_ASSERT(m_callbacks.empty());
+
+    Stop();
 }
 
 void ContainerEventTracker::OnEvent(const std::string& event)
@@ -101,7 +108,7 @@ void ContainerEventTracker::OnEvent(const std::string& event)
         return; // Event is not tracked, dropped.
     }
 
-    // The 'Event' field is a json string,
+    // N.B. The 'Event' field is a json string.
     auto innerEventJson = details->get<std::string>();
     auto innerEvent = nlohmann::json::parse(innerEventJson);
 
@@ -122,43 +129,47 @@ void ContainerEventTracker::OnEvent(const std::string& event)
 
 void ContainerEventTracker::Run(ServiceRunningProcess& process)
 {
-    std::string pendingBuffer;
+    try
+    {
+        std::string pendingBuffer;
 
-    wsl::windows::common::relay::MultiHandleWait io;
+        wsl::windows::common::relay::MultiHandleWait io;
 
-    auto onStdout = [&](const gsl::span<char>& buffer) {
-        // nerdctl events' output is line based. Call OnEvent() for each completed line.
+        auto onStdout = [&](const gsl::span<char>& buffer) {
+            // nerdctl events' output is line based. Call OnEvent() for each completed line.
 
-        auto begin = buffer.begin();
-        auto end = std::ranges::find(buffer, '\n');
-        while (end != buffer.end())
-        {
-            pendingBuffer.insert(pendingBuffer.end(), begin, end);
-
-            if (!pendingBuffer.empty()) // nerdctl inserts empty lines between events, skip those.
+            auto begin = buffer.begin();
+            auto end = std::ranges::find(buffer, '\n');
+            while (end != buffer.end())
             {
-                OnEvent(pendingBuffer);
+                pendingBuffer.insert(pendingBuffer.end(), begin, end);
+
+                if (!pendingBuffer.empty()) // nerdctl inserts empty lines between events, skip those.
+                {
+                    OnEvent(pendingBuffer);
+                }
+
+                pendingBuffer.clear();
+
+                begin = end + 1;
+                end = std::ranges::find(begin, buffer.end(), '\n');
             }
 
-            pendingBuffer.clear();
+            pendingBuffer.insert(pendingBuffer.end(), begin, end);
+        };
 
-            begin = end + 1;
-            end = std::ranges::find(begin, buffer.end(), '\n');
+        auto onStop = [&]() { io.Cancel(); };
+
+        io.AddHandle(std::make_unique<common::relay::ReadHandle>(process.GetStdHandle(1), std::move(onStdout)));
+        io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), std::move(onStop)));
+
+        if (io.Run({}))
+        {
+            // TODO: Report error to session.
+            WSL_LOG("Unexpected nerdctl exit");
         }
-
-        pendingBuffer.insert(pendingBuffer.end(), begin, end);
-    };
-
-    auto onStop = [&]() { io.Cancel(); };
-
-    io.AddHandle(std::make_unique<common::relay::ReadHandle>(process.GetStdHandle(1), std::move(onStdout)));
-    io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), std::move(onStop)));
-
-    if (io.Run({}))
-    {
-        // TODO: Report error to session.
-        WSL_LOG("Unexpected nerdctl exit");
     }
+    CATCH_LOG();
 }
 
 ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::RegisterContainerStateUpdates(
