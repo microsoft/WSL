@@ -49,7 +49,6 @@ private:
 
     std::optional<std::string> GetNerdctlStatus();
 
-    std::mutex m_lock;
     wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
     std::optional<ServiceRunningProcess> m_containerProcess;
     std::string m_name;

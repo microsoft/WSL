@@ -44,7 +44,7 @@ const std::string& WSLAContainer::Image() const noexcept
 
 void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
@@ -185,7 +185,7 @@ CATCH_RETURN();
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
 try
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_containerProcess.has_value());
     return m_containerProcess->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process);

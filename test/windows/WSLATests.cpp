@@ -1299,7 +1299,7 @@ class WSLATests
         {
             // Create a container
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-2", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest", "test-container-2", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto container = launcher.Launch(*session);
 
