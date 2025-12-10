@@ -231,6 +231,47 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
+    TEST_METHOD(PullImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-pull-image-test";
+
+        auto session = CreateSession(settings);
+
+        VERIFY_SUCCEEDED(session->PullImage("hello-world", nullptr, nullptr));
+
+        // Verify that the image is in the list of images.
+        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
+        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
+        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+    }
+
+    /*
+    TEST_METHOD(LoadImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-load-image-test";
+
+        auto session = CreateSession(settings);
+
+        // TODO: find a way to put test tar
+        VERIFY_SUCCEEDED(session->LoadImage(0, nullptr));
+
+        // Verify that the image is in the list of images.
+        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
+        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
+        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+    }
+    */
+
+    // TODO: Add test for ImportImage when we have latest nerdctl in test rootfs.
+
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
