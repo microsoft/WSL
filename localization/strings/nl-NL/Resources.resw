@@ -1194,7 +1194,7 @@ Zie de herstelinstructies voor: https://aka.ms/wsldiskmountrecovery</value>
     <value>Een absoluut Windows-pad naar een aangepaste Linux-kernel.</value>
   </data>
   <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
-    <value>Koor kernels bladeren</value>
+    <value>Door kernels bladeren</value>
   </data>
   <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Aangepaste kernel</value>
