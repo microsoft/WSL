@@ -35,8 +35,9 @@ public:
     void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
 
     // Image management.
-    IFACEMETHOD(PullImage)(_In_ LPCWSTR Image, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, _In_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(ImportImage)(_In_ ULONG Handle, _In_ LPCWSTR Image, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(PullImage)(_In_ LPCSTR ImageUri, _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ LPCWSTR Image) override;
 
