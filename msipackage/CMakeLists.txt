@@ -6,7 +6,6 @@ if(DEFINED PACKAGE_INPUT_DIR)
     message(STATUS "Using signed binaries from ${PACKAGE_INPUT_DIR} for MSI packaging")
 else()
     set(PACKAGE_INPUT_DIR ${BIN})
-    message(STATUS "Using binaries from ${BIN} for MSI packaging")
 endif()
 
 set(OUTPUT_PACKAGE ${BIN}/wsl.msi)
