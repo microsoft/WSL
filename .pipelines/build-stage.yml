@@ -121,6 +121,10 @@ stages:
           Codeql.PublishDatabaseLog: true
           Codeql.SourceRoot: src
           packageStagingDir: '$(Build.SourcesDirectory)\packageStagingDir'
+          ${{ if eq(parameters.isRelease, 'true') }}:
+            packageInputDirArg: '-DPACKAGE_INPUT_DIR=$(packageStagingDir)'
+          ${{ else }}:
+            packageInputDirArg: ''
 
         steps:
 
@@ -167,20 +171,7 @@ stages:
                 displayName: "CMake ${{ platform }}"
                 inputs:
                   workingDirectory: "."
-                  cmakeArgs: >-
-                    . --fresh -A ${{ platform }}
-                    -DCMAKE_BUILD_TYPE=Release
-                    -DCMAKE_SYSTEM_VERSION=10.0.26100.0
-                    -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION)
-                    -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION)
-                    -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }}
-                    -DOFFICIAL_BUILD=${{ parameters.isRelease }}
-                    -DPIPELINE_BUILD_ID=$(Build.BuildId)
-                    -DVSO_ORG=${{ parameters.vsoOrg }}
-                    -DVSO_PROJECT=${{ parameters.vsoProject }}
-                    -DWSL_BUILD_WSL_SETTINGS=true
-                    ${{ if eq(parameters.isRelease, 'true') }}:
-                      -DPACKAGE_INPUT_DIR=$(packageStagingDir)\${{ platform }}
+                  cmakeArgs: . --fresh -A ${{ platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true $(packageInputDirArg)\${{ platform }}
 
               # This additional Restore NuGet package task is added as a workaround for WSL Settings to have its packages restored properly.
               # Without this, building wsl settings may encounter the following error:
