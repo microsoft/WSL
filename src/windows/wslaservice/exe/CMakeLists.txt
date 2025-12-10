@@ -1,5 +1,6 @@
 set(SOURCES
     application.manifest
+    ContainerEventTracker.cpp
     main.rc
     ServiceMain.cpp
     ServiceProcessLauncher.cpp
@@ -12,6 +13,7 @@ set(SOURCES
     )
 
 set(HEADERS
+    ContainerEventTracker.h
     ServiceProcessLauncher.h
     WSLAContainer.h
     WSLAProcess.h
