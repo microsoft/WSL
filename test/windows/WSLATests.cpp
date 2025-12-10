@@ -198,6 +198,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings();
+        settings.StoragePath = nullptr;
         settings.DisplayName = L"wsla-test-list";
 
         wil::com_ptr<IWSLAUserSession> userSession;
@@ -210,11 +211,10 @@ class WSLATests
 
         // Act: list sessions
         wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-        ULONG count = 0;
-        VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, &count));
+        VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
         // Assert
-        VERIFY_ARE_EQUAL(count, 1u);
+        VERIFY_ARE_EQUAL(sessions.size(), 1);
         const auto& info = sessions[0];
 
         // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
@@ -226,6 +226,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings();
+        settings.StoragePath = nullptr;
         settings.DisplayName = L"wsla-open-by-name-test";
 
         wil::com_ptr<IWSLAUserSession> userSession;
@@ -1367,7 +1368,7 @@ class WSLATests
         }
 
         // Validate that stdin is correctly wired.
-        // TODO: Add test coverage for stdin being closed without anything written written to it once the stdin hang issue is solved.
+        // TODO: Add test coverage for stdin being closed without anything written to it once the stdin hang issue is solved.
         {
             auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
                                .Launch(container.Get());
@@ -1402,7 +1403,7 @@ class WSLATests
                                .Launch(container.Get());
 
             // TODO: Replace with Stop()
-            ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "stop", "test-container-exec"}, 0);
+            ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "stop", "-t", "0", "test-container-exec"}, 0);
 
             auto result = process.WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Code, 1);

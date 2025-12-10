@@ -93,12 +93,12 @@ public:
 
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
-    std::string FormatResult(const RunningWSLAProcess::ProcessResult& IWSLAContainer);
+    std::string FormatResult(const RunningWSLAProcess::ProcessResult& Result);
 
     template <typename T>
-    ClientRunningWSLAProcess Launch(T& Session)
+    auto Launch(T& Context)
     {
-        auto [hresult, error, process] = LaunchNoThrow(Session);
+        auto [hresult, error, process] = LaunchNoThrow(Context);
         if (FAILED(hresult))
         {
             auto commandLine = wsl::shared::string::Join(m_arguments, ' ');

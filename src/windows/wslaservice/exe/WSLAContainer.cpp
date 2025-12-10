@@ -162,6 +162,7 @@ CATCH_RETURN();
 HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
+    *Errno = -1;
     THROW_HR_IF_MSG(E_INVALIDARG, Options->Executable != nullptr, "Executable must be null");
 
     std::lock_guard lock{m_lock};
@@ -202,8 +203,12 @@ try
         launcher.AddFd(Options->Fds[i]);
     }
 
-    auto process = launcher.Launch(*m_parentVM);
-    THROW_IF_FAILED(process.Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
+    std::optional<ServiceRunningProcess> process;
+    HRESULT result = E_FAIL;
+    std::tie(result, *Errno, process) = launcher.LaunchNoThrow(*m_parentVM);
+    THROW_IF_FAILED(result);
+
+    THROW_IF_FAILED(process->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
 
     return S_OK;
 }
@@ -233,7 +238,7 @@ void WSLAContainer::AddEnvironmentVariables(std::vector<std::string>& args, cons
 {
     for (ULONG i = 0; i < options.EnvironmentCount; i++)
     {
-        THROW_HR_IF_MSG(E_INVALIDARG, options.Environment[i][0] == L'-', "Invalid environment string: %hs", options.Environment[i]);
+        THROW_HR_IF_MSG(E_INVALIDARG, options.Environment[i][0] == '-', "Invalid environment string: %hs", options.Environment[i]);
 
         args.insert(args.end(), {"-e", options.Environment[i]});
     }
