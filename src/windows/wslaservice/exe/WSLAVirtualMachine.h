@@ -20,6 +20,7 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "WSLAApi.h"
 #include "WSLAProcess.h"
+#include "ContainerEventTracker.h"
 
 namespace wsl::windows::service::wsla {
 
