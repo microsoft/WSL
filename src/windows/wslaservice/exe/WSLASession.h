@@ -17,6 +17,7 @@ Abstract:
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
 #include "WSLAContainer.h"
+#include "ContainerEventTracker.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -68,6 +69,7 @@ private:
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
+    std::optional<ContainerEventTracker> m_eventTracker;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
     std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
