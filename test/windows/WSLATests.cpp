@@ -214,7 +214,7 @@ class WSLATests
         VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
         // Assert
-        VERIFY_ARE_EQUAL(sessions.size(), 1);
+        VERIFY_ARE_EQUAL(sessions.size(), 1u);
         const auto& info = sessions[0];
 
         // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
@@ -1283,6 +1283,35 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Delete());
         }
 
+        // Test StopContainer
+        {
+            // Create a container
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-container-2", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+
+            // Verify that the container is in running state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+
+            // TODO: Once 'container run' is split into 'container create' + 'container start',
+            // validate that Stop() on a container in 'Created' state returns ERROR_INVALID_STATE.
+
+            expectContainerList(
+                {{"exited-container", "debian:latest", WslaContainerStateExited},
+                 {"test-container-2", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that the container is in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that deleting a container stopped via Stop() works.
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
+        }
+
         // Verify that trying to open a non existing container fails.
         {
             wil::com_ptr<IWSLAContainer> sameContainer;
@@ -1324,8 +1353,15 @@ class WSLATests
                 {{"exited-container", "debian:latest", WslaContainerStateExited},
                  {"test-unique-name", "debian:latest", WslaContainerStateExited}});
 
+            // Verify that calling Stop() on exited containers is a no-op and state remains as WslaContainerStateExited.
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
             // Verify that stopped containers can be deleted.
             VERIFY_SUCCEEDED(container.Get().Delete());
+
+            // Verify that stopping a deleted container returns ERROR_INVALID_STATE.
+            VERIFY_ARE_EQUAL(container.Get().Stop(15, 50000), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that deleted containers can't be deleted again.
             VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
@@ -1402,7 +1438,8 @@ class WSLATests
             auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
                                .Launch(container.Get());
 
-            // TODO: Replace with Stop()
+            VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+
             ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "stop", "-t", "0", "test-container-exec"}, 0);
 
             auto result = process.WaitAndCaptureOutput();

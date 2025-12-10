@@ -44,7 +44,7 @@ const std::string& WSLAContainer::Image() const noexcept
 
 void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
@@ -100,14 +100,48 @@ void WSLAContainer::OnEvent(ContainerEvent event)
 }
 
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
+try
 {
-    return E_NOTIMPL;
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    if (State() == WslaContainerStateExited)
+    {
+        return S_OK;
+    }
+
+    /* 'nerdctl stop ...'
+     *   returns success and <containerId> on stdout if the container is running or already stopped
+     *   returns error "No such container: <containerId>" on stderr if the container is in 'Created' state or does not exist
+     *
+     * For our case, we treat stopping an already-exited container as a no-op and return success.
+     * Stopping a deleted or created container returns ERROR_INVALID_STATE.
+     * TODO: Discuss and return stdout/stderr or corresponding HRESULT from nerdctl stop for better diagnostics.
+     */
+
+    // Validate that the container is in the running state.
+    RETURN_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        m_state != WslaContainerStateRunning,
+        "Container '%hs' is not in a stoppable state: %i",
+        m_name.c_str(),
+        m_state);
+    ServiceProcessLauncher launcher(
+        nerdctlPath, {nerdctlPath, "stop", m_name, "--time", std::to_string(static_cast<ULONG>(std::round(TimeoutMs / 1000)))});
+    // TODO: Figure out how we want to handle custom signals and timeout values.
+    // nerdctl stop has a --time and a --signal option that can be used
+    // By default, it uses SIGTERM and a default timeout of 10 seconds.
+    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    m_state = WslaContainerStateExited;
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLAContainer::Delete()
 try
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // Validate that the container is in the exited state.
     RETURN_HR_IF_MSG(
@@ -128,7 +162,7 @@ CATCH_RETURN();
 
 WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // If the container is running, refresh the init process state before returning.
     if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
@@ -152,7 +186,7 @@ CATCH_RETURN();
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
 try
 {
-    std::lock_guard lock{m_lock};
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_containerProcess.has_value());
     return m_containerProcess->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process);

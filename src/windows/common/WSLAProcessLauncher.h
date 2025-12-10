@@ -93,7 +93,6 @@ public:
 
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
-    std::string FormatResult(const RunningWSLAProcess::ProcessResult& Result);
 
     template <typename T>
     auto Launch(T& Context)
@@ -108,6 +107,9 @@ public:
 
         return std::move(process.value());
     }
+
+    std::string FormatResult(const RunningWSLAProcess::ProcessResult& result);
+    std::string FormatResult(const int code);
 
 protected:
     std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();
