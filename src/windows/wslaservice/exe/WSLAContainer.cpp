@@ -125,12 +125,13 @@ try
         "Container '%hs' is not in a stoppable state: %i",
         m_name.c_str(),
         m_state);
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "stop", m_name});
-    // TODO: Figure out how we want to handle custom signals and timeout values.
+    ServiceProcessLauncher launcher(
+        nerdctlPath, {nerdctlPath, "stop", m_name, "--time", std::to_string(static_cast<ULONG>(std::round(TimeoutMs / 1000)))});
+    // TODO: Figure out how we want to handle custom signals.
     // nerdctl stop has a --time and a --signal option that can be used
     // By default, it uses SIGTERM and a default timeout of 10 seconds.
-    auto result = launcher.Launch(*m_parentVM).Wait(TimeoutMs);
-    THROW_HR_IF_MSG(E_FAIL, result.first != 0, "%hs", launcher.FormatResult(result.first).c_str());
+    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
+    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 
     m_state = WslaContainerStateExited;
     return S_OK;
