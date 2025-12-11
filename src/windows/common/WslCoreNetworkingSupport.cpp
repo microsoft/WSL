@@ -248,3 +248,25 @@ wsl::core::networking::EphemeralHcnEndpoint wsl::core::networking::CreateEphemer
 
     return endpoint;
 }
+
+std::optional<ULONG> wsl::core::networking::GetMinimumConnectedInterfaceMtu() noexcept
+{
+    std::optional<ULONG> minMtu{};
+    try
+    {
+        unique_interface_table interfaceTable{};
+        THROW_IF_WIN32_ERROR(::GetIpInterfaceTable(AF_UNSPEC, &interfaceTable));
+
+        for (ULONG index = 0; index < interfaceTable.get()->NumEntries; index++)
+        {
+            const auto& ipInterface = interfaceTable.get()->Table[index];
+            if (ipInterface.Connected)
+            {
+                minMtu = std::min(minMtu.value_or(ipInterface.NlMtu), ipInterface.NlMtu);
+            }
+        }
+    }
+    CATCH_LOG()
+
+    return minMtu;
+}

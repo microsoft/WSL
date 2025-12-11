@@ -118,6 +118,11 @@ std::string WSLAProcessLauncher::FormatResult(const RunningWSLAProcess::ProcessR
         stdErr != result.Output.end() ? stdErr->second : "<none>");
 }
 
+std::string WSLAProcessLauncher::FormatResult(const int code)
+{
+    return std::format("{} [{}] exited with: {}.", m_executable, wsl::shared::string::Join(m_arguments, ','), code);
+}
+
 std::pair<int, bool> RunningWSLAProcess::Wait(DWORD TimeoutMs)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !GetExitEvent().wait(TimeoutMs));

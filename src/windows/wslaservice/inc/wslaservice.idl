@@ -258,7 +258,6 @@ struct WSLA_SESSION_SETTINGS {
 ]
 interface IWSLAContainer : IUnknown
 {
-    HRESULT Start();
     HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);

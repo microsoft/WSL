@@ -12,7 +12,7 @@
                 <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,0,0,-6"/>
                 <controls:HyperlinkTextBlock x:Uid="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample"/>
                 <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,-6"/>
-                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample" TextWrapping="Wrap"/>
                 <HyperlinkButton x:Uid="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink" Style="{StaticResource TextButtonStyle}" Margin="0,6,0,-12"/>
                 <HyperlinkButton x:Uid="Settings_OOBENetworkingIntegrationMirroredModeLink" Style="{StaticResource TextButtonStyle}"/>
             </StackPanel>

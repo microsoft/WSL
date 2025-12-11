@@ -67,7 +67,7 @@ stages:
         displayName: Copy AppxUpload artifact
 
       # creates a submission package that is published to the store; containers store page information and the WSL appxupload
-      - task: MS-RDX-MRO.windows-store-publish-dev.package-task.store-package@3
+      - task: MS-RDX-MRO.windows-store-publish.package-task.store-package@3
         displayName: 'Creating StoreBroker Payload'
         inputs:
           serviceEndpoint: 'AzureConnection-StoreBroker-WIF'
@@ -88,7 +88,7 @@ stages:
         displayName: Copy StoreBrokerPayload to drop
 
       # submit the package flight to the WSL SelfHost Flight Group
-      - task: MS-RDX-MRO.windows-store-publish-dev.flight-task.store-flight@3
+      - task: MS-RDX-MRO.windows-store-publish.flight-task.store-flight@3
         displayName: 'Flight StoreBroker Package to Partner Center - WSL SelfHost Flight Group'
         condition: and(succeeded(), eq('${{ parameters.publishPackage }}', true))
         inputs:

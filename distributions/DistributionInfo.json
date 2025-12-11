@@ -62,8 +62,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 15 SP7",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20250903.0/SUSE-Linux-Enterprise-15-SP7-15.7.x86_64-27.32-Build27.32.wsl",
-                    "Sha256": "0x1e53279af609b9d67b108bc31f1318c3317338595298ef8dfbf7a5728ab8a093"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20251201.0/SUSE-Linux-Enterprise-15-SP7-15.7.x86_64-30.1-Build30.1.wsl",
+                    "Sha256": "0x60924e13286ed15bdcf9069e3a24d3394fb858954de3bdfcb1ea576900b81b2e"
                 }
             },
             {
@@ -71,8 +71,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 16.0",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20251104.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.3-Build1.3.wsl",
-                    "Sha256": "0xb91f901ba96910fa65218ef0e6aaae7b9980bd11fed63cb3507878aa8915d726"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20251201.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.9-Build1.9.wsl",
+                    "Sha256": "0xf0fc07ed3543d3dc24cfb35b4194bbecf98485cefdd720c521034ac1c54bffd3"
                 }
             }
         ],
@@ -166,8 +166,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2025.11.01.150831/archlinux-2025.11.01.150831.wsl",
-                    "Sha256": "9dbac892c38c94fd22a8988eff4e072778f3f445378d33a81474a2b88cb04562"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2025.12.01.153427/archlinux-2025.12.01.153427.wsl",
+                    "Sha256": "8dfe92910a188f191b0af2972bd4bda661178b769ce820a8921e8b7aeae9a517"
                 }
             }
         ],

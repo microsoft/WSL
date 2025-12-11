@@ -381,7 +381,6 @@
                     <File Id="RdpWinStlHelper.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" />
                 <?endif?>
                 <File Id="wsldevicehost.dll" Source="${BIN}/wsldevicehost.dll" />
-                <File Id="lxutil.dll" Source="${BIN}/lxutil.dll" />
                 <File Id="${WSLG_TS_PLUGIN_DLL}" Source="${BIN}/${WSLG_TS_PLUGIN_DLL}" />
 
                 <!-- MSRDC Plugin registration -->

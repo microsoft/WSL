@@ -10,11 +10,11 @@
         <controls:OOBEContent.PageContent>
             <StackPanel Orientation="Vertical" Spacing="12">
                 <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,0,0,-6"/>
-                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample" TextWrapping="Wrap"/>
                 <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,-6"/>
-                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample" TextWrapping="Wrap"/>
                 <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle" Style="{StaticResource OobeSubtitleStyle}" Margin="0,12,0,-6"/>
-                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample"/>
+                <TextBlock x:Uid="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample" TextWrapping="Wrap"/>
                 <HyperlinkButton x:Uid="Settings_OOBECrossOSFileAccessLink" Margin="0,6,0,0" Style="{StaticResource TextButtonStyle}"/>
             </StackPanel>
         </controls:OOBEContent.PageContent>

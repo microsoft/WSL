@@ -95,6 +95,7 @@ public:
     ClientRunningWSLAProcess Launch(IWSLASession& Session);
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
     std::string FormatResult(const RunningWSLAProcess::ProcessResult& result);
+    std::string FormatResult(const int code);
 
 protected:
     std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();

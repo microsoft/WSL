@@ -135,12 +135,6 @@ public:
         Logfile << TestMode;
         VERIFY_NO_THROW(LxsstuRunTest(Command.str().c_str(), Logfile.str().c_str()));
 
-        if (DrvFsMode.has_value() && DrvFsMode.value() == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("TODO: debug test for virtiofs");
-            return;
-        }
-
         //
         // Check that the read-only attribute has been changed.
         //
@@ -173,8 +167,15 @@ public:
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink7", L"ntlink2", true));
         VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\ntlink8", L"foo\uf03abar", false));
 
-        VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink1"));
-        VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink2"));
+        if (DrvFsMode.has_value() && DrvFsMode.value() == DrvFsMode::VirtioFs)
+        {
+            LogInfo("TODO: debug VerifyDrvFsLxSymlink variations on virtiofs");
+        }
+        else
+        {
+            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink1"));
+            VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink2"));
+        }
 
         // Since target resolution is done on the Windows side in Plan 9, it is able to create an NT
         // link if the target path traverses an existing NT link (this is actually better than WSL 1).
@@ -228,9 +229,15 @@ public:
         VERIFY_NO_THROW(DrvFsCommon(LX_DRVFS_DISABLE_NONE, Mode));
     }
 
-    void DrvFsFat() const
+    void DrvFsFat(DrvFsMode Mode)
     {
         SKIP_TEST_ARM64();
+
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            LogSkipped("VirtioFS currently only supports mounting full drives");
+            return;
+        }
 
         constexpr auto MountPoint = "C:\\lxss_fat";
         constexpr auto VhdPath = "C:\\lxss_fat.vhdx";
@@ -241,9 +248,15 @@ public:
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 3'").c_str(), L"drvfs3"));
     }
 
-    void DrvFsSmb() const
+    void DrvFsSmb(DrvFsMode Mode)
     {
         SKIP_TEST_ARM64();
+
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            LogSkipped("TODO: debug virtiofs handling of //localhost/C$ style paths");
+            return;
+        }
 
         VERIFY_NO_THROW(
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 4'").c_str(), L"drvfs4"));
@@ -312,19 +325,19 @@ public:
     {
         SKIP_TEST_ARM64();
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("TODO: debug test for virtiofs");
-            return;
-        }
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests xattr drvfs", L"xattr_drvfs"));
     }
 
-    void DrvFsReFs() const
+    void DrvFsReFs(DrvFsMode Mode)
     {
         SKIP_TEST_ARM64();
         WSL_TEST_VERSION_REQUIRED(wsl::windows::common::helpers::WindowsBuildNumbers::Germanium);
+
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            LogSkipped("VirtioFS currently only supports mounting full drives");
+            return;
+        }
 
         constexpr auto MountPoint = "C:\\lxss_refs";
         constexpr auto VhdPath = "C:\\lxss_refs.vhdx";
@@ -1072,13 +1085,13 @@ class WSL1 : public DrvFsTests
     TEST_METHOD(DrvFsFat)
     {
         WSL1_TEST_ONLY();
-        DrvFsTests::DrvFsFat();
+        DrvFsTests::DrvFsFat(DrvFsMode::WSL1);
     }
 
     TEST_METHOD(DrvFsSmb)
     {
         WSL1_TEST_ONLY();
-        DrvFsTests::DrvFsSmb();
+        DrvFsTests::DrvFsSmb(DrvFsMode::WSL1);
     }
 
     TEST_METHOD(DrvFsMetadata)
@@ -1108,8 +1121,8 @@ class WSL1 : public DrvFsTests
             else \
             { \
                 VERIFY_ARE_EQUAL(LxsstuInitialize(FALSE), TRUE); \
-                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0); \
                 m_config.reset(new WslConfigChange(LxssGenerateTestConfig({.drvFsMode = DrvFsMode::##_mode##}))); \
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0); \
             } \
 \
             return true; \
@@ -1147,13 +1160,13 @@ class WSL1 : public DrvFsTests
         TEST_METHOD(DrvFsFat) \
         { \
             WSL2_TEST_ONLY(); \
-            DrvFsTests::DrvFsFat(); \
+            DrvFsTests::DrvFsFat(DrvFsMode::##_mode##); \
         } \
 \
         TEST_METHOD(DrvFsSmb) \
         { \
             WSL2_TEST_ONLY(); \
-            DrvFsTests::DrvFsSmb(); \
+            DrvFsTests::DrvFsSmb(DrvFsMode::##_mode##); \
         } \
 \
         TEST_METHOD(DrvFsMetadata) \
@@ -1195,7 +1208,7 @@ class WSL1 : public DrvFsTests
         TEST_METHOD(DrvFsReFs) \
         { \
             WSL2_TEST_ONLY(); \
-            DrvFsTests::DrvFsReFs(); \
+            DrvFsTests::DrvFsReFs(DrvFsMode::##_mode##); \
         } \
     }
 

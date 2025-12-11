@@ -2258,7 +2258,16 @@ Return Value:
     if (Value != nullptr)
     {
         Config.VmId = Value;
-        unsetenv(LX_WSL2_VM_ID_ENV);
+
+        //
+        // Unset the environment variable for user distros.
+        //
+
+        Value = getenv(LX_WSL2_SHARED_MEMORY_OB_DIRECTORY);
+        if (!Value)
+        {
+            unsetenv(LX_WSL2_VM_ID_ENV);
+        }
     }
 
     //
