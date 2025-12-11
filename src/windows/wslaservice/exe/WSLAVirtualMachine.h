@@ -32,6 +32,12 @@ enum WSLAMountFlags
     WSLAMountFlagsWriteableOverlayFs = 4,
 };
 
+struct MountedFolderInfo
+{
+    std::wstring ShareName;
+    std::optional<GUID> InstanceId; // For VirtioFS devices
+};
+
 class WSLAUserSessionImpl;
 
 class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
@@ -163,7 +169,7 @@ private:
     wil::unique_handle m_portRelayChannelWrite;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
-    std::map<std::string, std::wstring> m_mountedWindowsFolders;
+    std::map<std::string, MountedFolderInfo> m_mountedWindowsFolders;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
 };
