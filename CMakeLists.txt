@@ -65,7 +65,7 @@ find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
-find_nuget_package(Microsoft.WSL.WSLATestDistro WSLA_TEST_DISTRO /)
+find_nuget_package(Microsoft.WSL.WslaRootfs WSLA_TEST_DISTRO /)
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(StrawberryPerl PERL /)
 find_nuget_package(vswhere VSWHERE /tools)
@@ -376,7 +376,7 @@ if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smal
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
 
     if (NOT OFFICIAL_BUILD AND ${TARGET_PLATFORM} STREQUAL "x64")
-        add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd")
+        add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd")
     endif()
 endif()
 

@@ -91,7 +91,7 @@ WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SE
 
 #endif
 
-        vmSettings.RootVhdType = "squashfs";
+        vmSettings.RootVhdType = "ext4";
     }
 
     if (Settings.DmesgOutput != 0)

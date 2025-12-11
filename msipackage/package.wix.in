@@ -44,7 +44,7 @@
 
                 <!-- Temporary runtime VHD. TODO: Update once the final VHD is available. -->
                 <?if "${WSL_DEV_BINARY_PATH}" = "" AND "${TARGET_PLATFORM}" = "x64" ?>
-                <File Id="wslarootfs.vhd" Name="wslarootfs.vhd" Source="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd"/>
+                <File Id="wslarootfs.vhd" Name="wslarootfs.vhd" Source="${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd"/>
                 <?endif?>
 
                 <!-- Installation folder -->
