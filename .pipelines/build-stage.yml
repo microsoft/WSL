@@ -394,7 +394,7 @@ stages:
               Move-Item -Path "bin\x64\cloudtest" -Destination "$(ob_outputDirectory)\testbin\x64\cloudtest"
               Move-Item -Path "tools\test\test-setup.ps1" -Destination "$(ob_outputDirectory)\testbin\test-setup.ps1"
               Move-Item -Path "tools\test\CloudTest-Setup.bat" -Destination "$(ob_outputDirectory)\testbin\CloudTest-Setup.bat"
-              Move-Item -Path "tools\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
+              Move-Item -Path "diagnostics\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
               Move-Item -Path "test\linux\unit_tests" -Destination "$(ob_outputDirectory)\testbin\unit_tests"
 
               Move-Item -Path bundle\release\* -Destination $(ob_outputDirectory)\bundle
