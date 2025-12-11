@@ -276,7 +276,7 @@ public:
         SKIP_TEST_ARM64();
 
         TerminateDistribution();
-        WslKeepAlive keelAlive;
+        WslKeepAlive keepAlive;
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
@@ -288,7 +288,7 @@ public:
         SKIP_TEST_ARM64();
 
         TerminateDistribution();
-        WslKeepAlive keelAlive;
+        WslKeepAlive keepAlive;
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
     }
@@ -302,7 +302,7 @@ public:
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken();
-        WslKeepAlive keelAlive(nonElevatedToken.get());
+        WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
@@ -316,7 +316,7 @@ public:
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken();
-        WslKeepAlive keelAlive(nonElevatedToken.get());
+        WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
     }
@@ -328,7 +328,7 @@ public:
         SKIP_TEST_ARM64();
 
         WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true, .drvFsMode = Mode}));
-        WslKeepAlive keelAlive;
+        WslKeepAlive keepAlive;
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
@@ -342,7 +342,7 @@ public:
         WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true, .drvFsMode = Mode}));
 
         const auto nonElevatedToken = GetNonElevatedToken();
-        WslKeepAlive keelAlive(nonElevatedToken.get());
+        WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
