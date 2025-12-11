@@ -64,13 +64,13 @@ HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 
 HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)
 {
-    std::lock_guard lock(m_lock);
+    std::lock_guard lock(m_wslaSessionsLock);
 
     // TODO: ACL check
     // TODO: Check for duplicate on session creation.
     for (auto& e : m_sessions)
     {
-        if (e->GetDisplayName() == DisplayName)
+        if (e->DisplayName() == DisplayName)
         {
             THROW_IF_FAILED(e->QueryInterface(__uuidof(IWSLASession), (void**)Session));
             return S_OK;
