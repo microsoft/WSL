@@ -220,11 +220,7 @@ int MountWithRetry(const char* Source, const char* Target, const char* FsType, c
 
 Routine Description:
 
-    This routine will perform a mount using the /bin/mount binary, and will
-    retry it if it fails.
-
-    N.B. This routine is used for virtio-9p and virtiofs which can transiently
-         fail to mount if the PCI device isn't ready yet.
+    This routine performs a mount with retry logic for DrvFs filesystems.
 
 Arguments:
 
@@ -246,56 +242,20 @@ Return Value:
 
 try
 {
-    int Result;
-    try
+    //
+    // Verify the target directory exists before mounting.
+    //
+
+    int Result = access(Target, F_OK);
+    if (Result == 0)
     {
-        bool PrintWarning = true;
-        wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_LAST_ERROR_IF(mountutil::MountFilesystem(Source, Target, FsType, Options) < 0); },
-            std::chrono::milliseconds{100},
-            std::chrono::seconds{2},
-            [&]() {
-                // For virtio-9p, there are two errors that could indicate the PCI device is not ready:
-                // EBUSY - Returned if all devices with the tag are already in use.
-                // ENOENT - Returned if there are no devices with the tag, which can happen after the VM first boots.
-                //   In this case, check if the target exists; if it doesn't, ENOENT is for that and there's no reason to retry.
-                //
-                // For virtiofs, EINVAL will be returned if the tag is not ready.
-                auto savedErrno = wil::ResultFromCaughtException();
-                if (strcmp(FsType, PLAN9_FS_TYPE) == 0)
-                {
-                    if (errno != EBUSY && (errno != ENOENT || access(Target, F_OK) != 0))
-                    {
-                        errno = savedErrno;
-                        return false;
-                    }
-                }
-                else if ((strcmp(FsType, VIRTIO_FS_TYPE) == 0) && (errno != EINVAL))
-                {
-                    return false;
-                }
-
-                if (PrintWarning)
-                {
-                    LOG_WARNING("mount: waiting for virtio device {}", Source);
-                    PrintWarning = false;
-                }
-
-                return true;
-            });
-
-        Result = 0;
-    }
-    catch (...)
-    {
-        errno = wil::ResultFromCaughtException();
-        auto parsed = mountutil::MountParseFlags(Options);
-        LOG_ERROR("mount({}, {}, {}, {:#x}, {}) failed: {}", Source, Target, FsType, parsed.MountFlags, parsed.StringOptions.c_str(), strerror(errno));
-        Result = -1;
+        auto Parsed = mountutil::MountParseFlags(Options);
+        Result = UtilMount(Source, Target, FsType, Parsed.MountFlags, Parsed.StringOptions.c_str(), std::chrono::seconds{2});
     }
 
     if (ExitCode)
     {
+        LOG_STDERR(errno);
         *ExitCode = Result < 0 ? c_exitCodeMountFail : 0;
     }
 
