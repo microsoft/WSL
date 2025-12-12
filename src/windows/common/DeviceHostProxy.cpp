@@ -64,6 +64,30 @@ GUID DeviceHostProxy::AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9Fi
     return instanceId;
 }
 
+void DeviceHostProxy::RemoveDevice(const GUID& Type, const GUID& InstanceId)
+{
+    {
+        auto lock = m_devicesLock.lock_exclusive();
+        THROW_HR_IF(E_CHANGED_STATE, m_devicesShutdown);
+        THROW_HR_IF(E_INVALIDARG, m_devices.find(InstanceId) == m_devices.end());
+
+        m_devices.erase(InstanceId);
+    }
+
+    // N.B. Removing the FlexIov device is best effort since not all versions of Windows support it.
+    try
+    {
+        ModifySettingRequest<FlexibleIoDevice> request;
+        request.RequestType = ModifyRequestType::Remove;
+        request.ResourcePath = L"VirtualMachine/Devices/FlexibleIov/";
+        request.ResourcePath += wsl::shared::string::GuidToString<wchar_t>(InstanceId, wsl::shared::string::GuidToStringFlags::None);
+        request.Settings.EmulatorId = Type;
+        request.Settings.HostingModel = FlexibleIoDeviceHostingModel::ExternalRestricted;
+        wsl::windows::common::hcs::ModifyComputeSystem(m_system.get(), wsl::shared::ToJsonW(request).c_str());
+    }
+    CATCH_LOG()
+}
+
 void DeviceHostProxy::AddRemoteFileSystem(const GUID& ImplementationClsid, const std::wstring& Tag, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs)
 {
     auto lock = m_lock.lock_exclusive();

@@ -92,10 +92,7 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
 
     // Shutdown DeviceHostProxy before resetting compute system
-    if (m_guestDeviceManager)
-    {
-        m_guestDeviceManager->Shutdown();
-    }
+    m_guestDeviceManager.reset();
 
     m_computeSystem.reset();
 
@@ -1172,8 +1169,9 @@ try
 
     const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
+    std::optional<GUID> instanceId;
     {
-        // Create the plan9 share on the host
+        // Create the share on the host.
         std::lock_guard lock(m_lock);
 
         // Verify that this folder isn't already mounted.
@@ -1206,16 +1204,17 @@ try
                 userToken.get());
         }
 
-        m_mountedWindowsFolders.emplace(LinuxPath, shareName);
+        m_mountedWindowsFolders.emplace(LinuxPath, MountedFolderInfo{shareName, instanceId});
     }
 
     auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         std::lock_guard lock(m_lock);
-        LOG_HR_IF(E_UNEXPECTED, m_mountedWindowsFolders.erase(LinuxPath) != 1);
-
-        if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
+        auto mountIt = m_mountedWindowsFolders.find(LinuxPath);
+        if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
-            hcs::RemovePlan9Share(m_computeSystem.get(), shareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
+            auto mountInfo = mountIt->second;
+            m_mountedWindowsFolders.erase(mountIt);
+            RemoveShare(mountInfo);
         }
     });
 
@@ -1253,6 +1252,19 @@ try
 }
 CATCH_RETURN();
 
+void WSLAVirtualMachine::RemoveShare(_In_ const MountedFolderInfo& MountInfo)
+{
+    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
+    {
+        WI_ASSERT(!MountInfo.InstanceId.has_value());
+        hcs::RemovePlan9Share(m_computeSystem.get(), MountInfo.ShareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
+    }
+    else if (WI_VERIFY(MountInfo.InstanceId.has_value()))
+    {
+        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, MountInfo.InstanceId.value());
+    }
+}
+
 HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 try
 {
@@ -1266,14 +1278,11 @@ try
     auto result = Unmount(LinuxPath);
     THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
-    // Remove the share from the host.
-    // N.B. VirtioFs shares are present until the VM is destroyed, since HCS currently lacks support for removing them dynamically.
-    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
-    {
-        hcs::RemovePlan9Share(m_computeSystem.get(), it->second.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
-    }
-
+    auto mountInfo = it->second;
     m_mountedWindowsFolders.erase(it);
+
+    // Remove the share from the host
+    RemoveShare(mountInfo);
 
     return S_OK;
 }

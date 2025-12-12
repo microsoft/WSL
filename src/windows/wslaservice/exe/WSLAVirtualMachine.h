@@ -45,6 +45,12 @@ public:
         wil::unique_socket Socket;
     };
 
+    struct MountedFolderInfo
+    {
+        std::wstring ShareName;
+        std::optional<GUID> InstanceId; // Only used for VirtioFS devices
+    };
+
     struct Settings
     {
         std::wstring DisplayName;
@@ -107,6 +113,7 @@ private:
     ConnectedSocket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
+    void RemoveShare(_In_ const MountedFolderInfo& MountInfo);
 
     std::filesystem::path GetCrashDumpFolder();
     void CreateVmSavedStateFile();
@@ -163,7 +170,7 @@ private:
     wil::unique_handle m_portRelayChannelWrite;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
-    std::map<std::string, std::wstring> m_mountedWindowsFolders;
+    std::map<std::string, MountedFolderInfo> m_mountedWindowsFolders;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
 };
