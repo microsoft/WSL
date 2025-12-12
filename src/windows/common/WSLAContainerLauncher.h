@@ -47,7 +47,7 @@ public:
         const std::vector<std::string>& Environment = {},
         ProcessFlags Flags = ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-    void AddVolume(const std::string& HostPath, const std::string& ContainerPath, bool ReadOnly);
+    void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
 
     RunningWSLAContainer Launch(IWSLASession& Session);
@@ -56,5 +56,6 @@ public:
 private:
     std::string m_image;
     std::string m_name;
+    std::vector<WSLA_VOLUME> m_volumes;
 };
 } // namespace wsl::windows::common

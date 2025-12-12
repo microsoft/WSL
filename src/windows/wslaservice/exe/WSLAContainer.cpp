@@ -17,8 +17,10 @@ Abstract:
 #include "WSLAProcess.h"
 
 using wsl::windows::service::wsla::WSLAContainer;
+using wsl::windows::service::wsla::VolumeMountInfo;
 
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
+constexpr const DWORD deleteTimeout = 60 * 1000;
 
 // Constants for required default arguments for "nerdctl run..."
 static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
@@ -26,8 +28,8 @@ static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO:
                                                       "--ulimit",
                                                       "nofile=65536:65536"};
 
-WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image) :
-    m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image)
+WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image, std::vector<VolumeMountInfo> volumes) :
+    m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image), mountedVolumes(std::move(volumes))
 {
     m_state = WslaContainerStateCreated;
 
@@ -56,6 +58,14 @@ WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess
 
     // TODO: move to start() once create() and start() are split to different methods.
     m_state = WslaContainerStateRunning;
+}
+
+WSLAContainer::~WSLAContainer()
+{
+    if (m_state != WslaContainerStateDeleted)
+    {
+        LOG_IF_FAILED(Delete());
+    }
 }
 
 const std::string& WSLAContainer::Image() const noexcept
@@ -87,8 +97,10 @@ try
         m_state);
 
     ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "rm", "-f", m_name});
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
+    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput(deleteTimeout);
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    UnmountVolumes(mountedVolumes, *m_parentVM);
 
     m_state = WslaContainerStateDeleted;
     return S_OK;
@@ -164,7 +176,8 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
         inputOptions.push_back("-t");
     }
 
-    auto args = PrepareNerdctlRunCommand(containerOptions, std::move(inputOptions));
+    auto volumes = MountVolumes(containerOptions, parentVM);
+    auto args = PrepareNerdctlRunCommand(containerOptions, std::move(inputOptions), volumes);
 
     ServiceProcessLauncher launcher(nerdctlPath, args, {}, common::ProcessFlags::None);
     for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)
@@ -172,10 +185,51 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
         launcher.AddFd(containerOptions.InitProcessOptions.Fds[i]);
     }
 
-    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM), containerOptions.Name, containerOptions.Image);
+
+
+    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM), containerOptions.Name, containerOptions.Image, volumes);
 }
 
-std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)
+std::vector<VolumeMountInfo> WSLAContainer::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
+{
+    std::vector<VolumeMountInfo> mountedVolumes;
+    mountedVolumes.reserve(Options.VolumesCount);
+
+    for (ULONG i = 0; i < Options.VolumesCount; i++)
+    {
+        try
+        {
+            const WSLA_VOLUME& volume = Options.Volumes[i];
+            std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", Options.Name, i);
+
+            THROW_IF_FAILED(parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly));
+
+            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, volume.ReadOnly});
+        }
+        catch (...)
+        {
+            // On failure, unmount all previously mounted volumes.
+            UnmountVolumes(mountedVolumes, parentVM);
+            throw;
+        }
+    }
+
+    return mountedVolumes;
+}
+
+void WSLAContainer::UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM)
+{
+    for (const auto& volume : volumes)
+    {
+        try
+        {
+            parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str());
+        }
+        CATCH_LOG();
+    }
+}
+
+std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes)
 {
     std::vector<std::string> args{nerdctlPath};
     args.push_back("run");
@@ -212,8 +266,27 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
         args.push_back(options.InitProcessOptions.Executable);
     }
 
+    
+    if (!volumes.empty())
+    {
+        for (const auto& volume : volumes)
+        {
+            std::string mountArg = "-v";
+
+            mountArg += volume.ParentVMPath;
+            mountArg += ":";
+            mountArg += volume.ContainerPath;
+
+            if (volume.ReadOnly)
+            {
+                mountArg += ":ro";
+            }
+
+            args.push_back(mountArg);
+        }
+    }
+
     // TODO:
-    // - Implement volume mounts
     // - Implement port mapping
 
     args.push_back(options.Image);

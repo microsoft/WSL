@@ -105,6 +105,9 @@ WSLASession::~WSLASession()
 
     std::lock_guard lock{m_lock};
 
+    // This will delete all containers. Needs to be done before the VM is terminated.
+    m_containers.clear();
+
     if (m_virtualMachine)
     {
         m_virtualMachine->OnSessionTerminated();

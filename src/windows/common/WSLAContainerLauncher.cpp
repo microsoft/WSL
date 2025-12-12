@@ -53,6 +53,16 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 {
 }
 
+void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
+{
+    WSLA_VOLUME vol{};
+    vol.HostPath = HostPath.c_str();
+    vol.ContainerPath = ContainerPath.c_str();
+    vol.ReadOnly = ReadOnly ? TRUE : FALSE;
+
+    m_volumes.push_back(vol);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
 {
     WSLA_CONTAINER_OPTIONS options{};
@@ -64,6 +74,12 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     if (m_executable.empty())
     {
         options.InitProcessOptions.Executable = nullptr;
+    }
+
+    if (!m_volumes.empty())
+    {
+        options.Volumes = m_volumes.data();
+        options.VolumesCount = gsl::narrow_cast<ULONG>(m_volumes.size());
     }
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
