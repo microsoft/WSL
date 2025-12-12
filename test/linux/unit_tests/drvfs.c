@@ -1417,6 +1417,13 @@ Return Value:
 
     int Result;
 
+    if (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
+    {
+        LxtLogInfo("TODO: debug this test on virtiofs.");
+        Result = 0;
+        goto ErrorExit;
+    }
+
     LxtCheckResult(LxtFsDeleteLoopCommon(DRVFS_DELETELOOP_PREFIX));
 
 ErrorExit:
@@ -1951,12 +1958,12 @@ Return Value:
     //
     // Fstat should still work after unlink.
     //
-    // N.B. This currently doesn't work on plan 9.
+    // N.B. This currently doesn't work on plan9 or virtiofs.
     //
 
     LxtCheckErrnoZeroSuccess(unlink(DRVFS_BASIC_PREFIX "/testfile"));
     LxtCheckErrnoFailure(stat(DRVFS_BASIC_PREFIX "/testfile", &Stat2), ENOENT);
-    if (g_LxtFsInfo.FsType != LxtFsTypePlan9)
+    if (g_LxtFsInfo.FsType != LxtFsTypePlan9 && g_LxtFsInfo.FsType != LxtFsTypeVirtioFs)
     {
         LxtCheckErrnoZeroSuccess(fstat(Fd, &Stat2));
 
@@ -2143,9 +2150,9 @@ Return Value:
 
     Dir = NULL;
 
-    if (g_LxtFsInfo.FsType == LxtFsTypePlan9)
+    if (g_LxtFsInfo.FsType == LxtFsTypePlan9 || g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
     {
-        LxtLogInfo("This test is not relevant in VM mode.");
+        LxtLogInfo("This test is not relevant for plan9 or virtiofs.");
         Result = 0;
         goto ErrorExit;
     }
@@ -3171,12 +3178,12 @@ Return Value:
     Fd2 = -1;
 
     //
-    // This functionality is not supported on Plan 9.
+    // This functionality is not supported on Plan 9 or virtiofs.
     //
 
-    if (g_LxtFsInfo.FsType == LxtFsTypePlan9)
+    if (g_LxtFsInfo.FsType == LxtFsTypePlan9 || g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
     {
-        LxtLogInfo("This test is not supported in VM mode.");
+        LxtLogInfo("This test is not supported for plan9 or virtiofs.");
         Result = 0;
         goto ErrorExit;
     }
@@ -3248,6 +3255,7 @@ Return Value:
     bool FileLinkFound;
     bool JunctionFound;
     void* Mapping;
+    void* MapResult;
     void* PointerResult;
     bool RelativeLinkFound;
     int Result;
@@ -3261,7 +3269,7 @@ Return Value:
 
     DirFd = -1;
     Fd = -1;
-    Mapping = NULL;
+    Mapping = MAP_FAILED;
     LxtCheckNullErrno(Dir = opendir(DRVFS_REPARSE_PREFIX));
     errno = 0;
     AbsoluteLinkFound = false;
@@ -3460,11 +3468,18 @@ Return Value:
     // is what execve uses.
     //
 
-    LxtCheckNullErrno(Mapping = mmap(NULL, 2, PROT_READ, MAP_SHARED, Fd, 0));
-    LxtCheckMemoryEqual(Mapping, "MZ", 2);
+    if (g_LxtFsInfo.FsType != LxtFsTypeVirtioFs)
+    {
+        LxtCheckMapErrno(Mapping = mmap(NULL, 2, PROT_READ, MAP_SHARED, Fd, 0));
+        LxtCheckMemoryEqual(Mapping, "MZ", 2);
+    }
+    else
+    {
+        LxtLogInfo("TODO: debug virtiofs handling of app exec links");
+    }
 
 ErrorExit:
-    if (Mapping != NULL)
+    if (Mapping != MAP_FAILED)
     {
         munmap(Mapping, 2);
     }

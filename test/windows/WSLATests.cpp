@@ -194,11 +194,10 @@ class WSLATests
 
         // Act: list sessions
         wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-        ULONG count = 0;
-        VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, &count));
+        VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
         // Assert
-        VERIFY_ARE_EQUAL(count, 1u);
+        VERIFY_ARE_EQUAL(sessions.size(), 1u);
         const auto& info = sessions[0];
 
         // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.

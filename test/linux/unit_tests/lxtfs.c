@@ -3350,7 +3350,6 @@ Return Value:
     FullExpectedTime = (Expected->tv_sec * FS_NS_PER_SEC) + Expected->tv_nsec;
     if ((FullTime <= FullExpectedTime) && (FullTime >= (FullExpectedTime - (AllowedVarianceSeconds * FS_NS_PER_SEC))))
     {
-
         return true;
     }
 
@@ -3359,9 +3358,9 @@ Return Value:
     // the host and guest.
     //
 
-    if ((g_LxtFsInfo.FsType == LxtFsTypePlan9) && (FullTime <= (FullExpectedTime + (AllowedVarianceSeconds * FS_NS_PER_SEC))))
+    if (((g_LxtFsInfo.FsType == LxtFsTypePlan9) || (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)) &&
+        (FullTime <= (FullExpectedTime + (AllowedVarianceSeconds * FS_NS_PER_SEC))))
     {
-
         return true;
     }
 
