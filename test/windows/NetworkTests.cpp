@@ -2095,20 +2095,23 @@ class NetworkTests
         VerifyNotBoundLoopback(port, false);
     }
 
-    static void ValidateLocalhostRelayTraffic(bool ipv6)
+    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily)
     {
+        THROW_HR_IF(E_INVALIDARG, addressFamily != AF_INET && addressFamily != AF_INET6);
+
         // Bind a port in the guest.
-        auto [guestProcess, read] = BindGuestPort(ipv6 ? L"TCP6-LISTEN:1234,bind=::1" : L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
+        auto [guestProcess, read] =
+            BindGuestPort(addressFamily == AF_INET6 ? L"TCP6-LISTEN:1234,bind=::1" : L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
 
         // Connect to the port via the localhost relay
         wil::unique_socket hostSocket;
         SOCKADDR_INET addr{};
-        addr.si_family = ipv6 ? AF_INET6 : AF_INET;
+        addr.si_family = addressFamily;
         INETADDR_SETLOOPBACK((PSOCKADDR)&addr);
         SS_PORT(&addr) = htons(1234);
 
         auto pred = [&]() {
-            hostSocket.reset(socket(ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, IPPROTO_TCP));
+            hostSocket.reset(socket(addressFamily, SOCK_STREAM, IPPROTO_TCP));
             THROW_HR_IF(E_ABORT, !hostSocket);
             THROW_HR_IF(E_FAIL, connect(hostSocket.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
         };
@@ -2149,8 +2152,8 @@ class NetworkTests
         WSL2_TEST_ONLY();
         WslKeepAlive keepAlive;
 
-        ValidateLocalhostRelayTraffic(false);
-        ValidateLocalhostRelayTraffic(true);
+        ValidateLocalhostRelayTraffic(AF_INET);
+        ValidateLocalhostRelayTraffic(AF_INET6);
     }
 
     TEST_METHOD(NatLocalhostRelayNoIpv6)
@@ -2161,7 +2164,7 @@ class NetworkTests
         WslKeepAlive keepAlive;
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /proc/net/tcp6"), 1L);
-        ValidateLocalhostRelayTraffic(false);
+        ValidateLocalhostRelayTraffic(AF_INET);
     }
 
     static void TestNonRootNamespaceEphemeralBind()
