@@ -57,6 +57,6 @@ public:
 private:
     std::string m_image;
     std::string m_name;
-    int m_containerNetworkType;
+    WSLA_CONTAINER_NETWORK_TYPE m_containerNetworkType;
 };
 } // namespace wsl::windows::common
