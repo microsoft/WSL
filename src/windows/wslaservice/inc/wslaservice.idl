@@ -135,6 +135,20 @@ struct WSLA_PORT_MAPPING
     USHORT ContainerPort;
 };
 
+enum WSLA_CONTAINER_NETWORK_TYPE
+{
+    WSLA_CONTAINER_NETWORK_BRIDGE = 0,
+    WSLA_CONTAINER_NETWORK_HOST = 1,
+    WSLA_CONTAINER_NETWORK_NONE = 2,
+    // WSLA_CONTAINER_NETWORK_CUSTOM = 3 // TODO: Implement when implementing custom networks
+};
+struct WSLA_CONTAINER_NETWORK
+{
+    // TODO: Change default to bridge when implemented
+    enum WSLA_CONTAINER_NETWORK_TYPE ContainerNetworkType;
+    LPCSTR ContainerNetworkName;
+};
+
 enum WSLA_CONTAINER_FLAGS
 {
     WSLA_CONTAINER_FLAG_ENABLE_GPU = 1
@@ -154,6 +168,7 @@ struct WSLA_CONTAINER_OPTIONS
     // TODO: List specific GPU devices.
     // TODO: Flags on wether the caller wants to override entrypoint, args, or both.
     ULONGLONG ShmSize;
+    struct WSLA_CONTAINER_NETWORK ContainerNetwork;
 };
 
 enum WSLA_CONTAINER_STATE

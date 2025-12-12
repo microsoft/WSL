@@ -1141,7 +1141,13 @@ class WSLATests
 
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest",
+                "test-default-entrypoint",
+                "/bin/cat",
+                {},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
+                ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             // For now, validate that trying to use stdin without a tty returns the appropriate error.
             auto result = wil::ResultFromException([&]() { auto container = launcher.Launch(*session); });
@@ -1255,7 +1261,13 @@ class WSLATests
 
             // Create a stuck container.
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-1", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest",
+                "test-container-1",
+                "sleep",
+                {"sleep", "99999"},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto container = launcher.Launch(*session);
 
@@ -1299,7 +1311,13 @@ class WSLATests
         {
             // Create a container
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-2", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest",
+                "test-container-2",
+                "sleep",
+                {"sleep", "99999"},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto container = launcher.Launch(*session);
 
@@ -1333,7 +1351,13 @@ class WSLATests
         // Validate that container names are unique.
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-unique-name", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest",
+                "test-unique-name",
+                "sleep",
+                {"sleep", "99999"},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -1383,11 +1407,150 @@ class WSLATests
 
             // Verify that the same name can be reused now that the container is deleted.
             WSLAContainerLauncher otherLauncher(
-                "debian:latest", "test-unique-name", "echo", {"OK"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest",
+                "test-unique-name",
+                "echo",
+                {"OK"},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto result = otherLauncher.Launch(*session).GetInitProcess().WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
+    }
+
+    TEST_METHOD(ContainerNetwork)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto storagePath = std::filesystem::current_path() / "test-storage";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code error;
+
+            std::filesystem::remove_all(storagePath, error);
+            if (error)
+            {
+                LogError("Failed to cleanup storage path %ws: %hs", storagePath.c_str(), error.message().c_str());
+            }
+        });
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.StoragePath = storagePath.c_str();
+        settings.MaximumStorageSizeMb = 1024;
+
+        auto session = CreateSession(settings);
+
+        auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
+
+            for (size_t i = 0; i < expectedContainers.size(); i++)
+            {
+                const auto& [expectedName, expectedImage, expectedState] = expectedContainers[i];
+                VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
+                VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
+                VERIFY_ARE_EQUAL(expectedState, containers[i].State);
+            }
+        };
+
+        // Verify that containers launch successfully when host and none are used as network modes
+        // TODO: Test bridge network container launch when VHD with bridge cni is ready
+        // TODO: Add port mapping related tests when port mapping is implemented
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest",
+                "test-network",
+                {},
+                {"sleep", "99999"},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            auto result = ExpectCommandResult(
+                session.get(),
+                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
+                0);
+            VERIFY_ARE_EQUAL(result.Output[1], "'[\"host\"]'\n");
+
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+
+            expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that the container is in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that deleting a container stopped via Stop() works.
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            expectContainerList({});
+        }
+
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest",
+                "test-network",
+                {},
+                {"sleep", "99999"},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            auto result = ExpectCommandResult(
+                session.get(),
+                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
+                0);
+            VERIFY_ARE_EQUAL(result.Output[1], "'[\"none\"]'\n");
+
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+
+            expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that the container is in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that deleting a container stopped via Stop() works.
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            expectContainerList({});
+        }
+
+        // Test bridge when ready
+        /*
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-network", {}, {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_BRIDGE, ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            auto result = ExpectCommandResult(
+                session.get(),
+                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
+                0);
+            VERIFY_ARE_EQUAL(result.Output[1], "'[\"bridge\"]'\n");
+
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+
+            expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that the container is in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that deleting a container stopped via Stop() works.
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            expectContainerList({});
+        }
+        */
     }
 };
