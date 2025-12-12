@@ -1214,15 +1214,7 @@ try
         {
             auto mountInfo = mountIt->second;
             m_mountedWindowsFolders.erase(mountIt);
-
-            if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
-            {
-                hcs::RemovePlan9Share(m_computeSystem.get(), mountInfo.ShareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
-            }
-            else if (mountInfo.InstanceId.has_value())
-            {
-                m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, mountInfo.InstanceId.value());
-            }
+            RemoveShare(mountInfo);
         }
     });
 
@@ -1260,6 +1252,19 @@ try
 }
 CATCH_RETURN();
 
+void WSLAVirtualMachine::RemoveShare(_In_ const MountedFolderInfo& MountInfo)
+{
+    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
+    {
+        WI_ASSERT(!MountInfo.InstanceId.has_value());
+        hcs::RemovePlan9Share(m_computeSystem.get(), MountInfo.ShareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
+    }
+    else if (WI_VERIFY(MountInfo.InstanceId.has_value()))
+    {
+        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, MountInfo.InstanceId.value());
+    }
+}
+
 HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 try
 {
@@ -1269,22 +1274,15 @@ try
     auto it = m_mountedWindowsFolders.find(LinuxPath);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_mountedWindowsFolders.end());
 
-    auto mountInfo = it->second;
-    m_mountedWindowsFolders.erase(it);
-
     // Unmount the folder from the guest. If the mount is not found, this most likely means that the guest unmounted it.
     auto result = Unmount(LinuxPath);
     THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
+    auto mountInfo = it->second;
+    m_mountedWindowsFolders.erase(it);
+
     // Remove the share from the host
-    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
-    {
-        hcs::RemovePlan9Share(m_computeSystem.get(), mountInfo.ShareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
-    }
-    else if (mountInfo.InstanceId.has_value())
-    {
-        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, mountInfo.InstanceId.value());
-    }
+    RemoveShare(mountInfo);
 
     return S_OK;
 }
