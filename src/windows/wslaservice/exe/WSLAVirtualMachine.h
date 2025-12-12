@@ -27,8 +27,9 @@ namespace wsl::windows::service::wsla {
 enum WSLAMountFlags
 {
     WSLAMountFlagsNone = 0,
-    WSLAMountFlagsChroot = 1,
-    WSLAMountFlagsWriteableOverlayFs = 2,
+    WSLAMountFlagsReadOnly = 1,
+    WSLAMountFlagsChroot = 2,
+    WSLAMountFlagsWriteableOverlayFs = 4,
 };
 
 class WSLAUserSessionImpl;
@@ -74,7 +75,6 @@ public:
     IFACEMETHOD(Unmount(_In_ const char* Path)) override;
     IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
     IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
-    void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags);
 
     void OnProcessReleased(int Pid);
     void RegisterCallback(_In_ ITerminationCallback* callback);
@@ -88,6 +88,7 @@ public:
 
 private:
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
+    void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
     static bool ParseTtyInformation(
         const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl);
@@ -116,7 +117,7 @@ private:
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
-    HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WSLAMountFlags Flags);
+    HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ WSLAMountFlags Flags = WSLAMountFlagsNone);
 
     void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
 
@@ -162,7 +163,7 @@ private:
     wil::unique_handle m_portRelayChannelWrite;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
-    std::map<std::string, std::wstring> m_plan9Mounts;
+    std::map<std::string, std::wstring> m_mountedWindowsFolders;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
 };

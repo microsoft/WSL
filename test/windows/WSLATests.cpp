@@ -711,15 +711,28 @@ class WSLATests
         StopWslaService();
     }
 
-    TEST_METHOD(WindowsMounts)
+    void ValidateWindowsMounts(bool enableVirtioFs)
     {
-        WSL2_TEST_ONLY();
+        auto settings = GetDefaultSessionSettings();
+        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
-        auto session = CreateSession();
+        auto session = CreateSession(settings);
 
         wil::com_ptr<IWSLAVirtualMachine> vm;
         VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
         wsl::windows::common::security::ConfigureForCOMImpersonation(vm.get());
+
+        auto expectedMountOptions = [&](bool readOnly) -> std::string {
+            if (enableVirtioFs)
+            {
+                return std::format("/win-path*virtiofs*{},relatime*", readOnly ? "ro" : "rw");
+            }
+            else
+            {
+                return std::format(
+                    "/win-path*9p*{},relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
+            }
+        };
 
         auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
             auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
@@ -749,7 +762,7 @@ class WSLATests
         // Validate writeable mount.
         {
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
-            expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+            expectMount("/win-path", expectedMountOptions(false));
 
             // Validate that mount can't be stacked on each other
             VERIFY_ARE_EQUAL(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
@@ -765,7 +778,7 @@ class WSLATests
         // Validate read-only mount.
         {
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
-            expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+            expectMount("/win-path", expectedMountOptions(true));
 
             // Validate that folder is not writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
@@ -783,11 +796,23 @@ class WSLATests
 
             // Validate that folders that are manually unmounted from the guest are handled properly
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
-            expectMount("/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+            expectMount("/win-path", expectedMountOptions(true));
 
             ExpectCommandResult(session.get(), {"/usr/bin/umount", "/win-path"}, 0);
             VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
         }
+    }
+
+    TEST_METHOD(WindowsMounts)
+    {
+        WSL2_TEST_ONLY();
+        ValidateWindowsMounts(false);
+    }
+
+    TEST_METHOD(WindowsMountsVirtioFs)
+    {
+        WSL2_TEST_ONLY();
+        ValidateWindowsMounts(true);
     }
 
     // This test case validates that no file descriptors are leaked to user processes.

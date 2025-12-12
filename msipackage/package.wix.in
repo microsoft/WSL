@@ -345,6 +345,7 @@
                 </RegistryKey>
 
                 <!-- wsldevicehost.dll -->
+                <!-- TODO: WSL currently has two AppID registrations for wsldevicehost, is that needed? -->
                 <RegistryKey Root="HKCR" Key="AppID\{C457EA11-5486-4174-B90D-089909EDB170}">
                     <RegistryValue Name="DllSurrogate" Value="" Type="string" />
                     <RegistryValue Name="AppIDFlags" Value="2048" Type="integer" />
@@ -354,9 +355,42 @@
                     <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
                 </RegistryKey>
 
-                <!-- WslDeviceHost_VirtioNet -->
+                <!-- WslDeviceHost WSLA_VIRTIO_FS_ADMIN_CLASS_ID -->
+                <RegistryKey Root="HKCR" Key="CLSID\{8F7C2A3B-D9E4-4C1F-A2B8-5E3D7C9F1A6E}">
+                    <RegistryValue Value="WslDeviceHost_VirtioFsAdmin" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost WSLA_VIRTIO_FS_CLASS_ID -->
+                <RegistryKey Root="HKCR" Key="CLSID\{06ED032F-C528-41C1-B75D-905EEE823BBA}">
+                    <RegistryValue Value="WslDeviceHost_VirtioFs" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost WSLA_VIRTIO_NET_CLASS_ID -->
                 <RegistryKey Root="HKCR" Key="CLSID\{7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}">
-                    <RegistryValue Value="WslDeviceHost_Net" Type="string" />
+                    <RegistryValue Value="WslDeviceHost_VirtioNet" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost WSLA_VIRTIO_PMEM_CLASS_ID -->
+                <RegistryKey Root="HKCR" Key="CLSID\{ABB755FC-1B86-4255-83E2-E5787ABCF6C2}">
+                    <RegistryValue Value="WslDeviceHost_VirtioPmem" Type="string" />
                     <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
 
                     <RegistryKey Key="InProcServer32">
