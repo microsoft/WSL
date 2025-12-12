@@ -386,7 +386,6 @@ class WSLATests
                 offset += bytesRead;
             }
 
-            LogInfo("Read buffer: %i", offset);
             buffer.resize(offset);
             VERIFY_ARE_EQUAL(buffer, expected);
         };
@@ -396,9 +395,9 @@ class WSLATests
         };
 
         // Expect the shell prompt to be displayed
-        validateTtyOutput("sh-5.2# ");
+        validateTtyOutput("\033[?2004hsh-5.2# ");
         writeTty("echo OK\n");
-        validateTtyOutput(" echo OK\r\nOK");
+        validateTtyOutput("echo OK\r\n\033[?2004l\rOK");
 
         // Exit the shell
         writeTty("exit\n");

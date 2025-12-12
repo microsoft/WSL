@@ -18,6 +18,7 @@ Abstract:
 
 using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::IOHandleStatus;
+using wsl::windows::common::relay::LineBasedReadHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
@@ -1121,6 +1122,38 @@ void ReadHandle::Collect()
 HANDLE ReadHandle::GetHandle() const
 {
     return Event.get();
+}
+
+LineBasedReadHandle::LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Line)>&& OnLine) :
+    ReadHandle(std::move(MovedHandle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnLine(OnLine)
+{
+}
+
+LineBasedReadHandle::~LineBasedReadHandle()
+{
+    // Call the callback with any pending data (in case of an incomplete line).
+    if (PendingBuffer.empty())
+    {
+        OnLine(PendingBuffer);
+    }
+}
+
+void LineBasedReadHandle::OnRead(const gsl::span<char>& Buffer)
+{
+    auto begin = Buffer.begin();
+    auto end = std::ranges::find(Buffer, '\n');
+    while (end != Buffer.end())
+    {
+        PendingBuffer.insert(PendingBuffer.end(), begin, end);
+
+        OnLine(PendingBuffer);
+        PendingBuffer.clear();
+
+        begin = end + 1;
+        end = std::ranges::find(begin, Buffer.end(), '\n');
+    }
+
+    PendingBuffer.insert(PendingBuffer.end(), begin, end);
 }
 
 WriteHandle::WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer) :

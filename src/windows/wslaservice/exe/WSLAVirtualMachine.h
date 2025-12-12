@@ -86,6 +86,8 @@ public:
     void DetachDisk(_In_ ULONG Lun);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
+    const wil::unique_event& TerminatingEvent();
+
 private:
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
