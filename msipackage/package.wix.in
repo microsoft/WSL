@@ -357,7 +357,7 @@
 
                 <!-- WslDeviceHost WSLA_VIRTIO_FS_ADMIN_CLASS_ID -->
                 <RegistryKey Root="HKCR" Key="CLSID\{8F7C2A3B-D9E4-4C1F-A2B8-5E3D7C9F1A6E}">
-                    <RegistryValue Value="WslDeviceHost_Net" Type="string" />
+                    <RegistryValue Value="WslDeviceHost_VirtioFsAdmin" Type="string" />
                     <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
 
                     <RegistryKey Key="InProcServer32">
@@ -368,7 +368,7 @@
 
                 <!-- WslDeviceHost WSLA_VIRTIO_FS_CLASS_ID -->
                 <RegistryKey Root="HKCR" Key="CLSID\{06ED032F-C528-41C1-B75D-905EEE823BBA}">
-                    <RegistryValue Value="WslDeviceHost_Net" Type="string" />
+                    <RegistryValue Value="WslDeviceHost_VirtioFs" Type="string" />
                     <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
 
                     <RegistryKey Key="InProcServer32">
@@ -379,7 +379,7 @@
 
                 <!-- WslDeviceHost WSLA_VIRTIO_NET_CLASS_ID -->
                 <RegistryKey Root="HKCR" Key="CLSID\{7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}">
-                    <RegistryValue Value="WslDeviceHost_Net" Type="string" />
+                    <RegistryValue Value="WslDeviceHost_VirtioNet" Type="string" />
                     <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
 
                     <RegistryKey Key="InProcServer32">
@@ -390,7 +390,7 @@
 
                 <!-- WslDeviceHost WSLA_VIRTIO_PMEM_CLASS_ID -->
                 <RegistryKey Root="HKCR" Key="CLSID\{ABB755FC-1B86-4255-83E2-E5787ABCF6C2}">
-                    <RegistryValue Value="WslDeviceHost_Net" Type="string" />
+                    <RegistryValue Value="WslDeviceHost_VirtioPmem" Type="string" />
                     <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
 
                     <RegistryKey Key="InProcServer32">

@@ -1196,7 +1196,7 @@ try
         else
         {
             const bool admin = wsl::windows::common::security::IsTokenElevated(userToken.get());
-            const auto deviceId = m_guestDeviceManager->AddGuestDevice(
+            m_guestDeviceManager->AddGuestDevice(
                 VIRTIO_FS_DEVICE_ID,
                 admin ? WSLA_VIRTIO_FS_ADMIN_CLASS_ID : WSLA_VIRTIO_FS_CLASS_ID,
                 shareName.c_str(),
@@ -1204,8 +1204,6 @@ try
                 WindowsPath,
                 VIRTIO_FS_FLAGS_TYPE_FILES,
                 userToken.get());
-
-            // TODO: store deviceId so it can be removed later.
         }
 
         m_mountedWindowsFolders.emplace(LinuxPath, shareName);
@@ -1218,10 +1216,6 @@ try
         if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
         {
             hcs::RemovePlan9Share(m_computeSystem.get(), shareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
-        }
-        else
-        {
-            // TODO: handle removing virtiofs device.
         }
     });
 
@@ -1272,14 +1266,11 @@ try
     auto result = Unmount(LinuxPath);
     THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
-    // Remove the share from the host
+    // Remove the share from the host.
+    // N.B. VirtioFs shares are present until the VM is destroyed, since HCS currently lacks support for removing them dynamically.
     if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
     {
         hcs::RemovePlan9Share(m_computeSystem.get(), it->second.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
-    }
-    else
-    {
-        // TODO: handle removing virtiofs device.
     }
 
     m_mountedWindowsFolders.erase(it);
