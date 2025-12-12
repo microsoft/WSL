@@ -1132,7 +1132,7 @@ LineBasedReadHandle::LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::
 LineBasedReadHandle::~LineBasedReadHandle()
 {
     // Call the callback with any pending data (in case of an incomplete line).
-    if (PendingBuffer.empty())
+    if (!PendingBuffer.empty())
     {
         OnLine(PendingBuffer);
     }

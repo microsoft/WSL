@@ -60,7 +60,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
         common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
     m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine.Get()));
 
-    // Wait for containerd to be ready before.
+    // Wait for containerd to be ready before starting the event tracker.
     // TODO: Configurable timeout.
     THROW_WIN32_IF_MSG(ERROR_TIMEOUT, !m_containerdReadyEvent.wait(10 * 1000), "Timed out waiting for containerd to start");
 
@@ -134,7 +134,7 @@ WSLASession::~WSLASession()
 
     if (m_virtualMachine)
     {
-        // N.B. containerd has exited by this point, so umounting the VHD is safe since no container can be running.
+        // N.B. containerd has exited by this point, so unmounting the VHD is safe since no container can be running.
 
         m_virtualMachine->OnSessionTerminated();
         LOG_IF_FAILED(m_virtualMachine->Unmount(c_containerdStorage));
@@ -283,7 +283,7 @@ try
     }
     else
     {
-        // Otherwise this the session is shutting down, make terminate containerd before exiting.
+        // Otherwise, the session is shutting down; terminate containerd before exiting.
         process.Get().Signal(15); // SIGTERM
 
         process.Wait(30 * 1000); // TODO: Configurable timeout.
