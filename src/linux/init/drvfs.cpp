@@ -250,7 +250,7 @@ try
     if (Result == 0)
     {
         auto Parsed = mountutil::MountParseFlags(Options);
-        int Result = UtilMount(Source, Target, FsType, Parsed.MountFlags, Parsed.StringOptions.c_str(), std::chrono::seconds{2});
+        Result = UtilMount(Source, Target, FsType, Parsed.MountFlags, Parsed.StringOptions.c_str(), std::chrono::seconds{2});
     }
 
     if (ExitCode)
