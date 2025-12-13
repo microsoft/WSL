@@ -242,17 +242,8 @@ Return Value:
 
 try
 {
-    //
-    // Verify the target directory exists before mounting.
-    //
-
-    int Result = access(Target, F_OK);
-    if (Result == 0)
-    {
-        auto Parsed = mountutil::MountParseFlags(Options);
-        Result = UtilMount(Source, Target, FsType, Parsed.MountFlags, Parsed.StringOptions.c_str(), std::chrono::seconds{2});
-    }
-
+    auto Parsed = mountutil::MountParseFlags(Options);
+    int Result = UtilMount(Source, Target, FsType, Parsed.MountFlags, Parsed.StringOptions.c_str(), std::chrono::seconds{2});
     if (ExitCode)
     {
         *ExitCode = Result < 0 ? c_exitCodeMountFail : 0;
