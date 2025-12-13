@@ -395,9 +395,9 @@ class WSLATests
         };
 
         // Expect the shell prompt to be displayed
-        validateTtyOutput("/ #");
+        validateTtyOutput("\033[?2004hsh-5.2# ");
         writeTty("echo OK\n");
-        validateTtyOutput(" echo OK\r\nOK");
+        validateTtyOutput("echo OK\r\n\033[?2004l\rOK");
 
         // Exit the shell
         writeTty("exit\n");
@@ -543,7 +543,7 @@ class WSLATests
                 {{0, WSLAFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WSLAFdTypeLinuxFileInput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
 
             auto result = process->WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Output[2], "cat: write error: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: write error: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(result.Code, 1);
         }
 
@@ -551,7 +551,7 @@ class WSLATests
             auto process = createProcess({"/bin/cat"}, {{0, WSLAFdTypeLinuxFileOutput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
             auto result = process->WaitAndCaptureOutput();
 
-            VERIFY_ARE_EQUAL(result.Output[2], "cat: read error: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: standard output: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(result.Code, 1);
         }
     }
@@ -825,7 +825,7 @@ class WSLATests
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
 
         // Note: fd/0 is opened by readlink to read the actual content of /proc/self/fd.
-        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\n"))
+        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\nsocket:*\nsocket:*"))
         {
             LogInfo("Found additional fds: %hs", result.Output[1].c_str());
             VERIFY_FAIL();
@@ -1064,7 +1064,7 @@ class WSLATests
 
         // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
         // Check if a new file was added in crashDumpsDir matching the pattern and not in existingDumps.
-        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_busybox-11.dmp", processId);
+        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
 
         auto dumpFile = wsl::shared::retry::RetryWithTimeout<std::filesystem::path>(
             [crashDumpsDir, expectedPattern, existingDumps]() {

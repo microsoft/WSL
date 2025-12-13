@@ -128,36 +128,20 @@ void ContainerEventTracker::Run(ServiceRunningProcess& process)
 {
     try
     {
-        std::string pendingBuffer;
-
         wsl::windows::common::relay::MultiHandleWait io;
 
-        auto onStdout = [&](const gsl::span<char>& buffer) {
+        auto oneLineWritten = [&](const gsl::span<char>& buffer) {
             // nerdctl events' output is line based. Call OnEvent() for each completed line.
 
-            auto begin = buffer.begin();
-            auto end = std::ranges::find(buffer, '\n');
-            while (end != buffer.end())
+            if (!buffer.empty()) // nerdctl inserts empty lines between events, skip those.
             {
-                pendingBuffer.insert(pendingBuffer.end(), begin, end);
-
-                if (!pendingBuffer.empty()) // nerdctl inserts empty lines between events, skip those.
-                {
-                    OnEvent(pendingBuffer);
-                }
-
-                pendingBuffer.clear();
-
-                begin = end + 1;
-                end = std::ranges::find(begin, buffer.end(), '\n');
+                OnEvent(std::string{buffer.begin(), buffer.end()});
             }
-
-            pendingBuffer.insert(pendingBuffer.end(), begin, end);
         };
 
         auto onStop = [&]() { io.Cancel(); };
 
-        io.AddHandle(std::make_unique<common::relay::ReadHandle>(process.GetStdHandle(1), std::move(onStdout)));
+        io.AddHandle(std::make_unique<common::relay::LineBasedReadHandle>(process.GetStdHandle(1), std::move(oneLineWritten)));
         io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), std::move(onStop)));
 
         if (io.Run({}))

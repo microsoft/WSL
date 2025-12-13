@@ -383,6 +383,7 @@ void WSLAVirtualMachine::ConfigureMounts()
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
+    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
 
     if (FeatureEnabled(WslaFeatureFlagsGPU)) // TODO: re-think how GPU settings should work at the session level API.
     {
@@ -393,6 +394,11 @@ void WSLAVirtualMachine::ConfigureMounts()
 bool WSLAVirtualMachine::FeatureEnabled(WSLAFeatureFlags Value) const
 {
     return static_cast<ULONG>(m_settings.FeatureFlags) & static_cast<ULONG>(Value);
+}
+
+const wil::unique_event& WSLAVirtualMachine::TerminatingEvent()
+{
+    return m_vmTerminatingEvent;
 }
 
 void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
