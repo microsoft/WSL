@@ -34,7 +34,7 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 public:
     NON_COPYABLE(WSLAContainer);
 
-    WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image, std::vector<VolumeMountInfo> volumes);
+    WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image, std::vector<VolumeMountInfo>&& volumes);
     ~WSLAContainer();
 
     IFACEMETHOD(Start)() override;

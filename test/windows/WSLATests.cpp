@@ -1309,8 +1309,6 @@ class WSLATests
         std::string containerName = "test-container";
         std::string containerPath = "/volume";
         std::string containerReadOnlyPath = "/volume-ro";
-        std::wstring hostFolderW = hostFolder.wstring();
-        std::wstring hostFolderReadOnlyW = hostFolderReadOnly.wstring();
 
         // Container init script to validate volumes are mounted correctly.
         const std::string script =
@@ -1327,8 +1325,8 @@ class WSLATests
             "fi ";
 
         WSLAContainerLauncher launcher("debian:latest", containerName, "/bin/sh", {"-c", script});
-        launcher.AddVolume(hostFolderW, containerPath, false);
-        launcher.AddVolume(hostFolderReadOnlyW, containerReadOnlyPath, true);
+        launcher.AddVolume(hostFolder.wstring(), containerPath, false);
+        launcher.AddVolume(hostFolderReadOnly.wstring(), containerReadOnlyPath, true);
 
         {
             auto container = launcher.Launch(*session);
@@ -1343,5 +1341,42 @@ class WSLATests
         // Validate that the volumes are not mounted after container exits.
         ExpectMount(session.get(), std::format("/mnt/wsla/{}/volumes/{}", containerName, 0), {});
         ExpectMount(session.get(), std::format("/mnt/wsla/{}/volumes/{}", containerName, 1), {});
+    }
+
+    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnError)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto hostFolder = std::filesystem::current_path() / "test-volume";
+        auto storage = std::filesystem::current_path() / "storage";
+
+        std::filesystem::create_directories(hostFolder);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+            std::filesystem::remove_all(storage, ec);
+        });
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.StoragePath = storage.c_str();
+        settings.MaximumStorageSizeMb = 1024;
+
+        auto session = CreateSession(settings);
+
+        // Create a container with a simple command.
+        WSLAContainerLauncher launcher("debian:latest", "test-container", "/bin/echo", {"OK"});
+        launcher.AddVolume(hostFolder.wstring(), "/volume", false);
+
+        // Add a volume with an invalid (non-existing) host path
+        launcher.AddVolume(L"does-not-exist", "/volume-invalid", false);
+
+        auto [result, container] = launcher.LaunchNoThrow(*session);
+        VERIFY_FAILED(result);
+
+        // Verify that the first volume was mounted before the error occurred, then unmounted after failure.
+        ExpectMount(session.get(), "/mnt/wsla/test-container/volumes/0", {});
     }
 };

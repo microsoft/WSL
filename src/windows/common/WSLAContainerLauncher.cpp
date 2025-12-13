@@ -55,11 +55,15 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 
 void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
+    // Store a copy of the path strings to the launcher to ensure their references remain valid until we start the container.
+    const auto& hostPath = m_hostPaths.emplace_back(HostPath);
+    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
+     
     WSLA_VOLUME vol{};
-    vol.HostPath = HostPath.c_str();
-    vol.ContainerPath = ContainerPath.c_str();
+    vol.HostPath = hostPath.c_str();
+    vol.ContainerPath = containerPath.c_str();
     vol.ReadOnly = ReadOnly ? TRUE : FALSE;
-
+    
     m_volumes.push_back(vol);
 }
 

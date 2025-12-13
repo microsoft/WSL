@@ -28,7 +28,7 @@ static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO:
                                                       "--ulimit",
                                                       "nofile=65536:65536"};
 
-WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image, std::vector<VolumeMountInfo> volumes) :
+WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image, std::vector<VolumeMountInfo>&& volumes) :
     m_parentVM(parentVM), m_containerProcess(std::move(containerProcess)), m_name(name), m_image(image), mountedVolumes(std::move(volumes))
 {
     m_state = WslaContainerStateCreated;
@@ -185,9 +185,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(const WSLA_CONTAINER
         launcher.AddFd(containerOptions.InitProcessOptions.Fds[i]);
     }
 
-
-
-    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM), containerOptions.Name, containerOptions.Image, volumes);
+    return wil::MakeOrThrow<WSLAContainer>(&parentVM, launcher.Launch(parentVM), containerOptions.Name, containerOptions.Image, std::move(volumes));
 }
 
 std::vector<VolumeMountInfo> WSLAContainer::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
@@ -267,23 +265,9 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlRunCommand(const WSLA_CONT
     }
 
     
-    if (!volumes.empty())
+    for (const auto& volume : volumes)
     {
-        for (const auto& volume : volumes)
-        {
-            std::string mountArg = "-v";
-
-            mountArg += volume.ParentVMPath;
-            mountArg += ":";
-            mountArg += volume.ContainerPath;
-
-            if (volume.ReadOnly)
-            {
-                mountArg += ":ro";
-            }
-
-            args.push_back(mountArg);
-        }
+        args.emplace_back(std::format("-v{}:{}{}", volume.ParentVMPath, volume.ContainerPath, volume.ReadOnly ? ":ro" : ""));
     }
 
     // TODO:

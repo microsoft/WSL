@@ -56,6 +56,9 @@ public:
 private:
     std::string m_image;
     std::string m_name;
+
     std::vector<WSLA_VOLUME> m_volumes;
+    std::deque<std::wstring> m_hostPaths;
+    std::deque<std::string> m_containerPaths;
 };
 } // namespace wsl::windows::common
