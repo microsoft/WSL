@@ -63,6 +63,7 @@ std::wstring ReadString(_In_ HKEY Key, _In_opt_ LPCWSTR KeyName, _In_opt_ LPCWST
 std::optional<std::wstring> ReadOptionalString(_In_ HKEY Key, _In_opt_ LPCWSTR KeyName, _In_opt_ LPCWSTR ValueName);
 
 std::vector<std::string> ReadStringSet(_In_ HKEY Key, _In_opt_ LPCWSTR KeyName, _In_opt_ LPCWSTR ValueName, _In_ const std::vector<std::string>& Default);
+std::vector<std::wstring> ReadWideStringSet(_In_ HKEY Key, _In_opt_ LPCWSTR KeyName, _In_opt_ LPCWSTR ValueName, _In_ const std::vector<std::wstring>& Default);
 
 void WriteDword(_In_ HKEY Key, _In_ LPCWSTR SubKey, _In_ LPCWSTR KeyName, _In_ DWORD Value);
 
