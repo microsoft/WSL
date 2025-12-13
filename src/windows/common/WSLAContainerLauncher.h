@@ -45,6 +45,7 @@ public:
         const std::string& EntryPoint = "",
         const std::vector<std::string>& Arguments = {},
         const std::vector<std::string>& Environment = {},
+        WSLA_CONTAINER_NETWORK_TYPE containerNetworkType = WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
         ProcessFlags Flags = ProcessFlags::Stdout | ProcessFlags::Stderr);
 
     void AddVolume(const std::string& HostPath, const std::string& ContainerPath, bool ReadOnly);
@@ -56,5 +57,6 @@ public:
 private:
     std::string m_image;
     std::string m_name;
+    WSLA_CONTAINER_NETWORK_TYPE m_containerNetworkType;
 };
 } // namespace wsl::windows::common
