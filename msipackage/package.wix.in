@@ -1,4 +1,4 @@
-﻿<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
     <Package Name="Windows Subsystem for Linux" Language="1033" InstallerVersion="500" Version="${PACKAGE_VERSION}" Manufacturer="Microsoft Corporation" UpgradeCode="6D5B792B-1EDC-4DE9-8EAD-201B820F8E82" Scope="perMachine" Compressed="${COMPRESS_PACKAGE}">
         <MajorUpgrade AllowDowngrades="yes"  Disallow="no"  />
         <MediaTemplate EmbedCab="yes" />
@@ -19,22 +19,22 @@
         <DirectoryRef Id="INSTALLDIR">
             <Component Id="wsl" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134730" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <RemoveFile Id="CleanUpWSLShortCut" Directory="ProgramMenuFolder" Name="WSL" On="uninstall"/>
-                <File Id="wsl.exe" Name="wsl.exe" Source="${BIN}/wsl.exe" KeyPath="yes">
+                <File Id="wsl.exe" Name="wsl.exe" Source="${PACKAGE_INPUT_DIR}/wsl.exe" KeyPath="yes">
                     <Shortcut Id="WSLShortcut" Name="WSL" Description="Windows Subsystem for Linux" Arguments="--cd ~" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico">
                         <ShortcutProperty Key="System.AppUserModel.ID" Value="Microsoft.WSL"/>
                         <ShortcutProperty Key="System.AppUserModel.ToastActivatorCLSID" Value="{2B9C59C3-98F1-45C8-B87B-12AE3C7927E8}"/>
                     </Shortcut>
                 </File>
 
-                <File Id="wslg.exe" Name="wslg.exe" Source="${BIN}/wslg.exe" />
-                <File Id="wsladiag.exe" Name="wsladiag.exe" Source="${BIN}/wsladiag.exe" />
-                <File Id="wslhost.exe" Name="wslhost.exe" Source="${BIN}/wslhost.exe" />
-                <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${BIN}/wslrelay.exe" />
-                <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${BIN}/wslserviceproxystub.dll" />
-                <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${BIN}/wsldeps.dll" />
+                <File Id="wslg.exe" Name="wslg.exe" Source="${PACKAGE_INPUT_DIR}/wslg.exe" />
+                <File Id="wsladiag.exe" Name="wsladiag.exe" Source="${PACKAGE_INPUT_DIR}/wsladiag.exe" />
+                <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
+                <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
+                <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
+                <File Id="wsldeps.dll" Name="wsldeps.dll" Source="${PACKAGE_INPUT_DIR}/wsldeps.dll" />
 
                 <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
-                    <File Id="libwsl.dll" Name="libwsl.dll" Source="${BIN}/libwsl.dll" />
+                    <File Id="libwsl.dll" Name="libwsl.dll" Source="${PACKAGE_INPUT_DIR}/libwsl.dll" />
                 <?endif?>
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
@@ -231,7 +231,7 @@
                 </RegistryKey>
 
                 <!-- Session 0 service -->
-                <File Id="wslservice.exe" Source="${BIN}/wslservice.exe" KeyPath="yes" />
+                <File Id="wslservice.exe" Source="${PACKAGE_INPUT_DIR}/wslservice.exe" KeyPath="yes" />
                 <ServiceInstall Name="WSLService" DisplayName="WSL Service" Description="WSL Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
 
                 <!-- The service is stopped on uninstall and upgrade.
@@ -414,8 +414,8 @@
                     <File Id="rdpnanoTransport.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdpnanoTransport.dll" />
                     <File Id="RdpWinStlHelper.dll" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" />
                 <?endif?>
-                <File Id="wsldevicehost.dll" Source="${BIN}/wsldevicehost.dll" />
-                <File Id="${WSLG_TS_PLUGIN_DLL}" Source="${BIN}/${WSLG_TS_PLUGIN_DLL}" />
+                <File Id="wsldevicehost.dll" Source="${PACKAGE_INPUT_DIR}/wsldevicehost.dll" />
+                <File Id="${WSLG_TS_PLUGIN_DLL}" Source="${PACKAGE_INPUT_DIR}/${WSLG_TS_PLUGIN_DLL}" />
 
                 <!-- MSRDC Plugin registration -->
                 <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Terminal Server Client\Default\OptionalAddIns\WSLDVC_PACKAGE">
@@ -465,7 +465,7 @@
             <ComponentGroup Id="wslsettings" Directory="WSLSETTINGS" Source="${BIN}/wslsettings">
                 <Component Id="wslsettingsnonserver" Guid="AB166073-8855-492B-95C8-C6E5939B66A5" Bitness="always64" DisableRegistryReflection="yes" UninstallWhenSuperseded="yes" Condition="MsiNTProductType = 1">
                     <RemoveFile Id="CleanUpWSLSettingsShortCutNonServer" Directory="ProgramMenuFolder" Name="WSLSettings" On="uninstall"/>
-                    <File Id="wslsettings.exe_nonserver" Source="${BIN}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6a.exe">
+                    <File Id="wslsettings.exe_nonserver" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6a.exe">
                         <Shortcut Id="WSLSettingsShortcutNonServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico">
                             <ShortcutProperty Key="System.AppUserModel.IsSystemComponent" Value="true"/>
                         </Shortcut>
@@ -496,7 +496,7 @@
                 </Component>
                 <Component Id="wslsettingsserver" Guid="EE2D69A0-4F55-4EC5-9576-4FAD70BC798E" Bitness="always64" DisableRegistryReflection="yes" UninstallWhenSuperseded="yes" Condition="MsiNTProductType &gt; 1">
                     <RemoveFile Id="CleanUpWSLSettingsShortCutServer" Directory="ProgramMenuFolder" Name="WSLSettings" On="uninstall"/>
-                    <File Id="wslsettings.exe_server" Source="${BIN}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6b.exe">
+                    <File Id="wslsettings.exe_server" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.exe" KeyPath="yes" ShortName="kyk8fs6b.exe">
                         <Shortcut Id="WSLSettingsShortcutServer" Name="WSL Settings" Description="Windows Subsystem for Linux Settings" Advertise="yes" Directory="ProgramMenuFolder" Icon="wsl.ico"/>
                     </File>
                     <!-- Protocol registration -->
@@ -523,7 +523,10 @@
                         </RegistryKey>
                     </RegistryKey>
                 </Component>
-                <Files Include="*.dll"/>
+                <File Id="wslsettings.dll" Source="${PACKAGE_INPUT_DIR}/wslsettings/wslsettings.dll"/>
+                <Files Include="*.dll">
+                    <Exclude Files="wslsettings.dll" />
+                </Files>
                 <Files Include="*.exe">
                     <Exclude Files="wslsettings.exe" />
                 </Files>
@@ -559,8 +562,8 @@
 
         </Feature>
 
-        <Binary Id="wslinstall.dll" SourceFile="${BIN}/wslinstall.dll" />
-        <Binary Id="msixpackage" SourceFile="${BIN}/gluepackage.msix"/>
+        <Binary Id="wslinstall.dll" SourceFile="${PACKAGE_INPUT_DIR}/wslinstall.dll" />
+        <Binary Id="msixpackage" SourceFile="${PACKAGE_INPUT_DIR}/gluepackage.msix"/>
 
         <CustomAction Id="ValidateInstall"
             Impersonate="no"
@@ -733,3 +736,4 @@
         <Property Id="MSIRMSHUTDOWN" Value="0" Secure="yes" />
     </Package>
 </Wix>
+

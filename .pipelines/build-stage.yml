@@ -29,7 +29,7 @@ parameters:
     type: object
     default:
       - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslaclient;wsltests"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings.dll,wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslaclient.dll"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslaclient.dll"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage"
@@ -125,6 +125,11 @@ stages:
           ob_sdl_codeSignValidation_excludes: -|**testbin\**
           Codeql.PublishDatabaseLog: true
           Codeql.SourceRoot: src
+          packageStagingDir: '$(Build.SourcesDirectory)\packageStagingDir'
+          ${{ if eq(parameters.isRelease, 'true') }}:
+            packageInputDirArg: '-DPACKAGE_INPUT_DIR=$(packageStagingDir)'
+          ${{ else }}:
+            packageInputDirArg: ''
 
         steps:
 
@@ -171,7 +176,7 @@ stages:
                 displayName: "CMake ${{ platform }}"
                 inputs:
                   workingDirectory: "."
-                  cmakeArgs: . --fresh -A ${{ platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true
+                  cmakeArgs: . --fresh -A ${{ platform }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION=10.0.26100.0 -DPACKAGE_VERSION=$(version.WSL_PACKAGE_VERSION) -DWSL_NUGET_PACKAGE_VERSION=$(version.WSL_NUGET_PACKAGE_VERSION) -DSKIP_PACKAGE_SIGNING=${{ parameters.isRelease }} -DOFFICIAL_BUILD=${{ parameters.isRelease }} -DPIPELINE_BUILD_ID=$(Build.BuildId) -DVSO_ORG=${{ parameters.vsoOrg }} -DVSO_PROJECT=${{ parameters.vsoProject }} -DWSL_BUILD_WSL_SETTINGS=true $(packageInputDirArg)\${{ platform }}
 
               # This additional Restore NuGet package task is added as a workaround for WSL Settings to have its packages restored properly.
               # Without this, building wsl settings may encounter the following error:
@@ -201,7 +206,7 @@ stages:
                           AuthSignCertName: ${{ parameters.esrp.AuthSignCertName }}
                           AppRegistrationClientId: ${{ parameters.esrp.AppRegistrationClientId }}
                           AppRegistrationTenantId: ${{ parameters.esrp.AppRegistrationTenantId }}
-                          FolderPath: "bin\\${{ platform }}"
+                          FolderPath: "bin\\${{ platform }}\\Release"
                           Pattern: "${{ target.pattern }}"
                           UseMSIAuthentication: true
                           EsrpClientId: ${{ parameters.esrp.EsrpClientId }}
@@ -229,20 +234,27 @@ stages:
                                     }
                               ]
 
-                  # Replace the intermediate wslsettings binaries file with the signed versions so that any future steps building wslsettings will use the signed versions
-                  - task: PowerShell@2
-                    displayName: 'Replace wslsettings binaries in intermediate folder with signed versions'
-                    condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
-                    inputs:
-                      targetType: inline
-                      script: |
-                        $arch = '${{ platform }}'
-                        $wslsettingsbinpath = "bin\$arch\release\wslsettings"
-                        $wslsettingsobjpath = "src\windows\wslsettings\obj\$arch\release"
-                        # Update the timestamp of wslsettings.exe so that it doesn't get rebuilt
-                        (Get-Item $wslsettingsbinpath\wslsettings.exe).LastWriteTime = Get-Date
-                        Copy-Item $wslsettingsbinpath\wslsettings.dll $wslsettingsobjpath\wslsettings.dll -Force
-                        Copy-Item $wslsettingsbinpath\wslsettings.exe $wslsettingsobjpath\apphost.exe -Force
+                      - task: PowerShell@2
+                        displayName: "Copy signed ${{ target.target }} to staging (${{ platform }})"
+                        condition: and(succeeded(), eq('${{ parameters.isRelease }}', true))
+                        inputs:
+                          targetType: inline
+                          script: |
+                              $arch = '${{ platform }}'
+                              $pattern = '${{ target.pattern }}'
+                              $inputDir = "bin\$arch\Release"
+                              $outputDir = "$(packageStagingDir)\$arch"
+                              New-Item -ItemType Directory -Path "$outputDir\wslsettings" -Force
+                              foreach ($file in $pattern.Split(',')) {
+                                  $sourcePath = Join-Path $inputDir $file
+                                  if (Test-Path $sourcePath) {
+                                      $destPath = Join-Path $outputDir $file
+                                      Write-Host "Copying signed file: $sourcePath -> $destPath"
+                                      Copy-Item -Path $sourcePath -Destination $destPath -Force
+                                  } else {
+                                      Write-Warning "File not found: $sourcePath"
+                                  }
+                              }
 
               - script: cmake --build . --config Release -- -m
                 displayName: "Build installer msix and tests (${{ platform }})"
@@ -388,7 +400,7 @@ stages:
               Move-Item -Path "bin\x64\cloudtest" -Destination "$(ob_outputDirectory)\testbin\x64\cloudtest"
               Move-Item -Path "tools\test\test-setup.ps1" -Destination "$(ob_outputDirectory)\testbin\test-setup.ps1"
               Move-Item -Path "tools\test\CloudTest-Setup.bat" -Destination "$(ob_outputDirectory)\testbin\CloudTest-Setup.bat"
-              Move-Item -Path "tools\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
+              Move-Item -Path "diagnostics\wsl.wprp" -Destination "$(ob_outputDirectory)\testbin\wsl.wprp"
               Move-Item -Path "test\linux\unit_tests" -Destination "$(ob_outputDirectory)\testbin\unit_tests"
 
               Move-Item -Path bundle\release\* -Destination $(ob_outputDirectory)\bundle
@@ -417,3 +429,4 @@ stages:
 
           - task: CodeQL3000Finalize@0
             condition: ${{ and(parameters.isNightly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))}}
+
