@@ -27,6 +27,7 @@ constexpr auto c_containerdStorage = "/var/lib/containerd";
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
 
     m_id(id), m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
+
 {
     WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 

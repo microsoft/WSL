@@ -84,6 +84,7 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
 {
     std::lock_guard lock(m_wslaSessionsLock);
+
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_sessions.size());
 
     size_t index = 0;

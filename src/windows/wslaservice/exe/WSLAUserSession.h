@@ -43,6 +43,7 @@ private:
     wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
 
     std::atomic<ULONG> m_nextSessionId{1};
+
     std::recursive_mutex m_wslaSessionsLock;
 
     // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
