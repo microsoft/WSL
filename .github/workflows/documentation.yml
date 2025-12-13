@@ -16,7 +16,7 @@ jobs:
         id-token: write
     steps:
       - name: Checkout actions
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install packages
         run: pip install mkdocs-mermaid2-plugin mkdocs --break-system-packages
@@ -26,7 +26,7 @@ jobs:
         run:  mkdocs build -f doc/mkdocs.yml
         shell: bash
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: doc/site
 
