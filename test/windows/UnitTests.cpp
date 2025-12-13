@@ -3519,6 +3519,138 @@ localhostForwarding=true
         }
     }
 
+    TEST_METHOD(WriteWslConfigSectionHeaderOrder)
+    {
+        // This test validates the fix for GitHub issue #12671:
+        // Ensures that when writing a config key to a section, the section header
+        // appears BEFORE the key-value pair, not after it.
+        WSL2_TEST_ONLY();
+        WSL_SETTINGS_TEST();
+
+        auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        VERIFY_IS_TRUE(installPath.has_value());
+
+        std::filesystem::path wslInstallPath(installPath.value());
+        std::filesystem::path libWslDllPath = wslInstallPath / "libwsl.dll";
+        VERIFY_IS_TRUE(std::filesystem::exists(libWslDllPath));
+
+        LxssDynamicFunction<decltype(GetWslConfigFilePath)> getWslConfigFilePath(libWslDllPath.c_str(), "GetWslConfigFilePath");
+        LxssDynamicFunction<decltype(CreateWslConfig)> createWslConfig(libWslDllPath.c_str(), "CreateWslConfig");
+        LxssDynamicFunction<decltype(FreeWslConfig)> freeWslConfig(libWslDllPath.c_str(), "FreeWslConfig");
+        LxssDynamicFunction<decltype(GetWslConfigSetting)> getWslConfigSetting(libWslDllPath.c_str(), "GetWslConfigSetting");
+        LxssDynamicFunction<decltype(SetWslConfigSetting)> setWslConfigSetting(libWslDllPath.c_str(), "SetWslConfigSetting");
+
+        auto apiWslConfigFilePath = getWslConfigFilePath();
+
+        // Test 1: Write to an empty .wslconfig file
+        {
+            WslConfigChange config{L""};
+
+            auto wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            // Write a memory setting (which belongs to [wsl2] section)
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 8589934592ULL; // 8GB
+
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            // Read the file content and verify the section header comes before the key
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Find the positions of [wsl2] and memory=
+            auto sectionPos = fileContent.find(L"[wsl2]");
+            auto memoryPos = fileContent.find(L"memory=");
+
+            VERIFY_ARE_NOT_EQUAL(sectionPos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+            VERIFY_IS_TRUE(sectionPos < memoryPos); // Section header MUST come before the key
+        }
+
+        // Test 2: Write to a file that has existing content with sections
+        {
+            // Start with a file that has [experimental] section and some content
+            std::wstring initialConfig = LR"([experimental]
+autoMemoryReclaim=dropcache
+[wsl2]
+)";
+            WslConfigChange config{initialConfig.c_str()};
+
+            auto wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            // Write a processor count setting (which belongs to [wsl2] section)
+            WslConfigSetting processorSetting{};
+            processorSetting.ConfigEntry = WslConfigEntry::ProcessorCount;
+            processorSetting.Int32Value = 4;
+
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, processorSetting), ERROR_SUCCESS);
+
+            // Read the file and verify structure
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Verify that [wsl2] appears before processors=
+            auto wsl2SectionPos = fileContent.find(L"[wsl2]");
+            auto processorsPos = fileContent.find(L"processors=");
+
+            VERIFY_ARE_NOT_EQUAL(wsl2SectionPos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(processorsPos, std::wstring::npos);
+            VERIFY_IS_TRUE(wsl2SectionPos < processorsPos);
+
+            // Also verify [experimental] is still there and comes before [wsl2]
+            auto experimentalPos = fileContent.find(L"[experimental]");
+            VERIFY_ARE_NOT_EQUAL(experimentalPos, std::wstring::npos);
+            VERIFY_IS_TRUE(experimentalPos < wsl2SectionPos);
+        }
+
+        // Test 3: Reproduce the exact bug scenario from issue #12671
+        // Start with a file that has a [wsl2] section but it appears later
+        {
+            std::wstring bugScenarioConfig = LR"([wsl2]
+[experimental]
+[wsl2]
+)";
+            WslConfigChange config{bugScenarioConfig.c_str()};
+
+            auto wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            // Write memory setting - this should NOT appear before the first [wsl2]
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 17825792000ULL; // Value from bug report
+
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            // Read and verify
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Find FIRST occurrence of [wsl2] and memory=
+            auto firstWsl2Pos = fileContent.find(L"[wsl2]");
+            auto memoryPos = fileContent.find(L"memory=");
+
+            VERIFY_ARE_NOT_EQUAL(firstWsl2Pos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+
+            // The critical assertion: memory= must NOT appear before [wsl2]
+            VERIFY_IS_TRUE(firstWsl2Pos < memoryPos);
+
+            // Additional check: memory should appear after the first [wsl2], not after line 1
+            auto firstLineEnd = fileContent.find(L'\n');
+            VERIFY_IS_TRUE(memoryPos > firstLineEnd);
+        }
+    }
+
     TEST_METHOD(LaunchWslSettingsFromProtocol)
     {
         WSL_SETTINGS_TEST();
