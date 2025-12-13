@@ -240,7 +240,6 @@ int ParseConfigFile(std::vector<ConfigKey>& keys, FILE* file, int flags, const w
 {
     wint_t ch = 0;
     unsigned long line = 0;
-    size_t newKeyValueInsertPos = 0;
     bool trailingComment = false;
     bool inQuote = false;
     size_t trimmedLength = 0;
@@ -328,8 +327,6 @@ NewLine:
 
             if (trailingComment)
             {
-                // Subtract 1 to account for ch being '\n' or WEOF.
-                newKeyValueInsertPos = configFileOutput.length() - 1;
                 trailingComment = false;
             }
         }
@@ -390,6 +387,37 @@ NewLine:
             break;
 
         case '[':
+            // We're about to parse a new section. If we have an unwritten key-value
+            // and the current section matches, write it now before moving to the new section.
+            if (updateConfigFile && !outputKeyValueUpdated && !removeKey && sectionLength > 0)
+            {
+                const auto& outputConfigKey = outputKey.value();
+                if (outputConfigKey.Matches(key.c_str(), sectionLength))
+                {
+                    const auto& keyNames = outputConfigKey.GetNames();
+                    // Config key without name.
+                    FAIL_FAST_IF(keyNames.empty());
+                    const auto keyNameUtf8 = keyNames.front();
+                    const auto keyName = wsl::shared::string::MultiByteToWide(keyNameUtf8);
+                    const auto sectionKeySeparatorPos = keyName.find('.');
+                    // Config key without separated section/key name
+                    FAIL_FAST_IF(sectionKeySeparatorPos == std::string_view::npos);
+                    // Config key without section name
+                    FAIL_FAST_IF(sectionKeySeparatorPos == 0);
+                    // Config key without key name
+                    FAIL_FAST_IF(sectionKeySeparatorPos == (keyName.length() - 1));
+
+                    //Remove any trailing newlines before inserting the new key-value
+                    while (!configFileOutput.empty() && configFileOutput.back() == L'\n')
+                    {
+                        configFileOutput.pop_back();
+                    }
+
+                    auto keyValue = std::format(L"\n{}={}\n\n", keyName.substr(sectionKeySeparatorPos + 1), outputKey.value().GetValue());
+                    configFileOutput += keyValue;
+                    outputKeyValueUpdated = true;
+                }
+            }
             goto ParseSection;
 
         default:
@@ -418,30 +446,6 @@ NewLine:
     }
 
 ParseSection:
-    if (updateConfigFile && !outputKeyValueUpdated && !removeKey && sectionLength > 0)
-    {
-        const auto& outputConfigKey = outputKey.value();
-        if (outputConfigKey.Matches(key.c_str(), sectionLength))
-        {
-            const auto& keyNames = outputConfigKey.GetNames();
-            // Config key without name.
-            FAIL_FAST_IF(keyNames.empty());
-            const auto keyNameUtf8 = keyNames.front();
-            const auto keyName = wsl::shared::string::MultiByteToWide(keyNameUtf8);
-            const auto sectionKeySeparatorPos = keyName.find('.');
-            // Config key without separated section/key name
-            FAIL_FAST_IF(sectionKeySeparatorPos == std::string_view::npos);
-            // Config key without section name
-            FAIL_FAST_IF(sectionKeySeparatorPos == 0);
-            // Config key without key name
-            FAIL_FAST_IF(sectionKeySeparatorPos == (keyName.length() - 1));
-
-            auto keyValue = std::format(L"\n{}={}", keyName.substr(sectionKeySeparatorPos + 1), outputKey.value().GetValue());
-            configFileOutput.insert(newKeyValueInsertPos, keyValue);
-            outputKeyValueUpdated = true;
-        }
-    }
-
     // parse [section] ([ is already parsed)
     if (updateConfigFile)
     {
@@ -796,7 +800,6 @@ ValueDone:
         // Trim any trailing space.
         value.resize(trimmedLength);
         SetConfig(keys, key.c_str(), value.c_str(), flags & CFG_DEBUG, filePath, line);
-        newKeyValueInsertPos = configFileOutput.length();
     }
 
     goto NewLine;

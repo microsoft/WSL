@@ -3517,6 +3517,47 @@ localhostForwarding=true
             configRead.close();
             VERIFY_ARE_EQUAL(customWslConfigContentActual, customWslConfigContentExpected);
         }
+
+        // Regression test for GitHub issue #12671:
+        // Ensure that section headers always appear BEFORE their key-value pairs.
+        // Bug: WSL Settings GUI was writing keys before the section header, causing "Unknown key" errors.
+        {
+            std::wstring bugScenarioConfig = LR"([wsl2]
+[experimental]
+[wsl2]
+)";
+            WslConfigChange config{bugScenarioConfig.c_str()};
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            // Write memory setting - this should NOT appear before the first [wsl2]
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 17825792000ULL; // Value from bug report
+
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            // Read and verify
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Find FIRST occurrence of [wsl2] and memory=
+            auto firstWsl2Pos = fileContent.find(L"[wsl2]");
+            auto memoryPos = fileContent.find(L"memory=");
+
+            VERIFY_ARE_NOT_EQUAL(firstWsl2Pos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+
+            // The critical assertion: memory= must NOT appear before [wsl2]
+            VERIFY_IS_TRUE(firstWsl2Pos < memoryPos);
+
+            // Additional check: memory should appear after the first [wsl2], not after line 1
+            auto firstLineEnd = fileContent.find(L'\n');
+            VERIFY_IS_TRUE(memoryPos > firstLineEnd);
+        }
     }
 
     TEST_METHOD(LaunchWslSettingsFromProtocol)
