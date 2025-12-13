@@ -127,6 +127,7 @@ try
         m_state);
     ServiceProcessLauncher launcher(
         nerdctlPath, {nerdctlPath, "stop", m_name, "--time", std::to_string(static_cast<ULONG>(std::round(TimeoutMs / 1000)))});
+
     // TODO: Figure out how we want to handle custom signals.
     // nerdctl stop has a --time and a --signal option that can be used
     // By default, it uses SIGTERM and a default timeout of 10 seconds.
@@ -196,34 +197,92 @@ CATCH_RETURN();
 HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
-    // auto process = wil::MakeOrThrow<WSLAProcess>();
+    *Errno = -1;
+    THROW_HR_IF_MSG(E_INVALIDARG, Options->Executable != nullptr, "Executable must be null");
 
-    // process.CopyTo(__uuidof(IWSLAProcess), (void**)Process);
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        State() != WslaContainerStateRunning,
+        "Container %hs is not running. State: %i",
+        m_name.c_str(),
+        m_state);
+
+    auto [hasStdin, hasTty] = ParseFdStatus(*Options);
+
+    std::vector<std::string> args{nerdctlPath, "exec"};
+
+    if (hasStdin)
+    {
+        args.push_back("-i");
+    }
+
+    if (hasTty)
+    {
+        args.push_back("-t");
+    }
+
+    AddEnvironmentVariables(args, *Options);
+
+    args.emplace_back(m_id);
+
+    for (ULONG i = 0; i < Options->CommandLineCount; i++)
+    {
+        args.emplace_back(Options->CommandLine[i]);
+    }
+
+    ServiceProcessLauncher launcher(nerdctlPath, args, {}, common::ProcessFlags::None);
+    for (auto i = 0; i < Options->FdsCount; i++)
+    {
+        launcher.AddFd(Options->Fds[i]);
+    }
+
+    std::optional<ServiceRunningProcess> process;
+    HRESULT result = E_FAIL;
+    std::tie(result, *Errno, process) = launcher.LaunchNoThrow(*m_parentVM);
+    THROW_IF_FAILED(result);
+
+    THROW_IF_FAILED(process->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
 
     return S_OK;
 }
 CATCH_RETURN();
 
-Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
-    const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM, ContainerEventTracker& eventTracker)
+std::pair<bool, bool> WSLAContainer::ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options)
 {
-    // TODO: Switch to nerdctl create, and call nerdctl start in Start().
-
     bool hasStdin = false;
     bool hasTty = false;
-    for (size_t i = 0; i < containerOptions.InitProcessOptions.FdsCount; i++)
+    for (size_t i = 0; i < Options.FdsCount; i++)
     {
-        if (containerOptions.InitProcessOptions.Fds[i].Fd == 0)
+        if (Options.Fds[i].Fd == 0)
         {
             hasStdin = true;
         }
 
-        if (containerOptions.InitProcessOptions.Fds[i].Type == WSLAFdTypeTerminalInput ||
-            containerOptions.InitProcessOptions.Fds[i].Type == WSLAFdTypeTerminalOutput)
+        if (Options.Fds[i].Type == WSLAFdTypeTerminalInput || Options.Fds[i].Type == WSLAFdTypeTerminalOutput)
         {
             hasTty = true;
         }
     }
+
+    return {hasStdin, hasTty};
+}
+
+void WSLAContainer::AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options)
+{
+    for (ULONG i = 0; i < options.EnvironmentCount; i++)
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, options.Environment[i][0] == '-', "Invalid environment string: %hs", options.Environment[i]);
+
+        args.insert(args.end(), {"-e", options.Environment[i]});
+    }
+}
+
+Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
+    const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM, ContainerEventTracker& eventTracker)
+{
+    auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
 
     // Don't support stdin for now since it will hang.
     // TODO: Remove once stdin is fixed in nerdctl.
@@ -239,6 +298,8 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
     {
         inputOptions.push_back("-t");
     }
+
+    AddEnvironmentVariables(inputOptions, containerOptions.InitProcessOptions);
 
     auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions));
 
@@ -276,17 +337,6 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_C
 
     args.insert(args.end(), defaultNerdctlRunArgs.begin(), defaultNerdctlRunArgs.end());
     args.insert(args.end(), inputOptions.begin(), inputOptions.end());
-
-    for (ULONG i = 0; i < options.InitProcessOptions.EnvironmentCount; i++)
-    {
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            options.InitProcessOptions.Environment[i][0] == L'-',
-            "Invalid environment string: %hs",
-            options.InitProcessOptions.Environment[i]);
-
-        args.insert(args.end(), {"-e", options.InitProcessOptions.Environment[i]});
-    }
 
     if (options.InitProcessOptions.Executable != nullptr)
     {

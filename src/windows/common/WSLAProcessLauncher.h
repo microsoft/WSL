@@ -91,9 +91,23 @@ public:
     void AddFd(WSLA_PROCESS_FD Fd);
     void SetTtySize(ULONG Rows, ULONG Columns);
 
-    // TODO: Add overloads for IWSLAContainer once implemented.
-    ClientRunningWSLAProcess Launch(IWSLASession& Session);
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
+    std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
+
+    template <typename T>
+    auto Launch(T& Context)
+    {
+        auto [hresult, error, process] = LaunchNoThrow(Context);
+        if (FAILED(hresult))
+        {
+            auto commandLine = wsl::shared::string::Join(m_arguments, ' ');
+            THROW_HR_MSG(
+                hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
+        }
+
+        return std::move(process.value());
+    }
+
     std::string FormatResult(const RunningWSLAProcess::ProcessResult& result);
     std::string FormatResult(const int code);
 
