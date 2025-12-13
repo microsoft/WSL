@@ -736,9 +736,6 @@ Windows 버전: {}</value>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>디스크 크기를 조정하지 못했습니다.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>경로를 변환하지 못했습니다.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>값을 찾을 수 없습니다.</value>
   </data>

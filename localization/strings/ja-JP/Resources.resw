@@ -736,9 +736,6 @@ Windows バージョン: {}</value>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>ディスクのサイズを変更できませんでした。</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>パスを変換できませんでした。</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>値が見つかりません。</value>
   </data>

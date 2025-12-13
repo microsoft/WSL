@@ -736,9 +736,6 @@ Potrebbe essere necessario riavviare il sistema per rendere effettive le modific
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Non è possibile ridimensionare il disco.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Non è stato possibile tradurre il percorso.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Nessun valore trovato.</value>
   </data>

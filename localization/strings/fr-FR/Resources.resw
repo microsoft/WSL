@@ -737,9 +737,6 @@ Le système devra peut-être être redémarré pour que les modifications prenne
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Échec de redimensionnement de disque.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Échec de la traduction du chemin d’accès.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Valeur non trouvée.</value>
   </data>

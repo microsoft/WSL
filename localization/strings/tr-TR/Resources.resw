@@ -730,9 +730,6 @@ Değişikliklerin etkili olması için sistemin yeniden başlatılması gerekebi
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Disk yeniden boyutlandırılamadı.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Yol çevrilemedi.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Değer bulunamadı.</value>
   </data>

@@ -730,9 +730,6 @@ Systemet skal muligvis genstartes, så ændringerne kan træde i kraft.</value>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Diskens størrelsen kunne ikke tilpasses.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Det mislykkedes at oversætte stien.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Der blev ikke fundet nogen værdi.</value>
   </data>

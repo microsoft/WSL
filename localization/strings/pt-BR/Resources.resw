@@ -737,9 +737,6 @@ Talvez seja necessário reiniciar o sistema para que as alterações entrem em v
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Falha ao redimensionar o disco.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Falha ao converter o caminho.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Nenhum valor encontrado.</value>
   </data>

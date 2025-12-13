@@ -730,9 +730,6 @@ Het systeem moet mogelijk opnieuw worden opgestart, zodat de wijzigingen van kra
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Kan het formaat van de schijf niet wijzigen.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Kan pad niet vertalen.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Geen waarde gevonden.</value>
   </data>

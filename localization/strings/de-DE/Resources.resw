@@ -736,9 +736,6 @@ Das System muss möglicherweise neu gestartet werden, damit die Änderungen wirk
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Fehler beim Ändern der Größe des Datenträgers.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Fehler beim Übersetzen des Pfads.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Kein Wert gefunden.</value>
   </data>

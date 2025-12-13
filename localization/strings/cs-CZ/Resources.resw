@@ -730,9 +730,6 @@ Může být nutné restartovat systém, aby se změny projevily.</value>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Změna velikosti disku se nezdařila.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Cestu se nepodařilo přeložit.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Nebyla nalezena žádná hodnota.</value>
   </data>
@@ -1060,7 +1057,7 @@ Návrat k sítím NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>This looks like a VHD file. Use --vhd to import a VHD instead of a tar.</value>
+    <value>Vypadá to jako soubor VHD. K importu virtuálního pevného disku místo tar použijte --vhd </value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">

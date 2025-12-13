@@ -730,9 +730,6 @@ Lehet, hogy újra kell indítani a rendszert, hogy a módosítások érvénybe l
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Nem sikerült a lemez átméretezése.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Az útvonal fordítása nem sikerült.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Nem található érték.</value>
   </data>
