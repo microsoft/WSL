@@ -2884,14 +2884,16 @@ Return Value:
         std::string TranslatedPath = WslPathTranslate(Path, 0, Mode);
         if (TranslatedPath.empty())
         {
+            auto WarningMessage = wsl::shared::Localization::MessageFailedToTranslate(Path);
             if (wil::ScopedWarningsCollector::CanCollectWarning())
             {
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToTranslate(Path));
+                EMIT_USER_WARNING(std::move(WarningMessage));
             }
             else
             {
-                LOG_ERROR("Failed to translate {}", Path);
+                LOG_WARNING("{}", WarningMessage);
             }
+
             continue;
         }
 
