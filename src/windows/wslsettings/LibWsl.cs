@@ -23,27 +23,28 @@ namespace LibWsl
         SwapSizeBytes = 3,
         SwapFilePath = 4,
         VhdSizeBytes = 5,
-        NetworkingMode = 6,
-        FirewallEnabled = 7,
-        IgnoredPorts = 8,
-        LocalhostForwardingEnabled = 9,
-        HostAddressLoopbackEnabled = 10,
-        AutoProxyEnabled = 11,
-        InitialAutoProxyTimeout = 12,
-        DNSProxyEnabled = 13,
-        DNSTunnelingEnabled = 14,
-        BestEffortDNSParsingEnabled = 15,
-        AutoMemoryReclaim = 16,
-        GUIApplicationsEnabled = 17,
-        NestedVirtualizationEnabled = 18,
-        SafeModeEnabled = 19,
-        SparseVHDEnabled = 20,
-        VMIdleTimeout = 21,
-        DebugConsoleEnabled = 22,
-        HardwarePerformanceCountersEnabled = 23,
-        KernelPath = 24,
-        SystemDistroPath = 25,
-        KernelModulesPath = 26
+        VhdType = 6,
+        NetworkingMode = 7,
+        FirewallEnabled = 8,
+        IgnoredPorts = 9,
+        LocalhostForwardingEnabled = 10,
+        HostAddressLoopbackEnabled = 11,
+        AutoProxyEnabled = 12,
+        InitialAutoProxyTimeout = 13,
+        DNSProxyEnabled = 14,
+        DNSTunnelingEnabled = 15,
+        BestEffortDNSParsingEnabled = 16,
+        AutoMemoryReclaim = 17,
+        GUIApplicationsEnabled = 18,
+        NestedVirtualizationEnabled = 19,
+        SafeModeEnabled = 20,
+        SparseVHDEnabled = 21,
+        VMIdleTimeout = 22,
+        DebugConsoleEnabled = 23,
+        HardwarePerformanceCountersEnabled = 24,
+        KernelPath = 25,
+        SystemDistroPath = 26,
+        KernelModulesPath = 27
     }
 
     public enum NetworkingConfiguration
@@ -60,6 +61,12 @@ namespace LibWsl
         Disabled = 0,
         Gradual = 1,
         DropCache = 2
+    }
+
+    public enum VhdType
+    {
+        Dynamic = 0,
+        Fixed = 1
     }
 
     public unsafe partial class WslConfig
