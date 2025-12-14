@@ -407,7 +407,7 @@ NewLine:
                     // Config key without key name
                     FAIL_FAST_IF(sectionKeySeparatorPos == (keyName.length() - 1));
 
-                    //Remove any trailing newlines before inserting the new key-value
+                    // Remove any trailing newlines before inserting the new key-value
                     while (!configFileOutput.empty() && configFileOutput.back() == L'\n')
                     {
                         configFileOutput.pop_back();
