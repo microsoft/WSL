@@ -48,9 +48,9 @@ WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& EntryPoint,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
-    WSLA_CONTAINER_NETWORK_TYPE containerNetworkType,
+    WSLA_CONTAINER_NETWORK_TYPE ContainerNetworkType,
     ProcessFlags Flags) :
-    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
+    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(ContainerNetworkType)
 {
 }
 
