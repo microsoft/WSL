@@ -704,9 +704,9 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
-    <value>This application requires the Windows Subsystem for Linux Optional Component.
-Install it by running: wsl.exe --install --no-distribution
-The system may need to be restarted so the changes can take effect.</value>
+    <value>此应用程序需要“适用于 Linux 的 Windows 子系统”可选组件。
+请通过运行：wsl.exe --install --no-distribution 进行安装。
+系统可能需要重启以使更改生效。</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -947,7 +947,7 @@ The system may need to be restarted so the changes can take effect.</value>
     <value>计算机策略已禁用调试 shell。</value>
   </data>
   <data name="MessageWSLMountDisabled" xml:space="preserve">
-    <value>wsl.exe --mount is disabled by the computer policy.</value>
+    <value>计算机策略已禁用 wsl.exe --mount。</value>
     <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWSL1Disabled" xml:space="preserve">
