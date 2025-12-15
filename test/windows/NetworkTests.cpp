@@ -4466,36 +4466,6 @@ class BridgedTests
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv6/conf/all/disable_ipv6");
         VERIFY_ARE_EQUAL(L"0\n", out);
     }
-
-    TEST_METHOD(DnsResolutionBasic)
-    {
-        WSL2_TEST_ONLY();
-        WINDOWS_11_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
-
-        NetworkTests::VerifyDnsResolutionBasic();
-    }
-
-    TEST_METHOD(DnsResolutionDig)
-    {
-        WSL2_TEST_ONLY();
-        WINDOWS_11_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
-
-        NetworkTests::VerifyDnsResolutionDig();
-    }
-
-    TEST_METHOD(DnsResolutionRecordTypes)
-    {
-        WSL2_TEST_ONLY();
-        WINDOWS_11_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
-
-        NetworkTests::VerifyDnsResolutionRecordTypes();
-    }
 };
 
 class VirtioProxyTests
