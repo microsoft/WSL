@@ -1593,7 +1593,7 @@ class WSLATests
 
         // Create a container.
         WSLAContainerLauncher launcher(
-            "debian:latest", "test-container-exec", {}, {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+            "debian:latest", "test-container-exec", {}, {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE, ProcessFlags::Stdout | ProcessFlags::Stderr);
 
         auto container = launcher.Launch(*session);
 
