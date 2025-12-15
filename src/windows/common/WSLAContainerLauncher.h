@@ -22,7 +22,7 @@ class RunningWSLAContainer
 public:
     NON_COPYABLE(RunningWSLAContainer);
     DEFAULT_MOVABLE(RunningWSLAContainer);
-    RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& fds);
+    RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& Fds);
     IWSLAContainer& Get();
 
     WSLA_CONTAINER_STATE State();

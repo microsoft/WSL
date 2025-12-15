@@ -17,8 +17,8 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::RunningWSLAContainer;
 using wsl::windows::common::WSLAContainerLauncher;
 
-RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& fds) :
-    m_container(std::move(Container)), m_fds(std::move(fds))
+RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& Fds) :
+    m_container(std::move(Container)), m_fds(std::move(Fds))
 {
 }
 
