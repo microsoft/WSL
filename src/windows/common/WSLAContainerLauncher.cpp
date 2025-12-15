@@ -17,8 +17,8 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::RunningWSLAContainer;
 using wsl::windows::common::WSLAContainerLauncher;
 
-RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& fds) :
-    m_container(std::move(Container)), m_fds(std::move(fds))
+RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& Fds) :
+    m_container(std::move(Container)), m_fds(std::move(Fds))
 {
 }
 
@@ -48,9 +48,9 @@ WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& EntryPoint,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
-    WSLA_CONTAINER_NETWORK_TYPE containerNetworkType,
+    WSLA_CONTAINER_NETWORK_TYPE ContainerNetworkType,
     ProcessFlags Flags) :
-    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
+    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(ContainerNetworkType)
 {
 }
 
