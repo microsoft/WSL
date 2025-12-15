@@ -122,6 +122,7 @@ WSLASession::~WSLASession()
         m_eventTracker->Stop();
     }
 
+    // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
 
     m_sessionTerminatingEvent.SetEvent();

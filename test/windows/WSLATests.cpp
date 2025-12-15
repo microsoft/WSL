@@ -193,6 +193,27 @@ class WSLATests
         }
     }
 
+    void ExpectMount(IWSLASession* session, const std::string& target, const std::optional<std::string>& options)
+    {
+        auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
+        auto result = ExpectCommandResult(session, {"/bin/sh", "-c", cmd}, options.has_value() ? 0 : 1);
+
+        const auto& output = result.Output[1];
+        const auto& error = result.Output[2];
+
+        if (result.Code != (options.has_value() ? 0 : 1))
+        {
+            LogError("%hs failed. code=%i, output: %hs, error: %hs", cmd.c_str(), result.Code, output.c_str(), error.c_str());
+            VERIFY_FAIL();
+        }
+
+        if (options.has_value() && !PathMatchSpecA(output.c_str(), options->c_str()))
+        {
+            std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", output, options.value());
+            VERIFY_FAIL(message.c_str());
+        }
+    }
+
     TEST_METHOD(ListSessionsReturnsSessionWithDisplayName)
     {
         WSL2_TEST_ONLY();
@@ -752,27 +773,6 @@ class WSLATests
             }
         };
 
-        auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
-            auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
-
-            auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", cmd}, options.has_value() ? 0 : 1);
-
-            const auto& output = result.Output[1];
-            const auto& error = result.Output[2];
-
-            if (result.Code != (options.has_value() ? 0 : 1))
-            {
-                LogError("%hs failed. code=%i, output: %hs, error: %hs", cmd.c_str(), result.Code, output.c_str(), error.c_str());
-                VERIFY_FAIL();
-            }
-
-            if (options.has_value() && !PathMatchSpecA(output.c_str(), options->c_str()))
-            {
-                std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", output, options.value());
-                VERIFY_FAIL(message.c_str());
-            }
-        };
-
         auto testFolder = std::filesystem::current_path() / "test-folder";
         std::filesystem::create_directories(testFolder);
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
@@ -780,7 +780,7 @@ class WSLATests
         // Validate writeable mount.
         {
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
-            expectMount("/win-path", expectedMountOptions(false));
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(false));
 
             // Validate that mount can't be stacked on each other
             VERIFY_ARE_EQUAL(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
@@ -790,19 +790,19 @@ class WSLATests
             VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
 
             VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
-            expectMount("/win-path", {});
+            ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate read-only mount.
         {
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
-            expectMount("/win-path", expectedMountOptions(true));
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Validate that folder is not writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
             VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
-            expectMount("/win-path", {});
+            ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate various error paths
@@ -814,7 +814,7 @@ class WSLATests
 
             // Validate that folders that are manually unmounted from the guest are handled properly
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
-            expectMount("/win-path", expectedMountOptions(true));
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             ExpectCommandResult(session.get(), {"/usr/bin/umount", "/win-path"}, 0);
             VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
@@ -861,30 +861,16 @@ class WSLATests
 
         // Validate that the GPU device is available.
         ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
-        auto expectMount = [&](const std::string& target, const std::optional<std::string>& options) {
-            auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
-            WSLAProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", cmd}};
 
-            auto result = launcher.Launch(*session).WaitAndCaptureOutput();
-            const auto& output = result.Output[1];
-            const auto& error = result.Output[2];
-            if (result.Code != (options.has_value() ? 0 : 1))
-            {
-                LogError("%hs failed. code=%i, output: %hs, error: %hs", cmd.c_str(), result.Code, output.c_str(), error.c_str());
-                VERIFY_FAIL();
-            }
-
-            if (options.has_value() && !PathMatchSpecA(output.c_str(), options->c_str()))
-            {
-                std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", output, options.value());
-                VERIFY_FAIL(message.c_str());
-            }
-        };
-
-        expectMount(
+        ExpectMount(
+            session.get(),
             "/usr/lib/wsl/drivers",
             "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
-        expectMount("/usr/lib/wsl/lib", "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
+
+        ExpectMount(
+            session.get(),
+            "/usr/lib/wsl/lib",
+            "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
 
         // Validate that the mount points are not writeable.
         VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 1L);
@@ -901,8 +887,8 @@ class WSLATests
             VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
 
             // Validate that the GPU device is not available.
-            expectMount("/usr/lib/wsl/drivers", {});
-            expectMount("/usr/lib/wsl/lib", {});
+            ExpectMount(session.get(), "/usr/lib/wsl/drivers", {});
+            ExpectMount(session.get(), "/usr/lib/wsl/lib", {});
         }
     }
 
@@ -1479,5 +1465,112 @@ class WSLATests
 
             // TODO: Implement proper handling of executables that don't exist in the container.
         }
+    }
+
+    TEST_METHOD(ContainerVolume)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto hostFolder = std::filesystem::current_path() / "test-volume";
+        auto hostFolderReadOnly = std::filesystem::current_path() / "test-volume-ro";
+        auto storage = std::filesystem::current_path() / "storage";
+
+        std::filesystem::create_directories(hostFolder);
+        std::filesystem::create_directories(hostFolderReadOnly);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+            std::filesystem::remove_all(hostFolderReadOnly, ec);
+            std::filesystem::remove_all(storage, ec);
+        });
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.StoragePath = storage.c_str();
+        settings.MaximumStorageSizeMb = 1024;
+
+        auto session = CreateSession(settings);
+
+        // Validate both folders exist in the container and that the readonly one cannot be written to.
+        std::string containerName = "test-container";
+        std::string containerPath = "/volume";
+        std::string containerReadOnlyPath = "/volume-ro";
+
+        // Container init script to validate volumes are mounted correctly.
+        const std::string script =
+            "set -e; "
+
+            // Test that volumes are available in the container
+            "test -d " +
+            containerPath +
+            "; "
+            "test -d " +
+            containerReadOnlyPath +
+            "; "
+
+            // Test that the container cannot write to the read-only volume
+            "if touch " +
+            containerReadOnlyPath +
+            "/.ro-test 2>/dev/null;"
+            "then echo 'FAILED'; "
+            "else echo 'OK'; "
+            "fi ";
+
+        WSLAContainerLauncher launcher("debian:latest", containerName, "/bin/sh", {"-c", script});
+        launcher.AddVolume(hostFolder.wstring(), containerPath, false);
+        launcher.AddVolume(hostFolderReadOnly.wstring(), containerReadOnlyPath, true);
+
+        {
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+            VERIFY_SUCCEEDED(container.Get().Delete());
+        }
+
+        // Validate that the volumes are not mounted after container exits.
+        ExpectMount(session.get(), std::format("/mnt/wsla/{}/volumes/{}", containerName, 0), {});
+        ExpectMount(session.get(), std::format("/mnt/wsla/{}/volumes/{}", containerName, 1), {});
+    }
+
+    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnError)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto hostFolder = std::filesystem::current_path() / "test-volume";
+        auto storage = std::filesystem::current_path() / "storage";
+
+        std::filesystem::create_directories(hostFolder);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+            std::filesystem::remove_all(storage, ec);
+        });
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.StoragePath = storage.c_str();
+        settings.MaximumStorageSizeMb = 1024;
+
+        auto session = CreateSession(settings);
+
+        // Create a container with a simple command.
+        WSLAContainerLauncher launcher("debian:latest", "test-container", "/bin/echo", {"OK"});
+        launcher.AddVolume(hostFolder.wstring(), "/volume", false);
+
+        // Add a volume with an invalid (non-existing) host path
+        launcher.AddVolume(L"does-not-exist", "/volume-invalid", false);
+
+        auto [result, container] = launcher.LaunchNoThrow(*session);
+        VERIFY_FAILED(result);
+
+        // Verify that the first volume was mounted before the error occurred, then unmounted after failure.
+        ExpectMount(session.get(), "/mnt/wsla/test-container/volumes/0", {});
     }
 };
