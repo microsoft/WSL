@@ -101,7 +101,7 @@ void WSLAContainer::OnEvent(ContainerEvent event)
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 try
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    std::lock_guard lock(m_lock);
 
     if (State() == WslaContainerStateExited)
     {
@@ -263,27 +263,28 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_C
     args.push_back("--name");
     args.push_back(options.Name);
 
-    if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_HOST)
+    switch (options.ContainerNetwork.ContainerNetworkType)
     {
+    case WSLA_CONTAINER_NETWORK_HOST:
         args.push_back("--net=host");
-    }
-    else if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_NONE)
-    {
+        break;
+    case WSLA_CONTAINER_NETWORK_NONE:
         args.push_back("--net=none");
-    }
-    else if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_BRIDGE)
-    {
+        break;
+    case WSLA_CONTAINER_NETWORK_BRIDGE:
         args.push_back("--net=bridge");
-    }
+        break;
     // TODO: uncomment and implement when we have custom networks
-    /* else if (options.ContainerNetwork == WSLA_CONTAINER_NETWORK_CUSTOM)
-    {
-        args.push_back(std::format("--net={}", options.ContainerNetwork.ContainerNetworkName));
-    } */
-    else
-    {
-        // TODO: change the default to bridge once VHD has been fixed
-        args.push_back("--net=host");
+    // case WSLA_CONTAINER_NETWORK_CUSTOM:
+    //     args.push_back(std::format("--net={}", options.ContainerNetwork.ContainerNetworkName));
+    //     break;
+    default:
+        THROW_HR_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            "No such network: type: %i, name: %hs",
+            options.ContainerNetwork.ContainerNetworkType,
+            options.ContainerNetwork.ContainerNetworkName);
+        break;
     }
 
     if (options.ShmSize > 0)

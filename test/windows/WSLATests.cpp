@@ -1524,6 +1524,20 @@ class WSLATests
             expectContainerList({});
         }
 
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest",
+                "test-network",
+                {},
+                {"sleep", "99999"},
+                {},
+                (WSLA_CONTAINER_NETWORK_TYPE)6, // WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto retVal = launcher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(retVal.first, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+        }
+
         // Test bridge when ready
         /*
         {
