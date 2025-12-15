@@ -1231,6 +1231,32 @@ class WSLATests
             auto [hresult, container] = launcher.LaunchNoThrow(*session);
             VERIFY_ARE_EQUAL(hresult, E_FAIL); // TODO: Have a nicer error code when the image is not found.
         }
+
+        // Test null image name
+        {
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = nullptr;
+            options.Name = "test-container";
+            options.InitProcessOptions.CommandLine = nullptr;
+            options.InitProcessOptions.CommandLineCount = 0;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = session->CreateContainer(&options, &container);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test null container name
+        {
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = nullptr;
+            options.InitProcessOptions.CommandLine = nullptr;
+            options.InitProcessOptions.CommandLineCount = 0;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = session->CreateContainer(&options, &container);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
     }
 
     TEST_METHOD(ContainerState)
