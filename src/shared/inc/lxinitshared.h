@@ -1584,9 +1584,10 @@ struct WSLA_MOUNT
     enum MountType : uint8_t
     {
         None,
-        Chroot = 1,
-        OverlayFs = 2,
-        KernelModules = 4
+        ReadOnly = 1,
+        Chroot = 2,
+        OverlayFs = 4,
+        KernelModules = 8
     };
 
     char Buffer[];

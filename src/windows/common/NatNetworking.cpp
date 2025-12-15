@@ -506,23 +506,12 @@ CATCH_LOG()
 
 void NatNetworking::UpdateMtu()
 {
-    unique_interface_table interfaceTable{};
-    THROW_IF_WIN32_ERROR(::GetIpInterfaceTable(AF_UNSPEC, &interfaceTable));
-
-    ULONG minMtu = ULONG_MAX;
-    for (ULONG index = 0; index < interfaceTable.get()->NumEntries; index++)
-    {
-        const auto& ipInterface = interfaceTable.get()->Table[index];
-        if (ipInterface.Connected)
-        {
-            minMtu = std::min(ipInterface.NlMtu, minMtu);
-        }
-    }
+    const auto minMtu = GetMinimumConnectedInterfaceMtu();
 
     // Only send the update if the MTU changed.
-    if (minMtu != ULONG_MAX && minMtu != m_networkMtu)
+    if (minMtu && minMtu.value() != m_networkMtu)
     {
-        m_networkMtu = minMtu;
+        m_networkMtu = minMtu.value();
 
         hns::ModifyGuestEndpointSettingRequest<hns::NetworkInterface> notification{};
         notification.ResourceType = hns::GuestEndpointResourceType::Interface;

@@ -65,7 +65,7 @@ find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
-find_nuget_package(Microsoft.WSL.WSLATestDistro WSLA_TEST_DISTRO /)
+find_nuget_package(Microsoft.WSL.WslaRootfs WSLA_TEST_DISTRO /build/native/bin/${TARGET_PLATFORM})
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(StrawberryPerl PERL /)
 find_nuget_package(vswhere VSWHERE /tools)
@@ -75,13 +75,11 @@ find_nuget_package(Wix WIX /tools/net6.0/any)
 if (${TARGET_PLATFORM} STREQUAL "x64")
     find_nuget_package(Microsoft.DXCore.Linux.amd64fre DXCORE /build/native)
     find_nuget_package(Microsoft.WSL.Dependencies.amd64fre WSLDEPS /build/native)
-    find_nuget_package(Microsoft.WSL.LxUtil.amd64fre LXUTIL /build/native)
 endif()
 
 if (${TARGET_PLATFORM} STREQUAL "arm64")
     find_nuget_package(Microsoft.DXCore.Linux.arm64fre DXCORE /build/native)
     find_nuget_package(Microsoft.WSL.Dependencies.arm64fre WSLDEPS /build/native)
-    find_nuget_package(Microsoft.WSL.LxUtil.arm64fre LXUTIL /build/native)
 endif()
 
 # Wsl Settings packages
@@ -154,7 +152,6 @@ file(MAKE_DIRECTORY ${GENERATED_DIR})
 
 set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
 file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll ${BIN}/wsldevicehost.dll)
-file(CREATE_LINK ${LXUTIL_SOURCE_DIR}/bin/lxutil.dll ${BIN}/lxutil.dll)
 file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
 
@@ -205,7 +202,6 @@ add_compile_definitions(UNICODE
                         WSL_DEVICE_HOST_VERSION="${WSL_DEVICE_HOST_VERSION}"
                         COMMIT_HASH="${COMMIT_HASH}"
                         WSL_PACKAGE_VERSION="${PACKAGE_VERSION}"
-                        LXUTIL_VERSION="${LXUTIL_VERSION}"
                         MSRDC_VERSION="${MSRDC_VERSION}"
                         DIRECT3D_VERSION="${DIRECT3D_VERSION}"
                         DXCORE_VERSION="${DXCORE_VERSION}"
@@ -237,7 +233,6 @@ endif()
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
-link_directories(${LXUTIL_SOURCE_DIR}/lib/)
 set(COMMON_LINK_LIBRARIES
     ws2_32.lib
     Userenv.lib
@@ -381,7 +376,7 @@ if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smal
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
 
     if (NOT OFFICIAL_BUILD AND ${TARGET_PLATFORM} STREQUAL "x64")
-        add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/wslatestrootfs.vhd")
+        add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd")
     endif()
 endif()
 

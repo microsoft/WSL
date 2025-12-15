@@ -31,6 +31,8 @@ using wsl::windows::common::relay::WriteHandle;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 
+static std::filesystem::path storagePath;
+
 class WSLATests
 {
     WSL_TEST_CLASS(WSLATests)
@@ -46,6 +48,7 @@ class WSLATests
 
         auto vhdPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath");
         testVhd = std::filesystem::path{vhdPath} / "ext4.vhdx";
+        storagePath = std::filesystem::current_path() / "test-storage";
 
         WslShutdown();
         return true;
@@ -53,6 +56,16 @@ class WSLATests
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
+        if (!storagePath.empty())
+        {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+            if (error)
+            {
+                LogError("Failed to cleanup storage path %ws: %hs", storagePath.c_str(), error.message().c_str());
+            }
+        }
+
         return true;
     }
 
@@ -63,6 +76,9 @@ class WSLATests
         settings.CpuCount = 4;
         settings.MemoryMb = 2024;
         settings.BootTimeoutMs = 30 * 1000;
+        settings.StoragePath = storagePath.c_str();
+        settings.MaximumStorageSizeMb = 1000; // 1GB.
+
         return settings;
     }
 
@@ -180,7 +196,6 @@ class WSLATests
     void ExpectMount(IWSLASession* session, const std::string& target, const std::optional<std::string>& options)
     {
         auto cmd = std::format("set -o pipefail ; findmnt '{}' | tail  -n 1", target);
-        
         auto result = ExpectCommandResult(session, {"/bin/sh", "-c", cmd}, options.has_value() ? 0 : 1);
 
         const auto& output = result.Output[1];
@@ -197,6 +212,61 @@ class WSLATests
             std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", output, options.value());
             VERIFY_FAIL(message.c_str());
         }
+    }
+
+    TEST_METHOD(ListSessionsReturnsSessionWithDisplayName)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.StoragePath = nullptr;
+        settings.DisplayName = L"wsla-test-list";
+
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        wil::com_ptr<IWSLASession> session;
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
+
+        // Act: list sessions
+        wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+        VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
+
+        // Assert
+        VERIFY_ARE_EQUAL(sessions.size(), 1u);
+        const auto& info = sessions[0];
+
+        // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
+        VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), std::wstring(L"wsla-test-list"));
+    }
+
+    TEST_METHOD(OpenSessionByNameFindsExistingSession)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.StoragePath = nullptr;
+        settings.DisplayName = L"wsla-open-by-name-test";
+
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        wil::com_ptr<IWSLASession> created;
+        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &created));
+
+        // Act: open by the same display name
+        wil::com_ptr<IWSLASession> opened;
+        VERIFY_SUCCEEDED(userSession->OpenSessionByName(L"wsla-open-by-name-test", &opened));
+        VERIFY_IS_NOT_NULL(opened.get());
+
+        // And verify we get ERROR_NOT_FOUND for a nonexistent name
+        wil::com_ptr<IWSLASession> notFound;
+        auto hr = userSession->OpenSessionByName(L"this-name-does-not-exist", &notFound);
+        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
     TEST_METHOD(CustomDmesgOutput)
@@ -364,9 +434,9 @@ class WSLATests
         };
 
         // Expect the shell prompt to be displayed
-        validateTtyOutput("/ #");
+        validateTtyOutput("\033[?2004hsh-5.2# ");
         writeTty("echo OK\n");
-        validateTtyOutput(" echo OK\r\nOK");
+        validateTtyOutput("echo OK\r\n\033[?2004l\rOK");
 
         // Exit the shell
         writeTty("exit\n");
@@ -512,7 +582,7 @@ class WSLATests
                 {{0, WSLAFdTypeLinuxFileInput, "/proc/self/comm"}, {1, WSLAFdTypeLinuxFileInput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
 
             auto result = process->WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Output[2], "cat: write error: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: write error: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(result.Code, 1);
         }
 
@@ -520,7 +590,7 @@ class WSLATests
             auto process = createProcess({"/bin/cat"}, {{0, WSLAFdTypeLinuxFileOutput, "/tmp/output"}, {2, WSLAFdTypeDefault, nullptr}});
             auto result = process->WaitAndCaptureOutput();
 
-            VERIFY_ARE_EQUAL(result.Output[2], "cat: read error: Bad file descriptor\n");
+            VERIFY_ARE_EQUAL(result.Output[2], "/bin/cat: standard output: Bad file descriptor\n");
             VERIFY_ARE_EQUAL(result.Code, 1);
         }
     }
@@ -528,6 +598,10 @@ class WSLATests
     TEST_METHOD(NATPortMapping)
     {
         WSL2_TEST_ONLY();
+
+        // TODO: Enable again once socat is available in the runtime VHD.
+        LogSkipped("Skipping test since socat is required in the runtime VHD");
+        return;
 
         auto settings = GetDefaultSessionSettings();
         settings.RootVhdOverride = testVhd.c_str(); // socat is required to run this test case.
@@ -676,15 +750,28 @@ class WSLATests
         StopWslaService();
     }
 
-    TEST_METHOD(WindowsMounts)
+    void ValidateWindowsMounts(bool enableVirtioFs)
     {
-        WSL2_TEST_ONLY();
+        auto settings = GetDefaultSessionSettings();
+        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
-        auto session = CreateSession();
+        auto session = CreateSession(settings);
 
         wil::com_ptr<IWSLAVirtualMachine> vm;
         VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
         wsl::windows::common::security::ConfigureForCOMImpersonation(vm.get());
+
+        auto expectedMountOptions = [&](bool readOnly) -> std::string {
+            if (enableVirtioFs)
+            {
+                return std::format("/win-path*virtiofs*{},relatime*", readOnly ? "ro" : "rw");
+            }
+            else
+            {
+                return std::format(
+                    "/win-path*9p*{},relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*", readOnly ? "ro" : "rw");
+            }
+        };
 
         auto testFolder = std::filesystem::current_path() / "test-folder";
         std::filesystem::create_directories(testFolder);
@@ -693,7 +780,7 @@ class WSLATests
         // Validate writeable mount.
         {
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
-            ExpectMount(session.get(), "/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(false));
 
             // Validate that mount can't be stacked on each other
             VERIFY_ARE_EQUAL(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
@@ -709,7 +796,7 @@ class WSLATests
         // Validate read-only mount.
         {
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
-            ExpectMount(session.get(), "/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Validate that folder is not writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
@@ -727,11 +814,23 @@ class WSLATests
 
             // Validate that folders that are manually unmounted from the guest are handled properly
             VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
-            ExpectMount(session.get(), "/win-path", "/win-path*9p*rw,relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+            ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             ExpectCommandResult(session.get(), {"/usr/bin/umount", "/win-path"}, 0);
             VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
         }
+    }
+
+    TEST_METHOD(WindowsMounts)
+    {
+        WSL2_TEST_ONLY();
+        ValidateWindowsMounts(false);
+    }
+
+    TEST_METHOD(WindowsMountsVirtioFs)
+    {
+        WSL2_TEST_ONLY();
+        ValidateWindowsMounts(true);
     }
 
     // This test case validates that no file descriptors are leaked to user processes.
@@ -744,7 +843,7 @@ class WSLATests
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
 
         // Note: fd/0 is opened by readlink to read the actual content of /proc/self/fd.
-        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\n"))
+        if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\nsocket:*\nsocket:*"))
         {
             LogInfo("Found additional fds: %hs", result.Output[1].c_str());
             VERIFY_FAIL();
@@ -760,19 +859,17 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        wil::com_ptr<IWSLAVirtualMachine> vm;
-        VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
-
         // Validate that the GPU device is available.
         ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
-       
+
         ExpectMount(
             session.get(),
             "/usr/lib/wsl/drivers",
             "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+
         ExpectMount(
             session.get(),
-            "/usr/lib/wsl/lib", 
+            "/usr/lib/wsl/lib",
             "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
 
         // Validate that the mount points are not writeable.
@@ -781,6 +878,8 @@ class WSLATests
 
         // Validate that trying to mount the shares without GPU support disabled fails.
         {
+            session.reset(); // Required to close the storage VHD.
+
             WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
             session = CreateSession(settings);
 
@@ -968,7 +1067,7 @@ class WSLATests
 
         // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
         // Check if a new file was added in crashDumpsDir matching the pattern and not in existingDumps.
-        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_busybox-11.dmp", processId);
+        std::string expectedPattern = std::format("wsl-crash-*-{}-_usr_bin_cat-11.dmp", processId);
 
         auto dumpFile = wsl::shared::retry::RetryWithTimeout<std::filesystem::path>(
             [crashDumpsDir, expectedPattern, existingDumps]() {
@@ -1030,22 +1129,8 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto storagePath = std::filesystem::current_path() / "test-storage";
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            std::error_code error;
-
-            std::filesystem::remove_all(storagePath, error);
-            if (error)
-            {
-                LogError("Failed to cleanup storage path %ws: %s", storagePath.c_str(), error.message().c_str());
-            }
-        });
-
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.StoragePath = storagePath.c_str();
-        settings.MaximumStorageSizeMb = 1024;
 
         auto session = CreateSession(settings);
 
@@ -1067,16 +1152,17 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
 
-        // Validate that starting containers works with the default entrypoint and content on stdin
         {
             WSLAContainerLauncher launcher(
                 "debian:latest", "test-default-entrypoint", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             // For now, validate that trying to use stdin without a tty returns the appropriate error.
-            auto container = launcher.Launch(*session);
+            auto result = wil::ResultFromException([&]() { auto container = launcher.Launch(*session); });
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
 
             // TODO: nerdctl hangs if stdin is closed without writing to it.
             // Add test coverage for that usecase once the hang is fixed.
+            /*
             auto process = container.GetInitProcess();
             auto input = process.GetStdHandle(0);
 
@@ -1092,16 +1178,19 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(result.Output[2], "");
             VERIFY_ARE_EQUAL(result.Output[1], "foo");
+            */
         }
 
         // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
+        // TODO: This fails because nerdctl start always seems to hang on stdin.
+        /*
         {
             WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
             auto container = launcher.Launch(*session);
             auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {{1, ""}});
-        }
+        }*/
 
         // Validate error paths
         {
@@ -1117,11 +1206,11 @@ class WSLATests
         }
 
         // TODO: Add logic to detect when starting the container fails, and enable this test case.
-        /*{
+        {
             WSLAContainerLauncher launcher("invalid-image-name", "dummy", "/bin/cat");
             auto [hresult, container] = launcher.LaunchNoThrow(*session);
             VERIFY_ARE_EQUAL(hresult, E_FAIL); // TODO: Have a nicer error code when the image is not found.
-        }*/
+        }
     }
 
     TEST_METHOD(ContainerState)
@@ -1129,22 +1218,8 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto storagePath = std::filesystem::current_path() / "test-storage";
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            std::error_code error;
-
-            std::filesystem::remove_all(storagePath, error);
-            if (error)
-            {
-                LogError("Failed to cleanup storage path %ws: %s", storagePath.c_str(), error.message().c_str());
-            }
-        });
-
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.StoragePath = storagePath.c_str();
-        settings.MaximumStorageSizeMb = 1024;
 
         auto session = CreateSession(settings);
 
@@ -1179,7 +1254,7 @@ class WSLATests
 
             // Create a stuck container.
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-1", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest", "test-container-1", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto container = launcher.Launch(*session);
 
@@ -1219,6 +1294,35 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Delete());
         }
 
+        // Test StopContainer
+        {
+            // Create a container
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-container-2", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            auto container = launcher.Launch(*session);
+
+            // Verify that the container is in running state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+
+            // TODO: Once 'container run' is split into 'container create' + 'container start',
+            // validate that Stop() on a container in 'Created' state returns ERROR_INVALID_STATE.
+
+            expectContainerList(
+                {{"exited-container", "debian:latest", WslaContainerStateExited},
+                 {"test-container-2", "debian:latest", WslaContainerStateExited}});
+
+            // Verify that the container is in exited state.
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
+            // Verify that deleting a container stopped via Stop() works.
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
+        }
+
         // Verify that trying to open a non existing container fails.
         {
             wil::com_ptr<IWSLAContainer> sameContainer;
@@ -1228,7 +1332,7 @@ class WSLATests
         // Validate that container names are unique.
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-unique-name", "/bin/cat", {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest", "test-unique-name", "sleep", {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -1260,8 +1364,15 @@ class WSLATests
                 {{"exited-container", "debian:latest", WslaContainerStateExited},
                  {"test-unique-name", "debian:latest", WslaContainerStateExited}});
 
+            // Verify that calling Stop() on exited containers is a no-op and state remains as WslaContainerStateExited.
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+
             // Verify that stopped containers can be deleted.
             VERIFY_SUCCEEDED(container.Get().Delete());
+
+            // Verify that stopping a deleted container returns ERROR_INVALID_STATE.
+            VERIFY_ARE_EQUAL(container.Get().Stop(15, 50000), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that deleted containers can't be deleted again.
             VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
@@ -1271,11 +1382,88 @@ class WSLATests
 
             // Verify that the same name can be reused now that the container is deleted.
             WSLAContainerLauncher otherLauncher(
-                "debian:latest", "test-unique-name", "echo", {"OK"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest", "test-unique-name", "echo", {"OK"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto result = otherLauncher.Launch(*session).GetInitProcess().WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
             VERIFY_ARE_EQUAL(result.Code, 0);
+        }
+    }
+
+    TEST_METHOD(Exec)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+
+        auto session = CreateSession(settings);
+
+        // Create a container.
+        WSLAContainerLauncher launcher(
+            "debian:latest", "test-container-exec", {}, {"sleep", "99999"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+        auto container = launcher.Launch(*session);
+
+        // Simple exec case.
+        {
+            auto process =
+                WSLAProcessLauncher("/bin/echo", {"echo", "OK"}, {}, ProcessFlags::Stdout | ProcessFlags::Stderr).Launch(container.Get());
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+        }
+
+        // Validate that stdin is correctly wired.
+        // TODO: Add test coverage for stdin being closed without anything written to it once the stdin hang issue is solved.
+        {
+            auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
+                               .Launch(container.Get());
+
+            std::string shellInput = "foo";
+            std::vector<char> inputBuffer{shellInput.begin(), shellInput.end()};
+
+            std::unique_ptr<OverlappedIOHandle> writeStdin(new WriteHandle(process.GetStdHandle(0), inputBuffer));
+
+            std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
+            extraHandles.emplace_back(std::move(writeStdin));
+
+            auto result = process.WaitAndCaptureOutput(INFINITE, std::move(extraHandles));
+
+            VERIFY_ARE_EQUAL(result.Output[2], "");
+            VERIFY_ARE_EQUAL(result.Output[1], "foo");
+            VERIFY_ARE_EQUAL(result.Code, 0);
+        }
+
+        // Validate that environmnent is correctly wired.
+        {
+            auto process =
+                WSLAProcessLauncher({}, {"/bin/sh", "-c", "echo $testenv"}, {{"testenv=testvalue"}}, ProcessFlags::Stdout | ProcessFlags::Stderr)
+                    .Launch(container.Get());
+
+            ValidateProcessOutput(process, {{1, "testvalue\n"}});
+        }
+
+        // Validate that an exec'd command returns when the container is stopped.
+        {
+            auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
+                               .Launch(container.Get());
+
+            VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+
+            ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "stop", "-t", "0", "test-container-exec"}, 0);
+
+            auto result = process.WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(result.Code, 1);
+        }
+
+        // Validate error paths
+        {
+            // Validate that processes can't be launched in stopped containers.
+            auto [result, _, __] = WSLAProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
+            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // TODO: Implement proper handling of executables that don't exist in the container.
         }
     }
 
@@ -1315,12 +1503,18 @@ class WSLATests
             "set -e; "
 
             // Test that volumes are available in the container
-            "test -d " + containerPath + "; "
-            "test -d " + containerReadOnlyPath + "; "
+            "test -d " +
+            containerPath +
+            "; "
+            "test -d " +
+            containerReadOnlyPath +
+            "; "
 
             // Test that the container cannot write to the read-only volume
-            "if touch " + containerReadOnlyPath + "/.ro-test 2>/dev/null;"
-            "then echo 'FAILED'; " 
+            "if touch " +
+            containerReadOnlyPath +
+            "/.ro-test 2>/dev/null;"
+            "then echo 'FAILED'; "
             "else echo 'OK'; "
             "fi ";
 

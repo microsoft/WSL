@@ -55,15 +55,15 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 
 void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
-    // Store a copy of the path strings to the launcher to ensure their references remain valid until we start the container.
+    // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
     const auto& hostPath = m_hostPaths.emplace_back(HostPath);
     const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
-     
+
     WSLA_VOLUME vol{};
     vol.HostPath = hostPath.c_str();
     vol.ContainerPath = containerPath.c_str();
     vol.ReadOnly = ReadOnly ? TRUE : FALSE;
-    
+
     m_volumes.push_back(vol);
 }
 
@@ -79,12 +79,9 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     {
         options.InitProcessOptions.Executable = nullptr;
     }
-
-    if (!m_volumes.empty())
-    {
-        options.Volumes = m_volumes.data();
-        options.VolumesCount = gsl::narrow_cast<ULONG>(m_volumes.size());
-    }
+    
+    options.VolumesCount = static_cast<ULONG>(m_volumes.size());
+    options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;

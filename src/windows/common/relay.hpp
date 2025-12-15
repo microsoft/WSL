@@ -183,12 +183,14 @@ public:
     NON_MOVABLE(EventHandle)
 
     EventHandle(wil::unique_event&& EventHandle, std::function<void()>&& OnSignalled);
+    EventHandle(HANDLE EventHandle, std::function<void()>&& OnSignalled);
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
-    wil::unique_event Handle;
+    wil::unique_event OwnedHandle;
+    HANDLE Handle;
     std::function<void()> OnSignalled;
 };
 
@@ -199,7 +201,7 @@ public:
     NON_MOVABLE(ReadHandle);
 
     ReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
-    ~ReadHandle();
+    virtual ~ReadHandle();
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -210,6 +212,22 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
+};
+
+class LineBasedReadHandle : public ReadHandle
+{
+public:
+    NON_COPYABLE(LineBasedReadHandle);
+    NON_MOVABLE(LineBasedReadHandle);
+
+    LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OneLine);
+    ~LineBasedReadHandle();
+
+private:
+    void OnRead(const gsl::span<char>& Buffer);
+
+    std::function<void(const gsl::span<char>& Buffer)> OnLine;
+    std::string PendingBuffer;
 };
 
 class WriteHandle : public OverlappedIOHandle
@@ -238,10 +256,12 @@ public:
     MultiHandleWait() = default;
 
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
-    void Run(std::optional<std::chrono::milliseconds> Timeout);
+    bool Run(std::optional<std::chrono::milliseconds> Timeout);
+    void Cancel();
 
 private:
     std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;
+    bool m_cancel = false;
 };
 
 } // namespace wsl::windows::common::relay

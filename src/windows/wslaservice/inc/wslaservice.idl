@@ -227,10 +227,11 @@ typedef enum _WSLANetworkingMode
 
 typedef enum _WSLAFeatureFlags
 {
-    WslaFeatureFlagsNone = 0, 
-    WslaFeatureFlagsDnsTunneling = 1, 
-    WslaFeatureFlagsEarlyBootDmesg = 2, 
-    WslaFeatureFlagsGPU = 4, 
+    WslaFeatureFlagsNone = 0,
+    WslaFeatureFlagsDnsTunneling = 1,
+    WslaFeatureFlagsEarlyBootDmesg = 2,
+    WslaFeatureFlagsGPU = 4,
+    WslaFeatureFlagsVirtioFs = 8,
 } WSLAFeatureFlags;
 
 struct WSLA_SESSION_SETTINGS {
@@ -246,7 +247,7 @@ struct WSLA_SESSION_SETTINGS {
     ULONG DmesgOutput;
 
     // Below options are used for debugging purposes only.
-    [unique] LPCWSTR RootVhdOverride; 
+    [unique] LPCWSTR RootVhdOverride;
     [unique] LPCSTR RootVhdTypeOverride;
 };
 
@@ -258,7 +259,6 @@ struct WSLA_SESSION_SETTINGS {
 ]
 interface IWSLAContainer : IUnknown
 {
-    HRESULT Start();
     HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);

@@ -1741,7 +1741,7 @@ Return Value:
                 TimeoutSeconds.value(),
                 [&]() {
                     errno = wil::ResultFromCaughtException();
-                    return errno == ENOENT || errno == ENXIO || errno == EIO;
+                    return errno == ENOENT || errno == ENXIO || errno == EIO || ((strcmp(Type, VIRTIO_FS_TYPE) == 0) && (errno == EINVAL));
                 });
         }
         else
@@ -1752,7 +1752,7 @@ Return Value:
     catch (...)
     {
         errno = wil::ResultFromCaughtException();
-        LOG_ERROR("mount({}, {}, {}, 0x{}x, {}) failed {}", Source, Target, Type, MountFlags, Options, errno);
+        LOG_ERROR("mount({}, {}, {}, {:#x}, {}) failed {}", Source, Target, Type, MountFlags, Options, errno);
         return -errno;
     }
 
