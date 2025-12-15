@@ -1467,7 +1467,7 @@ class WSLATests
         }
     }
 
-    TEST_METHOD(ContainerVolume)
+    void ValidateContainerVolumes(bool enableVirtioFs)
     {
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
@@ -1488,8 +1488,7 @@ class WSLATests
 
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.StoragePath = storage.c_str();
-        settings.MaximumStorageSizeMb = 1024;
+        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
 
@@ -1525,7 +1524,6 @@ class WSLATests
         {
             auto container = launcher.Launch(*session);
             auto process = container.GetInitProcess();
-
             ValidateProcessOutput(process, {{1, "OK\n"}});
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
@@ -1535,6 +1533,16 @@ class WSLATests
         // Validate that the volumes are not mounted after container exits.
         ExpectMount(session.get(), std::format("/mnt/wsla/{}/volumes/{}", containerName, 0), {});
         ExpectMount(session.get(), std::format("/mnt/wsla/{}/volumes/{}", containerName, 1), {});
+    }
+
+    TEST_METHOD(ContainerVolume)
+    {
+        ValidateContainerVolumes(false);
+    }
+
+    TEST_METHOD(ContainerVolumeVirtioFs)
+    {
+        ValidateContainerVolumes(true);
     }
 
     TEST_METHOD(ContainerVolumeUnmountAllFoldersOnError)
