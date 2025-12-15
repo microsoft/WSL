@@ -736,9 +736,6 @@ Es posible que sea necesario reiniciar el sistema para que los cambios surtan ef
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Error al cambiar el tamaño del disco.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>No se pudo traducir la ruta de acceso.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>No se encontró ningún valor.</value>
   </data>
