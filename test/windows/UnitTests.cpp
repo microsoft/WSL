@@ -3517,6 +3517,208 @@ localhostForwarding=true
             configRead.close();
             VERIFY_ARE_EQUAL(customWslConfigContentActual, customWslConfigContentExpected);
         }
+
+        // Regression test for GitHub issue #12671:
+        // Ensure that section headers always appear BEFORE their key-value pairs.
+        // Bug: WSL Settings GUI was writing keys before the section header, causing "Unknown key" errors.
+        {
+            std::wstring bugScenarioConfig =
+                LR"([wsl2]
+[experimental]
+[wsl2]
+)";
+            WslConfigChange config{bugScenarioConfig.c_str()};
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            // Write memory setting - this should NOT appear before the first [wsl2]
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 17825792000ULL; // Value from bug report
+
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            // Read and verify
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Find FIRST occurrence of [wsl2] and memory=
+            auto firstWsl2Pos = fileContent.find(L"[wsl2]");
+            auto memoryPos = fileContent.find(L"memory=");
+
+            VERIFY_ARE_NOT_EQUAL(firstWsl2Pos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+
+            // The critical assertion: memory= must NOT appear before [wsl2]
+            VERIFY_IS_TRUE(firstWsl2Pos < memoryPos);
+
+            // Additional check: memory should appear after the first [wsl2], not after line 1
+            auto firstLineEnd = fileContent.find(L'\n');
+            VERIFY_IS_TRUE(memoryPos > firstLineEnd);
+        }
+
+        // Test: Empty file - should create proper [wsl2] section structure
+        {
+            std::wofstream emptyConfig(apiWslConfigFilePath, std::ios::trunc);
+            emptyConfig.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 4294967296ULL; // 4GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should create [wsl2] section and add memory key
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"memory=") != std::wstring::npos);
+            // Verify [wsl2] comes before memory=
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") < fileContent.find(L"memory="));
+        }
+
+        // Test: Multiple same-section instances - should update first occurrence
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]\n";
+            configFile << L"processors=4\n";
+            configFile << L"\n";
+            configFile << L"[experimental]\n";
+            configFile << L"autoProxy=true\n";
+            configFile << L"\n";
+            configFile << L"[wsl2]\n"; // Second [wsl2] section
+            configFile << L"swap=0\n";
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 8589934592ULL; // 8GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Find first and second [wsl2]
+            auto firstWsl2 = fileContent.find(L"[wsl2]");
+            auto secondWsl2 = fileContent.find(L"[wsl2]", firstWsl2 + 1);
+            auto memoryPos = fileContent.find(L"memory=");
+
+            VERIFY_ARE_NOT_EQUAL(firstWsl2, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(secondWsl2, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+
+            // Memory should be added to FIRST [wsl2] section, not second
+            VERIFY_IS_TRUE(memoryPos > firstWsl2);
+            VERIFY_IS_TRUE(memoryPos < secondWsl2);
+        }
+
+        // Test: EOF without trailing newline
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]\n";
+            configFile << L"processors=2"; // No trailing newline
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 3221225472ULL; // 3GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should properly append memory key even without trailing newline on last line
+            VERIFY_IS_TRUE(fileContent.find(L"processors=2") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"memory=") != std::wstring::npos);
+
+            // Verify both keys are in the same section
+            auto wsl2Pos = fileContent.find(L"[wsl2]");
+            auto processorsPos = fileContent.find(L"processors=2");
+            auto memoryPos = fileContent.find(L"memory=");
+            VERIFY_IS_TRUE(wsl2Pos < processorsPos);
+            VERIFY_IS_TRUE(wsl2Pos < memoryPos);
+
+            // Memory should come after processors in the same section
+            VERIFY_IS_TRUE(processorsPos < memoryPos);
+        }
+
+        // Test: Empty section followed by another section
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]\n";
+            configFile << L"[experimental]\n";
+            configFile << L"autoProxy=true\n";
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 5368709120ULL; // 5GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should insert memory into empty [wsl2] section before [experimental]
+            auto wsl2Pos = fileContent.find(L"[wsl2]");
+            auto memoryPos = fileContent.find(L"memory=");
+            auto experimentalPos = fileContent.find(L"[experimental]");
+
+            VERIFY_ARE_NOT_EQUAL(wsl2Pos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(experimentalPos, std::wstring::npos);
+
+            // Order should be: [wsl2], memory=, [experimental]
+            VERIFY_IS_TRUE(wsl2Pos < memoryPos);
+            VERIFY_IS_TRUE(memoryPos < experimentalPos);
+        }
+
+        // Test: Section header at EOF with no content
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]"; // Section at EOF, no newline, no content
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 6442450944ULL; // 6GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should properly add key to section at EOF
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"memory=") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") < fileContent.find(L"memory="));
+        }
     }
 
     TEST_METHOD(LaunchWslSettingsFromProtocol)
