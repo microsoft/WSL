@@ -4416,6 +4416,8 @@ class VirtioProxyTests
     {
         VIRTIOPROXY_TEST_ONLY();
 
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
         // Verify that we have a working connection
         NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
     }
@@ -4423,6 +4425,8 @@ class VirtioProxyTests
     TEST_METHOD(InternetConnectivityV4)
     {
         VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
         {
@@ -4437,6 +4441,8 @@ class VirtioProxyTests
     {
         VIRTIOPROXY_TEST_ONLY();
 
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
             LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
@@ -4449,6 +4455,8 @@ class VirtioProxyTests
     TEST_METHOD(Configuration)
     {
         VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
         VERIFY_IS_FALSE(state.V4Addresses.empty());
@@ -4463,6 +4471,8 @@ class VirtioProxyTests
     TEST_METHOD(GuestPortIsReleased)
     {
         VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         // Make sure the VM doesn't time out
         WslKeepAlive keepAlive;
@@ -4489,6 +4499,64 @@ class VirtioProxyTests
         }
 
         VERIFY_IS_TRUE(bound);
+    }
+
+    TEST_METHOD(LoopbackGuestToHost)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        // Verify guest can connect to host on loopback (TCP only, UDP not supported)
+        NetworkTests::VerifyLoopbackGuestToHost(L"127.0.0.1", IPPROTO_TCP);
+        NetworkTests::VerifyLoopbackGuestToHost(L"0.0.0.0", IPPROTO_TCP);
+        // TODO: enable when v6 loopback is supported
+        // NetworkTests::VerifyLoopbackGuestToHost(L"::1", IPPROTO_TCP);
+        // NetworkTests::VerifyLoopbackGuestToHost(L"::", IPPROTO_TCP);
+    }
+
+    TEST_METHOD(UdpBindDoesNotPreventTcpBind)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);
+        auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", true);
+    }
+
+    TEST_METHOD(HostUdpBindDoesNotPreventGuestTcpBind)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        auto udpPort = NetworkTests::BindHostPort(2345, SOCK_DGRAM, IPPROTO_UDP, true);
+        auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
+    }
+
+    TEST_METHOD(MultipleGuestBindOnSameTuple)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        auto bind1 = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
+        {
+            auto bind2 = NetworkTests::BindGuestPort(L"TCP6-LISTEN:1234,bind=::1", true);
+
+            // Allow time for this second bind to be viewed as "in use" by the init port tracker
+            // before closing the socket. If the socket is closed before the init port tracker sees
+            // that the port allocation was in use, then the init port tracker will hold onto the
+            // allocation for a considerable amount of time (through the duration of this test case)
+            // before releasing it.
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+        }
+
+        // Allow time for the init port tracker to detect the second port allocation as no longer in
+        // use and perform its cleanup of the second port allocation.
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        auto bind3 = NetworkTests::BindGuestPort(L"TCP6-LISTEN:1234,bind=::1", true);
     }
 
     TEST_METHOD(HttpProxySimple)
