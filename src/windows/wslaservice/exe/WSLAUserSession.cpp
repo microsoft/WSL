@@ -27,7 +27,7 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
     // In case there are still COM references on sessions, signal that the user session is terminating
     // so the sessions are all in a 'terminated' state.
     {
-        std::lock_guard lock(m_lock);
+        std::lock_guard lock(m_wslaSessionsLock);
 
         for (auto& e : m_sessions)
         {
@@ -38,7 +38,7 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
 
 void WSLAUserSessionImpl::OnSessionTerminated(WSLASession* Session)
 {
-    std::lock_guard lock(m_lock);
+    std::lock_guard lock(m_wslaSessionsLock);
     WI_VERIFY(m_sessions.erase(Session) == 1);
 }
 
@@ -49,7 +49,8 @@ PSID WSLAUserSessionImpl::GetUserSid() const
 
 HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession)
 {
-    auto session = wil::MakeOrThrow<WSLASession>(*Settings, *this);
+    ULONG id = m_nextSessionId++;
+    auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this);
 
     std::lock_guard lock(m_wslaSessionsLock);
     auto it = m_sessions.emplace(session.Get());
@@ -82,7 +83,7 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
 {
-    std::lock_guard lock(m_lock);
+    std::lock_guard lock(m_wslaSessionsLock);
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_sessions.size());
 
     size_t index = 0;
