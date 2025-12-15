@@ -1200,7 +1200,7 @@ try
         else
         {
             const bool admin = wsl::windows::common::security::IsTokenElevated(userToken.get());
-            m_guestDeviceManager->AddGuestDevice(
+            instanceId = m_guestDeviceManager->AddGuestDevice(
                 VIRTIO_FS_DEVICE_ID,
                 admin ? WSLA_VIRTIO_FS_ADMIN_CLASS_ID : WSLA_VIRTIO_FS_CLASS_ID,
                 shareName.c_str(),
