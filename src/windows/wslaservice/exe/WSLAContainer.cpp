@@ -20,10 +20,11 @@ using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "--net=host", // TODO: default for now, change later
-                                                      "--ulimit",
-                                                      "nofile=65536:65536"};
+static std::vector<std::string> defaultNerdctlRunArgs{
+    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+    "--net=host", // TODO: default for now, change later
+    "--ulimit",
+    "nofile=65536:65536"};
 
 static constexpr DWORD deleteTimeout = 60000; // 60 seconds
 
@@ -326,11 +327,7 @@ void wsl::windows::service::wsla::WSLAContainer::UnmountVolumes(const std::vecto
 {
     for (const auto& volume : volumes)
     {
-        try
-        {
-            parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str());
-        }
-        CATCH_LOG();
+        LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()));
     }
 }
 
