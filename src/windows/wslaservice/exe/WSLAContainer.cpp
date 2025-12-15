@@ -16,14 +16,14 @@ Abstract:
 #include "WSLAContainer.h"
 #include "WSLAProcess.h"
 
-using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::VolumeMountInfo;
+using wsl::windows::service::wsla::WSLAContainer;
 
 // Constants for required default arguments for "nerdctl run..."
 static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "--net=host", // TODO: default for now, change later
-                                                      "--ulimit",
-                                                      "nofile=65536:65536"};
+    "--net=host", // TODO: default for now, change later
+    "--ulimit",
+    "nofile=65536:65536"};
 
 static constexpr DWORD deleteTimeout = 60000; // 60 seconds
 
@@ -38,7 +38,7 @@ WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_
 WSLAContainer::~WSLAContainer()
 {
     // TODO: Stop and delete running containers when the session is shutting down
-    // so that we don't leak resources since we do not have means to track them after 
+    // so that we don't leak resources since we do not have means to track them after
     // restarting a session from a persisted storage.
 
     if (m_state == WslaContainerStateExited)
