@@ -112,15 +112,25 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     auto containerIdIt = innerEvent.find("container_id");
     THROW_HR_IF_MSG(E_INVALIDARG, containerIdIt == innerEvent.end(), "Failed to parse json: %hs", innerEventJson.c_str());
 
-    std::lock_guard lock{m_lock};
-
     std::string containerId = containerIdIt->get<std::string>();
-    for (const auto& e : m_callbacks)
+
+    // Copy callbacks to invoke outside the lock to avoid deadlock if callback tries to register/unregister
+    std::vector<ContainerStateChangeCallback> callbacksToInvoke;
     {
-        if (e.ContainerId == containerId)
+        std::lock_guard lock{m_lock};
+        for (const auto& e : m_callbacks)
         {
-            e.Callback(it->second);
+            if (e.ContainerId == containerId)
+            {
+                callbacksToInvoke.push_back(e.Callback);
+            }
         }
+    }
+
+    // Invoke callbacks outside the lock
+    for (const auto& callback : callbacksToInvoke)
+    {
+        callback(it->second);
     }
 }
 

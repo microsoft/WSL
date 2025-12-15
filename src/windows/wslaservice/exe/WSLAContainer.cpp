@@ -163,16 +163,24 @@ CATCH_RETURN();
 
 WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    std::optional<ServiceRunningProcess> processToDestroy;
+    WSLA_CONTAINER_STATE result;
 
-    // If the container is running, refresh the init process state before returning.
-    if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
     {
-        m_state = WslaContainerStateExited;
-        m_containerProcess.reset();
+        std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+        // If the container is running, refresh the init process state before returning.
+        if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
+        {
+            m_state = WslaContainerStateExited;
+            processToDestroy = std::move(m_containerProcess);
+        }
+
+        result = m_state;
     }
 
-    return m_state;
+    // Destructor runs outside the lock to avoid potential deadlock
+    return result;
 }
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
