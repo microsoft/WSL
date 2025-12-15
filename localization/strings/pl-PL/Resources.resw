@@ -730,9 +730,6 @@ Może być konieczne ponowne uruchomienie systemu, aby zmiany zostały wprowadzo
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Nie można zmienić rozmiaru dysku.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Nie można przetłumaczyć ścieżki.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Nie znaleziono wartości.</value>
   </data>
@@ -1060,7 +1057,7 @@ Powrót do sieci NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>This looks like a VHD file. Use --vhd to import a VHD instead of a tar.</value>
+    <value>Wygląda to na plik VHD. Użyj polecenia --vhd aby zaimportować plik VHD zamiast tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">

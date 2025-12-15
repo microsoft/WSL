@@ -730,9 +730,6 @@ Systemet kan behöva startas om så att ändringarna kan börja gälla.</value>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Det gick inte att ändra storlek på disken.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Det gick inte att översätta sökvägen.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Inget värde hittades.</value>
   </data>
