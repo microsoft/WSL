@@ -305,7 +305,9 @@ std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainer::MountVo
             const WSLA_VOLUME& volume = Options.Volumes[i];
             std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", Options.Name, i);
 
-            THROW_IF_FAILED(parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly));
+            auto result = parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly);
+            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath, parentVMPath.c_str());
+
             mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, volume.ReadOnly});
         }
         catch (...)
