@@ -18,11 +18,10 @@ Abstract:
 
 using wsl::windows::service::wsla::WSLAContainer;
 
-// Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                      "--net=host", // TODO: default for now, change later
-                                                      "--ulimit",
-                                                      "nofile=65536:65536"};
+// Constants for required default arguments for "nerdctl create..."
+static std::vector<std::string> defaultNerdctlCreateArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+                                                         "--ulimit",
+                                                         "nofile=65536:65536"};
 
 WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker) :
     m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id))
@@ -102,7 +101,7 @@ void WSLAContainer::OnEvent(ContainerEvent event)
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 try
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    std::lock_guard lock(m_lock);
 
     if (State() == WslaContainerStateExited)
     {
@@ -324,6 +323,31 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_C
     args.push_back("create");
     args.push_back("--name");
     args.push_back(options.Name);
+
+    switch (options.ContainerNetwork.ContainerNetworkType)
+    {
+    case WSLA_CONTAINER_NETWORK_HOST:
+        args.push_back("--net=host");
+        break;
+    case WSLA_CONTAINER_NETWORK_NONE:
+        args.push_back("--net=none");
+        break;
+    case WSLA_CONTAINER_NETWORK_BRIDGE:
+        args.push_back("--net=bridge");
+        break;
+    // TODO: uncomment and implement when we have custom networks
+    // case WSLA_CONTAINER_NETWORK_CUSTOM:
+    //     args.push_back(std::format("--net={}", options.ContainerNetwork.ContainerNetworkName));
+    //     break;
+    default:
+        THROW_HR_MSG(
+            E_INVALIDARG,
+            "No such network: type: %i, name: %hs",
+            options.ContainerNetwork.ContainerNetworkType,
+            options.ContainerNetwork.ContainerNetworkName);
+        break;
+    }
+
     if (options.ShmSize > 0)
     {
         args.push_back(std::format("--shm-size={}m", options.ShmSize));
@@ -335,7 +359,7 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_C
         args.push_back("all");
     }
 
-    args.insert(args.end(), defaultNerdctlRunArgs.begin(), defaultNerdctlRunArgs.end());
+    args.insert(args.end(), defaultNerdctlCreateArgs.begin(), defaultNerdctlCreateArgs.end());
     args.insert(args.end(), inputOptions.begin(), inputOptions.end());
 
     if (options.InitProcessOptions.Executable != nullptr)
