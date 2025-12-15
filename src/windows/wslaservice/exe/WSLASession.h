@@ -65,14 +65,19 @@ private:
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
     void Ext4Format(const std::string& Device);
     void ClearDeletedContainers();
+    void OnContainerdLog(const gsl::span<char>& Data);
+    void MonitorContainerd(ServiceRunningProcess&& process);
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
+    wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
+    std::thread m_containerdThread;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
     std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
+    wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     std::recursive_mutex m_lock;
 };
 

@@ -51,10 +51,26 @@ void ServiceRunningProcess::GetState(WSLA_PROCESS_STATE* State, int* Code)
     THROW_IF_FAILED(m_process->GetState(State, Code));
 }
 
-ServiceRunningProcess ServiceProcessLauncher::Launch(WSLAVirtualMachine& virtualMachine)
+std::tuple<HRESULT, int, std::optional<ServiceRunningProcess>> ServiceProcessLauncher::LaunchNoThrow(WSLAVirtualMachine& virtualMachine)
 {
     auto [options, commandLine, env] = CreateProcessOptions();
-    int Error = -1;
+    int error = -1;
 
-    return ServiceRunningProcess(virtualMachine.CreateLinuxProcess(options, &Error), std::move(m_fds));
+    std::optional<ServiceRunningProcess> process;
+    auto result =
+        wil::ResultFromException([&]() { process.emplace(virtualMachine.CreateLinuxProcess(options, &error), std::move(m_fds)); });
+
+    return {result, error, std::move(process)};
+}
+
+ServiceRunningProcess ServiceProcessLauncher::Launch(WSLAVirtualMachine& virtualMachine)
+{
+    auto [hresult, error, process] = LaunchNoThrow(virtualMachine);
+    if (FAILED(hresult))
+    {
+        auto commandLine = wsl::shared::string::Join(m_arguments, ' ');
+        THROW_HR_MSG(hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
+    }
+
+    return std::move(process.value());
 }

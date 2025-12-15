@@ -45,6 +45,7 @@ public:
     NON_MOVABLE(ServiceProcessLauncher);
     using WSLAProcessLauncher::WSLAProcessLauncher;
 
+    std::tuple<HRESULT, int, std::optional<ServiceRunningProcess>> LaunchNoThrow(WSLAVirtualMachine& virtualMachine);
     ServiceRunningProcess Launch(WSLAVirtualMachine& virtualMachine);
 };
 } // namespace wsl::windows::service::wsla
