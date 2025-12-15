@@ -316,6 +316,10 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
+    // Validate that Image and Name are not null - even though struct pointer is non-null, string fields can be null
+    RETURN_HR_IF(E_INVALIDARG, containerOptions->Image == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, containerOptions->Name == nullptr);
+
     std::lock_guard lock{m_lock};
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
