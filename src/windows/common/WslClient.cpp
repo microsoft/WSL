@@ -1552,6 +1552,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Utf8String(shell), L"--shell");
     parser.AddArgument(
         SetFlag<int, WslaFeatureFlagsDnsTunneling>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--dns-tunneling");
+    parser.AddArgument(
+        SetFlag<int, WslaFeatureFlagsVirtioFs>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--virtiofs");
     parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");
@@ -1565,7 +1567,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     if (help)
     {
         const auto usage = std::format(
-            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--networking-mode <mode>] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
+            LR"({} --wsla [--vhd </path/to/vhd>] [--shell </path/to/shell>] [--memory <memory-mb>] [--cpu <cpus>] [--dns-tunneling] [--virtiofs] [--networking-mode <mode>] [--fstype <fstype>] [--container-vhd </path/to/vhd>] [--help])",
             WSL_BINARY_NAME);
 
         wprintf(L"%ls\n", usage.c_str());

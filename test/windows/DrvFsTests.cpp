@@ -276,7 +276,7 @@ public:
         SKIP_TEST_ARM64();
 
         TerminateDistribution();
-        WslKeepAlive keelAlive;
+        WslKeepAlive keepAlive;
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
@@ -288,7 +288,7 @@ public:
         SKIP_TEST_ARM64();
 
         TerminateDistribution();
-        WslKeepAlive keelAlive;
+        WslKeepAlive keepAlive;
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
     }
@@ -302,7 +302,7 @@ public:
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken();
-        WslKeepAlive keelAlive(nonElevatedToken.get());
+        WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
@@ -316,9 +316,35 @@ public:
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken();
-        WslKeepAlive keelAlive(nonElevatedToken.get());
+        WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
+    }
+
+    void DrvfsMountElevatedSystemDistroEnabled(DrvFsMode Mode)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
+        SKIP_TEST_ARM64();
+
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true, .drvFsMode = Mode}));
+        WslKeepAlive keepAlive;
+
+        ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
+    }
+
+    void DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode Mode)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
+        SKIP_TEST_ARM64();
+
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true, .drvFsMode = Mode}));
+
+        const auto nonElevatedToken = GetNonElevatedToken();
+        WslKeepAlive keepAlive(nonElevatedToken.get());
+
+        ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
 
     static void XattrDrvFs(DrvFsMode Mode)
@@ -946,6 +972,31 @@ private:
 
         const auto nonElevatedToken = GetNonElevatedToken();
         validate(nonElevatedType, nonElevatedToken.get());
+
+        // Elevated token should be able to create files at the root of the drive (/mnt/c)
+        {
+            const auto commandLine =
+                LxssGenerateWslCommandLine(L"touch /mnt/c/elevated_test_file.tmp && rm /mnt/c/elevated_test_file.tmp");
+
+            wsl::windows::common::SubProcess process(nullptr, commandLine.c_str(), CreateProcessFlags);
+            process.SetToken(nullptr);
+            process.SetShowWindow(SW_HIDE);
+
+            const auto output = process.RunAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, output.ExitCode, L"Elevated token should be able to create files at /mnt/c");
+        }
+
+        // Non-elevated token should NOT be able to create files at the root of the drive (/mnt/c)
+        {
+            const auto commandLine = LxssGenerateWslCommandLine(L"touch /mnt/c/nonelevated_test_file.tmp");
+
+            wsl::windows::common::SubProcess process(nullptr, commandLine.c_str(), CreateProcessFlags);
+            process.SetToken(nonElevatedToken.get());
+            process.SetShowWindow(SW_HIDE);
+
+            const auto output = process.RunAndCaptureOutput();
+            VERIFY_ARE_NOT_EQUAL(0, output.ExitCode, L"Non-elevated token should NOT be able to create files at /mnt/c (C:\\)");
+        }
     }
 
     static VOID VerifyDrvFsSymlink(const std::wstring& Path, const std::wstring& ExpectedTarget, bool Directory)
@@ -1197,6 +1248,18 @@ class WSL1 : public DrvFsTests
         { \
             WSL2_TEST_ONLY(); \
             DrvFsTests::DrvfsMountNonElevatedDifferentConsole(DrvFsMode::##_mode##); \
+        } \
+\
+        TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
+        { \
+            WSL2_TEST_ONLY(); \
+            DrvFsTests::DrvfsMountElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
+        } \
+\
+        TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
+        { \
+            WSL2_TEST_ONLY(); \
+            DrvFsTests::DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
         } \
 \
         TEST_METHOD(XattrDrvFs) \

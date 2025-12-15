@@ -169,18 +169,6 @@ RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD
     return result;
 }
 
-ClientRunningWSLAProcess WSLAProcessLauncher::Launch(IWSLASession& Session)
-{
-    auto [hresult, error, process] = LaunchNoThrow(Session);
-    if (FAILED(hresult))
-    {
-        auto commandLine = wsl::shared::string::Join(m_arguments, ' ');
-        THROW_HR_MSG(hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
-    }
-
-    return std::move(process.value());
-}
-
 std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)
 {
     auto [options, commandLine, env] = CreateProcessOptions();
@@ -188,6 +176,24 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
     wil::com_ptr<IWSLAProcess> process;
     int error = -1;
     auto result = Session.CreateRootNamespaceProcess(&options, &process, &error);
+    if (FAILED(result))
+    {
+        return std::make_tuple(result, error, std::optional<ClientRunningWSLAProcess>());
+    }
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
+
+    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), std::move(m_fds)}};
+}
+
+std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLAContainer& Container)
+{
+    auto [options, commandLine, env] = CreateProcessOptions();
+    options.Executable = nullptr; // Must be null for exec.
+
+    wil::com_ptr<IWSLAProcess> process;
+    int error = -1;
+    auto result = Container.Exec(&options, &process, &error);
     if (FAILED(result))
     {
         return std::make_tuple(result, error, std::optional<ClientRunningWSLAProcess>());

@@ -49,6 +49,7 @@ private:
 
     std::optional<std::string> GetNerdctlStatus();
 
+    std::recursive_mutex m_lock;
     wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
     std::optional<ServiceRunningProcess> m_containerProcess;
     std::string m_name;
@@ -56,9 +57,10 @@ private:
     std::string m_id;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
-    std::recursive_mutex m_lock;
     ContainerEventTracker::ContainerTrackingReference m_trackingReference;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions);
+    static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);
+    static void AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options);
 };
 } // namespace wsl::windows::service::wsla

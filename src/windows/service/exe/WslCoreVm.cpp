@@ -774,10 +774,7 @@ WslCoreVm::~WslCoreVm() noexcept
     }
 
     // Shutdown virtio device hosts.
-    if (m_guestDeviceManager)
-    {
-        m_guestDeviceManager->Shutdown();
-    }
+    m_guestDeviceManager.reset();
 
     // Call RevokeVmAccess on each VHD that was added to the utility VM. This
     // ensures that the ACL on the VHD does not grow unbounded.
@@ -1755,8 +1752,10 @@ void WslCoreVm::InitializeGuest()
         {
             try
             {
-                m_guestDeviceManager->AddSharedMemoryDevice(
-                    VIRTIO_FS_CLASS_ID, L"wslg", L"wslg", WSLG_SHARED_MEMORY_SIZE_MB, m_userToken.get());
+                // Use the appropriate virtiofs class ID based on m_userToken elevation.
+                const bool admin = wsl::windows::common::security::IsTokenElevated(m_userToken.get());
+                const GUID classId = admin ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
+                m_guestDeviceManager->AddSharedMemoryDevice(classId, L"wslg", L"wslg", WSLG_SHARED_MEMORY_SIZE_MB, m_userToken.get());
                 m_sharedMemoryRoot = std::format(L"WSL\\{}\\wslg", m_machineId);
             }
             CATCH_LOG()
