@@ -175,6 +175,7 @@ class NetworkTests
     WSL_TEST_CLASS(NetworkTests)
 
     friend class MirroredTests;
+    friend class BridgedTests;
     friend class VirtioProxyTests;
 
     static std::wstring SockaddrToString(const SOCKADDR_INET* sockAddr)
@@ -790,6 +791,37 @@ class NetworkTests
         VERIFY_IS_TRUE(!out.empty());
     }
 
+    static void VerifyDnsResolutionBasic()
+    {
+        // Verify basic DNS resolution using getent
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"getent ahosts bing.com", 0);
+        VERIFY_IS_TRUE(!out.empty());
+    }
+
+    static void VerifyDnsResolutionDig()
+    {
+        // Test A record resolution (IPv4) with both UDP and TCP
+        VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+
+        // Test AAAA record resolution (IPv6) with both UDP and TCP
+        VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+
+        // Test reverse DNS lookup
+        VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
+        VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+    }
+
+    static void VerifyDnsResolutionRecordTypes()
+    {
+        // Test various DNS record types
+        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
+    }
+
     static void VerifyDnsQueries()
     {
         // query for A/IPv4 records
@@ -1004,6 +1036,27 @@ class NetworkTests
                                       L"domain microsoft.com\n"
                                       L"search foo.microsoft.com bar.microsoft.com\n";
         VERIFY_ARE_EQUAL(expected, out.c_str());
+    }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        WSL2_TEST_ONLY();
+
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        WSL2_TEST_ONLY();
+
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        WSL2_TEST_ONLY();
+
+        NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
     static void ClearHttpProxySettings(bool userScope)
@@ -4302,6 +4355,36 @@ class MirroredTests
 
         VERIFY_IS_FALSE(Watchdog.IsExpired());
     }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyDnsResolutionRecordTypes();
+    }
 };
 
 class BridgedTests
@@ -4382,6 +4465,36 @@ class BridgedTests
 
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv6/conf/all/disable_ipv6");
         VERIFY_ARE_EQUAL(L"0\n", out);
+    }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
+
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
+
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
+
+        NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 };
 
@@ -4557,6 +4670,33 @@ class VirtioProxyTests
         // use and perform its cleanup of the second port allocation.
         std::this_thread::sleep_for(std::chrono::seconds(3));
         auto bind3 = NetworkTests::BindGuestPort(L"TCP6-LISTEN:1234,bind=::1", true);
+    }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
     TEST_METHOD(HttpProxySimple)
