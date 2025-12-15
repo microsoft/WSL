@@ -79,7 +79,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     {
         options.InitProcessOptions.Executable = nullptr;
     }
-    
+
     options.VolumesCount = static_cast<ULONG>(m_volumes.size());
     options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
 

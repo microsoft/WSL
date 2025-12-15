@@ -20,14 +20,16 @@ using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
 
 // Constants for required default arguments for "nerdctl run..."
-static std::vector<std::string> defaultNerdctlRunArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
+static std::vector<std::string> defaultNerdctlRunArgs{
+    //"--pull=never", // TODO: Uncomment once PullImage() is implemented.
     "--net=host", // TODO: default for now, change later
     "--ulimit",
     "nofile=65536:65536"};
 
 static constexpr DWORD deleteTimeout = 60000; // 60 seconds
 
-WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<VolumeMountInfo>&& volumes) :
+WSLAContainer::WSLAContainer(
+    WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<VolumeMountInfo>&& volumes) :
     m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id)), m_mountedVolumes(std::move(volumes))
 {
     m_state = WslaContainerStateCreated;
@@ -373,7 +375,8 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
     return wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes));
 }
 
-std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes)
+std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(
+    const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes)
 {
     std::vector<std::string> args{nerdctlPath};
     args.push_back("create");
