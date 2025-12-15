@@ -61,7 +61,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     options.Name = m_name.c_str();
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
-    options.ContainerNetwork.ContainerNetworkType = static_cast<enum WSLA_CONTAINER_NETWORK_TYPE>(m_containerNetworkType);
+    options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
 
     if (m_executable.empty())
     {
