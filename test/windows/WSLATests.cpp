@@ -1549,7 +1549,7 @@ class WSLATests
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto retVal = launcher.LaunchNoThrow(*session);
-            VERIFY_ARE_EQUAL(retVal.first, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(retVal.first, E_INVALIDARG);
         }
 
         // Test bridge when ready
@@ -1593,7 +1593,13 @@ class WSLATests
 
         // Create a container.
         WSLAContainerLauncher launcher(
-            "debian:latest", "test-container-exec", {}, {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE, ProcessFlags::Stdout | ProcessFlags::Stderr);
+            "debian:latest",
+            "test-container-exec",
+            {},
+            {"sleep", "99999"},
+            {},
+            WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE,
+            ProcessFlags::Stdout | ProcessFlags::Stderr);
 
         auto container = launcher.Launch(*session);
 

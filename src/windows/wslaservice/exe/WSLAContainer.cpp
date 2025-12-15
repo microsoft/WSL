@@ -341,7 +341,7 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_C
     //     break;
     default:
         THROW_HR_MSG(
-            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            E_INVALIDARG,
             "No such network: type: %i, name: %hs",
             options.ContainerNetwork.ContainerNetworkType,
             options.ContainerNetwork.ContainerNetworkName);
