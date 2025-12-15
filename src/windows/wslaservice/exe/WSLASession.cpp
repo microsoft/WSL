@@ -316,7 +316,7 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
-    // Validate that Image and Name are not null - even though struct pointer is non-null, string fields can be null
+    // Validate that Image and Name are not null.
     RETURN_HR_IF(E_INVALIDARG, containerOptions->Image == nullptr);
     RETURN_HR_IF(E_INVALIDARG, containerOptions->Name == nullptr);
 
