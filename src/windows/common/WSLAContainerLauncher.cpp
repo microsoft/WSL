@@ -48,8 +48,9 @@ WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& EntryPoint,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
+    WSLA_CONTAINER_NETWORK_TYPE containerNetworkType,
     ProcessFlags Flags) :
-    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name)
+    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
 {
 }
 
@@ -74,6 +75,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     options.Name = m_name.c_str();
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
+    options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
 
     if (m_executable.empty())
     {
