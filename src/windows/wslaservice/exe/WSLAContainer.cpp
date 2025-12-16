@@ -24,6 +24,8 @@ static std::vector<std::string> defaultNerdctlCreateArgs{//"--pull=never", // TO
                                                          "--ulimit",
                                                          "nofile=65536:65536"};
 
+static std::vector<std::string> defaultNerdctlEnv{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"};
+
 namespace {
 auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm, std::vector<std::string>& args)
 {
@@ -43,6 +45,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         if (!vmPorts.empty())
         {
+            // TODO vmPorts is invalid once moved.
             LOG_IF_FAILED(wil::ResultFromException([&]() { vm.ReleasePorts(vmPorts); }));
         }
 
@@ -97,7 +100,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     {
         THROW_IF_FAILED(vm.MapPort(e.Family, e.HostPort, e.VmPort, false));
         args.push_back("-p");
-        args.push_back(std::format("{}{}:{}", e.Family == AF_INET6 ? "[::]:" : "", e.HostPort, e.VmPort));
+        args.push_back(std::format("{}{}:{}", e.Family == AF_INET6 ? "[::]:" : "", e.VmPort, e.ContainerPort));
     }
 
     return std::make_pair(mappedPorts, std::move(errorCleanup));
@@ -137,7 +140,7 @@ void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
         m_name.c_str(),
         m_state);
 
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "start", "-a", m_id}, {}, common::ProcessFlags::None);
+    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "start", "-a", m_id}, defaultNerdctlEnv, common::ProcessFlags::None);
     for (auto i = 0; i < Options.InitProcessOptions.FdsCount; i++)
     {
         launcher.AddFd(Options.InitProcessOptions.Fds[i]);
@@ -210,7 +213,7 @@ try
         m_name.c_str(),
         m_state);
     ServiceProcessLauncher launcher(
-        nerdctlPath, {nerdctlPath, "stop", m_name, "--time", std::to_string(static_cast<ULONG>(std::round(TimeoutMs / 1000)))});
+        nerdctlPath, {nerdctlPath, "stop", m_name, "--time", std::to_string(static_cast<ULONG>(std::round(TimeoutMs / 1000)))}, defaultNerdctlEnv);
 
     // TODO: Figure out how we want to handle custom signals.
     // nerdctl stop has a --time and a --signal option that can be used
@@ -236,7 +239,7 @@ try
         m_name.c_str(),
         m_state);
 
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "rm", "-f", m_name});
+    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "rm", "-f", m_name}, defaultNerdctlEnv);
     auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 
@@ -316,7 +319,7 @@ try
         args.emplace_back(Options->CommandLine[i]);
     }
 
-    ServiceProcessLauncher launcher(nerdctlPath, args, {}, common::ProcessFlags::None);
+    ServiceProcessLauncher launcher(nerdctlPath, args, defaultNerdctlEnv, common::ProcessFlags::None);
     for (auto i = 0; i < Options->FdsCount; i++)
     {
         launcher.AddFd(Options->Fds[i]);
@@ -390,7 +393,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
 
     auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions));
 
-    ServiceProcessLauncher launcher(nerdctlPath, args, {});
+    ServiceProcessLauncher launcher(nerdctlPath, args, defaultNerdctlEnv);
     auto result = launcher.Launch(parentVM).WaitAndCaptureOutput();
 
     // TODO: Have better error codes.

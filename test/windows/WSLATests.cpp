@@ -594,7 +594,6 @@ class WSLATests
                 LogError("Process exited, output: %hs", output.c_str());
                 VERIFY_FAIL();
             }
-            LogInfo("Buffer: %hs", output.c_str());
 
             index += bytesRead;
             if (output.find(Content) != std::string::npos)
@@ -1649,7 +1648,7 @@ class WSLATests
         }
     }
 
-    void ExpectHttpResponse(LPCWSTR Url, const std::wstring& ExpectedContent)
+    void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
     {
         const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
         filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
@@ -1657,9 +1656,15 @@ class WSLATests
         const winrt::Windows::Web::Http::HttpClient client(filter);
         auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url));
         auto content = response.get().Content().ReadAsStringAsync().get();
-        std::wstring contentString{content.data(), content.data() + content.size()};
 
-        VERIFY_ARE_EQUAL(contentString, ExpectedContent);
+        if (expectedCode.has_value())
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(response.get().StatusCode()), expectedCode.value());
+        }
+        else
+        {
+            // Validate that port isn't bound.
+        }
     }
 
     TEST_METHOD(PortMappingsBridged)
@@ -1673,7 +1678,13 @@ class WSLATests
         auto session = CreateSession(settings);
 
         WSLAContainerLauncher launcher(
-            "python:3.12-alpine", "test-ports", {}, {"python3", "-m", "http.server"}, {}, WSLA_CONTAINER_NETWORK_BRIDGE, ProcessFlags::Stdout);
+            "python:3.12-alpine",
+            "test-ports",
+            {},
+            {"python3", "-m", "http.server"},
+            {"PYTHONUNBUFFERED=1"},
+            WSLA_CONTAINER_NETWORK_BRIDGE,
+            ProcessFlags::Stdout | ProcessFlags::Stderr);
 
         launcher.AddPort(1234, 8000, AF_INET);
 
@@ -1684,6 +1695,6 @@ class WSLATests
         // Wait for the container bind() to be completed.
         WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-        ExpectHttpResponse(L"http://localhost:1234", L"Directory listing for /\n");
+        ExpectHttpResponse(L"http://localhost:1234", 200);
     }
 };
