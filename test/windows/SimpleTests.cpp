@@ -289,7 +289,7 @@ class SimpleTests
 
         THROW_LAST_ERROR_IF(!SetEnvironmentVariableW(L"PATH", testPath));
 
-        auto [output, __] = LxsstuLaunchWslAndCaptureOutput(L"echo $PATH");
+        auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"echo $PATH");
 
         VERIFY_IS_TRUE(output.find(L"/mnt/c/Program Files/Git/cmd") != std::wstring::npos);
         VERIFY_IS_TRUE(output.find(L"/mnt/c/Program Files/PowerShell/7") != std::wstring::npos);
