@@ -56,7 +56,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
     ServiceProcessLauncher launcher{
         "/usr/bin/containerd",
         {"/usr/bin/containerd"},
-        {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}},
+        {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:."}},
         common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
     m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine.Get()));
 

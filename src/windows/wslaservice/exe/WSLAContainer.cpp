@@ -17,14 +17,97 @@ Abstract:
 #include "WSLAProcess.h"
 
 using wsl::windows::service::wsla::WSLAContainer;
+using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 // Constants for required default arguments for "nerdctl create..."
 static std::vector<std::string> defaultNerdctlCreateArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
                                                          "--ulimit",
                                                          "nofile=65536:65536"};
 
-WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker) :
-    m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id))
+namespace {
+auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm, std::vector<std::string>& args)
+{
+
+    // Validate that port mappings are valid.
+    // N.B. If a host port is duplicated, MapPort will fail later.
+    for (ULONG i = 0; i < options.PortsCount; i++)
+    {
+        const auto& port = options.Ports[i];
+        THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
+    }
+
+    // Generate Windows <-> VM port mappings depending on the networking mode.
+    std::vector<uint16_t> vmPorts;
+    std::vector<WSLAContainer::PortMapping> mappedPorts;
+
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (!vmPorts.empty())
+        {
+            LOG_IF_FAILED(wil::ResultFromException([&]() { vm.ReleasePorts(vmPorts); }));
+        }
+
+        for (const auto& e : mappedPorts)
+        {
+            LOG_IF_FAILED_MSG(
+                vm.MapPort(e.Family, e.VmPort, e.HostPort, true),
+                "Failed to unmap port (family=%i, guestPort=%us, hostPort=%us)",
+                e.Family,
+                e.VmPort,
+                e.HostPort);
+        }
+    });
+
+    if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+    {
+        // If the container is in bridged mode, allocate one port in the VM for each port mapping.
+        vmPorts = vm.AllocatePorts(static_cast<uint16_t>(options.PortsCount));
+
+        for (ULONG i = 0; i < options.PortsCount; i++)
+        {
+            const auto& port = options.Ports[i];
+
+            mappedPorts.push_back({port.HostPort, vmPorts[i], port.ContainerPort, port.Family});
+        }
+    }
+    else if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_HOST)
+    {
+        // In host mode, the container port is the same as the VM port.
+        for (ULONG i = 0; i < options.PortsCount; i++)
+        {
+            const auto& port = options.Ports[i];
+
+            THROW_WIN32_IF_MSG(
+                ERROR_ALREADY_EXISTS, vm.TryAllocatePort(port.ContainerPort), "Failed to allocate port: %us", options.Ports[i].ContainerPort);
+
+            vmPorts.push_back(port.ContainerPort);
+            mappedPorts.push_back({port.HostPort, port.ContainerPort, port.ContainerPort, port.Family});
+        }
+    }
+    else
+    {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            options.PortsCount > 0,
+            "Port mappings are not supported in networking mode: %i",
+            options.ContainerNetwork.ContainerNetworkType);
+    }
+
+    // Map Windows <-> VM ports.
+    for (const auto& e : mappedPorts)
+    {
+        THROW_IF_FAILED(vm.MapPort(e.Family, e.HostPort, e.VmPort, false));
+        args.push_back("-p");
+        args.push_back(std::format("{}{}:{}", e.Family == AF_INET6 ? "[::]:" : "", e.HostPort, e.VmPort));
+    }
+
+    return std::make_pair(mappedPorts, std::move(errorCleanup));
+}
+
+} // namespace
+
+WSLAContainer::WSLAContainer(
+    WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<PortMapping>&& ports) :
+    m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id)), m_mappedPorts(std::move(ports))
 {
     m_state = WslaContainerStateCreated;
 
@@ -34,6 +117,8 @@ WSLAContainer::WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_
 WSLAContainer::~WSLAContainer()
 {
     m_trackingReference.Reset();
+
+    std::vector<uint16_t> allocatedGuestPorts;
 }
 
 const std::string& WSLAContainer::Image() const noexcept
@@ -300,6 +385,9 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
 
     AddEnvironmentVariables(inputOptions, containerOptions.InitProcessOptions);
 
+    // TODO: Rethink command line generation logic.
+    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, inputOptions);
+
     auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions));
 
     ServiceProcessLauncher launcher(nerdctlPath, args, {});
@@ -314,7 +402,10 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
         id.pop_back();
     }
 
-    return wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker);
+    auto container = wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker, std::move(mappedPorts));
+    errorCleanup.release();
+
+    return container;
 }
 
 std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)

@@ -54,6 +54,11 @@ WSLAContainerLauncher::WSLAContainerLauncher(
 {
 }
 
+void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family)
+{
+    m_ports.emplace_back(WSLA_PORT_MAPPING{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
+}
+
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
 {
     WSLA_CONTAINER_OPTIONS options{};
@@ -62,6 +67,8 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
+    options.Ports = m_ports.data();
+    options.PortsCount = static_cast<ULONG>(m_ports.size());
 
     if (m_executable.empty())
     {

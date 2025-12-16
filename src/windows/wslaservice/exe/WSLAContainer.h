@@ -25,9 +25,17 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>
 {
 public:
+    struct PortMapping
+    {
+        uint16_t HostPort;
+        uint16_t VmPort;
+        uint16_t ContainerPort;
+        int Family;
+    };
+
     NON_COPYABLE(WSLAContainer);
 
-    WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker);
+    WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<PortMapping>&& ports);
     ~WSLAContainer();
 
     void Start(const WSLA_CONTAINER_OPTIONS& Options);
@@ -58,6 +66,7 @@ private:
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
     ContainerEventTracker::ContainerTrackingReference m_trackingReference;
+    std::vector<PortMapping> m_mappedPorts;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions);
     static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);

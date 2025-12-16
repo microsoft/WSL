@@ -57,6 +57,7 @@ public:
 private:
     std::string m_image;
     std::string m_name;
+    std::vector<WSLA_PORT_MAPPING> m_ports;
     WSLA_CONTAINER_NETWORK_TYPE m_containerNetworkType;
 };
 } // namespace wsl::windows::common

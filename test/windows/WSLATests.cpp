@@ -574,6 +574,36 @@ class WSLATests
         }
     }
 
+    void WaitForOutput(HANDLE Handle, const char* Content)
+    {
+        std::string output;
+        DWORD index = 0;
+        while (true) // TODO: timeout
+        {
+            constexpr auto bufferSize = 100;
+            output.resize(output.size() + bufferSize);
+            DWORD bytesRead = 0;
+            if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
+            {
+                LogError("ReadFile failed with %lu", GetLastError());
+                VERIFY_FAIL();
+            }
+            output.resize(index + bytesRead);
+            if (bytesRead == 0)
+            {
+                LogError("Process exited, output: %hs", output.c_str());
+                VERIFY_FAIL();
+            }
+            LogInfo("Buffer: %hs", output.c_str());
+
+            index += bytesRead;
+            if (output.find(Content) != std::string::npos)
+            {
+                break;
+            }
+        }
+    }
+
     TEST_METHOD(NATPortMapping)
     {
         WSL2_TEST_ONLY();
@@ -592,41 +622,10 @@ class WSLATests
         wil::com_ptr<IWSLAVirtualMachine> vm;
         VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
 
-        auto waitForOutput = [](HANDLE Handle, const char* Content) {
-            std::string output;
-            DWORD index = 0;
-            while (true) // TODO: timeout
-            {
-                constexpr auto bufferSize = 100;
-
-                output.resize(output.size() + bufferSize);
-                DWORD bytesRead = 0;
-                if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
-                {
-                    LogError("ReadFile failed with %lu", GetLastError());
-                    VERIFY_FAIL();
-                }
-
-                output.resize(index + bytesRead);
-
-                if (bytesRead == 0)
-                {
-                    LogError("Process exited, output: %hs", output.c_str());
-                    VERIFY_FAIL();
-                }
-
-                index += bytesRead;
-                if (output.find(Content) != std::string::npos)
-                {
-                    break;
-                }
-            }
-        };
-
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
             auto process = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", cmd}).Launch(*session);
-            waitForOutput(process.GetStdHandle(2).get(), "listening on");
+            WaitForOutput(process.GetStdHandle(2).get(), "listening on");
 
             return process;
         };
@@ -706,7 +705,7 @@ class WSLATests
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
                 .Launch(*session);
 
-        waitForOutput(process.GetStdHandle(2).get(), "listening on");
+        WaitForOutput(process.GetStdHandle(2).get(), "listening on");
 
         for (auto i = 0; i < 100; i++)
         {
@@ -1439,22 +1438,8 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto storagePath = std::filesystem::current_path() / "test-storage";
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            std::error_code error;
-
-            std::filesystem::remove_all(storagePath, error);
-            if (error)
-            {
-                LogError("Failed to cleanup storage path %ws: %hs", storagePath.c_str(), error.message().c_str());
-            }
-        });
-
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.StoragePath = storagePath.c_str();
-        settings.MaximumStorageSizeMb = 1024;
 
         auto session = CreateSession(settings);
 
@@ -1662,5 +1647,43 @@ class WSLATests
 
             // TODO: Implement proper handling of executables that don't exist in the container.
         }
+    }
+
+    void ExpectHttpResponse(LPCWSTR Url, const std::wstring& ExpectedContent)
+    {
+        const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
+        filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
+
+        const winrt::Windows::Web::Http::HttpClient client(filter);
+        auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url));
+        auto content = response.get().Content().ReadAsStringAsync().get();
+        std::wstring contentString{content.data(), content.data() + content.size()};
+
+        VERIFY_ARE_EQUAL(contentString, ExpectedContent);
+    }
+
+    TEST_METHOD(PortMappingsBridged)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+
+        auto session = CreateSession(settings);
+
+        WSLAContainerLauncher launcher(
+            "python:3.12-alpine", "test-ports", {}, {"python3", "-m", "http.server"}, {}, WSLA_CONTAINER_NETWORK_BRIDGE, ProcessFlags::Stdout);
+
+        launcher.AddPort(1234, 8000, AF_INET);
+
+        auto container = launcher.Launch(*session);
+        auto initProcess = container.GetInitProcess();
+        auto stdoutHandle = initProcess.GetStdHandle(1);
+
+        // Wait for the container bind() to be completed.
+        WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+
+        ExpectHttpResponse(L"http://localhost:1234", L"Directory listing for /\n");
     }
 };
