@@ -74,10 +74,7 @@ public:
         // Log telemetry when a WSL notification is activated, used to determine user engagement for notifications
         WSL_LOG_TELEMETRY("NotificationActivate", PDT_ProductAndServicePerformance, TraceLoggingValue(invokedArgs, "Arguments"));
 
-        // Prepend the executable name to the arguments.
-        auto commandLine = std::format(L"\"{}\" {}", wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle()), invokedArgs);
-
-        ArgumentParser parser(commandLine.c_str(), wslhost::binary_name);
+        ArgumentParser parser(invokedArgs, wslhost::binary_name, 0);
         parser.AddArgument(
             []() {
                 std::wstring path;

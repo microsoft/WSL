@@ -2179,9 +2179,17 @@ try
 
     wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", m_vmTerminating.get());
 
+    // Check if drvfs notifications are enabled for the user.
+    bool drvFsNotifications{};
+    {
+        auto impersonate = wil::impersonate_token(m_userToken.get());
+        const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
+        drvFsNotifications =
+            wsl::windows::common::registry::ReadDword(lxssKey.get(), LXSS_NOTIFICATIONS_KEY, LXSS_NOTIFICATION_DRVFS_PERF_DISABLED, 0) == 0;
+    }
+
     // Aggregate information about what is running inside the VM. This is logged
     // periodically because logging each event individually would be too noisy.
-    bool drvFsNotifications = true;
     for (;;)
     {
         auto [Message, Span] = channel.ReceiveMessageOrClosed<LX_MINI_INIT_TELEMETRY_MESSAGE>();
@@ -2222,20 +2230,9 @@ try
 
         if (drvFsNotifications && Message->ShowDrvFsNotification && !values.empty())
         {
-            // Check if drvfs notifications are enabled for the user.
-            {
-                auto impersonate = wil::impersonate_token(m_userToken.get());
-                const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-                drvFsNotifications = wsl::windows::common::registry::ReadDword(
-                                         lxssKey.get(), LXSS_NOTIFICATIONS_KEY, LXSS_NOTIFICATION_DRVFS_PERF_DISABLED, 0) == 0;
-            }
-
             // If a drvfs notification is requested, the first entry is the executable that triggered it.
-            if (drvFsNotifications)
-            {
-                LOG_IF_FAILED(wsl::windows::common::notifications::DisplayFilesystemNotification(values[0].c_str()));
-                drvFsNotifications = false;
-            }
+            LOG_IF_FAILED(wsl::windows::common::notifications::DisplayFilesystemNotification(values[0].c_str()));
+            drvFsNotifications = false;
         }
     }
 }
