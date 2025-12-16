@@ -21,13 +21,21 @@ Abstract:
 
 namespace wsl::windows::service::wsla {
 
+struct VolumeMountInfo
+{
+    std::wstring HostPath;
+    std::string ParentVMPath;
+    std::string ContainerPath;
+    BOOL ReadOnly;
+};
+
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>
 {
 public:
     NON_COPYABLE(WSLAContainer);
 
-    WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker);
+    WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<VolumeMountInfo>&& volumes);
     ~WSLAContainer();
 
     void Start(const WSLA_CONTAINER_OPTIONS& Options);
@@ -58,9 +66,14 @@ private:
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
     ContainerEventTracker::ContainerTrackingReference m_trackingReference;
+    std::vector<VolumeMountInfo> m_mountedVolumes;
 
-    static std::vector<std::string> PrepareNerdctlCreateCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions);
+    static std::vector<std::string> PrepareNerdctlCreateCommand(
+        const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes);
     static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);
     static void AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options);
+
+    static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
+    static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
 };
 } // namespace wsl::windows::service::wsla
