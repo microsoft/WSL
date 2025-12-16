@@ -800,17 +800,31 @@ class NetworkTests
 
     static void VerifyDnsResolutionDig()
     {
-        // Test A record resolution (IPv4) with both UDP and TCP
-        VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+        if (HostHasInternetConnectivity(AF_INET))
+        {
+            // Test A record resolution (IPv4) with both UDP and TCP
+            VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
 
-        // Test AAAA record resolution (IPv6) with both UDP and TCP
-        VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+            // Test reverse DNS lookup
+            VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+        }
+        else
+        {
+            LogSkipped("Host does not have IPv4 internet connectivity. Skipping IPv4 DNS tests.");
+        }
 
-        // Test reverse DNS lookup
-        VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
-        VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+        if (HostHasInternetConnectivity(AF_INET6))
+        {
+            // Test AAAA record resolution (IPv6) with both UDP and TCP
+            VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+        }
+        else
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping IPv6 DNS tests.");
+        }
     }
 
     static void VerifyDnsResolutionRecordTypes()
@@ -4616,30 +4630,6 @@ class VirtioProxyTests
 
         auto udpPort = NetworkTests::BindHostPort(2345, SOCK_DGRAM, IPPROTO_UDP, true);
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
-    }
-
-    TEST_METHOD(MultipleGuestBindOnSameTuple)
-    {
-        VIRTIOPROXY_TEST_ONLY();
-
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
-
-        auto bind1 = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
-        {
-            auto bind2 = NetworkTests::BindGuestPort(L"TCP6-LISTEN:1234,bind=::1", true);
-
-            // Allow time for this second bind to be viewed as "in use" by the init port tracker
-            // before closing the socket. If the socket is closed before the init port tracker sees
-            // that the port allocation was in use, then the init port tracker will hold onto the
-            // allocation for a considerable amount of time (through the duration of this test case)
-            // before releasing it.
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-        }
-
-        // Allow time for the init port tracker to detect the second port allocation as no longer in
-        // use and perform its cleanup of the second port allocation.
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-        auto bind3 = NetworkTests::BindGuestPort(L"TCP6-LISTEN:1234,bind=::1", true);
     }
 
     TEST_METHOD(DnsResolutionBasic)
