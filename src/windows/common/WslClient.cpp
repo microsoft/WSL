@@ -1655,7 +1655,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         containerOptions.InitProcessOptions.Fds = fds.data();
         containerOptions.InitProcessOptions.FdsCount = static_cast<DWORD>(fds.size());
         containerOptions.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
-        containerOptions.InitProcessOptions.TtyRows = Info.srWindow.Right - Info.srWindow.Left + 1;
+        containerOptions.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
 
         container.emplace();
         THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
