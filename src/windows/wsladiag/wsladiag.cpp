@@ -43,101 +43,122 @@ static int ReportError(const std::wstring& context, HRESULT hr)
     return 1;
 }
 
-// Function to handle the --shell argument (so it can grow later).
-static int RunShellCommand(const std::wstring& sessionName)
+static void PrintVerbose(bool verbose, std::wstring_view msg)
 {
-    wslutil::PrintMessage(std::format(L"[diag] shell='{}'\n", sessionName), stdout);
+    if (verbose)
+    {
+        wslutil::PrintMessage(std::wstring(msg), stdout);
+    }
+}
+
+// Function to handle the --shell argument (TTY-backed interactive shell).
+static int RunShellCommand(const std::wstring& sessionName, bool verbose)
+{
+    PrintVerbose(verbose, std::format(L"[diag] shell='{}'\n", sessionName));
 
     try
     {
         wil::com_ptr<IWSLAUserSession> userSession;
         THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
         wil::com_ptr<IWSLASession> session;
-
-        // Open the existing session by name/ID from the --shell argument.
         THROW_IF_FAILED(userSession->OpenSessionByName(sessionName.c_str(), &session));
+        PrintVerbose(verbose, L"[diag] OpenSessionByName succeeded\n");
 
-        wslutil::PrintMessage(L"[diag] OpenSessionByName succeeded\n", stdout);
+        // Console size for TTY.
+        CONSOLE_SCREEN_BUFFER_INFO info{};
+        THROW_LAST_ERROR_IF(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
+        const ULONG rows = static_cast<ULONG>(info.srWindow.Bottom - info.srWindow.Top + 1);
+        const ULONG cols = static_cast<ULONG>(info.srWindow.Right - info.srWindow.Left + 1);
 
         std::string shell = "/bin/sh";
 
-        WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}};
+        // Launch with terminal fds (PTY).
+        wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "-i"}, {"TERM=xterm-256color"}, wsl::windows::common::ProcessFlags::None};
+
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+        launcher.SetTtySize(rows, cols);
 
-        wslutil::PrintMessage(L"[diag] launching shell process...\n", stdout);
-
+        PrintVerbose(verbose, L"[diag] launching shell process...\n");
         auto process = launcher.Launch(*session);
+        PrintVerbose(verbose, L"[diag] shell launched (TTY)\n");
 
-        // Interactive console wiring.
+        auto ttyIn = process.GetStdHandle(0);
+        auto ttyOut = process.GetStdHandle(1);
+        auto ttyControl = process.GetStdHandle(2);
 
-        const HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
-        const HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-        THROW_LAST_ERROR_IF(!Stdin || Stdin == INVALID_HANDLE_VALUE);
-        THROW_LAST_ERROR_IF(!Stdout || Stdout == INVALID_HANDLE_VALUE);
+        // Console handles.
+        wil::unique_hfile conin{CreateFileW(
+            L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        wil::unique_hfile conout{CreateFileW(
+            L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
+        THROW_LAST_ERROR_IF(!conin);
+        THROW_LAST_ERROR_IF(!conout);
 
-        // Save original console modes so they can be restored on exit.
-        DWORD OriginalInputMode{};
-        DWORD OriginalOutputMode{};
-        UINT OriginalOutputCP = GetConsoleOutputCP();
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
+        const HANDLE consoleIn = conin.get();
+        const HANDLE consoleOut = conout.get();
 
-        auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            SetConsoleMode(Stdin, OriginalInputMode);
-            SetConsoleMode(Stdout, OriginalOutputMode);
-            SetConsoleOutputCP(OriginalOutputCP);
+        // Save/restore console state.
+        DWORD originalInMode{};
+        DWORD originalOutMode{};
+        UINT originalOutCP = GetConsoleOutputCP();
+        UINT originalInCP = GetConsoleCP();
+
+        THROW_LAST_ERROR_IF(!GetConsoleMode(consoleIn, &originalInMode));
+        THROW_LAST_ERROR_IF(!GetConsoleMode(consoleOut, &originalOutMode));
+
+        auto restoreConsole = wil::scope_exit([&] {
+            SetConsoleMode(consoleIn, originalInMode);
+            SetConsoleMode(consoleOut, originalOutMode);
+            SetConsoleOutputCP(originalOutCP);
+            SetConsoleCP(originalInCP);
         });
 
-        // Configure console for interactive usage.
-        DWORD InputMode = OriginalInputMode;
-        WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
-        WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
+        // Console mode for interactive terminal.
+        DWORD inMode = originalInMode;
+        WI_SetAllFlags(inMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
+        WI_ClearAllFlags(inMode, ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_INSERT_MODE);
+        WI_SetFlag(inMode, ENABLE_PROCESSED_INPUT);
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleIn, inMode));
 
-        DWORD OutputMode = OriginalOutputMode;
-        WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
+        DWORD outMode = originalOutMode;
+        WI_SetAllFlags(outMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleOut, outMode));
 
-        THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
+        THROW_LAST_ERROR_IF(!SetConsoleOutputCP(CP_UTF8));
+        THROW_LAST_ERROR_IF(!SetConsoleCP(CP_UTF8));
 
-        // Create a thread to relay stdin to the process.
+        // It will keep terminal control socket alive.
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
+        wsl::shared::SocketChannel controlChannel{wil::unique_socket{(SOCKET)ttyControl.release()}, "TerminalControl", exitEvent.get()};
 
-        wsl::shared::SocketChannel controlChannel{
-            wil::unique_socket{(SOCKET)process.GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
-
-        std::thread inputThread([&]() {
-            auto updateTerminal = [&controlChannel, &Stdout]() {
-                CONSOLE_SCREEN_BUFFER_INFOEX info{};
-                info.cbSize = sizeof(info);
-
-                THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
-
-                WSLA_TERMINAL_CHANGED message{};
-                message.Columns = info.srWindow.Right - info.srWindow.Left + 1;
-                message.Rows = info.srWindow.Bottom - info.srWindow.Top + 1;
-
-                controlChannel.SendMessage(message);
-            };
-
-            wsl::windows::common::relay::StandardInputRelay(Stdin, process.GetStdHandle(0).get(), updateTerminal, exitEvent.get());
+        // Relay console -> tty input.
+        std::thread inputThread([&] {
+            try
+            {
+                wsl::windows::common::relay::InterruptableRelay(consoleIn, ttyIn.get());
+            }
+            catch (...)
+            {
+                exitEvent.SetEvent();
+            }
         });
 
-        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        auto joinInput = wil::scope_exit([&] {
             exitEvent.SetEvent();
-            inputThread.join();
+            if (inputThread.joinable())
+            {
+                inputThread.join();
+            }
         });
 
-        // Relay the process stdout to the console.
-        wsl::windows::common::relay::InterruptableRelay(process.GetStdHandle(1).get(), Stdout);
+        // Relay tty output -> console (blocks until output ends).
+        wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), consoleOut);
 
         process.GetExitEvent().wait();
-
         auto [code, signalled] = process.GetExitState();
 
         const std::wstring shellW{shell.begin(), shell.end()};
@@ -169,16 +190,16 @@ int wsladiag_main(std::wstring_view commandLine)
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
-    // Command-line parsing using ArgumentParser.
     ArgumentParser parser(std::wstring{commandLine}, L"wsladiag");
 
     bool help = false;
     bool list = false;
-
+    bool verbose = false;
     std::wstring shellSession;
 
     parser.AddArgument(list, L"--list");
-    parser.AddArgument(help, L"--help", L'h'); // short option is a single wide char
+    parser.AddArgument(help, L"--help", L'h');
+    parser.AddArgument(verbose, L"--verbose", L'v');
     parser.AddArgument(shellSession, L"--shell");
 
     parser.Parse();
@@ -187,13 +208,12 @@ int wsladiag_main(std::wstring_view commandLine)
         wslutil::PrintMessage(
             L"wsladiag - WSLA diagnostics tool\n"
             L"Usage:\n"
-            L"  wsladiag --list                  List WSLA sessions\n"
-            L"  wsladiag --shell <SessionName>   Open a shell in an existing WSLA session\n"
-            L"  wsladiag --help                  Show this help\n",
+            L"  wsladiag --list\n"
+            L"  wsladiag --shell <SessionName> [--verbose]\n"
+            L"  wsladiag --help\n",
             stderr);
     };
 
-    // If '--help' was requested, print usage and exit.
     if (help)
     {
         printUsage();
@@ -202,26 +222,23 @@ int wsladiag_main(std::wstring_view commandLine)
 
     if (!shellSession.empty())
     {
-        return RunShellCommand(shellSession);
+        return RunShellCommand(shellSession, verbose);
     }
 
     if (!list)
     {
-        // No recognized command → show usage
         printUsage();
         return 0;
     }
 
-    // --list: Call WSLA service COM interface to retrieve and display sessions.
+    // --list
     try
     {
         wil::com_ptr<IWSLAUserSession> userSession;
         THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
         wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-
         THROW_IF_FAILED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
         if (sessions.size() == 0)
@@ -232,14 +249,12 @@ int wsladiag_main(std::wstring_view commandLine)
         {
             wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:\n", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
 
-            wslutil::PrintMessage(L"ID\tCreator PID\tDisplay Name\n", stdout);
+            wslutil::PrintMessage(L"\nID\tCreator PID\tDisplay Name\n", stdout);
             wslutil::PrintMessage(L"--\t-----------\t------------\n", stdout);
 
-            for (const auto& session : sessions)
+            for (const auto& s : sessions)
             {
-                const auto* displayName = session.DisplayName;
-
-                wslutil::PrintMessage(std::format(L"{}\t{}\t{}\n", session.SessionId, session.CreatorPid, displayName), stdout);
+                wslutil::PrintMessage(std::format(L"{}\t{}\t{}\n", s.SessionId, s.CreatorPid, s.DisplayName), stdout);
             }
         }
 
@@ -256,7 +271,6 @@ int wmain(int /*argc*/, wchar_t** /*argv*/)
 {
     try
     {
-        // Use raw Unicode command line so ArgumentParser gets original input.
         return wsladiag_main(GetCommandLineW());
     }
     CATCH_RETURN();
