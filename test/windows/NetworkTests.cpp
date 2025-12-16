@@ -175,6 +175,7 @@ class NetworkTests
     WSL_TEST_CLASS(NetworkTests)
 
     friend class MirroredTests;
+    friend class BridgedTests;
     friend class VirtioProxyTests;
 
     static std::wstring SockaddrToString(const SOCKADDR_INET* sockAddr)
@@ -790,6 +791,51 @@ class NetworkTests
         VERIFY_IS_TRUE(!out.empty());
     }
 
+    static void VerifyDnsResolutionBasic()
+    {
+        // Verify basic DNS resolution using getent
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"getent ahosts bing.com", 0);
+        VERIFY_IS_TRUE(!out.empty());
+    }
+
+    static void VerifyDnsResolutionDig()
+    {
+        if (HostHasInternetConnectivity(AF_INET))
+        {
+            // Test A record resolution (IPv4) with both UDP and TCP
+            VerifyDigDnsResolution(L"dig +short +time=5 A bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=5 A bing.com");
+
+            // Test reverse DNS lookup
+            VerifyDigDnsResolution(L"dig +short +time=5 -x 8.8.8.8");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=5 -x 8.8.8.8");
+        }
+        else
+        {
+            LogSkipped("Host does not have IPv4 internet connectivity. Skipping IPv4 DNS tests.");
+        }
+
+        if (HostHasInternetConnectivity(AF_INET6))
+        {
+            // Test AAAA record resolution (IPv6) with both UDP and TCP
+            VerifyDigDnsResolution(L"dig +short +time=5 AAAA bing.com");
+            VerifyDigDnsResolution(L"dig +tcp +short +time=5 AAAA bing.com");
+        }
+        else
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping IPv6 DNS tests.");
+        }
+    }
+
+    static void VerifyDnsResolutionRecordTypes()
+    {
+        // Test various DNS record types
+        VerifyDigDnsResolution(L"dig +short +time=5 MX bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=5 NS bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=5 TXT bing.com");
+        VerifyDigDnsResolution(L"dig +short +time=5 SOA bing.com");
+    }
+
     static void VerifyDnsQueries()
     {
         // query for A/IPv4 records
@@ -1004,6 +1050,27 @@ class NetworkTests
                                       L"domain microsoft.com\n"
                                       L"search foo.microsoft.com bar.microsoft.com\n";
         VERIFY_ARE_EQUAL(expected, out.c_str());
+    }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        WSL2_TEST_ONLY();
+
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        WSL2_TEST_ONLY();
+
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        WSL2_TEST_ONLY();
+
+        NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
     static void ClearHttpProxySettings(bool userScope)
@@ -4302,6 +4369,36 @@ class MirroredTests
 
         VERIFY_IS_FALSE(Watchdog.IsExpired());
     }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyDnsResolutionRecordTypes();
+    }
 };
 
 class BridgedTests
@@ -4416,6 +4513,8 @@ class VirtioProxyTests
     {
         VIRTIOPROXY_TEST_ONLY();
 
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
         // Verify that we have a working connection
         NetworkTests::GuestClient(L"tcp-connect:bing.com:80");
     }
@@ -4423,6 +4522,8 @@ class VirtioProxyTests
     TEST_METHOD(InternetConnectivityV4)
     {
         VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
         {
@@ -4437,6 +4538,8 @@ class VirtioProxyTests
     {
         VIRTIOPROXY_TEST_ONLY();
 
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
         {
             LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
@@ -4449,6 +4552,8 @@ class VirtioProxyTests
     TEST_METHOD(Configuration)
     {
         VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");
         VERIFY_IS_FALSE(state.V4Addresses.empty());
@@ -4463,6 +4568,8 @@ class VirtioProxyTests
     TEST_METHOD(GuestPortIsReleased)
     {
         VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
 
         // Make sure the VM doesn't time out
         WslKeepAlive keepAlive;
@@ -4489,6 +4596,67 @@ class VirtioProxyTests
         }
 
         VERIFY_IS_TRUE(bound);
+    }
+
+    TEST_METHOD(LoopbackGuestToHost)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        // Verify guest can connect to host on loopback (TCP only, UDP not supported)
+        NetworkTests::VerifyLoopbackGuestToHost(L"127.0.0.1", IPPROTO_TCP);
+        NetworkTests::VerifyLoopbackGuestToHost(L"0.0.0.0", IPPROTO_TCP);
+        // TODO: enable when v6 loopback is supported
+        // NetworkTests::VerifyLoopbackGuestToHost(L"::1", IPPROTO_TCP);
+        // NetworkTests::VerifyLoopbackGuestToHost(L"::", IPPROTO_TCP);
+    }
+
+    TEST_METHOD(UdpBindDoesNotPreventTcpBind)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:1234", true);
+        auto udpPort = NetworkTests::BindGuestPort(L"UDP4-LISTEN:1234", true);
+    }
+
+    TEST_METHOD(HostUdpBindDoesNotPreventGuestTcpBind)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        auto udpPort = NetworkTests::BindHostPort(2345, SOCK_DGRAM, IPPROTO_UDP, true);
+        auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
+    }
+
+    TEST_METHOD(DnsResolutionBasic)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyDnsResolutionBasic();
+    }
+
+    TEST_METHOD(DnsResolutionDig)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyDnsResolutionDig();
+    }
+
+    TEST_METHOD(DnsResolutionRecordTypes)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        NetworkTests::VerifyDnsResolutionRecordTypes();
     }
 
     TEST_METHOD(HttpProxySimple)
