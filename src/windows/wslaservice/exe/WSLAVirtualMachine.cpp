@@ -1485,7 +1485,6 @@ bool WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
     return inserted;
 }
 
-
 std::vector<uint16_t> WSLAVirtualMachine::AllocatePorts(uint16_t Count)
 {
     std::lock_guard lock{m_lock};
