@@ -2172,7 +2172,7 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBeh
     return S_OK;
 }
 
-void LxssUserSessionImpl::TelemetryWorker(_In_ wil::unique_socket&& socket, _In_ bool drvFsNotifications) const
+void LxssUserSessionImpl::TelemetryWorker(_In_ wil::unique_socket&& socket) const
 try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"Telemetry");
@@ -2181,6 +2181,7 @@ try
 
     // Aggregate information about what is running inside the VM. This is logged
     // periodically because logging each event individually would be too noisy.
+    bool drvFsNotifications = true;
     for (;;)
     {
         auto [Message, Span] = channel.ReceiveMessageOrClosed<LX_MINI_INIT_TELEMETRY_MESSAGE>();
@@ -2221,9 +2222,20 @@ try
 
         if (drvFsNotifications && Message->ShowDrvFsNotification && !values.empty())
         {
+            // Check if drvfs notifications are enabled for the user.
+            {
+                auto impersonate = wil::impersonate_token(m_userToken.get());
+                const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
+                drvFsNotifications = wsl::windows::common::registry::ReadDword(
+                                         lxssKey.get(), LXSS_NOTIFICATIONS_KEY, LXSS_NOTIFICATION_DRVFS_PERF_DISABLED, 0) == 0;
+            }
+
             // If a drvfs notification is requested, the first entry is the executable that triggered it.
-            LOG_IF_FAILED(wsl::windows::common::notifications::DisplayFilesystemNotification(values[0].c_str()));
-            drvFsNotifications = false;
+            if (drvFsNotifications)
+            {
+                LOG_IF_FAILED(wsl::windows::common::notifications::DisplayFilesystemNotification(values[0].c_str()));
+                drvFsNotifications = false;
+            }
         }
     }
 }
@@ -2852,17 +2864,9 @@ void LxssUserSessionImpl::_CreateVm()
             // If the telemetry is enabled, launch the telemetry agent inside the VM.
             if (m_utilityVm->GetConfig().EnableTelemetry && TraceLoggingProviderEnabled(g_hTraceLoggingProvider, WINEVENT_LEVEL_INFO, 0))
             {
-                bool drvFsNotifications = false;
-                {
-                    auto impersonate = wil::impersonate_token(m_userToken.get());
-                    const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-                    drvFsNotifications = wsl::windows::common::registry::ReadDword(
-                                             lxssKey.get(), LXSS_NOTIFICATIONS_KEY, LXSS_NOTIFICATION_DRVFS_PERF_DISABLED, 0) == 0;
-                }
-
                 LPCSTR Arguments[] = {LX_INIT_TELEMETRY_AGENT, nullptr};
                 auto socket = m_utilityVm->CreateRootNamespaceProcess(LX_INIT_PATH, Arguments);
-                m_telemetryThread = std::thread(&LxssUserSessionImpl::TelemetryWorker, this, std::move(socket), drvFsNotifications);
+                m_telemetryThread = std::thread(&LxssUserSessionImpl::TelemetryWorker, this, std::move(socket));
             }
 
             m_pluginManager.OnVmStarted(&m_session, &userSettings);
