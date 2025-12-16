@@ -146,8 +146,6 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
         controlChannel.SendMessage(message);
     };
 
-    updateTerminalSize();
-
     // Relay console -> tty input.
     std::thread inputThread([&] {
         try
