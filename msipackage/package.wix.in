@@ -183,21 +183,12 @@
                 <!-- WslDeviceHost_VirtioFs (admin) -->
                 <RegistryKey Root="HKCR" Key="CLSID\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}">
                     <RegistryValue Value="WslDeviceHost_VirtioFs_Admin" Type="string"/>
-                    <RegistryValue Name="AppId" Value="{7F82AD86-755B-4870-86B1-D2E68DFE8A49}" Type="string"/>
+                    <RegistryValue Name="AppId" Value="{17696EAC-9568-4CF5-BB8C-82515AAD6C09}" Type="string"/>
 
                     <RegistryKey Key="InProcServer32">
                         <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string"/>
                         <RegistryValue Name="ThreadingModel" Value="Both" Type="string"/>
                     </RegistryKey>
-                </RegistryKey>
-
-                <RegistryKey Root="HKCR" Key="AppID\{7F82AD86-755B-4870-86B1-D2E68DFE8A49}">
-                    <RegistryValue Name="DllSurrogate" Value="" Type="string"/>
-                    <RegistryValue Name="AppIDFlags" Value="2048" Type="integer"/><!--0x800-->
-
-                    <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
-                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
-                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
                 </RegistryKey>
 
                 <!-- WslDeviceHost_VirtioFs -->

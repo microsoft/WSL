@@ -461,7 +461,7 @@ extern "C" UINT __stdcall CleanMsixState(MSIHANDLE install)
         const std::map<LPCWSTR, LPCWSTR> keys{
             {L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application", L"WSL"},
             {L"SOFTWARE\\Classes\\CLSID", L"{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}"},
-            {L"SOFTWARE\\Classes\\AppID", L"{7F82AD86-755B-4870-86B1-D2E68DFE8A49}"},
+            {L"SOFTWARE\\Classes\\AppID", L"{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"},
             {L"SOFTWARE\\Microsoft\\Terminal Server Client", L"Default"},
             {L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default", L"OptionalAddIns"},
             {L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns", L"WSLDVC_PACKAGE"}};
