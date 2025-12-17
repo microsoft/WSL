@@ -2312,7 +2312,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         const std::vector<LPCWSTR> serviceKeys{
             L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns\\WSLDVC_PACKAGE",
             L"SOFTWARE\\Classes\\CLSID\\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}",
-            L"SOFTWARE\\Classes\\AppID\\{7F82AD86-755B-4870-86B1-D2E68DFE8A49}"};
+            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"};
 
         for (const auto* keyName : serviceKeys)
         {
