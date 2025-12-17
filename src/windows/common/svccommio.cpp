@@ -25,46 +25,76 @@ bool IsConsoleHandle(_In_ HANDLE Handle)
     return GetFileType(Handle) == FILE_TYPE_CHAR && GetConsoleMode(Handle, &Mode);
 }
 
-void TrySetConsoleMode(_In_ HANDLE Handle, _In_ DWORD Mode)
+void ChangeConsoleMode(_In_ HANDLE Handle, _In_ DWORD Mode)
 {
+    //
+    // Use the invalid parameter error code to detect the v1 console that does
+    // not support the provided mode. This can be improved in the future when
+    // a more elegant solution exists.
+    //
+    // N.B. Ignore failures setting the mode if the console has already
+    //      disconnected.
+    //
+
     if (!SetConsoleMode(Handle, Mode))
     {
-        const auto Error = GetLastError();
-        if (Error != ERROR_INVALID_PARAMETER && Error != ERROR_PIPE_NOT_CONNECTED)
+        // DISABLE_NEWLINE_AUTO_RETURN is not supported everywhere, if the flag was present fall back and try again.
+        if (WI_IsFlagSet(Mode, DISABLE_NEWLINE_AUTO_RETURN))
         {
-            LOG_IF_WIN32_ERROR(Error);
+            if (SetConsoleMode(Handle, WI_ClearFlag(Mode, DISABLE_NEWLINE_AUTO_RETURN)))
+            {
+                return;
+            }
+        }
+
+        switch (GetLastError())
+        {
+        case ERROR_INVALID_PARAMETER:
+            THROW_HR(WSL_E_CONSOLE);
+
+        case ERROR_PIPE_NOT_CONNECTED:
+            break;
+
+        default:
+            THROW_LAST_ERROR();
         }
     }
 }
+
+void TrySetConsoleMode(_In_ HANDLE Handle, _In_ DWORD Mode)
+try
+{
+    ChangeConsoleMode(Handle, Mode);
+}
+CATCH_LOG()
 
 } // namespace
 
 namespace wsl::windows::common {
 
-// ConsoleInput implementation
-std::unique_ptr<ConsoleInput> ConsoleInput::Create(HANDLE Handle)
+std::optional<ConsoleInput> ConsoleInput::Create(HANDLE Handle)
 {
     DWORD Mode;
     if (GetFileType(Handle) == FILE_TYPE_CHAR && GetConsoleMode(Handle, &Mode))
     {
-        return std::unique_ptr<ConsoleInput>(new ConsoleInput(Handle, Mode));
+        return ConsoleInput(Handle, Mode);
     }
 
-    return nullptr;
+    return std::nullopt;
 }
 
 ConsoleInput::ConsoleInput(HANDLE Handle, DWORD SavedMode) : m_Handle(Handle), m_SavedMode(SavedMode)
 {
-    // Save code page
+    // Save code page.
     m_SavedCodePage = GetConsoleCP();
 
-    // Configure for raw input with VT support
+    // Configure for raw input with VT support.
     DWORD NewMode = m_SavedMode;
     WI_SetAllFlags(NewMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
     WI_ClearAllFlags(NewMode, ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
-    TrySetConsoleMode(Handle, NewMode);
+    ChangeConsoleMode(Handle, NewMode);
 
-    // Set UTF-8 code page
+    // Set UTF-8 code page.
     LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
 }
 
@@ -77,44 +107,35 @@ ConsoleInput::~ConsoleInput()
     }
 }
 
-// ConsoleOutput implementation
-std::unique_ptr<ConsoleOutput> ConsoleOutput::Create()
+std::optional<ConsoleOutput> ConsoleOutput::Create()
 {
     wil::unique_hfile ConsoleHandle(
         CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
 
-    if (!ConsoleHandle)
+    if (ConsoleHandle)
     {
-        return nullptr;
+        DWORD Mode;
+        if (GetConsoleMode(ConsoleHandle.get(), &Mode))
+        {
+            return ConsoleOutput(std::move(ConsoleHandle), Mode);
+        }
     }
 
-    DWORD Mode;
-    if (GetConsoleMode(ConsoleHandle.get(), &Mode))
-    {
-        return std::unique_ptr<ConsoleOutput>(new ConsoleOutput(std::move(ConsoleHandle), Mode));
-    }
-
-    return nullptr;
+    return std::nullopt;
 }
 
 ConsoleOutput::ConsoleOutput(wil::unique_hfile ConsoleHandle, DWORD SavedMode) :
     m_ConsoleHandle(std::move(ConsoleHandle)), m_SavedMode(SavedMode)
 {
-    // Save code page
+    // Save code page.
     m_SavedCodePage = GetConsoleOutputCP();
 
-    // Configure for VT output with DISABLE_NEWLINE_AUTO_RETURN
+    // Configure for VT output.
     DWORD NewMode = m_SavedMode;
     WI_SetAllFlags(NewMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+    ChangeConsoleMode(m_ConsoleHandle.get(), NewMode);
 
-    // Try with DISABLE_NEWLINE_AUTO_RETURN first, fall back without it if not supported
-    if (!SetConsoleMode(m_ConsoleHandle.get(), NewMode))
-    {
-        WI_ClearFlag(NewMode, DISABLE_NEWLINE_AUTO_RETURN);
-        TrySetConsoleMode(m_ConsoleHandle.get(), NewMode);
-    }
-
-    // Set UTF-8 code page
+    // Set UTF-8 code page.
     LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(CP_UTF8));
 }
 
@@ -127,7 +148,6 @@ ConsoleOutput::~ConsoleOutput()
     }
 }
 
-// SvcCommIo implementation
 SvcCommIo::SvcCommIo()
 {
     const HANDLE InputHandle = GetStdHandle(STD_INPUT_HANDLE);
@@ -141,7 +161,7 @@ SvcCommIo::SvcCommIo()
     m_ConsoleOutput = ConsoleOutput::Create();
 
     // Initialize the standard handles structure
-    const bool IsConsoleInput = m_ConsoleInput != nullptr;
+    const bool IsConsoleInput = m_ConsoleInput.has_value();
     m_StdHandles.StdIn.HandleType = IsConsoleInput ? LxssHandleConsole : LxssHandleInput;
     m_StdHandles.StdIn.Handle = IsConsoleInput ? LXSS_HANDLE_USE_CONSOLE : HandleToUlong(InputHandle);
 

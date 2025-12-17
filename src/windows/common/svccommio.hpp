@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include <optional>
 #include <wil/filesystem.h>
 #include <wil/result.h>
 #include "wslservice.h"
@@ -24,10 +25,12 @@ namespace wsl::windows::common {
 class ConsoleInput
 {
 public:
-    static std::unique_ptr<ConsoleInput> Create(HANDLE Handle);
+    static std::optional<ConsoleInput> Create(HANDLE Handle);
     ~ConsoleInput();
     ConsoleInput(const ConsoleInput&) = delete;
     ConsoleInput& operator=(const ConsoleInput&) = delete;
+    ConsoleInput(ConsoleInput&&) = default;
+    ConsoleInput& operator=(ConsoleInput&&) = default;
 
 private:
     ConsoleInput(HANDLE Handle, DWORD SavedMode);
@@ -41,10 +44,12 @@ private:
 class ConsoleOutput
 {
 public:
-    static std::unique_ptr<ConsoleOutput> Create();
+    static std::optional<ConsoleOutput> Create();
     ~ConsoleOutput();
     ConsoleOutput(const ConsoleOutput&) = delete;
     ConsoleOutput& operator=(const ConsoleOutput&) = delete;
+    ConsoleOutput(ConsoleOutput&&) = default;
+    ConsoleOutput& operator=(ConsoleOutput&&) = default;
 
 private:
     ConsoleOutput(wil::unique_hfile ConsoleHandle, DWORD SavedMode);
@@ -68,7 +73,7 @@ private:
     HANDLE m_WindowSizeHandle = nullptr; // Cached console handle for GetWindowSize
 
     // RAII members for automatic restoration
-    std::unique_ptr<ConsoleInput> m_ConsoleInput;
-    std::unique_ptr<ConsoleOutput> m_ConsoleOutput;
+    std::optional<ConsoleInput> m_ConsoleInput;
+    std::optional<ConsoleOutput> m_ConsoleOutput;
 };
 } // namespace wsl::windows::common
