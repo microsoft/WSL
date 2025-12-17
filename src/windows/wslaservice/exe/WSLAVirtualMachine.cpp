@@ -1480,6 +1480,8 @@ bool WSLAVirtualMachine::TryAllocatePort(uint16_t Port)
 {
     std::lock_guard lock{m_lock};
 
+    WSL_LOG("AllocatePort", TraceLoggingValue(Port, "Port"));
+
     auto [_, inserted] = m_allocatedPorts.insert(Port);
 
     return inserted;
@@ -1520,6 +1522,8 @@ void WSLAVirtualMachine::ReleasePorts(const std::vector<uint16_t>& Ports)
 
     for (const auto& port : Ports)
     {
+        WSL_LOG("ReleasePort", TraceLoggingValue(port, "Port"));
+
         WI_VERIFY(m_allocatedPorts.erase(port) == 1);
     }
 }

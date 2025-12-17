@@ -1375,7 +1375,7 @@ class WSLATests
                 "debian:latest",
                 "test-unique-name",
                 "sleep",
-                {"sleep", "99999"},
+                {"99999"},
                 {},
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
@@ -1394,9 +1394,6 @@ class WSLATests
             // Kill the container.
             auto initProcess = container.GetInitProcess();
             initProcess.Get().Signal(9);
-
-            auto r = initProcess.WaitAndCaptureOutput();
-            LogInfo("Output: %hs|%hs", r.Output[1].c_str(), r.Output[2].c_str());
 
             // Wait for the process to actually exit.
             wsl::shared::retry::RetryWithTimeout<void>(
@@ -1696,7 +1693,7 @@ class WSLATests
         }
     }
 
-    TEST_METHOD(PortMappingsBridged)
+    void RunPortMappingsTest(WSLA_CONTAINER_NETWORK_TYPE Mode)
     {
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
@@ -1706,13 +1703,7 @@ class WSLATests
         // Test a simple port mapping.
         {
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine",
-                "test-ports",
-                {},
-                {"python3", "-m", "http.server"},
-                {"PYTHONUNBUFFERED=1"},
-                WSLA_CONTAINER_NETWORK_BRIDGE,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "python:3.12-alpine", "test-ports", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, WSLA_CONTAINER_NETWORK_BRIDGE);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET6);
@@ -1729,13 +1720,7 @@ class WSLATests
 
             // Validate that the port cannot be reused while the container is running.
             WSLAContainerLauncher subLauncher(
-                "python:3.12-alpine",
-                "test-ports-2",
-                {},
-                {"python3", "-m", "http.server"},
-                {"PYTHONUNBUFFERED=1"},
-                WSLA_CONTAINER_NETWORK_BRIDGE,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "python:3.12-alpine", "test-ports-2", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
 
             subLauncher.AddPort(1234, 8000, AF_INET);
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(*session);
@@ -1749,13 +1734,7 @@ class WSLATests
             // Validate that the port can be reused now that the container is stopped.
             {
                 WSLAContainerLauncher launcher(
-                    "python:3.12-alpine",
-                    "test-ports-3",
-                    {},
-                    {"python3", "-m", "http.server"},
-                    {"PYTHONUNBUFFERED=1"},
-                    WSLA_CONTAINER_NETWORK_BRIDGE,
-                    ProcessFlags::Stdout | ProcessFlags::Stderr);
+                    "python:3.12-alpine", "test-ports-3", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
 
                 launcher.AddPort(1234, 8000, AF_INET);
 
@@ -1767,19 +1746,17 @@ class WSLATests
                 WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
+
+                VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+                VERIFY_SUCCEEDED(container.Get().Delete());
+                container.Reset(); // TODO: Re-think container lifetime management.
             }
         }
 
         // Validate that the same host port can't be bound twice in the same Create() call.
         {
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine",
-                "test-ports-fail",
-                {},
-                {"python3", "-m", "http.server"},
-                {"PYTHONUNBUFFERED=1"},
-                WSLA_CONTAINER_NETWORK_BRIDGE,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET);
@@ -1788,7 +1765,6 @@ class WSLATests
         }
 
         // Validate that Create() fails if the port is already bound.
-
         {
             wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, 0));
             sockaddr_in address{};
@@ -1798,13 +1774,7 @@ class WSLATests
             VERIFY_ARE_NOT_EQUAL(bind(socket.get(), (sockaddr*)&address, sizeof(address)), SOCKET_ERROR);
 
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine",
-                "test-ports-fail",
-                {},
-                {"python3", "-m", "http.server"},
-                {"PYTHONUNBUFFERED=1"},
-                WSLA_CONTAINER_NETWORK_BRIDGE,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
 
             launcher.AddPort(1235, 8000, AF_INET);
 
@@ -1820,7 +1790,7 @@ class WSLATests
                 {},
                 {"python3", "-m", "http.server", "--bind", "::1"},
                 {"PYTHONUNBUFFERED=1"},
-                WSLA_CONTAINER_NETWORK_BRIDGE,
+                Mode,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             launcher.AddPort(1234, 8000, AF_INET);
@@ -1837,6 +1807,27 @@ class WSLATests
             system("pause");
             ExpectHttpResponse(L"http://[::1]:1234", 200);
         }*/
+    }
+
+    TEST_METHOD(PortMappingsBridged)
+    {
+        RunPortMappingsTest(WSLA_CONTAINER_NETWORK_BRIDGE);
+    }
+
+    TEST_METHOD(PortMappingsHost)
+    {
+        RunPortMappingsTest(WSLA_CONTAINER_NETWORK_HOST);
+    }
+
+    TEST_METHOD(PortMappingsNone)
+    {
+        // Validate that trying to map ports without network fails.
+        WSLAContainerLauncher launcher(
+            "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, WSLA_CONTAINER_NETWORK_NONE);
+
+        launcher.AddPort(1234, 8000, AF_INET);
+
+        VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*CreateSession()).first, E_INVALIDARG);
     }
 
     void ValidateContainerVolumes(bool enableVirtioFs)
