@@ -119,11 +119,7 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     // Console mode for interactive terminal.
     DWORD inMode = originalInMode;
     WI_SetAllFlags(inMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
-    WI_ClearAllFlags(inMode, ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_INSERT_MODE);
-
-    // We clear ENABLE_PROCESSED_INPUT and install a Ctrl handler so Ctrl+C/Ctrl+Break
-    // are forwarded to the Linux TTY instead of terminating wsladiag, matching wsl.exe behavior.
-    WI_ClearFlag(inMode, ENABLE_PROCESSED_INPUT);
+    WI_ClearAllFlags(inMode, ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_INSERT_MODE | ENABLE_PROCESSED_INPUT);
     THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleIn, inMode));
 
     DWORD outMode = originalOutMode;
@@ -132,13 +128,6 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
 
     THROW_LAST_ERROR_IF(!SetConsoleOutputCP(CP_UTF8));
     THROW_LAST_ERROR_IF(!SetConsoleCP(CP_UTF8));
-
-    auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
-        return (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT) ? TRUE : FALSE;
-    };
-
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(ctrlHandler, TRUE));
-    auto removeCtrlHandler = wil::scope_exit([&] { SetConsoleCtrlHandler(ctrlHandler, FALSE); });
 
     // Keep terminal control socket alive.
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
