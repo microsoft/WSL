@@ -163,6 +163,13 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("C:/Foo/bar", "/mnt/c/Foo/bar", true));
     LxtCheckResult(LxtCheckWslPathTranslation("foo", "foo", true));
     LxtCheckResult(LxtCheckWslPathTranslation("foo\\", "foo/", true));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Program Files\\Git", "/mnt/c/Program Files/Git", true));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Program Files\\PowerShell\\7", "/mnt/c/Program Files/PowerShell/7", true));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Program Files (x86)\\Common Files", "/mnt/c/Program Files (x86)/Common Files", true));
+    LxtCheckResult(LxtCheckWslPathTranslation(
+        "C:\\Users\\Test User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin",
+        "/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin",
+        true));
 
 ErrorExit:
     return Result;
@@ -241,6 +248,13 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("/mnt/c/Users", "C:\\Users", false));
     LxtCheckResult(LxtCheckWslPathTranslation("/mnt/c/Users/", "C:\\Users\\", false));
     LxtCheckResult(LxtCheckWslPathTranslation("/mnt/c/DOESNOTEXIST/", "C:\\DOESNOTEXIST\\", false));
+    LxtCheckResult(LxtCheckWslPathTranslation("/mnt/c/Program Files/Git", "C:\\Program Files\\Git", false));
+    LxtCheckResult(LxtCheckWslPathTranslation("/mnt/c/Program Files/PowerShell/7", "C:\\Program Files\\PowerShell\\7", false));
+    LxtCheckResult(LxtCheckWslPathTranslation("/mnt/c/Program Files (x86)/Common Files", "C:\\Program Files (x86)\\Common Files", false));
+    LxtCheckResult(LxtCheckWslPathTranslation(
+        "/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin",
+        "C:\\Users\\Test User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin",
+        false));
 
 ErrorExit:
     return Result;
