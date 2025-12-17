@@ -247,7 +247,11 @@ try
     //
 
     int Result = access(Target, F_OK);
-    if (Result == 0)
+    if (Result < 0)
+    {
+        LOG_STDERR(errno);
+    }
+    else
     {
         auto Parsed = mountutil::MountParseFlags(Options);
         Result = UtilMount(Source, Target, FsType, Parsed.MountFlags, Parsed.StringOptions.c_str(), std::chrono::seconds{2});
@@ -255,15 +259,7 @@ try
 
     if (ExitCode)
     {
-        if (Result < 0)
-        {
-            LOG_STDERR(errno);
-            *ExitCode = c_exitCodeMountFail;
-        }
-        else
-        {
-            *ExitCode = 0;
-        }
+        *ExitCode = Result < 0 ? c_exitCodeMountFail : 0;
     }
 
     return Result;
