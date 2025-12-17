@@ -136,9 +136,8 @@ WSLASession::~WSLASession()
     if (m_virtualMachine)
     {
         // N.B. containerd has exited by this point, so unmounting the VHD is safe since no container can be running.
-
-        m_virtualMachine->OnSessionTerminated();
         LOG_IF_FAILED(m_virtualMachine->Unmount(c_containerdStorage));
+        m_virtualMachine->OnSessionTerminated();
 
         m_virtualMachine.Reset();
     }

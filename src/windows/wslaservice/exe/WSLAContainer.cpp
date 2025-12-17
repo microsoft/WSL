@@ -111,10 +111,19 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
 
 static constexpr DWORD deleteTimeout = 60000; // 60 seconds
 
-
 WSLAContainer::WSLAContainer(
-    WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<PortMapping>&& ports, std::vector<VolumeMountInfo>&& volumes) :
-    m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id)), m_mappedPorts(std::move(ports)), m_mountedVolumes(std::move(volumes))
+    WSLAVirtualMachine* parentVM,
+    const WSLA_CONTAINER_OPTIONS& Options,
+    std::string&& Id,
+    ContainerEventTracker& tracker,
+    std::vector<VolumeMountInfo>&& volumes,
+    std::vector<PortMapping>&& ports) :
+    m_parentVM(parentVM),
+    m_name(Options.Name),
+    m_image(Options.Image),
+    m_id(std::move(Id)),
+    m_mountedVolumes(std::move(volumes)),
+    m_mappedPorts(std::move(ports))
 {
     m_state = WslaContainerStateCreated;
 
@@ -457,7 +466,8 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
         id.pop_back();
     }
 
-    auto container = wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::move(mappedPorts));
+    auto container = wil::MakeOrThrow<WSLAContainer>(
+        &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::move(mappedPorts));
     errorCleanup.release();
 
     return container;

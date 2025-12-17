@@ -1048,8 +1048,15 @@ ReadHandle::~ReadHandle()
     if (State == IOHandleStatus::Pending)
     {
         DWORD bytesRead{};
-        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(Handle.get(), &Overlapped));
-        LOG_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true));
+        if (CancelIoEx(Handle.get(), &Overlapped))
+        {
+            LOG_LAST_ERROR_IF(!GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true) && GetLastError() != ERROR_CONNECTION_ABORTED);
+        }
+        else
+        {
+            // ERROR_NOT_FOUND is returned if there was no IO to cancel.
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        }
     }
 }
 
@@ -1167,8 +1174,15 @@ WriteHandle::~WriteHandle()
     if (State == IOHandleStatus::Pending)
     {
         DWORD bytesRead{};
-        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(Handle.get(), &Overlapped));
-        LOG_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true));
+        if (CancelIoEx(Handle.get(), &Overlapped))
+        {
+            LOG_LAST_ERROR_IF(!GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true) && GetLastError() != ERROR_CONNECTION_ABORTED);
+        }
+        else
+        {
+            // ERROR_NOT_FOUND is returned if there was no IO to cancel.
+            LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
+        }
     }
 }
 

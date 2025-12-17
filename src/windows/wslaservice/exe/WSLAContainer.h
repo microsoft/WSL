@@ -43,7 +43,13 @@ public:
 
     NON_COPYABLE(WSLAContainer);
 
-    WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<VolumeMountInfo>&& volumes, std::vector<PortMapping>&& ports);
+    WSLAContainer(
+        WSLAVirtualMachine* parentVM,
+        const WSLA_CONTAINER_OPTIONS& Options,
+        std::string&& Id,
+        ContainerEventTracker& tracker,
+        std::vector<VolumeMountInfo>&& volumes,
+        std::vector<PortMapping>&& ports);
     ~WSLAContainer();
 
     void Start(const WSLA_CONTAINER_OPTIONS& Options);
