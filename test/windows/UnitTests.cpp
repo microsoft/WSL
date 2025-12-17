@@ -268,8 +268,12 @@ class UnitTests
         {
             validateUserSession();
 
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L"\n");
+
+            // N.B. The XDG_RUNTIME_DIR variable is always set by init even if gui apps are disabled.
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $XDG_RUNTIME_DIR", LXSST_TEST_USERNAME));
+            VERIFY_ARE_EQUAL(out, std::format(L"/run/user/{}\n", TestUid));
         }
 
         // Validate user sessions state with gui apps enabled.
@@ -277,8 +281,11 @@ class UnitTests
             WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
 
             validateUserSession();
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L":0\n");
+
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $XDG_RUNTIME_DIR", LXSST_TEST_USERNAME));
+            VERIFY_ARE_EQUAL(out, std::format(L"/run/user/{}\n", TestUid));
         }
 
         // Create a 'broken' /run/user and validate that the warning is correctly displayed.
