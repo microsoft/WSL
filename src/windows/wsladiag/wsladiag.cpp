@@ -120,7 +120,10 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     DWORD inMode = originalInMode;
     WI_SetAllFlags(inMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
     WI_ClearAllFlags(inMode, ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_INSERT_MODE);
-    WI_SetFlag(inMode, ENABLE_PROCESSED_INPUT);
+
+    // We clear ENABLE_PROCESSED_INPUT and install a Ctrl handler so Ctrl+C/Ctrl+Break
+    // are forwarded to the Linux TTY instead of terminating wsladiag, matching wsl.exe behavior.
+    WI_ClearFlag(inMode, ENABLE_PROCESSED_INPUT);
     THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleIn, inMode));
 
     DWORD outMode = originalOutMode;
@@ -129,6 +132,13 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
 
     THROW_LAST_ERROR_IF(!SetConsoleOutputCP(CP_UTF8));
     THROW_LAST_ERROR_IF(!SetConsoleCP(CP_UTF8));
+
+    auto ctrlHandler = [](DWORD ctrlType) -> BOOL {
+        return (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT) ? TRUE : FALSE;
+    };
+
+    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(ctrlHandler, TRUE));
+    auto removeCtrlHandler = wil::scope_exit([&] { SetConsoleCtrlHandler(ctrlHandler, FALSE); });
 
     // Keep terminal control socket alive.
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
@@ -252,13 +262,11 @@ int wsladiag_main(std::wstring_view commandLine)
         printUsage();
         return 0;
     }
-
-    if (verb == L"list")
+    else if (verb == L"list")
     {
         return RunListCommand(verbose);
     }
-
-    if (verb == L"shell")
+    else if (verb == L"shell")
     {
         if (shellSession.empty())
         {
@@ -267,9 +275,12 @@ int wsladiag_main(std::wstring_view commandLine)
         }
         return RunShellCommand(shellSession, verbose);
     }
-
-    printUsage();
-    return 1;
+    else
+    {
+        wslutil::PrintMessage(std::format(L"Unknown command: '{}'\n", verb), stderr);
+        printUsage();
+        return 1;
+    }
 }
 
 int wmain(int, wchar_t**)
