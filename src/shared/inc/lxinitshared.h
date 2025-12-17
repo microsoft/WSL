@@ -284,6 +284,11 @@ Abstract:
     }
 
 //
+// Definitions used by WSLA
+//
+
+constexpr auto c_ephmeralPortRange = std::pair<uint16_t, uint16_t>(10000, 20000);
+
 // The types of messages that can be sent to init and mini init.
 //
 

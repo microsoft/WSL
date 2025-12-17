@@ -32,8 +32,9 @@ constexpr auto MAX_CRASH_DUMPS = 10;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
-constexpr auto EPHEMERAL_PORT_RANGE = std::pair<uint16_t, uint16_t>(10000, 20000);
 constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20001, 65535);
+
+static_assert(c_ephmeralPortRange.second <= CONTAINER_PORT_RANGE.second);
 
 // WSLA-specific virtio device class IDs.
 DEFINE_GUID(WSLA_VIRTIO_FS_ADMIN_CLASS_ID, 0x8F7C2A3B, 0xD9E4, 0x4C1F, 0xA2, 0xB8, 0x5E, 0x3D, 0x7C, 0x9F, 0x1A, 0x6E); // {8F7C2A3B-D9E4-4C1F-A2B8-5E3D7C9F1A6E}

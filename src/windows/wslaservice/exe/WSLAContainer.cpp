@@ -36,7 +36,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
         "Port mappings are not supported without networking");
 
     // Validate that port mappings are valid.
-    // N.B. If a host port is duplicated, MapPort will fail later.
+    // N.B. If a host port is duplicated, MapPort() will fail later.
     for (ULONG i = 0; i < options.PortsCount; i++)
     {
         const auto& port = options.Ports[i];

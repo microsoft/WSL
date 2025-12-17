@@ -553,7 +553,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_PORT_RELA
     Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
     Channel.Close();
     UtilSetThreadName("PortRelay");
-    LOG_ERROR("StartLocalHost");
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
@@ -880,6 +879,16 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     //
 
     if (WriteToFile("/proc/sys/kernel/printk_devkmsg", "on\n") < 0)
+    {
+        return -1;
+    }
+
+    //
+    // Set the ephemeral port range
+    //
+
+    if (WriteToFile(
+            "/proc/sys/net/ipv4/ip_local_port_range", std::format("{} {}", c_ephmeralPortRange.first, c_ephmeralPortRange.second).c_str()) < 0)
     {
         return -1;
     }
