@@ -92,11 +92,6 @@ void SubProcess::SetFlags(DWORD Flag)
     WI_SetAllFlags(m_flags, Flag);
 }
 
-void SubProcess::SetDesktop(LPCWSTR Desktop)
-{
-    m_desktop = Desktop;
-}
-
 void SubProcess::SetToken(HANDLE Token)
 {
     m_token = Token;

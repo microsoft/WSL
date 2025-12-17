@@ -195,7 +195,6 @@ CreateProcessResult CreateProcess(_In_ CreateProcessParsed* Parsed, _In_ HANDLE 
     wsl::windows::common::helpers::SetHandleInheritable(StdErr);
 
     wsl::windows::common::SubProcess process(Parsed->ApplicationName.c_str(), Parsed->CommandLine(), CREATE_UNICODE_ENVIRONMENT);
-    process.SetDesktop(L"winsta0\\default");
 
     CreateProcessResult Result{};
     if (Parsed->CreatePseudoconsole)
