@@ -86,8 +86,8 @@ public:
     void RegisterCallback(_In_ ITerminationCallback* callback);
 
     bool TryAllocatePort(uint16_t Port);
-    std::vector<uint16_t> AllocatePorts(uint16_t Count);
-    void ReleasePorts(const std::vector<uint16_t>& Ports);
+    std::set<uint16_t> AllocatePorts(uint16_t Count);
+    void ReleasePorts(const std::set<uint16_t>& Ports);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});

@@ -45,7 +45,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
 
     // Generate Windows <-> VM port mappings depending on the networking mode.
     // N.B. pointers are used so the vectors are still available if the errorCleanup is executed.
-    auto vmPorts = std::make_shared<std::vector<uint16_t>>();
+    auto vmPorts = std::make_shared<std::set<uint16_t>>();
     auto mappedPorts = std::make_shared<std::vector<WSLAContainer::PortMapping>>();
 
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [mappedPorts = mappedPorts, vmPorts = vmPorts, &vm]() {
@@ -73,11 +73,15 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
         // If the container is in bridged mode, allocate one port in the VM for each port mapping.
         *vmPorts = vm.AllocatePorts(static_cast<uint16_t>(options.PortsCount));
 
+        auto vmPortIt = vmPorts->begin();
         for (ULONG i = 0; i < options.PortsCount; i++)
         {
+            WI_ASSERT(vmPortIt != vmPorts->end());
+
             const auto& port = options.Ports[i];
 
-            mappedPorts->push_back({port.HostPort, (*vmPorts)[i], port.ContainerPort, port.Family});
+            mappedPorts->push_back({port.HostPort, *vmPortIt, port.ContainerPort, port.Family});
+            vmPortIt++;
         }
     }
     else if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_HOST)
@@ -87,15 +91,16 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
         {
             const auto& port = options.Ports[i];
 
-            // Only allocate a VM port if it hasn't already been allocate to that container.
+            // Only allocate a VM port if it hasn't already been allocated to that container.
             // A user can allocate two different host ports to the same container port.
             if (std::ranges::find(*vmPorts, port.ContainerPort) == vmPorts->end())
             {
                 THROW_WIN32_IF_MSG(
                     ERROR_ALREADY_EXISTS, !vm.TryAllocatePort(port.ContainerPort), "Failed to allocate port: %u", options.Ports[i].ContainerPort);
 
-                vmPorts->push_back(port.ContainerPort);
+                vmPorts->insert(port.ContainerPort);
             }
+
             mappedPorts->push_back({port.HostPort, port.ContainerPort, port.ContainerPort, port.Family});
         }
     }
@@ -146,7 +151,6 @@ WSLAContainer::WSLAContainer(
 
 WSLAContainer::~WSLAContainer()
 {
-
     WSL_LOG(
         "~WSLAContainer",
         TraceLoggingValue(m_name.c_str(), "Name"),
@@ -165,10 +169,10 @@ WSLAContainer::~WSLAContainer()
     m_trackingReference.Reset();
 
     // Release port mappings.
-    std::vector<uint16_t> allocatedGuestPorts;
+    std::set<uint16_t> allocatedGuestPorts;
     for (const auto& e : m_mappedPorts)
     {
-        WI_VERIFY(e.MappedToHost);
+        WI_ASSERT(e.MappedToHost);
 
         LOG_IF_FAILED_MSG(
             m_parentVM->MapPort(e.Family, e.HostPort, e.VmPort, true),
@@ -177,7 +181,7 @@ WSLAContainer::~WSLAContainer()
             e.VmPort,
             e.HostPort);
 
-        allocatedGuestPorts.push_back(e.VmPort);
+        allocatedGuestPorts.insert(e.VmPort);
     }
 
     m_parentVM->ReleasePorts(allocatedGuestPorts);
