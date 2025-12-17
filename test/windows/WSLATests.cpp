@@ -1677,24 +1677,54 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        WSLAContainerLauncher launcher(
-            "python:3.12-alpine",
-            "test-ports",
-            {},
-            {"python3", "-m", "http.server"},
-            {"PYTHONUNBUFFERED=1"},
-            WSLA_CONTAINER_NETWORK_BRIDGE,
-            ProcessFlags::Stdout | ProcessFlags::Stderr);
+        // Test a simple port mapping.
+        {
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine",
+                "test-ports",
+                {},
+                {"python3", "-m", "http.server"},
+                {"PYTHONUNBUFFERED=1"},
+                WSLA_CONTAINER_NETWORK_BRIDGE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-        launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(1234, 8000, AF_INET6);
 
-        auto container = launcher.Launch(*session);
-        auto initProcess = container.GetInitProcess();
-        auto stdoutHandle = initProcess.GetStdHandle(1);
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+            auto stdoutHandle = initProcess.GetStdHandle(1);
 
-        // Wait for the container bind() to be completed.
-        WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            // Wait for the container bind() to be completed.
+            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-        ExpectHttpResponse(L"http://localhost:1234", 200);
+            ExpectHttpResponse(L"http://localhost:1234", 200);
+            ExpectHttpResponse(L"http://[::1]:1234", 200);
+        }
+
+        // Validate that two hosts ports can map to the same container port.
+        {
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine",
+                "test-ports",
+                {},
+                {"python3", "-m", "http.server"},
+                {"PYTHONUNBUFFERED=1"},
+                WSLA_CONTAINER_NETWORK_BRIDGE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(12345, 8000, AF_INET);
+
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+            auto stdoutHandle = initProcess.GetStdHandle(1);
+
+            // Wait for the container bind() to be completed.
+            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+
+            ExpectHttpResponse(L"http://localhost:1234", 200);
+            ExpectHttpResponse(L"http://localhost:1235", 200);
+        }
     }
 };
