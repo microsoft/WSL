@@ -503,7 +503,7 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
         id.pop_back();
     }
 
-    // N.B. mappedPorts is explicitely copied because it's referenced in errorCleanup, so it can't be moved.
+    // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
     auto container = wil::MakeOrThrow<WSLAContainer>(
         &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts));
 
