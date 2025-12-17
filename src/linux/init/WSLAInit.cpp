@@ -553,6 +553,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_PORT_RELA
     Channel.SendResultMessage<uint32_t>(SocketAddress.svm_port);
     Channel.Close();
     UtilSetThreadName("PortRelay");
+    LOG_ERROR("StartLocalHost");
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
