@@ -46,6 +46,7 @@ WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, 
 
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? WSLA_VIRTIO_FS_ADMIN_CLASS_ID : WSLA_VIRTIO_FS_CLASS_ID;
     m_crashDumpFolder = GetCrashDumpFolder();
 }
 
@@ -624,8 +625,7 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
         AttachedDisk disk{Path};
 
         auto grantDiskAccess = [&]() {
-            const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-            auto runAsUser = wil::impersonate_token(userToken.get());
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
             wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
             disk.AccessGranted = true;
         };
@@ -1100,9 +1100,8 @@ void WSLAVirtualMachine::LaunchPortRelay()
     wsl::windows::common::helpers::SetHandleInheritable(writePipe.get());
     wsl::windows::common::helpers::SetHandleInheritable(m_vmExitEvent.get());
 
-    // Get an impersonation token
-    auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    auto restrictedToken = wsl::windows::common::security::CreateRestrictedToken(userToken.get());
+    // Create a restricted token.
+    auto restrictedToken = wsl::windows::common::security::CreateRestrictedToken(m_userToken.get());
 
     auto path = wsl::windows::common::wslutil::GetBasePath() / L"wslrelay.exe";
 
@@ -1173,8 +1172,6 @@ try
 
     auto shareName = shared::string::GuidToString<wchar_t>(shareGuid, shared::string::None);
 
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-
     std::optional<GUID> instanceId;
     {
         // Create the share on the host.
@@ -1195,19 +1192,18 @@ try
                 WindowsPath,
                 LX_INIT_UTILITY_VM_PLAN9_PORT,
                 flags,
-                userToken.get());
+                m_userToken.get());
         }
         else
         {
-            const bool admin = wsl::windows::common::security::IsTokenElevated(userToken.get());
             instanceId = m_guestDeviceManager->AddGuestDevice(
                 VIRTIO_FS_DEVICE_ID,
-                admin ? WSLA_VIRTIO_FS_ADMIN_CLASS_ID : WSLA_VIRTIO_FS_CLASS_ID,
+                m_virtioFsClassId,
                 shareName.c_str(),
                 L"",
                 WindowsPath,
                 VIRTIO_FS_FLAGS_TYPE_FILES,
-                userToken.get());
+                m_userToken.get());
         }
 
         m_mountedWindowsFolders.emplace(LinuxPath, MountedFolderInfo{shareName, instanceId});
