@@ -1538,7 +1538,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     sessionSettings.BootTimeoutMs = 30 * 1000;
     sessionSettings.MaximumStorageSizeMb = 4096;
 
-    std::string shell = "/bin/sh";
+    std::string shell = "/bin/bash";
 
     std::string containerImage;
     bool help = false;
@@ -1631,18 +1631,13 @@ int WslaShell(_In_ std::wstring_view commandLine)
     Info.cbSize = sizeof(Info);
     THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
 
-    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
-    launcher.SetTtySize(Info.srWindow.Bottom - Info.srWindow.Top + 1, Info.srWindow.Right - Info.srWindow.Left + 1);
-
     if (containerImage.empty())
     {
-        wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell}, {"TERM=xterm-256color"}, ProcessFlags::None};
+        wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, ProcessFlags::None};
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+        launcher.SetTtySize(Info.srWindow.Bottom - Info.srWindow.Top + 1, Info.srWindow.Right - Info.srWindow.Left + 1);
 
         process = launcher.Launch(*session);
     }
@@ -1659,6 +1654,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
         containerOptions.Name = "test-container";
         containerOptions.InitProcessOptions.Fds = fds.data();
         containerOptions.InitProcessOptions.FdsCount = static_cast<DWORD>(fds.size());
+        containerOptions.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
+        containerOptions.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
 
         container.emplace();
         THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));

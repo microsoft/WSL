@@ -59,6 +59,20 @@ void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort
     m_ports.emplace_back(WSLA_PORT_MAPPING{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
 }
 
+void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
+{
+    // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
+    const auto& hostPath = m_hostPaths.emplace_back(HostPath);
+    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
+
+    WSLA_VOLUME vol{};
+    vol.HostPath = hostPath.c_str();
+    vol.ContainerPath = containerPath.c_str();
+    vol.ReadOnly = ReadOnly ? TRUE : FALSE;
+
+    m_volumes.push_back(vol);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
 {
     WSLA_CONTAINER_OPTIONS options{};
@@ -74,6 +88,9 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     {
         options.InitProcessOptions.Executable = nullptr;
     }
+
+    options.VolumesCount = static_cast<ULONG>(m_volumes.size());
+    options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;

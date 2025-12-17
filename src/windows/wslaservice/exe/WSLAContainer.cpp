@@ -16,6 +16,7 @@ Abstract:
 #include "WSLAContainer.h"
 #include "WSLAProcess.h"
 
+using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
@@ -108,9 +109,12 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
 
 } // namespace
 
+static constexpr DWORD deleteTimeout = 60000; // 60 seconds
+
+
 WSLAContainer::WSLAContainer(
-    WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<PortMapping>&& ports) :
-    m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id)), m_mappedPorts(std::move(ports))
+    WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<PortMapping>&& ports, std::vector<VolumeMountInfo>&& volumes) :
+    m_parentVM(parentVM), m_name(Options.Name), m_image(Options.Image), m_id(std::move(Id)), m_mappedPorts(std::move(ports)), m_mountedVolumes(std::move(volumes))
 {
     m_state = WslaContainerStateCreated;
 
@@ -119,6 +123,15 @@ WSLAContainer::WSLAContainer(
 
 WSLAContainer::~WSLAContainer()
 {
+    // TODO: Stop and delete running containers when the session is shutting down
+    // so that we don't leak resources since we do not have means to track them after
+    // restarting a session from a persisted storage.
+
+    if (m_state == WslaContainerStateExited)
+    {
+        LOG_IF_FAILED(Delete());
+    }
+
     m_trackingReference.Reset();
 
     std::vector<uint16_t> allocatedGuestPorts;
@@ -240,8 +253,10 @@ try
         m_state);
 
     ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "rm", "-f", m_name}, defaultNerdctlEnv);
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
+    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput(deleteTimeout);
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+
+    UnmountVolumes(m_mountedVolumes, *m_parentVM);
 
     m_state = WslaContainerStateDeleted;
     return S_OK;
@@ -366,6 +381,42 @@ void WSLAContainer::AddEnvironmentVariables(std::vector<std::string>& args, cons
     }
 }
 
+std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainer::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
+{
+    std::vector<VolumeMountInfo> mountedVolumes;
+    mountedVolumes.reserve(Options.VolumesCount);
+
+    for (ULONG i = 0; i < Options.VolumesCount; i++)
+    {
+        try
+        {
+            const WSLA_VOLUME& volume = Options.Volumes[i];
+            std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", Options.Name, i);
+
+            auto result = parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly);
+            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath, parentVMPath.c_str());
+
+            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, volume.ReadOnly});
+        }
+        catch (...)
+        {
+            // On failure, unmount all previously mounted volumes.
+            UnmountVolumes(mountedVolumes, parentVM);
+            throw;
+        }
+    }
+
+    return mountedVolumes;
+}
+
+void wsl::windows::service::wsla::WSLAContainer::UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM)
+{
+    for (const auto& volume : volumes)
+    {
+        LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()));
+    }
+}
+
 Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM, ContainerEventTracker& eventTracker)
 {
@@ -391,7 +442,8 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
     // TODO: Rethink command line generation logic.
     auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, inputOptions);
 
-    auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions));
+    auto volumes = MountVolumes(containerOptions, parentVM);
+    auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions), volumes);
 
     ServiceProcessLauncher launcher(nerdctlPath, args, defaultNerdctlEnv);
     auto result = launcher.Launch(parentVM).WaitAndCaptureOutput();
@@ -405,13 +457,14 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
         id.pop_back();
     }
 
-    auto container = wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker, std::move(mappedPorts));
+    auto container = wil::MakeOrThrow<WSLAContainer>(&parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::move(mappedPorts));
     errorCleanup.release();
 
     return container;
 }
 
-std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions)
+std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(
+    const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes)
 {
     std::vector<std::string> args{nerdctlPath};
     args.push_back("create");
@@ -462,8 +515,12 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(const WSLA_C
         args.push_back(options.InitProcessOptions.Executable);
     }
 
+    for (const auto& volume : volumes)
+    {
+        args.emplace_back(std::format("-v{}:{}{}", volume.ParentVMPath, volume.ContainerPath, volume.ReadOnly ? ":ro" : ""));
+    }
+
     // TODO:
-    // - Implement volume mounts
     // - Implement port mapping
 
     args.push_back(options.Image);
