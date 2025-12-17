@@ -34,7 +34,10 @@ constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
 
 // WSLA-specific virtio device class IDs.
+DEFINE_GUID(WSLA_VIRTIO_FS_ADMIN_CLASS_ID, 0x8F7C2A3B, 0xD9E4, 0x4C1F, 0xA2, 0xB8, 0x5E, 0x3D, 0x7C, 0x9F, 0x1A, 0x6E); // {8F7C2A3B-D9E4-4C1F-A2B8-5E3D7C9F1A6E}
+DEFINE_GUID(WSLA_VIRTIO_FS_CLASS_ID, 0x06ED032F, 0xC528, 0x41C1, 0xB7, 0x5D, 0x90, 0x5E, 0xEE, 0x82, 0x3B, 0xBA); // {06ED032F-C528-41C1-B75D-905EEE823BBA}
 DEFINE_GUID(WSLA_VIRTIO_NET_CLASS_ID, 0x7B3C9A42, 0x8E1F, 0x4D5A, 0x9F, 0x2E, 0xC4, 0xA7, 0xB8, 0xD3, 0xE6, 0xF1); // {7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}
+DEFINE_GUID(WSLA_VIRTIO_PMEM_CLASS_ID, 0xABB755FC, 0x1B86, 0x4255, 0x83, 0xE2, 0xE5, 0x78, 0x7A, 0xBC, 0xF6, 0xC2); // {ABB755FC-1B86-4255-83E2-E5787ABCF6C2}
 
 WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, PSID UserSid) :
     m_settings(std::move(Settings)), m_userSid(UserSid)
@@ -43,6 +46,7 @@ WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, 
 
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? WSLA_VIRTIO_FS_ADMIN_CLASS_ID : WSLA_VIRTIO_FS_CLASS_ID;
     m_crashDumpFolder = GetCrashDumpFolder();
 }
 
@@ -89,10 +93,7 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
 
     // Shutdown DeviceHostProxy before resetting compute system
-    if (m_guestDeviceManager)
-    {
-        m_guestDeviceManager->Shutdown();
-    }
+    m_guestDeviceManager.reset();
 
     m_computeSystem.reset();
 
@@ -306,8 +307,7 @@ void WSLAVirtualMachine::Start()
     WI_ASSERT(IsEqualGUID(m_vmId, runtimeId));
 
     // Initialize DeviceHostProxy for virtio device support.
-    // N.B. This is currently only needed for VirtioProxy networking mode but would also be needed for virtiofs.
-    if (m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy)
+    if (FeatureEnabled(WslaFeatureFlagsVirtioFs) || m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy)
     {
         m_guestDeviceManager = std::make_shared<GuestDeviceManager>(m_vmIdString, m_vmId);
     }
@@ -384,16 +384,22 @@ void WSLAVirtualMachine::ConfigureMounts()
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
+    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
 
     if (FeatureEnabled(WslaFeatureFlagsGPU)) // TODO: re-think how GPU settings should work at the session level API.
     {
-        MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers", WSLAMountFlagsNone);
+        MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
     }
 }
 
 bool WSLAVirtualMachine::FeatureEnabled(WSLAFeatureFlags Value) const
 {
     return static_cast<ULONG>(m_settings.FeatureFlags) & static_cast<ULONG>(Value);
+}
+
+const wil::unique_event& WSLAVirtualMachine::TerminatingEvent()
+{
+    return m_vmTerminatingEvent;
 }
 
 void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
@@ -619,8 +625,7 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
         AttachedDisk disk{Path};
 
         auto grantDiskAccess = [&]() {
-            const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-            auto runAsUser = wil::impersonate_token(userToken.get());
+            auto runAsUser = wil::impersonate_token(m_userToken.get());
             wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
             disk.AccessGranted = true;
         };
@@ -931,6 +936,7 @@ void WSLAVirtualMachine::Mount(LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR
 void WSLAVirtualMachine::Mount(shared::SocketChannel& Channel, LPCSTR Source, LPCSTR Target, LPCSTR Type, LPCSTR Options, ULONG Flags)
 {
     static_assert(WSLAMountFlagsNone == WSLA_MOUNT::None);
+    static_assert(WSLAMountFlagsReadOnly == WSLA_MOUNT::ReadOnly);
     static_assert(WSLAMountFlagsChroot == WSLA_MOUNT::Chroot);
     static_assert(WSLAMountFlagsWriteableOverlayFs == WSLA_MOUNT::OverlayFs);
 
@@ -1094,9 +1100,8 @@ void WSLAVirtualMachine::LaunchPortRelay()
     wsl::windows::common::helpers::SetHandleInheritable(writePipe.get());
     wsl::windows::common::helpers::SetHandleInheritable(m_vmExitEvent.get());
 
-    // Get an impersonation token
-    auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    auto restrictedToken = wsl::windows::common::security::CreateRestrictedToken(userToken.get());
+    // Create a restricted token.
+    auto restrictedToken = wsl::windows::common::security::CreateRestrictedToken(m_userToken.get());
 
     auto path = wsl::windows::common::wslutil::GetBasePath() / L"wslrelay.exe";
 
@@ -1151,67 +1156,116 @@ CATCH_RETURN();
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
 {
-    return MountWindowsFolderImpl(WindowsPath, LinuxPath, ReadOnly, WSLAMountFlagsNone);
+    return MountWindowsFolderImpl(WindowsPath, LinuxPath, ReadOnly ? WSLAMountFlagsReadOnly : WSLAMountFlagsNone);
 }
 
-HRESULT WSLAVirtualMachine::MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly, _In_ WSLAMountFlags Flags)
+HRESULT WSLAVirtualMachine::MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ WSLAMountFlags Flags)
 try
 {
-    std::filesystem::path Path(WindowsPath);
-    THROW_HR_IF_MSG(E_INVALIDARG, !Path.is_absolute(), "Path is not absolute: '%ls'", WindowsPath);
+    std::filesystem::path path(WindowsPath);
+    THROW_HR_IF_MSG(E_INVALIDARG, !path.is_absolute(), "Path is not absolute: '%ls'", WindowsPath);
     THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(Path), "Path is not a directory: '%ls'", WindowsPath);
+        HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(path), "Path is not a directory: '%ls'", WindowsPath);
 
     GUID shareGuid{};
     THROW_IF_FAILED(CoCreateGuid(&shareGuid));
 
     auto shareName = shared::string::GuidToString<wchar_t>(shareGuid, shared::string::None);
 
+    std::optional<GUID> instanceId;
     {
-        // Create the plan9 share on the host
+        // Create the share on the host.
         std::lock_guard lock(m_lock);
 
         // Verify that this folder isn't already mounted.
-        auto it = m_plan9Mounts.find(LinuxPath);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_plan9Mounts.end());
+        auto it = m_mountedWindowsFolders.find(LinuxPath);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
 
-        hcs::AddPlan9Share(
-            m_computeSystem.get(),
-            shareName.c_str(),
-            shareName.c_str(),
-            WindowsPath,
-            LX_INIT_UTILITY_VM_PLAN9_PORT,
-            hcs::Plan9ShareFlags::AllowOptions | (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None),
-            wsl::windows::common::security::GetUserToken(TokenImpersonation).get());
+        if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
+        {
+            auto flags = hcs::Plan9ShareFlags::AllowOptions;
+            WI_SetFlagIf(flags, hcs::Plan9ShareFlags::ReadOnly, WI_IsFlagSet(Flags, WSLAMountFlagsReadOnly));
+            hcs::AddPlan9Share(
+                m_computeSystem.get(),
+                shareName.c_str(),
+                shareName.c_str(),
+                WindowsPath,
+                LX_INIT_UTILITY_VM_PLAN9_PORT,
+                flags,
+                m_userToken.get());
+        }
+        else
+        {
+            instanceId = m_guestDeviceManager->AddGuestDevice(
+                VIRTIO_FS_DEVICE_ID,
+                m_virtioFsClassId,
+                shareName.c_str(),
+                L"",
+                WindowsPath,
+                VIRTIO_FS_FLAGS_TYPE_FILES,
+                m_userToken.get());
+        }
 
-        m_plan9Mounts.emplace(LinuxPath, shareName);
+        m_mountedWindowsFolders.emplace(LinuxPath, MountedFolderInfo{shareName, instanceId});
     }
 
     auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         std::lock_guard lock(m_lock);
-
-        LOG_HR_IF(E_UNEXPECTED, m_plan9Mounts.erase(LinuxPath) != 1);
+        auto mountIt = m_mountedWindowsFolders.find(LinuxPath);
+        if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
+        {
+            auto mountInfo = mountIt->second;
+            m_mountedWindowsFolders.erase(mountIt);
+            RemoveShare(mountInfo);
+        }
     });
 
     // Create the guest mount
-    auto [_, __, channel] = Fork(WSLA_FORK::Thread);
-
-    WSLA_CONNECT message;
-    message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
-
-    auto fd = channel.Transaction(message).Result;
-    THROW_HR_IF_MSG(E_FAIL, fd < 0, "WSLA_CONNECT failed with %i", fd);
-
     auto shareNameUtf8 = shared::string::WideToMultiByte(shareName);
-    auto mountOptions =
-        std::format("msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, fd, fd, shareNameUtf8);
+    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
+    {
+        auto [_, __, channel] = Fork(WSLA_FORK::Thread);
 
-    Mount(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags);
+        WSLA_CONNECT message;
+        message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
+
+        auto fd = channel.Transaction(message).Result;
+        THROW_HR_IF_MSG(E_FAIL, fd < 0, "WSLA_CONNECT failed with %i", fd);
+
+        auto mountOptions = std::format(
+            "{},msize={},trans=fd,rfdno={},wfdno={},aname={},cache=mmap",
+            WI_IsFlagSet(Flags, WSLAMountFlagsReadOnly) ? "ro" : "rw",
+            LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE,
+            fd,
+            fd,
+            shareNameUtf8);
+
+        Mount(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags);
+    }
+    else
+    {
+        std::string options = WI_IsFlagSet(Flags, WSLAMountFlagsReadOnly) ? "ro" : "rw";
+        Mount(m_initChannel, shareNameUtf8.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
+    }
 
     deleteOnFailure.release();
+
     return S_OK;
 }
 CATCH_RETURN();
+
+void WSLAVirtualMachine::RemoveShare(_In_ const MountedFolderInfo& MountInfo)
+{
+    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
+    {
+        WI_ASSERT(!MountInfo.InstanceId.has_value());
+        hcs::RemovePlan9Share(m_computeSystem.get(), MountInfo.ShareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
+    }
+    else if (WI_VERIFY(MountInfo.InstanceId.has_value()))
+    {
+        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, MountInfo.InstanceId.value());
+    }
+}
 
 HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 try
@@ -1219,23 +1273,24 @@ try
     std::lock_guard lock(m_lock);
 
     // Verify that this folder is mounted.
-    auto it = m_plan9Mounts.find(LinuxPath);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_plan9Mounts.end());
+    auto it = m_mountedWindowsFolders.find(LinuxPath);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_mountedWindowsFolders.end());
 
     // Unmount the folder from the guest. If the mount is not found, this most likely means that the guest unmounted it.
     auto result = Unmount(LinuxPath);
     THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
-    // Remove the share from the host
-    hcs::RemovePlan9Share(m_computeSystem.get(), it->second.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
+    auto mountInfo = it->second;
+    m_mountedWindowsFolders.erase(it);
 
-    m_plan9Mounts.erase(it);
+    // Remove the share from the host
+    RemoveShare(mountInfo);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint, _In_ DWORD Flags)
+void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !FeatureEnabled(WslaFeatureFlagsGPU));
 
@@ -1245,7 +1300,7 @@ void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
 
     // Mount drivers.
     THROW_IF_FAILED(MountWindowsFolderImpl(
-        std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, true, static_cast<WSLAMountFlags>(Flags)));
+        std::format(L"{}\\System32\\DriverStore\\FileRepository", windowsPath).c_str(), DriversMountpoint, WSLAMountFlagsReadOnly));
 
     // Mount the inbox libraries.
     auto inboxLibPath = std::format(L"{}\\System32\\lxss\\lib", windowsPath);
@@ -1253,7 +1308,7 @@ void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
     if (std::filesystem::is_directory(inboxLibPath))
     {
         inboxLibMountPoint = std::format("{}/inbox", LibrariesMountPoint);
-        THROW_IF_FAILED(MountWindowsFolder(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), true));
+        THROW_IF_FAILED(MountWindowsFolderImpl(inboxLibPath.c_str(), inboxLibMountPoint->c_str(), WSLAMountFlagsReadOnly));
     }
 
     // Mount the packaged libraries.
@@ -1269,7 +1324,7 @@ void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
 #endif
 
     auto packagedLibMountPoint = std::format("{}/packaged", LibrariesMountPoint);
-    THROW_IF_FAILED(MountWindowsFolder(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), true));
+    THROW_IF_FAILED(MountWindowsFolderImpl(packagedLibPath.c_str(), packagedLibMountPoint.c_str(), WSLAMountFlagsReadOnly));
 
     // Mount an overlay containing both inbox and packaged libraries (the packaged mount takes precedence).
     std::string options = "lowerdir=" + packagedLibMountPoint;
@@ -1278,7 +1333,7 @@ void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
         options += ":" + inboxLibMountPoint.value();
     }
 
-    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), Flags);
+    Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), 0);
 }
 
 std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder()

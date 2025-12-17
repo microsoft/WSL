@@ -124,7 +124,7 @@ struct WSLA_PROCESS_OPTIONS
 
 struct WSLA_VOLUME
 {
-    LPCSTR HostPath;
+    LPCWSTR HostPath;
     LPCSTR ContainerPath;
     BOOL ReadOnly;
 };
@@ -133,6 +133,20 @@ struct WSLA_PORT_MAPPING
 {
     USHORT HostPort;
     USHORT ContainerPort;
+};
+
+enum WSLA_CONTAINER_NETWORK_TYPE
+{
+    WSLA_CONTAINER_NETWORK_BRIDGE = 0,
+    WSLA_CONTAINER_NETWORK_HOST = 1,
+    WSLA_CONTAINER_NETWORK_NONE = 2,
+    // WSLA_CONTAINER_NETWORK_CUSTOM = 3 // TODO: Implement when implementing custom networks
+};
+struct WSLA_CONTAINER_NETWORK
+{
+    // TODO: Change default to bridge when implemented
+    enum WSLA_CONTAINER_NETWORK_TYPE ContainerNetworkType;
+    LPCSTR ContainerNetworkName;
 };
 
 enum WSLA_CONTAINER_FLAGS
@@ -154,6 +168,7 @@ struct WSLA_CONTAINER_OPTIONS
     // TODO: List specific GPU devices.
     // TODO: Flags on wether the caller wants to override entrypoint, args, or both.
     ULONGLONG ShmSize;
+    struct WSLA_CONTAINER_NETWORK ContainerNetwork;
 };
 
 enum WSLA_CONTAINER_STATE
@@ -227,10 +242,11 @@ typedef enum _WSLANetworkingMode
 
 typedef enum _WSLAFeatureFlags
 {
-    WslaFeatureFlagsNone = 0, 
-    WslaFeatureFlagsDnsTunneling = 1, 
-    WslaFeatureFlagsEarlyBootDmesg = 2, 
-    WslaFeatureFlagsGPU = 4, 
+    WslaFeatureFlagsNone = 0,
+    WslaFeatureFlagsDnsTunneling = 1,
+    WslaFeatureFlagsEarlyBootDmesg = 2,
+    WslaFeatureFlagsGPU = 4,
+    WslaFeatureFlagsVirtioFs = 8,
 } WSLAFeatureFlags;
 
 struct WSLA_SESSION_SETTINGS {
@@ -246,7 +262,7 @@ struct WSLA_SESSION_SETTINGS {
     ULONG DmesgOutput;
 
     // Below options are used for debugging purposes only.
-    [unique] LPCWSTR RootVhdOverride; 
+    [unique] LPCWSTR RootVhdOverride;
     [unique] LPCSTR RootVhdTypeOverride;
 };
 
@@ -258,7 +274,6 @@ struct WSLA_SESSION_SETTINGS {
 ]
 interface IWSLAContainer : IUnknown
 {
-    HRESULT Start();
     HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);

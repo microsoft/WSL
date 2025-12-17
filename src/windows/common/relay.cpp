@@ -18,6 +18,7 @@ Abstract:
 
 using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::IOHandleStatus;
+using wsl::windows::common::relay::LineBasedReadHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
@@ -936,7 +937,12 @@ void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle)
     m_handles.emplace_back(std::move(handle));
 }
 
-void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
+void MultiHandleWait::Cancel()
+{
+    m_cancel = true;
+}
+
+bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     std::optional<std::chrono::steady_clock::time_point> deadline;
 
@@ -947,7 +953,7 @@ void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 
     // Run until all handles are completed.
 
-    while (!m_handles.empty())
+    while (!m_handles.empty() && !m_cancel)
     {
         // Schedule IO on each handle until all are either pending, or completed.
         for (auto i = 0; i < m_handles.size(); i++)
@@ -997,6 +1003,8 @@ void MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             THROW_LAST_ERROR_MSG("Timeout: %lu, Count: %llu", waitTimeout, waitHandles.size());
         }
     }
+
+    return !m_cancel;
 }
 
 IOHandleStatus OverlappedIOHandle::GetState() const
@@ -1004,8 +1012,12 @@ IOHandleStatus OverlappedIOHandle::GetState() const
     return State;
 }
 
+EventHandle::EventHandle(HANDLE Handle, std::function<void()>&& OnSignalled) : Handle(Handle), OnSignalled(std::move(OnSignalled))
+{
+}
+
 EventHandle::EventHandle(wil::unique_event&& Handle, std::function<void()>&& OnSignalled) :
-    Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
+    OwnedHandle(std::move(Handle)), Handle(OwnedHandle.get()), OnSignalled(std::move(OnSignalled))
 {
 }
 
@@ -1022,7 +1034,7 @@ void EventHandle::Collect()
 
 HANDLE EventHandle::GetHandle() const
 {
-    return Handle.get();
+    return Handle;
 }
 
 ReadHandle::ReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
@@ -1110,6 +1122,38 @@ void ReadHandle::Collect()
 HANDLE ReadHandle::GetHandle() const
 {
     return Event.get();
+}
+
+LineBasedReadHandle::LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Line)>&& OnLine) :
+    ReadHandle(std::move(MovedHandle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnLine(OnLine)
+{
+}
+
+LineBasedReadHandle::~LineBasedReadHandle()
+{
+    // Call the callback with any pending data (in case of an incomplete line).
+    if (!PendingBuffer.empty())
+    {
+        OnLine(PendingBuffer);
+    }
+}
+
+void LineBasedReadHandle::OnRead(const gsl::span<char>& Buffer)
+{
+    auto begin = Buffer.begin();
+    auto end = std::ranges::find(Buffer, '\n');
+    while (end != Buffer.end())
+    {
+        PendingBuffer.insert(PendingBuffer.end(), begin, end);
+
+        OnLine(PendingBuffer);
+        PendingBuffer.clear();
+
+        begin = end + 1;
+        end = std::ranges::find(begin, Buffer.end(), '\n');
+    }
+
+    PendingBuffer.insert(PendingBuffer.end(), begin, end);
 }
 
 WriteHandle::WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer) :

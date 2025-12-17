@@ -14,7 +14,7 @@ class VirtioNetworking : public INetworkingEngine
 {
 public:
     VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, GUID classId, wil::shared_handle userToken);
-    ~VirtioNetworking() = default;
+    ~VirtioNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
     VirtioNetworking(const VirtioNetworking&) = delete;

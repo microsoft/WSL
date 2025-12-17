@@ -52,6 +52,8 @@ using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
+constexpr auto c_containerdStorage = "/var/lib/containerd";
+
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
 
     m_id(id), m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
@@ -69,24 +71,33 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
 
     ConfigureStorage(Settings);
 
-    // Launch the init script.
-    // TODO: Replace with something more robust once the final VHD is ready.
-    try
-    {
-        ServiceProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "/etc/lsw-init.sh"}};
-        auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
+    // Make sure that everything is destroyed correctly if an exception is thrown.
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        m_sessionTerminatingEvent.SetEvent();
 
-        THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "Init script failed: %hs", launcher.FormatResult(result).c_str());
-    }
-    catch (...)
-    {
-        // Ignore issues launching the init script with custom root VHD's, for convenience.
-        // TODO: Remove once the final VHD is ready.
-        if (Settings.RootVhdOverride == nullptr)
+        if (m_containerdThread.joinable())
         {
-            throw;
+            m_containerdThread.join();
         }
-    }
+    });
+
+    // Launch containerd
+    // TODO: Rework the daemon logic so we can have only one thread watching all daemons.
+    ServiceProcessLauncher launcher{
+        "/usr/bin/containerd",
+        {"/usr/bin/containerd"},
+        {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}},
+        common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
+    m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine.Get()));
+
+    // Wait for containerd to be ready before starting the event tracker.
+    // TODO: Configurable timeout.
+    THROW_WIN32_IF_MSG(ERROR_TIMEOUT, !m_containerdReadyEvent.wait(10 * 1000), "Timed out waiting for containerd to start");
+
+    // Start the event tracker.
+    m_eventTracker.emplace(*m_virtualMachine.Get());
+
+    errorCleanup.release();
 }
 
 WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings)
@@ -118,7 +129,7 @@ WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SE
 
 #endif
 
-        vmSettings.RootVhdType = "squashfs";
+        vmSettings.RootVhdType = "ext4";
     }
 
     if (Settings.DmesgOutput != 0)
@@ -135,9 +146,30 @@ WSLASession::~WSLASession()
 
     std::lock_guard lock{m_lock};
 
+    // Stop the event tracker
+    if (m_eventTracker.has_value())
+    {
+        m_eventTracker->Stop();
+    }
+
+    // This will delete all containers. Needs to be done before the VM is terminated.
+    m_containers.clear();
+
+    m_sessionTerminatingEvent.SetEvent();
+
+    // N.B. The containerd thread can only run if the VM is running.
+    if (m_containerdThread.joinable())
+    {
+        m_containerdThread.join();
+    }
+
     if (m_virtualMachine)
     {
+        // N.B. containerd has exited by this point, so unmounting the VHD is safe since no container can be running.
+
         m_virtualMachine->OnSessionTerminated();
+        LOG_IF_FAILED(m_virtualMachine->Unmount(c_containerdStorage));
+
         m_virtualMachine.Reset();
     }
 
@@ -152,7 +184,7 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
     if (Settings.StoragePath == nullptr)
     {
         // If no storage path is specified, use a tmpfs for convenience.
-        m_virtualMachine->Mount("", "/root", "tmpfs", "", 0);
+        m_virtualMachine->Mount("", c_containerdStorage, "tmpfs", "", 0);
         return;
     }
 
@@ -207,7 +239,7 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
     }
 
     // Mount the device to /root.
-    m_virtualMachine->Mount(diskDevice.c_str(), "/root", "ext4", "", 0);
+    m_virtualMachine->Mount(diskDevice.c_str(), c_containerdStorage, "ext4", "", 0);
 
     deleteVhdOnFailure.release();
 }
@@ -228,7 +260,69 @@ void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, siz
     wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
-HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+void WSLASession::OnContainerdLog(const gsl::span<char>& buffer)
+try
+{
+    if (buffer.empty())
+    {
+        return;
+    }
+
+    constexpr auto c_containerdReadyLogLine = "containerd successfully booted";
+
+    std::string entry = {buffer.begin(), buffer.end()};
+    WSL_LOG("ContainerdLog", TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
+
+    auto parsed = nlohmann::json::parse(entry);
+
+    if (!m_containerdReadyEvent.is_signaled())
+    {
+        auto it = parsed.find("msg");
+        if (it != parsed.end())
+        {
+            if (it->get<std::string>().starts_with(c_containerdReadyLogLine))
+            {
+                m_containerdReadyEvent.SetEvent();
+            }
+        }
+    }
+}
+CATCH_LOG();
+
+void WSLASession::MonitorContainerd(ServiceRunningProcess&& process)
+try
+{
+    windows::common::relay::MultiHandleWait io;
+
+    // Read stdout & stderr.
+    io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        process.GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }));
+
+    io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }));
+
+    // Exit if either the VM terminates or containerd exits.
+    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), [&]() { io.Cancel(); }));
+    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { io.Cancel(); }));
+
+    io.Run({});
+
+    if (!m_sessionTerminatingEvent.is_signaled())
+    {
+        // If containerd exited before the VM starts terminating, then it exited unexpectedly.
+        WSL_LOG("UnexpectedContainerdExit", TraceLoggingValue(m_displayName.c_str(), "SessionDisplayName"));
+    }
+    else
+    {
+        // Otherwise, the session is shutting down; terminate containerd before exiting.
+        process.Get().Signal(15); // SIGTERM
+
+        process.Wait(30 * 1000); // TODO: Configurable timeout.
+    }
+}
+CATCH_LOG();
+
+HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
@@ -305,6 +399,10 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
+    // Validate that Image and Name are not null.
+    RETURN_HR_IF(E_INVALIDARG, containerOptions->Image == nullptr);
+    RETURN_HR_IF(E_INVALIDARG, containerOptions->Name == nullptr);
+
     std::lock_guard lock{m_lock};
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -319,11 +417,14 @@ try
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     // TODO: Log entrance into the function.
-    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get());
+    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get(), *m_eventTracker);
 
     RETURN_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
-    m_containers.emplace(containerOptions->Name, std::move(container));
+    auto [newElement, inserted] = m_containers.emplace(containerOptions->Name, std::move(container));
+    WI_ASSERT(inserted);
+
+    newElement->second->Start(*containerOptions);
 
     return S_OK;
 }

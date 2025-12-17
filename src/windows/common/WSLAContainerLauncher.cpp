@@ -48,9 +48,24 @@ WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& EntryPoint,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
+    WSLA_CONTAINER_NETWORK_TYPE containerNetworkType,
     ProcessFlags Flags) :
-    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name)
+    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
 {
+}
+
+void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
+{
+    // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
+    const auto& hostPath = m_hostPaths.emplace_back(HostPath);
+    const auto& containerPath = m_containerPaths.emplace_back(ContainerPath);
+
+    WSLA_VOLUME vol{};
+    vol.HostPath = hostPath.c_str();
+    vol.ContainerPath = containerPath.c_str();
+    vol.ReadOnly = ReadOnly ? TRUE : FALSE;
+
+    m_volumes.push_back(vol);
 }
 
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
@@ -60,11 +75,15 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
     options.Name = m_name.c_str();
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
+    options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
 
     if (m_executable.empty())
     {
         options.InitProcessOptions.Executable = nullptr;
     }
+
+    options.VolumesCount = static_cast<ULONG>(m_volumes.size());
+    options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;

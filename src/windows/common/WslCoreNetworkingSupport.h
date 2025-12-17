@@ -457,6 +457,11 @@ std::vector<wsl::core::networking::CurrentInterfaceInformation> EnumerateConnect
 bool IsMetered(ABI::Windows::Networking::Connectivity::NetworkCostType cost) noexcept;
 
 /// <summary>
+/// Gets the minimum MTU across all connected network interfaces.
+/// </summary>
+std::optional<ULONG> GetMinimumConnectedInterfaceMtu() noexcept;
+
+/// <summary>
 /// This instance acts as an IP_ADAPTER_ADDRESS pointer.
 /// </summary>
 class AdapterAddresses;

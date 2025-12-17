@@ -17,8 +17,17 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
+#include "ContainerEventTracker.h"
 
 namespace wsl::windows::service::wsla {
+
+struct VolumeMountInfo
+{
+    std::wstring HostPath;
+    std::string ParentVMPath;
+    std::string ContainerPath;
+    BOOL ReadOnly;
+};
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>
@@ -26,9 +35,11 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 public:
     NON_COPYABLE(WSLAContainer);
 
-    WSLAContainer(WSLAVirtualMachine* parentVM, ServiceRunningProcess&& containerProcess, const char* name, const char* image);
+    WSLAContainer(WSLAVirtualMachine* parentVM, const WSLA_CONTAINER_OPTIONS& Options, std::string&& Id, ContainerEventTracker& tracker, std::vector<VolumeMountInfo>&& volumes);
+    ~WSLAContainer();
 
-    IFACEMETHOD(Start)() override;
+    void Start(const WSLA_CONTAINER_OPTIONS& Options);
+
     IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
@@ -38,18 +49,31 @@ public:
     const std::string& Image() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
-    static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
+    static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM, ContainerEventTracker& tracker);
 
 private:
+    void OnEvent(ContainerEvent event);
+    void WaitForContainerEvent();
+
     std::optional<std::string> GetNerdctlStatus();
 
-    ServiceRunningProcess m_containerProcess;
+    std::recursive_mutex m_lock;
+    wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
+    std::optional<ServiceRunningProcess> m_containerProcess;
     std::string m_name;
     std::string m_image;
+    std::string m_id;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
-    std::mutex m_lock;
+    ContainerEventTracker::ContainerTrackingReference m_trackingReference;
+    std::vector<VolumeMountInfo> m_mountedVolumes;
 
-    static std::vector<std::string> PrepareNerdctlRunCommand(const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions);
+    static std::vector<std::string> PrepareNerdctlCreateCommand(
+        const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes);
+    static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);
+    static void AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options);
+
+    static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
+    static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
 };
 } // namespace wsl::windows::service::wsla

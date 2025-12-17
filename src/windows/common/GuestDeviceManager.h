@@ -22,6 +22,7 @@ class GuestDeviceManager
 {
 public:
     GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId);
+    ~GuestDeviceManager();
 
     _Requires_lock_not_held_(m_lock)
     GUID AddGuestDevice(
@@ -33,6 +34,7 @@ public:
         _In_ UINT32 Flags,
         _In_ HANDLE UserToken);
 
+    _Requires_lock_not_held_(m_lock)
     GUID AddNewDevice(_In_ const GUID& deviceId, _In_ const wil::com_ptr<IPlan9FileSystem>& server, _In_ PCWSTR tag);
 
     void AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server);
@@ -41,7 +43,8 @@ public:
 
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag);
 
-    void Shutdown();
+    _Requires_lock_not_held_(m_lock)
+    void RemoveGuestDevice(_In_ const GUID& DeviceId, _In_ const GUID& InstanceId);
 
 private:
     _Requires_lock_held_(m_lock)
