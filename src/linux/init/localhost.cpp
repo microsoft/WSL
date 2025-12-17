@@ -250,8 +250,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
         wil::unique_fd relaySocket{UtilAcceptVsock(listenSocket, hvSocketAddress)};
         THROW_LAST_ERROR_IF(!relaySocket);
 
-        LOG_ERROR("Accepted socket in relay");
-
         std::thread([relaySocket = std::move(relaySocket)]() {
             try
             {
@@ -262,8 +260,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                 {
                     return;
                 }
-
-                LOG_ERROR("Read message socket in relay");
 
                 auto* message = gslhelpers::try_get_struct<LX_INIT_START_SOCKET_RELAY>(gsl::make_span(buffer.data(), bytesRead));
                 THROW_ERRNO_IF(EINVAL, !message || (message->Header.MessageType != LxInitMessageStartSocketRelay));
@@ -301,15 +297,10 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                 wil::unique_fd tcpSocket{socket(socketAddress->sa_family, SOCK_STREAM, IPPROTO_TCP)};
                 THROW_LAST_ERROR_IF(!tcpSocket);
 
-                LOG_ERROR("pre connect socket in relay, port: {}", message->Port);
-
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
-                    LOG_ERROR("Connect failed: {}", errno);
                     return;
                 }
-
-                LOG_ERROR("post connect socket in relay");
 
                 // Resize the buffer to be the requested size.
                 buffer.resize(message->BufferSize);
@@ -322,8 +313,6 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                 {
                     if ((pollDescriptors[0].fd == -1) || (pollDescriptors[1].fd == -1))
                     {
-                        LOG_ERROR("exit socket in relay");
-
                         return;
                     }
 
@@ -342,14 +331,10 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                             }
                             else if (bytesRead < 0)
                             {
-                                LOG_ERROR("exit socket in relay");
-
                                 return;
                             }
                             else if (UtilWriteBuffer(outFd[Index], buffer.data(), bytesRead) < 0)
                             {
-                                LOG_ERROR("exit socket in relay");
-
                                 return;
                             }
                         }
