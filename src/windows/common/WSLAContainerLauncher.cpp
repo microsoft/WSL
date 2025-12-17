@@ -27,6 +27,11 @@ IWSLAContainer& RunningWSLAContainer::Get()
     return *m_container;
 }
 
+void RunningWSLAContainer::Reset()
+{
+    m_container.reset();
+}
+
 WSLA_CONTAINER_STATE RunningWSLAContainer::State()
 {
     WSLA_CONTAINER_STATE state{};

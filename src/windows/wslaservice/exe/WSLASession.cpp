@@ -123,6 +123,7 @@ WSLASession::~WSLASession()
     }
 
     // This will delete all containers. Needs to be done before the VM is terminated.
+    // TODO: If callers still have references to containers, the instances won't actually be deleted.
     m_containers.clear();
 
     m_sessionTerminatingEvent.SetEvent();

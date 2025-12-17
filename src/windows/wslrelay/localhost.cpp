@@ -518,7 +518,7 @@ std::optional<WSLA_MAP_PORT> ReceiveServiceMessage()
 
 void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint32_t RelayPort, HANDLE ExitEvent)
 {
-    std::map<std::tuple<uint16_t, uint16_t, uint32_t>, std::shared_ptr<PortRelay>> ports;
+    std::map<std::tuple<uint16_t, uint32_t>, std::shared_ptr<PortRelay>> ports;
 
     std::thread acceptThread;
     wil::unique_event acceptThreadEvent{wil::EventOptions::ManualReset};
@@ -544,7 +544,7 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
             return;
         }
 
-        std::tuple<uint16_t, uint16_t, uint16_t> key{message->WindowsPort, message->LinuxPort, message->AddressFamily};
+        std::tuple<uint16_t, uint16_t> key{message->WindowsPort, message->AddressFamily};
 
         HRESULT result = E_UNEXPECTED;
         auto sendResponse = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -583,8 +583,16 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
             }
             else
             {
-                ports.emplace(key, CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily));
-                update = true;
+                try
+                {
+                    ports.emplace(key, CreatePortListener(message->WindowsPort, message->LinuxPort, RelayPort, message->AddressFamily));
+                    update = true;
+                }
+                catch (...)
+                {
+                    result = wil::ResultFromCaughtException();
+                    continue;
+                }
             }
         }
 

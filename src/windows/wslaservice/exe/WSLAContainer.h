@@ -39,6 +39,7 @@ public:
         uint16_t VmPort;
         uint16_t ContainerPort;
         int Family;
+        bool MappedToHost = false;
     };
 
     NON_COPYABLE(WSLAContainer);

@@ -1964,6 +1964,8 @@ Return Value:
 --*/
 
 {
+    wsl::windows::common::wslutil::InitializeWil();
+
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG
     wil::g_fResultFailFastUnknownExceptions = false;

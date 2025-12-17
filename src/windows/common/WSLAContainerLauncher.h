@@ -27,6 +27,7 @@ public:
 
     WSLA_CONTAINER_STATE State();
     ClientRunningWSLAProcess GetInitProcess();
+    void Reset();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;

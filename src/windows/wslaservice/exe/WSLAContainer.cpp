@@ -52,12 +52,15 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
 
         for (const auto& e : mappedPorts)
         {
-            LOG_IF_FAILED_MSG(
-                vm.MapPort(e.Family, e.VmPort, e.HostPort, true),
-                "Failed to unmap port (family=%i, guestPort=%us, hostPort=%us)",
-                e.Family,
-                e.VmPort,
-                e.HostPort);
+            if (e.MappedToHost)
+            {
+                LOG_IF_FAILED_MSG(
+                    vm.MapPort(e.Family, e.VmPort, e.HostPort, true),
+                    "Failed to unmap port (family=%i, guestPort=%us, hostPort=%us)",
+                    e.Family,
+                    e.VmPort,
+                    e.HostPort);
+            }
         }
     });
 
@@ -97,9 +100,11 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     }
 
     // Map Windows <-> VM ports.
-    for (const auto& e : mappedPorts)
+    for (auto& e : mappedPorts)
     {
         THROW_IF_FAILED(vm.MapPort(e.Family, e.HostPort, e.VmPort, false));
+        e.MappedToHost = true;
+
         args.push_back("-p");
         args.push_back(std::format("{}{}:{}", e.Family == AF_INET6 ? "[::]:" : "", e.VmPort, e.ContainerPort));
     }
@@ -132,6 +137,13 @@ WSLAContainer::WSLAContainer(
 
 WSLAContainer::~WSLAContainer()
 {
+
+    WSL_LOG(
+        "~WSLAContainer",
+        TraceLoggingValue(m_name.c_str(), "Name"),
+        TraceLoggingValue(m_id.c_str(), "Id"),
+        TraceLoggingValue((int)m_state, "State"));
+
     // TODO: Stop and delete running containers when the session is shutting down
     // so that we don't leak resources since we do not have means to track them after
     // restarting a session from a persisted storage.
@@ -143,7 +155,23 @@ WSLAContainer::~WSLAContainer()
 
     m_trackingReference.Reset();
 
+    // Release port mappings.
     std::vector<uint16_t> allocatedGuestPorts;
+    for (const auto& e : m_mappedPorts)
+    {
+        WI_VERIFY(e.MappedToHost);
+
+        LOG_IF_FAILED_MSG(
+            m_parentVM->MapPort(e.Family, e.HostPort, e.VmPort, true),
+            "Failed to delete port mapping (family=%i, guestPort=%us, hostPort=%us)",
+            e.Family,
+            e.VmPort,
+            e.HostPort);
+
+        allocatedGuestPorts.push_back(e.VmPort);
+    }
+
+    m_parentVM->ReleasePorts(allocatedGuestPorts);
 }
 
 const std::string& WSLAContainer::Image() const noexcept

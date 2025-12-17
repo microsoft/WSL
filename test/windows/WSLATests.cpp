@@ -1664,16 +1664,35 @@ class WSLATests
         filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
 
         const winrt::Windows::Web::Http::HttpClient client(filter);
-        auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url));
-        auto content = response.get().Content().ReadAsStringAsync().get();
 
-        if (expectedCode.has_value())
+        try
         {
-            VERIFY_ARE_EQUAL(static_cast<int>(response.get().StatusCode()), expectedCode.value());
+            auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
+            auto content = response.Content().ReadAsStringAsync().get();
+
+            if (expectedCode.has_value())
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
+            }
+            else
+            {
+                LogError("Unexpected reply for: %ls", Url);
+                VERIFY_FAIL();
+            }
         }
-        else
+        catch (...)
         {
-            // Validate that port isn't bound.
+            auto result = wil::ResultFromCaughtException();
+
+            if (!expectedCode.has_value())
+            {
+                // We currently reset the connection if connect() fails inside the VM. Consider failing the Windows connect() instead.
+                VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
+            }
+            else
+            {
+                LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
+            }
         }
     }
 
@@ -1706,15 +1725,56 @@ class WSLATests
             WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
-            system("pause");
-            ExpectHttpResponse(L"http://[::1]:1234", 200);
+            ExpectHttpResponse(L"http://[::1]:1234", {});
+
+            // Validate that the port cannot be reused while the container is running.
+            WSLAContainerLauncher subLauncher(
+                "python:3.12-alpine",
+                "test-ports-2",
+                {},
+                {"python3", "-m", "http.server"},
+                {"PYTHONUNBUFFERED=1"},
+                WSLA_CONTAINER_NETWORK_BRIDGE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            subLauncher.AddPort(1234, 8000, AF_INET);
+            auto [hresult, newContainer] = subLauncher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+            VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            container.Reset(); // TODO: Re-think container lifetime management.
+
+            // Validate that the port can be reused now that the container is stopped.
+            {
+                WSLAContainerLauncher launcher(
+                    "python:3.12-alpine",
+                    "test-ports-3",
+                    {},
+                    {"python3", "-m", "http.server"},
+                    {"PYTHONUNBUFFERED=1"},
+                    WSLA_CONTAINER_NETWORK_BRIDGE,
+                    ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+                launcher.AddPort(1234, 8000, AF_INET);
+
+                auto container = launcher.Launch(*session);
+                auto initProcess = container.GetInitProcess();
+                auto stdoutHandle = initProcess.GetStdHandle(1);
+
+                // Wait for the container bind() to be completed.
+                WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+
+                ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
+            }
         }
 
-        // Validate that two hosts ports can map to the same container port.
+        // Validate that the same host port can't be bound twice in the same Create() call.
         {
             WSLAContainerLauncher launcher(
                 "python:3.12-alpine",
-                "test-ports",
+                "test-ports-fail",
                 {},
                 {"python3", "-m", "http.server"},
                 {"PYTHONUNBUFFERED=1"},
@@ -1722,18 +1782,61 @@ class WSLATests
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             launcher.AddPort(1234, 8000, AF_INET);
-            launcher.AddPort(12345, 8000, AF_INET);
+            launcher.AddPort(1234, 8000, AF_INET);
+
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
+        // Validate that Create() fails if the port is already bound.
+
+        {
+            wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, 0));
+            sockaddr_in address{};
+            address.sin_family = AF_INET;
+            address.sin_port = htons(1235);
+            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            VERIFY_ARE_NOT_EQUAL(bind(socket.get(), (sockaddr*)&address, sizeof(address)), SOCKET_ERROR);
+
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine",
+                "test-ports-fail",
+                {},
+                {"python3", "-m", "http.server"},
+                {"PYTHONUNBUFFERED=1"},
+                WSLA_CONTAINER_NETWORK_BRIDGE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            launcher.AddPort(1235, 8000, AF_INET);
+
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(WSAEACCES));
+        }
+
+        // TODO: Uncomment once ipv6 port mapping is supported.
+        // Validate ipv6 port mapping
+        /*{
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine",
+                "test-ports-ipv6",
+                {},
+                {"python3", "-m", "http.server", "--bind", "::1"},
+                {"PYTHONUNBUFFERED=1"},
+                WSLA_CONTAINER_NETWORK_BRIDGE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(1234, 8000, AF_INET6);
 
             auto container = launcher.Launch(*session);
             auto initProcess = container.GetInitProcess();
             auto stdoutHandle = initProcess.GetStdHandle(1);
 
             // Wait for the container bind() to be completed.
-            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+            WaitForOutput(stdoutHandle.get(), "Serving HTTP on ::1 port 8000");
 
-            ExpectHttpResponse(L"http://localhost:1234", 200);
-            ExpectHttpResponse(L"http://localhost:1235", 200);
-        }
+            ExpectHttpResponse(L"http://localhost:1234", {});
+            system("pause");
+            ExpectHttpResponse(L"http://[::1]:1234", 200);
+        }*/
     }
 
     void ValidateContainerVolumes(bool enableVirtioFs)
