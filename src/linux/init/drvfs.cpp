@@ -255,8 +255,15 @@ try
 
     if (ExitCode)
     {
-        LOG_STDERR(errno);
-        *ExitCode = Result < 0 ? c_exitCodeMountFail : 0;
+        if (Result < 0)
+        {
+            LOG_STDERR(errno);
+            *ExitCode = c_exitCodeMountFail;
+        }
+        else
+        {
+            *ExitCode = 0;
+        }
     }
 
     return Result;
