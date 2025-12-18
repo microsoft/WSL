@@ -22,29 +22,6 @@ Abstract:
 namespace {
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
 
-HRESULT TransferFileContent(HANDLE from, HANDLE to)
-{
-    const DWORD FILE_BUFFER_SIZE = 4 * 1024 * 1024; // 4MB buffer
-    std::vector<char> buffer;
-    buffer.resize(FILE_BUFFER_SIZE);
-    DWORD bytesRead = 0;
-    DWORD bytesWritten = 0;
-
-    do
-    {
-        RETURN_LAST_ERROR_IF(!ReadFile(from, buffer.data(), FILE_BUFFER_SIZE, &bytesRead, nullptr));
-
-        if (bytesRead == 0)
-        {
-            break;
-        }
-
-        RETURN_LAST_ERROR_IF(!WriteFile(to, buffer.data(), bytesRead, &bytesWritten, nullptr) || bytesRead != bytesWritten);
-
-    } while (bytesWritten > 0);
-
-    return S_OK;
-}
 } // namespace
 
 using namespace wsl::windows::common;
@@ -351,7 +328,8 @@ try
     auto loadProcess = launcher.Launch(*m_virtualMachine.Get());
 
     auto loadProcessStdin = loadProcess.GetStdHandle(0);
-    RETURN_IF_FAILED(TransferFileContent(imageFileHandle, loadProcessStdin.get()));
+    wsl::windows::common::relay::InterruptableRelay(
+        imageFileHandle, loadProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
     loadProcessStdin.reset();
 
     auto result = loadProcess.WaitAndCaptureOutput();
@@ -374,7 +352,8 @@ try
     auto importProcess = launcher.Launch(*m_virtualMachine.Get());
 
     auto importProcessStdin = importProcess.GetStdHandle(0);
-    RETURN_IF_FAILED(TransferFileContent(imageFileHandle, importProcessStdin.get()));
+    wsl::windows::common::relay::InterruptableRelay(
+        imageFileHandle, importProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
     importProcessStdin.reset();
 
     auto result = importProcess.WaitAndCaptureOutput();
