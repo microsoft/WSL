@@ -19,34 +19,33 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
-namespace
+namespace {
+constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
+
+HRESULT TransferFileContent(HANDLE from, HANDLE to)
 {
-    constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
+    const DWORD FILE_BUFFER_SIZE = 4 * 1024 * 1024; // 4MB buffer
+    std::vector<char> buffer;
+    buffer.resize(FILE_BUFFER_SIZE);
+    DWORD bytesRead = 0;
+    DWORD bytesWritten = 0;
 
-    HRESULT TransferFileContent(HANDLE from, HANDLE to)
+    do
     {
-        const DWORD FILE_BUFFER_SIZE = 4 * 1024 * 1024; // 4MB buffer
-        std::vector<char> buffer;
-        buffer.resize(FILE_BUFFER_SIZE);
-        DWORD bytesRead = 0;
-        DWORD bytesWritten = 0;
+        RETURN_LAST_ERROR_IF(!ReadFile(from, buffer.data(), FILE_BUFFER_SIZE, &bytesRead, nullptr));
 
-        do
+        if (bytesRead == 0)
         {
-            RETURN_LAST_ERROR_IF(!ReadFile(from, buffer.data(), FILE_BUFFER_SIZE, &bytesRead, nullptr));
+            break;
+        }
 
-            if (bytesRead == 0)
-            {
-                break;
-            }
+        RETURN_LAST_ERROR_IF(!WriteFile(to, buffer.data(), bytesRead, &bytesWritten, nullptr) || bytesRead != bytesWritten);
 
-            RETURN_LAST_ERROR_IF(!WriteFile(to, buffer.data(), bytesRead, &bytesWritten, nullptr) || bytesRead != bytesWritten);
+    } while (bytesWritten > 0);
 
-        } while (bytesWritten > 0);
-
-        return S_OK;
-    }
+    return S_OK;
 }
+} // namespace
 
 using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
@@ -341,13 +340,14 @@ CATCH_RETURN();
 HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback)
 try
 {
-    HANDLE imageFileHandle = ULongToHandle(ImageHandle);
+    HANDLE imageFileHandle = wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle));
     RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle);
 
     // Directly invoking "nerdctl load" will immediately return with failure
     // "stdin is empty and input flag is not specified".
     // TODO: Change the workaround when nerdctl has a fix.
-    ServiceProcessLauncher launcher{"/bin/sh", {"/bin/sh", "-c", "cat | /usr/bin/nerdctl load"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
+    ServiceProcessLauncher launcher{
+        "/bin/sh", {"/bin/sh", "-c", "cat | /usr/bin/nerdctl load"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
     auto loadProcess = launcher.Launch(*m_virtualMachine.Get());
 
     auto loadProcessStdin = loadProcess.GetStdHandle(0);
@@ -365,11 +365,12 @@ CATCH_RETURN();
 HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback)
 try
 {
-    HANDLE imageFileHandle = ULongToHandle(ImageHandle);
+    HANDLE imageFileHandle = wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle));
     RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle);
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
 
-    ServiceProcessLauncher launcher{nerdctlPath, {nerdctlPath, "import", "-", ImageName}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
+    ServiceProcessLauncher launcher{
+        nerdctlPath, {nerdctlPath, "import", "-", ImageName}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
     auto importProcess = launcher.Launch(*m_virtualMachine.Get());
 
     auto importProcessStdin = importProcess.GetStdHandle(0);
