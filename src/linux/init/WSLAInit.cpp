@@ -888,7 +888,7 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     //
 
     if (WriteToFile(
-            "/proc/sys/net/ipv4/ip_local_port_range", std::format("{} {}", c_ephmeralPortRange.first, c_ephmeralPortRange.second).c_str()) < 0)
+            "/proc/sys/net/ipv4/ip_local_port_range", std::format("{} {}", c_ephemeralPortRange.first, c_ephemeralPortRange.second).c_str()) < 0)
     {
         return -1;
     }
