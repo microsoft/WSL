@@ -331,7 +331,6 @@ struct PortRelay
     uint32_t LinuxPort;
     uint32_t RelayPort;
     wil::unique_event AcceptEvent{wil::EventOptions::None};
-    wil::unique_event StopRelayEvent{wil::EventOptions::None};
     OVERLAPPED Overlapped{};
     bool Pending = false;
     wil::unique_socket PendingSocket;
@@ -345,8 +344,6 @@ struct PortRelay
 
     ~PortRelay()
     {
-        StopRelayEvent.SetEvent();
-
         if (Pending) // Cancel pending accept(), if any.
         {
             DWORD bytesProcessed;

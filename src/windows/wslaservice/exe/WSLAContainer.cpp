@@ -59,7 +59,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
             if (e.MappedToHost)
             {
                 LOG_IF_FAILED_MSG(
-                    vm.MapPort(e.Family, e.VmPort, e.HostPort, true),
+                    vm.MapPort(e.Family, e.HostPort, e.VmPort, true),
                     "Failed to unmap port (family=%i, guestPort=%u, hostPort=%u)",
                     e.Family,
                     e.VmPort,

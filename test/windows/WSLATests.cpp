@@ -1764,21 +1764,38 @@ class WSLATests
             VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
         }
 
-        // Validate that Create() fails if the port is already bound.
-        {
+        auto bindSocket = [](auto port) {
             wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, 0));
             sockaddr_in address{};
             address.sin_family = AF_INET;
-            address.sin_port = htons(1235);
+            address.sin_port = htons(port);
             address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
             VERIFY_ARE_NOT_EQUAL(bind(socket.get(), (sockaddr*)&address, sizeof(address)), SOCKET_ERROR);
+            return socket;
+        };
 
+        // Validate that Create() fails if the port is already bound.
+        {
+            auto boundSocket = bindSocket(1235);
             WSLAContainerLauncher launcher(
                 "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
 
             launcher.AddPort(1235, 8000, AF_INET);
-
             VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(WSAEACCES));
+
+            // Validate that Create() correctly cleans up bound ports after a port fails to map
+            {
+                WSLAContainerLauncher launcher(
+                    "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+                launcher.AddPort(1236, 8000, AF_INET); // Should succeed
+                launcher.AddPort(1235, 8000, AF_INET); // Should fail.
+
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(WSAEACCES));
+
+                // Validate that port 1234 is still available.
+                VERIFY_IS_TRUE(!!bindSocket(1236));
+
+            }
         }
 
         // TODO: Uncomment once ipv6 port mapping is supported.
