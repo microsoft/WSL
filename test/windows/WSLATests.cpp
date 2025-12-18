@@ -595,6 +595,35 @@ class WSLATests
         }
     }
 
+    void WaitForOutput(HANDLE Handle, const char* Content)
+    {
+        std::string output;
+        DWORD index = 0;
+        while (true) // TODO: timeout
+        {
+            constexpr auto bufferSize = 100;
+            output.resize(output.size() + bufferSize);
+            DWORD bytesRead = 0;
+            if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
+            {
+                LogError("ReadFile failed with %lu", GetLastError());
+                VERIFY_FAIL();
+            }
+            output.resize(index + bytesRead);
+            if (bytesRead == 0)
+            {
+                LogError("Process exited, output: %hs", output.c_str());
+                VERIFY_FAIL();
+            }
+
+            index += bytesRead;
+            if (output.find(Content) != std::string::npos)
+            {
+                break;
+            }
+        }
+    }
+
     TEST_METHOD(NATPortMapping)
     {
         WSL2_TEST_ONLY();
@@ -613,41 +642,10 @@ class WSLATests
         wil::com_ptr<IWSLAVirtualMachine> vm;
         VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
 
-        auto waitForOutput = [](HANDLE Handle, const char* Content) {
-            std::string output;
-            DWORD index = 0;
-            while (true) // TODO: timeout
-            {
-                constexpr auto bufferSize = 100;
-
-                output.resize(output.size() + bufferSize);
-                DWORD bytesRead = 0;
-                if (!ReadFile(Handle, &output[index], bufferSize, &bytesRead, nullptr))
-                {
-                    LogError("ReadFile failed with %lu", GetLastError());
-                    VERIFY_FAIL();
-                }
-
-                output.resize(index + bytesRead);
-
-                if (bytesRead == 0)
-                {
-                    LogError("Process exited, output: %hs", output.c_str());
-                    VERIFY_FAIL();
-                }
-
-                index += bytesRead;
-                if (output.find(Content) != std::string::npos)
-                {
-                    break;
-                }
-            }
-        };
-
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
             auto process = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", cmd}).Launch(*session);
-            waitForOutput(process.GetStdHandle(2).get(), "listening on");
+            WaitForOutput(process.GetStdHandle(2).get(), "listening on");
 
             return process;
         };
@@ -727,7 +725,7 @@ class WSLATests
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
                 .Launch(*session);
 
-        waitForOutput(process.GetStdHandle(2).get(), "listening on");
+        WaitForOutput(process.GetStdHandle(2).get(), "listening on");
 
         for (auto i = 0; i < 100; i++)
         {
@@ -1377,7 +1375,7 @@ class WSLATests
                 "debian:latest",
                 "test-unique-name",
                 "sleep",
-                {"sleep", "99999"},
+                {"99999"},
                 {},
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
@@ -1396,9 +1394,6 @@ class WSLATests
             // Kill the container.
             auto initProcess = container.GetInitProcess();
             initProcess.Get().Signal(9);
-
-            auto r = initProcess.WaitAndCaptureOutput();
-            LogInfo("Output: %hs|%hs", r.Output[1].c_str(), r.Output[2].c_str());
 
             // Wait for the process to actually exit.
             wsl::shared::retry::RetryWithTimeout<void>(
@@ -1449,22 +1444,8 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto storagePath = std::filesystem::current_path() / "test-storage";
-
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            std::error_code error;
-
-            std::filesystem::remove_all(storagePath, error);
-            if (error)
-            {
-                LogError("Failed to cleanup storage path %ws: %hs", storagePath.c_str(), error.message().c_str());
-            }
-        });
-
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = WSLANetworkingModeNAT;
-        settings.StoragePath = storagePath.c_str();
-        settings.MaximumStorageSizeMb = 1024;
 
         auto session = CreateSession(settings);
 
@@ -1672,6 +1653,181 @@ class WSLATests
 
             // TODO: Implement proper handling of executables that don't exist in the container.
         }
+    }
+
+    void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
+    {
+        const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;
+        filter.CacheControl().WriteBehavior(winrt::Windows::Web::Http::Filters::HttpCacheWriteBehavior::NoCache);
+
+        const winrt::Windows::Web::Http::HttpClient client(filter);
+
+        try
+        {
+            auto response = client.GetAsync(winrt::Windows::Foundation::Uri(Url)).get();
+            auto content = response.Content().ReadAsStringAsync().get();
+
+            if (expectedCode.has_value())
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(response.StatusCode()), expectedCode.value());
+            }
+            else
+            {
+                LogError("Unexpected reply for: %ls", Url);
+                VERIFY_FAIL();
+            }
+        }
+        catch (...)
+        {
+            auto result = wil::ResultFromCaughtException();
+
+            if (!expectedCode.has_value())
+            {
+                // We currently reset the connection if connect() fails inside the VM. Consider failing the Windows connect() instead.
+                VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(WININET_E_INVALID_SERVER_RESPONSE));
+            }
+            else
+            {
+                LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
+            }
+        }
+    }
+
+    void RunPortMappingsTest(WSLA_CONTAINER_NETWORK_TYPE Mode)
+    {
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+
+        auto session = CreateSession(settings);
+
+        // Test a simple port mapping.
+        {
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine", "test-ports", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+
+            launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(1234, 8000, AF_INET6);
+
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+            auto stdoutHandle = initProcess.GetStdHandle(1);
+
+            // Wait for the container bind() to be completed.
+            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+
+            ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
+            ExpectHttpResponse(L"http://[::1]:1234", {});
+
+            // Validate that the port cannot be reused while the container is running.
+            WSLAContainerLauncher subLauncher(
+                "python:3.12-alpine", "test-ports-2", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+
+            subLauncher.AddPort(1234, 8000, AF_INET);
+            auto [hresult, newContainer] = subLauncher.LaunchNoThrow(*session);
+            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+            VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete());
+
+            container.Reset(); // TODO: Re-think container lifetime management.
+
+            // Validate that the port can be reused now that the container is stopped.
+            {
+                WSLAContainerLauncher launcher(
+                    "python:3.12-alpine", "test-ports-3", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+
+                launcher.AddPort(1234, 8000, AF_INET);
+
+                auto container = launcher.Launch(*session);
+                auto initProcess = container.GetInitProcess();
+                auto stdoutHandle = initProcess.GetStdHandle(1);
+
+                // Wait for the container bind() to be completed.
+                WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+
+                ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
+
+                VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+                VERIFY_SUCCEEDED(container.Get().Delete());
+                container.Reset(); // TODO: Re-think container lifetime management.
+            }
+        }
+
+        // Validate that the same host port can't be bound twice in the same Create() call.
+        {
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+
+            launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(1234, 8000, AF_INET);
+
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
+        // Validate that Create() fails if the port is already bound.
+        {
+            wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, 0));
+            sockaddr_in address{};
+            address.sin_family = AF_INET;
+            address.sin_port = htons(1235);
+            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            VERIFY_ARE_NOT_EQUAL(bind(socket.get(), (sockaddr*)&address, sizeof(address)), SOCKET_ERROR);
+
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+
+            launcher.AddPort(1235, 8000, AF_INET);
+
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(WSAEACCES));
+        }
+
+        // TODO: Uncomment once ipv6 port mapping is supported.
+        // Validate ipv6 port mapping
+        /*{
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine",
+                "test-ports-ipv6",
+                {},
+                {"python3", "-m", "http.server", "--bind", "::1"},
+                {"PYTHONUNBUFFERED=1"},
+                Mode,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
+
+            launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(1234, 8000, AF_INET6);
+
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+            auto stdoutHandle = initProcess.GetStdHandle(1);
+
+            // Wait for the container bind() to be completed.
+            WaitForOutput(stdoutHandle.get(), "Serving HTTP on ::1 port 8000");
+
+            ExpectHttpResponse(L"http://localhost:1234", {});
+            system("pause");
+            ExpectHttpResponse(L"http://[::1]:1234", 200);
+        }*/
+    }
+
+    TEST_METHOD(PortMappingsBridged)
+    {
+        RunPortMappingsTest(WSLA_CONTAINER_NETWORK_BRIDGE);
+    }
+
+    TEST_METHOD(PortMappingsHost)
+    {
+        RunPortMappingsTest(WSLA_CONTAINER_NETWORK_HOST);
+    }
+
+    TEST_METHOD(PortMappingsNone)
+    {
+        // Validate that trying to map ports without network fails.
+        WSLAContainerLauncher launcher(
+            "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, WSLA_CONTAINER_NETWORK_NONE);
+
+        launcher.AddPort(1234, 8000, AF_INET);
+
+        VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*CreateSession()).first, E_INVALIDARG);
     }
 
     void ValidateContainerVolumes(bool enableVirtioFs)
