@@ -325,6 +325,7 @@ try
     auto loadProcess = launcher.Launch(*m_virtualMachine.Get());
 
     auto loadProcessStdin = loadProcess.GetStdHandle(0);
+    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
     wsl::windows::common::relay::InterruptableRelay(
         imageFileHandle, loadProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
     loadProcessStdin.reset();
@@ -351,6 +352,7 @@ try
     auto importProcess = launcher.Launch(*m_virtualMachine.Get());
 
     auto importProcessStdin = importProcess.GetStdHandle(0);
+    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
     wsl::windows::common::relay::InterruptableRelay(
         imageFileHandle, importProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
     importProcessStdin.reset();
