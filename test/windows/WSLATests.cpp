@@ -1689,6 +1689,7 @@ class WSLATests
             else
             {
                 LogError("Expected success but request failed with 0x%08X for: %ls", result, Url);
+                VERIFY_FAIL();
             }
         }
     }
@@ -1820,7 +1821,7 @@ class WSLATests
             WaitForOutput(stdoutHandle.get(), "Serving HTTP on ::1 port 8000");
 
             ExpectHttpResponse(L"http://localhost:1234", {});
-            system("pause");
+
             ExpectHttpResponse(L"http://[::1]:1234", 200);
         }*/
     }
