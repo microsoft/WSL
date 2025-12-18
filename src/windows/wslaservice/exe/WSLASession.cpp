@@ -322,7 +322,7 @@ try
 }
 CATCH_LOG();
 
-HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
