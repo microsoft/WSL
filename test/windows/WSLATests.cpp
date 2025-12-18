@@ -1794,7 +1794,6 @@ class WSLATests
 
                 // Validate that port 1234 is still available.
                 VERIFY_IS_TRUE(!!bindSocket(1236));
-
             }
         }
 
