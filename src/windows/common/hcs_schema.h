@@ -435,7 +435,7 @@ inline void to_json(nlohmann::json& j, const Chipset& chipset)
 
 struct Scsi
 {
-    std::map<std::string, EmptyObject> Attachments;
+    std::map<std::string, Attachment> Attachments;
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(Scsi, Attachments);
 };
 
