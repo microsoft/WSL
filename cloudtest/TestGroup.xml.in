@@ -8,7 +8,7 @@
       <Copy Src="[drop]\bundle\Microsoft.WSL_${PACKAGE_VERSION}_x64_ARM64.msixbundle" Dest="[WorkingDirectory]" IsRecursive="false"/>
       <Copy Src="[drop]\testbin\${TARGET_PLATFORM}\release\*" Dest="[WorkingDirectory]\" IsRecursive="true" Writable="true"/>
       <Copy Src="[drop]\testbin\${TARGET_PLATFORM}\test_distro.tar.xz" Dest="[WorkingDirectory]" IsRecursive="false" Writable="true"/>
-      <Copy Src="[drop]\testbin\${TARGET_PLATFORM}\test_data" Dest="[WorkingDirectory]" IsRecursive="true" Writable="true"/>
+      <Copy Src="[drop]\testbin\${TARGET_PLATFORM}\test_data\*" Dest="[WorkingDirectory]\test_data" IsRecursive="true" Writable="true"/>
       <Copy Src="[drop]\testbin\test-setup.ps1" Dest="[WorkingDirectory]\" IsRecursive="false" />
       <Copy Src="[drop]\testbin\CloudTest-Setup.bat" Dest="[WorkingDirectory]\" IsRecursive="false" />
       <Copy Src="[drop]\testbin\wsl.wprp" Dest="[WorkingDirectory]\" IsRecursive="false" />
