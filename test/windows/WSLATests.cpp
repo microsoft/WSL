@@ -1504,7 +1504,7 @@ class WSLATests
                 0);
             VERIFY_ARE_EQUAL(result.Output[1], "'[\"host\"]'\n");
 
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
             expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
 
@@ -1535,7 +1535,7 @@ class WSLATests
                 0);
             VERIFY_ARE_EQUAL(result.Output[1], "'[\"none\"]'\n");
 
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
             expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
 
@@ -1563,10 +1563,15 @@ class WSLATests
         }
 
         // Test bridge when ready
-        /*
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-network", {}, {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_BRIDGE, ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest",
+                "test-network",
+                {},
+                {"sleep", "99999"},
+                {},
+                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_BRIDGE,
+                ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -1576,7 +1581,7 @@ class WSLATests
                 0);
             VERIFY_ARE_EQUAL(result.Output[1], "'[\"bridge\"]'\n");
 
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 50000));
+            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
             expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
 
@@ -1588,7 +1593,6 @@ class WSLATests
 
             expectContainerList({});
         }
-        */
     }
 
     TEST_METHOD(Exec)
