@@ -60,7 +60,18 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLASession> session;
-    THROW_IF_FAILED(userSession->OpenSessionByName(sessionName.c_str(), &session));
+    HRESULT hr = userSession->OpenSessionByName(sessionName.c_str(), &session);
+    if (FAILED(hr))
+    {
+        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND) || hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) ||
+            hr == HRESULT_FROM_WIN32(ERROR_INVALID_NAME))
+        {
+            wslutil::PrintMessage(std::format(L"Session not found: '{}'\n", sessionName), stderr);
+            return 1;
+        }
+
+        return ReportError(std::format(L"OpenSessionByName('{}') failed", sessionName), hr);
+    }
     log(L"[diag] OpenSessionByName succeeded\n");
 
     // Console size for TTY.
@@ -188,18 +199,42 @@ static int RunListCommand(bool /*verbose*/)
     if (sessions.size() == 0)
     {
         wslutil::PrintMessage(L"No WSLA sessions found.\n", stdout);
+        return 0;
     }
-    else
+
+    wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:\n\n", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
+
+    // Compute column widths from headers + data (same pattern as wsl --list).
+    size_t idWidth = wcslen(L"ID");
+    size_t pidWidth = wcslen(L"Creator PID");
+
+    for (const auto& s : sessions)
     {
-        wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:\n", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
+        idWidth = std::max(idWidth, std::to_wstring(s.SessionId).size());
+        pidWidth = std::max(pidWidth, std::to_wstring(s.CreatorPid).size());
+    }
 
-        wslutil::PrintMessage(L"\nID\tCreator PID\tDisplay Name\n", stdout);
-        wslutil::PrintMessage(L"--\t-----------\t------------\n", stdout);
+    // Header
+    wprintf(L"%-*ls  %-*ls  %ls\n", static_cast<int>(idWidth), L"ID", static_cast<int>(pidWidth), L"Creator PID", L"Display Name");
 
-        for (const auto& s : sessions)
-        {
-            wslutil::PrintMessage(std::format(L"{}\t{}\t{}\n", s.SessionId, s.CreatorPid, s.DisplayName), stdout);
-        }
+    // Underline
+    std::wstring idDash(idWidth, L'-');
+    std::wstring pidDash(pidWidth, L'-');
+    std::wstring nameDash(wcslen(L"Display Name"), L'-');
+
+    wprintf(
+        L"%-*ls  %-*ls  %ls\n", static_cast<int>(idWidth), idDash.c_str(), static_cast<int>(pidWidth), pidDash.c_str(), nameDash.c_str());
+
+    // Rows
+    for (const auto& s : sessions)
+    {
+        wprintf(
+            L"%-*lu  %-*lu  %ls\n",
+            static_cast<int>(idWidth),
+            static_cast<unsigned long>(s.SessionId),
+            static_cast<int>(pidWidth),
+            static_cast<unsigned long>(s.CreatorPid),
+            s.DisplayName);
     }
 
     return 0;
@@ -234,8 +269,6 @@ int wsladiag_main(std::wstring_view commandLine)
     parser.AddArgument(help, L"--help", L'h');
     parser.AddArgument(verbose, L"--verbose", L'v');
 
-    parser.Parse();
-
     auto printUsage = []() {
         wslutil::PrintMessage(
             L"wsladiag - WSLA diagnostics tool\n"
@@ -245,6 +278,21 @@ int wsladiag_main(std::wstring_view commandLine)
             L"  wsladiag --help\n",
             stderr);
     };
+
+    try
+    {
+        parser.Parse();
+    }
+    catch (...)
+    {
+        const auto hr = wil::ResultFromCaughtException();
+        if (hr == E_INVALIDARG)
+        {
+            printUsage();
+            return 1;
+        }
+        throw;
+    }
 
     if (help || verb.empty())
     {
