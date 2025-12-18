@@ -407,6 +407,9 @@ stages:
               $TestDistroVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
               Copy-Item "packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz" "$(ob_outputDirectory)\testbin\x64"
 
+              $TestDataVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestData'']/@version').Node.Value
+              Copy-Item "packages\Microsoft.WSL.TestData.$TestDataVersion\build\native\bin\x64" "$(ob_outputDirectory)\testbin\x64\test_data" -Recurse -Force
+
             displayName: Move artifacts to drop directory
 
           - task: PublishSymbols@2
