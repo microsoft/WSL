@@ -19,11 +19,6 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
-namespace {
-constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
-
-} // namespace
-
 using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
@@ -320,6 +315,8 @@ try
     HANDLE imageFileHandle = wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle));
     RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle);
 
+    std::lock_guard lock{m_lock};
+
     // Directly invoking "nerdctl load" will immediately return with failure
     // "stdin is empty and input flag is not specified".
     // TODO: Change the workaround when nerdctl has a fix.
@@ -346,6 +343,8 @@ try
     HANDLE imageFileHandle = wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle));
     RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle);
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
+
+    std::lock_guard lock{m_lock};
 
     ServiceProcessLauncher launcher{
         nerdctlPath, {nerdctlPath, "import", "-", ImageName}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
