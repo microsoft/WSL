@@ -29,6 +29,8 @@ struct VolumeMountInfo
     BOOL ReadOnly;
 };
 
+class WSLAContainer;
+
 class WSLAContainerImpl
 {
 public:
@@ -42,6 +44,7 @@ public:
     };
 
     NON_COPYABLE(WSLAContainerImpl);
+    NON_MOVABLE(WSLAContainerImpl);
 
     WSLAContainerImpl(
         WSLAVirtualMachine* parentVM,
@@ -60,10 +63,12 @@ public:
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
 
+    IWSLAContainer& ComWrapper();
+
     const std::string& Image() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
-    static std::shared_ptr<WSLAContainerImpl> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM, ContainerEventTracker& tracker);
+    static std::unique_ptr<WSLAContainerImpl> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM, ContainerEventTracker& tracker);
 
 private:
     void OnEvent(ContainerEvent event);
@@ -82,6 +87,7 @@ private:
     ContainerEventTracker::ContainerTrackingReference m_trackingReference;
     std::vector<PortMapping> m_mappedPorts;
     std::vector<VolumeMountInfo> m_mountedVolumes;
+    Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(
         const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes);
@@ -97,7 +103,7 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 {
 
 public:
-    WSLAContainer(std::weak_ptr<WSLAContainerImpl>&& impl);
+    WSLAContainer(WSLAContainerImpl* impl);
 
     IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
     IFACEMETHOD(Delete)() override;
@@ -105,20 +111,23 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
 
+    void Disconnect() noexcept;
+
 private:
     template <typename... Args>
     HRESULT CallImpl(void (WSLAContainerImpl::*routine)(Args... args), Args... args)
     try
     {
-        auto impl = m_impl.lock();
-        RETURN_HR_IF(RPC_E_DISCONNECTED, !impl);
+        auto lock = m_lock.lock_shared();
+        RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
 
-        (impl.get()->*routine)(std::forward<Args>(args)...);
+        (m_impl->*routine)(std::forward<Args>(args)...);
 
         return S_OK;
     }
     CATCH_RETURN();
 
-    std::weak_ptr<WSLAContainerImpl> m_impl;
+    WSLAContainerImpl* m_impl = nullptr;
+    wil::srwlock m_lock;
 };
 } // namespace wsl::windows::service::wsla

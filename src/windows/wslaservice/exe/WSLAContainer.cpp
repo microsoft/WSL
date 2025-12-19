@@ -143,7 +143,8 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_image(Options.Image),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
-    m_mappedPorts(std::move(ports))
+    m_mappedPorts(std::move(ports)),
+    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this))
 {
     m_state = WslaContainerStateCreated;
 
@@ -157,6 +158,9 @@ WSLAContainerImpl::~WSLAContainerImpl()
         TraceLoggingValue(m_name.c_str(), "Name"),
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
+
+    // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
+    m_comWrapper->Disconnect();
 
     // TODO: Stop and delete running containers when the session is shutting down
     // so that we don't leak resources since we do not have means to track them after
@@ -195,6 +199,11 @@ WSLAContainerImpl::~WSLAContainerImpl()
 const std::string& WSLAContainerImpl::Image() const noexcept
 {
     return m_image;
+}
+
+IWSLAContainer& WSLAContainerImpl::ComWrapper()
+{
+    return *m_comWrapper.Get();
 }
 
 void WSLAContainerImpl::Start(const WSLA_CONTAINER_OPTIONS& Options)
@@ -455,7 +464,7 @@ void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::v
     }
 }
 
-std::shared_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
+std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM, ContainerEventTracker& eventTracker)
 {
     auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
@@ -496,7 +505,7 @@ std::shared_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
-    auto container = std::make_shared<WSLAContainerImpl>(
+    auto container = std::make_unique<WSLAContainerImpl>(
         &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts));
 
     errorCleanup.release();
@@ -601,8 +610,16 @@ std::optional<std::string> WSLAContainerImpl::GetNerdctlStatus()
     return status.empty() ? std::optional<std::string>{} : status;
 }
 
-WSLAContainer::WSLAContainer(std::weak_ptr<WSLAContainerImpl>&& impl) : m_impl(std::move(impl))
+WSLAContainer::WSLAContainer(WSLAContainerImpl* impl) : m_impl(impl)
 {
+}
+
+void WSLAContainer::Disconnect() noexcept
+{
+    auto lock = m_lock.lock_exclusive();
+
+    WI_ASSERT(m_impl != nullptr);
+    m_impl = nullptr;
 }
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)

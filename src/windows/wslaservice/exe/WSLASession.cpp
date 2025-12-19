@@ -335,15 +335,13 @@ try
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     // TODO: Log entrance into the function.
-    auto container = WSLAContainerImpl::Create(*containerOptions, *m_virtualMachine.Get(), *m_eventTracker);
-
-    auto wrapper = wil::MakeOrThrow<WSLAContainer>(std::weak_ptr(container));
-    RETURN_IF_FAILED(wrapper.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
-
-    auto [_, inserted] = m_containers.emplace(containerOptions->Name, container);
+    auto [container, inserted] = m_containers.emplace(
+        containerOptions->Name, WSLAContainerImpl::Create(*containerOptions, *m_virtualMachine.Get(), *m_eventTracker));
     WI_ASSERT(inserted);
 
-    container->Start(*containerOptions);
+    container->second->Start(*containerOptions);
+
+    THROW_IF_FAILED(container->second->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
 
     return S_OK;
 }
@@ -356,8 +354,8 @@ try
     auto it = m_containers.find(Name);
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_containers.end(), "Container not found: '%hs'", Name);
 
-    auto wrapper = wil::MakeOrThrow<WSLAContainer>(std::weak_ptr(it->second));
-    THROW_IF_FAILED(wrapper.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+    THROW_IF_FAILED(it->second->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
+
     return S_OK;
 }
 CATCH_RETURN();
@@ -467,7 +465,7 @@ CATCH_RETURN();
 void WSLASession::ClearDeletedContainers()
 {
     std::lock_guard lock{m_lock};
-    auto deleted = std::erase_if(m_containers, [](const auto e) { return e.second->State() == WslaContainerStateDeleted; });
+    auto deleted = std::erase_if(m_containers, [](const auto& e) { return e.second->State() == WslaContainerStateDeleted; });
 
     if (deleted > 0)
     {
