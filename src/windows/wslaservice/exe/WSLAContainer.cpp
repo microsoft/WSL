@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLAContainerImpl.cpp
+    WSLAContainer.cpp
 
 Abstract:
 
-    Contains the implementation of WSLAContainerImpl.
+    Contains the implementation of WSLAContainer.
 
 --*/
 
