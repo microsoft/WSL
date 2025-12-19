@@ -10,7 +10,6 @@ Abstract:
 
     Entry point for the wsladiag tool, performs WSL runtime initialization and parses --list/--help.
 
-
 --*/
 
 #include "precomp.h"
@@ -182,7 +181,8 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     process.GetExitEvent().wait();
     auto [code, signalled] = process.GetExitState();
 
-    wslutil::PrintMessage(std::format(L"{} exited with: {}{}", shell, code, signalled ? L" (signalled)" : L""), stdout);
+    std::wstring shellWide(shell.begin(), shell.end());
+    wslutil::PrintMessage(std::format(L"{} exited with: {}{}", shellWide, code, signalled ? L" (signalled)" : L""), stdout);
 
     return 0;
 }
@@ -203,7 +203,6 @@ static int RunListCommand(bool /*verbose*/)
     }
 
     wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
-    wslutil::PrintMessage(L"", stdout);
 
     // Compute column widths from headers + data (same pattern as wsl --list).
     size_t idWidth = wcslen(L"ID");
