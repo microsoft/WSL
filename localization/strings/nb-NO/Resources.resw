@@ -730,9 +730,6 @@ Systemet må kanskje startes på nytt slik at endringene kan tre i kraft.</value
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Kan ikke endre størrelsen på disken.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Kan ikke oversette banen.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Finner ingen verdi.</value>
   </data>

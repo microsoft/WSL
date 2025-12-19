@@ -503,7 +503,7 @@ public:
     /// <summary>
     /// Worker thread for logging telemetry about processes running inside of WSL.
     /// </summary>
-    void TelemetryWorker(_In_ wil::unique_socket&& socket, _In_ bool drvFsNotifications) const;
+    void TelemetryWorker(_In_ wil::unique_socket&& socket) const;
 
     /// <summary>
     /// Terminates a distribution by it's client identifier.

@@ -33,5 +33,5 @@ LPCWSTR const handle_option = L"--handle";
 LPCWSTR const event_option = L"--event";
 LPCWSTR const parent_option = L"--parent";
 LPCWSTR const vm_id_option = L"--vm-id";
-LPCWSTR const embedding_option = L"--Embedding";
+LPCWSTR const embedding_option = L"-Embedding";
 } // namespace wslhost

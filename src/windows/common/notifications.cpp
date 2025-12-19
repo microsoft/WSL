@@ -86,8 +86,8 @@ try
                     </binding>
                 </visual>
                 <actions>
-                    <action arguments='--{}' content='{}'/>
-                    <action arguments='--{}' content='{}'/>
+                    <action arguments='{}' content='{}'/>
+                    <action arguments='{}' content='{}'/>
                 </actions>
             </toast>)",
         Localization::MessageNewWslVersionAvailable(Localization::Options::DontImpersonate),
@@ -118,8 +118,8 @@ try
                     </binding>
                 </visual>
                 <actions>
-                    <action arguments='--{} {}' content='{}'/>
-                    <action arguments='--{} {}' content="{}"/>
+                    <action arguments='{} {}' content='{}'/>
+                    <action arguments='{} {}' content="{}"/>
                 </actions>
             </toast>)",
         Localization::MessagePerformanceTip(Localization::Options::DontImpersonate),
@@ -151,7 +151,7 @@ try
                    </binding>
                </visual>
                <actions>
-                   <action arguments='--{}' content='{}'/>
+                   <action arguments='{}' content='{}'/>
                </actions>
            </toast>)",
         Localization::MessageWarningDuringStartup(),
@@ -176,7 +176,7 @@ try
                    </binding>
                </visual>
                <actions>
-                   <action arguments='--{}' content='{}'/>
+                   <action arguments='{}' content='{}'/>
                </actions>
            </toast>)",
         Localization::MessageMissingOptionalComponents(),
