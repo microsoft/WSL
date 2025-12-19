@@ -458,6 +458,53 @@ inline void to_json(nlohmann::json& j, const DebugOptions& d)
     OMIT_IF_EMPTY(j, d, ShutdownOrResetSavedStateFileName);
 }
 
+enum VirtualPMemImageFormat
+{
+    Vhdx,
+    Vhd1
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    VirtualPMemImageFormat,
+    {
+        {VirtualPMemImageFormat::Vhdx, "Vhdx"},
+        {VirtualPMemImageFormat::Vhd1, "Vhd1"},
+    })
+
+struct VirtualPMemDevice
+{
+    std::wstring HostPath;
+    bool ReadOnly;
+    VirtualPMemImageFormat ImageFormat;
+    // uint64_t SizeBytes;
+    // std::map<uint64_t, VirtualPMemMapping> Mappings;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualPMemDevice, HostPath, ReadOnly, ImageFormat);
+};
+
+enum class VirtualPMemBackingType
+{
+    Virtual,
+    Physical
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    VirtualPMemBackingType,
+    {
+        {VirtualPMemBackingType::Virtual, "Virtual"},
+        {VirtualPMemBackingType::Physical, "Physical"},
+    })
+
+struct VirtualPMemController
+{
+    std::map<std::string, VirtualPMemDevice> Devices;
+    uint8_t MaximumCount;
+    uint64_t MaximumSizeBytes;
+    VirtualPMemBackingType Backing;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualPMemController, Devices, MaximumCount, MaximumSizeBytes, Backing);
+};
+
 struct Devices
 {
     std::optional<VirtioSerial> VirtioSerial;
@@ -466,6 +513,7 @@ struct Devices
     EmptyObject Battery;
     HvSocket HvSocket;
     std::map<std::string, Scsi> Scsi;
+    std::optional<VirtualPMemController> VirtualPMem;
 };
 
 inline void to_json(nlohmann::json& j, const Devices& devices)
@@ -478,6 +526,7 @@ inline void to_json(nlohmann::json& j, const Devices& devices)
         {"Scsi", devices.Scsi}};
 
     OMIT_IF_EMPTY(j, devices, VirtioSerial);
+    OMIT_IF_EMPTY(j, devices, VirtualPMem);
 }
 
 struct VirtualMachine

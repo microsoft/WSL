@@ -272,17 +272,45 @@ void WSLAVirtualMachine::Start()
         vmSettings.Chipset.Uefi = std::move(uefiSettings);
     }
 
-    // Initialize other devices.
+    // Initialize SCSI controller.
     vmSettings.Devices.Scsi["0"] = hcs::Scsi{};
-    hcs::HvSocket hvSocketConfig{};
+
+    // Initialize PMEM devices.
+    hcs::VirtualPMemController pmemController;
+    pmemController.MaximumCount = 0;
+    pmemController.MaximumSizeBytes = 0;
+    pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
+    auto attachPmemDisk = [&](PCWSTR path) {
+        ULONG deviceId = pmemController.MaximumCount;
+        pmemController.MaximumCount += 1;
+        hcs::VirtualPMemDevice vhd;
+        vhd.HostPath = path;
+        vhd.ReadOnly = true;
+        vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
+        pmemController.Devices[std::to_string(deviceId)] = std::move(vhd);
+        return std::format("/dev/pmem{}", deviceId);
+    };
+
+#ifdef WSL_KERNEL_MODULES_PATH
+
+    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
+
+#else
+
+    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
+
+#endif
+
+    const auto rootVhdDevicePath = attachPmemDisk(m_settings.RootVhd.c_str());
+    const auto modulesDevicePath = attachPmemDisk(kernelModulesPath.c_str());
+    vmSettings.Devices.VirtualPMem = std::move(pmemController);
 
     // Construct a security descriptor that allows system and the current user.
     wil::unique_hlocal_string userSidString;
     THROW_LAST_ERROR_IF(!ConvertSidToStringSidW(m_userSid, &userSidString));
 
-    std::wstring securityDescriptor{L"D:P(A;;FA;;;SY)(A;;FA;;;"};
-    securityDescriptor += userSidString.get();
-    securityDescriptor += L")";
+    std::wstring securityDescriptor = std::format(L"D:P(A;;FA;;;SY)(A;;FA;;;{})", userSidString.get());
+    hcs::HvSocket hvSocketConfig{};
     hvSocketConfig.HvSocketConfig.DefaultBindSecurityDescriptor = securityDescriptor;
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
@@ -340,20 +368,18 @@ void WSLAVirtualMachine::Start()
 
     ConfigureNetworking();
 
-    // Mount the kernel modules VHD.
+    ConfigureMounts(rootVhdDevicePath.c_str(), modulesDevicePath.c_str());
+}
 
-#ifdef WSL_KERNEL_MODULES_PATH
-
-    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
-
-#else
-
-    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
-
-#endif
-
-    auto [_, device] = AttachDisk(kernelModulesPath.c_str(), true);
-    Mount(m_initChannel, device.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
+void WSLAVirtualMachine::ConfigureMounts(LPCSTR RootVhdDevicePath, LPCSTR ModulesDevicePath)
+{
+    Mount(m_initChannel, RootVhdDevicePath, "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
+    Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
+    Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
+    Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
+    Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
+    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
+    Mount(m_initChannel, ModulesDevicePath, "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     // Configure GPU if requested.
     if (FeatureEnabled(WslaFeatureFlagsGPU))
@@ -370,24 +396,6 @@ void WSLAVirtualMachine::Start()
         }
 
         wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
-    }
-
-    ConfigureMounts();
-}
-
-void WSLAVirtualMachine::ConfigureMounts()
-{
-    auto [_, device] = AttachDisk(m_settings.RootVhd.c_str(), true);
-
-    Mount(m_initChannel, device.c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
-    Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
-    Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
-    Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
-    Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
-    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
-
-    if (FeatureEnabled(WslaFeatureFlagsGPU)) // TODO: re-think how GPU settings should work at the session level API.
-    {
         MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
     }
 }
