@@ -633,6 +633,7 @@ HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
 
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
 {
+    *Process = nullptr;
     return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
 }
 
