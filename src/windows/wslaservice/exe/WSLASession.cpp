@@ -296,6 +296,9 @@ CATCH_LOG();
 HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
+    UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
+    UNREFERENCED_PARAMETER(ProgressCallback);
+
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
     std::lock_guard lock{m_lock};
@@ -312,8 +315,10 @@ CATCH_RETURN();
 HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback)
 try
 {
-    HANDLE imageFileHandle = wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle));
-    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle);
+    UNREFERENCED_PARAMETER(ProgressCallback);
+
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
+    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
 
     std::lock_guard lock{m_lock};
 
@@ -327,7 +332,7 @@ try
     auto loadProcessStdin = loadProcess.GetStdHandle(0);
     // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
     wsl::windows::common::relay::InterruptableRelay(
-        imageFileHandle, loadProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
+        imageFileHandle.get(), loadProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
     loadProcessStdin.reset();
 
     auto result = loadProcess.WaitAndCaptureOutput();
@@ -341,8 +346,10 @@ CATCH_RETURN();
 HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback)
 try
 {
-    HANDLE imageFileHandle = wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle));
-    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle);
+    UNREFERENCED_PARAMETER(ProgressCallback);
+
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
+    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
 
     std::lock_guard lock{m_lock};
@@ -354,7 +361,7 @@ try
     auto importProcessStdin = importProcess.GetStdHandle(0);
     // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
     wsl::windows::common::relay::InterruptableRelay(
-        imageFileHandle, importProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
+        imageFileHandle.get(), importProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
     importProcessStdin.reset();
 
     auto result = importProcess.WaitAndCaptureOutput();
