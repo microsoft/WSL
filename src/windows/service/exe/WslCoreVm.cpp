@@ -1730,7 +1730,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
         return lun;
     };
 
-    if (m_systemDistroDeviceType = LxMiniInitMountDeviceTypeLun)
+    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypeLun)
     {
         m_systemDistroDeviceId = attachDisk(m_vmConfig.SystemDistroPath.c_str());
     }
