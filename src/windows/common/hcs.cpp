@@ -86,12 +86,12 @@ wsl::windows::common::hcs::unique_hcs_system wsl::windows::common::hcs::CreateCo
 
     wil::unique_cotaskmem_string resultDocument;
     const auto result = ::HcsWaitForOperationResult(operation.get(), INFINITE, &resultDocument);
-    THROW_IF_FAILED_MSG(
-        result,
-        "HcsWaitForOperationResult for HcsCreateComputeSystem failed (%ls %ls - error string: %ls)",
-        Id,
-        Configuration,
-        resultDocument.get());
+    if (FAILED(result))
+    {
+        // N.B. Logging is split into two calls because the configuration and error strings can be quite long.
+        LOG_HR_MSG(result, "HcsCreateComputeSystem(%ls, %ls)", Id, Configuration);
+        THROW_HR_MSG(result, "HcsCreateComputeSystem failed (error string: %ls)", resultDocument.get());
+    }
 
     return system;
 }
@@ -137,8 +137,7 @@ GUID wsl::windows::common::hcs::GetRuntimeId(_In_ HCS_SYSTEM ComputeSystem)
 
     wil::unique_cotaskmem_string resultDocument;
     const auto result = ::HcsWaitForOperationResult(operation.get(), INFINITE, &resultDocument);
-    THROW_IF_FAILED_MSG(
-        result, "HcsWaitForOperationResult for HcsGetComputeSystemProperties failed (error string: %ls)", resultDocument.get());
+    THROW_IF_FAILED_MSG(result, "HcsGetComputeSystemProperties failed (error string: %ls)", resultDocument.get());
 
     const auto properties = wsl::shared::FromJson<Properties>(resultDocument.get());
     THROW_HR_IF(HCS_E_SYSTEM_NOT_FOUND, (properties.SystemType != SystemType::VirtualMachine));
@@ -193,11 +192,7 @@ void wsl::windows::common::hcs::ModifyComputeSystem(_In_ HCS_SYSTEM ComputeSyste
 
     wil::unique_cotaskmem_string resultDocument;
     const auto result = ::HcsWaitForOperationResult(operation.get(), INFINITE, &resultDocument);
-    THROW_IF_FAILED_MSG(
-        result,
-        "HcsWaitForOperationResult for HcsModifyComputeSystem failed (%ls - error string: %ls)",
-        Configuration,
-        resultDocument.get());
+    THROW_IF_FAILED_MSG(result, "HcsModifyComputeSystem failed (%ls - error string: %ls)", Configuration, resultDocument.get());
 }
 
 wsl::windows::common::hcs::unique_hcs_system wsl::windows::common::hcs::OpenComputeSystem(_In_ PCWSTR Id, _In_ DWORD RequestedAccess)
@@ -241,11 +236,7 @@ void wsl::windows::common::hcs::StartComputeSystem(_In_ HCS_SYSTEM ComputeSystem
 
     wil::unique_cotaskmem_string resultDocument;
     const auto result = ::HcsWaitForOperationResult(operation.get(), INFINITE, &resultDocument);
-    THROW_IF_FAILED_MSG(
-        result,
-        "HcsWaitForOperationResult for HcsStartComputeSystem failed (error string: %ls, configuration: %ls)",
-        resultDocument.get(),
-        Configuration);
+    THROW_IF_FAILED_MSG(result, "HcsStartComputeSystem failed (error string: %ls, configuration: %ls)", resultDocument.get(), Configuration);
 }
 
 void wsl::windows::common::hcs::TerminateComputeSystem(_In_ HCS_SYSTEM ComputeSystem)
@@ -257,8 +248,7 @@ void wsl::windows::common::hcs::TerminateComputeSystem(_In_ HCS_SYSTEM ComputeSy
 
     wil::unique_cotaskmem_string resultDocument;
     const auto result = ::HcsWaitForOperationResult(operation.get(), INFINITE, &resultDocument);
-    THROW_IF_FAILED_MSG(
-        result, "HcsWaitForOperationResult for HcsTerminateComputeSystem failed (error string: %ls)", resultDocument.get());
+    THROW_IF_FAILED_MSG(result, "HcsTerminateComputeSystem failed (error string: %ls)", resultDocument.get());
 }
 
 wsl::windows::common::hcs::unique_hcn_service_callback wsl::windows::common::hcs::RegisterServiceCallback(
