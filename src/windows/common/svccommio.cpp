@@ -100,11 +100,8 @@ ConsoleInput::ConsoleInput(HANDLE Handle, DWORD SavedMode) : m_Handle(Handle), m
 
 ConsoleInput::~ConsoleInput()
 {
-    if (m_Handle)
-    {
-        TrySetConsoleMode(m_Handle, m_SavedMode);
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedCodePage));
-    }
+    TrySetConsoleMode(m_Handle, m_SavedMode);
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedCodePage));
 }
 
 std::optional<ConsoleOutput> ConsoleOutput::Create()
