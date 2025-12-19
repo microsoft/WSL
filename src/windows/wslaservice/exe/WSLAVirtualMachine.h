@@ -106,7 +106,7 @@ private:
         const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl);
 
     void ConfigureNetworking();
-    void ConfigureMounts();
+    void ConfigureMounts(LPCSTR RootVhdDevicePath, LPCSTR ModulesDevicePath);
     void OnExit(_In_ const HCS_EVENT* Event);
     void OnCrash(_In_ const HCS_EVENT* Event);
     bool FeatureEnabled(WSLAFeatureFlags Flag) const;
