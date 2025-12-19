@@ -29,6 +29,9 @@ static std::vector<std::string> defaultNerdctlCreateArgs{//"--pull=never", // TO
 static std::vector<std::string> defaultNerdctlEnv{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"};
 
 namespace {
+
+// TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
+
 auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm, std::vector<std::string>& args)
 {
     THROW_HR_IF_MSG(
