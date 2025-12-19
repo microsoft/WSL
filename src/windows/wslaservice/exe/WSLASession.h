@@ -76,7 +76,7 @@ private:
     std::thread m_containerdThread;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
-    std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
+    std::map<std::string, std::shared_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     std::recursive_mutex m_lock;
 };

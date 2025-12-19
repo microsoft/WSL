@@ -29,8 +29,7 @@ struct VolumeMountInfo
     BOOL ReadOnly;
 };
 
-class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>
+class WSLAContainerImpl
 {
 public:
     struct PortMapping
@@ -42,29 +41,29 @@ public:
         bool MappedToHost = false;
     };
 
-    NON_COPYABLE(WSLAContainer);
+    NON_COPYABLE(WSLAContainerImpl);
 
-    WSLAContainer(
+    WSLAContainerImpl(
         WSLAVirtualMachine* parentVM,
         const WSLA_CONTAINER_OPTIONS& Options,
         std::string&& Id,
         ContainerEventTracker& tracker,
         std::vector<VolumeMountInfo>&& volumes,
         std::vector<PortMapping>&& ports);
-    ~WSLAContainer();
+    ~WSLAContainerImpl();
 
     void Start(const WSLA_CONTAINER_OPTIONS& Options);
 
-    IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
-    IFACEMETHOD(Delete)() override;
-    IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
-    IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
-    IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
+    void Stop(_In_ int Signal, _In_ ULONG TimeoutMs);
+    void Delete();
+    void GetState(_Out_ WSLA_CONTAINER_STATE* State);
+    void GetInitProcess(_Out_ IWSLAProcess** process);
+    void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
 
     const std::string& Image() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
-    static Microsoft::WRL::ComPtr<WSLAContainer> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM, ContainerEventTracker& tracker);
+    static std::shared_ptr<WSLAContainerImpl> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM, ContainerEventTracker& tracker);
 
 private:
     void OnEvent(ContainerEvent event);
@@ -91,5 +90,35 @@ private:
 
     static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
     static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
+};
+
+class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>
+{
+
+public:
+    WSLAContainer(std::weak_ptr<WSLAContainerImpl>&& impl);
+
+    IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
+    IFACEMETHOD(Delete)() override;
+    IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
+    IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
+    IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
+
+private:
+    template <typename... Args>
+    HRESULT CallImpl(void (WSLAContainerImpl::*routine)(Args... args), Args... args)
+    try
+    {
+        auto impl = m_impl.lock();
+        RETURN_HR_IF(RPC_E_DISCONNECTED, !impl);
+
+        (impl.get()->*routine)(std::forward<Args>(args)...);
+
+        return S_OK;
+    }
+    CATCH_RETURN();
+
+    std::weak_ptr<WSLAContainerImpl> m_impl;
 };
 } // namespace wsl::windows::service::wsla

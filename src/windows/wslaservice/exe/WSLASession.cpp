@@ -335,14 +335,15 @@ try
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     // TODO: Log entrance into the function.
-    auto container = WSLAContainer::Create(*containerOptions, *m_virtualMachine.Get(), *m_eventTracker);
+    auto container = WSLAContainerImpl::Create(*containerOptions, *m_virtualMachine.Get(), *m_eventTracker);
 
-    RETURN_IF_FAILED(container.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+    auto wrapper = wil::MakeOrThrow<WSLAContainer>(std::weak_ptr(container));
+    RETURN_IF_FAILED(wrapper.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
 
-    auto [newElement, inserted] = m_containers.emplace(containerOptions->Name, std::move(container));
+    auto [_, inserted] = m_containers.emplace(containerOptions->Name, container);
     WI_ASSERT(inserted);
 
-    newElement->second->Start(*containerOptions);
+    container->Start(*containerOptions);
 
     return S_OK;
 }
@@ -355,7 +356,8 @@ try
     auto it = m_containers.find(Name);
     RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_containers.end(), "Container not found: '%hs'", Name);
 
-    THROW_IF_FAILED(it->second.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
+    auto wrapper = wil::MakeOrThrow<WSLAContainer>(std::weak_ptr(it->second));
+    THROW_IF_FAILED(wrapper.CopyTo(__uuidof(IWSLAContainer), (void**)Container));
     return S_OK;
 }
 CATCH_RETURN();
@@ -376,7 +378,7 @@ try
     {
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, container->Image().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, name.c_str()) != 0);
-        THROW_IF_FAILED(container->GetState(&output[index].State));
+        container->GetState(&output[index].State);
         index++;
     }
 
