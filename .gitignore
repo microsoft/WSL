@@ -65,3 +65,4 @@ tools/clang-format.exe
 /linux-crashes
 doc/site/
 directory.build.targets
+_codeql_detected_source_root
