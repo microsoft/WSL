@@ -33,11 +33,11 @@ static int ReportError(const std::wstring& context, HRESULT hr)
 
     if (!hrMessage.empty())
     {
-        wslutil::PrintMessage(std::format(L"{}: 0x{:08x} - {}\n", context, static_cast<unsigned int>(hr), hrMessage), stderr);
+        wslutil::PrintMessage(std::format(L"{}: 0x{:08x} - {}", context, static_cast<unsigned int>(hr), hrMessage), stderr);
     }
     else
     {
-        wslutil::PrintMessage(std::format(L"{}: 0x{:08x}\n", context, static_cast<unsigned int>(hr)), stderr);
+        wslutil::PrintMessage(std::format(L"{}: 0x{:08x}", context, static_cast<unsigned int>(hr)), stderr);
     }
 
     return 1;
@@ -53,7 +53,7 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
         }
     };
 
-    log(std::format(L"[diag] shell='{}'\n", sessionName));
+    log(std::format(L"[diag] shell='{}'", sessionName));
 
     wil::com_ptr<IWSLAUserSession> userSession;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
@@ -63,16 +63,16 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     HRESULT hr = userSession->OpenSessionByName(sessionName.c_str(), &session);
     if (FAILED(hr))
     {
-        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND) || hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) ||
-            hr == HRESULT_FROM_WIN32(ERROR_INVALID_NAME))
+        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
         {
-            wslutil::PrintMessage(std::format(L"Session not found: '{}'\n", sessionName), stderr);
+            wslutil::PrintMessage(std::format(L"Session not found: '{}'", sessionName), stderr);
             return 1;
         }
 
         return ReportError(std::format(L"OpenSessionByName('{}') failed", sessionName), hr);
     }
-    log(L"[diag] OpenSessionByName succeeded\n");
+
+    log(L"[diag] OpenSessionByName succeeded");
 
     // Console size for TTY.
     CONSOLE_SCREEN_BUFFER_INFO info{};
@@ -91,9 +91,9 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
     launcher.SetTtySize(rows, cols);
 
-    log(L"[diag] launching shell process...\n");
+    log(L"[diag] launching shell process...");
     auto process = launcher.Launch(*session);
-    log(L"[diag] shell launched (TTY)\n");
+    log(L"[diag] shell launched (TTY)");
 
     auto ttyIn = process.GetStdHandle(0);
     auto ttyOut = process.GetStdHandle(1);
@@ -182,7 +182,7 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     process.GetExitEvent().wait();
     auto [code, signalled] = process.GetExitState();
 
-    wslutil::PrintMessage(std::format(L"{} exited with: {}{}\n", shell, code, signalled ? L" (signalled)" : L""), stdout);
+    wslutil::PrintMessage(std::format(L"{} exited with: {}{}", shell, code, signalled ? L" (signalled)" : L""), stdout);
 
     return 0;
 }
@@ -198,11 +198,12 @@ static int RunListCommand(bool /*verbose*/)
 
     if (sessions.size() == 0)
     {
-        wslutil::PrintMessage(L"No WSLA sessions found.\n", stdout);
+        wslutil::PrintMessage(L"No WSLA sessions found.", stdout);
         return 0;
     }
 
-    wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:\n\n", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
+    wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
+    wslutil::PrintMessage(L"", stdout);
 
     // Compute column widths from headers + data (same pattern as wsl --list).
     size_t idWidth = wcslen(L"ID");
@@ -314,7 +315,7 @@ int wsladiag_main(std::wstring_view commandLine)
     }
     else
     {
-        wslutil::PrintMessage(std::format(L"Unknown command: '{}'\n", verb), stderr);
+        wslutil::PrintMessage(std::format(L"Unknown command: '{}'", verb), stderr);
         printUsage();
         return 1;
     }
