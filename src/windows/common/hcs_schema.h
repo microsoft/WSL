@@ -458,7 +458,7 @@ inline void to_json(nlohmann::json& j, const DebugOptions& d)
     OMIT_IF_EMPTY(j, d, ShutdownOrResetSavedStateFileName);
 }
 
-enum VirtualPMemImageFormat
+enum class VirtualPMemImageFormat
 {
     Vhdx,
     Vhd1
