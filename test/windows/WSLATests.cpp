@@ -1705,6 +1705,30 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
+        auto expectBoundPorts = [&](const char* Name, const std::vector<std::string>& expectedBoundPorts) {
+            auto result = ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "inspect", Name}, 0);
+
+            auto parsed = nlohmann::json::parse(result.Output[1]);
+            auto ports = parsed[0]["HostConfig"]["PortBindings"];
+
+            std::vector<std::string> boundPorts;
+
+            for (const auto& e : ports.items())
+            {
+                boundPorts.emplace_back(e.key());
+            }
+
+            if (!std::ranges::equal(boundPorts, expectedBoundPorts))
+            {
+                LogError(
+                    "Port bindings do not match expected values. Expected: [%hs], Actual: [%hs]",
+                    wsl::shared::string::Join(expectedBoundPorts, ',').c_str(),
+                    wsl::shared::string::Join(boundPorts, ',').c_str());
+
+                VERIFY_FAIL();
+            }
+        };
+
         // Test a simple port mapping.
         {
             WSLAContainerLauncher launcher(
@@ -1719,6 +1743,8 @@ class WSLATests
 
             // Wait for the container bind() to be completed.
             WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+
+            expectBoundPorts("test-ports", {"8000/tcp"});
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
             ExpectHttpResponse(L"http://[::1]:1234", {});
@@ -1750,6 +1776,7 @@ class WSLATests
                 // Wait for the container bind() to be completed.
                 WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
+                expectBoundPorts("test-ports-3", {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
                 VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
