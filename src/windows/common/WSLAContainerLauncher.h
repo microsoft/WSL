@@ -27,6 +27,7 @@ public:
 
     WSLA_CONTAINER_STATE State();
     ClientRunningWSLAProcess GetInitProcess();
+    void Reset();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;
@@ -57,7 +58,7 @@ public:
 private:
     std::string m_image;
     std::string m_name;
-
+    std::vector<WSLA_PORT_MAPPING> m_ports;
     std::vector<WSLA_VOLUME> m_volumes;
     std::deque<std::wstring> m_hostPaths;
     std::deque<std::string> m_containerPaths;
