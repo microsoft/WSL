@@ -138,11 +138,8 @@ ConsoleOutput::ConsoleOutput(wil::unique_hfile ConsoleHandle, DWORD SavedMode) :
 
 ConsoleOutput::~ConsoleOutput()
 {
-    if (m_ConsoleHandle)
-    {
-        TrySetConsoleMode(m_ConsoleHandle.get(), m_SavedMode);
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(m_SavedCodePage));
-    }
+    TrySetConsoleMode(m_ConsoleHandle.get(), m_SavedMode);
+    LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(m_SavedCodePage));
 }
 
 SvcCommIo::SvcCommIo()
