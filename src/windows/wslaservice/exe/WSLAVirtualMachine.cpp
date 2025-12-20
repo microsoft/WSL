@@ -272,25 +272,6 @@ void WSLAVirtualMachine::Start()
         vmSettings.Chipset.Uefi = std::move(uefiSettings);
     }
 
-    // Initialize SCSI controller.
-    vmSettings.Devices.Scsi["0"] = hcs::Scsi{};
-
-    // Initialize PMEM devices.
-    hcs::VirtualPMemController pmemController;
-    pmemController.MaximumCount = 0;
-    pmemController.MaximumSizeBytes = 0;
-    pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
-    auto attachPmemDisk = [&](PCWSTR path) {
-        ULONG deviceId = pmemController.MaximumCount;
-        pmemController.MaximumCount += 1;
-        hcs::VirtualPMemDevice vhd;
-        vhd.HostPath = path;
-        vhd.ReadOnly = true;
-        vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
-        pmemController.Devices[std::to_string(deviceId)] = std::move(vhd);
-        return std::format("/dev/pmem{}", deviceId);
-    };
-
 #ifdef WSL_KERNEL_MODULES_PATH
 
     auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
@@ -301,9 +282,57 @@ void WSLAVirtualMachine::Start()
 
 #endif
 
-    const auto rootVhdDevicePath = attachPmemDisk(m_settings.RootVhd.c_str());
-    const auto modulesDevicePath = attachPmemDisk(kernelModulesPath.c_str());
-    vmSettings.Devices.VirtualPMem = std::move(pmemController);
+    // Initialize the boot VHDs.
+    std::pair<std::optional<ULONG>, std::optional<std::string>> rootVhd;
+    std::pair<std::optional<ULONG>, std::optional<std::string>> modulesVhd;
+    hcs::Scsi scsiController{};
+    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
+    {
+        ULONG nextLun = 0;
+        auto attachScsiDisk = [&](PCWSTR path) {
+            auto lun = nextLun;
+            nextLun += 1;
+            hcs::Attachment disk{};
+            disk.Type = hcs::AttachmentType::VirtualDisk;
+            disk.Path = path;
+            disk.ReadOnly = true;
+            disk.SupportCompressedVolumes = true;
+            disk.AlwaysAllowSparseFiles = true;
+            disk.SupportEncryptedFiles = true;
+            scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+            AttachedDisk attachedDisk{path};
+            // TODO: devicePath will be filled in later.
+            m_attachedDisks.emplace(lun, std::move(attachedDisk));
+            return lun;
+        };
+
+        rootVhd.first = attachScsiDisk(m_settings.RootVhd.c_str());
+        modulesVhd.first = attachScsiDisk(kernelModulesPath.c_str());
+    }
+    else
+    {
+        hcs::VirtualPMemController pmemController;
+        pmemController.MaximumCount = 0;
+        pmemController.MaximumSizeBytes = 0;
+        pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
+        auto attachPmemDisk = [&](PCWSTR path) {
+            ULONG deviceId = pmemController.MaximumCount;
+            pmemController.MaximumCount += 1;
+            hcs::VirtualPMemDevice vhd;
+            vhd.HostPath = path;
+            vhd.ReadOnly = true;
+            vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
+            pmemController.Devices[std::to_string(deviceId)] = std::move(vhd);
+            return std::format("/dev/pmem{}", deviceId);
+        };
+
+        rootVhd.second = attachPmemDisk(m_settings.RootVhd.c_str());
+        modulesVhd.second = attachPmemDisk(kernelModulesPath.c_str());
+        vmSettings.Devices.VirtualPMem = std::move(pmemController);
+    }
+
+    // Initialize the SCSI controller.
+    vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 
     // Construct a security descriptor that allows system and the current user.
     wil::unique_hlocal_string userSidString;
@@ -368,18 +397,26 @@ void WSLAVirtualMachine::Start()
 
     ConfigureNetworking();
 
-    ConfigureMounts(rootVhdDevicePath.c_str(), modulesDevicePath.c_str());
-}
+    // Configure mounts.
+    auto getVhdDevicePath = [&](const std::pair<std::optional<ULONG>, std::optional<std::string>>& vhd) {
+        WI_ASSERT(vhd.first.has_value() ^ vhd.second.has_value());
+        if (vhd.first.has_value())
+        {
+            return GetVhdDevicePath(vhd.first.value());
+        }
+        else
+        {
+            return vhd.second.value();
+        }
+    };
 
-void WSLAVirtualMachine::ConfigureMounts(LPCSTR RootVhdDevicePath, LPCSTR ModulesDevicePath)
-{
-    Mount(m_initChannel, RootVhdDevicePath, "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
+    Mount(m_initChannel, getVhdDevicePath(rootVhd).c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
     Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
     Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
-    Mount(m_initChannel, ModulesDevicePath, "", "ext4", "ro", WSLA_MOUNT::KernelModules);
+    Mount(m_initChannel, getVhdDevicePath(modulesVhd).c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     // Configure GPU if requested.
     if (FeatureEnabled(WslaFeatureFlagsGPU))
@@ -676,17 +713,10 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
 
         vhdAdded = true;
 
-        WSLA_GET_DISK message{};
-        message.Header.MessageSize = sizeof(message);
-        message.Header.MessageType = WSLA_GET_DISK::Type;
-        message.ScsiLun = Lun;
-        const auto& response = m_initChannel.Transaction(message);
-
-        THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to attach disk, init returned: %lu", response.Result);
-
+        const auto devicePath = GetVhdDevicePath(Lun);
         cleanup.release();
 
-        disk.Device = response.Buffer;
+        disk.Device = std::move(devicePath);
         Device = disk.Device;
         m_attachedDisks.emplace(Lun, std::move(disk));
     });
@@ -795,6 +825,18 @@ WSLAVirtualMachine::ConnectedSocket WSLAVirtualMachine::ConnectSocket(wsl::share
     }
 
     return socket;
+}
+
+std::string WSLAVirtualMachine::GetVhdDevicePath(ULONG Lun)
+{
+    WSLA_GET_DISK message{};
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = WSLA_GET_DISK::Type;
+    message.ScsiLun = Lun;
+    const auto& response = m_initChannel.Transaction(message);
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to get disk path, init returned: %lu", response.Result);
+
+    return response.Buffer;
 }
 
 void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)

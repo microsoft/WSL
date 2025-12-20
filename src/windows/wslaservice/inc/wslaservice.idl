@@ -247,6 +247,7 @@ typedef enum _WSLAFeatureFlags
     WslaFeatureFlagsEarlyBootDmesg = 2,
     WslaFeatureFlagsGPU = 4,
     WslaFeatureFlagsVirtioFs = 8,
+    WslaFeatureFlagsPmemVhds = 16,
 } WSLAFeatureFlags;
 
 struct WSLA_SESSION_SETTINGS {
