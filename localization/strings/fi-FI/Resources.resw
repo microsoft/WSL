@@ -730,9 +730,6 @@ Järjestelmä on ehkä käynnistettävä uudelleen, jotta muutokset tulevat voim
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Levyn koon muuttaminen epäonnistui.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Polun kääntäminen epäonnistui.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Arvoa ei löytynyt.</value>
   </data>

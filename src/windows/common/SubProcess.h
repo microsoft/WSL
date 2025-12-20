@@ -37,7 +37,6 @@ public:
     void InheritHandle(HANDLE Handle);
     void SetEnvironment(LPVOID Environment);
     void SetWorkingDirectory(LPCWSTR Directory);
-    void SetDesktop(LPCWSTR Desktop);
     void SetToken(HANDLE Token);
     void SetShowWindow(WORD Show);
     void SetFlags(DWORD Flag);

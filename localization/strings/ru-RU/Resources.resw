@@ -737,9 +737,6 @@
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Не удалось изменить размер диска.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Не удалось преобразовать путь.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Значение не найдено.</value>
   </data>

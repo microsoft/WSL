@@ -137,7 +137,7 @@ Return Value:
         auto translatedPath = WslPathTranslate(value.data(), TRANSLATE_FLAG_ABSOLUTE, TRANSLATE_MODE_UNIX);
         if (translatedPath.empty())
         {
-            std::cerr << Localization::MessageFailedToTranslatePath() << "\n";
+            std::cerr << Localization::MessageFailedToTranslate(value.data()) << "\n";
             return 1;
         }
 

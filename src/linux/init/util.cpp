@@ -1727,8 +1727,10 @@ Return Value:
     //
     // Mount the device to the mount point.
     //
-    // N.B. The mount operation is only retried if the mount source does not yet exist,
-    //      which can happen when hot-added devices are not yet available in the guest.
+    // N.B. The mount operation is retried if:
+    //      - The mount source does not yet exist (hot-added devices)
+    //      - For Plan9 (9p): device is busy or not found
+    //      - For VirtioFS: invalid tag (device not ready)
     //
 
     try
@@ -1741,7 +1743,23 @@ Return Value:
                 TimeoutSeconds.value(),
                 [&]() {
                     errno = wil::ResultFromCaughtException();
-                    return errno == ENOENT || errno == ENXIO || errno == EIO || ((strcmp(Type, VIRTIO_FS_TYPE) == 0) && (errno == EINVAL));
+
+                    // Generic device not ready errors
+                    if (errno == ENXIO || errno == EIO || errno == ENOENT)
+                    {
+                        return true;
+                    }
+
+                    // Filesystem-specific device readiness errors
+                    if (Type != nullptr)
+                    {
+                        if ((strcmp(Type, PLAN9_FS_TYPE) == 0 && errno == EBUSY) || (strcmp(Type, VIRTIO_FS_TYPE) == 0 && errno == EINVAL))
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
                 });
         }
         else
@@ -2905,14 +2923,16 @@ Return Value:
         std::string TranslatedPath = WslPathTranslate(Path, 0, Mode);
         if (TranslatedPath.empty())
         {
+            auto WarningMessage = wsl::shared::Localization::MessageFailedToTranslate(Path);
             if (wil::ScopedWarningsCollector::CanCollectWarning())
             {
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToTranslate(Path));
+                EMIT_USER_WARNING(std::move(WarningMessage));
             }
             else
             {
-                LOG_ERROR("Failed to translate {}", Path);
+                LOG_WARNING("{}", WarningMessage);
             }
+
             continue;
         }
 
