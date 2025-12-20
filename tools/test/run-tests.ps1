@@ -9,6 +9,8 @@
     Path to a setup script to be run prior to running the tests. Defaults to ".\test-setup.ps1".
 .PARAMETER DistroPath
     Path to a .tar/.tar.gz file of the distro to be imported to run the tests with. Defaults to ".\test_distro.tar.gz".
+.PARAMETER TestDataPath
+    Path to test data folder. Defaults to ".\test_data".
 .PARAMETER Package
     Path to the wsl.msix package to install. Defaults to ".\wsl.msix".
 .PARAMETER UnitTestsPath
@@ -28,6 +30,7 @@ param (
     [string]$Version = 2,
     [string]$SetupScript = ".\test-setup.ps1",
     [string]$DistroPath = ".\test_distro.tar.gz",
+    [string]$TestDataPath = ".\test_data",
     [string]$Package = ".\installer.msix",
     [string]$UnitTestsPath = ".\unit_tests",
     [switch]$PullRequest = $false,
@@ -45,7 +48,7 @@ if ($Fast)
     $SetupScript = $null
 }
 
-te.exe $TestDllPath /p:SetupScript=$SetupScript  /p:Version=$Version /p:DistroPath=$DistroPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
+te.exe $TestDllPath /p:SetupScript=$SetupScript /p:Version=$Version /p:DistroPath=$DistroPath /p:TestDataPath=$TestDataPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
 
 if (!$?)
 {

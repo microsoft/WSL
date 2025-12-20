@@ -29,6 +29,8 @@
     Skip copying over the distro.
 .PARAMETER TestDistroPath
     Path to the distro image to import and use for testing, if needed. Auto filled if left empty.
+.PARAMETER TestDataPath
+    Path to the test data folder to be copied to the VM, if needed. Auto filled if left empty.
 #>
 
 [CmdletBinding(PositionalBinding=$False, DefaultParameterSetName='vm')]
@@ -46,7 +48,8 @@ param (
     [string]$RemoteFolder = "C:\Package",
     [string]$TaefFolder = "C:\Taef",
     [switch]$SkipDistro,
-    [string]$TestDistroPath
+    [string]$TestDistroPath,
+    [string]$TestDataPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -98,6 +101,11 @@ if ([string]::IsNullOrEmpty($TestDistroPath)) {
     $TestDistroPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz"
 }
 
+if ([string]::IsNullOrEmpty($TestDataPath)) {
+    $TestDataVersion = (Select-Xml -Path "$PSScriptRoot\..\..\packages.config" -XPath '/packages/package[@id=''Microsoft.WSL.TestData'']/@version').Node.Value
+    $TestDataPath =  "$PSScriptRoot\..\..\packages\Microsoft.WSL.TestData.$TestDataVersion\build\native\bin\x64"
+}
+
 if ([string]::IsNullOrEmpty($ArtifactFolder)) {
     $ArtifactFolder = "$PSScriptRoot/../.."
 }
@@ -140,6 +148,8 @@ Copy-Item -ToSession $Session -Path "$PSScriptRoot/../../test/linux/unit_tests" 
 if (!$SkipDistro) {
     Copy-Item -ToSession $Session -Path $TestDistroPath -Destination "$RemoteFolder/test_distro.tar.gz" -Force
 }
+
+Copy-Item -ToSession $Session -Path $TestDataPath -Destination "$RemoteFolder/test_data" -Recurse -Force
 
 $taefVersion = (Select-Xml -Path "$PSScriptRoot\..\..\packages.config" -XPath '/packages/package[@id=''Microsoft.Taef'']/@version').Node.Value
 $taefPackage = "$ArtifactFolder/packages/Microsoft.Taef.$taefVersion/build/Binaries/$Platform"

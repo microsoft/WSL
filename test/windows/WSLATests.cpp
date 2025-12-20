@@ -33,6 +33,8 @@ DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 
 static std::filesystem::path storagePath;
 
+extern std::wstring g_testDataPath;
+
 class WSLATests
 {
     WSL_TEST_CLASS(WSLATests)
@@ -267,6 +269,71 @@ class WSLATests
         wil::com_ptr<IWSLASession> notFound;
         auto hr = userSession->OpenSessionByName(L"this-name-does-not-exist", &notFound);
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+    }
+
+    TEST_METHOD(PullImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-pull-image-test";
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+
+        auto session = CreateSession(settings);
+
+        VERIFY_SUCCEEDED(session->PullImage("hello-world", nullptr, nullptr));
+
+        // Verify that the image is in the list of images.
+        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
+        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
+        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+    }
+
+    TEST_METHOD(LoadImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-load-image-test";
+
+        auto session = CreateSession(settings);
+
+        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+        wil::unique_handle imageTarFileHandle{
+            CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr));
+
+        // Verify that the image is in the list of images.
+        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
+        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
+        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+    }
+
+    TEST_METHOD(ImportImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-import-image-test";
+
+        auto session = CreateSession(settings);
+
+        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+        wil::unique_handle imageTarFileHandle{
+            CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr));
+
+        // Verify that the image is in the list of images.
+        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
+        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
+        VERIFY_IS_TRUE(listImagesResult.Output[1].find("my-hello-world") != std::string::npos);
     }
 
     TEST_METHOD(CustomDmesgOutput)

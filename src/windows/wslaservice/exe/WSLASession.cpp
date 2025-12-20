@@ -19,6 +19,7 @@ Abstract:
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 
+using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
@@ -292,15 +293,84 @@ try
 }
 CATCH_LOG();
 
-HRESULT WSLASession::PullImage(LPCWSTR Image, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+try
 {
-    return E_NOTIMPL;
-}
+    UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
+    UNREFERENCED_PARAMETER(ProgressCallback);
 
-HRESULT WSLASession::ImportImage(ULONG Handle, LPCWSTR Image, IProgressCallback* ProgressCallback)
-{
-    return E_NOTIMPL;
+    RETURN_HR_IF_NULL(E_POINTER, ImageUri);
+
+    std::lock_guard lock{m_lock};
+
+    ServiceProcessLauncher launcher{nerdctlPath, {nerdctlPath, "pull", ImageUri}};
+    auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
+
+    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Pull image failed: %hs", launcher.FormatResult(result).c_str());
+
+    return S_OK;
 }
+CATCH_RETURN();
+
+HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback)
+try
+{
+    UNREFERENCED_PARAMETER(ProgressCallback);
+
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
+    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
+
+    std::lock_guard lock{m_lock};
+
+    // Directly invoking "nerdctl load" will immediately return with failure
+    // "stdin is empty and input flag is not specified".
+    // TODO: Change the workaround when nerdctl has a fix.
+    ServiceProcessLauncher launcher{
+        "/bin/sh", {"/bin/sh", "-c", "cat | /usr/bin/nerdctl load"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
+    auto loadProcess = launcher.Launch(*m_virtualMachine.Get());
+
+    auto loadProcessStdin = loadProcess.GetStdHandle(0);
+    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
+    wsl::windows::common::relay::InterruptableRelay(
+        imageFileHandle.get(), loadProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
+    loadProcessStdin.reset();
+
+    auto result = loadProcess.WaitAndCaptureOutput();
+
+    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Load image failed: %hs", launcher.FormatResult(result).c_str());
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback)
+try
+{
+    UNREFERENCED_PARAMETER(ProgressCallback);
+
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
+    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
+    RETURN_HR_IF_NULL(E_POINTER, ImageName);
+
+    std::lock_guard lock{m_lock};
+
+    ServiceProcessLauncher launcher{
+        nerdctlPath, {nerdctlPath, "import", "-", ImageName}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
+    auto importProcess = launcher.Launch(*m_virtualMachine.Get());
+
+    auto importProcessStdin = importProcess.GetStdHandle(0);
+    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
+    wsl::windows::common::relay::InterruptableRelay(
+        imageFileHandle.get(), importProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
+    importProcessStdin.reset();
+
+    auto result = importProcess.WaitAndCaptureOutput();
+
+    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Import image failed: %hs", launcher.FormatResult(result).c_str());
+
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
 {

@@ -65,6 +65,7 @@ std::optional<std::wstring> g_dumpToolPath;
 static bool g_enableWerReport = false;
 static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
+std::wstring g_testDataPath;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -2063,6 +2064,8 @@ Return Value:
     }
 
     g_testDistroPath = getTestParam(L"DistroPath");
+
+    g_testDataPath = getTestParam(L"TestDataPath");
 
     const auto setupScript = getOptionalTestParam(L"SetupScript");
     if (!setupScript.has_value())
