@@ -883,6 +883,17 @@ int WSLAEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
+    //
+    // Set the ephemeral port range
+    //
+
+    if (WriteToFile(
+            "/proc/sys/net/ipv4/ip_local_port_range",
+            std::format("{} {}", c_ephemeralPortRange.first, c_ephemeralPortRange.second).c_str()) < 0)
+    {
+        return -1;
+    }
+
     THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
 
     sigset_t mask{};

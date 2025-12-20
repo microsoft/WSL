@@ -85,6 +85,10 @@ public:
     void OnProcessReleased(int Pid);
     void RegisterCallback(_In_ ITerminationCallback* callback);
 
+    bool TryAllocatePort(uint16_t Port);
+    std::set<uint16_t> AllocatePorts(uint16_t Count);
+    void ReleasePorts(const std::set<uint16_t>& Ports);
+
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
         _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
@@ -140,6 +144,8 @@ private:
     Settings m_settings;
     std::thread m_processExitThread;
     std::thread m_crashDumpCollectionThread;
+
+    std::set<uint16_t> m_allocatedPorts;
 
     GUID m_vmId{};
     std::wstring m_vmIdString;

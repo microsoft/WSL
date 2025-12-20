@@ -133,6 +133,7 @@ struct WSLA_PORT_MAPPING
 {
     USHORT HostPort;
     USHORT ContainerPort;
+    int Family;
 };
 
 enum WSLA_CONTAINER_NETWORK_TYPE
