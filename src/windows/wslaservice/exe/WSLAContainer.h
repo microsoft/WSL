@@ -52,7 +52,8 @@ public:
         std::string&& Id,
         ContainerEventTracker& tracker,
         std::vector<VolumeMountInfo>&& volumes,
-        std::vector<PortMapping>&& ports);
+        std::vector<PortMapping>&& ports,
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
     ~WSLAContainerImpl();
 
     void Start(const WSLA_CONTAINER_OPTIONS& Options);
@@ -68,7 +69,11 @@ public:
     const std::string& Image() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
-    static std::unique_ptr<WSLAContainerImpl> Create(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM, ContainerEventTracker& tracker);
+    static std::unique_ptr<WSLAContainerImpl> Create(
+        const WSLA_CONTAINER_OPTIONS& Options,
+        WSLAVirtualMachine& parentVM,
+        ContainerEventTracker& tracker,
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
 private:
     void OnEvent(ContainerEvent event);
@@ -103,7 +108,7 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 {
 
 public:
-    WSLAContainer(WSLAContainerImpl* impl);
+    WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
     IFACEMETHOD(Delete)() override;
@@ -118,7 +123,7 @@ private:
     HRESULT CallImpl(void (WSLAContainerImpl::*routine)(Args... args), Args... args)
     try
     {
-        auto lock = m_lock.lock_shared();
+        std::lock_guard lock{m_lock};
         RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
 
         (m_impl->*routine)(std::forward<Args>(args)...);
@@ -128,6 +133,7 @@ private:
     CATCH_RETURN();
 
     WSLAContainerImpl* m_impl = nullptr;
-    wil::srwlock m_lock;
+    std::function<void(const WSLAContainerImpl*)> m_onDeleted;
+    std::recursive_mutex m_lock;
 };
 } // namespace wsl::windows::service::wsla

@@ -64,7 +64,7 @@ private:
 
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
     void Ext4Format(const std::string& Device);
-    void ClearDeletedContainers();
+    void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnContainerdLog(const gsl::span<char>& Data);
     void MonitorContainerd(ServiceRunningProcess&& process);
 

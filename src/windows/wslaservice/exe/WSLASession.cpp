@@ -324,8 +324,6 @@ try
     std::lock_guard lock{m_lock};
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    ClearDeletedContainers();
-
     // Validate that no container with the same name already exists.
     auto it = m_containers.find(containerOptions->Name);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_containers.end());
@@ -336,7 +334,9 @@ try
 
     // TODO: Log entrance into the function.
     auto [container, inserted] = m_containers.emplace(
-        containerOptions->Name, WSLAContainerImpl::Create(*containerOptions, *m_virtualMachine.Get(), *m_eventTracker));
+        containerOptions->Name,
+        WSLAContainerImpl::Create(
+            *containerOptions, *m_virtualMachine.Get(), *m_eventTracker, std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1)));
     WI_ASSERT(inserted);
 
     container->second->Start(*containerOptions);
@@ -367,7 +367,6 @@ try
     *Containers = nullptr;
 
     std::lock_guard lock{m_lock};
-    ClearDeletedContainers();
 
     auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
 
@@ -462,13 +461,8 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::ClearDeletedContainers()
+void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
     std::lock_guard lock{m_lock};
-    auto deleted = std::erase_if(m_containers, [](const auto& e) { return e.second->State() == WslaContainerStateDeleted; });
-
-    if (deleted > 0)
-    {
-        WSL_LOG("ClearedDeletedContainers", TraceLoggingValue(deleted, "Count"));
-    }
+    WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.second.get() == Container; }) == 1);
 }

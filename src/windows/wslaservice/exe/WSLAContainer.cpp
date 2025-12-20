@@ -140,14 +140,15 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Id,
     ContainerEventTracker& tracker,
     std::vector<VolumeMountInfo>&& volumes,
-    std::vector<PortMapping>&& ports) :
+    std::vector<PortMapping>&& ports,
+    std::function<void(const WSLAContainerImpl*)>&& onDeleted) :
     m_parentVM(parentVM),
     m_name(Options.Name),
     m_image(Options.Image),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
-    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this))
+    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted)))
 {
     m_state = WslaContainerStateCreated;
 
@@ -468,7 +469,10 @@ void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::v
 }
 
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
-    const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM, ContainerEventTracker& eventTracker)
+    const WSLA_CONTAINER_OPTIONS& containerOptions,
+    WSLAVirtualMachine& parentVM,
+    ContainerEventTracker& eventTracker,
+    std::function<void(const WSLAContainerImpl*)>&& OnDeleted)
 {
     auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
 
@@ -509,7 +513,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
     auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts));
+        &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted));
 
     errorCleanup.release();
 
@@ -613,13 +617,14 @@ std::optional<std::string> WSLAContainerImpl::GetNerdctlStatus()
     return status.empty() ? std::optional<std::string>{} : status;
 }
 
-WSLAContainer::WSLAContainer(WSLAContainerImpl* impl) : m_impl(impl)
+WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
+    m_impl(impl), m_onDeleted(std::move(OnDeleted))
 {
 }
 
 void WSLAContainer::Disconnect() noexcept
 {
-    auto lock = m_lock.lock_exclusive();
+    std::lock_guard lock(m_lock);
 
     WI_ASSERT(m_impl != nullptr);
     m_impl = nullptr;
@@ -633,6 +638,7 @@ HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
 
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
 {
+    *Process = nullptr;
     return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
 }
 
@@ -648,6 +654,15 @@ HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 }
 
 HRESULT WSLAContainer::Delete()
+try
 {
-    return CallImpl(&WSLAContainerImpl::Delete);
+    // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
+    std::lock_guard lock{m_lock};
+    RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
+
+    m_impl->Delete();
+    m_onDeleted(m_impl);
+
+    return S_OK;
 }
+CATCH_RETURN();
