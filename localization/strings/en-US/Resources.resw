@@ -730,9 +730,6 @@ The system may need to be restarted so the changes can take effect.</value>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Failed to resize disk.</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Failed to translate path.</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>No value found.</value>
   </data>

@@ -236,7 +236,7 @@ private:
     void ReadGuestCapabilities();
 
     _Requires_lock_held_(m_lock)
-    ULONG ReserveLun(_In_ std::optional<ULONG> Lun);
+    ULONG ReserveLun(_In_ std::optional<ULONG> Lun = {});
 
     void RestorePassthroughDiskState(_In_ LPCWSTR Disk) const;
 
@@ -290,6 +290,7 @@ private:
     bool m_defaultKernel = true;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;
     ULONG m_systemDistroDeviceId = ULONG_MAX;
+    ULONG m_kernelModulesDeviceId = ULONG_MAX;
     wsl::windows::common::hcs::unique_hcs_system m_system;
     wil::unique_socket m_listenSocket;
     std::function<void(GUID)> m_onExit;

@@ -66,12 +66,30 @@ Build parameters:
 ## Testing
 
 ### Unit Tests (Windows Only - TAEF Framework)
+
+**CRITICAL: ALWAYS build the ENTIRE project before running tests:**
+```powershell
+# Build everything first - this is required!
+cmake --build . -- -m
+
+# Then run tests
+bin\<platform>\<target>\test.bat
+```
+
+**Why full build is required:**
+- Tests depend on multiple components (libwsl.dll, wsltests.dll, wslservice.exe, etc.)
+- Partial builds (e.g., only `configfile` or `wsltests`) will cause test failures
+- Changed components must be built together to ensure compatibility
+- **DO NOT skip the full build step even if only one file changed**
+
+Test execution:
 - Run all tests: `bin\<platform>\<target>\test.bat`
 - **NEVER CANCEL: Full test suite takes 30-60 minutes. Set timeout to 90+ minutes.**
 - Run subset: `bin\<platform>\<target>\test.bat /name:*UnitTest*`
 - Run specific test: `bin\<platform>\<target>\test.bat /name:<class>::<test>`
 - WSL1 tests: Add `-Version 1` flag
 - Fast mode (after first run): Add `-f` flag (requires `wsl --set-default test_distro`)
+- **Requires Administrator privileges** - test.bat will fail without admin rights
 
 Test debugging:
 - Wait for debugger: `/waitfordebugger`

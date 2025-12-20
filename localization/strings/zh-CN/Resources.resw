@@ -736,9 +736,6 @@ Windows: {}</value>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>未能重设磁盘大小。</value>
   </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>无法转换路径。</value>
-  </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>找不到值。</value>
   </data>
