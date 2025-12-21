@@ -116,6 +116,7 @@
             <EventProviderId Value="lxcore_service"/>
             <EventProviderId Value="wsl_devicehost"/>
             <EventProviderId Value="wslclient"/>
+            <EventProviderId Value="wslaservice"/>
             <EventProviderId Value="wslapi"/>
             <EventProviderId Value="vfpext"/>
             <EventProviderId Value="vm_chipset"/>
