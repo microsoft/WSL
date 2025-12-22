@@ -68,7 +68,7 @@ private:
 
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
     void Ext4Format(const std::string& Device);
-    void ClearDeletedContainers();
+    void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnContainerdLog(const gsl::span<char>& Data);
     void MonitorContainerd(ServiceRunningProcess&& process);
 
@@ -80,7 +80,7 @@ private:
     std::thread m_containerdThread;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
-    std::map<std::string, Microsoft::WRL::ComPtr<WSLAContainer>> m_containers;
+    std::map<std::string, std::unique_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     std::recursive_mutex m_lock;
 };

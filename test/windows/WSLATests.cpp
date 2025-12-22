@@ -1349,13 +1349,7 @@ class WSLATests
 
             // Create a stuck container.
             WSLAContainerLauncher launcher(
-                "debian:latest",
-                "test-container-1",
-                "sleep",
-                {"sleep", "99999"},
-                {},
-                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest", "test-container-1", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
             auto container = launcher.Launch(*session);
 
@@ -1399,13 +1393,7 @@ class WSLATests
         {
             // Create a container
             WSLAContainerLauncher launcher(
-                "debian:latest",
-                "test-container-2",
-                "sleep",
-                {"sleep", "99999"},
-                {},
-                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest", "test-container-2", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
             auto container = launcher.Launch(*session);
 
@@ -1439,13 +1427,7 @@ class WSLATests
         // Validate that container names are unique.
         {
             WSLAContainerLauncher launcher(
-                "debian:latest",
-                "test-unique-name",
-                "sleep",
-                {"99999"},
-                {},
-                WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
-                ProcessFlags::Stdout | ProcessFlags::Stderr);
+                "debian:latest", "test-unique-name", "sleep", {"99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -1482,10 +1464,10 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Delete());
 
             // Verify that stopping a deleted container returns ERROR_INVALID_STATE.
-            VERIFY_ARE_EQUAL(container.Get().Stop(15, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container.Get().Stop(15, 0), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers can't be deleted again.
-            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers don't show up in the container list.
             expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
@@ -1503,6 +1485,22 @@ class WSLATests
             auto result = otherLauncher.Launch(*session).GetInitProcess().WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
             VERIFY_ARE_EQUAL(result.Code, 0);
+        }
+
+        // Validate that containers behave correctly if they outlive their session.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-dangling-ref", "sleep", {"99999"}, {});
+            auto container = launcher.Launch(*session);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            // Terminate the session
+            session.reset();
+
+            // Validate that calling into the container returns RPC_E_DISCONNECTED.
+            WSLA_CONTAINER_STATE state = WslaContainerStateRunning;
+            VERIFY_ARE_EQUAL(container.Get().GetState(&state), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(state, WslaContainerStateInvalid);
         }
     }
 

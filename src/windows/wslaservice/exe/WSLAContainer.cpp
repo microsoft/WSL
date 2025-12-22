@@ -18,6 +18,7 @@ Abstract:
 
 using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
+using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 // Constants for required default arguments for "nerdctl create..."
@@ -49,7 +50,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     // Generate Windows <-> VM port mappings depending on the networking mode.
     // N.B. pointers are used so the vectors are still available if the errorCleanup is executed.
     auto vmPorts = std::make_shared<std::set<uint16_t>>();
-    auto mappedPorts = std::make_shared<std::vector<WSLAContainer::PortMapping>>();
+    auto mappedPorts = std::make_shared<std::vector<WSLAContainerImpl::PortMapping>>();
 
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [mappedPorts = mappedPorts, vmPorts = vmPorts, &vm]() {
         if (!vmPorts->empty())
@@ -133,32 +134,37 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
 
 static constexpr DWORD deleteTimeout = 60000; // 60 seconds
 
-WSLAContainer::WSLAContainer(
+WSLAContainerImpl::WSLAContainerImpl(
     WSLAVirtualMachine* parentVM,
     const WSLA_CONTAINER_OPTIONS& Options,
     std::string&& Id,
     ContainerEventTracker& tracker,
     std::vector<VolumeMountInfo>&& volumes,
-    std::vector<PortMapping>&& ports) :
+    std::vector<PortMapping>&& ports,
+    std::function<void(const WSLAContainerImpl*)>&& onDeleted) :
     m_parentVM(parentVM),
     m_name(Options.Name),
     m_image(Options.Image),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
-    m_mappedPorts(std::move(ports))
+    m_mappedPorts(std::move(ports)),
+    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted)))
 {
     m_state = WslaContainerStateCreated;
 
-    m_trackingReference = tracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainer::OnEvent, this, std::placeholders::_1));
+    m_trackingReference = tracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1));
 }
 
-WSLAContainer::~WSLAContainer()
+WSLAContainerImpl::~WSLAContainerImpl()
 {
     WSL_LOG(
-        "~WSLAContainer",
+        "~WSLAContainerImpl",
         TraceLoggingValue(m_name.c_str(), "Name"),
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
+
+    // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
+    m_comWrapper->Disconnect();
 
     // TODO: Stop and delete running containers when the session is shutting down
     // so that we don't leak resources since we do not have means to track them after
@@ -166,7 +172,11 @@ WSLAContainer::~WSLAContainer()
 
     if (m_state == WslaContainerStateExited)
     {
-        LOG_IF_FAILED(Delete());
+        try
+        {
+            Delete();
+        }
+        CATCH_LOG();
     }
 
     m_trackingReference.Reset();
@@ -190,12 +200,17 @@ WSLAContainer::~WSLAContainer()
     m_parentVM->ReleasePorts(allocatedGuestPorts);
 }
 
-const std::string& WSLAContainer::Image() const noexcept
+const std::string& WSLAContainerImpl::Image() const noexcept
 {
     return m_image;
 }
 
-void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
+IWSLAContainer& WSLAContainerImpl::ComWrapper()
+{
+    return *m_comWrapper.Get();
+}
+
+void WSLAContainerImpl::Start(const WSLA_CONTAINER_OPTIONS& Options)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
@@ -238,7 +253,7 @@ void WSLAContainer::Start(const WSLA_CONTAINER_OPTIONS& Options)
     m_state = WslaContainerStateRunning;
 }
 
-void WSLAContainer::OnEvent(ContainerEvent event)
+void WSLAContainerImpl::OnEvent(ContainerEvent event)
 {
     if (event == ContainerEvent::Start)
     {
@@ -252,14 +267,13 @@ void WSLAContainer::OnEvent(ContainerEvent event)
         TraceLoggingValue((int)event, "Event"));
 }
 
-HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
-try
+void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
 {
     std::lock_guard lock(m_lock);
 
     if (State() == WslaContainerStateExited)
     {
-        return S_OK;
+        return;
     }
 
     /* 'nerdctl stop ...'
@@ -272,7 +286,7 @@ try
      */
 
     // Validate that the container is in the running state.
-    RETURN_HR_IF_MSG(
+    THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
         m_state != WslaContainerStateRunning,
         "Container '%hs' is not in a stoppable state: %i",
@@ -288,17 +302,14 @@ try
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 
     m_state = WslaContainerStateExited;
-    return S_OK;
 }
-CATCH_RETURN();
 
-HRESULT WSLAContainer::Delete()
-try
+void WSLAContainerImpl::Delete()
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // Validate that the container is in the exited state.
-    RETURN_HR_IF_MSG(
+    THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
         State() != WslaContainerStateExited,
         "Cannot delete container '%hs', state: %i",
@@ -312,11 +323,9 @@ try
     UnmountVolumes(m_mountedVolumes, *m_parentVM);
 
     m_state = WslaContainerStateDeleted;
-    return S_OK;
 }
-CATCH_RETURN();
 
-WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
+WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
@@ -330,29 +339,21 @@ WSLA_CONTAINER_STATE WSLAContainer::State() noexcept
     return m_state;
 }
 
-HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
-try
+void WSLAContainerImpl::GetState(WSLA_CONTAINER_STATE* Result)
 {
     *Result = State();
-
-    return S_OK;
 }
-CATCH_RETURN();
 
-HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
-try
+void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_containerProcess.has_value());
-    return m_containerProcess->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process);
+    THROW_IF_FAILED(m_containerProcess->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
 }
-CATCH_RETURN();
 
-HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
-try
+void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 {
-    *Errno = -1;
     THROW_HR_IF_MSG(E_INVALIDARG, Options->Executable != nullptr, "Executable must be null");
 
     std::lock_guard lock{m_lock};
@@ -399,12 +400,9 @@ try
     THROW_IF_FAILED(result);
 
     THROW_IF_FAILED(process->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
-
-    return S_OK;
 }
-CATCH_RETURN();
 
-std::pair<bool, bool> WSLAContainer::ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options)
+std::pair<bool, bool> WSLAContainerImpl::ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options)
 {
     bool hasStdin = false;
     bool hasTty = false;
@@ -424,7 +422,7 @@ std::pair<bool, bool> WSLAContainer::ParseFdStatus(const WSLA_PROCESS_OPTIONS& O
     return {hasStdin, hasTty};
 }
 
-void WSLAContainer::AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options)
+void WSLAContainerImpl::AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options)
 {
     for (ULONG i = 0; i < options.EnvironmentCount; i++)
     {
@@ -434,7 +432,7 @@ void WSLAContainer::AddEnvironmentVariables(std::vector<std::string>& args, cons
     }
 }
 
-std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainer::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
+std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainerImpl::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
 {
     std::vector<VolumeMountInfo> mountedVolumes;
     mountedVolumes.reserve(Options.VolumesCount);
@@ -462,7 +460,7 @@ std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainer::MountVo
     return mountedVolumes;
 }
 
-void wsl::windows::service::wsla::WSLAContainer::UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM)
+void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM)
 {
     for (const auto& volume : volumes)
     {
@@ -470,8 +468,11 @@ void wsl::windows::service::wsla::WSLAContainer::UnmountVolumes(const std::vecto
     }
 }
 
-Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
-    const WSLA_CONTAINER_OPTIONS& containerOptions, WSLAVirtualMachine& parentVM, ContainerEventTracker& eventTracker)
+std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
+    const WSLA_CONTAINER_OPTIONS& containerOptions,
+    WSLAVirtualMachine& parentVM,
+    ContainerEventTracker& eventTracker,
+    std::function<void(const WSLAContainerImpl*)>&& OnDeleted)
 {
     auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
 
@@ -511,15 +512,15 @@ Microsoft::WRL::ComPtr<WSLAContainer> WSLAContainer::Create(
     }
 
     // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
-    auto container = wil::MakeOrThrow<WSLAContainer>(
-        &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts));
+    auto container = std::make_unique<WSLAContainerImpl>(
+        &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted));
 
     errorCleanup.release();
 
     return container;
 }
 
-std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(
+std::vector<std::string> WSLAContainerImpl::PrepareNerdctlCreateCommand(
     const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes)
 {
     std::vector<std::string> args{nerdctlPath};
@@ -594,7 +595,7 @@ std::vector<std::string> WSLAContainer::PrepareNerdctlCreateCommand(
     return args;
 }
 
-std::optional<std::string> WSLAContainer::GetNerdctlStatus()
+std::optional<std::string> WSLAContainerImpl::GetNerdctlStatus()
 {
     ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "inspect", "-f", "{{.State.Status}}", m_name});
     auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
@@ -615,3 +616,53 @@ std::optional<std::string> WSLAContainer::GetNerdctlStatus()
     // N.B. nerdctl inspect can return with exit code 0 and no output. Return an empty optional if that happens.
     return status.empty() ? std::optional<std::string>{} : status;
 }
+
+WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
+    m_impl(impl), m_onDeleted(std::move(OnDeleted))
+{
+}
+
+void WSLAContainer::Disconnect() noexcept
+{
+    std::lock_guard lock(m_lock);
+
+    WI_ASSERT(m_impl != nullptr);
+    m_impl = nullptr;
+}
+
+HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
+{
+    *Result = WslaContainerStateInvalid;
+    return CallImpl(&WSLAContainerImpl::GetState, Result);
+}
+
+HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
+{
+    *Process = nullptr;
+    return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
+}
+
+HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
+{
+    *Errno = -1;
+    return CallImpl(&WSLAContainerImpl::Exec, Options, Process, Errno);
+}
+
+HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
+{
+    return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutMs);
+}
+
+HRESULT WSLAContainer::Delete()
+try
+{
+    // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
+    std::lock_guard lock{m_lock};
+    RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
+
+    m_impl->Delete();
+    m_onDeleted(m_impl);
+
+    return S_OK;
+}
+CATCH_RETURN();
