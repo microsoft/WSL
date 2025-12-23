@@ -148,7 +148,7 @@ void WSLAVirtualMachine::Start()
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
 
     // Determine which schema version to use based on the Windows version. Windows 10 does not support
-    // newer schema versions and some feature may be disabled as a result.
+    // newer schema versions and some features may be disabled as a result.
     if (wsl::windows::common::helpers::IsWindows11OrAbove())
     {
         systemSettings.SchemaVersion.Major = 2;
