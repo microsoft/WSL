@@ -97,13 +97,19 @@ void DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::s
 
     WSL_LOG("HTTPResult", TraceLoggingValue(parser.get().result_int(), "Status"));
 
-    while (true)
+    boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
+    stream.assign(hv_proto, socket.release());
+
+    while (!parser.is_done())
     {
-        auto bytesRead = common::socket::Receive(socket.get(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), buffer.size()), m_exitingEvent);
-        if (bytesRead == 0)
-        {
-            break;
-        }
-        OnResponse(gsl::span<char>{buffer.data(), gsl::narrow_cast<size_t>(bytesRead)});
+        boost::beast::flat_buffer adapter;
+
+        parser.get().body().data = buffer.data();
+        parser.get().body().size = buffer.size();
+        http::read(stream, adapter, parser);
+
+        auto bytesRead = parser.get().body().size - buffer.size();
+
+        OnResponse(gsl::span<char>{buffer.data(), bytesRead});
     }
 }
