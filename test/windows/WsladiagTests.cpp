@@ -130,5 +130,23 @@ class WsladiagTests
 
         VERIFY_IS_TRUE(err.find(L"Usage:") != std::wstring::npos);
     }
+
+    TEST_METHOD(Help_ShortAndLongFlags_Match)
+    {
+        auto [outH, errH, codeH] = RunWsladiag(L"-h");
+        auto [outLong, errLong, codeLong] = RunWsladiag(L"--help");
+
+        VERIFY_ARE_EQUAL(0, codeH);
+        VERIFY_ARE_EQUAL(0, codeLong);
+
+        VERIFY_ARE_EQUAL(L"", outH);
+        VERIFY_ARE_EQUAL(L"", outLong);
+
+        VERIFY_ARE_EQUAL(errH, errLong);
+
+        VERIFY_IS_TRUE(errH.find(L"Usage:") != std::wstring::npos);
+        VERIFY_IS_TRUE(errH.find(L"wsladiag list") != std::wstring::npos);
+        VERIFY_IS_TRUE(errH.find(L"wsladiag shell <SessionName> [--verbose]") != std::wstring::npos);
+    }
 };
 } // namespace WsladiagTests
