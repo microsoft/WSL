@@ -2,11 +2,21 @@
 
 #include "DockerHTTPClient.h"
 
+using boost::beast::http::verb;
 using wsl::windows::service::wsla::DockerHTTPClient;
 
 DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
     m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
 {
+}
+
+uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback)
+{
+    auto [code, _] = SendRequest(verb::post, std::format("http://localhost/images/create?fromImage=library/{}&tag={}", Name, Tag), {}, [Callback](const gsl::span<char>& span) {
+        Callback(std::string{span.data(), span.size()});
+    });
+
+    return code;
 }
 
 wil::unique_socket DockerHTTPClient::ConnectSocket()
@@ -35,7 +45,7 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     return newChannel.Release();
 }
 
-void DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::string& Url, const OnResponseBytes& OnResponse, const std::string& Body)
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::string& Url, const std::string& Body, const OnResponseBytes& OnResponse)
 {
     namespace http = boost::beast::http;
 
@@ -43,20 +53,16 @@ void DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::s
     boost::asio::generic::stream_protocol::socket stream(context);
 
     // Write the request
-    {
-        boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
-        stream.assign(hv_proto, ConnectSocket().release());
+    boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
+    stream.assign(hv_proto, ConnectSocket().release());
 
-        // boost::beast::basic_stream<boost::asio::generic::stream_protocol::socket> wrapped_stream;
+    http::request<http::string_body> req{Method, Url, 11};
+    req.set(http::field::host, "localhost");
+    req.set(http::field::connection, "close");
+    req.set(http::field::accept, "application/json");
+    req.prepare_payload();
 
-        http::request<http::string_body> req{http::verb::get, Url, 11};
-        req.set(http::field::host, "hvsocket"); // label only; AF_HYPERV doesn't do DNS
-        req.prepare_payload();
-
-        http::write(stream, req);
-    }
-
-    wil::unique_socket socket{stream.release()};
+    http::write(stream, req);
 
     // Parse the response header
     std::vector<char> buffer(16 * 4096);
@@ -66,12 +72,12 @@ void DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::s
 
     size_t lineFeeds = 0;
 
-    // Consume the socket until the header is reached
+    // Consume the socket until the header end is reached
     while (!parser.is_header_done())
     {
         // Peek for the end of the HTTP header '\r\n'
         auto bytesRead = common::socket::Receive(
-            socket.get(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), buffer.size()), m_exitingEvent, MSG_PEEK);
+            stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), buffer.size()), m_exitingEvent, MSG_PEEK);
 
         size_t i{};
         for (i = 0; i < bytesRead && lineFeeds < 2; i++)
@@ -87,7 +93,7 @@ void DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::s
         }
 
         // Consumme the buffer from the socket.
-        bytesRead = common::socket::Receive(socket.get(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), i), m_exitingEvent);
+        bytesRead = common::socket::Receive(stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), i), m_exitingEvent);
         WI_ASSERT(bytesRead == i);
 
         boost::beast::error_code error;
@@ -95,21 +101,26 @@ void DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::s
         THROW_HR_IF(E_UNEXPECTED, error && error != boost::beast::http::error::need_more);
     }
 
-    WSL_LOG("HTTPResult", TraceLoggingValue(parser.get().result_int(), "Status"));
+    WSL_LOG("HTTPResult", TraceLoggingValue(Url.c_str(), "Url"), TraceLoggingValue(parser.get().result_int(), "Status"));
 
-    boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
-    stream.assign(hv_proto, socket.release());
-
-    while (!parser.is_done())
+    if (OnResponse)
     {
-        boost::beast::flat_buffer adapter;
+        while (!parser.is_done())
+        {
+            boost::beast::flat_buffer adapter;
 
-        parser.get().body().data = buffer.data();
-        parser.get().body().size = buffer.size();
-        http::read(stream, adapter, parser);
+            parser.get().body().data = buffer.data();
+            parser.get().body().size = buffer.size();
+            http::read(stream, adapter, parser);
 
-        auto bytesRead = parser.get().body().size - buffer.size();
 
-        OnResponse(gsl::span<char>{buffer.data(), bytesRead});
+            WSL_LOG("Sizes", TraceLoggingValue(parser.get().body().size));
+
+            auto bytesRead = buffer.size() - parser.get().body().size;
+
+            OnResponse(gsl::span<char>{buffer.data(), bytesRead});
+        }
     }
+
+    return {parser.get().result_int(), wil::unique_socket{stream.release()}};
 }

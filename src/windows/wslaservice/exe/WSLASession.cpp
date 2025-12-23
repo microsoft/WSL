@@ -18,7 +18,6 @@ Abstract:
 #include "WSLAContainer.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
-#include "DockerHTTPClient.h"
 
 using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
@@ -68,16 +67,11 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLA_FORK::Thread);
 
-    DockerHTTPClient client(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
-    client.SendRequest(boost::beast::http::verb::get, "/info", [](const gsl::span<char>& span) {
-        WSL_LOG("Response", TraceLoggingValue(span.data(), "data"));
-    });
-    // auto response = DockerRequest("/info");
-
-    //WSL_LOG("Info", TraceLoggingValue(response.c_str(), "DockerInfo"));
-    // Start the event tracker.
-    // m_eventTracker.emplace(*m_virtualMachine.Get());
+    // WSL_LOG("Info", TraceLoggingValue(response.c_str(), "DockerInfo"));
+    //  Start the event tracker.
+    //  m_eventTracker.emplace(*m_virtualMachine.Get());
 
     errorCleanup.release();
 }
@@ -310,10 +304,18 @@ try
 
     std::lock_guard lock{m_lock};
 
-    ServiceProcessLauncher launcher{nerdctlPath, {nerdctlPath, "pull", ImageUri}};
-    auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
+    std::string image{ImageUri};
+    size_t separator = image.find(':');
+    THROW_HR_IF_MSG(E_INVALIDARG, separator == std::string::npos || separator >= image.size() - 1, "Invalid image: %hs", ImageUri);
 
-    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Pull image failed: %hs", launcher.FormatResult(result).c_str());
+    auto callback = [&](const std::string &content)
+    {
+        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(content.c_str(), "Content"));
+    };
+
+    auto code = m_dockerClient->PullImage(image.substr(0, separator).c_str(), image.substr(separator + 1).c_str(), callback);
+
+    THROW_HR_IF_MSG(E_FAIL, code != 200, "Failed to pull image: %hs", ImageUri);
 
     return S_OK;
 }

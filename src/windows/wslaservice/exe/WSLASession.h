@@ -18,6 +18,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "WSLAContainer.h"
 #include "ContainerEventTracker.h"
+#include "DockerHTTPClient.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -75,6 +76,7 @@ private:
     std::string DockerRequest(const std::string& Url);
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
+    std::optional<DockerHTTPClient> m_dockerClient;
     WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;

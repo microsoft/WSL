@@ -1643,6 +1643,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     }
     else
     {
+        THROW_IF_FAILED(session->PullImage(containerImage.c_str(), nullptr, nullptr));
+
         std::vector<WSLA_PROCESS_FD> fds{
             WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput},
             WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput},
