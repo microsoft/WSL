@@ -52,23 +52,11 @@ static int RunShellCommand(std::wstring_view commandLine)
     parser.AddPositionalArgument(sessionName, 0);
     parser.AddArgument(verbose, L"--verbose", L'v');
 
-    try
-    {
-        parser.Parse();
-    }
-    catch (...)
-    {
-        const auto hr = wil::ResultFromCaughtException();
-        if (hr == E_INVALIDARG)
-        {
-            return 1;
-        }
-        throw;
-    }
+    parser.Parse();
 
     if (sessionName.empty())
     {
-        return 1;
+        THROW_HR(E_INVALIDARG);
     }
 
     const auto log = [&](std::wstring_view msg) {
@@ -168,31 +156,10 @@ static int RunShellCommand(std::wstring_view commandLine)
 
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
-    std::optional<wsl::shared::SocketChannel> controlChannel;
-    try
-    {
-        auto ttyControl = process.GetStdHandle(2); // only once
-        controlChannel.emplace(wil::unique_socket{(SOCKET)ttyControl.release()}, "TerminalControl", exitEvent.get());
-    }
-    catch (const wil::ResultException& e)
-    {
-        const HRESULT hr = e.GetErrorCode();
-        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
-        {
-            log(L"[diag] TerminalControl not available; live resize disabled");
-        }
-        else
-        {
-            throw; // or ReportError + return
-        }
-    }
+    auto ttyControl = process.GetStdHandle(2); // TerminalControl
+    wsl::shared::SocketChannel controlChannel{wil::unique_socket{(SOCKET)ttyControl.release()}, "TerminalControl", exitEvent.get()};
 
     auto updateTerminalSize = [&]() {
-        if (!controlChannel.has_value())
-        {
-            return;
-        }
-
         CONSOLE_SCREEN_BUFFER_INFOEX infoEx{};
         infoEx.cbSize = sizeof(infoEx);
         THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(consoleOut, &infoEx));
@@ -201,7 +168,7 @@ static int RunShellCommand(std::wstring_view commandLine)
         message.Columns = static_cast<unsigned short>(infoEx.srWindow.Right - infoEx.srWindow.Left + 1);
         message.Rows = static_cast<unsigned short>(infoEx.srWindow.Bottom - infoEx.srWindow.Top + 1);
 
-        controlChannel->SendMessage(message);
+        controlChannel.SendMessage(message);
     };
 
     // Start input relay thread to forward console input to TTY
@@ -228,8 +195,6 @@ static int RunShellCommand(std::wstring_view commandLine)
     // Relay tty output -> console (blocks until output ends).
     wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), consoleOut, exitEvent.get());
 
-    // Output relay finished - signal input thread to stop and wait for process exit
-    exitEvent.SetEvent();
     process.GetExitEvent().wait();
 
     auto exitCode = process.GetExitCode();
@@ -347,20 +312,7 @@ int wsladiag_main(std::wstring_view commandLine)
     parser.AddPositionalArgument(verb, 0);
     parser.AddArgument(help, L"--help", L'h');
 
-    try
-    {
-        parser.Parse();
-    }
-    catch (...)
-    {
-        const auto hr = wil::ResultFromCaughtException();
-        if (hr == E_INVALIDARG)
-        {
-            PrintUsage();
-            return 1;
-        }
-        throw;
-    }
+    parser.Parse(); // Let exceptions propagate to wmain for centralized handling
 
     if (help || verb.empty())
     {
@@ -384,7 +336,6 @@ int wsladiag_main(std::wstring_view commandLine)
     {
         wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
         PrintUsage();
-
         return 1;
     }
 }
@@ -398,6 +349,11 @@ int wmain(int, wchar_t**)
     catch (...)
     {
         const auto hr = wil::ResultFromCaughtException();
+        if (hr == E_INVALIDARG)
+        {
+            PrintUsage();
+            return 1;
+        }
         return ReportError(L"wsladiag failed", hr);
     }
 }
