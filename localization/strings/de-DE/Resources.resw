@@ -295,7 +295,7 @@ und "wsl.exe --install &lt;Distro&gt;".</value>
     <value>Die Distribution ist bereits die angeforderte Version.</value>
   </data>
   <data name="MessageVmModeNotSupported" xml:space="preserve">
-    <value>WSL 2 wird von der Legacy Distribution nicht unterstützt.</value>
+    <value>WSL 2 wird von der Legacy-Distribution nicht unterstützt.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 wird von Ihrer aktuellen Computerkonfiguration nicht unterstützt.
