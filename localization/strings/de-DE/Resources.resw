@@ -427,7 +427,7 @@ Argumente für die Verwaltung des Windows-Subsystems für Linux:
         Eine WSL2-Debugshell zu Diagnosezwecken öffnen.
 
     --install [Distribution] [Optionen...]
-        Eine Windows-Subsystem für die Linux Distribution installieren.
+        Eine Windows-Subsystem für die Linux-Distribution installieren.
         Verwenden Sie 'wsl.exe --list --online', um eine Liste gültiger Distributionen zu erhalten.
 
         Optionen:
