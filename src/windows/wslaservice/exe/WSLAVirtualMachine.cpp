@@ -112,10 +112,10 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
         CATCH_LOG()
     }
 
-    try
+    if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
     {
         // If the VM did not crash, the saved state file should be empty, so we can remove it.
-        if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
+        try
         {
             WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
             std::filesystem::remove(m_vmSavedStateFile);
@@ -146,8 +146,19 @@ void WSLAVirtualMachine::Start()
     hcs::ComputeSystem systemSettings{};
     systemSettings.Owner = L"WSL";
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
-    systemSettings.SchemaVersion.Major = 2;
-    systemSettings.SchemaVersion.Minor = 7;
+
+    // Determine which schema version to use based on the Windows version. Windows 10 does not support
+    // newer schema versions and some feature may be disabled as a result.
+    if (wsl::windows::common::helpers::IsWindows11OrAbove())
+    {
+        systemSettings.SchemaVersion.Major = 2;
+        systemSettings.SchemaVersion.Minor = 7;
+    }
+    else
+    {
+        systemSettings.SchemaVersion.Major = 2;
+        systemSettings.SchemaVersion.Minor = 3;
+    }
 
     hcs::VirtualMachine vmSettings{};
     vmSettings.StopOnReset = true;
@@ -162,12 +173,8 @@ void WSLAVirtualMachine::Start()
     // Configure backing page size, fault cluster shift size, and cold discard hint size to favor density (lower vmmem usage).
     //
     // N.B. Cold discard hint size should be a multiple of the fault cluster shift size.
-    //
-    // N.B. This is only done on builds that have the fix for the VID deadlock on partition teardown.
-    if ((m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && m_windowsVersion.UpdateBuildRevision >= 2360) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && m_windowsVersion.UpdateBuildRevision >= 1970) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && m_windowsVersion.UpdateBuildRevision >= 3393))
+    const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+    if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
     {
         vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
         vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;          // 64k
@@ -290,14 +297,16 @@ void WSLAVirtualMachine::Start()
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
 
-    CreateVmSavedStateFile();
-    WI_ASSERT(!m_vmSavedStateFile.empty());
+    // Enable .vmrs dump collection if supported.
+    if (wsl::windows::common::helpers::IsWindows11OrAbove())
+    {
+        CreateVmSavedStateFile();
+        WI_ASSERT(!m_vmSavedStateFile.empty());
 
-    // Prepare debug options: create saved state (.vmrs) file and grant vmwp access.
-    hcs::DebugOptions debugOptions{};
-    debugOptions.BugcheckSavedStateFileName = m_vmSavedStateFile;
-
-    vmSettings.DebugOptions = std::move(debugOptions);
+        hcs::DebugOptions debugOptions{};
+        debugOptions.BugcheckSavedStateFileName = m_vmSavedStateFile;
+        vmSettings.DebugOptions = std::move(debugOptions);
+    }
 
     systemSettings.VirtualMachine = std::move(vmSettings);
     auto json = wsl::shared::ToJsonW(systemSettings);
@@ -518,11 +527,11 @@ void WSLAVirtualMachine::ConfigureNetworking()
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
 
-        // TODO-WSLA: Implement firewall logic
-        /*if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(config))
+        // Disable HyperV Firewall if not supported
+        if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(config))
         {
             config.FirewallConfig.reset();
-        }*/
+        }
 
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
