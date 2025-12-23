@@ -318,6 +318,11 @@ public:
         return m_socket.get();
     }
 
+    auto Release()
+    {
+        return std::move(m_socket);
+    }
+
     bool Connected() const
     {
         return m_socket.get() >= 0;
