@@ -122,15 +122,6 @@ class WsladiagTests
         VERIFY_IS_TRUE(err.find(L"Session not found: 'DefinitelyNotARealSession'") != std::wstring::npos);
     }
 
-    TEST_METHOD(Help_ShortFlag_ShowsUsage)
-    {
-        auto [out, err, code] = RunWsladiag(L"-h");
-        VERIFY_ARE_EQUAL(0, code);
-        VERIFY_ARE_EQUAL(L"", out);
-
-        VERIFY_IS_TRUE(err.find(L"Usage:") != std::wstring::npos);
-    }
-
     TEST_METHOD(Help_ShortAndLongFlags_Match)
     {
         auto [outH, errH, codeH] = RunWsladiag(L"-h");
