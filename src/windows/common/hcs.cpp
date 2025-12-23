@@ -182,6 +182,8 @@ std::pair<uint32_t, uint32_t> wsl::windows::common::hcs::GetSchemaVersion()
                 }
             }
         }
+
+        g_schemaVersion = {majorVersion, minorVersion};
     });
 
     return g_schemaVersion;
@@ -249,7 +251,7 @@ void wsl::windows::common::hcs::RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR Fil
 {
     WSL_LOG_DEBUG("HcsRevokeVmAccess", TraceLoggingValue(VmId, "vmId"), TraceLoggingValue(FilePath, "filePath"));
 
-    ExecutionContext context(Context::HNS);
+    ExecutionContext context(Context::HCS);
 
     THROW_IF_FAILED_MSG(::HcsRevokeVmAccess(VmId, FilePath), "HcsRevokeVmAccess(%ls, %ls)", VmId, FilePath);
 }
