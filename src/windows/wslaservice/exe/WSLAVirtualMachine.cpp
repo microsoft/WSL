@@ -120,8 +120,8 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
             WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
             std::filesystem::remove(m_vmSavedStateFile);
         }
+        CATCH_LOG()
     }
-    CATCH_LOG()
 
     if (m_processExitThread.joinable())
     {
