@@ -100,9 +100,9 @@ wsl::windows::common::hcs::unique_hcs_system wsl::windows::common::hcs::CreateCo
 
 std::vector<std::string> wsl::windows::common::hcs::GetProcessorFeatures()
 {
-    static std::vector<std::string> g_processorFeatures;
+    static std::optional<std::vector<std::string>> g_processorFeatures;
     static std::once_flag flag;
-    std::call_once(flag, [&]() {
+    std::call_once(flag, []() {
         ExecutionContext context(Context::HCS);
 
         wil::unique_cotaskmem_string result;
@@ -120,7 +120,9 @@ std::vector<std::string> wsl::windows::common::hcs::GetProcessorFeatures()
         g_processorFeatures = std::move(response.Response.ProcessorFeatures);
     });
 
-    return g_processorFeatures;
+    // If we reach here after call_once, initialization succeeded. The optional will be set.
+    // If call_once threw, we never reach this line.
+    return g_processorFeatures.value();
 }
 
 wsl::shared::hns::HNSEndpoint wsl::windows::common::hcs::GetEndpointProperties(HCN_ENDPOINT Endpoint)
@@ -156,9 +158,9 @@ GUID wsl::windows::common::hcs::GetRuntimeId(_In_ HCS_SYSTEM ComputeSystem)
 
 std::pair<uint32_t, uint32_t> wsl::windows::common::hcs::GetSchemaVersion()
 {
-    static std::pair<uint32_t, uint32_t> g_schemaVersion{};
+    static std::optional<std::pair<uint32_t, uint32_t>> g_schemaVersion;
     static std::once_flag flag;
-    std::call_once(flag, [&]() {
+    std::call_once(flag, []() {
         ExecutionContext context(Context::HCS);
 
         PropertyQuery query;
@@ -186,7 +188,9 @@ std::pair<uint32_t, uint32_t> wsl::windows::common::hcs::GetSchemaVersion()
         g_schemaVersion = {majorVersion, minorVersion};
     });
 
-    return g_schemaVersion;
+    // If we reach here after call_once, initialization succeeded. The optional will be set.
+    // If call_once threw, we never reach this line.
+    return g_schemaVersion.value();
 }
 
 void wsl::windows::common::hcs::GrantVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR FilePath)
