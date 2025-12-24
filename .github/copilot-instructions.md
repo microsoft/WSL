@@ -37,7 +37,7 @@ Build parameters:
 - `cmake . -DBUILD_BUNDLE=TRUE` - Build bundle msix package (requires ARM64 built first)
 
 ### Deploying WSL (Windows Only)  
-- Install MSI: `bin\<platform>\<target>\wsl.msi`
+- Install MSI: `bin\<platform>\<target>\wsl.msi` and `bin\<platform>\<target>\wsla.msi`
 - OR use script: `powershell tools\deploy\deploy-to-host.ps1`
 - For Hyper-V VM: `powershell tools\deploy\deploy-to-vm.ps1 -VmName <vm> -Username <user> -Password <pass>`
 
