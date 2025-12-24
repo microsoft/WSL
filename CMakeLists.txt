@@ -40,6 +40,36 @@ FetchContent_Declare(nlohmannjson
 FetchContent_MakeAvailable(nlohmannjson)
 FetchContent_GetProperties(nlohmannjson SOURCE_DIR NLOHMAN_JSON_SOURCE_DIR)
 
+FetchContent_Declare(httplib SYSTEM
+    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib
+    GIT_TAG v0.28.0
+    GIT_SHALLOW TRUE)
+
+FetchContent_MakeAvailable(httplib)
+FetchContent_GetProperties(httplib SOURCE_DIR HTTP_LIB_SOURCE_DIR)
+
+
+set(BOOST_VERSION "1.90.0")
+set(BOOST_TARBALL "boost_${BOOST_VERSION}")
+string(REPLACE "." "_" BOOST_TARBALL "${BOOST_TARBALL}") # 1.84.0 -> 1_84_0
+
+FetchContent_Declare(
+  boost_headers
+  URL https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_TARBALL}.tar.gz
+  # You can add URL_HASH to pin integrity:
+  # URL_HASH SHA256=<checksum>
+)
+
+# Download & unpack to boost_headers_SOURCE_DIR (no add_subdirectory!)
+FetchContent_GetProperties(boost_headers)
+if(NOT boost_headers_POPULATED)
+  FetchContent_Populate(boost_headers)
+endif()
+
+# Path where Boost headers reside (root has 'boost/' folder)
+include_directories(${boost_headers_SOURCE_DIR})
+
+
 # Import modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(IDL REQUIRED)
@@ -314,6 +344,7 @@ set(LINUX_COMMON_FLAGS --gcc-toolchain=${LINUXSDK_PATH}
                        -I "${CMAKE_CURRENT_LIST_DIR}/src/shared/configfile"
                        -I "${CMAKE_CURRENT_LIST_DIR}/src/shared/inc"
                        -I "${NLOHMAN_JSON_SOURCE_DIR}/include"
+                       -I "${HTTP_LIB_SOURCE_DIR}"
                        -I "${CMAKE_BINARY_DIR}/generated"
                        --no-standard-libraries
                        -Werror

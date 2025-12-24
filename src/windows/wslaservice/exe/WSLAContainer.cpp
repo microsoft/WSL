@@ -138,21 +138,23 @@ WSLAContainerImpl::WSLAContainerImpl(
     WSLAVirtualMachine* parentVM,
     const WSLA_CONTAINER_OPTIONS& Options,
     std::string&& Id,
-    ContainerEventTracker& tracker,
     std::vector<VolumeMountInfo>&& volumes,
     std::vector<PortMapping>&& ports,
-    std::function<void(const WSLAContainerImpl*)>&& onDeleted) :
+    std::function<void(const WSLAContainerImpl*)>&& onDeleted,
+    DockerHTTPClient& DockerClient) :
     m_parentVM(parentVM),
     m_name(Options.Name),
     m_image(Options.Image),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
-    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted)))
+    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
+    m_dockerClient(DockerClient)
 {
     m_state = WslaContainerStateCreated;
 
-    m_trackingReference = tracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1));
+    // Attach to the tty now. This is required not to 'drop' tty content before GetTtyHandle is called().
+    m_TtyHandle = m_dockerClient.AttachContainer(m_id);
 }
 
 WSLAContainerImpl::~WSLAContainerImpl()
@@ -178,8 +180,6 @@ WSLAContainerImpl::~WSLAContainerImpl()
         }
         CATCH_LOG();
     }
-
-    m_trackingReference.Reset();
 
     // Release port mappings.
     std::set<uint16_t> allocatedGuestPorts;
@@ -221,36 +221,17 @@ void WSLAContainerImpl::Start(const WSLA_CONTAINER_OPTIONS& Options)
         m_name.c_str(),
         m_state);
 
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "start", "-a", m_id}, defaultNerdctlEnv, common::ProcessFlags::None);
-    for (auto i = 0; i < Options.InitProcessOptions.FdsCount; i++)
-    {
-        launcher.AddFd(Options.InitProcessOptions.Fds[i]);
-    }
+    auto result = m_dockerClient.StartContainer(m_id);
+    THROW_HR_IF_MSG(E_FAIL, result.StatusCode != 204, "Failed to start container: %hs, %hs", m_id.c_str(), result.Format().c_str());
 
-    m_containerProcess = launcher.Launch(*m_parentVM);
-
-    auto cleanup = wil::scope_exit([&]() { m_containerProcess.reset(); });
-
-    // Wait for either the container to get into a 'started' state, or the nerdctl process to exit.
-    common::relay::MultiHandleWait wait;
-    wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_containerProcess->GetExitEvent(), [&]() { wait.Cancel(); }));
-    wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_startedEvent.get(), [&]() { wait.Cancel(); }));
-    wait.Run({});
-
-    if (!m_startedEvent.is_signaled())
-    {
-        auto status = GetNerdctlStatus();
-
-        THROW_HR_IF_MSG(
-            E_FAIL,
-            status != "exited",
-            "Failed to start container %hs, nerdctl status: %hs",
-            m_name.c_str(),
-            status.value_or("<empty>").c_str());
-    }
-
-    cleanup.release();
     m_state = WslaContainerStateRunning;
+}
+
+void WSLAContainerImpl::GetTtyHandle(ULONG* Handle)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess((HANDLE)m_TtyHandle.get()));
 }
 
 void WSLAContainerImpl::OnEvent(ContainerEvent event)
@@ -471,49 +452,26 @@ void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::v
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
-    ContainerEventTracker& eventTracker,
-    std::function<void(const WSLAContainerImpl*)>&& OnDeleted)
+    std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+    DockerHTTPClient& DockerClient)
 {
+    // TODO: Think about when 'StdinOnce' should be set.
     auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
 
-    // Don't support stdin for now since it will hang.
-    // TODO: Remove once stdin is fixed in nerdctl.
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hasStdin && !hasTty);
+    auto result = DockerClient.CreateContainer(
+        {.Image = containerOptions.Image, .Tty = hasTty, .OpenStdin = true, .StdinOnce = true, .AttachStdin = false, .AttachStdout = false, .AttachStderr = false});
 
-    std::vector<std::string> inputOptions;
-    if (hasStdin)
-    {
-        inputOptions.push_back("-i");
-    }
-
-    if (hasTty)
-    {
-        inputOptions.push_back("-t");
-    }
-
-    AddEnvironmentVariables(inputOptions, containerOptions.InitProcessOptions);
+    THROW_HR_IF_MSG(E_FAIL, !result.ResponseObject.has_value(), "Failed to create container: %hs", result.Format().c_str());
 
     // TODO: Rethink command line generation logic.
-    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, inputOptions);
+    std::vector<std::string> dummy;
+    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, dummy);
 
     auto volumes = MountVolumes(containerOptions, parentVM);
-    auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions), volumes);
-
-    ServiceProcessLauncher launcher(nerdctlPath, args, defaultNerdctlEnv);
-    auto result = launcher.Launch(parentVM).WaitAndCaptureOutput();
-
-    // TODO: Have better error codes.
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "Failed to create container: %hs", launcher.FormatResult(result).c_str());
-
-    auto id = result.Output[1];
-    while (!id.empty() && (id.back() == '\n'))
-    {
-        id.pop_back();
-    }
 
     // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
     auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted));
+        &parentVM, containerOptions, std::move(result.ResponseObject->Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), DockerClient);
 
     errorCleanup.release();
 
@@ -651,6 +609,11 @@ HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** 
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 {
     return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutMs);
+}
+
+HRESULT WSLAContainer::GetTtyHandle(ULONG* Handle)
+{
+    return CallImpl(&WSLAContainerImpl::GetTtyHandle, Handle);
 }
 
 HRESULT WSLAContainer::Delete()

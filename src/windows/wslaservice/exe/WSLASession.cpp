@@ -23,7 +23,7 @@ using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
-constexpr auto c_containerdStorage = "/var/lib/containerd";
+constexpr auto c_containerdStorage = "/var/lib/docker";
 
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
 
@@ -55,8 +55,8 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
     // Launch containerd
     // TODO: Rework the daemon logic so we can have only one thread watching all daemons.
     ServiceProcessLauncher launcher{
-        "/usr/bin/containerd",
-        {"/usr/bin/containerd"},
+        "/usr/bin/dockerd",
+        {"/usr/bin/dockerd"},
         {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}},
         common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
     m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine.Get()));
@@ -65,8 +65,13 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
     // TODO: Configurable timeout.
     THROW_WIN32_IF_MSG(ERROR_TIMEOUT, !m_containerdReadyEvent.wait(10 * 1000), "Timed out waiting for containerd to start");
 
-    // Start the event tracker.
-    m_eventTracker.emplace(*m_virtualMachine.Get());
+    auto [_, __, channel] = m_virtualMachine->Fork(WSLA_FORK::Thread);
+
+    m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+
+    // WSL_LOG("Info", TraceLoggingValue(response.c_str(), "DockerInfo"));
+    //  Start the event tracker.
+    //  m_eventTracker.emplace(*m_virtualMachine.Get());
 
     errorCleanup.release();
 }
@@ -239,22 +244,18 @@ try
         return;
     }
 
-    constexpr auto c_containerdReadyLogLine = "containerd successfully booted";
+    constexpr auto c_containerdReadyLogLine = "API listen on /var/run/docker.sock";
 
     std::string entry = {buffer.begin(), buffer.end()};
     WSL_LOG("ContainerdLog", TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
 
-    auto parsed = nlohmann::json::parse(entry);
+    // auto parsed = nlohmann::json::parse(entry);
 
     if (!m_containerdReadyEvent.is_signaled())
     {
-        auto it = parsed.find("msg");
-        if (it != parsed.end())
+        if (entry.find(c_containerdReadyLogLine) != std::string::npos)
         {
-            if (it->get<std::string>().starts_with(c_containerdReadyLogLine))
-            {
-                m_containerdReadyEvent.SetEvent();
-            }
+            m_containerdReadyEvent.SetEvent();
         }
     }
 }
@@ -303,10 +304,17 @@ try
 
     std::lock_guard lock{m_lock};
 
-    ServiceProcessLauncher launcher{nerdctlPath, {nerdctlPath, "pull", ImageUri}};
-    auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
+    std::string image{ImageUri};
+    size_t separator = image.find(':');
+    THROW_HR_IF_MSG(E_INVALIDARG, separator == std::string::npos || separator >= image.size() - 1, "Invalid image: %hs", ImageUri);
 
-    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Pull image failed: %hs", launcher.FormatResult(result).c_str());
+    auto callback = [&](const std::string& content) {
+        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(content.c_str(), "Content"));
+    };
+
+    auto code = m_dockerClient->PullImage(image.substr(0, separator).c_str(), image.substr(separator + 1).c_str(), callback);
+
+    THROW_HR_IF_MSG(E_FAIL, code != 200, "Failed to pull image: %hs", ImageUri);
 
     return S_OK;
 }
@@ -406,7 +414,11 @@ try
     auto [container, inserted] = m_containers.emplace(
         containerOptions->Name,
         WSLAContainerImpl::Create(
-            *containerOptions, *m_virtualMachine.Get(), *m_eventTracker, std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1)));
+            *containerOptions,
+            *m_virtualMachine.Get(),
+            std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
+            m_dockerClient.value()));
+
     WI_ASSERT(inserted);
 
     container->second->Start(*containerOptions);
@@ -535,4 +547,36 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
     std::lock_guard lock{m_lock};
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.second.get() == Container; }) == 1);
+}
+
+std::string WSLASession::DockerRequest(const std::string& Url)
+{
+    wil::unique_socket socket;
+    {
+        std::lock_guard lock{m_lock};
+        socket = m_virtualMachine->ConnectUnixSocket("/var/run/docker.sock");
+    }
+
+    namespace http = boost::beast::http;
+
+    boost::asio::io_context context;
+
+    boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
+
+    boost::asio::generic::stream_protocol::stream_protocol::socket stream(context);
+    stream.assign(hv_proto, socket.release());
+
+    http::request<http::string_body> req{http::verb::get, Url, 11};
+    req.set(http::field::host, "hvsocket"); // label only; AF_HYPERV doesn't do DNS
+    req.prepare_payload();
+
+    WSL_LOG("Written", TraceLoggingValue(http::write(stream, req), "Bytes"));
+
+    boost::beast::flat_buffer buffer; // for header/body framing
+    http::response<http::string_body> res;
+    http::read(stream, buffer, res);
+
+    WSL_LOG("HTTPREsult", TraceLoggingValue(res.result_int(), "Status"));
+
+    return res.body();
 }
