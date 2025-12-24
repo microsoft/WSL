@@ -32,7 +32,7 @@ constexpr auto MAX_CRASH_DUMPS = 10;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
-constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20000, 65535);
+constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
