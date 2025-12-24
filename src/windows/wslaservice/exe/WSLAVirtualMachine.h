@@ -149,7 +149,6 @@ private:
 
     GUID m_vmId{};
     std::wstring m_vmIdString;
-    wsl::windows::common::helpers::WindowsVersion m_windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
     int m_coldDiscardShiftSize{};
     bool m_running = false;
     PSID m_userSid{};
