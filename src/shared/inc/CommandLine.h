@@ -307,8 +307,8 @@ class ArgumentParser
 public:
 #ifdef WIN32
 
-    ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool IgnoreUnknownArgs = false) :
-        m_startIndex(StartIndex), m_name(Name), m_stopUnknownArgs(IgnoreUnknownArgs)
+    ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool stopUnknownArgs = false) :
+        m_startIndex(StartIndex), m_name(Name), m_stopUnknownArgs(stopUnknownArgs)
     {
         m_argv.reset(CommandLineToArgvW(std::wstring(CommandLine).c_str(), &m_argc));
         THROW_LAST_ERROR_IF(!m_argv);
@@ -316,8 +316,8 @@ public:
 
 #else
 
-    ArgumentParser(int argc, const char* const* argv, bool IgnoreUnknownArgs = false) :
-        m_argc(argc), m_argv(argv), m_startIndex(1), m_stopUnknownArgs(IgnoreUnknownArgs)
+    ArgumentParser(int argc, const char* const* argv, bool stopUnknownArgs = false) :
+        m_argc(argc), m_argv(argv), m_startIndex(1), m_stopUnknownArgs(stopUnknownArgs)
     {
     }
 
@@ -402,7 +402,7 @@ public:
                         const TChar* value = nullptr;
                         if (e.Positional)
                         {
-                            value = m_argv[i]; // Positional arguments directly receive arvg[i]
+                            value = m_argv[i]; // Positional arguments directly receive argv[i]
                         }
                         else if (i + 1 < m_argc)
                         {
