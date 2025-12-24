@@ -308,8 +308,7 @@ try
     size_t separator = image.find(':');
     THROW_HR_IF_MSG(E_INVALIDARG, separator == std::string::npos || separator >= image.size() - 1, "Invalid image: %hs", ImageUri);
 
-    auto callback = [&](const std::string &content)
-    {
+    auto callback = [&](const std::string& content) {
         WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(content.c_str(), "Content"));
     };
 
@@ -415,7 +414,11 @@ try
     auto [container, inserted] = m_containers.emplace(
         containerOptions->Name,
         WSLAContainerImpl::Create(
-            *containerOptions, *m_virtualMachine.Get(), *m_eventTracker, std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1)));
+            *containerOptions,
+            *m_virtualMachine.Get(),
+            std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
+            m_dockerClient.value()));
+
     WI_ASSERT(inserted);
 
     container->second->Start(*containerOptions);

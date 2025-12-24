@@ -1663,8 +1663,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
         THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
 
         wil::com_ptr<IWSLAProcess> initProcess;
-        THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
-        process.emplace(std::move(initProcess), std::move(fds));
+        // THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
+        // process.emplace(std::move(initProcess), std::move(fds));
     }
 
     // Save original console modes so they can be restored on exit.
@@ -1692,9 +1692,28 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
 
+    auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
+
+    if (!containerImage.empty())
+    {
+        wil::unique_handle ttyHandle;
+        THROW_IF_FAILED(container->get()->GetTtyHandle(reinterpret_cast<ULONG*>(&ttyHandle)));
+
+        std::thread inputThread(
+            [&]() { wsl::windows::common::relay::StandardInputRelay(Stdin, ttyHandle.get(), []() {}, exitEvent.get()); });
+
+        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            exitEvent.SetEvent();
+            inputThread.join();
+        });
+
+        // Relay the contents of the pipe to stdout.
+        wsl::windows::common::relay::InterruptableRelay(ttyHandle.get(), Stdout);
+        return 0;
+    }
+
     {
         // Create a thread to relay stdin to the pipe.
-        auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
         wsl::shared::SocketChannel controlChannel{
             wil::unique_socket{(SOCKET)process->GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};

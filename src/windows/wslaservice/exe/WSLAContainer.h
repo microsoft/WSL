@@ -18,6 +18,7 @@ Abstract:
 #include "wslaservice.h"
 #include "WSLAVirtualMachine.h"
 #include "ContainerEventTracker.h"
+#include "DockerHTTPClient.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -50,10 +51,10 @@ public:
         WSLAVirtualMachine* parentVM,
         const WSLA_CONTAINER_OPTIONS& Options,
         std::string&& Id,
-        ContainerEventTracker& tracker,
         std::vector<VolumeMountInfo>&& volumes,
         std::vector<PortMapping>&& ports,
-        std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+        DockerHTTPClient& DockerClient);
     ~WSLAContainerImpl();
 
     void Start(const WSLA_CONTAINER_OPTIONS& Options);
@@ -63,6 +64,7 @@ public:
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
+    void GetTtyHandle(_Out_ ULONG* Handle);
 
     IWSLAContainer& ComWrapper();
 
@@ -72,8 +74,8 @@ public:
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLAVirtualMachine& parentVM,
-        ContainerEventTracker& tracker,
-        std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+        DockerHTTPClient& DockerClient);
 
 private:
     void OnEvent(ContainerEvent event);
@@ -87,12 +89,13 @@ private:
     std::string m_name;
     std::string m_image;
     std::string m_id;
+    DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
-    ContainerEventTracker::ContainerTrackingReference m_trackingReference;
     std::vector<PortMapping> m_mappedPorts;
     std::vector<VolumeMountInfo> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
+    wil::unique_socket m_TtyHandle;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(
         const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes);
@@ -115,6 +118,7 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
+    IFACEMETHOD(GetTtyHandle)(_Out_ ULONG* Handle) override;
 
     void Disconnect() noexcept;
 

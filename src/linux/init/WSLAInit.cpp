@@ -184,6 +184,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_OPEN& Mes
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
 {
+
+    // Make sure to close the channel since no more messages can be processed after this.
+    auto closeChannel = wil::scope_exit([&]() { Channel.Close(); });
+
     int result = -1;
 
     auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
@@ -210,10 +214,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
 
     sendResult.reset();
 
-    LOG_ERROR("Connected to unix socket {}", path);
-
     // Relay data between the two sockets.
-
     pollfd pollDescriptors[2];
     pollDescriptors[0].fd = socket.get();
     pollDescriptors[0].events = POLLIN;
@@ -248,8 +249,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
                     LOG_ERROR("write failed {}", errno);
                     break;
                 }
-
-                LOG_ERROR("Relayed: {} bytes from unix socket to hvsocket", bytesWritten);
             }
         }
 
@@ -275,8 +274,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
                     LOG_ERROR("write failed {}", errno);
                     break;
                 }
-
-                LOG_ERROR("Relayed: {} bytes from hvsocket to unix socket", bytesWritten);
             }
         }
     }

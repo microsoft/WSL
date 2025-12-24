@@ -1946,7 +1946,7 @@ struct WSLA_UNIX_CONNECT
     unsigned int PathOffset;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset)); 
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

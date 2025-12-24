@@ -402,8 +402,7 @@ void WSLAVirtualMachine::ConfigureMounts()
         "net_prio",
         "hugetlb",
         "pids",
-        "rdma"
-    };
+        "rdma"};
 
     for (const auto* e : cgroups)
     {
@@ -1546,13 +1545,13 @@ void WSLAVirtualMachine::ReleasePorts(const std::set<uint16_t>& Ports)
     }
 }
 
-wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char *Path)
+wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char* Path)
 {
     auto [_, __, channel] = Fork(WSLA_FORK::Thread);
 
     shared::MessageWriter<WSLA_UNIX_CONNECT> message;
     message.WriteString(message->PathOffset, Path);
-    
+
     auto result = channel.Transaction<WSLA_UNIX_CONNECT>(message.Span());
 
     THROW_HR_IF_MSG(E_FAIL, result.Result < 0, "Failed to connect to unix socket: '%hs', %i", Path, result.Result);

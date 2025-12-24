@@ -15,6 +15,7 @@ set(SOURCES
 
 set(HEADERS
     ContainerEventTracker.h
+    docker_schema.h
     DockerHTTPClient.h
     ServiceProcessLauncher.h
     WSLAContainer.h

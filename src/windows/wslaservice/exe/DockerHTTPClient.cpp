@@ -4,6 +4,7 @@
 
 using boost::beast::http::verb;
 using wsl::windows::service::wsla::DockerHTTPClient;
+using namespace wsl::windows::service::wsla::docker_schema;
 
 DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
     m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
@@ -12,11 +13,40 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 
 uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback)
 {
-    auto [code, _] = SendRequest(verb::post, std::format("http://localhost/images/create?fromImage=library/{}&tag={}", Name, Tag), {}, [Callback](const gsl::span<char>& span) {
-        Callback(std::string{span.data(), span.size()});
-    });
+    auto [code, _] = SendRequest(
+        verb::post,
+        std::format("http://localhost/images/create?fromImage=library/{}&tag={}", Name, Tag),
+        {},
+        [Callback](const gsl::span<char>& span) { Callback(std::string{span.data(), span.size()}); });
 
     return code;
+}
+
+DockerHTTPClient::RequestResult<CreatedContainer> DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
+{
+    // TODO: Url escaping.
+    return SendRequest<docker_schema::CreateContainer>(verb::post, "http://localhost/containers/create", Request);
+}
+
+DockerHTTPClient::RequestResult<void> DockerHTTPClient::StartContainer(const std::string& Id)
+{
+    RequestResult<void> result;
+    std::tie(result.StatusCode, result.ResponseString) = Transaction(verb::post, std::format("http://localhost/containers/{}/start", Id));
+
+    return result;
+}
+
+wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
+{
+    std::map<boost::beast::http::field, std::string> headers{
+        {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
+
+    auto [status, socket] = SendRequest(
+        verb::post, std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1&logs=true", Id), {}, {}, headers);
+
+    THROW_HR_IF_MSG(E_FAIL, status != 101, "Failed to attach to container %hs: %i", Id.c_str(), status);
+
+    return std::move(socket);
 }
 
 wil::unique_socket DockerHTTPClient::ConnectSocket()
@@ -45,7 +75,22 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     return newChannel.Release();
 }
 
-std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(boost::beast::http::verb Method, const std::string& Url, const std::string& Body, const OnResponseBytes& OnResponse)
+std::pair<uint32_t, std::string> DockerHTTPClient::Transaction(verb Method, const std::string& Url, const std::string& Body)
+{
+    std::string responseBody;
+    auto OnResponse = [&responseBody](const gsl::span<char>& span) { responseBody.append(span.data(), span.size()); };
+
+    auto [status, _] = SendRequest(Method, Url, Body, OnResponse);
+
+    return {status, std::move(responseBody)};
+}
+
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
+    verb Method,
+    const std::string& Url,
+    const std::string& Body,
+    const OnResponseBytes& OnResponse,
+    const std::map<boost::beast::http::field, std::string>& Headers)
 {
     namespace http = boost::beast::http;
 
@@ -60,6 +105,17 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(boost::bea
     req.set(http::field::host, "localhost");
     req.set(http::field::connection, "close");
     req.set(http::field::accept, "application/json");
+    if (!Body.empty())
+    {
+        req.set(http::field::content_type, "application/json");
+        req.body() = Body;
+    }
+
+    for (const auto [field, value] : Headers)
+    {
+        req.set(field, value);
+    }
+
     req.prepare_payload();
 
     http::write(stream, req);
@@ -112,9 +168,6 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(boost::bea
             parser.get().body().data = buffer.data();
             parser.get().body().size = buffer.size();
             http::read(stream, adapter, parser);
-
-
-            WSL_LOG("Sizes", TraceLoggingValue(parser.get().body().size));
 
             auto bytesRead = buffer.size() - parser.get().body().size;
 
