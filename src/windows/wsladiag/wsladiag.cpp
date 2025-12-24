@@ -165,8 +165,8 @@ static int RunShellCommand(std::wstring_view commandLine)
         THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(consoleOut, &infoEx));
 
         WSLA_TERMINAL_CHANGED message{};
-        message.Columns = static_cast<unsigned short>(infoEx.srWindow.Right - infoEx.srWindow.Left + 1);
-        message.Rows = static_cast<unsigned short>(infoEx.srWindow.Bottom - infoEx.srWindow.Top + 1);
+        message.Columns = infoEx.srWindow.Right - infoEx.srWindow.Left + 1;
+        message.Rows = infoEx.srWindow.Bottom - infoEx.srWindow.Top + 1;
 
         controlChannel.SendMessage(message);
     };
