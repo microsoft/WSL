@@ -21,6 +21,7 @@ class WsladiagTests
 {
     WSL_TEST_CLASS(WsladiagTests)
 
+    // Initialize the tests
     TEST_CLASS_SETUP(TestClassSetup)
     {
         VERIFY_ARE_EQUAL(LxsstuInitialize(FALSE), TRUE);
@@ -32,96 +33,35 @@ class WsladiagTests
         LxsstuUninitialize(FALSE);
         return true;
     }
-
-    static std::wstring BuildWsladiagCmd(const std::wstring& args)
-    {
-        const auto exePath = wsl::windows::common::wslutil::GetBasePath() / L"wsladiag.exe";
-        VERIFY_IS_TRUE(std::filesystem::exists(exePath));
-
-        const auto exe = exePath.wstring();
-        return args.empty() ? std::format(L"\"{}\"", exe) : std::format(L"\"{}\" {}", exe, args);
-    }
-
-    static std::tuple<std::wstring, std::wstring, int> RunWsladiag(const std::wstring& args)
-    {
-        auto cmd = BuildWsladiagCmd(args);
-        return LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data());
-    }
-
+    // Test that wsladiag list command shows either sessions or "no sessions" message
     TEST_METHOD(List_ShowsSessionsOrNoSessions)
     {
         auto [out, err, code] = RunWsladiag(L"list");
         VERIFY_ARE_EQUAL(0, code);
         VERIFY_ARE_EQUAL(L"", err);
 
-        const bool noSessions = (out.find(L"No WSLA sessions found.") != std::wstring::npos);
-
-        const bool hasTable = (out.find(L"WSLA session") != std::wstring::npos) && (out.find(L"ID") != std::wstring::npos) &&
-                              (out.find(L"Display Name") != std::wstring::npos);
-
-        VERIFY_IS_TRUE(noSessions || hasTable);
+        ValidateListOutput(out);
     }
 
+    // Test that wsladiag --help shows usage information
     TEST_METHOD(Help_ShowsUsage)
     {
         auto [out, err, code] = RunWsladiag(L"--help");
         VERIFY_ARE_EQUAL(0, code);
         VERIFY_ARE_EQUAL(L"", out);
-
-        VERIFY_IS_TRUE(err.find(L"Usage:") != std::wstring::npos);
-        VERIFY_IS_TRUE(err.find(L"wsladiag list") != std::wstring::npos);
-        VERIFY_IS_TRUE(err.find(L"wsladiag shell <SessionName> [--verbose]") != std::wstring::npos);
+        ValidateUsage(err);
     }
 
-    TEST_METHOD(Shell_MissingName_ShowsUsage)
-    {
-        auto [out, err, code] = RunWsladiag(L"shell");
-        VERIFY_ARE_NOT_EQUAL(0, code);
-        VERIFY_ARE_EQUAL(L"", out);
-
-        VERIFY_IS_TRUE(err.find(L"Usage:") != std::wstring::npos);
-        VERIFY_IS_TRUE(err.find(L"wsladiag shell <SessionName> [--verbose]") != std::wstring::npos);
-    }
-
-    TEST_METHOD(Shell_InvalidSessionName_Verbose)
-    {
-        auto [out, err, code] = RunWsladiag(L"shell DefinitelyNotARealSession --verbose");
-        VERIFY_ARE_NOT_EQUAL(0, code);
-
-        VERIFY_IS_TRUE(out.find(L"[diag] shell='DefinitelyNotARealSession'") != std::wstring::npos);
-        VERIFY_IS_TRUE(err.find(L"Session not found: 'DefinitelyNotARealSession'") != std::wstring::npos);
-    }
-
-    TEST_METHOD(UnknownCommand_ShowsUsage)
-    {
-        auto [out, err, code] = RunWsladiag(L"blah");
-        VERIFY_ARE_NOT_EQUAL(0, code);
-        VERIFY_ARE_EQUAL(L"", out);
-
-        VERIFY_IS_TRUE(err.find(L"Unknown command: 'blah'") != std::wstring::npos);
-        VERIFY_IS_TRUE(err.find(L"Usage:") != std::wstring::npos);
-    }
-
+    // Test that wsladiag with no arguments shows usage information
     TEST_METHOD(EmptyCommand_ShowsUsage)
     {
         auto [out, err, code] = RunWsladiag(L"");
         VERIFY_ARE_EQUAL(0, code);
         VERIFY_ARE_EQUAL(L"", out);
-
-        VERIFY_IS_TRUE(err.find(L"Usage:") != std::wstring::npos);
-        VERIFY_IS_TRUE(err.find(L"wsladiag list") != std::wstring::npos);
-        VERIFY_IS_TRUE(err.find(L"wsladiag shell <SessionName> [--verbose]") != std::wstring::npos);
+        ValidateUsage(err);
     }
 
-    TEST_METHOD(Shell_InvalidSessionName_Silent)
-    {
-        auto [out, err, code] = RunWsladiag(L"shell DefinitelyNotARealSession");
-        VERIFY_ARE_NOT_EQUAL(0, code);
-        VERIFY_ARE_EQUAL(L"", out);
-
-        VERIFY_IS_TRUE(err.find(L"Session not found: 'DefinitelyNotARealSession'") != std::wstring::npos);
-    }
-
+    // Test that -h and --help flags produce identical output
     TEST_METHOD(Help_ShortAndLongFlags_Match)
     {
         auto [outH, errH, codeH] = RunWsladiag(L"-h");
@@ -134,10 +74,93 @@ class WsladiagTests
         VERIFY_ARE_EQUAL(L"", outLong);
 
         VERIFY_ARE_EQUAL(errH, errLong);
+        ValidateUsage(errH);
+    }
 
-        VERIFY_IS_TRUE(errH.find(L"Usage:") != std::wstring::npos);
-        VERIFY_IS_TRUE(errH.find(L"wsladiag list") != std::wstring::npos);
-        VERIFY_IS_TRUE(errH.find(L"wsladiag shell <SessionName> [--verbose]") != std::wstring::npos);
+    // Test that unknown commands show error message and usage
+    TEST_METHOD(UnknownCommand_ShowsUsage)
+    {
+        auto [out, err, code] = RunWsladiag(L"blah");
+        VERIFY_ARE_NOT_EQUAL(0, code);
+        VERIFY_ARE_EQUAL(L"", out);
+
+        VERIFY_IS_TRUE(err.find(L"Unknown command: 'blah'") != std::wstring::npos);
+        ValidateUsage(err);
+    }
+
+    // Test that shell command without session name shows usage
+    TEST_METHOD(Shell_MissingName_ShowsUsage)
+    {
+        auto [out, err, code] = RunWsladiag(L"shell");
+        VERIFY_ARE_NOT_EQUAL(0, code);
+        VERIFY_ARE_EQUAL(L"", out);
+        ValidateUsage(err);
+    }
+
+    // Test shell command with invalid session name (silent mode)
+    TEST_METHOD(Shell_InvalidSessionName_Silent)
+    {
+        const std::wstring name = L"DefinitelyNotARealSession";
+        auto [out, err, code] = RunWsladiag(std::format(L"shell {}", name));
+        VERIFY_ARE_NOT_EQUAL(0, code);
+        VERIFY_ARE_EQUAL(L"", out);
+
+        ValidateSessionNotFound(err, name);
+    }
+
+    // Test shell command with invalid session name (verbose mode)
+    TEST_METHOD(Shell_InvalidSessionName_Verbose)
+    {
+        const std::wstring name = L"DefinitelyNotARealSession";
+        auto [out, err, code] = RunWsladiag(std::format(L"shell {} --verbose", name));
+        VERIFY_ARE_NOT_EQUAL(0, code);
+
+        VERIFY_IS_TRUE(out.find(std::format(L"[diag] shell='{}'", name)) != std::wstring::npos);
+        ValidateSessionNotFound(err, name);
+    }
+
+    // Build command line for wsladiag.exe with given arguments
+    static std::wstring BuildWsladiagCmd(const std::wstring& args)
+    {
+        const auto msiPathOpt = wsl::windows::common::wslutil::GetMsiPackagePath();
+        VERIFY_IS_TRUE(msiPathOpt.has_value());
+
+        const auto exePath = std::filesystem::path(*msiPathOpt) / L"wsladiag.exe";
+        const auto exe = exePath.wstring();
+
+        return args.empty() ? std::format(L"\"{}\"", exe) : std::format(L"\"{}\" {}", exe, args);
+    }
+
+    // Execute wsladiag with given arguments and return output, error, and exit code
+    static std::tuple<std::wstring, std::wstring, int> RunWsladiag(const std::wstring& args)
+    {
+        auto cmd = BuildWsladiagCmd(args);
+        return LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data());
+    }
+
+    // Validate that list command output shows either no sessions message or session table
+    static void ValidateListOutput(const std::wstring& out)
+    {
+        const bool noSessions = out.find(L"No WSLA sessions found.") != std::wstring::npos;
+
+        const bool hasTable = out.find(L"WSLA session") != std::wstring::npos && out.find(L"ID") != std::wstring::npos &&
+                              out.find(L"Creator PID") != std::wstring::npos && out.find(L"Display Name") != std::wstring::npos;
+
+        VERIFY_IS_TRUE(noSessions || hasTable);
+    }
+
+    // Validate that usage information contains expected command descriptions
+    static void ValidateUsage(const std::wstring& err)
+    {
+        VERIFY_IS_TRUE(err.find(L"Usage:") != std::wstring::npos);
+        VERIFY_IS_TRUE(err.find(L"wsladiag list") != std::wstring::npos);
+        VERIFY_IS_TRUE(err.find(L"wsladiag shell <SessionName> [--verbose]") != std::wstring::npos);
+    }
+
+    // Validate that session not found error contains the expected session name
+    static void ValidateSessionNotFound(const std::wstring& err, const std::wstring& name)
+    {
+        VERIFY_IS_TRUE(err.find(std::format(L"Session not found: '{}'", name)) != std::wstring::npos);
     }
 };
 } // namespace WsladiagTests
