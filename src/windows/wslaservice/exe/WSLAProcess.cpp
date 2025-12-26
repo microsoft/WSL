@@ -131,6 +131,11 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLAProcess::ResizeTty(ULONG Rows, ULONG Columns)
+{
+    return E_NOTIMPL;
+}
+
 void WSLAProcess::OnTerminated(bool Signalled, int Code)
 {
     WI_ASSERT(m_virtualMachine != nullptr);

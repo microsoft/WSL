@@ -12,9 +12,26 @@ struct CreatedContainer
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(CreatedContainer, Id, Warnings);
 };
 
+struct ErrorResponse
+{
+    std::string Message;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ErrorResponse, Message);
+};
+
+struct EmtpyResponse
+{
+};
+
+struct EmtpyRequest
+{
+    using TResponse = EmtpyResponse;
+};
+
 struct CreateContainer
 {
     using TResponse = CreatedContainer;
+
     std::string Image;
     bool Tty{};
     bool OpenStdin{};

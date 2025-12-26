@@ -19,6 +19,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
+#include "WSLAContainerProcess.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -57,7 +58,7 @@ public:
         DockerHTTPClient& DockerClient);
     ~WSLAContainerImpl();
 
-    void Start(const WSLA_CONTAINER_OPTIONS& Options);
+    void Start();
 
     void Stop(_In_ int Signal, _In_ ULONG TimeoutMs);
     void Delete();
@@ -85,7 +86,6 @@ private:
 
     std::recursive_mutex m_lock;
     wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
-    std::optional<ServiceRunningProcess> m_containerProcess;
     std::string m_name;
     std::string m_image;
     std::string m_id;
@@ -95,7 +95,7 @@ private:
     std::vector<PortMapping> m_mappedPorts;
     std::vector<VolumeMountInfo> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
-    wil::unique_socket m_TtyHandle;
+    std::optional<WSLAContainerProcess> m_initProcess;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(
         const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes);
@@ -119,6 +119,7 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
     IFACEMETHOD(GetTtyHandle)(_Out_ ULONG* Handle) override;
+    IFACEMETHOD(Start)() override;
 
     void Disconnect() noexcept;
 

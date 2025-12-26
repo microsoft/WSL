@@ -398,8 +398,6 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLATerminalChanged,
     LxMessageWSLAWatchProcesses,
     LxMessageWSLAProcessExited,
-    LxMessageWSLAHTTPResponse,
-    LxMessageWSLAHTTPRequest,
     LxMessageWSLAUnixConnect,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
@@ -511,8 +509,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLADetach)
         X(LxMessageWSLATerminalChanged)
         X(LxMessageWSLAWatchProcesses)
-        X(LxMessageWSLAHTTPResponse)
-        X(LxMessageWSLAHTTPRequest)
+        X(LxMessageWSLAProcessExited)
         X(LxMessageWSLAUnixConnect)
 
     default:
@@ -1884,55 +1881,6 @@ struct WSLA_PROCESS_EXITED
     bool Signaled;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Code), FIELD(Signaled));
-};
-
-struct WSLA_HTTP_RESPONSE
-{
-    static inline auto Type = LxMessageWSLAHTTPResponse;
-
-    int Errno;
-    unsigned int StatusCode;
-    unsigned int ContentSize;
-};
-
-enum class HTTPMethod
-{
-    GET,
-    POST
-};
-
-inline auto ToString(HTTPMethod type)
-{
-    if (type == HTTPMethod::GET)
-    {
-        return "GET";
-    }
-    else if (type == HTTPMethod::POST)
-    {
-        return "POST";
-    }
-    else
-    {
-        return "Unknown";
-    }
-}
-
-inline void PrettyPrint(std::stringstream& Out, HTTPMethod Value)
-{
-    Out << ToString(Value);
-}
-
-struct WSLA_HTTP_REQUEST
-{
-    static inline auto Type = LxMessageWSLAHTTPRequest;
-    using TResponse = WSLA_HTTP_RESPONSE;
-
-    HTTPMethod Method;
-    unsigned int UrlOffset;
-    unsigned int BodyOffset;
-    unsigned int ContentTypeOffset;
-
-    PRETTY_PRINT(FIELD(Method), STRING_FIELD(UrlOffset), STRING_FIELD(BodyOffset), STRING_FIELD(ContentTypeOffset));
 };
 
 struct WSLA_UNIX_CONNECT

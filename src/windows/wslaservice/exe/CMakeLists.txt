@@ -1,5 +1,6 @@
 set(SOURCES
     application.manifest
+    WSLAContainerProcess.cpp
     ContainerEventTracker.cpp
     DockerHTTPClient.cpp
     main.rc
@@ -15,6 +16,7 @@ set(SOURCES
 
 set(HEADERS
     ContainerEventTracker.h
+    WSLAContainerProcess.h
     docker_schema.h
     DockerHTTPClient.h
     ServiceProcessLauncher.h
@@ -41,8 +43,7 @@ target_link_libraries(wslaservice
                       legacy_stdio_definitions
                       VirtDisk.lib
                       Winhttp.lib
-                      Synchronization.lib
-                      httplib)
+                      Synchronization.lib)
 
 target_precompile_headers(wslaservice REUSE_FROM common)
 set_target_properties(wslaservice PROPERTIES FOLDER windows)

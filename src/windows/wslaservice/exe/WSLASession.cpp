@@ -421,8 +421,6 @@ try
 
     WI_ASSERT(inserted);
 
-    container->second->Start(*containerOptions);
-
     THROW_IF_FAILED(container->second->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
 
     return S_OK;

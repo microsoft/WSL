@@ -1661,10 +1661,12 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
         container.emplace();
         THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
+        THROW_IF_FAILED((*container)->Start());
 
         wil::com_ptr<IWSLAProcess> initProcess;
-        // THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
-        // process.emplace(std::move(initProcess), std::move(fds));
+        THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
+        process.emplace(std::move(initProcess), std::move(fds));
+
     }
 
     // Save original console modes so they can be restored on exit.
@@ -1696,8 +1698,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     if (!containerImage.empty())
     {
-        wil::unique_handle ttyHandle;
-        THROW_IF_FAILED(container->get()->GetTtyHandle(reinterpret_cast<ULONG*>(&ttyHandle)));
+        auto ttyHandle = process->GetStdHandle(0);
 
         std::thread inputThread(
             [&]() { wsl::windows::common::relay::StandardInputRelay(Stdin, ttyHandle.get(), []() {}, exitEvent.get()); });

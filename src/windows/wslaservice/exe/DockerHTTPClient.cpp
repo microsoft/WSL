@@ -22,10 +22,15 @@ uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const On
     return code;
 }
 
-DockerHTTPClient::RequestResult<CreatedContainer> DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
+CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
 {
     // TODO: Url escaping.
-    return SendRequest<docker_schema::CreateContainer>(verb::post, "http://localhost/containers/create", Request);
+    return Transaction<docker_schema::CreateContainer>(verb::post, "http://localhost/containers/create", Request);
+}
+
+void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns)
+{
+    Transaction(verb::post, std::format("http://localhost/containers/{}/resize?w={}&h={}", Id, Columns, Rows));
 }
 
 DockerHTTPClient::RequestResult<void> DockerHTTPClient::StartContainer(const std::string& Id)

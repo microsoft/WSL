@@ -211,6 +211,7 @@ interface IWSLAProcess : IUnknown
     HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
+    HRESULT ResizeTty([in] ULONG Rows, [in] ULONG Columns);
 
     // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
 }
@@ -276,6 +277,7 @@ struct WSLA_SESSION_SETTINGS {
 interface IWSLAContainer : IUnknown
 {
     HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
+    HRESULT Start();
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);

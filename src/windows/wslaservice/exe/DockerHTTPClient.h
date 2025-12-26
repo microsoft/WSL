@@ -8,6 +8,31 @@
 
 namespace wsl::windows::service::wsla {
 
+class DockerHTTPExceptions : std::runtime_error
+{
+public:
+    DockerHTTPExceptions(uint16_t StatusCode, const std::string& Url, const std::string& RequestContent, const std::string& ResponseContent) :
+        std::runtime_error(std::format("HTTP request failed: {} -> {} (Request: {}, Response: {})", Url, StatusCode, RequestContent, ResponseContent)),
+        m_statusCode(StatusCode),
+        m_url(Url),
+        m_request(RequestContent),
+        m_response(ResponseContent)
+    {
+    }
+
+    template <typename T = docker_schema::ErrorResponse>
+    T DockerMessage()
+    {
+        return wsl::shared::FromJson<T>(m_response.c_str());
+    }
+
+private:
+    uint16_t m_statusCode{};
+    std::string m_url;
+    std::string m_request;
+    std::string m_response;
+};
+
 class DockerHTTPClient
 {
     NON_COPYABLE(DockerHTTPClient);
@@ -45,10 +70,12 @@ public:
 
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
-    RequestResult<docker_schema::CreatedContainer> CreateContainer(const docker_schema::CreateContainer& Request);
+    docker_schema::CreatedContainer CreateContainer(const docker_schema::CreateContainer& Request);
     RequestResult<void> StartContainer(const std::string& Id);
 
     wil::unique_socket AttachContainer(const std::string& Id);
+
+    void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
     uint32_t PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback);
     std::pair<uint32_t, wil::unique_socket> SendRequest(
@@ -64,22 +91,26 @@ public:
 private:
     wil::unique_socket ConnectSocket();
 
-    template <typename TRequest>
-    auto SendRequest(boost::beast::http::verb Method, const std::string& Url, const TRequest& Request)
+    template <typename TRequest = EmtpyRequest, typename TResponse = TRequest::TResponse>
+    auto Transaction(boost::beast::http::verb Method, const std::string& Url, const TRequest& RequestObject = {})
     {
-        RequestResult<typename TRequest::TResponse> result;
-        result.RequestString = wsl::shared::ToJson(Request);
-        std::tie(result.StatusCode, result.ResponseString) = Transaction(Method, Url, result.RequestString);
-
-        if constexpr (!std::is_same_v<typename TRequest::TResponse, void>)
+        std::string requestString;
+        if constexpr (!std::is_same_v<TRequest, void>)
         {
-            if (result.StatusCode >= 200 && result.StatusCode < 300)
-            {
-                result.ResponseObject = wsl::shared::FromJson<typename TRequest::TResponse>(result.ResponseString.c_str());
-            }
+            requestString = wsl::shared::ToJson(RequestObject);
         }
 
-        return result;
+        auto [statusCode, responseString] = Transaction(Method, Url, requestString);
+
+        if (statusCode < 200 || statusCode >= 300)
+        {
+            throw DockerHTTPExceptions(statusCode, Url, requestString, responseString);
+        }
+
+        if constexpr (!std::is_same_v<TResponse, void>)
+        {
+            return wsl::shared::FromJson<TResponse>(responseString.c_str());
+        }
     }
 
     ULONG m_connectTimeoutMs{};

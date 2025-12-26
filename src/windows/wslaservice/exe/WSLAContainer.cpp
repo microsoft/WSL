@@ -150,11 +150,8 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_mappedPorts(std::move(ports)),
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient)
-{
+{   
     m_state = WslaContainerStateCreated;
-
-    // Attach to the tty now. This is required not to 'drop' tty content before GetTtyHandle is called().
-    m_TtyHandle = m_dockerClient.AttachContainer(m_id);
 }
 
 WSLAContainerImpl::~WSLAContainerImpl()
@@ -210,7 +207,7 @@ IWSLAContainer& WSLAContainerImpl::ComWrapper()
     return *m_comWrapper.Get();
 }
 
-void WSLAContainerImpl::Start(const WSLA_CONTAINER_OPTIONS& Options)
+void WSLAContainerImpl::Start()
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
@@ -221,17 +218,22 @@ void WSLAContainerImpl::Start(const WSLA_CONTAINER_OPTIONS& Options)
         m_name.c_str(),
         m_state);
 
+    // Attach to the container's init process so no IO is lost.
+    m_initProcess.emplace(std::string{m_id}, wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()}, true, m_dockerClient);
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.reset(); });
+
     auto result = m_dockerClient.StartContainer(m_id);
     THROW_HR_IF_MSG(E_FAIL, result.StatusCode != 204, "Failed to start container: %hs, %hs", m_id.c_str(), result.Format().c_str());
 
     m_state = WslaContainerStateRunning;
+    cleanup.release();
 }
 
 void WSLAContainerImpl::GetTtyHandle(ULONG* Handle)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    *Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess((HANDLE)m_TtyHandle.get()));
+    //*Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess((HANDLE)m_TtyHandle.get()));
 }
 
 void WSLAContainerImpl::OnEvent(ContainerEvent event)
@@ -311,10 +313,10 @@ WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // If the container is running, refresh the init process state before returning.
-    if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
+    // if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
     {
         m_state = WslaContainerStateExited;
-        m_containerProcess.reset();
+        // m_containerProcess.reset();
     }
 
     return m_state;
@@ -329,8 +331,8 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_containerProcess.has_value());
-    THROW_IF_FAILED(m_containerProcess->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_initProcess.has_value());
+    THROW_IF_FAILED(m_initProcess->QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
 }
 
 void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
@@ -461,8 +463,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     auto result = DockerClient.CreateContainer(
         {.Image = containerOptions.Image, .Tty = hasTty, .OpenStdin = true, .StdinOnce = true, .AttachStdin = false, .AttachStdout = false, .AttachStderr = false});
 
-    THROW_HR_IF_MSG(E_FAIL, !result.ResponseObject.has_value(), "Failed to create container: %hs", result.Format().c_str());
-
     // TODO: Rethink command line generation logic.
     std::vector<std::string> dummy;
     auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, dummy);
@@ -471,7 +471,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
     auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM, containerOptions, std::move(result.ResponseObject->Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), DockerClient);
+        &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), DockerClient);
 
     errorCleanup.release();
 
@@ -614,6 +614,11 @@ HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 HRESULT WSLAContainer::GetTtyHandle(ULONG* Handle)
 {
     return CallImpl(&WSLAContainerImpl::GetTtyHandle, Handle);
+}
+
+HRESULT WSLAContainer::Start()
+{
+    return CallImpl(&WSLAContainerImpl::Start);
 }
 
 HRESULT WSLAContainer::Delete()
