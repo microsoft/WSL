@@ -33,6 +33,8 @@ set(SOURCES
     SubProcess.cpp
     svccomm.cpp
     svccommio.cpp
+    usbclient.cpp
+    usbservice.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -108,6 +110,8 @@ set(HEADERS
     SubProcess.h
     svccomm.hpp
     svccommio.hpp
+    usbclient.hpp
+    usbservice.hpp
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h
