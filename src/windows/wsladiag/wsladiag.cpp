@@ -18,11 +18,14 @@ Abstract:
 #include "wslaservice.h"
 #include "WslSecurity.h"
 #include "WSLAProcessLauncher.h"
+#include "ExecutionContext.h"
 #include <thread>
 #include <format>
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
+using wsl::windows::common::Context;
+using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::WSLAProcessLauncher;
 
 // Adding a helper to factor error handling between all the arguments.
@@ -319,18 +322,35 @@ int wsladiag_main(std::wstring_view commandLine)
 
 int wmain(int, wchar_t**)
 {
+    wsl::windows::common::EnableContextualizedErrors(false);
+
+    std::optional<ExecutionContext> context;
+    int exitCode = 1;
+    HRESULT result = S_OK;
+
     try
     {
-        return wsladiag_main(GetCommandLineW());
+        context.emplace(Context::WslaDiag);
+        exitCode = wsladiag_main(GetCommandLineW());
     }
     catch (...)
     {
-        const auto hr = wil::ResultFromCaughtException();
-        if (hr == E_INVALIDARG)
-        {
-            PrintUsage();
-            return 1;
-        }
-        return ReportError(L"wsladiag failed", hr);
+        result = wil::ResultFromCaughtException();
     }
+
+    if (FAILED(result))
+    {
+        if (context.has_value() && context->ReportedError().has_value())
+        {
+            auto strings = wsl::windows::common::wslutil::ErrorToString(context->ReportedError().value());
+            wslutil::PrintMessage(strings.Message, stderr);
+        }
+        else
+        {
+            // Fallback for errors without context
+            wslutil::PrintMessage(wslutil::GetErrorString(result), stderr);
+        }
+    }
+
+    return exitCode;
 }
