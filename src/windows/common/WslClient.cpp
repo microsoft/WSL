@@ -1696,31 +1696,26 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
+    std::vector<wil::unique_handle> handleStorage;
+    HANDLE ttyInput = nullptr;
+    HANDLE ttyOutput = nullptr;
     if (!containerImage.empty())
     {
-        auto ttyHandle = process->GetStdHandle(0);
-
-        std::thread inputThread(
-            [&]() { wsl::windows::common::relay::StandardInputRelay(Stdin, ttyHandle.get(), []() {}, exitEvent.get()); });
-
-        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            exitEvent.SetEvent();
-            inputThread.join();
-        });
-
-        // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(ttyHandle.get(), Stdout);
-        return 0;
+        auto& it = handleStorage.emplace_back(process->GetStdHandle(0));
+        ttyInput = it.get();
+        ttyOutput = it.get();
+    }
+    else
+    {
+        ttyInput = handleStorage.emplace_back(process->GetStdHandle(0)).get();
+        ttyOutput = handleStorage.emplace_back(process->GetStdHandle(1)).get();
     }
 
     {
         // Create a thread to relay stdin to the pipe.
 
-        wsl::shared::SocketChannel controlChannel{
-            wil::unique_socket{(SOCKET)process->GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
-
         std::thread inputThread([&]() {
-            auto updateTerminal = [&controlChannel, &Stdout]() {
+            auto updateTerminal = [&Stdout, &process]() {
                 CONSOLE_SCREEN_BUFFER_INFOEX info{};
                 info.cbSize = sizeof(info);
 
@@ -1729,11 +1724,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
                 WSLA_TERMINAL_CHANGED message{};
                 message.Columns = info.srWindow.Right - info.srWindow.Left + 1;
                 message.Rows = info.srWindow.Bottom - info.srWindow.Top + 1;
-
-                controlChannel.SendMessage(message);
+                LOG_IF_FAILED(process->Get().ResizeTty(message.Rows, message.Columns));
             };
 
-            wsl::windows::common::relay::StandardInputRelay(Stdin, process->GetStdHandle(0).get(), updateTerminal, exitEvent.get());
+            wsl::windows::common::relay::StandardInputRelay(Stdin, ttyInput, updateTerminal, exitEvent.get());
         });
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1742,7 +1736,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         });
 
         // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(process->GetStdHandle(1).get(), Stdout);
+        wsl::windows::common::relay::InterruptableRelay(ttyOutput, Stdout);
     }
 
     process->GetExitEvent().wait();
