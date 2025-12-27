@@ -73,7 +73,7 @@ class WsladiagTests
     // Test that shell command without session name shows error
     TEST_METHOD(Shell_MissingName_ShowsError)
     {
-        ValidateWslaDiagFailsWith(L"shell", L"wsladiag shell <SessionName> [--verbose]");
+        ValidateWslaDiagFailsWith(L"shell", L"The parameter is incorrect.");
     }
 
     // Test shell command with invalid session name (silent mode)
