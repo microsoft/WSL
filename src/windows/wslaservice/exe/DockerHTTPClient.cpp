@@ -33,12 +33,19 @@ void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULO
     Transaction(verb::post, std::format("http://localhost/containers/{}/resize?w={}&h={}", Id, Columns, Rows));
 }
 
-DockerHTTPClient::RequestResult<void> DockerHTTPClient::StartContainer(const std::string& Id)
+void DockerHTTPClient::StartContainer(const std::string& Id)
 {
-    RequestResult<void> result;
-    std::tie(result.StatusCode, result.ResponseString) = Transaction(verb::post, std::format("http://localhost/containers/{}/start", Id));
+    Transaction(verb::post, std::format("http://localhost/containers/{}/start", Id));
+}
 
-    return result;
+void DockerHTTPClient::StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds)
+{
+    Transaction(verb::post, std::format("http://localhost/containers/{}/stop?signal={}&t={}", Id, Signal, TimeoutSeconds));
+}
+
+void DockerHTTPClient::DeleteContainer(const std::string& Id)
+{
+    Transaction(verb::delete_, std::format("http://localhost/containers/{}", Id));
 }
 
 wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
@@ -46,10 +53,26 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     std::map<boost::beast::http::field, std::string> headers{
         {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
 
-    auto [status, socket] = SendRequest(
-        verb::post, std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1&logs=true", Id), {}, {}, headers);
+    auto url = std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1&logs=true", Id);
+    auto [status, socket] = SendRequest(verb::post, url, {}, {}, headers);
 
-    THROW_HR_IF_MSG(E_FAIL, status != 101, "Failed to attach to container %hs: %i", Id.c_str(), status);
+    if (status != 101)
+    {
+        throw DockerHTTPException(status, url, "", "");
+    }
+
+    return std::move(socket);
+}
+
+wil::unique_socket DockerHTTPClient::MonitorEvents()
+{
+    auto url = "http://localhost/events";
+    auto [status, socket] = SendRequest(verb::get, url, {}, {});
+
+    if (status != 200)
+    {
+        throw DockerHTTPException(status, url, "", "");
+    }
 
     return std::move(socket);
 }
@@ -80,7 +103,7 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     return newChannel.Release();
 }
 
-std::pair<uint32_t, std::string> DockerHTTPClient::Transaction(verb Method, const std::string& Url, const std::string& Body)
+std::pair<uint32_t, std::string> DockerHTTPClient::SendRequest(verb Method, const std::string& Url, const std::string& Body)
 {
     std::string responseBody;
     auto OnResponse = [&responseBody](const gsl::span<char>& span) { responseBody.append(span.data(), span.size()); };

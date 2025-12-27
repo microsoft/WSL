@@ -13,7 +13,7 @@ Abstract:
 --*/
 #pragma once
 
-#include "ServiceProcessLauncher.h"
+#include "DockerHTTPClient.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -55,7 +55,7 @@ public:
 
     using ContainerStateChangeCallback = std::function<void(ContainerEvent)>;
 
-    ContainerEventTracker(WSLAVirtualMachine& virtualMachine);
+    ContainerEventTracker(DockerHTTPClient& dockerClient);
     ~ContainerEventTracker();
 
     void Stop();
@@ -65,7 +65,7 @@ public:
 
 private:
     void OnEvent(const std::string& event);
-    void Run(ServiceRunningProcess& process);
+    void Run(wil::unique_socket&& Socket);
 
     struct Callback
     {

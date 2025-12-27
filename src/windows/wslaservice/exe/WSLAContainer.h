@@ -55,6 +55,7 @@ public:
         std::vector<VolumeMountInfo>&& volumes,
         std::vector<PortMapping>&& ports,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+        ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient);
     ~WSLAContainerImpl();
 
@@ -76,6 +77,7 @@ public:
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLAVirtualMachine& parentVM,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+        ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient);
 
 private:
@@ -85,7 +87,6 @@ private:
     std::optional<std::string> GetNerdctlStatus();
 
     std::recursive_mutex m_lock;
-    wil::unique_event m_startedEvent{wil::EventOptions::ManualReset};
     std::string m_name;
     std::string m_image;
     std::string m_id;
@@ -96,6 +97,7 @@ private:
     std::vector<VolumeMountInfo> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
     std::optional<WSLAContainerProcess> m_initProcess;
+    ContainerEventTracker::ContainerTrackingReference m_containerEvents;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(
         const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes);

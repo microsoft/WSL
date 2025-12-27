@@ -19,13 +19,9 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(ErrorResponse, Message);
 };
 
-struct EmtpyResponse
-{
-};
-
 struct EmtpyRequest
 {
-    using TResponse = EmtpyResponse;
+    using TResponse = void;
 };
 
 struct CreateContainer

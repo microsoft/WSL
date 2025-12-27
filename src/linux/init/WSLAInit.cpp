@@ -277,8 +277,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
             }
         }
     }
-
-    LOG_ERROR("Relay exited");
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY& Message, const gsl::span<gsl::byte>&)

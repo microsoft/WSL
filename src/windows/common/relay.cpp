@@ -17,6 +17,7 @@ Abstract:
 #pragma hdrstop
 
 using wsl::windows::common::relay::EventHandle;
+using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
 using wsl::windows::common::relay::IOHandleStatus;
 using wsl::windows::common::relay::LineBasedReadHandle;
 using wsl::windows::common::relay::MultiHandleWait;
@@ -1161,6 +1162,81 @@ void LineBasedReadHandle::OnRead(const gsl::span<char>& Buffer)
     }
 
     PendingBuffer.insert(PendingBuffer.end(), begin, end);
+}
+
+HTTPChunkBasedReadHandle::HTTPChunkBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Line)>&& OnChunk) :
+    LineBasedReadHandle(std::move(MovedHandle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnChunk(OnChunk)
+{
+}
+
+HTTPChunkBasedReadHandle::~HTTPChunkBasedReadHandle()
+{
+    LOG_HR_IF(E_UNEXPECTED, !PendingBuffer.empty() || PendingChunkSize != 0);
+}
+
+void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
+{
+    // See: https://httpwg.org/specs/rfc9112.html#field.transfer-encoding
+
+    auto buffer = Input;
+
+    auto advance = [&](size_t count) {
+        WI_ASSERT(buffer.size() >= count);
+        buffer = buffer.subspan(count);
+    };
+
+    while (!buffer.empty())
+    {
+        if (PendingChunkSize == 0 || !ReadingChunk)
+        {
+            if (buffer.front() == '\r' || buffer.front() == '\n')
+            {
+                // Consume CRLF's between chunks.
+                advance(1);
+                continue;
+            }
+        }
+
+        if (PendingChunkSize == 0)
+        {
+            auto lf = std::ranges::find(buffer, '\r');
+
+            THROW_HR_IF_MSG(
+                E_INVALIDARG, lf == buffer.end(), "Unexpected HTTP chunk trailer: %hs", std::string(buffer.data(), buffer.size()).c_str());
+
+            auto chunkSizeStr = std::string{buffer.begin(), lf};
+
+            try
+            {
+                PendingChunkSize = std::stoul(chunkSizeStr.c_str(), nullptr, 16);
+            }
+            catch (...)
+            {
+                THROW_HR_MSG(E_INVALIDARG, "Failed to parse chunk size: %hs", chunkSizeStr.c_str());
+            }
+
+            advance(chunkSizeStr.size());
+            ReadingChunk = false;
+        }
+        else
+        {
+            // Consume the chunk.
+            ReadingChunk = true;
+
+            auto consumedBytes = std::min(PendingChunkSize, buffer.size());
+            PendingBuffer.insert(PendingBuffer.end(), buffer.data(), buffer.data() + consumedBytes);
+            advance(consumedBytes);
+
+            WI_ASSERT(PendingChunkSize >= PendingChunkSize);
+            PendingChunkSize -= consumedBytes;
+
+            if (PendingChunkSize == 0)
+            {
+                OnChunk(PendingBuffer);
+                PendingBuffer.clear();
+            }
+        }
+    }
 }
 
 WriteHandle::WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer) :

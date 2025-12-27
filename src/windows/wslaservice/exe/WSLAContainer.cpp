@@ -141,6 +141,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::vector<VolumeMountInfo>&& volumes,
     std::vector<PortMapping>&& ports,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
+    ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient) :
     m_parentVM(parentVM),
     m_name(Options.Name),
@@ -149,8 +150,9 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
-    m_dockerClient(DockerClient)
-{   
+    m_dockerClient(DockerClient),
+    m_containerEvents(EventTracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1)))
+{
     m_state = WslaContainerStateCreated;
 }
 
@@ -161,6 +163,8 @@ WSLAContainerImpl::~WSLAContainerImpl()
         TraceLoggingValue(m_name.c_str(), "Name"),
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
+
+    m_containerEvents.Reset();
 
     // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
     m_comWrapper->Disconnect();
@@ -222,8 +226,7 @@ void WSLAContainerImpl::Start()
     m_initProcess.emplace(std::string{m_id}, wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()}, true, m_dockerClient);
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.reset(); });
 
-    auto result = m_dockerClient.StartContainer(m_id);
-    THROW_HR_IF_MSG(E_FAIL, result.StatusCode != 204, "Failed to start container: %hs, %hs", m_id.c_str(), result.Format().c_str());
+    m_dockerClient.StartContainer(m_id);
 
     m_state = WslaContainerStateRunning;
     cleanup.release();
@@ -238,9 +241,10 @@ void WSLAContainerImpl::GetTtyHandle(ULONG* Handle)
 
 void WSLAContainerImpl::OnEvent(ContainerEvent event)
 {
-    if (event == ContainerEvent::Start)
+    if (event == ContainerEvent::Stop)
     {
-        m_startedEvent.SetEvent();
+        std::lock_guard<std::recursive_mutex> lock(m_lock);
+        m_state = WslaContainerStateExited;
     }
 
     WSL_LOG(
@@ -259,30 +263,7 @@ void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
         return;
     }
 
-    /* 'nerdctl stop ...'
-     *   returns success and <containerId> on stdout if the container is running or already stopped
-     *   returns error "No such container: <containerId>" on stderr if the container is in 'Created' state or does not exist
-     *
-     * For our case, we treat stopping an already-exited container as a no-op and return success.
-     * Stopping a deleted or created container returns ERROR_INVALID_STATE.
-     * TODO: Discuss and return stdout/stderr or corresponding HRESULT from nerdctl stop for better diagnostics.
-     */
-
-    // Validate that the container is in the running state.
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslaContainerStateRunning,
-        "Container '%hs' is not in a stoppable state: %i",
-        m_name.c_str(),
-        m_state);
-    ServiceProcessLauncher launcher(
-        nerdctlPath, {nerdctlPath, "stop", m_name, "--time", std::to_string(static_cast<ULONG>(std::round(TimeoutMs / 1000)))}, defaultNerdctlEnv);
-
-    // TODO: Figure out how we want to handle custom signals.
-    // nerdctl stop has a --time and a --signal option that can be used
-    // By default, it uses SIGTERM and a default timeout of 10 seconds.
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+    m_dockerClient.StopContainer(m_id, Signal, static_cast<ULONG>(std::round<ULONG>(TimeoutMs / 1000)));
 
     m_state = WslaContainerStateExited;
 }
@@ -299,9 +280,7 @@ void WSLAContainerImpl::Delete()
         m_name.c_str(),
         m_state);
 
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "rm", "-f", m_name}, defaultNerdctlEnv);
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput(deleteTimeout);
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+    m_dockerClient.DeleteContainer(m_id);
 
     UnmountVolumes(m_mountedVolumes, *m_parentVM);
 
@@ -455,6 +434,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+    ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient)
 {
     // TODO: Think about when 'StdinOnce' should be set.
@@ -471,7 +451,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
     auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), DockerClient);
+        &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), EventTracker, DockerClient);
 
     errorCleanup.release();
 

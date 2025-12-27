@@ -17,6 +17,7 @@ Abstract:
 #include <nlohmann/json.hpp>
 
 using wsl::windows::service::wsla::ContainerEventTracker;
+using wsl::windows::service::wsla::DockerHTTPClient;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(ContainerEventTracker* tracker, size_t id) :
@@ -51,15 +52,12 @@ ContainerEventTracker::ContainerTrackingReference::~ContainerTrackingReference()
     Reset();
 }
 
-ContainerEventTracker::ContainerEventTracker(WSLAVirtualMachine& virtualMachine)
+ContainerEventTracker::ContainerEventTracker(DockerHTTPClient& dockerClient)
 {
-    ServiceProcessLauncher launcher{nerdctlPath, {nerdctlPath, "events", "--format", "{{json .}}"}, {}, common::ProcessFlags::Stdout};
+    auto socket = dockerClient.MonitorEvents();
+    m_thread = std::thread([socket = std::move(socket), this]() mutable { Run(std::move(socket)); }
 
-    // Redirect stderr to /dev/null to avoid pipe deadlocks.
-    launcher.AddFd({.Fd = 2, .Type = WSLAFdTypeLinuxFileOutput, .Path = "/dev/null"});
-
-    auto process = launcher.Launch(virtualMachine);
-    m_thread = std::thread(std::bind(&ContainerEventTracker::Run, this, std::move(process)));
+    );
 }
 
 void ContainerEventTracker::Stop()
@@ -85,36 +83,29 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     // TODO: log session ID
     WSL_LOG("NerdCtlEvent", TraceLoggingValue(event.c_str(), "Data"));
 
-    static std::map<std::string, ContainerEvent> events{
-        {"/tasks/create", ContainerEvent::Create},
-        {"/tasks/start", ContainerEvent::Start},
-        {"/tasks/stop", ContainerEvent::Stop},
-        {"/tasks/exit", ContainerEvent::Exit},
-        {"/tasks/destroy", ContainerEvent::Destroy}};
+    static std::map<std::string, ContainerEvent> events{{"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}};
 
     auto parsed = nlohmann::json::parse(event);
 
-    auto type = parsed.find("Topic");
-    auto details = parsed.find("Event");
+    auto type = parsed.find("Type");
+    auto action = parsed.find("Action");
+    auto actor = parsed.find("Actor");
 
-    THROW_HR_IF_MSG(E_INVALIDARG, type == parsed.end() || details == parsed.end(), "Failed to parse json: %hs", event.c_str());
+    THROW_HR_IF_MSG(
+        E_INVALIDARG, type == parsed.end() || action == parsed.end() || actor == parsed.end(), "Failed to parse json: %hs", event.c_str());
 
-    auto it = events.find(type->get<std::string>());
+    auto it = events.find(action->get<std::string>());
     if (it == events.end())
     {
         return; // Event is not tracked, dropped.
     }
 
-    // N.B. The 'Event' field is a json string.
-    auto innerEventJson = details->get<std::string>();
-    auto innerEvent = nlohmann::json::parse(innerEventJson);
+    auto id = actor->find("ID");
+    THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Failed to parse json: %hs", event.c_str());
 
-    auto containerIdIt = innerEvent.find("container_id");
-    THROW_HR_IF_MSG(E_INVALIDARG, containerIdIt == innerEvent.end(), "Failed to parse json: %hs", innerEventJson.c_str());
-
+    auto containerId = id->get<std::string>();
     std::lock_guard lock{m_lock};
 
-    std::string containerId = containerIdIt->get<std::string>();
     for (const auto& e : m_callbacks)
     {
         if (e.ContainerId == containerId)
@@ -124,34 +115,32 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     }
 }
 
-void ContainerEventTracker::Run(ServiceRunningProcess& process)
+void ContainerEventTracker::Run(wil::unique_socket&& socket)
+try
 {
-    try
-    {
-        wsl::windows::common::relay::MultiHandleWait io;
+    wsl::windows::common::relay::MultiHandleWait io;
 
-        auto oneLineWritten = [&](const gsl::span<char>& buffer) {
-            // nerdctl events' output is line based. Call OnEvent() for each completed line.
+    auto oneLineWritten = [&](const gsl::span<char>& buffer) {
+        // nerdctl events' output is line based. Call OnEvent() for each completed line.
 
-            if (!buffer.empty()) // nerdctl inserts empty lines between events, skip those.
-            {
-                OnEvent(std::string{buffer.begin(), buffer.end()});
-            }
-        };
-
-        auto onStop = [&]() { io.Cancel(); };
-
-        io.AddHandle(std::make_unique<common::relay::LineBasedReadHandle>(process.GetStdHandle(1), std::move(oneLineWritten)));
-        io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), std::move(onStop)));
-
-        if (io.Run({}))
+        if (!buffer.empty()) // nerdctl inserts empty lines between events, skip those.
         {
-            // TODO: Report error to session.
-            WSL_LOG("Unexpected nerdctl exit");
+            OnEvent(std::string{buffer.begin(), buffer.end()});
         }
+    };
+
+    auto onStop = [&]() { io.Cancel(); };
+
+    io.AddHandle(std::make_unique<common::relay::HTTPChunkBasedReadHandle>(wil::unique_handle{(HANDLE)socket.release()}, std::move(oneLineWritten)));
+    io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), std::move(onStop)));
+
+    if (io.Run({}))
+    {
+        // TODO: Report error to session.
+        WSL_LOG("Unexpected nerdctl exit");
     }
-    CATCH_LOG();
 }
+CATCH_LOG();
 
 ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::RegisterContainerStateUpdates(
     const std::string& ContainerId, ContainerStateChangeCallback&& Callback)

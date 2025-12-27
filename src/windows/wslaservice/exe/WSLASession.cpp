@@ -69,9 +69,8 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
 
     m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
-    // WSL_LOG("Info", TraceLoggingValue(response.c_str(), "DockerInfo"));
     //  Start the event tracker.
-    //  m_eventTracker.emplace(*m_virtualMachine.Get());
+    m_eventTracker.emplace(m_dockerClient.value());
 
     errorCleanup.release();
 }
@@ -417,6 +416,7 @@ try
             *containerOptions,
             *m_virtualMachine.Get(),
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
+            m_eventTracker.value(),
             m_dockerClient.value()));
 
     WI_ASSERT(inserted);

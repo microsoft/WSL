@@ -220,7 +220,7 @@ public:
     NON_COPYABLE(LineBasedReadHandle);
     NON_MOVABLE(LineBasedReadHandle);
 
-    LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OneLine);
+    LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnLine);
     ~LineBasedReadHandle();
 
 private:
@@ -228,6 +228,24 @@ private:
 
     std::function<void(const gsl::span<char>& Buffer)> OnLine;
     std::string PendingBuffer;
+};
+
+class HTTPChunkBasedReadHandle : public LineBasedReadHandle
+{
+public:
+    NON_COPYABLE(HTTPChunkBasedReadHandle);
+    NON_MOVABLE(HTTPChunkBasedReadHandle);
+
+    HTTPChunkBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnChunk);
+    ~HTTPChunkBasedReadHandle();
+
+private:
+    void OnRead(const gsl::span<char>& Line);
+
+    std::function<void(const gsl::span<char>& Buffer)> OnChunk;
+    std::string PendingBuffer;
+    uint64_t PendingChunkSize = 0;
+    bool ReadingChunk = false;
 };
 
 class WriteHandle : public OverlappedIOHandle
