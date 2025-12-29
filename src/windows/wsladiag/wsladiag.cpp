@@ -23,6 +23,9 @@ Abstract:
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
+using wsl::shared::Localization;
+using wsl::windows::common::Context;
+using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::WSLAProcessLauncher;
 
 // Adding a helper to factor error handling between all the arguments.
@@ -64,11 +67,11 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     {
         if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
         {
-            wslutil::PrintMessage(std::format(L"Session not found: '{}'", sessionName), stderr);
+            wslutil::PrintMessage(Localization::MessageWslaSessionNotFound(sessionName.c_str()), stderr);
             return 1;
         }
 
-        return ReportError(std::format(L"OpenSessionByName('{}') failed", sessionName), hr);
+        return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
     }
 
     log(L"[diag] OpenSessionByName succeeded");
@@ -182,7 +185,8 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     auto [code, signalled] = process.GetExitState();
 
     std::wstring shellWide(shell.begin(), shell.end());
-    wslutil::PrintMessage(std::format(L"{} exited with: {}{}", shellWide, code, signalled ? L" (signalled)" : L""), stdout);
+    wslutil::PrintMessage(
+        Localization::MessageWslaShellExited(shellWide.c_str(), exitCode) + (signalled ? Localization::MessageWslaShellSignalled() : L""), stdout);
 
     return 0;
 }
@@ -198,11 +202,11 @@ static int RunListCommand(bool /*verbose*/)
 
     if (sessions.size() == 0)
     {
-        wslutil::PrintMessage(L"No WSLA sessions found.", stdout);
+        wslutil::PrintMessage(Localization::MessageWslaNoSessionsFound(), stdout);
         return 0;
     }
 
-    wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
+    wslutil::PrintMessage(Localization::MessageWslaSessionsFound(sessions.size()), stdout);
 
     // Compute column widths from headers + data (same pattern as wsl --list).
     size_t idWidth = wcslen(L"ID");
@@ -215,12 +219,19 @@ static int RunListCommand(bool /*verbose*/)
     }
 
     // Header
-    wprintf(L"%-*ls  %-*ls  %ls\n", static_cast<int>(idWidth), L"ID", static_cast<int>(pidWidth), L"Creator PID", L"Display Name");
+    wprintf(
+        L"%-*ls  %-*ls  %ls\n",
+        static_cast<int>(idWidth),
+        Localization::MessageWslaHeaderId().c_str(),
+        static_cast<int>(pidWidth),
+        Localization::MessageWslaHeaderCreatorPid().c_str(),
+        Localization::MessageWslaHeaderDisplayName().c_str());
 
     // Underline
     std::wstring idDash(idWidth, L'-');
     std::wstring pidDash(pidWidth, L'-');
-    std::wstring nameDash(wcslen(L"Display Name"), L'-');
+    size_t nameWidth = Localization::MessageWslaHeaderDisplayName().size();
+    std::wstring nameDash(nameWidth, L'-');
 
     wprintf(
         L"%-*ls  %-*ls  %ls\n", static_cast<int>(idWidth), idDash.c_str(), static_cast<int>(pidWidth), pidDash.c_str(), nameDash.c_str());
@@ -238,6 +249,11 @@ static int RunListCommand(bool /*verbose*/)
     }
 
     return 0;
+}
+
+static void PrintUsage()
+{
+    wslutil::PrintMessage(Localization::MessageWsladiagUsage(), stderr);
 }
 
 int wsladiag_main(std::wstring_view commandLine)
@@ -314,8 +330,9 @@ int wsladiag_main(std::wstring_view commandLine)
     }
     else
     {
-        wslutil::PrintMessage(std::format(L"Unknown command: '{}'", verb), stderr);
-        printUsage();
+        wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
+        PrintUsage();
+
         return 1;
     }
 }
