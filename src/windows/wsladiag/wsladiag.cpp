@@ -31,15 +31,15 @@ using wsl::windows::common::WSLAProcessLauncher;
 // Adding a helper to factor error handling between all the arguments.
 static int ReportError(const std::wstring& context, HRESULT hr)
 {
-    const std::wstring hrMessage = wslutil::ErrorCodeToString(hr);
+    const std::wstring hrMessage = wslutil::GetErrorString(hr);
 
     if (!hrMessage.empty())
     {
-        wslutil::PrintMessage(std::format(L"{}: 0x{:08x} - {}", context, static_cast<unsigned int>(hr), hrMessage), stderr);
+        wslutil::PrintMessage(std::format(L"{}: 0x{:08x} - {}", context, static_cast<uint32_t>(hr), hrMessage), stderr);
     }
     else
     {
-        wslutil::PrintMessage(std::format(L"{}: 0x{:08x}", context, static_cast<unsigned int>(hr)), stderr);
+        wslutil::PrintMessage(std::format(L"{}: 0x{:08x}", context, static_cast<uint32_t>(hr)), stderr);
     }
 
     return 1;
@@ -185,8 +185,14 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     auto [code, signalled] = process.GetExitState();
 
     std::wstring shellWide(shell.begin(), shell.end());
-    wslutil::PrintMessage(
-        Localization::MessageWslaShellExited(shellWide.c_str(), exitCode) + (signalled ? Localization::MessageWslaShellSignalled() : L""), stdout);
+    std::wstring message = Localization::MessageWslaShellExited(shellWide.c_str(), exitCode);
+
+    if (signalled)
+    {
+        message += Localization::MessageWslaShellSignalled();
+    }
+
+    wslutil::PrintMessage(message, stdout);
 
     return 0;
 }
@@ -208,44 +214,59 @@ static int RunListCommand(bool /*verbose*/)
 
     wslutil::PrintMessage(Localization::MessageWslaSessionsFound(sessions.size()), stdout);
 
-    // Compute column widths from headers + data (same pattern as wsl --list).
-    size_t idWidth = wcslen(L"ID");
-    size_t pidWidth = wcslen(L"Creator PID");
+    // Compute column widths from headers + data .
+    const auto idHeader = Localization::MessageWslaHeaderId();
+    const auto pidHeader = Localization::MessageWslaHeaderCreatorPid();
+    const auto nameHeader = Localization::MessageWslaHeaderDisplayName();
+
+    size_t idWidth = idHeader.size();
+    size_t pidWidth = pidHeader.size();
+    size_t nameWidth = nameHeader.size();
 
     for (const auto& s : sessions)
     {
         idWidth = std::max(idWidth, std::to_wstring(s.SessionId).size());
         pidWidth = std::max(pidWidth, std::to_wstring(s.CreatorPid).size());
+        nameWidth = std::max(nameWidth, static_cast<size_t>(s.DisplayName ? wcslen(s.DisplayName) : 0));
     }
 
     // Header
     wprintf(
-        L"%-*ls  %-*ls  %ls\n",
+        L"%-*ls  %-*ls  %-*ls\n",
         static_cast<int>(idWidth),
-        Localization::MessageWslaHeaderId().c_str(),
+        idHeader.c_str(),
         static_cast<int>(pidWidth),
-        Localization::MessageWslaHeaderCreatorPid().c_str(),
-        Localization::MessageWslaHeaderDisplayName().c_str());
+        pidHeader.c_str(),
+        static_cast<int>(nameWidth),
+        nameHeader.c_str());
 
     // Underline
     std::wstring idDash(idWidth, L'-');
     std::wstring pidDash(pidWidth, L'-');
-    size_t nameWidth = Localization::MessageWslaHeaderDisplayName().size();
     std::wstring nameDash(nameWidth, L'-');
 
     wprintf(
-        L"%-*ls  %-*ls  %ls\n", static_cast<int>(idWidth), idDash.c_str(), static_cast<int>(pidWidth), pidDash.c_str(), nameDash.c_str());
+        L"%-*ls  %-*ls  %-*ls\n",
+        static_cast<int>(idWidth),
+        idDash.c_str(),
+        static_cast<int>(pidWidth),
+        pidDash.c_str(),
+        static_cast<int>(nameWidth),
+        nameDash.c_str());
 
     // Rows
     for (const auto& s : sessions)
     {
+        const wchar_t* displayName = s.DisplayName ? s.DisplayName : L"";
+
         wprintf(
-            L"%-*lu  %-*lu  %ls\n",
+            L"%-*lu  %-*lu  %-*ls\n",
             static_cast<int>(idWidth),
             static_cast<unsigned long>(s.SessionId),
             static_cast<int>(pidWidth),
             static_cast<unsigned long>(s.CreatorPid),
-            s.DisplayName);
+            static_cast<int>(nameWidth),
+            displayName);
     }
 
     return 0;
