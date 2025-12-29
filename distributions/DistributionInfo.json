@@ -198,6 +198,17 @@
                     "Sha256": "a5a2ceb8ca56b7245b909d021b0fd620427db349f02b8ef3b82b741bcb5611cd"
                 }
             }
+        ],
+        "eLxr": [
+            {
+                "Name": "eLxr-12",
+                "FriendlyName": "eLxr 12.12.0.0 GNU/Linux",
+                "Default": true,
+                "Amd64Url": {
+                    "Url": "https://gitlab.com/api/v4/projects/68007430/packages/generic/wsl/12.12.0.0/eLxr_WSL_AMD64_12.12.0.0.wsl",
+                    "Sha256": "f94e0c44be51550478100ea150b80535f955bf87487d1b964f4636d97478c05d"
+                }
+            }
         ]
     },
     "Default": "Ubuntu",
