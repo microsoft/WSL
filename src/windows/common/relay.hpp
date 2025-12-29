@@ -159,6 +159,32 @@ enum class IOHandleStatus
     Completed
 };
 
+struct HandleWrapper
+{
+    HandleWrapper(wil::unique_handle&& handle) : OwnedHandle(std::move(handle)), Handle(OwnedHandle.get())
+    {
+    }
+
+    HandleWrapper(HANDLE handle) : Handle(handle)
+    {
+    }
+
+    HANDLE Get() const
+    {
+        return Handle;
+    }
+
+    void Reset()
+    {
+        OwnedHandle.reset();
+        Handle = nullptr;
+    }
+
+private:
+    wil::unique_handle OwnedHandle;
+    HANDLE Handle{};
+};
+
 class OverlappedIOHandle
 {
 public:
@@ -200,14 +226,14 @@ public:
     NON_COPYABLE(ReadHandle);
     NON_MOVABLE(ReadHandle);
 
-    ReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
+    ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
     virtual ~ReadHandle();
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
-    wil::unique_handle Handle;
+    HandleWrapper Handle;
     std::function<void(const gsl::span<char>& Buffer)> OnRead;
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
@@ -220,7 +246,7 @@ public:
     NON_COPYABLE(LineBasedReadHandle);
     NON_MOVABLE(LineBasedReadHandle);
 
-    LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnLine);
+    LineBasedReadHandle(HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnLine);
     ~LineBasedReadHandle();
 
 private:
@@ -236,7 +262,7 @@ public:
     NON_COPYABLE(HTTPChunkBasedReadHandle);
     NON_MOVABLE(HTTPChunkBasedReadHandle);
 
-    HTTPChunkBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnChunk);
+    HTTPChunkBasedReadHandle(HandleWrapper&& Handler, std::function<void(const gsl::span<char>& Buffer)>&& OnChunk);
     ~HTTPChunkBasedReadHandle();
 
 private:
@@ -254,18 +280,60 @@ public:
     NON_COPYABLE(WriteHandle);
     NON_MOVABLE(WriteHandle);
 
-    WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer);
+    WriteHandle(HandleWrapper&& Handle, const std::vector<char>& Buffer = {});
     ~WriteHandle();
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+    void Push(const gsl::span<char>& Buffer);
+
+private:
+    HandleWrapper Handle;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    std::vector<char> Buffer;
+};
+
+class RelayHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(RelayHandle);
+    NON_MOVABLE(RelayHandle);
+
+    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output);
+
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
-    wil::unique_handle Handle;
-    wil::unique_event Event{wil::EventOptions::ManualReset};
-    OVERLAPPED Overlapped{};
-    const std::vector<char>& Buffer;
-    DWORD Offset = 0;
+    void OnRead(const gsl::span<char>& Buffer);
+
+    ReadHandle Read;
+    WriteHandle Write;
+    std::vector<char> PendingBuffer;
+};
+
+class DockerIORelayHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(DockerIORelayHandle);
+    NON_MOVABLE(DockerIORelayHandle);
+
+    DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr);
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    void OnRead(const gsl::span<char>& Buffer);
+
+    ReadHandle Read;
+    WriteHandle WriteStdout;
+    WriteHandle WriteStderr;
+    std::vector<char> PendingBuffer;
+    WriteHandle* ActiveHandle = nullptr;
+    size_t RemainingBytes = 0;
 };
 
 class MultiHandleWait

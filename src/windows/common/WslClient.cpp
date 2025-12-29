@@ -1542,6 +1542,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     std::string containerImage;
     bool help = false;
+    bool noTty = false;
     std::wstring debugShell;
 
     std::wstring storagePath;
@@ -1561,6 +1562,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(reinterpret_cast<int&>(sessionSettings.NetworkingMode)), L"--networking-mode");
     parser.AddArgument(Utf8String(containerImage), L"--image");
     parser.AddArgument(debugShell, L"--debug-shell");
+    parser.AddArgument(noTty, L"--no-tty");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
@@ -1645,11 +1647,19 @@ int WslaShell(_In_ std::wstring_view commandLine)
     {
         THROW_IF_FAILED(session->PullImage(containerImage.c_str(), nullptr, nullptr));
 
-        std::vector<WSLA_PROCESS_FD> fds{
-            WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput},
-            WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput},
-            WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl},
-        };
+        std::vector<WSLA_PROCESS_FD> fds;
+
+        if (noTty)
+        {
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
+        }
+        else
+        {
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+        }
 
         WSLA_CONTAINER_OPTIONS containerOptions{};
         containerOptions.Image = containerImage.c_str();
@@ -1666,7 +1676,6 @@ int WslaShell(_In_ std::wstring_view commandLine)
         wil::com_ptr<IWSLAProcess> initProcess;
         THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
         process.emplace(std::move(initProcess), std::move(fds));
-
     }
 
     // Save original console modes so they can be restored on exit.

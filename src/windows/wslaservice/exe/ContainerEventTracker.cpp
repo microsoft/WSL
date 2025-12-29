@@ -81,7 +81,7 @@ ContainerEventTracker::~ContainerEventTracker()
 void ContainerEventTracker::OnEvent(const std::string& event)
 {
     // TODO: log session ID
-    WSL_LOG("NerdCtlEvent", TraceLoggingValue(event.c_str(), "Data"));
+    WSL_LOG("DockerEvent", TraceLoggingValue(event.c_str(), "Data"));
 
     static std::map<std::string, ContainerEvent> events{{"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}};
 

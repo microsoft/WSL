@@ -245,6 +245,9 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event)
     {
         std::lock_guard<std::recursive_mutex> lock(m_lock);
         m_state = WslaContainerStateExited;
+
+        // TODO: propagate exit code.
+        m_initProcess->OnExited(0);
     }
 
     WSL_LOG(
@@ -440,8 +443,21 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     // TODO: Think about when 'StdinOnce' should be set.
     auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
 
-    auto result = DockerClient.CreateContainer(
-        {.Image = containerOptions.Image, .Tty = hasTty, .OpenStdin = true, .StdinOnce = true, .AttachStdin = false, .AttachStdout = false, .AttachStderr = false});
+    docker_schema::CreateContainer request;
+    request.Image = containerOptions.Image;
+
+    if (hasTty)
+    {
+        request.Tty = true;
+    }
+
+    if (hasStdin)
+    {
+        request.OpenStdin = true;
+        request.StdinOnce = true;
+    }
+
+    auto result = DockerClient.CreateContainer(request);
 
     // TODO: Rethink command line generation logic.
     std::vector<std::string> dummy;
