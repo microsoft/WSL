@@ -60,6 +60,8 @@ HRESULT WSLAContainerProcess::GetPid(_Out_ int* Pid)
 
 HRESULT WSLAContainerProcess::GetState(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code)
 {
+    *Code = -1;
+
     if (m_exitEvent.is_signaled())
     {
         // TODO: Handle signals.
@@ -98,6 +100,11 @@ wil::unique_handle& WSLAContainerProcess::GetStdHandle(int Index)
     }
     else
     {
+        if (!m_relayedHandles.has_value())
+        {
+            StartIORelay();
+        }
+
         THROW_HR_IF_MSG(E_INVALIDARG, Index > m_relayedHandles->size(), "Invalid fd index for non-tty process: %i", Index);
 
         return m_relayedHandles->at(Index);
@@ -111,13 +118,20 @@ wil::unique_handle& WSLAContainerProcess::GetStdHandle(int Index)
     return m_ioStream; // TODO: fix
 }
 
-void WSLAContainerProcess::RunIORelay(HANDLE exitEvent, wil::unique_handle&& stdinPipe, wil::unique_handle&& stdoutPipe, wil::unique_handle&& stderrPipe)
+void WSLAContainerProcess::RunIORelay(HANDLE exitEvent, wil::unique_hfile&& stdinPipe, wil::unique_hfile&& stdoutPipe, wil::unique_hfile&& stderrPipe)
 try
 {
     common::relay::MultiHandleWait io;
 
+    // This is required for docker to know when stdin is closed.
+    auto onInputComplete = [&]() {
+        LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(m_ioStream.get()), SD_SEND) == SOCKET_ERROR);
+    };
+
+    io.AddHandle(std::make_unique<common::relay::RelayHandle>(
+        common::relay::HandleWrapper{std::move(stdinPipe), std::move(onInputComplete)}, m_ioStream.get()));
+
     io.AddHandle(std::make_unique<common::relay::EventHandle>(exitEvent, [&]() { io.Cancel(); }));
-    io.AddHandle(std::make_unique<common::relay::RelayHandle>(std::move(stdinPipe), m_ioStream.get()));
     io.AddHandle(std::make_unique<common::relay::DockerIORelayHandle>(m_ioStream.get(), std::move(stdoutPipe), std::move(stderrPipe)));
 
     io.Run({});
@@ -141,13 +155,13 @@ void WSLAContainerProcess::StartIORelay()
         return pipe;
     };
 
-    auto stdinPipe = createPipe();
-    auto stdoutPipe = createPipe();
-    auto stderrPipe = createPipe();
+    auto stdinPipe = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto stdoutPipe = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto stderrPipe = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
-    m_relayedHandles->emplace_back(std::move(stdinPipe.second));
-    m_relayedHandles->emplace_back(std::move(stdoutPipe.first));
-    m_relayedHandles->emplace_back(std::move(stdoutPipe.first));
+    m_relayedHandles->emplace_back(stdinPipe.second.release());
+    m_relayedHandles->emplace_back(stdoutPipe.first.release());
+    m_relayedHandles->emplace_back(stderrPipe.first.release());
 
     m_relayThread.emplace([this,
                            event = m_exitRelayEvent.get(),

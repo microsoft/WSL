@@ -1444,6 +1444,13 @@ void DockerIORelayHandle::Schedule()
     }
     else
     {
+        if (Read.GetState() == IOHandleStatus::Completed)
+        {
+            // No more data to read, we're done.
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
         // Schedule a read from the input.
         Read.Schedule();
         if (Read.GetState() == IOHandleStatus::Pending)
@@ -1541,5 +1548,8 @@ void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
         {
             THROW_HR_MSG(E_UNEXPECTED, "Unexpected Docker IO multiplexed header fd: %u", header->Fd);
         }
+
+        // Consume the header.
+        PendingBuffer.erase(PendingBuffer.begin(), PendingBuffer.begin() + sizeof(MultiplexedHeader));
     }
 }

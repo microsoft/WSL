@@ -264,7 +264,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
             {
                 // hvsocket has been closed.
                 pollDescriptors[1].fd = -1;
-                break;
+
+                // Shutdown the write side of the socket. This is required so docker know when stdin is EOF for instance.
+                if (shutdown(socket.get(), SHUT_WR) < 0)
+                {
+                    LOG_ERROR("shutdown({}, SHUT_WR) failed {}", socket.get(), errno);
+                }
             }
             else
             {

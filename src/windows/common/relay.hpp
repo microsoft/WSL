@@ -161,12 +161,25 @@ enum class IOHandleStatus
 
 struct HandleWrapper
 {
+    DEFAULT_MOVABLE(HandleWrapper);
+
     HandleWrapper(wil::unique_handle&& handle) : OwnedHandle(std::move(handle)), Handle(OwnedHandle.get())
     {
     }
 
-    HandleWrapper(HANDLE handle) : Handle(handle)
+    HandleWrapper(HANDLE handle, std::function<void()>&& OnClose = []() {}) : Handle(handle), OnClose(std::move(OnClose))
     {
+    }
+
+    HandleWrapper(
+        wil::unique_hfile&& handle, std::function<void()>&& OnClose = []() {}) :
+        OwnedHandle(handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+    {
+    }
+
+    ~HandleWrapper()
+    {
+        Reset();
     }
 
     HANDLE Get() const
@@ -176,6 +189,12 @@ struct HandleWrapper
 
     void Reset()
     {
+        if (OnClose != nullptr)
+        {
+            OnClose();
+            OnClose = {};
+        }
+
         OwnedHandle.reset();
         Handle = nullptr;
     }
@@ -183,6 +202,7 @@ struct HandleWrapper
 private:
     wil::unique_handle OwnedHandle;
     HANDLE Handle{};
+    std::function<void()> OnClose;
 };
 
 class OverlappedIOHandle

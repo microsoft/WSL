@@ -24,7 +24,7 @@ public:
 private:
     wil::unique_handle& GetStdHandle(int Index);
     void StartIORelay();
-    void RunIORelay(HANDLE exitEvent, wil::unique_handle&& stdinPipe, wil::unique_handle&& stdoutPipe, wil::unique_handle&& stderrPipe);
+    void RunIORelay(HANDLE exitEvent, wil::unique_hfile&& stdinPipe, wil::unique_hfile&& stdoutPipe, wil::unique_hfile&& stderrPipe);
 
     wil::unique_handle m_ioStream;
     DockerHTTPClient& m_dockerClient;

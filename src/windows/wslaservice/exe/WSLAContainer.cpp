@@ -154,6 +154,9 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1)))
 {
     m_state = WslaContainerStateCreated;
+
+    // TODO: Move this to an API flag.
+    m_tty = ParseFdStatus(Options.InitProcessOptions).second;
 }
 
 WSLAContainerImpl::~WSLAContainerImpl()
@@ -223,20 +226,13 @@ void WSLAContainerImpl::Start()
         m_state);
 
     // Attach to the container's init process so no IO is lost.
-    m_initProcess.emplace(std::string{m_id}, wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()}, true, m_dockerClient);
+    m_initProcess.emplace(std::string{m_id}, wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()}, m_tty, m_dockerClient);
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.reset(); });
 
     m_dockerClient.StartContainer(m_id);
 
     m_state = WslaContainerStateRunning;
     cleanup.release();
-}
-
-void WSLAContainerImpl::GetTtyHandle(ULONG* Handle)
-{
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
-
-    //*Handle = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess((HANDLE)m_TtyHandle.get()));
 }
 
 void WSLAContainerImpl::OnEvent(ContainerEvent event)
@@ -605,11 +601,6 @@ HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** 
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 {
     return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutMs);
-}
-
-HRESULT WSLAContainer::GetTtyHandle(ULONG* Handle)
-{
-    return CallImpl(&WSLAContainerImpl::GetTtyHandle, Handle);
 }
 
 HRESULT WSLAContainer::Start()

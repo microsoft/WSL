@@ -90,6 +90,9 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(
         socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle, Location);
     }
 
+    // Mark the socket as connected (required to call shutdown() later).
+    THROW_LAST_ERROR_IF(setsockopt(Socket.get(), SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nullptr, 0) == SOCKET_ERROR);
+
     return Socket;
 }
 

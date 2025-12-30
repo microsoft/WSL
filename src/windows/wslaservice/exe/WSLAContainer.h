@@ -66,7 +66,6 @@ public:
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
-    void GetTtyHandle(_Out_ ULONG* Handle);
 
     IWSLAContainer& ComWrapper();
 
@@ -90,6 +89,7 @@ private:
     std::string m_name;
     std::string m_image;
     std::string m_id;
+    bool m_tty{}; // TODO: have a flag for this at the API level.
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
@@ -120,7 +120,6 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
-    IFACEMETHOD(GetTtyHandle)(_Out_ ULONG* Handle) override;
     IFACEMETHOD(Start)() override;
 
     void Disconnect() noexcept;
