@@ -52,6 +52,9 @@ class WSLATests
         testVhd = std::filesystem::path{vhdPath} / "ext4.vhdx";
         storagePath = std::filesystem::current_path() / "test-storage";
 
+        auto session = CreateSession();
+        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr));
+
         WslShutdown();
         return true;
     }
@@ -80,6 +83,7 @@ class WSLATests
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = storagePath.c_str();
         settings.MaximumStorageSizeMb = 1000; // 1GB.
+        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         return settings;
     }
@@ -1215,6 +1219,7 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
 
+        // Validate that stdin is correctly wired
         {
             WSLAContainerLauncher launcher(
                 "debian:latest",
@@ -1225,13 +1230,8 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            // For now, validate that trying to use stdin without a tty returns the appropriate error.
-            auto result = wil::ResultFromException([&]() { auto container = launcher.Launch(*session); });
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            auto container = launcher.Launch(*session);
 
-            // TODO: nerdctl hangs if stdin is closed without writing to it.
-            // Add test coverage for that usecase once the hang is fixed.
-            /*
             auto process = container.GetInitProcess();
             auto input = process.GetStdHandle(0);
 
@@ -1247,19 +1247,17 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(result.Output[2], "");
             VERIFY_ARE_EQUAL(result.Output[1], "foo");
-            */
         }
 
-        // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
-        // TODO: This fails because nerdctl start always seems to hang on stdin.
-        /*
+        // Validate that stdin behaves correctly if closed without any input.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
             auto container = launcher.Launch(*session);
             auto process = container.GetInitProcess();
+            process.GetStdHandle(0); // Close stdin;  
 
             ValidateProcessOutput(process, {{1, ""}});
-        }*/
+        }
 
         // Validate error paths
         {

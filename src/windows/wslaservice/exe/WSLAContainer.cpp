@@ -466,6 +466,18 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         request.Entrypoint = std::vector<std::string>{containerOptions.InitProcessOptions.Executable};
     }
 
+    for (DWORD i = 0; i < containerOptions.InitProcessOptions.EnvironmentCount; i++)
+    {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            containerOptions.InitProcessOptions.Environment[i][0] == '-',
+            "Invalid environment string at index: %i: %hs",
+            i,
+            containerOptions.InitProcessOptions.Environment[i]);
+
+        request.Env.push_back(containerOptions.InitProcessOptions.Environment[i]);
+    }
+
     try
     {
 
