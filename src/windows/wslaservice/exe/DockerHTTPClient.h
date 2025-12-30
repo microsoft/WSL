@@ -8,7 +8,7 @@
 
 namespace wsl::windows::service::wsla {
 
-class DockerHTTPException : std::runtime_error
+class DockerHTTPException : public std::runtime_error
 {
 public:
     DockerHTTPException(uint16_t StatusCode, const std::string& Url, const std::string& RequestContent, const std::string& ResponseContent) :

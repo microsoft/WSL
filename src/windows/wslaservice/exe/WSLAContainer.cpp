@@ -453,21 +453,43 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         request.StdinOnce = true;
     }
 
-    auto result = DockerClient.CreateContainer(request);
+    if (containerOptions.InitProcessOptions.CommandLineCount > 0)
+    {
+        request.Cmd.insert(
+            request.Cmd.end(),
+            containerOptions.InitProcessOptions.CommandLine,
+            containerOptions.InitProcessOptions.CommandLine + containerOptions.InitProcessOptions.CommandLineCount);
+    }
 
-    // TODO: Rethink command line generation logic.
-    std::vector<std::string> dummy;
-    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, dummy);
+    if (containerOptions.InitProcessOptions.Executable != nullptr)
+    {
+        request.Entrypoint = std::vector<std::string>{containerOptions.InitProcessOptions.Executable};
+    }
 
-    auto volumes = MountVolumes(containerOptions, parentVM);
+    try
+    {
 
-    // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
-    auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), EventTracker, DockerClient);
+        auto result = DockerClient.CreateContainer(request);
 
-    errorCleanup.release();
+        // TODO: Rethink command line generation logic.
+        std::vector<std::string> dummy;
+        auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, dummy);
 
-    return container;
+        auto volumes = MountVolumes(containerOptions, parentVM);
+
+        // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
+        auto container = std::make_unique<WSLAContainerImpl>(
+            &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), EventTracker, DockerClient);
+
+        errorCleanup.release();
+
+        return container;
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // TODO: propagate error message to caller.
+        THROW_HR_MSG(E_FAIL, "Failed to create container: %hs ", e.what());
+    }
 }
 
 std::vector<std::string> WSLAContainerImpl::PrepareNerdctlCreateCommand(

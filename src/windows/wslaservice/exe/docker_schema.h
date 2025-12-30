@@ -24,6 +24,15 @@ struct EmtpyRequest
     using TResponse = void;
 };
 
+struct EmptyObject
+{
+};
+
+inline void to_json(nlohmann::json& j, const EmptyObject& memory)
+{
+    j = nlohmann::json::object();
+}
+
 struct CreateContainer
 {
     using TResponse = CreatedContainer;
@@ -36,8 +45,11 @@ struct CreateContainer
     bool AttachStdout{};
     bool AttachStderr{};
     std::vector<std::string> Cmd;
+    std::vector<std::string> Entrypoint;
+    std::vector<std::string> Env;
+    std::map<std::string, EmptyObject> ExposedPorts;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts);
 };
 
 } // namespace wsl::windows::service::wsla::docker_schema

@@ -1539,6 +1539,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     sessionSettings.MaximumStorageSizeMb = 4096;
 
     std::string shell = "/bin/bash";
+    std::string cmd;
 
     std::string containerImage;
     bool help = false;
@@ -1563,6 +1564,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Utf8String(containerImage), L"--image");
     parser.AddArgument(debugShell, L"--debug-shell");
     parser.AddArgument(noTty, L"--no-tty");
+    parser.AddArgument(Utf8String(cmd), L"--cmd");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
@@ -1668,6 +1670,24 @@ int WslaShell(_In_ std::wstring_view commandLine)
         containerOptions.InitProcessOptions.FdsCount = static_cast<DWORD>(fds.size());
         containerOptions.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
         containerOptions.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
+
+        std::vector<std::string> cmdStorage;
+        for (const auto& e : cmd | std::views::split(' '))
+        {
+            cmdStorage.emplace_back(e.begin(), e.end());
+        }
+
+        std::vector<const char*> cmdPtr;
+        for (auto&& e : cmdStorage)
+        {
+            cmdPtr.push_back(e.c_str());
+        }
+
+        if (!cmdPtr.empty())
+        {
+            containerOptions.InitProcessOptions.CommandLine = cmdPtr.data();
+            containerOptions.InitProcessOptions.CommandLineCount = gsl::narrow_cast<DWORD>(cmdPtr.size());
+        }
 
         container.emplace();
         THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
