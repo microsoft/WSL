@@ -83,7 +83,6 @@ private:
     void OnEvent(ContainerEvent event);
     void WaitForContainerEvent();
 
-
     std::recursive_mutex m_lock;
     std::string m_name;
     std::string m_image;
