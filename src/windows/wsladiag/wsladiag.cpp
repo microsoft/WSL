@@ -182,7 +182,7 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), consoleOut, exitEvent.get());
 
     process.GetExitEvent().wait();
-    auto [code, signalled] = process.GetExitState();
+    auto [exitCode, signalled] = process.GetExitState();
 
     std::wstring shellWide(shell.begin(), shell.end());
     std::wstring message = Localization::MessageWslaShellExited(shellWide.c_str(), exitCode);
