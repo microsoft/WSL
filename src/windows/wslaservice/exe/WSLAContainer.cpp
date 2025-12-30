@@ -226,8 +226,10 @@ void WSLAContainerImpl::Start()
         m_state);
 
     // Attach to the container's init process so no IO is lost.
-    m_initProcess.emplace(std::string{m_id}, wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()}, m_tty, m_dockerClient);
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.reset(); });
+    m_initProcess = wil::MakeOrThrow<WSLAContainerProcess>(
+        m_id, wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()}, m_tty, m_dockerClient);
+
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.Reset(); });
 
     m_dockerClient.StartContainer(m_id);
 
@@ -262,7 +264,25 @@ void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
         return;
     }
 
-    m_dockerClient.StopContainer(m_id, Signal, static_cast<ULONG>(std::round<ULONG>(TimeoutMs / 1000)));
+    try
+    {
+        m_dockerClient.StopContainer(m_id, Signal, static_cast<ULONG>(std::round<ULONG>(TimeoutMs / 1000)));
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // HTTP 304 is returned when the container is already stopped.
+        if (e.StatusCode() == 304)
+        {
+            return;
+        }
+
+        WSL_LOG(
+            "StopContainerFailed",
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(m_id.c_str(), "Id"),
+            TraceLoggingValue(e.what(), "Error"));
+        throw;
+    }
 
     m_state = WslaContainerStateExited;
 }
@@ -291,7 +311,7 @@ WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // If the container is running, refresh the init process state before returning.
-    // if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
+    if (m_state == WslaContainerStateRunning && m_initProcess->State().first != WSLAProcessStateRunning)
     {
         m_state = WslaContainerStateExited;
         // m_containerProcess.reset();
@@ -309,8 +329,8 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_initProcess.has_value());
-    THROW_IF_FAILED(m_initProcess->QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_initProcess);
+    THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
 }
 
 void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
@@ -577,28 +597,6 @@ std::vector<std::string> WSLAContainerImpl::PrepareNerdctlCreateCommand(
     }
 
     return args;
-}
-
-std::optional<std::string> WSLAContainerImpl::GetNerdctlStatus()
-{
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "inspect", "-f", "{{.State.Status}}", m_name});
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
-    if (result.Code != 0)
-    {
-        // Can happen if the container is not found.
-        // TODO: Find a way to validate that the container is indeed not found, and not some other error.
-        return {};
-    }
-
-    auto& status = result.Output[1];
-
-    while (!status.empty() && status.back() == '\n')
-    {
-        status.pop_back();
-    }
-
-    // N.B. nerdctl inspect can return with exit code 0 and no output. Return an empty optional if that happens.
-    return status.empty() ? std::optional<std::string>{} : status;
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :

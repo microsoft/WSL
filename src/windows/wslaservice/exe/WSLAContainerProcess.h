@@ -9,7 +9,7 @@ class DECLSPEC_UUID("3A5DB29D-6D1D-4619-B89D-578EB34C8E52") WSLAContainerProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAProcess, IFastRundown>
 {
 public:
-    WSLAContainerProcess(std::string&& Id, wil::unique_handle&& IoStream, bool Tty, DockerHTTPClient& client);
+    WSLAContainerProcess(const std::string& Id, wil::unique_handle&& IoStream, bool Tty, DockerHTTPClient& client);
     ~WSLAContainerProcess();
 
     IFACEMETHOD(Signal)(_In_ int Signal) override;
@@ -18,6 +18,8 @@ public:
     IFACEMETHOD(GetPid)(_Out_ int* Pid) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code) override;
     IFACEMETHOD(ResizeTty)(_In_ ULONG Rows, _In_ ULONG Columns) override;
+
+    std::pair<WSLA_PROCESS_STATE, int> State() const;
 
     void OnExited(int Code);
 

@@ -43,6 +43,11 @@ void DockerHTTPClient::StopContainer(const std::string& Id, int Signal, ULONG Ti
     Transaction(verb::post, std::format("http://localhost/containers/{}/stop?signal={}&t={}", Id, Signal, TimeoutSeconds));
 }
 
+void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
+{
+    Transaction(verb::post, std::format("http://localhost/containers/{}/kill?signal={}", Id, Signal));
+}
+
 void DockerHTTPClient::DeleteContainer(const std::string& Id)
 {
     Transaction(verb::delete_, std::format("http://localhost/containers/{}", Id));
@@ -58,7 +63,7 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
 
     if (status != 101)
     {
-        throw DockerHTTPException(status, url, "", "");
+        throw DockerHTTPException(status, verb::post, url, "", "");
     }
 
     return std::move(socket);
@@ -71,7 +76,7 @@ wil::unique_socket DockerHTTPClient::MonitorEvents()
 
     if (status != 200)
     {
-        throw DockerHTTPException(status, url, "", "");
+        throw DockerHTTPException(status, verb::get, url, "", "");
     }
 
     return std::move(socket);

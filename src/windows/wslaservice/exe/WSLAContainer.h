@@ -83,7 +83,6 @@ private:
     void OnEvent(ContainerEvent event);
     void WaitForContainerEvent();
 
-    std::optional<std::string> GetNerdctlStatus();
 
     std::recursive_mutex m_lock;
     std::string m_name;
@@ -96,7 +95,7 @@ private:
     std::vector<PortMapping> m_mappedPorts;
     std::vector<VolumeMountInfo> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
-    std::optional<WSLAContainerProcess> m_initProcess;
+    Microsoft::WRL::ComPtr<WSLAContainerProcess> m_initProcess;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(

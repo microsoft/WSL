@@ -184,7 +184,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_OPEN& Mes
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
 {
-
     // Make sure to close the channel since no more messages can be processed after this.
     auto closeChannel = wil::scope_exit([&]() { Channel.Close(); });
 

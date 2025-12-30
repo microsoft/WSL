@@ -3,13 +3,12 @@
 
 using wsl::windows::service::wsla::WSLAContainerProcess;
 
-WSLAContainerProcess::WSLAContainerProcess(std::string&& Id, wil::unique_handle&& IoStream, bool Tty, DockerHTTPClient& client) :
+WSLAContainerProcess::WSLAContainerProcess(const std::string& Id, wil::unique_handle&& IoStream, bool Tty, DockerHTTPClient& client) :
     m_id(std::move(Id)), m_ioStream(std::move(IoStream)), m_dockerClient(client), m_tty(Tty)
 {
 }
 WSLAContainerProcess::~WSLAContainerProcess()
 {
-
     // TODO: consider moving this to a different class.
     if (m_relayThread.has_value())
     {
@@ -20,16 +19,29 @@ WSLAContainerProcess::~WSLAContainerProcess()
 }
 
 HRESULT WSLAContainerProcess::Signal(_In_ int Signal)
+try
 {
-    return E_NOTIMPL;
+    try
+    {
+        m_dockerClient.SignalContainer(m_id, Signal);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_MSG(E_FAIL, "Failed to signal container process %hs with signal %d: %hs", m_id.c_str(), Signal, e.what());
+    }
+
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLAContainerProcess::GetExitEvent(_Out_ ULONG* Event)
+try
 {
     *Event = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(m_exitEvent.get()));
 
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLAContainerProcess::GetStdHandle(_In_ ULONG Index, _Out_ ULONG* Handle)
 try
@@ -58,22 +70,27 @@ HRESULT WSLAContainerProcess::GetPid(_Out_ int* Pid)
     return E_NOTIMPL;
 }
 
-HRESULT WSLAContainerProcess::GetState(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code)
+HRESULT WSLAContainerProcess::GetState(_Out_ WSLA_PROCESS_STATE* CurrentState, _Out_ int* Code)
+try
 {
-    *Code = -1;
+    std::tie(*CurrentState, *Code) = State();
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+std::pair<WSLA_PROCESS_STATE, int> WSLAContainerProcess::State() const
+{
 
     if (m_exitEvent.is_signaled())
     {
         // TODO: Handle signals.
-        *State = WSLA_PROCESS_STATE::WslaProcessStateExited;
-        *Code = m_exitedCode;
+        return {WSLA_PROCESS_STATE::WslaProcessStateExited, m_exitedCode};
     }
     else
     {
-        *State = WSLA_PROCESS_STATE::WslaProcessStateRunning;
+        return {WSLA_PROCESS_STATE::WslaProcessStateRunning, -1};
     }
-
-    return S_OK;
 }
 
 HRESULT WSLAContainerProcess::ResizeTty(_In_ ULONG Rows, _In_ ULONG Columns)

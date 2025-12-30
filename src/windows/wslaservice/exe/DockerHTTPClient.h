@@ -11,8 +11,9 @@ namespace wsl::windows::service::wsla {
 class DockerHTTPException : public std::runtime_error
 {
 public:
-    DockerHTTPException(uint16_t StatusCode, const std::string& Url, const std::string& RequestContent, const std::string& ResponseContent) :
-        std::runtime_error(std::format("HTTP request failed: {} -> {} (Request: {}, Response: {})", Url, StatusCode, RequestContent, ResponseContent)),
+    DockerHTTPException(uint16_t StatusCode, boost::beast::http::verb Method, const std::string& Url, const std::string& RequestContent, const std::string& ResponseContent) :
+        std::runtime_error(std::format(
+            "HTTP request failed: {} {} -> {} (Request: {}, Response: {})", boost::beast::http::to_string(Method), Url, StatusCode, RequestContent, ResponseContent)),
         m_statusCode(StatusCode),
         m_url(Url),
         m_request(RequestContent),
@@ -24,6 +25,11 @@ public:
     T DockerMessage()
     {
         return wsl::shared::FromJson<T>(m_response.c_str());
+    }
+
+    uint16_t StatusCode() const noexcept
+    {
+        return m_statusCode;
     }
 
 private:
@@ -74,6 +80,7 @@ public:
     void StartContainer(const std::string& Id);
     void StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
+    void SignalContainer(const std::string& Id, int Signal);
 
     wil::unique_socket AttachContainer(const std::string& Id);
     wil::unique_socket MonitorEvents();
@@ -107,7 +114,7 @@ private:
 
         if (statusCode < 200 || statusCode >= 300)
         {
-            throw DockerHTTPException(statusCode, Url, requestString, responseString);
+            throw DockerHTTPException(statusCode, Method, Url, requestString, responseString);
         }
 
         if constexpr (!std::is_same_v<TResponse, void>)

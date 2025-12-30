@@ -1054,7 +1054,11 @@ ReadHandle::~ReadHandle()
         DWORD bytesRead{};
         if (CancelIoEx(Handle.Get(), &Overlapped))
         {
-            LOG_LAST_ERROR_IF(!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true) && GetLastError() != ERROR_CONNECTION_ABORTED);
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
+            {
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            }
         }
         else
         {
@@ -1255,7 +1259,11 @@ WriteHandle::~WriteHandle()
         DWORD bytesRead{};
         if (CancelIoEx(Handle.Get(), &Overlapped))
         {
-            LOG_LAST_ERROR_IF(!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true) && GetLastError() != ERROR_CONNECTION_ABORTED);
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
+            {
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            }
         }
         else
         {

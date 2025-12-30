@@ -1254,7 +1254,7 @@ class WSLATests
             WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
             auto container = launcher.Launch(*session);
             auto process = container.GetInitProcess();
-            process.GetStdHandle(0); // Close stdin;  
+            process.GetStdHandle(0); // Close stdin;
 
             ValidateProcessOutput(process, {{1, ""}});
         }
@@ -1346,8 +1346,7 @@ class WSLATests
             }
 
             // Create a stuck container.
-            WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-1", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+            WSLAContainerLauncher launcher("debian:latest", "test-container-1", {}, {"sleep", "99999"});
 
             auto container = launcher.Launch(*session);
 
@@ -1359,7 +1358,7 @@ class WSLATests
 
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
-            initProcess.Get().Signal(9);
+            VERIFY_SUCCEEDED(initProcess.Get().Signal(9));
 
             // Wait for the process to actually exit.
             wsl::shared::retry::RetryWithTimeout<void>(
@@ -1483,6 +1482,30 @@ class WSLATests
             auto result = otherLauncher.Launch(*session).GetInitProcess().WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
             VERIFY_ARE_EQUAL(result.Code, 0);
+        }
+
+        // Validate that creating and starting a container separately behaves as expected
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-create", "sleep", {"99999"}, {});
+            auto [result, container] = launcher.CreateNoThrow(*session);
+            VERIFY_SUCCEEDED(result);
+
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
+            VERIFY_SUCCEEDED(container->Get().Start());
+
+            // Verify that Start() can't be called again on a running container.
+            VERIFY_ARE_EQUAL(container->Get().Start(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container->Get().Stop(9, 0));
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
+
+            VERIFY_SUCCEEDED(container->Get().Delete());
+
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_ARE_EQUAL(container->Get().GetState(&state), RPC_E_DISCONNECTED);
         }
 
         // Validate that containers behave correctly if they outlive their session.
