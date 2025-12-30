@@ -32,7 +32,7 @@ namespace {
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
 
-auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm, std::vector<std::string>& args)
+auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm)
 {
     THROW_HR_IF_MSG(
         E_INVALIDARG,
@@ -122,9 +122,6 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     {
         THROW_IF_FAILED(vm.MapPort(e.Family, e.HostPort, e.VmPort, false));
         e.MappedToHost = true;
-
-        args.push_back("-p");
-        args.push_back(std::format("{}{}:{}", e.Family == AF_INET6 ? "[::]:" : "", e.VmPort, e.ContainerPort));
     }
 
     return std::make_pair(std::move(mappedPorts), std::move(errorCleanup));
@@ -428,7 +425,7 @@ std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainerImpl::Mou
             auto result = parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly);
             THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath, parentVMPath.c_str());
 
-            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, volume.ReadOnly});
+            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
         }
         catch (...)
         {
@@ -498,16 +495,51 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         request.Env.push_back(containerOptions.InitProcessOptions.Environment[i]);
     }
 
+    // Mount volumes.
+    auto volumes = MountVolumes(containerOptions, parentVM);
+
+    for (const auto& e : volumes)
+    {
+        request.HostConfig.Mounts.emplace_back(
+            docker_schema::Mount{.Source = e.ParentVMPath, .Target = e.ContainerPath, .Type = "bind", .ReadOnly = e.ReadOnly});
+    }
+
+    // Set the networking mode.
+    if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+    {
+        request.HostConfig.NetworkMode = "bridge";
+    }
+    else if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_HOST)
+    {
+        request.HostConfig.NetworkMode = "host";
+    }
+    else if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_NONE)
+    {
+        request.HostConfig.NetworkMode = "none";
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %i", containerOptions.ContainerNetwork.ContainerNetworkType);
+    }
+
+    // Process port bindings.
+    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM);
+
+    for (const auto& e : *mappedPorts)
+    {
+        // TODO: UDP support
+        // TODO: Investigate ipv6 support.
+        auto& portEntry = request.HostConfig.PortBindings[std::format("{}/tcp", e.ContainerPort)];
+        portEntry.emplace_back(docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
+    }
+
+    // Send the request to docker.
     try
     {
 
         auto result = DockerClient.CreateContainer(request);
 
         // TODO: Rethink command line generation logic.
-        std::vector<std::string> dummy;
-        auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, dummy);
-
-        auto volumes = MountVolumes(containerOptions, parentVM);
 
         // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
         auto container = std::make_unique<WSLAContainerImpl>(

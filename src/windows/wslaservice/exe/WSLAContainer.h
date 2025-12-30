@@ -28,7 +28,7 @@ struct VolumeMountInfo
     std::wstring HostPath;
     std::string ParentVMPath;
     std::string ContainerPath;
-    BOOL ReadOnly;
+    bool ReadOnly;
 };
 
 class WSLAContainer;
