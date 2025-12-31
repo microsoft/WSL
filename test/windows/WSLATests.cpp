@@ -288,10 +288,16 @@ class WSLATests
         VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr));
 
         // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+        THROW_IF_FAILED(session->ListImages(images.addressof(), images.size_address<ULONG>()));
+
+        std::vector<std::string> tags;
+        for (const auto &e: images)
+        {
+            tags.push_back(e.Image);
+        }
+
+        VERIFY_IS_TRUE(std::ranges::find(tags, "hello-world:latest") != tags.end());
     }
 
     TEST_METHOD(LoadImage)

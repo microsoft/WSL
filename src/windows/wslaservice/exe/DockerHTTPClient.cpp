@@ -22,6 +22,11 @@ uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const On
     return code;
 }
 
+std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
+{
+    return Transaction<docker_schema::EmtpyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
+}
+
 docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
 {
     // TODO: Url escaping.

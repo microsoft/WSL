@@ -380,9 +380,37 @@ try
 CATCH_RETURN();
 
 HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+try
 {
-    return E_NOTIMPL;
+    *Count = 0;
+    *Images = nullptr;
+
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto images = m_dockerClient->ListImages();
+
+    auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(images.size());
+
+    size_t index = 0;
+    for (const auto& e: images)
+    {
+        // TODO: Find a better way to encode tags;
+        // TODO: download_timestamp
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e.RepoTags[0].c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+        output[index].Size = e.Size;
+
+        index++;
+    }
+
+    *Count = static_cast<ULONG>(images.size());
+    *Images = output.release();
+    return S_OK;
+
 }
+CATCH_RETURN();
 
 HRESULT WSLASession::DeleteImage(LPCWSTR Image)
 {

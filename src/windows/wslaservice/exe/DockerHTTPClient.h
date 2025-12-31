@@ -89,6 +89,7 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
     uint32_t PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback);
+    std::vector<common::docker_schema::Image> ListImages();
 
 private:
     wil::unique_socket ConnectSocket();

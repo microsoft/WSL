@@ -103,7 +103,7 @@ struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
 struct WSLA_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
-    LPWSTR Hash;
+    char Hash[256];
     ULONGLONG Size;
     ULONGLONG DownloadTimestamp;
 };
