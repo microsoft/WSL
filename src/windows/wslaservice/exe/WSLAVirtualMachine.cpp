@@ -15,6 +15,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include <format>
 #include <filesystem>
+#include <variant>
 #include "hcs_schema.h"
 #include "VirtioNetworking.h"
 #include "NatNetworking.h"
@@ -283,8 +284,8 @@ void WSLAVirtualMachine::Start()
 #endif
 
     // Initialize the boot VHDs.
-    std::pair<std::optional<ULONG>, std::optional<std::string>> rootVhd;
-    std::pair<std::optional<ULONG>, std::optional<std::string>> modulesVhd;
+    std::variant<ULONG, std::string> rootVhd;
+    std::variant<ULONG, std::string> modulesVhd;
     hcs::Scsi scsiController{};
     if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
     {
@@ -306,8 +307,8 @@ void WSLAVirtualMachine::Start()
             return lun;
         };
 
-        rootVhd.first = attachScsiDisk(m_settings.RootVhd.c_str());
-        modulesVhd.first = attachScsiDisk(kernelModulesPath.c_str());
+        rootVhd = attachScsiDisk(m_settings.RootVhd.c_str());
+        modulesVhd = attachScsiDisk(kernelModulesPath.c_str());
     }
     else
     {
@@ -326,8 +327,8 @@ void WSLAVirtualMachine::Start()
             return std::format("/dev/pmem{}", deviceId);
         };
 
-        rootVhd.second = attachPmemDisk(m_settings.RootVhd.c_str());
-        modulesVhd.second = attachPmemDisk(kernelModulesPath.c_str());
+        rootVhd = attachPmemDisk(m_settings.RootVhd.c_str());
+        modulesVhd = attachPmemDisk(kernelModulesPath.c_str());
         vmSettings.Devices.VirtualPMem = std::move(pmemController);
     }
 
@@ -398,16 +399,20 @@ void WSLAVirtualMachine::Start()
     ConfigureNetworking();
 
     // Configure mounts.
-    auto getVhdDevicePath = [&](const std::pair<std::optional<ULONG>, std::optional<std::string>>& vhd) {
-        WI_ASSERT(vhd.first.has_value() ^ vhd.second.has_value());
-        if (vhd.first.has_value())
-        {
-            return GetVhdDevicePath(vhd.first.value());
-        }
-        else
-        {
-            return vhd.second.value();
-        }
+    auto getVhdDevicePath = [&](const std::variant<ULONG, std::string>& vhd) {
+        return std::visit(
+            [&](auto&& arg) -> std::string {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, ULONG>)
+                {
+                    return GetVhdDevicePath(arg);
+                }
+                else if constexpr (std::is_same_v<T, std::string>)
+                {
+                    return arg;
+                }
+            },
+            vhd);
     };
 
     Mount(m_initChannel, getVhdDevicePath(rootVhd).c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
