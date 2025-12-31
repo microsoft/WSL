@@ -163,7 +163,15 @@ struct HandleWrapper
 {
     DEFAULT_MOVABLE(HandleWrapper);
 
-    HandleWrapper(wil::unique_handle&& handle) : OwnedHandle(std::move(handle)), Handle(OwnedHandle.get())
+    HandleWrapper(
+        wil::unique_handle&& handle, std::function<void()>&& OnClose = []() {}) :
+        OwnedHandle(std::move(handle)), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(
+        SOCKET handle, std::function<void()>&& OnClose = []() {}) :
+        Handle(reinterpret_cast<HANDLE>(handle)), OnClose(std::move(OnClose))
     {
     }
 

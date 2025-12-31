@@ -275,6 +275,20 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
+    void ExpectImagePresent(IWSLASession& Session, const char* Image)
+    {
+        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+        THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
+
+        std::vector<std::string> tags;
+        for (const auto& e : images)
+        {
+            tags.push_back(e.Image);
+        }
+
+        VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
+    }
+
     TEST_METHOD(PullImage)
     {
         WSL2_TEST_ONLY();
@@ -288,16 +302,7 @@ class WSLATests
         VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr));
 
         // Verify that the image is in the list of images.
-        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        THROW_IF_FAILED(session->ListImages(images.addressof(), images.size_address<ULONG>()));
-
-        std::vector<std::string> tags;
-        for (const auto &e: images)
-        {
-            tags.push_back(e.Image);
-        }
-
-        VERIFY_IS_TRUE(std::ranges::find(tags, "hello-world:latest") != tags.end());
+        ExpectImagePresent(*session, "hello-world:latest");
     }
 
     TEST_METHOD(LoadImage)
@@ -339,11 +344,7 @@ class WSLATests
 
         VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr));
 
-        // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("my-hello-world") != std::string::npos);
+        ExpectImagePresent(*session, "my-hello-world:test");
     }
 
     TEST_METHOD(CustomDmesgOutput)

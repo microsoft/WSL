@@ -25,6 +25,18 @@ using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
 
+namespace {
+
+std::pair<std::string, std::string> ParseImage(const std::string& Input)
+{
+    std::string image{Input};
+    size_t separator = image.find(':');
+    THROW_HR_IF_MSG(E_INVALIDARG, separator == std::string::npos || separator >= Input.size() - 1, "Invalid image: %hs", Input.c_str());
+
+    return {image.substr(0, separator), image.substr(separator + 1)};
+}
+} // namespace
+
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
 
     m_id(id), m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
@@ -301,17 +313,16 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
-    std::lock_guard lock{m_lock};
+    auto [repo, tag] = ParseImage(ImageUri);
 
-    std::string image{ImageUri};
-    size_t separator = image.find(':');
-    THROW_HR_IF_MSG(E_INVALIDARG, separator == std::string::npos || separator >= image.size() - 1, "Invalid image: %hs", ImageUri);
+
+    std::lock_guard lock{m_lock};
 
     auto callback = [&](const std::string& content) {
         WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(content.c_str(), "Content"));
     };
 
-    auto code = m_dockerClient->PullImage(image.substr(0, separator).c_str(), image.substr(separator + 1).c_str(), callback);
+    auto code = m_dockerClient->PullImage(repo.c_str(), tag.c_str(), callback);
 
     THROW_HR_IF_MSG(E_FAIL, code != 200, "Failed to pull image: %hs", ImageUri);
 
@@ -355,25 +366,65 @@ try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
+    auto [repo, tag] = ParseImage(ImageName);
+
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
     RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
 
     std::lock_guard lock{m_lock};
 
-    ServiceProcessLauncher launcher{
-        nerdctlPath, {nerdctlPath, "import", "-", ImageName}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
-    auto importProcess = launcher.Launch(*m_virtualMachine.Get());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto importProcessStdin = importProcess.GetStdHandle(0);
-    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
-    wsl::windows::common::relay::InterruptableRelay(
-        imageFileHandle.get(), importProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
-    importProcessStdin.reset();
+    auto [status, socket] = m_dockerClient->ImportImage(ImageName);
 
-    auto result = importProcess.WaitAndCaptureOutput();
+    THROW_HR_IF_MSG(E_FAIL, status != 200, "Failed to import image: %hs", ImageName);
 
-    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Import image failed: %hs", launcher.FormatResult(result).c_str());
+    relay::MultiHandleWait io;
+
+    std::optional<docker_schema::ImportStatus> importStatus;
+    // TODO: report progress to caller.
+    auto onProgress = [&](const gsl::span<char>& buffer) {
+        std::string entry = {buffer.begin(), buffer.end()};
+        WSL_LOG("ImageImportProgress", TraceLoggingValue(ImageName, "Image"), TraceLoggingValue(entry.c_str(), "Content"));
+
+        THROW_HR_IF(E_UNEXPECTED, importStatus.has_value());
+
+        importStatus = wsl::shared::FromJson<docker_schema::ImportStatus>(entry.c_str());
+    };
+
+    wil::unique_event completedEvent{wil::EventOptions::ManualReset};
+
+    auto onInputComplete = [&]() {
+        completedEvent.SetEvent();
+        WSL_LOG("ImageImportInputComplete", TraceLoggingValue(ImageName, "Image"));
+    };
+
+    // TODO: Docker seems to close the socket when it's done parsing the tar, even if the imageFileHandle isn't fully flushed.
+    // Investigate why.
+
+    io.AddHandle(std::make_unique<relay::RelayHandle>(std::move(imageFileHandle), socket.get()));
+    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+    io.AddHandle(std::make_unique<relay::EventHandle>(completedEvent.get(), [&]() { io.Cancel(); }));
+    io.AddHandle(std::make_unique<relay::HTTPChunkBasedReadHandle>(
+        common::relay::HandleWrapper{socket.get(), std::move(onInputComplete)}, std::move(onProgress)));
+
+    io.Run({});
+
+    THROW_HR_IF(E_FAIL, !importStatus.has_value());
+
+    // TODO: cleanup on failure.
+
+    // Image was imported, now tag it.
+    try
+    {
+        m_dockerClient->TagImage(importStatus->status.c_str(), repo, tag);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_MSG(
+            E_FAIL, "Failed to tag image: %hs", e.what());
+    }
 
     return S_OK;
 }
@@ -548,6 +599,10 @@ CATCH_RETURN();
 
 void WSLASession::OnUserSessionTerminating()
 {
+    // m_sessionTerminatingEvent is always valid, so it can be signalled with the lock.
+    // This allows a sesssion to be unblocked if a stuck operation is holding the lock.
+    m_sessionTerminatingEvent.SetEvent();
+
     std::lock_guard lock{m_lock};
     WI_ASSERT(m_userSession != nullptr);
 
@@ -572,36 +627,4 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
     std::lock_guard lock{m_lock};
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.second.get() == Container; }) == 1);
-}
-
-std::string WSLASession::DockerRequest(const std::string& Url)
-{
-    wil::unique_socket socket;
-    {
-        std::lock_guard lock{m_lock};
-        socket = m_virtualMachine->ConnectUnixSocket("/var/run/docker.sock");
-    }
-
-    namespace http = boost::beast::http;
-
-    boost::asio::io_context context;
-
-    boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
-
-    boost::asio::generic::stream_protocol::stream_protocol::socket stream(context);
-    stream.assign(hv_proto, socket.release());
-
-    http::request<http::string_body> req{http::verb::get, Url, 11};
-    req.set(http::field::host, "hvsocket"); // label only; AF_HYPERV doesn't do DNS
-    req.prepare_payload();
-
-    WSL_LOG("Written", TraceLoggingValue(http::write(stream, req), "Bytes"));
-
-    boost::beast::flat_buffer buffer; // for header/body framing
-    http::response<http::string_body> res;
-    http::read(stream, buffer, res);
-
-    WSL_LOG("HTTPREsult", TraceLoggingValue(res.result_int(), "Status"));
-
-    return res.body();
 }

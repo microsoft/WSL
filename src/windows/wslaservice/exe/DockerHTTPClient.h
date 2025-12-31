@@ -4,6 +4,7 @@
 #include <boost/asio/generic/stream_protocol.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include "relay.hpp"
 #include "docker_schema.h"
 
 namespace wsl::windows::service::wsla {
@@ -47,31 +48,19 @@ public:
     using OnResponseBytes = std::function<void(gsl::span<char>)>;
     using OnImageProgress = std::function<void(const std::string&)>;
 
-    template <typename T>
-    struct RequestResult
+    struct HTTPRequestContext
     {
-        uint32_t StatusCode;
-        std::optional<T> ResponseObject;
-        std::string ResponseString;
-        std::string RequestString;
+        NON_COPYABLE(HTTPRequestContext);
+        NON_MOVABLE(HTTPRequestContext);
 
-        std::string Format()
+        HTTPRequestContext(wil::unique_socket&& Socket) : stream(context)
         {
-            return std::format("{} -> {}({})", RequestString, StatusCode, ResponseString);
+            boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
+            stream.assign(hv_proto, Socket.release());
         }
-    };
 
-    template <>
-    struct RequestResult<void>
-    {
-        uint32_t StatusCode;
-        std::string ResponseString;
-        std::string RequestString;
-
-        std::string Format()
-        {
-            return std::format("{} -> {}({})", RequestString, StatusCode, ResponseString);
-        }
+        boost::asio::io_context context;
+        boost::asio::generic::stream_protocol::socket stream;
     };
 
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
@@ -89,10 +78,34 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
     uint32_t PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback);
+    std::pair<uint32_t, wil::unique_socket> ImportImage(const char* Tag);
+    void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::vector<common::docker_schema::Image> ListImages();
+
+    struct DockerHttpResponseHandle : common::relay::OverlappedIOHandle
+    {
+        NON_COPYABLE(DockerHttpResponseHandle);
+        NON_MOVABLE(DockerHttpResponseHandle);
+
+        DockerHttpResponseHandle(
+            HTTPRequestContext& context, std::function<void()>&& OnResponseHeader, std::function<void(const gsl::span<char>&)>&& OnResponseBytes);
+
+        void Schedule() override;
+        void Collect() override;
+        HANDLE GetHandle() const override;
+
+    private:
+        HTTPRequestContext& Context;
+        std::function<void()> OnResponseHeader;
+        std::function<void(const gsl::span<char>&)>&& OnResponseBytes;
+    };
 
 private:
     wil::unique_socket ConnectSocket();
+
+    std::unique_ptr<HTTPRequestContext> SendRequestImpl(
+        boost::beast::http::verb Method, const std::string& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers);
+
     std::pair<uint32_t, std::string> SendRequest(
         boost::beast::http::verb Method, const std::string& Url, const std::string& Body = "");
 

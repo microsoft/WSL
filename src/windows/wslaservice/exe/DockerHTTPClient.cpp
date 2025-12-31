@@ -2,6 +2,7 @@
 
 #include "DockerHTTPClient.h"
 
+namespace http = boost::beast::http;
 using boost::beast::http::verb;
 using wsl::windows::service::wsla::DockerHTTPClient;
 using namespace wsl::windows::common;
@@ -20,6 +21,21 @@ uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const On
         [Callback](const gsl::span<char>& span) { Callback(std::string{span.data(), span.size()}); });
 
     return code;
+}
+
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ImportImage(const char* Tag)
+{
+    return SendRequest(
+        verb::post,
+        std::format("http://localhost/images/create?fromSrc=-&tag={}", Tag),
+        {},
+        {},
+        {{http::field::content_type, "application/x-tar"}});
+}
+
+void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag)
+{
+    Transaction<docker_schema::EmtpyRequest>(verb::post, std::format("http://localhost/images/{}/tag?repo={}&tag={}", Id, Repo, Tag));
 }
 
 std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
@@ -136,21 +152,10 @@ std::pair<uint32_t, std::string> DockerHTTPClient::SendRequest(verb Method, cons
     return {status, std::move(responseBody)};
 }
 
-std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
-    verb Method,
-    const std::string& Url,
-    const std::string& Body,
-    const OnResponseBytes& OnResponse,
-    const std::map<boost::beast::http::field, std::string>& Headers)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequestImpl(
+    verb Method, const std::string& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers)
 {
-    namespace http = boost::beast::http;
-
-    boost::asio::io_context context;
-    boost::asio::generic::stream_protocol::socket stream(context);
-
-    // Write the request
-    boost::asio::generic::stream_protocol hv_proto(AF_HYPERV, SOCK_STREAM);
-    stream.assign(hv_proto, ConnectSocket().release());
+    auto context = std::make_unique<DockerHTTPClient::HTTPRequestContext>(ConnectSocket());
 
     http::request<http::string_body> req{Method, Url, 11};
     req.set(http::field::host, "localhost");
@@ -169,7 +174,20 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
 
     req.prepare_payload();
 
-    http::write(stream, req);
+    http::write(context->stream, req);
+
+    return std::move(context);
+}
+
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
+    verb Method,
+    const std::string& Url,
+    const std::string& Body,
+    const OnResponseBytes& OnResponse,
+    const std::map<boost::beast::http::field, std::string>& Headers)
+{
+    // Write the request
+    auto context = SendRequestImpl(Method, Url, Body, Headers);
 
     // Parse the response header
     std::vector<char> buffer(16 * 4096);
@@ -184,7 +202,7 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
     {
         // Peek for the end of the HTTP header '\r\n'
         auto bytesRead = common::socket::Receive(
-            stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), buffer.size()), m_exitingEvent, MSG_PEEK);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), buffer.size()), m_exitingEvent, MSG_PEEK);
 
         size_t i{};
         for (i = 0; i < bytesRead && lineFeeds < 2; i++)
@@ -200,7 +218,8 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
         }
 
         // Consumme the buffer from the socket.
-        bytesRead = common::socket::Receive(stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), i), m_exitingEvent);
+        bytesRead = common::socket::Receive(
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), i), m_exitingEvent);
         WI_ASSERT(bytesRead == i);
 
         boost::beast::error_code error;
@@ -218,7 +237,7 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
 
             parser.get().body().data = buffer.data();
             parser.get().body().size = buffer.size();
-            http::read(stream, adapter, parser);
+            http::read(context->stream, adapter, parser);
 
             auto bytesRead = buffer.size() - parser.get().body().size;
 
@@ -226,5 +245,5 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
         }
     }
 
-    return {parser.get().result_int(), wil::unique_socket{stream.release()}};
+    return {parser.get().result_int(), wil::unique_socket{context->stream.release()}};
 }
