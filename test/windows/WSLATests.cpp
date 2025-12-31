@@ -1638,7 +1638,6 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
 
-
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
             expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
@@ -1782,17 +1781,14 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        auto expectBoundPorts = [&](const char* Name, const std::vector<std::string>& expectedBoundPorts) {
-            auto result = ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "inspect", Name}, 0);
-
-            auto parsed = nlohmann::json::parse(result.Output[1]);
-            auto ports = parsed[0]["HostConfig"]["PortBindings"];
+        auto expectBoundPorts = [&](RunningWSLAContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
+            auto ports = Container.Inspect().HostConfig.PortBindings;
 
             std::vector<std::string> boundPorts;
 
-            for (const auto& e : ports.items())
+            for (const auto& e : ports)
             {
-                boundPorts.emplace_back(e.key());
+                boundPorts.emplace_back(e.first);
             }
 
             if (!std::ranges::equal(boundPorts, expectedBoundPorts))
@@ -1821,7 +1817,7 @@ class WSLATests
             // Wait for the container bind() to be completed.
             WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-            // expectBoundPorts("test-ports", {"8000/tcp"});
+            expectBoundPorts(container, {"8000/tcp"});
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
             ExpectHttpResponse(L"http://[::1]:1234", {});
@@ -1853,7 +1849,7 @@ class WSLATests
                 // Wait for the container bind() to be completed.
                 WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-                // expectBoundPorts("test-ports-3", {"8000/tcp"});
+                expectBoundPorts(container, {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
                 VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
