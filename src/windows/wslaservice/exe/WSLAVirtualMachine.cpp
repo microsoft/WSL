@@ -400,19 +400,22 @@ void WSLAVirtualMachine::Start()
 
     // Configure mounts.
     auto getVhdDevicePath = [&](const std::variant<ULONG, std::string>& vhd) {
-        return std::visit(
-            [&](auto&& arg) -> std::string {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, ULONG>)
-                {
-                    return GetVhdDevicePath(arg);
-                }
-                else if constexpr (std::is_same_v<T, std::string>)
-                {
-                    return arg;
-                }
-            },
-            vhd);
+        struct Visitor
+        {
+            WSLAVirtualMachine* vm;
+
+            std::string operator()(ULONG lun) const
+            {
+                return vm->GetVhdDevicePath(lun);
+            }
+
+            std::string operator()(const std::string& path) const
+            {
+                return path;
+            }
+        };
+
+        return std::visit(Visitor{this}, vhd);
     };
 
     Mount(m_initChannel, getVhdDevicePath(rootVhd).c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
