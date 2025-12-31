@@ -315,7 +315,6 @@ try
 
     auto [repo, tag] = ParseImage(ImageUri);
 
-
     std::lock_guard lock{m_lock};
 
     auto callback = [&](const std::string& content) {
@@ -422,8 +421,7 @@ try
     }
     catch (const DockerHTTPException& e)
     {
-        THROW_HR_MSG(
-            E_FAIL, "Failed to tag image: %hs", e.what());
+        THROW_HR_MSG(E_FAIL, "Failed to tag image: %hs", e.what());
     }
 
     return S_OK;

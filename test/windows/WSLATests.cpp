@@ -303,6 +303,8 @@ class WSLATests
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*session, "hello-world:latest");
+
+        // TODO: Check that the image can actually be used to start a container.
     }
 
     TEST_METHOD(LoadImage)
@@ -345,6 +347,16 @@ class WSLATests
         VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr));
 
         ExpectImagePresent(*session, "my-hello-world:test");
+
+        // Validate that containers can be started from the imported image.
+        WSLAContainerLauncher launcher("my-hello-world:test", "wsla-import-image-container", "/hello");
+
+        auto container = launcher.Launch(*session);
+
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
 
     TEST_METHOD(CustomDmesgOutput)
