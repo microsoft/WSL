@@ -394,7 +394,7 @@ try
     auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(images.size());
 
     size_t index = 0;
-    for (const auto& e: images)
+    for (const auto& e : images)
     {
         // TODO: Find a better way to encode tags;
         // TODO: download_timestamp
@@ -408,7 +408,6 @@ try
     *Count = static_cast<ULONG>(images.size());
     *Images = output.release();
     return S_OK;
-
 }
 CATCH_RETURN();
 
