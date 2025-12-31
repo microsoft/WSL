@@ -76,11 +76,12 @@ public:
 
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
-    docker_schema::CreatedContainer CreateContainer(const docker_schema::CreateContainer& Request);
+    common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request);
     void StartContainer(const std::string& Id);
     void StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
+    std::string InspectContainer(const std::string& Id);
 
     wil::unique_socket AttachContainer(const std::string& Id);
     wil::unique_socket MonitorEvents();
@@ -101,11 +102,11 @@ private:
         const OnResponseBytes& OnResponse,
         const std::map<boost::beast::http::field, std::string>& Headers = {});
 
-    template <typename TRequest = docker_schema::EmtpyRequest, typename TResponse = TRequest::TResponse>
+    template <typename TRequest = common::docker_schema::EmtpyRequest, typename TResponse = TRequest::TResponse>
     auto Transaction(boost::beast::http::verb Method, const std::string& Url, const TRequest& RequestObject = {})
     {
         std::string requestString;
-        if constexpr (!std::is_same_v<TRequest, docker_schema::EmtpyRequest>)
+        if constexpr (!std::is_same_v<TRequest, common::docker_schema::EmtpyRequest>)
         {
             requestString = wsl::shared::ToJson(RequestObject);
         }

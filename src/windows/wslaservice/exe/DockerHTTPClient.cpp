@@ -4,7 +4,7 @@
 
 using boost::beast::http::verb;
 using wsl::windows::service::wsla::DockerHTTPClient;
-using namespace wsl::windows::service::wsla::docker_schema;
+using namespace wsl::windows::common;
 
 DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
     m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
@@ -22,7 +22,7 @@ uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const On
     return code;
 }
 
-CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
+docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
 {
     // TODO: Url escaping.
     return Transaction<docker_schema::CreateContainer>(verb::post, "http://localhost/containers/create", Request);
@@ -51,6 +51,19 @@ void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
 void DockerHTTPClient::DeleteContainer(const std::string& Id)
 {
     Transaction(verb::delete_, std::format("http://localhost/containers/{}", Id));
+}
+
+std::string DockerHTTPClient::InspectContainer(const std::string& Id)
+{
+    auto url = std::format("http://localhost/containers/{}/json", Id);
+    auto [code, response] = SendRequest(verb::get, url);
+
+    if (code < 200 || code >= 300)
+    {
+        throw DockerHTTPException(code, verb::get, url, "", response);
+    }
+
+    return response;
 }
 
 wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)

@@ -66,6 +66,7 @@ public:
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
+    void Inspect(LPSTR* Output);
 
     IWSLAContainer& ComWrapper();
 
@@ -119,6 +120,7 @@ public:
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
     IFACEMETHOD(Start)() override;
+    IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
 
     void Disconnect() noexcept;
 

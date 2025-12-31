@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 #include "WSLAProcessLauncher.h"
+#include "docker_schema.h"
 
 namespace wsl::windows::common {
 
@@ -28,6 +29,7 @@ public:
     WSLA_CONTAINER_STATE State();
     ClientRunningWSLAProcess GetInitProcess();
     void Reset();
+    docker_schema::InspectContainer Inspect();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;

@@ -1565,11 +1565,9 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"host\"]'\n");
+
+            auto details = container.Inspect();
+            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1596,11 +1594,8 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"none\"]'\n");
+
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "none");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1629,7 +1624,6 @@ class WSLATests
             VERIFY_ARE_EQUAL(retVal.first, E_INVALIDARG);
         }
 
-        // Test bridge when ready
         {
             WSLAContainerLauncher launcher(
                 "debian:latest",
@@ -1642,11 +1636,8 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"bridge\"]'\n");
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
+
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 

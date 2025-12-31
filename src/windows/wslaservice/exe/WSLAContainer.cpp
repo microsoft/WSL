@@ -21,6 +21,8 @@ using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
+using namespace wsl::windows::common::docker_schema;
+
 // Constants for required default arguments for "nerdctl create..."
 static std::vector<std::string> defaultNerdctlCreateArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
                                                          "--ulimit",
@@ -456,7 +458,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     // TODO: Think about when 'StdinOnce' should be set.
     auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
 
-    docker_schema::CreateContainer request;
+    common::docker_schema::CreateContainer request;
     request.Image = containerOptions.Image;
 
     if (hasTty)
@@ -501,7 +503,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     for (const auto& e : volumes)
     {
         request.HostConfig.Mounts.emplace_back(
-            docker_schema::Mount{.Source = e.ParentVMPath, .Target = e.ContainerPath, .Type = "bind", .ReadOnly = e.ReadOnly});
+            common::docker_schema::Mount{.Source = e.ParentVMPath, .Target = e.ContainerPath, .Type = "bind", .ReadOnly = e.ReadOnly});
     }
 
     // Set the networking mode.
@@ -530,7 +532,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         // TODO: UDP support
         // TODO: Investigate ipv6 support.
         auto& portEntry = request.HostConfig.PortBindings[std::format("{}/tcp", e.ContainerPort)];
-        portEntry.emplace_back(docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
+        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
     }
 
     // Send the request to docker.
@@ -556,79 +558,16 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 }
 
-std::vector<std::string> WSLAContainerImpl::PrepareNerdctlCreateCommand(
-    const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes)
+void WSLAContainerImpl::Inspect(LPSTR* Output)
 {
-    std::vector<std::string> args{nerdctlPath};
-    args.push_back("create");
-    args.push_back("--name");
-    args.push_back(options.Name);
-
-    switch (options.ContainerNetwork.ContainerNetworkType)
+    try
     {
-    case WSLA_CONTAINER_NETWORK_HOST:
-        args.push_back("--net=host");
-        break;
-    case WSLA_CONTAINER_NETWORK_NONE:
-        args.push_back("--net=none");
-        break;
-    case WSLA_CONTAINER_NETWORK_BRIDGE:
-        args.push_back("--net=bridge");
-        break;
-    // TODO: uncomment and implement when we have custom networks
-    // case WSLA_CONTAINER_NETWORK_CUSTOM:
-    //     args.push_back(std::format("--net={}", options.ContainerNetwork.ContainerNetworkName));
-    //     break;
-    default:
-        THROW_HR_MSG(
-            E_INVALIDARG,
-            "No such network: type: %i, name: %hs",
-            options.ContainerNetwork.ContainerNetworkType,
-            options.ContainerNetwork.ContainerNetworkName);
-        break;
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_dockerClient.InspectContainer(m_id).data()).release();
     }
-
-    if (options.ShmSize > 0)
+    catch (const DockerHTTPException& e)
     {
-        args.push_back(std::format("--shm-size={}m", options.ShmSize));
+        THROW_HR_MSG(E_FAIL, "Failed to inspect container: %hs ", e.what());
     }
-    if (options.Flags & WSLA_CONTAINER_FLAG_ENABLE_GPU)
-    {
-        args.push_back("--gpus");
-        // TODO: Parse GPU device list from WSLA_CONTAINER_OPTIONS. For now, just enable all GPUs.
-        args.push_back("all");
-    }
-
-    args.insert(args.end(), defaultNerdctlCreateArgs.begin(), defaultNerdctlCreateArgs.end());
-    args.insert(args.end(), inputOptions.begin(), inputOptions.end());
-
-    if (options.InitProcessOptions.Executable != nullptr)
-    {
-        args.push_back("--entrypoint");
-        args.push_back(options.InitProcessOptions.Executable);
-    }
-
-    for (const auto& volume : volumes)
-    {
-        args.emplace_back(std::format("-v{}:{}{}", volume.ParentVMPath, volume.ContainerPath, volume.ReadOnly ? ":ro" : ""));
-    }
-
-    // TODO:
-    // - Implement port mapping
-
-    args.push_back(options.Image);
-
-    if (options.InitProcessOptions.CommandLineCount > 0)
-    {
-        args.push_back("--");
-
-        for (ULONG i = 0; i < options.InitProcessOptions.CommandLineCount; i++)
-        {
-            args.push_back(options.InitProcessOptions.CommandLine[i]);
-        }
-    }
-
-    return args;
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
@@ -670,6 +609,13 @@ HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 HRESULT WSLAContainer::Start()
 {
     return CallImpl(&WSLAContainerImpl::Start);
+}
+
+HRESULT WSLAContainer::Inspect(LPSTR* Output)
+{
+    *Output = nullptr;
+
+    return CallImpl(&WSLAContainerImpl::Inspect, Output);
 }
 
 HRESULT WSLAContainer::Delete()
