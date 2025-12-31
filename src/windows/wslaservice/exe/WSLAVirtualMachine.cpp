@@ -293,8 +293,8 @@ void WSLAVirtualMachine::Start()
 #endif
 
     // Initialize the boot VHDs.
-    std::pair<std::optional<ULONG>, std::optional<std::string>> rootVhd;
-    std::pair<std::optional<ULONG>, std::optional<std::string>> modulesVhd;
+    std::variant<ULONG, std::string> rootVhd;
+    std::variant<ULONG, std::string> modulesVhd;
     hcs::Scsi scsiController{};
     if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
     {
@@ -311,13 +311,12 @@ void WSLAVirtualMachine::Start()
             disk.SupportEncryptedFiles = true;
             scsiController.Attachments[std::to_string(lun)] = std::move(disk);
             AttachedDisk attachedDisk{path};
-            // TODO: devicePath will be filled in later.
             m_attachedDisks.emplace(lun, std::move(attachedDisk));
             return lun;
         };
 
-        rootVhd.first = attachScsiDisk(m_settings.RootVhd.c_str());
-        modulesVhd.first = attachScsiDisk(kernelModulesPath.c_str());
+        rootVhd = attachScsiDisk(m_settings.RootVhd.c_str());
+        modulesVhd = attachScsiDisk(kernelModulesPath.c_str());
     }
     else
     {
@@ -336,8 +335,8 @@ void WSLAVirtualMachine::Start()
             return std::format("/dev/pmem{}", deviceId);
         };
 
-        rootVhd.second = attachPmemDisk(m_settings.RootVhd.c_str());
-        modulesVhd.second = attachPmemDisk(kernelModulesPath.c_str());
+        rootVhd = attachPmemDisk(m_settings.RootVhd.c_str());
+        modulesVhd = attachPmemDisk(kernelModulesPath.c_str());
         vmSettings.Devices.VirtualPMem = std::move(pmemController);
     }
 
@@ -410,25 +409,28 @@ void WSLAVirtualMachine::Start()
     ConfigureNetworking();
 
     // Configure mounts.
-    auto getVhdDevicePath = [&](const std::pair<std::optional<ULONG>, std::optional<std::string>>& vhd) {
-        WI_ASSERT(vhd.first.has_value() ^ vhd.second.has_value());
-        if (vhd.first.has_value())
+    auto getDevicePath = [&](std::variant<ULONG, std::string>& vhd) -> const std::string& {
+        // If the variant holds the SCSI LUN, query the guest for the device path.
+        if (std::holds_alternative<ULONG>(vhd))
         {
-            return GetVhdDevicePath(vhd.first.value());
+            const auto lun = std::get<ULONG>(vhd);
+            auto it = m_attachedDisks.find(lun);
+            WI_ASSERT(it != m_attachedDisks.end() && it->second.Device.empty());
+
+            it->second.Device = GetVhdDevicePath(lun);
+            vhd = it->second.Device;
         }
-        else
-        {
-            return vhd.second.value();
-        }
+
+        return std::get<std::string>(vhd);
     };
 
-    Mount(m_initChannel, getVhdDevicePath(rootVhd).c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
+    Mount(m_initChannel, getDevicePath(rootVhd).c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
     Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
     Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
-    Mount(m_initChannel, getVhdDevicePath(modulesVhd).c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
+    Mount(m_initChannel, getDevicePath(modulesVhd).c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     // Configure GPU if requested.
     if (FeatureEnabled(WslaFeatureFlagsGPU))
