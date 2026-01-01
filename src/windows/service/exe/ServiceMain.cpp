@@ -37,7 +37,7 @@ struct WslServiceSecurityPolicy
     {
         // COM Access and Launch permissions allowed for authenticated user, principal self, and system.
         // 0xB = (COM_RIGHTS_EXECUTE | COM_RIGHTS_EXECUTE_LOCAL | COM_RIGHTS_ACTIVATE_LOCAL)
-        // N.B. This should be kept in sync with the security descriptors in the appxmanifest and package.wix.
+        // N.B. This should be kept in sync with the security descriptors in the appxmanifest and msipackage.wix.
         return L"O:BAG:BAD:(A;;0xB;;;AU)(A;;0xB;;;PS)(A;;0xB;;;SY)";
     }
 };

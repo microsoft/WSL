@@ -43,7 +43,7 @@
                 </RegistryKey>
 
                 <!-- WSLAUserSession -->
-                <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
+                <RegistryKey Root="HKCR" Key="CLSID\{A9B7A1B9-0671-405C-95F1-E0612CB4CE8F}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
                     <RegistryValue Value="WSLAUserSession" Type="string" />
                 </RegistryKey>

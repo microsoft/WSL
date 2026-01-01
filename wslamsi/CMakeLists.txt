@@ -1,7 +1,7 @@
 set(BIN ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE})
 set(OUTPUT_PACKAGE ${BIN}/wsla.msi)
-set(PACKAGE_WIX_IN ${CMAKE_CURRENT_LIST_DIR}/package.wix.in)
-set(PACKAGE_WIX ${BIN}/package.wix)
+set(PACKAGE_WIX_IN ${CMAKE_CURRENT_LIST_DIR}/wslamsi.wix.in)
+set(PACKAGE_WIX ${BIN}/wslamsi.wix)
 set(CAB_CACHE ${BIN}/cab)
 set(BINARIES wslaservice.exe;wslaserviceproxystub.dll;wsladiag.exe)
 

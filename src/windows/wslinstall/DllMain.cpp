@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains various methods used during MSI installation (see package.wix.in)
+    This file contains various methods used during MSI installation (see msipackage.wix.in)
 
 --*/
 

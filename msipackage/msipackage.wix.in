@@ -554,4 +554,3 @@
         <Property Id="MSIRMSHUTDOWN" Value="0" Secure="yes" />
     </Package>
 </Wix>
-
