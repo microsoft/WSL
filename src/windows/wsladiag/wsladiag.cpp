@@ -213,7 +213,7 @@ static int RunListCommand(bool /*verbose*/)
     }
 
     wslutil::PrintMessage(Localization::MessageWslaSessionsFound(sessions.size()), stdout);
-    // Compute column widths from headers + data .
+    // Compute column widths from headers + data.
     const auto idHeader = Localization::MessageWslaHeaderId();
     const auto pidHeader = Localization::MessageWslaHeaderCreatorPid();
     const auto nameHeader = Localization::MessageWslaHeaderDisplayName();
