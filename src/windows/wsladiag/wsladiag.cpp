@@ -346,11 +346,6 @@ int wmain(int, wchar_t**)
     catch (...)
     {
         const auto hr = wil::ResultFromCaughtException();
-        if (hr == E_INVALIDARG)
-        {
-            PrintUsage();
-            return 1;
-        }
         return ReportError(L"wsladiag failed", hr);
     }
 }
