@@ -1877,7 +1877,7 @@ Usage:
   wsladiag list
   wsladiag shell &lt;SessionName&gt; [--verbose]
   wsladiag --help</value>
-  <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  <comment>{Locked="--verbose"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
 </data>
 <data name="MessageWslaSessionNotFound" xml:space="preserve">
   <value>Session not found: '{}'</value>
