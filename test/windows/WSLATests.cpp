@@ -344,7 +344,10 @@ class WSLATests
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
 
-        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr));
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+
+        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
 
         ExpectImagePresent(*session, "my-hello-world:test");
 

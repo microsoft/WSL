@@ -971,7 +971,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         // Remove completed handles from m_handles.
         std::erase_if(m_handles, [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; });
 
-        if (m_handles.empty())
+        if (m_handles.empty() || m_cancel)
         {
             break;
         }
@@ -1042,7 +1042,7 @@ HANDLE EventHandle::GetHandle() const
 }
 
 ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
-    Handle(std::move(MovedHandle)), OnRead(OnRead)
+    Handle(std::move(MovedHandle)), OnRead(OnRead), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
 }
@@ -1076,8 +1076,12 @@ void ReadHandle::Schedule()
 
     // Schedule the read.
     DWORD bytesRead{};
+    Overlapped.Offset = Offset.LowPart;
+    Overlapped.OffsetHigh = Offset.HighPart;
     if (ReadFile(Handle.Get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesRead, &Overlapped))
     {
+        Offset.QuadPart += bytesRead;
+
         // Signal the read.
         OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
 
@@ -1123,6 +1127,8 @@ void ReadHandle::Collect()
         // We received ERROR_HANDLE_EOF or ERROR_BROKEN_PIPE. Validate that this was indeed a zero byte read.
         WI_ASSERT(bytesRead == 0);
     }
+
+    Offset.QuadPart += bytesRead;
 
     // Signal the read.
     OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));

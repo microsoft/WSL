@@ -360,7 +360,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -375,49 +375,79 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto [status, socket] = m_dockerClient->ImportImage(ImageName);
-
-    THROW_HR_IF_MSG(E_FAIL, status != 200, "Failed to import image: %hs", ImageName);
+    auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
 
     relay::MultiHandleWait io;
 
     std::optional<docker_schema::ImportStatus> importStatus;
-    // TODO: report progress to caller.
-    auto onProgress = [&](const gsl::span<char>& buffer) {
-        std::string entry = {buffer.begin(), buffer.end()};
-        WSL_LOG("ImageImportProgress", TraceLoggingValue(ImageName, "Image"), TraceLoggingValue(entry.c_str(), "Content"));
 
-        THROW_HR_IF(E_UNEXPECTED, importStatus.has_value());
+    std::optional<boost::beast::http::status> importResult;
 
-        importStatus = wsl::shared::FromJson<docker_schema::ImportStatus>(entry.c_str());
+    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
+        WSL_LOG(
+            "ImageImportHttpResponse",
+            TraceLoggingValue(ImageName, "Image"),
+            TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+
+        importResult = response.result();
     };
 
-    wil::unique_event completedEvent{wil::EventOptions::ManualReset};
+    // TODO: report progress to caller.
 
-    auto onInputComplete = [&]() {
-        completedEvent.SetEvent();
+    std::string errorJson;
+
+    auto onProgress = [&](const gsl::span<char>& buffer) {
+        WI_ASSERT(importResult.has_value());
+
+        if (importResult.value() != boost::beast::http::status::ok)
+        {
+            // If the import failed, accumulate the error message.
+            errorJson.append(buffer.data(), buffer.size());
+        }
+        else
+        {
+            std::string entry = {buffer.begin(), buffer.end()};
+            WSL_LOG("ImageImportProgress", TraceLoggingValue(ImageName, "Image"), TraceLoggingValue(entry.c_str(), "Content"));
+
+            THROW_HR_IF(E_UNEXPECTED, importStatus.has_value());
+
+            importStatus = wsl::shared::FromJson<docker_schema::ImportStatus>(entry.c_str());
+        }
+    };
+
+    auto onCompleted = [&]() {
         WSL_LOG("ImageImportInputComplete", TraceLoggingValue(ImageName, "Image"));
+
+        io.Cancel();
     };
 
     // TODO: Docker seems to close the socket when it's done parsing the tar, even if the imageFileHandle isn't fully flushed.
     // Investigate why.
 
-    io.AddHandle(std::make_unique<relay::RelayHandle>(std::move(imageFileHandle), socket.get()));
+    io.AddHandle(std::make_unique<relay::RelayHandle>(
+        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{requestContext->stream.native_handle()}));
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
-    io.AddHandle(std::make_unique<relay::EventHandle>(completedEvent.get(), [&]() { io.Cancel(); }));
-    io.AddHandle(std::make_unique<relay::HTTPChunkBasedReadHandle>(
-        common::relay::HandleWrapper{socket.get(), std::move(onInputComplete)}, std::move(onProgress)));
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
+        *requestContext, std::move(onHttpResponse), std::move(onProgress), std::move(onCompleted)));
 
     io.Run({});
 
-    THROW_HR_IF(E_FAIL, !importStatus.has_value());
+    THROW_HR_IF(E_UNEXPECTED, !importResult.has_value());
+
+    if (importResult.value() != boost::beast::http::status::ok)
+    {
+        // Import failed, parse the error message.
+        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+
+        THROW_HR_MSG(E_FAIL, "Image import failed: %hs", error.message.c_str());
+    }
 
     // TODO: cleanup on failure.
 
     // Image was imported, now tag it.
     try
     {
-        m_dockerClient->TagImage(importStatus->status.c_str(), repo, tag);
+        // m_dockerClient->TagImage(importStatus->status.c_str(), repo, tag);
     }
     catch (const DockerHTTPException& e)
     {
@@ -447,7 +477,11 @@ try
     {
         // TODO: Find a better way to encode tags;
         // TODO: download_timestamp
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e.RepoTags[0].c_str()) != 0);
+        if (!e.RepoTags.empty())
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e.RepoTags[0].c_str()) != 0);
+        }
+
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
         output[index].Size = e.Size;
 

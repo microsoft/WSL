@@ -266,6 +266,7 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
+    LARGE_INTEGER Offset{};
 };
 
 class LineBasedReadHandle : public ReadHandle
@@ -293,9 +294,9 @@ public:
     HTTPChunkBasedReadHandle(HandleWrapper&& Handler, std::function<void(const gsl::span<char>& Buffer)>&& OnChunk);
     ~HTTPChunkBasedReadHandle();
 
-private:
     void OnRead(const gsl::span<char>& Line);
 
+private:
     std::function<void(const gsl::span<char>& Buffer)> OnChunk;
     std::string PendingBuffer;
     uint64_t PendingChunkSize = 0;

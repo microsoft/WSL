@@ -78,26 +78,36 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
     uint32_t PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback);
-    std::pair<uint32_t, wil::unique_socket> ImportImage(const char* Tag);
+    std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
+    std::unique_ptr<HTTPRequestContext> LoadImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::vector<common::docker_schema::Image> ListImages();
 
-    struct DockerHttpResponseHandle : common::relay::OverlappedIOHandle
+    struct DockerHttpResponseHandle : public common::relay::ReadHandle
     {
         NON_COPYABLE(DockerHttpResponseHandle);
         NON_MOVABLE(DockerHttpResponseHandle);
 
         DockerHttpResponseHandle(
-            HTTPRequestContext& context, std::function<void()>&& OnResponseHeader, std::function<void(const gsl::span<char>&)>&& OnResponseBytes);
+            HTTPRequestContext& context,
+            std::function<void(const boost::beast::http::message<false, boost::beast::http::buffer_body>&)>&& OnResponseHeader,
+            std::function<void(const gsl::span<char>&)>&& OnResponseBytes,
+            std::function<void()>&& OnCompleted);
 
-        void Schedule() override;
-        void Collect() override;
-        HANDLE GetHandle() const override;
+        ~DockerHttpResponseHandle();
 
     private:
+        void OnRead(const gsl::span<char>& Content);
+        void OnResponseBytes(const gsl::span<char>& Content);
+
         HTTPRequestContext& Context;
-        std::function<void()> OnResponseHeader;
-        std::function<void(const gsl::span<char>&)>&& OnResponseBytes;
+        std::function<void(const boost::beast::http::message<false, boost::beast::http::buffer_body>&)> OnResponseHeader;
+        std::function<void(const gsl::span<char>&)> OnResponse;
+        std::function<void()> OnCompleted;
+        boost::beast::http::response_parser<boost::beast::http::buffer_body> Parser;
+        size_t LineFeeds = 0;
+        std::optional<size_t> RemainingContentLength;
+        std::optional<common::relay::HTTPChunkBasedReadHandle> ResponseParser;
     };
 
 private:
