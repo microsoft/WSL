@@ -41,7 +41,7 @@ public:
         _In_ LPCSTR ImageUri,
         _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
         _In_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ LPCWSTR Image) override;
@@ -72,6 +72,7 @@ private:
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnContainerdLog(const gsl::span<char>& Data);
     void MonitorContainerd(ServiceRunningProcess&& process);
+    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     std::optional<DockerHTTPClient> m_dockerClient;

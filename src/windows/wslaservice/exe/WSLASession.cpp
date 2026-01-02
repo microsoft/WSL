@@ -260,8 +260,6 @@ try
     std::string entry = {buffer.begin(), buffer.end()};
     WSL_LOG("ContainerdLog", TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
 
-    // auto parsed = nlohmann::json::parse(entry);
-
     if (!m_containerdReadyEvent.is_signaled())
     {
         if (entry.find(c_containerdReadyLogLine) != std::string::npos)
@@ -329,33 +327,18 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
-    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
-
     std::lock_guard lock{m_lock};
 
-    // Directly invoking "nerdctl load" will immediately return with failure
-    // "stdin is empty and input flag is not specified".
-    // TODO: Change the workaround when nerdctl has a fix.
-    ServiceProcessLauncher launcher{
-        "/bin/sh", {"/bin/sh", "-c", "cat | /usr/bin/nerdctl load"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
-    auto loadProcess = launcher.Launch(*m_virtualMachine.Get());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto loadProcessStdin = loadProcess.GetStdHandle(0);
-    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
-    wsl::windows::common::relay::InterruptableRelay(
-        imageFileHandle.get(), loadProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
-    loadProcessStdin.reset();
+    auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    auto result = loadProcess.WaitAndCaptureOutput();
-
-    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Load image failed: %hs", launcher.FormatResult(result).c_str());
-
+    ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;
 }
 CATCH_RETURN();
@@ -364,12 +347,9 @@ HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressC
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
+    RETURN_HR_IF_NULL(E_POINTER, ImageName);
 
     auto [repo, tag] = ParseImage(ImageName);
-
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
-    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
-    RETURN_HR_IF_NULL(E_POINTER, ImageName);
 
     std::lock_guard lock{m_lock};
 
@@ -377,25 +357,28 @@ try
 
     auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
 
-    relay::MultiHandleWait io;
+    ImportImageImpl(*requestContext, ImageHandle);
+    return S_OK;
+}
+CATCH_RETURN();
 
-    std::optional<docker_schema::ImportStatus> importStatus;
+void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
+{
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(InputHandle))};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    relay::MultiHandleWait io;
 
     std::optional<boost::beast::http::status> importResult;
 
     auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
-        WSL_LOG(
-            "ImageImportHttpResponse",
-            TraceLoggingValue(ImageName, "Image"),
-            TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+        WSL_LOG("ImageImportHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
 
         importResult = response.result();
     };
 
-    // TODO: report progress to caller.
-
     std::string errorJson;
-
     auto onProgress = [&](const gsl::span<char>& buffer) {
         WI_ASSERT(importResult.has_value());
 
@@ -406,29 +389,21 @@ try
         }
         else
         {
+            // TODO: report progress to caller.
             std::string entry = {buffer.begin(), buffer.end()};
-            WSL_LOG("ImageImportProgress", TraceLoggingValue(ImageName, "Image"), TraceLoggingValue(entry.c_str(), "Content"));
-
-            THROW_HR_IF(E_UNEXPECTED, importStatus.has_value());
-
-            importStatus = wsl::shared::FromJson<docker_schema::ImportStatus>(entry.c_str());
+            WSL_LOG("ImageImportProgress", TraceLoggingValue(entry.c_str(), "Content"));
         }
     };
 
-    auto onCompleted = [&]() {
-        WSL_LOG("ImageImportInputComplete", TraceLoggingValue(ImageName, "Image"));
-
-        io.Cancel();
-    };
-
-    // TODO: Docker seems to close the socket when it's done parsing the tar, even if the imageFileHandle isn't fully flushed.
-    // Investigate why.
+    auto onCompleted = [&]() { io.Cancel(); };
 
     io.AddHandle(std::make_unique<relay::RelayHandle>(
-        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{requestContext->stream.native_handle()}));
+        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
+
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+
     io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        *requestContext, std::move(onHttpResponse), std::move(onProgress), std::move(onCompleted)));
+        Request, std::move(onHttpResponse), std::move(onProgress), std::move(onCompleted)));
 
     io.Run({});
 
@@ -439,24 +414,10 @@ try
         // Import failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
 
+        // TODO: Return error message to client.
         THROW_HR_MSG(E_FAIL, "Image import failed: %hs", error.message.c_str());
     }
-
-    // TODO: cleanup on failure.
-
-    // Image was imported, now tag it.
-    try
-    {
-        // m_dockerClient->TagImage(importStatus->status.c_str(), repo, tag);
-    }
-    catch (const DockerHTTPException& e)
-    {
-        THROW_HR_MSG(E_FAIL, "Failed to tag image: %hs", e.what());
-    }
-
-    return S_OK;
 }
-CATCH_RETURN();
 
 HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
 try

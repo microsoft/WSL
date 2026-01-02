@@ -307,6 +307,7 @@ class WSLATests
         // TODO: Check that the image can actually be used to start a container.
     }
 
+    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {
         WSL2_TEST_ONLY();
@@ -321,15 +322,23 @@ class WSLATests
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
 
-        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr));
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+
+        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
 
         // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+        ExpectImagePresent(*session, "hello-world:latest");
+        WSLAContainerLauncher launcher("hello-world:latest", "wsla-import-image-container");
+
+        auto container = launcher.Launch(*session);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
 
+    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(ImportImage)
     {
         WSL2_TEST_ONLY();
@@ -355,7 +364,6 @@ class WSLATests
         WSLAContainerLauncher launcher("my-hello-world:test", "wsla-import-image-container", "/hello");
 
         auto container = launcher.Launch(*session);
-
         auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
         VERIFY_ARE_EQUAL(0, result.Code);

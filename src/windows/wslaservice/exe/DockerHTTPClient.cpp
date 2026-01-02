@@ -24,7 +24,7 @@ uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const On
     return code;
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)
 {
     return SendRequestImpl(
         verb::post,

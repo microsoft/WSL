@@ -79,7 +79,7 @@ public:
 
     uint32_t PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
-    std::unique_ptr<HTTPRequestContext> LoadImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
+    std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::vector<common::docker_schema::Image> ListImages();
 
