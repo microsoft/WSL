@@ -87,9 +87,7 @@ public:
     wil::unique_socket StartExec(const std::string& Id, const common::docker_schema::StartExec& Request);
     void ResizeExecTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
-
     wil::unique_socket MonitorEvents();
-
 
     struct DockerHttpResponseHandle : public common::relay::ReadHandle
     {
