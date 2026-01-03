@@ -106,7 +106,6 @@ private:
         const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl);
 
     void ConfigureNetworking();
-    void ConfigureMounts();
     void OnExit(_In_ const HCS_EVENT* Event);
     void OnCrash(_In_ const HCS_EVENT* Event);
     bool FeatureEnabled(WSLAFeatureFlags Flag) const;
@@ -117,6 +116,7 @@ private:
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);
 
     ConnectedSocket ConnectSocket(wsl::shared::SocketChannel& Channel, int32_t Fd);
+    std::string GetVhdDevicePath(ULONG Lun);
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
     void RemoveShare(_In_ const MountedFolderInfo& MountInfo);

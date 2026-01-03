@@ -1553,6 +1553,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(
         SetFlag<int, WslaFeatureFlagsDnsTunneling>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--dns-tunneling");
     parser.AddArgument(
+        SetFlag<int, WslaFeatureFlagsPmemVhds>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--pmem-vhds");
+    parser.AddArgument(
         SetFlag<int, WslaFeatureFlagsVirtioFs>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--virtiofs");
     parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
