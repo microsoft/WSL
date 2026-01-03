@@ -83,7 +83,8 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     // TODO: log session ID
     WSL_LOG("DockerEvent", TraceLoggingValue(event.c_str(), "Data"));
 
-    static std::map<std::string, ContainerEvent> events{{"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}};
+    static std::map<std::string, ContainerEvent> events{
+        {"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}, {"exec_die", ContainerEvent::ExecDied}};
 
     auto parsed = nlohmann::json::parse(event);
 
@@ -104,13 +105,32 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Failed to parse json: %hs", event.c_str());
 
     auto containerId = id->get<std::string>();
+
+    std::optional<int> exitCode;
+    std::optional<std::string> execId;
+    auto attributes = actor->find("Attributes");
+    if (attributes != actor->end())
+    {
+        auto exitCodeEntry = attributes->find("exitCode");
+        if (exitCodeEntry != attributes->end())
+        {
+            exitCode = std::stoi(exitCodeEntry->get<std::string>());
+        }
+
+        auto execIdEntry = attributes->find("execID");
+        if (execIdEntry != attributes->end())
+        {
+            execId = execIdEntry->get<std::string>();
+        }
+    }
+
     std::lock_guard lock{m_lock};
 
     for (const auto& e : m_callbacks)
     {
-        if (e.ContainerId == containerId)
+        if (e.ContainerId == containerId && (!e.ExecId.has_value() || e.ExecId == execId))
         {
-            e.Callback(it->second);
+            e.Callback(it->second, exitCode);
         }
     }
 }
@@ -125,7 +145,17 @@ try
 
         if (!buffer.empty()) // nerdctl inserts empty lines between events, skip those.
         {
-            OnEvent(std::string{buffer.begin(), buffer.end()});
+            try
+            {
+                OnEvent(std::string{buffer.begin(), buffer.end()});
+            }
+            catch (...)
+            {
+                WSL_LOG(
+                    "DockerEventParseError",
+                    TraceLoggingValue(buffer.data(), "Data"),
+                    TraceLoggingValue(wil::ResultFromCaughtException(), "Error"));
+            }
         }
     };
 
@@ -148,7 +178,18 @@ ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::Registe
     std::lock_guard lock{m_lock};
 
     auto id = m_callbackId++;
-    m_callbacks.emplace_back(id, ContainerId, std::move(Callback));
+    m_callbacks.emplace_back(id, ContainerId, std::optional<std::string>{}, std::move(Callback));
+
+    return ContainerTrackingReference{this, id};
+}
+
+ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::RegisterExecStateUpdates(
+    const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback)
+{
+    std::lock_guard lock{m_lock};
+
+    auto id = m_callbackId++;
+    m_callbacks.emplace_back(id, ContainerId, ExecId, std::move(Callback));
 
     return ContainerTrackingReference{this, id};
 }

@@ -3,10 +3,18 @@
 
 using wsl::windows::service::wsla::WSLAContainerProcess;
 
-WSLAContainerProcess::WSLAContainerProcess(const std::string& Id, wil::unique_handle&& IoStream, bool Tty, DockerHTTPClient& client) :
-    m_id(std::move(Id)), m_ioStream(std::move(IoStream)), m_dockerClient(client), m_tty(Tty)
+WSLAContainerProcess::WSLAContainerProcess(
+    const std::string& Id, bool Tty, DockerHTTPClient& client, const std::optional<std::string>& ParentContainerId, ContainerEventTracker& tracker) :
+    m_id(Id), m_dockerClient(client), m_tty(Tty), m_exec(ParentContainerId.has_value())
 {
+    // Register for exit events.
+    if (m_exec)
+    {
+        m_trackingReference = tracker.RegisterExecStateUpdates(
+            ParentContainerId.value(), Id, std::bind(&WSLAContainerProcess::OnExecEvent, this, std::placeholders::_1, std::placeholders::_2));
+    }
 }
+
 WSLAContainerProcess::~WSLAContainerProcess()
 {
     // TODO: consider moving this to a different class.
@@ -18,9 +26,25 @@ WSLAContainerProcess::~WSLAContainerProcess()
     }
 }
 
+void WSLAContainerProcess::AssignIoStream(wil::unique_handle&& IoStream)
+{
+    m_ioStream = std::move(IoStream);
+}
+
+void WSLAContainerProcess::OnExecEvent(ContainerEvent Event, std::optional<int> ExitCode)
+{
+    if (Event == ContainerEvent::ExecDied)
+    {
+        THROW_HR_IF(E_UNEXPECTED, !ExitCode.has_value());
+        OnExited(ExitCode.value());
+    }
+}
+
 HRESULT WSLAContainerProcess::Signal(_In_ int Signal)
 try
 {
+    THROW_WIN32_IF(ERROR_NOT_SUPPORTED, m_exec);
+
     try
     {
         m_dockerClient.SignalContainer(m_id, Signal);
@@ -81,7 +105,6 @@ CATCH_RETURN();
 
 std::pair<WSLA_PROCESS_STATE, int> WSLAContainerProcess::State() const
 {
-
     if (m_exitEvent.is_signaled())
     {
         // TODO: Handle signals.
@@ -99,7 +122,21 @@ try
     std::lock_guard lock{m_mutex};
     RETURN_HR_IF(E_INVALIDARG, !m_tty);
 
-    m_dockerClient.ResizeContainerTty(m_id, Rows, Columns);
+    try
+    {
+        if (m_exec)
+        {
+            m_dockerClient.ResizeExecTty(m_id, Rows, Columns);
+        }
+        else
+        {
+            m_dockerClient.ResizeContainerTty(m_id, Rows, Columns);
+        }
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_MSG(E_FAIL, "Failed to resize tty for process %hs: %hs", m_id.c_str(), e.what());
+    }
 
     return S_OK;
 }
@@ -152,6 +189,8 @@ try
     io.AddHandle(std::make_unique<common::relay::DockerIORelayHandle>(m_ioStream.get(), std::move(stdoutPipe), std::move(stderrPipe)));
 
     io.Run({});
+
+    // IO relay is done, check the process exit status.
 }
 CATCH_LOG();
 

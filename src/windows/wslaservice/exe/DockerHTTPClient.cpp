@@ -112,6 +112,32 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     return std::move(socket);
 }
 
+docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string& Container, const docker_schema::CreateExec& Request)
+{
+    return Transaction<docker_schema::CreateExec>(verb::post, std::format("http://localhost/containers/{}/exec", Container), Request);
+}
+
+wil::unique_socket DockerHTTPClient::StartExec(const std::string& Id, const common::docker_schema::StartExec& Request)
+{
+    std::map<boost::beast::http::field, std::string> headers{
+        {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
+
+    auto url = std::format("http://localhost/exec/{}/start", Id);
+
+    auto body = wsl::shared::ToJson(Request);
+    auto [status, socket] = SendRequest(verb::post, url, body, {}, headers);
+    if (status != 101)
+    {
+        throw DockerHTTPException(status, verb::post, url, body, "");
+    }
+    return std::move(socket);
+}
+
+void DockerHTTPClient::ResizeExecTty(const std::string& Id, ULONG Rows, ULONG Columns)
+{
+    Transaction(verb::post, std::format("http://localhost/exec/{}/resize?w={}&h={}", Id, Columns, Rows));
+}
+
 wil::unique_socket DockerHTTPClient::MonitorEvents()
 {
     auto url = "http://localhost/events";
@@ -322,22 +348,27 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
     auto context = SendRequestImpl(Method, Url, Body, Headers);
 
     // Parse the response header
-    std::vector<char> buffer(16 * 4096);
+    constexpr auto bufferSize = 4096;
+    size_t Offset = 0;
+    std::vector<char> buffer;
     http::response_parser<http::buffer_body> parser;
     parser.eager(false);
     parser.skip(false);
 
     size_t lineFeeds = 0;
-
     // Consume the socket until the header end is reached
     while (!parser.is_header_done())
     {
+        buffer.resize(Offset + bufferSize);
+
         // Peek for the end of the HTTP header '\r\n'
         auto bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), buffer.size()), m_exitingEvent, MSG_PEEK);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_exitingEvent, MSG_PEEK);
+
+        THROW_HR_IF(E_ABORT, bytesRead == 0);
 
         size_t i{};
-        for (i = 0; i < bytesRead && lineFeeds < 2; i++)
+        for (i = 0; i < bytesRead + Offset && lineFeeds < 2; i++)
         {
             if (buffer[i] == '\n')
             {
@@ -351,13 +382,23 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
 
         // Consumme the buffer from the socket.
         bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data()), i), m_exitingEvent);
-        WI_ASSERT(bytesRead == i);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), i - Offset), m_exitingEvent);
+        WI_ASSERT(bytesRead == i - Offset);
 
-        boost::beast::error_code error;
-        parser.put(boost::asio::buffer(buffer.data(), bytesRead), error);
-        THROW_HR_IF_MSG(
-            E_UNEXPECTED, error && error != boost::beast::http::error::need_more, "Error parsing HTTP response: %hs", error.what().c_str());
+        Offset += bytesRead;
+        buffer.resize(Offset);
+
+        if (lineFeeds == 2) // Header is complete, feed it to the parser.
+        {
+            boost::beast::error_code error;
+            parser.put(boost::asio::buffer(buffer.data(), buffer.size()), error);
+
+            THROW_HR_IF_MSG(
+                E_UNEXPECTED,
+                error && error != boost::beast::http::error::need_more,
+                "Error parsing HTTP response: %hs",
+                error.what().c_str());
+        }
     }
 
     WSL_LOG("HTTPResult", TraceLoggingValue(Url.c_str(), "Url"), TraceLoggingValue(parser.get().result_int(), "Status"));

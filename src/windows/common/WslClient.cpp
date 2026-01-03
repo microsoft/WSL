@@ -1544,6 +1544,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     std::string containerImage;
     bool help = false;
     bool noTty = false;
+    bool exec = false;
     std::wstring debugShell;
 
     std::wstring storagePath;
@@ -1565,6 +1566,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(debugShell, L"--debug-shell");
     parser.AddArgument(noTty, L"--no-tty");
     parser.AddArgument(Utf8String(cmd), L"--cmd");
+    parser.AddArgument(exec, L"--exec");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
@@ -1693,9 +1695,19 @@ int WslaShell(_In_ std::wstring_view commandLine)
         THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
         THROW_IF_FAILED((*container)->Start());
 
-        wil::com_ptr<IWSLAProcess> initProcess;
-        THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
-        process.emplace(std::move(initProcess), std::move(fds));
+        wil::com_ptr<IWSLAProcess> createdProcess;
+
+        if (exec)
+        {
+            int error = -1;
+            THROW_IF_FAILED((*container)->Exec(&containerOptions.InitProcessOptions, &createdProcess, &error));
+        }
+        else
+        {
+            THROW_IF_FAILED((*container)->GetInitProcess(&createdProcess));
+        }
+
+        process.emplace(std::move(createdProcess), std::move(fds));
     }
 
     if (noTty)

@@ -296,7 +296,7 @@ try
     else
     {
         // Otherwise, the session is shutting down; terminate containerd before exiting.
-        process.Get().Signal(15); // SIGTERM
+        process.Get().Signal(9); // SIGKILL
 
         process.Wait(30 * 1000); // TODO: Configurable timeout.
     }

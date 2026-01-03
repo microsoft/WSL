@@ -81,7 +81,7 @@ public:
         DockerHTTPClient& DockerClient);
 
 private:
-    void OnEvent(ContainerEvent event);
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
 
     std::recursive_mutex m_lock;
@@ -96,6 +96,7 @@ private:
     std::vector<VolumeMountInfo> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
     Microsoft::WRL::ComPtr<WSLAContainerProcess> m_initProcess;
+    ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
 
     static std::vector<std::string> PrepareNerdctlCreateCommand(

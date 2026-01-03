@@ -150,7 +150,9 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_mappedPorts(std::move(ports)),
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
-    m_containerEvents(EventTracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1)))
+    m_eventTracker(EventTracker),
+    m_containerEvents(EventTracker.RegisterContainerStateUpdates(
+        m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2)))
 {
     m_state = WslaContainerStateCreated;
 
@@ -225,8 +227,9 @@ void WSLAContainerImpl::Start()
         m_state);
 
     // Attach to the container's init process so no IO is lost.
-    m_initProcess = wil::MakeOrThrow<WSLAContainerProcess>(
-        m_id, wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()}, m_tty, m_dockerClient);
+    m_initProcess = wil::MakeOrThrow<WSLAContainerProcess>(m_id, m_tty, m_dockerClient, std::optional<std::string>{}, m_eventTracker);
+
+    m_initProcess->AssignIoStream(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.Reset(); });
 
@@ -236,15 +239,16 @@ void WSLAContainerImpl::Start()
     cleanup.release();
 }
 
-void WSLAContainerImpl::OnEvent(ContainerEvent event)
+void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode)
 {
     if (event == ContainerEvent::Stop)
     {
+        THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
+
         std::lock_guard<std::recursive_mutex> lock(m_lock);
         m_state = WslaContainerStateExited;
 
-        // TODO: propagate exit code.
-        m_initProcess->OnExited(0);
+        m_initProcess->OnExited(exitCode.value());
     }
 
     WSL_LOG(
@@ -347,39 +351,41 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
     auto [hasStdin, hasTty] = ParseFdStatus(*Options);
 
-    std::vector<std::string> args{nerdctlPath, "exec"};
-
-    if (hasStdin)
-    {
-        args.push_back("-i");
-    }
-
-    if (hasTty)
-    {
-        args.push_back("-t");
-    }
-
-    AddEnvironmentVariables(args, *Options);
-
-    args.emplace_back(m_id);
-
+    common::docker_schema::CreateExec request;
     for (ULONG i = 0; i < Options->CommandLineCount; i++)
     {
-        args.emplace_back(Options->CommandLine[i]);
+        request.Cmd.push_back(Options->CommandLine[i]);
     }
 
-    ServiceProcessLauncher launcher(nerdctlPath, args, defaultNerdctlEnv, common::ProcessFlags::None);
-    for (auto i = 0; i < Options->FdsCount; i++)
+    for (ULONG i = 0; i < Options->EnvironmentCount; i++)
     {
-        launcher.AddFd(Options->Fds[i]);
+        request.Env.push_back(Options->Environment[i]);
     }
 
-    std::optional<ServiceRunningProcess> process;
-    HRESULT result = E_FAIL;
-    std::tie(result, *Errno, process) = launcher.LaunchNoThrow(*m_parentVM);
-    THROW_IF_FAILED(result);
+    if (Options->CurrentDirectory != nullptr)
+    {
+        request.WorkingDir = Options->CurrentDirectory;
+    }
 
-    THROW_IF_FAILED(process->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
+    try
+    {
+        auto result = m_dockerClient.CreateExec(m_id, request);
+
+        // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
+
+        auto process = wil::MakeOrThrow<WSLAContainerProcess>(result.Id, hasTty, m_dockerClient, m_id, m_eventTracker);
+
+        process->AssignIoStream(wil::unique_handle{
+            (HANDLE)m_dockerClient
+                .StartExec(result.Id, common::docker_schema::StartExec{.Tty = hasTty, .ConsoleSize = request.ConsoleSize})
+                .release()});
+
+        THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
+    }
+    catch (DockerHTTPException& e)
+    {
+        THROW_HR_MSG(E_FAIL, "Failed to exec process in container %hs: %hs", m_id.c_str(), e.what());
+    }
 }
 
 std::pair<bool, bool> WSLAContainerImpl::ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options)

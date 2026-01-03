@@ -104,4 +104,35 @@ struct ImportStatus
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImportStatus, status);
 };
 
+struct CreateExecResponse
+{
+    std::string Id;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExecResponse, Id);
+};
+
+struct CreateExec
+{
+    using TResponse = CreateExecResponse;
+
+    bool AttachStdin;
+    bool AttachStdout;
+    bool AttachStderr;
+    bool Tty;
+    std::vector<ULONG> ConsoleSize;
+    std::vector<std::string> Cmd;
+    std::vector<std::string> Env;
+    std::string WorkingDir;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir);
+};
+
+struct StartExec
+{
+    using TResponse = void;
+    bool Tty;
+    std::vector<ULONG> ConsoleSize;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, ConsoleSize);
+};
+
 } // namespace wsl::windows::common::docker_schema

@@ -65,23 +65,31 @@ public:
 
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
+    // Container management.
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request);
     void StartContainer(const std::string& Id);
     void StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
     std::string InspectContainer(const std::string& Id);
-
     wil::unique_socket AttachContainer(const std::string& Id);
-    wil::unique_socket MonitorEvents();
-
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
+    // Image management.
     uint32_t PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::vector<common::docker_schema::Image> ListImages();
+
+    // Exec.
+    common::docker_schema::CreateExecResponse CreateExec(const std::string& Container, const common::docker_schema::CreateExec& Request);
+    wil::unique_socket StartExec(const std::string& Id, const common::docker_schema::StartExec& Request);
+    void ResizeExecTty(const std::string& Id, ULONG Rows, ULONG Columns);
+
+
+    wil::unique_socket MonitorEvents();
+
 
     struct DockerHttpResponseHandle : public common::relay::ReadHandle
     {

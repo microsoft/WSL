@@ -2,6 +2,7 @@
 
 #include "DockerHTTPClient.h"
 #include "wslaservice.h"
+#include "ContainerEventTracker.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -9,7 +10,7 @@ class DECLSPEC_UUID("3A5DB29D-6D1D-4619-B89D-578EB34C8E52") WSLAContainerProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAProcess, IFastRundown>
 {
 public:
-    WSLAContainerProcess(const std::string& Id, wil::unique_handle&& IoStream, bool Tty, DockerHTTPClient& client);
+    WSLAContainerProcess(const std::string& Id, bool Tty, DockerHTTPClient& Client, const std::optional<std::string>& ParentContainerId, ContainerEventTracker& tracker);
     ~WSLAContainerProcess();
 
     IFACEMETHOD(Signal)(_In_ int Signal) override;
@@ -22,15 +23,19 @@ public:
     std::pair<WSLA_PROCESS_STATE, int> State() const;
 
     void OnExited(int Code);
+    void AssignIoStream(wil::unique_handle&& IoStream); // TODO: rework.
 
 private:
     wil::unique_handle& GetStdHandle(int Index);
     void StartIORelay();
     void RunIORelay(HANDLE exitEvent, wil::unique_hfile&& stdinPipe, wil::unique_hfile&& stdoutPipe, wil::unique_hfile&& stderrPipe);
+    void OnExecEvent(ContainerEvent Event, std::optional<int> ExitCode);
 
     wil::unique_handle m_ioStream;
     DockerHTTPClient& m_dockerClient;
     bool m_tty = false;
+    bool m_exec = false;
+    ContainerEventTracker::ContainerTrackingReference m_trackingReference;
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
     int m_exitedCode = -1;
     std::string m_id;

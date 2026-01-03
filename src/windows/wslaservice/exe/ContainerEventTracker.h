@@ -25,7 +25,8 @@ enum class ContainerEvent
     Start,
     Stop,
     Exit,
-    Destroy
+    Destroy,
+    ExecDied
 };
 
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
@@ -53,7 +54,7 @@ public:
         ContainerEventTracker* m_tracker = nullptr;
     };
 
-    using ContainerStateChangeCallback = std::function<void(ContainerEvent)>;
+    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>)>;
 
     ContainerEventTracker(DockerHTTPClient& dockerClient);
     ~ContainerEventTracker();
@@ -61,6 +62,7 @@ public:
     void Stop();
 
     ContainerTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback);
+    ContainerTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback);
     void UnregisterContainerStateUpdates(size_t Id);
 
 private:
@@ -71,6 +73,7 @@ private:
     {
         size_t CallbackId;
         std::string ContainerId;
+        std::optional<std::string> ExecId;
         ContainerStateChangeCallback Callback;
     };
 

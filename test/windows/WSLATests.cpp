@@ -1249,6 +1249,15 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
 
+        // Validate that exit codes are correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-exit-code", "/bin/sh", {"-c", "exit 12"});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {}, 12);
+        }
+
         // Validate that stdin is correctly wired
         {
             WSLAContainerLauncher launcher(
