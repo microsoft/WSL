@@ -52,6 +52,9 @@ class WSLATests
         testVhd = std::filesystem::path{vhdPath} / "ext4.vhdx";
         storagePath = std::filesystem::current_path() / "test-storage";
 
+        auto session = CreateSession();
+        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr));
         WslShutdown();
         return true;
     }
@@ -80,6 +83,7 @@ class WSLATests
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = storagePath.c_str();
         settings.MaximumStorageSizeMb = 1000; // 1GB.
+        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         return settings;
     }
@@ -271,6 +275,20 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
+    void ExpectImagePresent(IWSLASession& Session, const char* Image)
+    {
+        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+        THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
+
+        std::vector<std::string> tags;
+        for (const auto& e : images)
+        {
+            tags.push_back(e.Image);
+        }
+
+        VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
+    }
+
     TEST_METHOD(PullImage)
     {
         WSL2_TEST_ONLY();
@@ -281,15 +299,15 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        VERIFY_SUCCEEDED(session->PullImage("hello-world", nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr));
 
         // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+        ExpectImagePresent(*session, "hello-world:latest");
+
+        // TODO: Check that the image can actually be used to start a container.
     }
 
+    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {
         WSL2_TEST_ONLY();
@@ -304,15 +322,23 @@ class WSLATests
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
 
-        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr));
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+
+        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
 
         // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+        ExpectImagePresent(*session, "hello-world:latest");
+        WSLAContainerLauncher launcher("hello-world:latest", "wsla-import-image-container");
+
+        auto container = launcher.Launch(*session);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
 
+    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(ImportImage)
     {
         WSL2_TEST_ONLY();
@@ -327,13 +353,21 @@ class WSLATests
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
 
-        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr));
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("my-hello-world") != std::string::npos);
+        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
+
+        ExpectImagePresent(*session, "my-hello-world:test");
+
+        // Validate that containers can be started from the imported image.
+        WSLAContainerLauncher launcher("my-hello-world:test", "wsla-import-image-container", "/hello");
+
+        auto container = launcher.Launch(*session);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
 
     TEST_METHOD(CustomDmesgOutput)
@@ -1215,6 +1249,16 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
 
+        // Validate that exit codes are correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-exit-code", "/bin/sh", {"-c", "exit 12"});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {}, 12);
+        }
+
+        // Validate that stdin is correctly wired
         {
             WSLAContainerLauncher launcher(
                 "debian:latest",
@@ -1225,13 +1269,8 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            // For now, validate that trying to use stdin without a tty returns the appropriate error.
-            auto result = wil::ResultFromException([&]() { auto container = launcher.Launch(*session); });
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            auto container = launcher.Launch(*session);
 
-            // TODO: nerdctl hangs if stdin is closed without writing to it.
-            // Add test coverage for that usecase once the hang is fixed.
-            /*
             auto process = container.GetInitProcess();
             auto input = process.GetStdHandle(0);
 
@@ -1247,19 +1286,17 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(result.Output[2], "");
             VERIFY_ARE_EQUAL(result.Output[1], "foo");
-            */
         }
 
-        // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
-        // TODO: This fails because nerdctl start always seems to hang on stdin.
-        /*
+        // Validate that stdin behaves correctly if closed without any input.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
             auto container = launcher.Launch(*session);
             auto process = container.GetInitProcess();
+            process.GetStdHandle(0); // Close stdin;
 
             ValidateProcessOutput(process, {{1, ""}});
-        }*/
+        }
 
         // Validate error paths
         {
@@ -1348,8 +1385,7 @@ class WSLATests
             }
 
             // Create a stuck container.
-            WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-1", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+            WSLAContainerLauncher launcher("debian:latest", "test-container-1", {}, {"sleep", "99999"});
 
             auto container = launcher.Launch(*session);
 
@@ -1361,7 +1397,7 @@ class WSLATests
 
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
-            initProcess.Get().Signal(9);
+            VERIFY_SUCCEEDED(initProcess.Get().Signal(9));
 
             // Wait for the process to actually exit.
             wsl::shared::retry::RetryWithTimeout<void>(
@@ -1487,6 +1523,30 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
 
+        // Validate that creating and starting a container separately behaves as expected
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-create", "sleep", {"99999"}, {});
+            auto [result, container] = launcher.CreateNoThrow(*session);
+            VERIFY_SUCCEEDED(result);
+
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
+            VERIFY_SUCCEEDED(container->Get().Start());
+
+            // Verify that Start() can't be called again on a running container.
+            VERIFY_ARE_EQUAL(container->Get().Start(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container->Get().Stop(9, 0));
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
+
+            VERIFY_SUCCEEDED(container->Get().Delete());
+
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_ARE_EQUAL(container->Get().GetState(&state), RPC_E_DISCONNECTED);
+        }
+
         // Validate that containers behave correctly if they outlive their session.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-dangling-ref", "sleep", {"99999"}, {});
@@ -1544,11 +1604,9 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"host\"]'\n");
+
+            auto details = container.Inspect();
+            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1575,11 +1633,8 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"none\"]'\n");
+
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "none");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1608,7 +1663,6 @@ class WSLATests
             VERIFY_ARE_EQUAL(retVal.first, E_INVALIDARG);
         }
 
-        // Test bridge when ready
         {
             WSLAContainerLauncher launcher(
                 "debian:latest",
@@ -1621,11 +1675,7 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"bridge\"]'\n");
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1770,17 +1820,14 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        auto expectBoundPorts = [&](const char* Name, const std::vector<std::string>& expectedBoundPorts) {
-            auto result = ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "inspect", Name}, 0);
-
-            auto parsed = nlohmann::json::parse(result.Output[1]);
-            auto ports = parsed[0]["HostConfig"]["PortBindings"];
+        auto expectBoundPorts = [&](RunningWSLAContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
+            auto ports = Container.Inspect().HostConfig.PortBindings;
 
             std::vector<std::string> boundPorts;
 
-            for (const auto& e : ports.items())
+            for (const auto& e : ports)
             {
-                boundPorts.emplace_back(e.key());
+                boundPorts.emplace_back(e.first);
             }
 
             if (!std::ranges::equal(boundPorts, expectedBoundPorts))
@@ -1809,7 +1856,7 @@ class WSLATests
             // Wait for the container bind() to be completed.
             WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-            expectBoundPorts("test-ports", {"8000/tcp"});
+            expectBoundPorts(container, {"8000/tcp"});
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
             ExpectHttpResponse(L"http://[::1]:1234", {});
@@ -1841,7 +1888,7 @@ class WSLATests
                 // Wait for the container bind() to be completed.
                 WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-                expectBoundPorts("test-ports-3", {"8000/tcp"});
+                expectBoundPorts(container, {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
                 VERIFY_SUCCEEDED(container.Get().Stop(9, 0));

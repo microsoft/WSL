@@ -1,6 +1,8 @@
 set(SOURCES
     application.manifest
+    WSLAContainerProcess.cpp
     ContainerEventTracker.cpp
+    DockerHTTPClient.cpp
     main.rc
     ServiceMain.cpp
     ServiceProcessLauncher.cpp
@@ -14,6 +16,8 @@ set(SOURCES
 
 set(HEADERS
     ContainerEventTracker.h
+    WSLAContainerProcess.h
+    DockerHTTPClient.h
     ServiceProcessLauncher.h
     WSLAContainer.h
     WSLAProcess.h

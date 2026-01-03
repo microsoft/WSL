@@ -13,7 +13,7 @@ Abstract:
 --*/
 #pragma once
 
-#include "ServiceProcessLauncher.h"
+#include "DockerHTTPClient.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -25,7 +25,8 @@ enum class ContainerEvent
     Start,
     Stop,
     Exit,
-    Destroy
+    Destroy,
+    ExecDied
 };
 
 constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
@@ -53,24 +54,26 @@ public:
         ContainerEventTracker* m_tracker = nullptr;
     };
 
-    using ContainerStateChangeCallback = std::function<void(ContainerEvent)>;
+    using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>)>;
 
-    ContainerEventTracker(WSLAVirtualMachine& virtualMachine);
+    ContainerEventTracker(DockerHTTPClient& dockerClient);
     ~ContainerEventTracker();
 
     void Stop();
 
     ContainerTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback);
+    ContainerTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback);
     void UnregisterContainerStateUpdates(size_t Id);
 
 private:
     void OnEvent(const std::string& event);
-    void Run(ServiceRunningProcess& process);
+    void Run(wil::unique_socket&& Socket);
 
     struct Callback
     {
         size_t CallbackId;
         std::string ContainerId;
+        std::optional<std::string> ExecId;
         ContainerStateChangeCallback Callback;
     };
 
