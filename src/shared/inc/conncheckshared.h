@@ -116,6 +116,24 @@ inline unique_socket ConnCheckConnectSocket(int family, const char* hostname, co
         auto status = getaddrinfo(hostname, port, &hints, &servinfo);
         if (status != 0)
         {
+            bool noData = false;
+#if defined(EAI_NODATA)
+            noData = noData || (status == EAI_NODATA);
+#endif
+#if defined(EAI_NONAME)
+            noData = noData || (status == EAI_NONAME);
+#endif
+            if (noData)
+            {
+                // Some platforms return EAI_NODATA when a domain exists but lacks records
+                // for the requested address family (A for IPv4, AAAA for IPv6).
+                // On other platforms, the same condition may be reported as EAI_NONAME.
+                // In this case, we skip attempting a connection for this address family by
+                // returning an empty socket. The caller can still test connectivity using
+                // the other protocol, so WSL startup is not blocked by the missing records.
+                return sock; // Empty socket - connection attempt for this family is skipped
+            }
+
             throw std::runtime_error(std::format("CheckConnection: getaddrinfo() failed: {}", status));
         }
 
