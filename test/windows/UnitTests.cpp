@@ -4550,12 +4550,62 @@ Error code: Wsl/Service/RegisterDistro/WSL_E_DISTRIBUTION_NAME_NEEDED\r\n";
             // Validate that the distribution was created in the correct path
             VERIFY_ARE_EQUAL(std::filesystem::path(basePath).parent_path().string(), currentPath.string());
 
+            // Validate that the folder name matches the instance name (not a GUID)
+            VERIFY_ARE_EQUAL(std::filesystem::path(basePath).filename().wstring(), L"test-overridden-default-location");
+
+            // Validate that the folder name matches the instance name (not a GUID)
+            VERIFY_ARE_EQUAL(std::filesystem::path(basePath).filename().wstring(), L"test-overridden-default-location");
+
             ValidateDistributionShortcut(L"test-overridden-default-location", nullptr);
 
             cleanup.reset();
 
             // Validate that the base path is removed and that the shortcut is gone*
             VERIFY_IS_FALSE(std::filesystem::exists(shortcutPath));
+            VERIFY_IS_FALSE(std::filesystem::exists(basePath));
+        }
+
+        // Distribution with overridden default location but without explicit name (should use GUID)
+        {
+            constexpr auto distroName = L"test-guid-folder";
+            
+            auto cleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() {
+                    LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                    DeleteFile(L"test-guid-folder.tar");
+                });
+
+            auto currentPath = std::filesystem::current_path();
+            WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
+
+            // Create a tar with a default name, then install without --name
+            CreateTarFromManifest(std::format(L"[oobe]\ndefaultName = {}", distroName).c_str(), L"test-guid-folder.tar");
+            
+            // Install without --name, so the folder should use a GUID despite having a default name
+            InstallFromTar(L"test-guid-folder.tar", L"");
+            
+            ValidateDistributionStarts(distroName);
+
+            auto distroKey = OpenDistributionKey(distroName);
+            VERIFY_IS_TRUE(!!distroKey);
+
+            auto basePath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath", L"");
+            VERIFY_IS_TRUE(std::filesystem::exists(basePath));
+
+            // Validate that the distribution was created in the correct path
+            VERIFY_ARE_EQUAL(std::filesystem::path(basePath).parent_path().string(), currentPath.string());
+
+            // Validate that the folder name is a GUID (since no --name was provided)
+            // The GUID should match the distribution ID
+            wsl::windows::common::SvcComm service;
+            auto distroGuid = service.GetDistributionId(distroName);
+            auto expectedFolderName = wsl::shared::string::GuidToString<wchar_t>(distroGuid);
+            auto actualFolderName = std::filesystem::path(basePath).filename().wstring();
+            VERIFY_ARE_EQUAL(expectedFolderName, actualFolderName);
+
+            cleanup.reset();
+
+            // Validate that the base path is removed
             VERIFY_IS_FALSE(std::filesystem::exists(basePath));
         }
 
