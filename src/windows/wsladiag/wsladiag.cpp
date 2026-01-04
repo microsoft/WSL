@@ -324,13 +324,12 @@ int wmain(int, wchar_t**)
 {
     wsl::windows::common::EnableContextualizedErrors(false);
 
-    std::optional<ExecutionContext> context;
+    ExecutionContext context{Context::WslaDiag};
     int exitCode = 1;
     HRESULT result = S_OK;
 
     try
     {
-        context.emplace(Context::WslaDiag);
         exitCode = wsladiag_main(GetCommandLineW());
     }
     catch (...)
@@ -340,10 +339,10 @@ int wmain(int, wchar_t**)
 
     if (FAILED(result))
     {
-        if (context.has_value() && context->ReportedError().has_value())
+        if (auto reported = context.ReportedError())
         {
-            auto strings = wsl::windows::common::wslutil::ErrorToString(context->ReportedError().value());
-            wslutil::PrintMessage(strings.Message, stderr);
+            auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
+            wslutil::PrintMessage(strings.Message.empty() ? strings.Code : strings.Message, stderr);
         }
         else
         {

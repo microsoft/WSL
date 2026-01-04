@@ -16,6 +16,13 @@ Abstract:
 #include "Common.h"
 #include <format>
 
+static const std::wstring c_usageText =
+    L"wsladiag - WSLA diagnostics tool\r\n"
+    L"Usage:\r\n"
+    L"  wsladiag list\r\n"
+    L"  wsladiag shell <SessionName> [--verbose]\r\n"
+    L"  wsladiag --help\r\n";
+
 namespace WsladiagTests {
 class WsladiagTests
 {
@@ -34,13 +41,13 @@ class WsladiagTests
     // Test that wsladiag --help shows usage information
     TEST_METHOD(Help_ShowsUsage)
     {
-        ValidateWslaDiagOutput(L"--help", 0, L"Usage:");
+        ValidateWsladiagOutput(L"--help", 0, L"", c_usageText);
     }
 
     // Test that wsladiag with no arguments shows usage information
     TEST_METHOD(EmptyCommand_ShowsUsage)
     {
-        ValidateWslaDiagOutput(L"", 0, L"Usage:");
+        ValidateWsladiagOutput(L"", 0, L"", c_usageText);
     }
 
     // Test that -h and --help flags produce identical output
@@ -62,24 +69,23 @@ class WsladiagTests
     // Test that unknown commands show error message and usage
     TEST_METHOD(UnknownCommand_ShowsError)
     {
-        auto [out, err, code] = RunWsladiag(L"blah");
-        VERIFY_ARE_EQUAL(1, code);
-
-        const std::wstring combined = out + err;
-        VERIFY_IS_TRUE(combined.find(L"Unknown command: 'blah'") != std::wstring::npos);
-        VERIFY_IS_TRUE(combined.find(L"Usage:") != std::wstring::npos);
+        ValidateWsladiagOutput(L"blah", 1, L"", std::wstring(L"Unknown command: 'blah'\r\n") + c_usageText);
     }
 
     // Test that shell command without session name shows error
     TEST_METHOD(Shell_MissingName_ShowsError)
     {
-        ValidateWslaDiagFailsWith(L"shell", L"The parameter is incorrect.");
+        ValidateWsladiagOutput(L"shell", 1, L"", L"The parameter is incorrect.\r\n");
     }
 
     // Test shell command with invalid session name (silent mode)
     TEST_METHOD(Shell_InvalidSessionName_Silent)
     {
-        ValidateWslaDiagFailsWith(L"shell DefinitelyNotARealSession", L"Session not found: 'DefinitelyNotARealSession'");
+        auto [out, err, code] = RunWsladiag(L"shell DefinitelyNotARealSession");
+        VERIFY_ARE_NOT_EQUAL(0, code);
+
+        VERIFY_ARE_EQUAL(L"", out);
+        VERIFY_IS_TRUE(err.find(L"Session not found: 'DefinitelyNotARealSession'") != std::wstring::npos);
     }
 
     // Test shell command with invalid session name (verbose mode)
@@ -112,29 +118,12 @@ class WsladiagTests
         return LxsstuLaunchCommandAndCaptureOutputWithResult(cmd.data());
     }
 
-    static void ValidateWslaDiagOutput(const std::wstring& cmd, const std::wstring& expectedSubstring)
-    {
-        auto [out, err, code] = RunWsladiag(cmd);
-        const std::wstring combined = out + err;
-        VERIFY_IS_TRUE(combined.find(expectedSubstring) != std::wstring::npos);
-    }
-
-    static void ValidateWslaDiagOutput(const std::wstring& cmd, int expectedExitCode, const std::wstring& expectedSubstring)
+    static void ValidateWsladiagOutput(const std::wstring& cmd, int expectedExitCode, const std::wstring& expectedStdout, const std::wstring& expectedStderr)
     {
         auto [out, err, code] = RunWsladiag(cmd);
         VERIFY_ARE_EQUAL(expectedExitCode, code);
-
-        const std::wstring combined = out + err;
-        VERIFY_IS_TRUE(combined.find(expectedSubstring) != std::wstring::npos);
-    }
-
-    static void ValidateWslaDiagFailsWith(const std::wstring& cmd, const std::wstring& expectedSubstring)
-    {
-        auto [out, err, code] = RunWsladiag(cmd);
-        VERIFY_ARE_NOT_EQUAL(0, code);
-
-        const std::wstring combined = out + err;
-        VERIFY_IS_TRUE(combined.find(expectedSubstring) != std::wstring::npos);
+        VERIFY_ARE_EQUAL(expectedStdout, out);
+        VERIFY_ARE_EQUAL(expectedStderr, err);
     }
 
     // Validate that list command output shows either no sessions message or session table
@@ -142,7 +131,7 @@ class WsladiagTests
     {
         const bool noSessions = out.find(L"No WSLA sessions found.") != std::wstring::npos;
 
-        const bool hasTable = out.find(L"WSLA session") != std::wstring::npos && out.find(L"ID") != std::wstring::npos &&
+        const bool hasTable = out.find(L"Found") != std::wstring::npos && out.find(L"ID") != std::wstring::npos &&
                               out.find(L"Creator PID") != std::wstring::npos && out.find(L"Display Name") != std::wstring::npos;
 
         VERIFY_IS_TRUE(noSessions || hasTable);
