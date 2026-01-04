@@ -101,7 +101,7 @@ try
         // Ensure that the other end of the pipe has connected.
         wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000), {exitEvent.get()});
 
-        // Bind, listen, and accept a connection on the specified port.
+        // Bind and listen on the specified port (once)
         const wil::unique_socket listenSocket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
         THROW_LAST_ERROR_IF(!listenSocket);
 
@@ -113,14 +113,29 @@ try
 
         THROW_LAST_ERROR_IF(listen(listenSocket.get(), 1) == SOCKET_ERROR);
 
-        const wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
-        THROW_LAST_ERROR_IF(!socket);
+        for (;;)
+        {
 
-        wsl::windows::common::socket::Accept(listenSocket.get(), socket.get(), INFINITE, exitEvent.get());
+            const wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
+            THROW_LAST_ERROR_IF(!socket);
 
-        // Begin the relay.
-        wsl::windows::common::relay::BidirectionalRelay(
-            reinterpret_cast<HANDLE>(socket.get()), pipe.get(), 0x1000, wsl::windows::common::relay::RelayFlags::LeftIsSocket);
+            try
+            {
+                wsl::windows::common::socket::Accept(listenSocket.get(), socket.get(), INFINITE, exitEvent.get());
+
+                // Begin the relay for this connection
+                wsl::windows::common::relay::BidirectionalRelay(
+                    reinterpret_cast<HANDLE>(socket.get()), pipe.get(), 0x1000, 
+                    wsl::windows::common::relay::RelayFlags::LeftIsSocket);
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+                
+                // Small delay to prevent tight loop on persistent errors
+                Sleep(100);
+            }
+        }
 
         break;
     }
