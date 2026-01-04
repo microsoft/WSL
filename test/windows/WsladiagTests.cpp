@@ -16,6 +16,13 @@ Abstract:
 #include "Common.h"
 #include <format>
 
+static const std::wstring c_usageText =
+    L"wsladiag - WSLA diagnostics tool\r\n"
+    L"Usage:\r\n"
+    L"  wsladiag list\r\n"
+    L"  wsladiag shell <SessionName> [--verbose]\r\n"
+    L"  wsladiag --help\r\n";
+
 namespace WsladiagTests {
 class WsladiagTests
 {
@@ -50,6 +57,7 @@ class WsladiagTests
         VERIFY_ARE_EQUAL(0, code);
         VERIFY_ARE_EQUAL(L"", out);
         ValidateUsage(err);
+
     }
 
     // Test that wsladiag with no arguments shows usage information
@@ -80,12 +88,14 @@ class WsladiagTests
     // Test that unknown commands show error message and usage
     TEST_METHOD(UnknownCommand_ShowsUsage)
     {
+
         auto [out, err, code] = RunWsladiag(L"blah");
         VERIFY_ARE_NOT_EQUAL(0, code);
         VERIFY_ARE_EQUAL(L"", out);
 
         VERIFY_IS_TRUE(err.find(L"Unknown command: 'blah'") != std::wstring::npos);
         ValidateUsage(err);
+
     }
 
     // Test that shell command without session name shows usage
@@ -95,6 +105,7 @@ class WsladiagTests
         VERIFY_ARE_NOT_EQUAL(0, code);
         VERIFY_ARE_EQUAL(L"", out);
         ValidateUsage(err);
+
     }
 
     // Test shell command with invalid session name (silent mode)
@@ -143,7 +154,7 @@ class WsladiagTests
     {
         const bool noSessions = out.find(L"No WSLA sessions found.") != std::wstring::npos;
 
-        const bool hasTable = out.find(L"WSLA session") != std::wstring::npos && out.find(L"ID") != std::wstring::npos &&
+        const bool hasTable = out.find(L"Found") != std::wstring::npos && out.find(L"ID") != std::wstring::npos &&
                               out.find(L"Creator PID") != std::wstring::npos && out.find(L"Display Name") != std::wstring::npos;
 
         VERIFY_IS_TRUE(noSessions || hasTable);

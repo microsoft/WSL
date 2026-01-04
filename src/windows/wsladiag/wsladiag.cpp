@@ -727,6 +727,7 @@ int wmain(int, wchar_t**)
     wsl::windows::common::EnableContextualizedErrors(false);
 
     ExecutionContext context{Context::WslaDiag};
+
     int exitCode = 1;
     HRESULT result = S_OK;
 
