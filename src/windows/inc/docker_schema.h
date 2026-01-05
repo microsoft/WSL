@@ -38,7 +38,7 @@ struct Mount
     std::string Source;
     std::string Target;
     std::string Type;
-    bool ReadOnly;
+    bool ReadOnly{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Mount, Target, Source, Type, ReadOnly);
 };
@@ -92,7 +92,7 @@ struct Image
 {
     std::string Id;
     std::vector<std::string> RepoTags;
-    uint64_t Size;
+    uint64_t Size{};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Image, Id, RepoTags, Size);
 };
@@ -114,10 +114,10 @@ struct CreateExec
 {
     using TResponse = CreateExecResponse;
 
-    bool AttachStdin = false;
-    bool AttachStdout = false;
-    bool AttachStderr = false;
-    bool Tty = false;
+    bool AttachStdin{};
+    bool AttachStdout{};
+    bool AttachStderr{};
+    bool Tty{};
     std::vector<ULONG> ConsoleSize;
     std::vector<std::string> Cmd;
     std::vector<std::string> Env;
@@ -129,8 +129,8 @@ struct CreateExec
 struct StartExec
 {
     using TResponse = void;
-    bool Tty = false;
-    bool Detach = false;
+    bool Tty{};
+    bool Detach{};
     std::vector<ULONG> ConsoleSize;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, Detach, ConsoleSize);
