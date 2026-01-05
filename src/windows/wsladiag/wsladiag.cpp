@@ -18,6 +18,7 @@ Abstract:
 #include "wslaservice.h"
 #include "WslSecurity.h"
 #include "WSLAProcessLauncher.h"
+#include "ExecutionContext.h"
 #include <thread>
 #include <format>
 
@@ -56,7 +57,8 @@ static int RunShellCommand(std::wstring_view commandLine)
 
     if (sessionName.empty())
     {
-        THROW_HR(E_INVALIDARG);
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wsladiag shell"));
     }
 
     const auto log = [&](std::wstring_view msg) {
@@ -286,6 +288,7 @@ static void PrintUsage()
 
 int wsladiag_main(std::wstring_view commandLine)
 {
+    // Basic initialization that was previously in this function.
     wslutil::ConfigureCrt();
     wslutil::InitializeWil();
 
@@ -301,40 +304,100 @@ int wsladiag_main(std::wstring_view commandLine)
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 1, true);
+    // Enable contextualized error collection and create an ExecutionContext so
+    // THROW_HR_WITH_USER_ERROR will save a user-visible message.
+    wsl::windows::common::EnableContextualizedErrors(false);
 
-    bool help = false;
-    std::wstring verb;
-
-    parser.AddPositionalArgument(verb, 0);
-    parser.AddArgument(help, L"--help", L'h');
-
-    parser.Parse(); // Let exceptions propagate to wmain for centralized handling
-
-    if (help || verb.empty())
+    FILE* warningsFile = nullptr;
+    const char* disableWarnings = getenv("WSL_DISABLE_WARNINGS");
+    if (disableWarnings == nullptr || strcmp(disableWarnings, "1") != 0)
     {
-        PrintUsage();
-        return 0;
+        warningsFile = stderr;
     }
-    else if (verb == L"list")
+
+    std::optional<wsl::windows::common::ExecutionContext> context;
+    context.emplace(wsl::windows::common::Context::Wsl, warningsFile);
+
+    int exitCode = 0;
+    HRESULT result = S_OK;
+
+    try
     {
-        return RunListCommand();
-    }
-    else if (verb == L"shell")
-    {
-        if (shellSession.empty())
+        ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 1, true);
+
+        bool help = false;
+        std::wstring verb;
+
+        parser.AddPositionalArgument(verb, 0);
+        parser.AddArgument(help, L"--help", L'h');
+
+        parser.Parse(); // Let exceptions propagate to this try/catch
+
+        if (help || verb.empty())
         {
             PrintUsage();
-            return 1;
+            exitCode = 0;
         }
-        return RunShellCommand(commandLine);
+        else if (verb == L"list")
+        {
+            exitCode = RunListCommand();
+        }
+        else if (verb == L"shell")
+        {
+            exitCode = RunShellCommand(commandLine);
+        }
+        else
+        {
+            wslutil::PrintMessage(std::format(L"Unknown command: '{}'", verb), stderr);
+            PrintUsage();
+            exitCode = 1;
+        }
     }
-    else
+    catch (...)
     {
-        wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
-        PrintUsage();
-        return 1;
+        // Capture the exception HRESULT and fall through to printing contextualized error.
+        result = wil::ResultFromCaughtException();
+        // Default nonzero exit code on failure.
+        exitCode = 1;
     }
+
+    wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
+    PrintUsage();
+    return 1;
+
+    // If there was a failure, attempt to print a contextualized error message collected
+    // by the ExecutionContext. Otherwise fall back to the HRESULT -> string path.
+    if (FAILED(result))
+    {
+        try
+        {
+            std::wstring errorString{};
+            if (context.has_value() && context->ReportedError().has_value())
+            {
+                auto strings = wsl::windows::common::wslutil::ErrorToString(context->ReportedError().value());
+
+                // For most errors, show both message and code
+                errorString = wsl::shared::Localization::MessageErrorCode(strings.Message, strings.Code);
+
+                // Log telemetry for user-visible errors (matches other tools).
+                WSL_LOG("UserVisibleError", TraceLoggingValue(strings.Code.c_str(), "ErrorCode"));
+            }
+            else
+            {
+                // Fallback: show basic HRESULT string.
+                errorString = wslutil::ErrorCodeToString(result);
+            }
+
+            wslutil::PrintMessage(errorString, stderr);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+
+    }
+
+    return exitCode;
 }
 
 int wmain(int, wchar_t**)
