@@ -139,9 +139,9 @@ try
     wsl::windows::common::relay::MultiHandleWait io;
 
     auto oneLineWritten = [&](const gsl::span<char>& buffer) {
-        // nerdctl events' output is line based. Call OnEvent() for each completed line.
+        // docker events' output is line based. Call OnEvent() for each completed line.
 
-        if (!buffer.empty()) // nerdctl inserts empty lines between events, skip those.
+        if (!buffer.empty()) // docker inserts empty lines between events, skip those.
         {
             try
             {
@@ -165,7 +165,7 @@ try
     if (io.Run({}))
     {
         // TODO: Report error to session.
-        WSL_LOG("Unexpected nerdctl exit");
+        WSL_LOG("Unexpected docker exit");
     }
 }
 CATCH_LOG();

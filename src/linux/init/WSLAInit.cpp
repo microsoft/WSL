@@ -188,13 +188,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
     auto closeChannel = wil::scope_exit([&]() { Channel.Close(); });
 
     int result = -1;
-
     auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
-
-    wil::unique_fd socket;
 
     const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathOffset);
     THROW_ERRNO_IF(EINVAL, path == nullptr);
+
+    wil::unique_fd socket;
 
     try
     {
@@ -264,7 +263,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
                 // hvsocket has been closed.
                 pollDescriptors[1].fd = -1;
 
-                // Shutdown the write side of the socket. This is required so docker know when stdin is EOF for instance.
+                // Shutdown the write side of the socket. This is required so docker knows when stdin is in EOF for instance.
                 if (shutdown(socket.get(), SHUT_WR) < 0)
                 {
                     LOG_ERROR("shutdown({}, SHUT_WR) failed {}", socket.get(), errno);

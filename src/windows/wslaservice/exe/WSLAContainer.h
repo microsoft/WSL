@@ -102,8 +102,6 @@ private:
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
 
-    static std::vector<std::string> PrepareNerdctlCreateCommand(
-        const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes);
     static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);
     static void AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options);
 

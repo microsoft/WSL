@@ -23,13 +23,6 @@ using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 using namespace wsl::windows::common::docker_schema;
 
-// Constants for required default arguments for "nerdctl create..."
-static std::vector<std::string> defaultNerdctlCreateArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                         "--ulimit",
-                                                         "nofile=65536:65536"};
-
-static std::vector<std::string> defaultNerdctlEnv{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"};
-
 namespace {
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
@@ -599,10 +592,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     // Send the request to docker.
     try
     {
-
         auto result = DockerClient.CreateContainer(request);
-
-        // TODO: Rethink command line generation logic.
 
         // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
         auto container = std::make_unique<WSLAContainerImpl>(

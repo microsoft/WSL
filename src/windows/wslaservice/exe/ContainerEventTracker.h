@@ -29,8 +29,6 @@ enum class ContainerEvent
     ExecDied
 };
 
-constexpr const char* nerdctlPath = "/usr/bin/nerdctl";
-
 class ContainerEventTracker
 {
 public:

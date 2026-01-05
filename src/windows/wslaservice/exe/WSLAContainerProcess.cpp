@@ -108,8 +108,6 @@ try
 
     handle.reset();
     return S_OK;
-
-    return E_NOTIMPL;
 }
 CATCH_RETURN();
 
@@ -188,12 +186,7 @@ wil::unique_handle& WSLAContainerProcess::GetStdHandle(int Index)
         return m_relayedHandles->at(Index);
     }
 
-    if (Index == 0 && m_tty)
-    {
-        return m_ioStream;
-    }
-
-    return m_ioStream; // TODO: fix
+    THROW_HR_MSG(E_INVALIDARG, "Invalid fd index: %i", Index);
 }
 
 void WSLAContainerProcess::RunIORelay(HANDLE exitEvent, wil::unique_hfile&& stdinPipe, wil::unique_hfile&& stdoutPipe, wil::unique_hfile&& stderrPipe)
@@ -203,7 +196,6 @@ try
 
     // This is required for docker to know when stdin is closed.
     auto onInputComplete = [&]() {
-        WSL_LOG("StdinClosed");
         LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(m_ioStream.get()), SD_SEND) == SOCKET_ERROR);
     };
 

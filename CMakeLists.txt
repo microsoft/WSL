@@ -47,17 +47,10 @@ string(REPLACE "." "_" BOOST_TARBALL "${BOOST_TARBALL}")
 FetchContent_Declare(
   boost_headers
   URL https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_TARBALL}.tar.gz
-  # URL_HASH SHA256=TODO
+  URL_HASH SHA256=5e93d582aff26868d581a52ae78c7d8edf3f3064742c6e77901a1f18a437eea9
 )
 
-# Download & unpack to boost_headers_SOURCE_DIR (no add_subdirectory!)
-FetchContent_GetProperties(boost_headers)
-if(NOT boost_headers_POPULATED)
-  FetchContent_Populate(boost_headers)
-endif()
-
-# Path where Boost headers reside (root has 'boost/' folder)
-include_directories(${boost_headers_SOURCE_DIR})
+FetchContent_MakeAvailable(boost_headers)
 
 
 # Import modules
@@ -403,6 +396,7 @@ endif()
 
 # Common include paths
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wil/include)
+include_directories(${boost_headers_SOURCE_DIR})
 include_directories(${WSLDEPS_SOURCE_DIR}/include)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/Windows)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/schemas)
