@@ -81,7 +81,7 @@ private:
 
     std::thread m_thread;
     wil::unique_event m_stopEvent{wil::EventOptions::ManualReset};
-    std::mutex m_lock;
+    std::recursive_mutex m_lock;
     std::atomic<size_t> m_callbackId{0};
 };
 } // namespace wsl::windows::service::wsla

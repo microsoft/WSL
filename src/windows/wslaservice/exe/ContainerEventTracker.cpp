@@ -88,12 +88,10 @@ void ContainerEventTracker::OnEvent(const std::string& event)
 
     auto parsed = nlohmann::json::parse(event);
 
-    auto type = parsed.find("Type");
     auto action = parsed.find("Action");
     auto actor = parsed.find("Actor");
 
-    THROW_HR_IF_MSG(
-        E_INVALIDARG, type == parsed.end() || action == parsed.end() || actor == parsed.end(), "Failed to parse json: %hs", event.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end() || actor == parsed.end(), "Failed to parse json: %hs", event.c_str());
 
     auto it = events.find(action->get<std::string>());
     if (it == events.end())

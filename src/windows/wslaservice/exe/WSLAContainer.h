@@ -73,6 +73,8 @@ public:
     const std::string& Image() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
+    void OnProcessReleased(WSLAContainerProcess* process);
+
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLAVirtualMachine& parentVM,
@@ -89,6 +91,7 @@ private:
     std::string m_image;
     std::string m_id;
     bool m_tty{}; // TODO: have a flag for this at the API level.
+    std::vector<WSLAContainerProcess*> m_processes;
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;

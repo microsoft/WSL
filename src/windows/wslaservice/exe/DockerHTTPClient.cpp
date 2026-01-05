@@ -2,6 +2,7 @@
 
 #include "DockerHTTPClient.h"
 
+#define WSLA_HTTP_DEBUG
 namespace http = boost::beast::http;
 using boost::beast::http::verb;
 using wsl::windows::common::relay::HandleWrapper;
@@ -348,7 +349,7 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
     auto context = SendRequestImpl(Method, Url, Body, Headers);
 
     // Parse the response header
-    constexpr auto bufferSize = 4096;
+    constexpr auto bufferSize = 16 * 1024;
     size_t Offset = 0;
     std::vector<char> buffer;
     http::response_parser<http::buffer_body> parser;
@@ -390,6 +391,15 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
 
         if (lineFeeds == 2) // Header is complete, feed it to the parser.
         {
+
+#ifdef WSLA_HTTP_DEBUG
+
+            buffer.push_back('\0');
+            WSL_LOG("HTTPResponseDebug", TraceLoggingValue(Url.c_str(), "Url"), TraceLoggingValue(buffer.data(), "Response"));
+            buffer.pop_back();
+
+#endif
+
             boost::beast::error_code error;
             parser.put(boost::asio::buffer(buffer.data(), buffer.size()), error);
 
@@ -405,6 +415,7 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
 
     if (OnResponse)
     {
+        buffer.resize(bufferSize);
         while (!parser.is_done())
         {
             boost::beast::flat_buffer adapter;

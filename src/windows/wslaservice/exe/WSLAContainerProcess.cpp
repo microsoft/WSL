@@ -1,11 +1,17 @@
 #include "precomp.h"
 #include "WSLAContainerProcess.h"
+#include "WSLAContainer.h"
 
 using wsl::windows::service::wsla::WSLAContainerProcess;
 
 WSLAContainerProcess::WSLAContainerProcess(
-    const std::string& Id, bool Tty, DockerHTTPClient& client, const std::optional<std::string>& ParentContainerId, ContainerEventTracker& tracker) :
-    m_id(Id), m_dockerClient(client), m_tty(Tty), m_exec(ParentContainerId.has_value())
+    const std::string& Id,
+    bool Tty,
+    DockerHTTPClient& client,
+    const std::optional<std::string>& ParentContainerId,
+    ContainerEventTracker& tracker,
+    WSLAContainerImpl& Container) :
+    m_id(Id), m_dockerClient(client), m_tty(Tty), m_exec(ParentContainerId.has_value()), m_container(&Container)
 {
     // Register for exit events.
     if (m_exec)
@@ -18,12 +24,30 @@ WSLAContainerProcess::WSLAContainerProcess(
 WSLAContainerProcess::~WSLAContainerProcess()
 {
     // TODO: consider moving this to a different class.
-    if (m_relayThread.has_value())
+    if (m_relayThread.has_value() && m_relayThread->joinable())
     {
         m_exitRelayEvent.SetEvent();
 
         m_relayThread->join();
     }
+
+    std::lock_guard lock{m_mutex};
+    if (m_container != nullptr)
+    {
+        m_container->OnProcessReleased(this);
+    }
+}
+
+void WSLAContainerProcess::OnContainerReleased()
+{
+    std::lock_guard lock{m_mutex};
+
+    WI_ASSERT(m_container != nullptr);
+    m_container = nullptr;
+
+    // Signal the exit event to prevent callers being blocked on it.
+
+    OnExited(137); // 128 + 9 (SIGKILL)
 }
 
 void WSLAContainerProcess::AssignIoStream(wil::unique_handle&& IoStream)
@@ -179,6 +203,7 @@ try
 
     // This is required for docker to know when stdin is closed.
     auto onInputComplete = [&]() {
+        WSL_LOG("StdinClosed");
         LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(m_ioStream.get()), SD_SEND) == SOCKET_ERROR);
     };
 
@@ -230,8 +255,14 @@ void WSLAContainerProcess::StartIORelay()
 
 void WSLAContainerProcess::OnExited(int Code)
 {
-    WI_ASSERT(!m_exitEvent.is_signaled());
+    std::lock_guard lock{m_mutex};
 
-    m_exitedCode = Code;
-    m_exitEvent.SetEvent();
+    m_trackingReference.Reset();
+
+    // N.B. OnExited() can be called when the container terminates. If we have already received an exit code for the process, ignore.
+    if (!m_exitEvent.is_signaled())
+    {
+        m_exitedCode = Code;
+        m_exitEvent.SetEvent();
+    }
 }

@@ -6,11 +6,19 @@
 
 namespace wsl::windows::service::wsla {
 
+class WSLAContainerImpl;
+
 class DECLSPEC_UUID("3A5DB29D-6D1D-4619-B89D-578EB34C8E52") WSLAContainerProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAProcess, IFastRundown>
 {
 public:
-    WSLAContainerProcess(const std::string& Id, bool Tty, DockerHTTPClient& Client, const std::optional<std::string>& ParentContainerId, ContainerEventTracker& tracker);
+    WSLAContainerProcess(
+        const std::string& Id,
+        bool Tty,
+        DockerHTTPClient& Client,
+        const std::optional<std::string>& ParentContainerId,
+        ContainerEventTracker& Tracker,
+        WSLAContainerImpl& Container);
     ~WSLAContainerProcess();
 
     IFACEMETHOD(Signal)(_In_ int Signal) override;
@@ -24,6 +32,7 @@ public:
 
     void OnExited(int Code);
     void AssignIoStream(wil::unique_handle&& IoStream); // TODO: rework.
+    void OnContainerReleased();
 
 private:
     wil::unique_handle& GetStdHandle(int Index);
@@ -42,6 +51,7 @@ private:
     std::optional<std::thread> m_relayThread;
     wil::unique_event m_exitRelayEvent;
     std::optional<std::vector<wil::unique_handle>> m_relayedHandles;
+    WSLAContainerImpl* m_container{};
     std::recursive_mutex m_mutex;
 };
 

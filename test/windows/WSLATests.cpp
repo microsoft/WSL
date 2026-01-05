@@ -1722,7 +1722,6 @@ class WSLATests
         }
 
         // Validate that stdin is correctly wired.
-        // TODO: Add test coverage for stdin being closed without anything written to it once the stdin hang issue is solved.
         {
             auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
                                .Launch(container.Get());
@@ -1742,6 +1741,21 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
 
+        // Validate that behavior is correct when stdin is closed without any input.
+        {
+            auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
+                               .Launch(container.Get());
+
+            process.GetStdHandle(0); // Close stdin.
+            ValidateProcessOutput(process, {{1, ""}, {2, ""}});
+        }
+
+        // Validate that exit codes are correctly wired.
+        {
+            auto process = WSLAProcessLauncher({}, {"/bin/sh", "-c", "exit 12"}, {}).Launch(container.Get());
+            ValidateProcessOutput(process, {}, 12);
+        }
+
         // Validate that environmnent is correctly wired.
         {
             auto process =
@@ -1758,10 +1772,8 @@ class WSLATests
 
             VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
 
-            ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "stop", "-t", "0", "test-container-exec"}, 0);
-
             auto result = process.WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 1);
+            VERIFY_ARE_EQUAL(result.Code, 137);
         }
 
         // Validate error paths

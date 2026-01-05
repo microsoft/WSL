@@ -168,6 +168,17 @@ WSLAContainerImpl::~WSLAContainerImpl()
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
 
+    // Remove container callback from any outstanding processes.
+    {
+        std::lock_guard lock(m_lock);
+
+        m_initProcess->OnContainerReleased();
+        for (auto& process : m_processes)
+        {
+            process->OnContainerReleased();
+        }
+    }
+
     m_containerEvents.Reset();
 
     // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
@@ -205,6 +216,24 @@ WSLAContainerImpl::~WSLAContainerImpl()
     m_parentVM->ReleasePorts(allocatedGuestPorts);
 }
 
+void WSLAContainerImpl::OnProcessReleased(WSLAContainerProcess* process)
+{
+    std::lock_guard lock(m_lock);
+
+    if (process == m_initProcess.Get())
+    {
+        m_initProcess.Reset();
+
+        // TODO: Consider switching to Stopped state.
+        return;
+    }
+
+    auto remove = std::ranges::remove_if(m_processes, [process](const auto* e) { return e == process; });
+    WI_ASSERT(remove.size() == 1);
+
+    m_processes.erase(remove.begin(), remove.end());
+}
+
 const std::string& WSLAContainerImpl::Image() const noexcept
 {
     return m_image;
@@ -227,7 +256,8 @@ void WSLAContainerImpl::Start()
         m_state);
 
     // Attach to the container's init process so no IO is lost.
-    m_initProcess = wil::MakeOrThrow<WSLAContainerProcess>(m_id, m_tty, m_dockerClient, std::optional<std::string>{}, m_eventTracker);
+    m_initProcess =
+        wil::MakeOrThrow<WSLAContainerProcess>(m_id, m_tty, m_dockerClient, std::optional<std::string>{}, m_eventTracker, *this);
 
     m_initProcess->AssignIoStream(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
 
@@ -248,7 +278,19 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         std::lock_guard<std::recursive_mutex> lock(m_lock);
         m_state = WslaContainerStateExited;
 
-        m_initProcess->OnExited(exitCode.value());
+        if (m_initProcess)
+        {
+            m_initProcess->OnExited(exitCode.value());
+        }
+
+        // Notify all processes that the container has exited.
+        // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
+        for (auto& process : m_processes)
+        {
+            process->OnContainerReleased();
+        }
+
+        m_processes.clear();
     }
 
     WSL_LOG(
@@ -313,11 +355,9 @@ WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    // If the container is running, refresh the init process state before returning.
     if (m_state == WslaContainerStateRunning && m_initProcess->State().first != WSLAProcessStateRunning)
     {
         m_state = WslaContainerStateExited;
-        // m_containerProcess.reset();
     }
 
     return m_state;
@@ -342,16 +382,19 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
     std::lock_guard lock{m_lock};
 
+    auto state = State();
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        State() != WslaContainerStateRunning,
+        state != WslaContainerStateRunning,
         "Container %hs is not running. State: %i",
         m_name.c_str(),
-        m_state);
+        state);
 
     auto [hasStdin, hasTty] = ParseFdStatus(*Options);
 
-    common::docker_schema::CreateExec request;
+    common::docker_schema::CreateExec request{};
+    request.AttachStdout = true;
+    request.AttachStderr = true;
     for (ULONG i = 0; i < Options->CommandLineCount; i++)
     {
         request.Cmd.push_back(Options->CommandLine[i]);
@@ -367,13 +410,25 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
         request.WorkingDir = Options->CurrentDirectory;
     }
 
+    if (hasTty)
+    {
+        request.Tty = true;
+    }
+
+    if (hasStdin)
+    {
+        request.AttachStdin = true;
+    }
+
     try
     {
         auto result = m_dockerClient.CreateExec(m_id, request);
 
         // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
+        auto process = wil::MakeOrThrow<WSLAContainerProcess>(result.Id, hasTty, m_dockerClient, m_id, m_eventTracker, *this);
 
-        auto process = wil::MakeOrThrow<WSLAContainerProcess>(result.Id, hasTty, m_dockerClient, m_id, m_eventTracker);
+        // Store a non owning reference to the process.
+        m_processes.push_back(process.Get());
 
         process->AssignIoStream(wil::unique_handle{
             (HANDLE)m_dockerClient

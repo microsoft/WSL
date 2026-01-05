@@ -1715,7 +1715,31 @@ int WslaShell(_In_ std::wstring_view commandLine)
         using namespace wsl::windows::common::relay;
         wsl::windows::common::relay::MultiHandleWait io;
 
-        io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), process->GetStdHandle(0)));
+        // Create a thread to relay stdin to the pipe.
+
+        std::thread inputThread;
+        wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+
+        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (inputThread.joinable())
+            {
+                exitEvent.SetEvent();
+                inputThread.join();
+            }
+        });
+
+        // Required because ReadFile() blocks if stdin is a tty.
+        if (IsInteractiveConsole())
+        {
+            inputThread = std::thread{[&]() {
+                wsl::windows::common::relay::StandardInputRelay(Stdin, process->GetStdHandle(0).get(), []() {}, exitEvent.get());
+            }};
+        }
+        else
+        {
+            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), process->GetStdHandle(0)));
+        }
+
         io.AddHandle(std::make_unique<RelayHandle>(process->GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
         io.AddHandle(std::make_unique<RelayHandle>(process->GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
 

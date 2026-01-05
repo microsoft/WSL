@@ -114,10 +114,10 @@ struct CreateExec
 {
     using TResponse = CreateExecResponse;
 
-    bool AttachStdin;
-    bool AttachStdout;
-    bool AttachStderr;
-    bool Tty;
+    bool AttachStdin = false;
+    bool AttachStdout = false;
+    bool AttachStderr = false;
+    bool Tty = false;
     std::vector<ULONG> ConsoleSize;
     std::vector<std::string> Cmd;
     std::vector<std::string> Env;
@@ -129,10 +129,11 @@ struct CreateExec
 struct StartExec
 {
     using TResponse = void;
-    bool Tty;
+    bool Tty = false;
+    bool Detach = false;
     std::vector<ULONG> ConsoleSize;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, ConsoleSize);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, Detach, ConsoleSize);
 };
 
 } // namespace wsl::windows::common::docker_schema

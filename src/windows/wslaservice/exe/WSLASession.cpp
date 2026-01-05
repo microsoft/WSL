@@ -68,7 +68,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
     // TODO: Rework the daemon logic so we can have only one thread watching all daemons.
     ServiceProcessLauncher launcher{
         "/usr/bin/dockerd",
-        {"/usr/bin/dockerd"},
+        {"/usr/bin/dockerd" /*, "--debug"*/}, // TODO: Flag for --debug.
         {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}},
         common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
     m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine.Get()));
