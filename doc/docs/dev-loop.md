@@ -4,13 +4,13 @@
 
 The following tools are required to build WSL: 
 
-- CMake >= 2.25
+- CMake >= 3.25
     - Can be installed with `winget install Kitware.CMake`
 - Visual Studio with the following components:
     - Windows SDK 26100
     - MSBuild
     - Universal Windows platform support for v143 build tools (X64 and ARM64)
-    - MSVC v143 - VS 2020 C++ ARM64 build tools (Latest + Spectre) (X64 and ARM64)
+    - MSVC v143 - VS 2022 C++ ARM64 build tools (Latest + Spectre) (X64 and ARM64)
     - C++ core features
     - C++ ATL for latest v143 tools (X64 and ARM64)
     - C++ Clang compiler for Windows

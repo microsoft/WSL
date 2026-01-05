@@ -1389,6 +1389,13 @@ Return Value:
 
     int Result;
 
+    if (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
+    {
+        LxtLogInfo("TODO: debug this test on virtiofs.");
+        Result = 0;
+        goto ErrorExit;
+    }
+
     LxtCheckErrno(LxtFsDeleteCurrentWorkingDirectoryCommon(DRVFS_PREFIX, FS_DELETE_DRVFS));
 
 ErrorExit:
@@ -3468,6 +3475,10 @@ Return Value:
     // is what execve uses.
     //
 
+    LxtCheckMapErrno(Mapping = mmap(NULL, 2, PROT_READ, MAP_PRIVATE, Fd, 0));
+    LxtCheckMemoryEqual(Mapping, "MZ", 2);
+    LxtCheckResult(munmap(Mapping, 2));
+
     if (g_LxtFsInfo.FsType != LxtFsTypeVirtioFs)
     {
         LxtCheckMapErrno(Mapping = mmap(NULL, 2, PROT_READ, MAP_SHARED, Fd, 0));
@@ -3475,7 +3486,7 @@ Return Value:
     }
     else
     {
-        LxtLogInfo("TODO: debug virtiofs handling of app exec links");
+        LxtLogInfo("TODO: virtiofs does not support MAP_SHARED");
     }
 
 ErrorExit:

@@ -451,27 +451,12 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     ReadGuestCapabilities();
 
     // Mount the system distro.
+    // N.B. If using SCSI, the system distro is added during VM creation.
     switch (m_systemDistroDeviceType)
     {
-    case LxMiniInitMountDeviceTypeLun:
-        m_systemDistroDeviceId =
-            AttachDiskLockHeld(m_vmConfig.SystemDistroPath.c_str(), DiskType::VHD, MountFlags::ReadOnly, {}, false, m_userToken.get());
-        break;
-
     case LxMiniInitMountDeviceTypePmem:
         m_systemDistroDeviceId = MountFileAsPersistentMemory(m_vmConfig.SystemDistroPath.c_str(), true);
         break;
-
-    default:
-        break;
-    }
-
-    // Mount the kernel modules VHD.
-    ULONG modulesLun = ULONG_MAX;
-    if (!m_vmConfig.KernelModulesPath.empty())
-    {
-        modulesLun =
-            AttachDiskLockHeld(m_vmConfig.KernelModulesPath.c_str(), DiskType::VHD, MountFlags::ReadOnly, {}, false, m_userToken.get());
     }
 
     // Attempt to create and mount the swap vhd.
@@ -543,7 +528,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
     message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling;
     message->DefaultKernel = m_defaultKernel;
-    message->KernelModulesDeviceId = modulesLun;
+    message->KernelModulesDeviceId = m_kernelModulesDeviceId;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
     message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
@@ -1729,9 +1714,33 @@ std::wstring WslCoreVm::GenerateConfigJson()
         vmSettings.Chipset.Uefi = std::move(uefiSettings);
     }
 
-    // Initialize other devices.
-    vmSettings.Devices.Scsi["0"] = hcs::Scsi{};
-    hcs::HvSocket hvSocketConfig{};
+    // Initialize SCSI devices.
+    hcs::Scsi scsiController{};
+    auto attachDisk = [&](PCWSTR path) {
+        auto lun = ReserveLun();
+        hcs::Attachment disk{};
+        disk.Type = hcs::AttachmentType::VirtualDisk;
+        disk.Path = path;
+        disk.ReadOnly = true;
+        disk.SupportCompressedVolumes = true;
+        disk.AlwaysAllowSparseFiles = true;
+        disk.SupportEncryptedFiles = true;
+        scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, {}});
+        return lun;
+    };
+
+    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypeLun)
+    {
+        m_systemDistroDeviceId = attachDisk(m_vmConfig.SystemDistroPath.c_str());
+    }
+
+    if (!m_vmConfig.KernelModulesPath.empty())
+    {
+        m_kernelModulesDeviceId = attachDisk(m_vmConfig.KernelModulesPath.c_str());
+    }
+
+    vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 
     // Construct a security descriptor that allows system and the current user.
     wil::unique_hlocal_string userSidString;
@@ -1740,6 +1749,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     std::wstring securityDescriptor{L"D:P(A;;FA;;;SY)(A;;FA;;;"};
     securityDescriptor += userSidString.get();
     securityDescriptor += L")";
+    hcs::HvSocket hvSocketConfig{};
     hvSocketConfig.HvSocketConfig.DefaultBindSecurityDescriptor = securityDescriptor;
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
