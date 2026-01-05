@@ -4,7 +4,10 @@
         <MediaTemplate EmbedCab="yes" />
 
         <StandardDirectory Id="ProgramFiles64Folder">
-            <Directory Id="INSTALLDIR" Name="WSLA" />
+            <Directory Id="INSTALLDIR" Name="WSLA">
+                <Directory Id="TOOLSFOLDER" Name="tools" />
+                <Directory Id="LIBFOLDER" Name="lib" />
+            </Directory>
         </StandardDirectory>
 
         <Icon Id="wsl.ico" SourceFile="${CMAKE_SOURCE_DIR}/images/wsl.ico"/>
@@ -175,6 +178,7 @@
                 <File Id="wsladiag.exe" Name="wsladiag.exe" Source="${BIN}/wsladiag.exe" />
 
                 <File Id="wsldevicehost.dll" Source="${BIN}/wsldevicehost.dll" />
+                <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${BIN}/wslrelay.exe" />
 
                 <!-- Temporary runtime VHD. TODO: Update once the final VHD is available. -->
                 <?if "${WSL_DEV_BINARY_PATH}" = "" AND "${TARGET_PLATFORM}" = "x64" ?>
@@ -186,8 +190,36 @@
             </Component>
         </DirectoryRef>
 
+        <DirectoryRef Id="TOOLSFOLDER">
+            <Component Id="tools" Guid="AD5D2394-6344-4DAA-924B-CFA46175ECD6" Bitness="always64" UninstallWhenSuperseded="yes">
+                <File Id="initrd.img" Source="${BIN}/initrd.img"/>
+
+                <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
+                    <File Id="kernel" Source="${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/kernel"/>
+                    <File Id="modules.vhd" Source="${KERNEL_SOURCE_DIR}/bin/${TARGET_PLATFORM}/modules.vhd"/>
+                <?endif?>
+            </Component>
+        </DirectoryRef>
+
+        <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
+            <DirectoryRef Id="LIBFOLDER">
+                <Component Id="directx" Guid="5F20FE67-C8EE-434F-8FA6-E8DD073D05BA" Bitness="always64" UninstallWhenSuperseded="yes">
+                    <!--
+                    <File Id="libd3d12.so" Source="${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}/libd3d12.so" />
+                    <File Id="libd3d12core.so" Source="${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}/libd3d12core.so" />
+                    <File Id="libdxcore.so" Source="${DXCORE_SOURCE_DIR}/lib/libdxcore.so" />
+                    -->
+                </Component>
+            </DirectoryRef>
+        <?endif?>
+
         <Feature Id="WSLA" Title="WSL For Apps" Level="1">
             <ComponentRef Id="wslaservice" />
+            <ComponentRef Id="tools" />
+
+            <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
+                <ComponentRef Id="directx" />
+            <?endif?>
         </Feature>
 
         <!-- Don't show a 'Modify' button in settings since there is nothing to modify -->
