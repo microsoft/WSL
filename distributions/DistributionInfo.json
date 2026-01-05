@@ -82,12 +82,12 @@
                 "FriendlyName": "Kali Linux Rolling",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://kali.download/wsl-images/kali-2025.3/kali-linux-2025.3-wsl-rootfs-amd64.wsl",
-                    "Sha256": "dda0ff3ffe4465cf2af1061262e44cec5a90c1eccb71fe5ccfb1b0fceb5e23a8"
+                    "Url": "https://kali.download/wsl-images/kali-2025.4/kali-linux-2025.4-wsl-rootfs-amd64.wsl",
+                    "Sha256": "86aba7bb3d74d313e349f9f50d3f6119ee3b1491072920d063f17ce9b3f706ab"
                 },
                 "Arm64Url": {
-                    "Url": "https://kali.download/wsl-images/kali-2025.3/kali-linux-2025.3-wsl-rootfs-arm64.wsl",
-                    "Sha256": "e175688d9c305b621e701bb11e54f57ac772aed7fa1d94e3f6cb812c1e5e806f"
+                    "Url": "https://kali.download/wsl-images/kali-2025.4/kali-linux-2025.4-wsl-rootfs-arm64.wsl",
+                    "Sha256": "bd8cdfe340ec596e470b6853ac662382897bc656c0ac3d3096eb399d0780e25e"
                 }
             }
         ],
@@ -166,8 +166,8 @@
                 "FriendlyName": "Arch Linux",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2025.12.01.153427/archlinux-2025.12.01.153427.wsl",
-                    "Sha256": "8dfe92910a188f191b0af2972bd4bda661178b769ce820a8921e8b7aeae9a517"
+                    "Url": "https://fastly.mirror.pkgbuild.com/wsl/2026.01.01.156076/archlinux-2026.01.01.156076.wsl",
+                    "Sha256": "e3820c60df62edc22df29c9c16d2205512d95c1b086232a9b7bc3960542036d4"
                 }
             }
         ],
