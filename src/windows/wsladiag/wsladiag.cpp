@@ -49,7 +49,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     std::wstring sessionName;
     bool verbose = false;
 
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2); // Skip "wsladiag.exe shell" to parse shell-specific args
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, false); // Skip "wsladiag.exe shell" to parse shell-specific args
     parser.AddPositionalArgument(sessionName, 0);
     parser.AddArgument(verbose, L"--verbose", L'v');
 
@@ -207,14 +207,26 @@ static int RunShellCommand(std::wstring_view commandLine)
     return 0;
 }
 
-static int RunListCommand()
+static int RunListCommand(std::wstring_view commandLine)
 {
+    bool verbose = false;
+
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, false); // Skip "wsladiag.exe list" to parse list-specific args
+    parser.AddArgument(verbose, L"--verbose", L'v');
+
+    parser.Parse();
+
     wil::com_ptr<IWSLAUserSession> userSession;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
     THROW_IF_FAILED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
+
+    if (verbose)
+    {
+        wslutil::PrintMessage(std::format(L"[diag] Found {} session(s)", sessions.size()), stdout);
+    }
 
     if (sessions.size() == 0)
     {
@@ -340,7 +352,7 @@ int wsladiag_main(std::wstring_view commandLine)
         }
         else if (verb == L"list")
         {
-            exitCode = RunListCommand();
+            exitCode = RunListCommand(commandLine);
         }
         else if (verb == L"shell")
         {
@@ -348,7 +360,7 @@ int wsladiag_main(std::wstring_view commandLine)
         }
         else
         {
-            wslutil::PrintMessage(std::format(L"Unknown command: '{}'", verb), stderr);
+            wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
             PrintUsage();
             exitCode = 1;
         }
@@ -360,10 +372,6 @@ int wsladiag_main(std::wstring_view commandLine)
         // Default nonzero exit code on failure.
         exitCode = 1;
     }
-
-    wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
-    PrintUsage();
-    return 1;
 
     // If there was a failure, attempt to print a contextualized error message collected
     // by the ExecutionContext. Otherwise fall back to the HRESULT -> string path.

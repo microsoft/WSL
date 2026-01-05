@@ -307,8 +307,8 @@ class ArgumentParser
 public:
 #ifdef WIN32
 
-    ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool stopUnknownArgs = false) :
-        m_startIndex(StartIndex), m_name(Name), m_stopUnknownArgs(stopUnknownArgs)
+    ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool ignoreUnknownArgs = false) :
+        m_startIndex(StartIndex), m_name(Name), m_ignoreUnknownArgs(ignoreUnknownArgs)
     {
         m_argv.reset(CommandLineToArgvW(std::wstring(CommandLine).c_str(), &m_argc));
         THROW_LAST_ERROR_IF(!m_argv);
@@ -316,8 +316,8 @@ public:
 
 #else
 
-    ArgumentParser(int argc, const char* const* argv, bool stopUnknownArgs = false) :
-        m_argc(argc), m_argv(argv), m_startIndex(1), m_stopUnknownArgs(stopUnknownArgs)
+    ArgumentParser(int argc, const char* const* argv, bool ignoreUnknownArgs = false) :
+        m_argc(argc), m_argv(argv), m_startIndex(1), m_ignoreUnknownArgs(ignoreUnknownArgs)
     {
     }
 
@@ -431,7 +431,7 @@ public:
 
             if (!foundMatch)
             {
-                if (m_stopUnknownArgs)
+                if (m_ignoreUnknownArgs)
                 {
                     break;
                 }
@@ -542,7 +542,7 @@ private:
 
     int m_startIndex{};
     const TChar* m_name{};
-    bool m_stopUnknownArgs{false};
+    bool m_ignoreUnknownArgs{false};
 };
 } // namespace wsl::shared
 
