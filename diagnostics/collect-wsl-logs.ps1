@@ -11,32 +11,46 @@ Set-StrictMode -Version Latest
 $folder = "WslLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
 mkdir -p $folder | Out-Null
 
-if ($LogProfile -eq $null -Or ![System.IO.File]::Exists($LogProfile))
+# Check if LogProfile is a custom file path or a profile name
+if ($LogProfile -ne $null -And [System.IO.File]::Exists($LogProfile))
 {
-    if ($LogProfile -eq $null)
+    # User provided a custom .wprp file path - use it directly
+    $wprpFile = $LogProfile
+    $wprpProfile = $null  # Use default profile in the file
+}
+else
+{
+    # Map log profile names to WPRP profile names
+    $wprpProfile = "WSL"
+    if ($LogProfile -eq "storage")
     {
-        $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp"
+        $wprpProfile = "WSL-Storage"
     }
-    elseif ($LogProfile -eq "storage")
+    elseif ($LogProfile -eq "networking")
     {
-         $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_storage.wprp"
+        $wprpProfile = "WSL-Networking"
     }
     elseif ($LogProfile -eq "hvsocket")
     {
-         $url = "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_hvsocket.wprp"
+        $wprpProfile = "WSL-HvSocket"
     }
-    else
+    elseif ($LogProfile -ne $null)
     {
-        Write-Error "Unknown log profile: $LogProfile"
+        Write-Error "Unknown log profile: $LogProfile. Valid options are: storage, networking, hvsocket, or a path to a custom .wprp file"
         exit 1
     }
 
-    $LogProfile = "$folder/wsl.wprp"
-    try {
-        Invoke-WebRequest -UseBasicParsing $url -OutFile $LogProfile
+    # Use the consolidated wsl.wprp file, attempt to use local copy first.
+    $wprpFile = "$folder/wsl.wprp"
+    if (Test-Path "$PSScriptRoot/wsl.wprp")
+    {
+        Write-Host -ForegroundColor Yellow "Using local copy of wsl.wprp"
+        Copy-Item "$PSScriptRoot/wsl.wprp" $wprpFile
     }
-    catch {
-        throw
+    else
+    {
+        Write-Host -ForegroundColor Yellow "wsl.wprp not found in the current directory. Downloading it from GitHub."
+        Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp" -OutFile $wprpFile
     }
 }
 
@@ -71,13 +85,23 @@ if (Test-Path $uninstallLogs)
 
 $wprOutputLog = "$folder/wpr.txt"
 
-wpr.exe -start $LogProfile -filemode 2>&1 >> $wprOutputLog
+# Build wpr command - if wprpProfile is set, use profile syntax, otherwise use file only
+if ($wprpProfile -ne $null)
+{
+    $wprCommand = "$wprpFile!$wprpProfile"
+}
+else
+{
+    $wprCommand = $wprpFile
+}
+
+wpr.exe -start $wprCommand -filemode 2>&1 >> $wprOutputLog
 if ($LastExitCode -Ne 0)
 {
     Write-Host -ForegroundColor Yellow "Log collection failed to start (exit code: $LastExitCode), trying to reset it."
     wpr.exe -cancel 2>&1 >> $wprOutputLog
 
-    wpr.exe -start $LogProfile -filemode 2>&1 >> $wprOutputLog
+    wpr.exe -start $wprCommand -filemode 2>&1 >> $wprOutputLog
     if ($LastExitCode -Ne 0)
     {
         Write-Host -ForegroundColor Red "Couldn't start log collection (exitCode: $LastExitCode)"
