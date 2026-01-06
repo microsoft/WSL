@@ -52,7 +52,7 @@ public:
     ConsoleOutput& operator=(ConsoleOutput&&) = default;
 
 private:
-    ConsoleOutput(wil::unique_hfile ConsoleHandle, DWORD SavedMode);
+    ConsoleOutput(wil::unique_hfile&& ConsoleHandle, DWORD SavedMode);
 
     wil::unique_hfile m_ConsoleHandle;
     DWORD m_SavedMode = 0;
@@ -63,7 +63,6 @@ class SvcCommIo
 {
 public:
     SvcCommIo();
-    ~SvcCommIo() = default;
 
     PLXSS_STD_HANDLES GetStdHandles();
     COORD GetWindowSize() const;

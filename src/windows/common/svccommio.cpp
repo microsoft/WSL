@@ -121,7 +121,7 @@ std::optional<ConsoleOutput> ConsoleOutput::Create()
     return std::nullopt;
 }
 
-ConsoleOutput::ConsoleOutput(wil::unique_hfile ConsoleHandle, DWORD SavedMode) :
+ConsoleOutput::ConsoleOutput(wil::unique_hfile&& ConsoleHandle, DWORD SavedMode) :
     m_ConsoleHandle(std::move(ConsoleHandle)), m_SavedMode(SavedMode)
 {
     // Save code page.
@@ -190,7 +190,8 @@ SvcCommIo::GetWindowSize() const
             static_cast<short>(Info.srWindow.Bottom - Info.srWindow.Top + 1)};
     }
 
-    return {80, 24}; // Default size if no console
+    LOG_HR_MSG(E_UNEXPECTED, "No console handle available for GetWindowSize");
+    return {80, 24};
 }
 
 } // namespace wsl::windows::common
