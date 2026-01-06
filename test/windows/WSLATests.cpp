@@ -971,6 +971,43 @@ class WSLATests
         ExpectCommandResult(session.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
     }
 
+    TEST_METHOD(PmemVhds)
+    {
+        WSL2_TEST_ONLY();
+
+        // Test with SCSI boot VHDs.
+        {
+            auto settings = GetDefaultSessionSettings();
+            WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
+
+            auto session = CreateSession(settings);
+
+            // Validate that SCSI devices are present and PMEM devices are not.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/sda"}, 0);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/sdb"}, 0);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem0"}, 1);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem1"}, 1);
+
+            // Verify that the SCSI device is readable.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "dd if=/dev/sda of=/dev/null bs=512 count=1 2>&1"}, 0);
+        }
+
+        // Test with PMEM boot VHDs enabled.
+        {
+            auto settings = GetDefaultSessionSettings();
+            WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
+
+            auto session = CreateSession(settings);
+
+            // Validate that PMEM devices are present.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem0"}, 0);
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem1"}, 0);
+
+            // Verify that the PMEM devices can be read from.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "dd if=/dev/pmem0 of=/dev/null bs=512 count=1 2>&1"}, 0);
+        }
+    }
+
     TEST_METHOD(CreateRootNamespaceProcess)
     {
         WSL2_TEST_ONLY();
