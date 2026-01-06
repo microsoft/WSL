@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    DockerHTTPClient.cpp
+
+Abstract:
+
+    This file contains the implementation of the Docker HTTP client.
+
+--*/
+
 #include "precomp.h"
 
 #include "DockerHTTPClient.h"

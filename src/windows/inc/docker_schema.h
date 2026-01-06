@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    docker_schema.h
+
+Abstract:
+
+    JSON schema for the docker API.
+
+--*/
+
 #pragma once
 
 #include "JsonUtils.h"

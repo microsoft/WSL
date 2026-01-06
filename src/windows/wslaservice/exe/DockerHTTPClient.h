@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    DockerHTTPClient.h
+
+Abstract:
+
+    This file contains the definition of the Docker HTTP client.
+
+--*/
+
 #pragma once
 
 #include <boost/asio.hpp>

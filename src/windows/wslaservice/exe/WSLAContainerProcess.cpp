@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAContainerProcess.cpp
+
+Abstract:
+
+    Contains the implementation for WSLAContainerProcess.
+
+--*/
+
 #include "precomp.h"
 #include "WSLAContainerProcess.h"
 #include "WSLAContainer.h"

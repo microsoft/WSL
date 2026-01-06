@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAContainerProcess.h
+
+Abstract:
+
+    Contains the definition for WSLAContainerProcess.
+
+--*/
+
 #pragma once
 
 #include "DockerHTTPClient.h"
