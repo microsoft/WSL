@@ -555,6 +555,26 @@ class WSLATests
         VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
     }
 
+    TEST_METHOD(VirtioProxyNetworking)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeVirtioProxy;
+
+        auto session = CreateSession(settings);
+
+        // Validate that eth0 has an ip address
+        ExpectCommandResult(
+            session.get(),
+            {"/bin/sh",
+             "-c",
+             "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"},
+            0);
+
+        ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}, 0);
+    }
+
     TEST_METHOD(OpenFiles)
     {
         WSL2_TEST_ONLY();
