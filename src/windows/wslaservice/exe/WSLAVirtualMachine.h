@@ -153,7 +153,6 @@ private:
     bool m_running = false;
     PSID m_userSid{};
     wil::shared_handle m_userToken;
-    std::wstring m_debugShellPipe;
     GUID m_virtioFsClassId;
 
     std::mutex m_trackedProcessesLock;
