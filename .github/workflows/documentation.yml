@@ -26,7 +26,7 @@ jobs:
         run:  mkdocs build -f doc/mkdocs.yml
         shell: bash
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: doc/site
 
