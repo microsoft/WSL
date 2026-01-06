@@ -137,15 +137,23 @@ auto LogImpl(int fd, const std::format_string<Args...>& format, Args&&... args)
     }
 
 #define GNS_LOG_INFO(str, ...) \
-    if (g_TelemetryFd != -1) { \
-        LogImpl(g_TelemetryFd, "{}: {} - " str "\n", g_threadName.c_str(), __FUNCTION__, ##__VA_ARGS__); \
+    { \
+        if (g_TelemetryFd != -1) \
+        { \
+            LogImpl(g_TelemetryFd, "{}: {} - " str "\n", g_threadName.c_str(), __FUNCTION__, ##__VA_ARGS__); \
+        } \
     }
 
 #define GNS_LOG_ERROR(str, ...) \
-    if (g_TelemetryFd != -1) { \
-        LogImpl(g_TelemetryFd, "{}: {} - ERROR: " str "\n", g_threadName.c_str(), __FUNCTION__, ##__VA_ARGS__); \
-    } else { \
-        LOG_ERROR(str, ##__VA_ARGS__); \
+    { \
+        if (g_TelemetryFd != -1) \
+        { \
+            LogImpl(g_TelemetryFd, "{}: {} - ERROR: " str "\n", g_threadName.c_str(), __FUNCTION__, ##__VA_ARGS__); \
+        } \
+        else \
+        { \
+            LOG_ERROR(str, ##__VA_ARGS__); \
+        } \
     }
 
 #define FATAL_ERROR(str, ...) FATAL_ERROR_EX(1, str, ##__VA_ARGS__)
