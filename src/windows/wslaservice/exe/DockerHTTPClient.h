@@ -146,11 +146,11 @@ private:
         const OnResponseBytes& OnResponse,
         const std::map<boost::beast::http::field, std::string>& Headers = {});
 
-    template <typename TRequest = common::docker_schema::EmtpyRequest, typename TResponse = TRequest::TResponse>
+    template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
     auto Transaction(boost::beast::http::verb Method, const std::string& Url, const TRequest& RequestObject = {})
     {
         std::string requestString;
-        if constexpr (!std::is_same_v<TRequest, common::docker_schema::EmtpyRequest>)
+        if constexpr (!std::is_same_v<TRequest, common::docker_schema::EmptyRequest>)
         {
             requestString = wsl::shared::ToJson(RequestObject);
         }

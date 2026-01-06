@@ -58,12 +58,12 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportIm
 
 void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag)
 {
-    Transaction<docker_schema::EmtpyRequest>(verb::post, std::format("http://localhost/images/{}/tag?repo={}&tag={}", Id, Repo, Tag));
+    Transaction<docker_schema::EmptyRequest>(verb::post, std::format("http://localhost/images/{}/tag?repo={}&tag={}", Id, Repo, Tag));
 }
 
 std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
 {
-    return Transaction<docker_schema::EmtpyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
 }
 
 docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)

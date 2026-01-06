@@ -165,7 +165,11 @@ WSLAContainerImpl::~WSLAContainerImpl()
     {
         std::lock_guard lock(m_lock);
 
-        m_initProcess->OnContainerReleased();
+        if (m_initProcess)
+        {
+            m_initProcess->OnContainerReleased();
+        }
+
         for (auto& process : m_processes)
         {
             process->OnContainerReleased();

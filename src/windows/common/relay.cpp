@@ -1240,7 +1240,7 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
             PendingBuffer.insert(PendingBuffer.end(), buffer.data(), buffer.data() + consumedBytes);
             advance(consumedBytes);
 
-            WI_ASSERT(PendingChunkSize >= PendingChunkSize);
+            WI_ASSERT(PendingChunkSize >= consumedBytes);
             PendingChunkSize -= consumedBytes;
 
             if (PendingChunkSize == 0)

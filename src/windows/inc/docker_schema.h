@@ -33,7 +33,7 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
-struct EmtpyRequest
+struct EmptyRequest
 {
     using TResponse = void;
 };
@@ -85,7 +85,7 @@ struct CreateContainer
     bool AttachStdout{};
     bool AttachStderr{};
     std::vector<std::string> Cmd;
-    std::vector<std::string> Entrypoint; // TODO: Find a way to ommit if the caller wants the default entrypoint.
+    std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
     HostConfig HostConfig;

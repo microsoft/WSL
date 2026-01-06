@@ -1756,7 +1756,7 @@ class WSLATests
             ValidateProcessOutput(process, {}, 12);
         }
 
-        // Validate that environmnent is correctly wired.
+        // Validate that environment is correctly wired.
         {
             auto process =
                 WSLAProcessLauncher({}, {"/bin/sh", "-c", "echo $testenv"}, {{"testenv=testvalue"}}, ProcessFlags::Stdout | ProcessFlags::Stderr)

@@ -29,11 +29,14 @@ namespace {
 
 std::pair<std::string, std::string> ParseImage(const std::string& Input)
 {
-    std::string image{Input};
-    size_t separator = image.find(':');
-    THROW_HR_IF_MSG(E_INVALIDARG, separator == std::string::npos || separator >= Input.size() - 1, "Invalid image: %hs", Input.c_str());
+    size_t separator = Input.find(':');
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        separator == std::string::npos || separator >= Input.size() - 1 || separator == 0,
+        "Invalid image: %hs",
+        Input.c_str());
 
-    return {image.substr(0, separator), image.substr(separator + 1)};
+    return {Input.substr(0, separator), Input.substr(separator + 1)};
 }
 } // namespace
 
@@ -296,7 +299,7 @@ try
     else
     {
         // Otherwise, the session is shutting down; terminate containerd before exiting.
-        LOG_IF_FAILED(process.Get().Signal(15)); // SIGKILL
+        LOG_IF_FAILED(process.Get().Signal(15)); // SIGTERM
 
         auto [code, signaled] = process.Wait(30 * 1000); // TODO: Configurable timeout.
 
