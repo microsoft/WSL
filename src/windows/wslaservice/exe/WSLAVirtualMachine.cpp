@@ -144,22 +144,11 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
 void WSLAVirtualMachine::Start()
 {
     hcs::ComputeSystem systemSettings{};
+    const auto schemaVersion = wsl::windows::common::hcs::GetSchemaVersion();
+    systemSettings.SchemaVersion.Major = schemaVersion.first;
+    systemSettings.SchemaVersion.Minor = schemaVersion.second;
     systemSettings.Owner = L"WSL";
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
-
-    // Determine which schema version to use based on the Windows version. Windows 10 does not support
-    // newer schema versions and some features may be disabled as a result.
-    if (wsl::windows::common::helpers::IsWindows11OrAbove())
-    {
-        systemSettings.SchemaVersion.Major = 2;
-        systemSettings.SchemaVersion.Minor = 7;
-    }
-    else
-    {
-        systemSettings.SchemaVersion.Major = 2;
-        systemSettings.SchemaVersion.Minor = 3;
-    }
-
     hcs::VirtualMachine vmSettings{};
     vmSettings.StopOnReset = true;
     vmSettings.Chipset.UseUtc = true;
@@ -353,7 +342,7 @@ void WSLAVirtualMachine::Start()
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
 
-    // Enable .vmrs dump collection if supported.
+    // Enable .vmrs dump collection if supported by the host OS.
     if (wsl::windows::common::helpers::IsWindows11OrAbove())
     {
         CreateVmSavedStateFile();
