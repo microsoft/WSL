@@ -280,10 +280,10 @@ try
 
     // Read stdout & stderr.
     io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }));
+        process.GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }, false));
 
     io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }));
+        process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }, false));
 
     // Exit if either the VM terminates or containerd exits.
     io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), [&]() { io.Cancel(); }));

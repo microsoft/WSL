@@ -9,6 +9,17 @@ Module Name:
 Abstract:
 
     This file contains the implementation of the Docker HTTP client.
+    This class is designed to wrap calls to the docker API over a socket channel.
+
+    The flow of an HTTP request is:
+
+    - Create a new hvsocket channel by sending a WSLA_FORK message to init.
+    - Connect the new socket to the docker unix socket server via WSLA_UNIX_CONNECT
+    - Once connected, send the HTTP request over that socket.
+
+    Some HTTP requests have simple response bodies that can be read right away, and some others upgrade
+    the connection to TCP (like attaching to a process stdio, importing a tar, ...). For those,
+    we return the socket without reading the response body, so the caller can interact directly with the stream.
 
 --*/
 
@@ -246,7 +257,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             }
         }
 
-        // Feed the parser up to the end of the heaer.
+        // Feed the parser up to the end of the header.
         boost::beast::error_code error;
         Parser.put(boost::asio::buffer(Content.data(), i), error);
 
@@ -394,7 +405,7 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
             }
         }
 
-        // Consumme the buffer from the socket.
+        // Consume the buffer from the socket.
         bytesRead = common::socket::Receive(
             context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), i - Offset), m_exitingEvent);
         WI_ASSERT(bytesRead == i - Offset);

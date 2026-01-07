@@ -1099,6 +1099,9 @@ void ReadHandle::Schedule()
         auto error = GetLastError();
         if (error == ERROR_HANDLE_EOF || error == ERROR_BROKEN_PIPE)
         {
+            // Signal an empty read for EOF.
+            OnRead({});
+
             State = IOHandleStatus::Completed;
             return;
         }
@@ -1145,51 +1148,79 @@ HANDLE ReadHandle::GetHandle() const
     return Event.get();
 }
 
-LineBasedReadHandle::LineBasedReadHandle(HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Line)>&& OnLine) :
-    ReadHandle(std::move(Handle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnLine(OnLine)
+LineBasedReadHandle::LineBasedReadHandle(HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Line)>&& OnLine, bool Crlf) :
+    ReadHandle(std::move(Handle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnLine(OnLine), Crlf(Crlf)
 {
 }
 
 LineBasedReadHandle::~LineBasedReadHandle()
 {
-    // Call the callback with any pending data (in case of an incomplete line).
-    if (!PendingBuffer.empty())
-    {
-        OnLine(PendingBuffer);
-    }
+    // N.B. PendingBuffer can contain remaining data is an exception was thrown during parsing.
 }
 
 void LineBasedReadHandle::OnRead(const gsl::span<char>& Buffer)
 {
-    auto begin = Buffer.begin();
-    auto end = std::ranges::find(Buffer, '\n');
-    while (end != Buffer.end())
+    // If we reach of the end, signal a line with the remaining buffer.
+    if (Buffer.empty() && !PendingBuffer.empty())
     {
-        PendingBuffer.insert(PendingBuffer.end(), begin, end);
-
         OnLine(PendingBuffer);
         PendingBuffer.clear();
+        return;
+    }
+
+    auto begin = Buffer.begin();
+    auto end = std::ranges::find(Buffer, Crlf ? '\r' : '\n');
+    while (end != Buffer.end())
+    {
+        if (Crlf)
+        {
+            end++; // Move to the following '\n'
+
+            if (end == Buffer.end() || *end != '\n') // Incomplete CRLF sequence. Append to buffer and continue.
+            {
+                PendingBuffer.insert(PendingBuffer.end(), begin, end);
+                begin = end;
+                end = std::ranges::find(end, Buffer.end(), '\r');
+                continue;
+            }
+        }
+
+        // Discard the '\r' in CRLF mode.
+        PendingBuffer.insert(PendingBuffer.end(), begin, Crlf ? end - 1 : end);
+
+        if (!PendingBuffer.empty())
+        {
+            OnLine(PendingBuffer);
+            PendingBuffer.clear();
+        }
 
         begin = end + 1;
-        end = std::ranges::find(begin, Buffer.end(), '\n');
+        end = std::ranges::find(begin, Buffer.end(), Crlf ? '\r' : '\n');
     }
 
     PendingBuffer.insert(PendingBuffer.end(), begin, end);
 }
 
 HTTPChunkBasedReadHandle::HTTPChunkBasedReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Line)>&& OnChunk) :
-    LineBasedReadHandle(std::move(MovedHandle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnChunk(OnChunk)
+    ReadHandle(std::move(MovedHandle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnChunk(std::move(OnChunk))
 {
 }
 
 HTTPChunkBasedReadHandle::~HTTPChunkBasedReadHandle()
 {
-    LOG_HR_IF(E_UNEXPECTED, !PendingBuffer.empty() || PendingChunkSize != 0);
+    // N.B. PendingBuffer can contain remaining data is an exception was thrown during parsing.
+    LOG_HR_IF(E_UNEXPECTED, !PendingBuffer.empty() || PendingChunkSize != 0 || ExpectHeader);
 }
 
 void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 {
     // See: https://httpwg.org/specs/rfc9112.html#field.transfer-encoding
+
+    if (Input.empty())
+    {
+        // N.B. The body can be terminated by a zero-length chunk.
+        THROW_HR_IF(E_INVALIDARG, PendingChunkSize != 0 || ExpectHeader);
+    }
 
     auto buffer = Input;
 
@@ -1200,7 +1231,7 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 
     while (!buffer.empty())
     {
-        if (PendingChunkSize == 0 || !ReadingChunk)
+        if (PendingChunkSize == 0)
         {
             if (buffer.front() == '\r' || buffer.front() == '\n')
             {
@@ -1208,36 +1239,46 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
                 advance(1);
                 continue;
             }
-        }
 
-        if (PendingChunkSize == 0)
-        {
-            auto lf = std::ranges::find(buffer, '\r');
+            ExpectHeader = true;
 
-            THROW_HR_IF_MSG(
-                E_INVALIDARG, lf == buffer.end(), "Unexpected HTTP chunk trailer: %hs", std::string(buffer.data(), buffer.size()).c_str());
+            auto end = std::ranges::find(buffer, '\n');
+            PendingBuffer.insert(PendingBuffer.end(), buffer.begin(), end);
+            if (end == buffer.end())
+            {
+                // Incomplete size header, buffer until next read.
+                break;
+            }
 
-            auto chunkSizeStr = std::string{buffer.begin(), lf};
+            THROW_HR_IF_MSG(E_INVALIDARG, end - buffer.begin() < 2, "Malformed chunk header: %hs", PendingBuffer.c_str());
+            PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CRLF.
+
+#ifdef WSLA_HTTP_DEBUG
+
+            WSL_LOG("HTTPChunkHeader", TraceLoggingValue(PendingBuffer.c_str(), "Size"));
+
+#endif
 
             try
             {
-                PendingChunkSize = std::stoul(chunkSizeStr.c_str(), nullptr, 16);
+                size_t parsed{};
+                PendingChunkSize = std::stoul(PendingBuffer.c_str(), &parsed, 16);
+                THROW_HR_IF(E_INVALIDARG, parsed != PendingBuffer.size());
             }
             catch (...)
             {
-                THROW_HR_MSG(E_INVALIDARG, "Failed to parse chunk size: %hs", chunkSizeStr.c_str());
+                THROW_HR_MSG(E_INVALIDARG, "Failed to parse chunk size: %hs", PendingBuffer.c_str());
             }
 
-            advance(chunkSizeStr.size());
-            ReadingChunk = false;
+            ExpectHeader = false;
+            advance(PendingBuffer.size() + 2);
+            PendingBuffer.clear();
         }
         else
         {
             // Consume the chunk.
-            ReadingChunk = true;
-
             auto consumedBytes = std::min(PendingChunkSize, buffer.size());
-            PendingBuffer.insert(PendingBuffer.end(), buffer.data(), buffer.data() + consumedBytes);
+            PendingBuffer.append(buffer.data(), consumedBytes);
             advance(consumedBytes);
 
             WI_ASSERT(PendingChunkSize >= consumedBytes);
@@ -1245,6 +1286,12 @@ void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
 
             if (PendingChunkSize == 0)
             {
+
+#ifdef WSLA_HTTP_DEBUG
+
+                WSL_LOG("HTTPChunk", TraceLoggingValue(PendingBuffer.c_str(), "Content"));
+
+#endif
                 OnChunk(PendingBuffer);
                 PendingBuffer.clear();
             }
@@ -1454,6 +1501,8 @@ void DockerIORelayHandle::Schedule()
         {
             // Switch back to reading if we've written all bytes for this chunk.
             ActiveHandle = nullptr;
+
+            ProcessNextHeader();
         }
     }
     else
@@ -1522,48 +1571,41 @@ HANDLE DockerIORelayHandle::GetHandle() const
     }
 }
 
+void DockerIORelayHandle::ProcessNextHeader()
+{
+    if (PendingBuffer.size() < sizeof(MultiplexedHeader))
+    {
+        // Not enough data for a header yet.
+        return;
+    }
+
+    const auto* header = reinterpret_cast<const MultiplexedHeader*>(PendingBuffer.data());
+    RemainingBytes = ntohl(header->Length);
+
+    if (header->Fd == 1)
+    {
+        ActiveHandle = &WriteStdout;
+    }
+    else if (header->Fd == 2)
+    {
+        ActiveHandle = &WriteStderr;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid Docker IO multiplexed header fd: %u", header->Fd);
+    }
+
+    // Consume the header.
+    PendingBuffer.erase(PendingBuffer.begin(), PendingBuffer.begin() + sizeof(MultiplexedHeader));
+}
+
 void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
 {
-
-#pragma pack(push, 1)
-    struct MultiplexedHeader
-    {
-        uint8_t Fd;
-        char Zeroes[3];
-        uint32_t Length;
-    };
-#pragma pack(pop)
-
-    static_assert(sizeof(MultiplexedHeader) == 8);
-
     PendingBuffer.insert(PendingBuffer.end(), Buffer.begin(), Buffer.end());
 
     if (ActiveHandle == nullptr)
     {
         // If no handle is active, expect a header.
-        if (PendingBuffer.size() < sizeof(MultiplexedHeader))
-        {
-            // Not enough data for a header yet.
-            return;
-        }
-
-        const auto* header = reinterpret_cast<const MultiplexedHeader*>(PendingBuffer.data());
-        RemainingBytes = ntohl(header->Length);
-
-        if (header->Fd == 1)
-        {
-            ActiveHandle = &WriteStdout;
-        }
-        else if (header->Fd == 2)
-        {
-            ActiveHandle = &WriteStderr;
-        }
-        else
-        {
-            THROW_HR_MSG(E_UNEXPECTED, "Unexpected Docker IO multiplexed header fd: %u", header->Fd);
-        }
-
-        // Consume the header.
-        PendingBuffer.erase(PendingBuffer.begin(), PendingBuffer.begin() + sizeof(MultiplexedHeader));
+        ProcessNextHeader();
     }
 }

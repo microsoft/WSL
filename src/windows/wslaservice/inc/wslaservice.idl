@@ -179,7 +179,6 @@ enum WSLA_CONTAINER_STATE
     WslaContainerStateRunning = 2,
     WslaContainerStateExited = 3,
     WslaContainerStateDeleted = 4,
-    // TODO: More states might be added to reflect all nerdctl's states.
 };
 
 struct WSLA_CONTAINER

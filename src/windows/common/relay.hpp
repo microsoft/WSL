@@ -162,6 +162,7 @@ enum class IOHandleStatus
 struct HandleWrapper
 {
     DEFAULT_MOVABLE(HandleWrapper);
+    NON_COPYABLE(HandleWrapper)
 
     HandleWrapper(
         wil::unique_handle&& handle, std::function<void()>&& OnClose = []() {}) :
@@ -200,7 +201,7 @@ struct HandleWrapper
         if (OnClose != nullptr)
         {
             OnClose();
-            OnClose = {};
+            OnClose = nullptr;
         }
 
         OwnedHandle.reset();
@@ -275,7 +276,7 @@ public:
     NON_COPYABLE(LineBasedReadHandle);
     NON_MOVABLE(LineBasedReadHandle);
 
-    LineBasedReadHandle(HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnLine);
+    LineBasedReadHandle(HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Buffer)>&& OnLine, bool Crlf);
     ~LineBasedReadHandle();
 
 private:
@@ -283,9 +284,10 @@ private:
 
     std::function<void(const gsl::span<char>& Buffer)> OnLine;
     std::string PendingBuffer;
+    bool Crlf{};
 };
 
-class HTTPChunkBasedReadHandle : public LineBasedReadHandle
+class HTTPChunkBasedReadHandle : public ReadHandle
 {
 public:
     NON_COPYABLE(HTTPChunkBasedReadHandle);
@@ -300,7 +302,7 @@ private:
     std::function<void(const gsl::span<char>& Buffer)> OnChunk;
     std::string PendingBuffer;
     uint64_t PendingChunkSize = 0;
-    bool ReadingChunk = false;
+    bool ExpectHeader = true;
 };
 
 class WriteHandle : public OverlappedIOHandle
@@ -354,8 +356,20 @@ public:
     void Collect() override;
     HANDLE GetHandle() const override;
 
+#pragma pack(push, 1)
+    struct MultiplexedHeader
+    {
+        uint8_t Fd;
+        char Zeroes[3];
+        uint32_t Length;
+    };
+#pragma pack(pop)
+
+    static_assert(sizeof(MultiplexedHeader) == 8);
+
 private:
     void OnRead(const gsl::span<char>& Buffer);
+    void ProcessNextHeader();
 
     ReadHandle Read;
     WriteHandle WriteStdout;

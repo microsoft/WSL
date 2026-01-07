@@ -55,7 +55,6 @@ class WSLATests
         auto session = CreateSession();
         VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr));
         VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr));
-        WslShutdown();
         return true;
     }
 
@@ -2115,5 +2114,202 @@ class WSLATests
 
         // Verify that the first volume was mounted before the error occurred, then unmounted after failure.
         ExpectMount(session.get(), "/mnt/wsla/test-container/volumes/0", {});
+    }
+
+    TEST_METHOD(LineBasedReader)
+    {
+        auto runTest = [](bool Crlf, const std::string& Data, const std::vector<std::string>& ExpectedLines) {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            std::vector<std::string> lines;
+            auto onData = [&](const gsl::span<char>& data) { lines.emplace_back(data.data(), data.size()); };
+
+            wsl::windows::common::relay::MultiHandleWait io;
+
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::LineBasedReadHandle>(std::move(readPipe), std::move(onData), Crlf));
+
+            std::vector<char> buffer{Data.begin(), Data.end()};
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::WriteHandle>(std::move(writePipe), buffer));
+
+            io.Run({});
+
+            for (size_t i = 0; i < lines.size(); i++)
+            {
+                if (i >= ExpectedLines.size())
+                {
+                    LogError(
+                        "Input: '%hs'. Line %zu is missing. Expected: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedLines[i]).c_str());
+                    VERIFY_FAIL();
+                }
+                else if (ExpectedLines[i] != lines[i])
+                {
+                    LogError(
+                        "Input: '%hs'. Line %zu does not match expected value. Expected: '%hs', Actual: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedLines[i]).c_str(),
+                        EscapeString(lines[i]).c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            if (ExpectedLines.size() != lines.size())
+            {
+                LogError(
+                    "Input: '%hs', Number of lines do not match. Expected: %zu, Actual: %zu",
+                    EscapeString(Data).c_str(),
+                    ExpectedLines.size(),
+                    lines.size());
+                VERIFY_FAIL();
+            }
+        };
+
+        runTest(false, "foo\nbar", {"foo", "bar"});
+        runTest(false, "foo", {"foo"});
+        runTest(false, "\n", {});
+        runTest(false, "\n\n", {});
+        runTest(false, "\n\r\n", {"\r"});
+        runTest(false, "\n\nfoo\nbar", {"foo", "bar"});
+        runTest(false, "foo\r\nbar", {"foo\r", "bar"});
+        runTest(true, "foo\nbar", {"foo\nbar"});
+        runTest(true, "foo\r\nbar", {"foo", "bar"});
+        runTest(true, "foo\rbar\nbaz", {"foo\rbar\nbaz"});
+        runTest(true, "\r", {"\r"});
+    }
+
+    TEST_METHOD(HTTPChunkReader)
+    {
+        auto runTest = [](const std::string& Data, const std::vector<std::string>& ExpectedChunk) {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            std::vector<std::string> chunks;
+            auto onData = [&](const gsl::span<char>& data) { chunks.emplace_back(data.data(), data.size()); };
+
+            wsl::windows::common::relay::MultiHandleWait io;
+
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::HTTPChunkBasedReadHandle>(std::move(readPipe), std::move(onData)));
+
+            std::vector<char> buffer{Data.begin(), Data.end()};
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::WriteHandle>(std::move(writePipe), buffer));
+
+            io.Run({});
+
+            for (size_t i = 0; i < ExpectedChunk.size(); i++)
+            {
+                if (i >= chunks.size())
+                {
+                    LogError(
+                        "Input: '%hs': Chunk %zu is missing. Expected: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str());
+                    VERIFY_FAIL();
+                }
+                else if (ExpectedChunk[i] != chunks[i])
+                {
+                    LogError(
+
+                        "Input: '%hs': Chunk %zu does not match expected value. Expected: '%hs', Actual: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str(),
+                        EscapeString(chunks[i]).c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            if (ExpectedChunk.size() != chunks.size())
+            {
+                LogError(
+                    "Input: '%hs', Number of chunks do not match. Expected: %zu, Actual: %zu",
+                    EscapeString(Data).c_str(),
+                    ExpectedChunk.size(),
+                    chunks.size());
+                VERIFY_FAIL();
+            }
+        };
+
+        runTest("3\r\nfoo\r\n3\r\nbar", {"foo", "bar"});
+        runTest("1\r\na\r\n\r\n", {"a"});
+
+        runTest("c\r\nlf\nin\r\nchunk\r\n3\r\nEOF", {"lf\nin\r\nchunk", "EOF"});
+        runTest("15\r\n\r\nchunkstartingwithlf\r\n3\r\nEOF", {"\r\nchunkstartingwithlf", "EOF"});
+
+        // Validate that invalid chunk sizes fail
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("Invalid", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("Invalid\r\nInvalid", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4nolf", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\nnocr", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4invalid\nnocr", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid\n", {}); }), E_INVALIDARG);
+    }
+
+    TEST_METHOD(DockerIORelay)
+    {
+        using namespace wsl::windows::common::relay;
+
+        auto runTest = [](const std::vector<char>& Input, const std::string& ExpectedStdout, const std::string& ExpectedStderr) {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+            auto [stderrRead, stderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            MultiHandleWait io;
+
+            std::string readStdout;
+            std::string readStderr;
+
+            io.AddHandle(std::make_unique<DockerIORelayHandle>(std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite)));
+            io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
+
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
+
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
+
+            io.Run({});
+
+            VERIFY_ARE_EQUAL(ExpectedStdout, readStdout);
+            VERIFY_ARE_EQUAL(ExpectedStderr, readStderr);
+        };
+
+        auto insert = [](std::vector<char>& buffer, auto fd, const std::string& content) {
+            DockerIORelayHandle::MultiplexedHeader header;
+            header.Fd = fd;
+            header.Length = htonl(static_cast<uint32_t>(content.size()));
+
+            buffer.insert(buffer.end(), (char*)&header, ((char*)&header) + sizeof(header));
+            buffer.insert(buffer.end(), content.begin(), content.end());
+        };
+
+        {
+            std::vector<char> input;
+            insert(input, 1, "foo");
+            insert(input, 1, "bar");
+            insert(input, 2, "stderr");
+            insert(input, 2, "stderrAgain");
+            insert(input, 1, "stdOutAgain");
+
+            runTest(input, "foobarstdOutAgain", "stderrstderrAgain");
+        }
+
+        {
+            std::vector<char> input;
+            insert(input, 0, "foo");
+
+            VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
+        }
+
+        {
+            std::vector<char> input;
+            insert(input, 12, "foo");
+
+            VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
+        }
     }
 };

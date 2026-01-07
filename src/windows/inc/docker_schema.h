@@ -9,6 +9,7 @@ Module Name:
 Abstract:
 
     JSON schema for the docker API.
+    The documentation for the API can be found at: https://docs.docker.com/reference/api/engine/version/v1.52/#tag/Container
 
 --*/
 
