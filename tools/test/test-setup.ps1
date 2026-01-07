@@ -70,6 +70,28 @@ function RemoveMSI
     }
 }
 
+if ($WslaPackage) {
+    RemoveMSI -MSIDataRegistryPath "HKLM:Software\Microsoft\Windows\CurrentVersion\WSLA\MSI"
+
+    # msiexec.exe is very picky about path formats, so use the canonical path
+    $WslaPackage = Resolve-Path $WslaPackage
+
+    Write-Host "Installing MSI package: $WslaPackage"
+    $MSIArguments = @(
+        "/norestart"
+        "/qn"
+        "/i"
+        $WslaPackage
+    )
+
+    $exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
+    if ($exitCode -Ne 0)
+    {
+        Write-Host "Failed to remove package: $exitCode"
+        exit 1
+    }
+}
+
 if ($Package) {
     $installedPackage = Get-AppxPackage MicrosoftCorporationII.WindowsSubsystemforLinux -AllUsers
     if ($installedPackage) {
@@ -118,28 +140,6 @@ if ($Package) {
     catch {
         Write-Host "Error installing package: $_"
         Get-AppPackageLog | Select-Object -First 64 | Format-List
-        exit 1
-    }
-}
-
-if ($WslaPackage) {
-    RemoveMSI -MSIDataRegistryPath "HKLM:Software\Microsoft\Windows\CurrentVersion\WSLA\MSI"
-
-    # msiexec.exe is very picky about path formats, so use the canonical path
-    $WslaPackage = Resolve-Path $WslaPackage
-
-    Write-Host "Installing MSI package: $WslaPackage"
-    $MSIArguments = @(
-        "/norestart"
-        "/qn"
-        "/i"
-        $WslaPackage
-    )
-
-    $exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
-    if ($exitCode -Ne 0)
-    {
-        Write-Host "Failed to remove package: $exitCode"
         exit 1
     }
 }
