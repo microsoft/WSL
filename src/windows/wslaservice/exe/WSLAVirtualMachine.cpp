@@ -467,6 +467,7 @@ void WSLAVirtualMachine::Start()
         }
 
         wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
+        MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
     }
 }
 
