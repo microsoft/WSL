@@ -23,9 +23,6 @@ Abstract:
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
-using wsl::shared::Localization;
-using wsl::windows::common::Context;
-using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::WSLAProcessLauncher;
 
 // Adding a helper to factor error handling between all the arguments.
@@ -212,7 +209,7 @@ static int RunListCommand(bool /*verbose*/)
         return 0;
     }
 
-    wslutil::PrintMessage(Localization::MessageWslaSessionsFound(sessions.size()), stdout);
+    wslutil::PrintMessage(Localization::MessageWslaSessionsFound(sessions.size(), sessions.size() == 1 ? L"" : L"s"), stdout);
     // Compute column widths from headers + data.
     const auto idHeader = Localization::MessageWslaHeaderId();
     const auto pidHeader = Localization::MessageWslaHeaderCreatorPid();
@@ -305,16 +302,6 @@ int wsladiag_main(std::wstring_view commandLine)
     parser.AddArgument(help, L"--help", L'h');
     parser.AddArgument(verbose, L"--verbose", L'v');
 
-    auto printUsage = []() {
-        wslutil::PrintMessage(
-            L"wsladiag - WSLA diagnostics tool\n"
-            L"Usage:\n"
-            L"  wsladiag list\n"
-            L"  wsladiag shell <SessionName> [--verbose]\n"
-            L"  wsladiag --help\n",
-            stderr);
-    };
-
     try
     {
         parser.Parse();
@@ -324,7 +311,7 @@ int wsladiag_main(std::wstring_view commandLine)
         const auto hr = wil::ResultFromCaughtException();
         if (hr == E_INVALIDARG)
         {
-            printUsage();
+            PrintUsage();
             return 1;
         }
         throw;
@@ -332,7 +319,7 @@ int wsladiag_main(std::wstring_view commandLine)
 
     if (help || verb.empty())
     {
-        printUsage();
+        PrintUsage();
         return 0;
     }
     else if (verb == L"list")
@@ -343,7 +330,7 @@ int wsladiag_main(std::wstring_view commandLine)
     {
         if (shellSession.empty())
         {
-            printUsage();
+            PrintUsage();
             return 1;
         }
         return RunShellCommand(shellSession, verbose);

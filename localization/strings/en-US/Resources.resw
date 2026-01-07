@@ -1891,7 +1891,7 @@ Usage:
   <value>No WSLA sessions found.</value>
 </data>
 <data name="MessageWslaSessionsFound" xml:space="preserve">
-  <value>Found {} WSLA session(s):</value>
+  <value>Found {} WSLA session{}:</value>
   <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
 </data>
 <data name="MessageWslaShellExited" xml:space="preserve">
