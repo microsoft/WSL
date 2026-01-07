@@ -1643,11 +1643,12 @@ Return Value:
     }
 
     // Initialize logging to the hvc console device responsible for logging telemetry.
+    // If the device is not present, error messages will be logged to kmesg.
     if (UtilIsUtilityVm())
     {
         devicePath = DEVFS_PATH "/" LX_INIT_HVC_TELEMETRY;
         g_TelemetryFd = TEMP_FAILURE_RETRY(open(devicePath, (O_WRONLY | O_CLOEXEC)));
-        if (g_TelemetryFd < 0)
+        if (g_TelemetryFd < 0 && errno != ENODEV)
         {
             LOG_ERROR("open({}) failed {}", devicePath, errno);
         }

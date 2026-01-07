@@ -224,27 +224,16 @@ void WSLAVirtualMachine::Start()
         vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
     }
 
+    // The primary "console" will be a virtio serial device.
     if (helpers::IsVirtioSerialConsoleSupported())
     {
-        vmSettings.Devices.VirtioSerial.emplace();
-
-        // The primary "console" will be a virtio serial device.
-
         kernelCmdLine += L" console=hvc0 debug";
+        vmSettings.Devices.VirtioSerial.emplace();
         hcs::VirtioSerialPort virtioPort{};
         virtioPort.Name = L"hvc0";
         virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
         virtioPort.ConsoleSupport = true;
         vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
-
-        if (!m_debugShellPipe.empty())
-        {
-            hcs::VirtioSerialPort virtioPort;
-            virtioPort.Name = L"hvc1";
-            virtioPort.NamedPipe = m_debugShellPipe;
-            virtioPort.ConsoleSupport = true;
-            vmSettings.Devices.VirtioSerial->Ports["1"] = std::move(virtioPort);
-        }
     }
 
     // Set up boot params.
