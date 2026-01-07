@@ -513,9 +513,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
-
-            // Reconfigure crash dump collection after chroot so symlink & core_pattern resolve correctly.
-            WSLAEnableCrashDumpCollection();
         }
 
         response.Result = 0;
@@ -816,9 +813,6 @@ int WSLAEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
-    // Enable crash dump collection.
-    WSLAEnableCrashDumpCollection();
-
     //
     // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
     //
@@ -859,6 +853,11 @@ int WSLAEntryPoint(int Argc, char* Argv[])
         LOG_ERROR("setrlimit(RLIMIT_MEMLOCK) failed {}", errno);
         return -1;
     }
+
+    //
+    // Enable dump colleciton when processes crash.
+    //
+    WSLAEnableCrashDumpCollection();
 
     //
     // Enable logging when processes receive fatal signals.
