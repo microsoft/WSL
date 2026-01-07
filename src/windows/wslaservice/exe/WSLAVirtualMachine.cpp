@@ -430,27 +430,7 @@ void WSLAVirtualMachine::Start()
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
     Mount(m_initChannel, getDevicePath(modulesVhd).c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
-    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "tmpfs", "uid=0,gid=0,mode=0755", 0);
-
-    std::vector<const char*> cgroups = {
-        "cpuset",
-        "cpu",
-        "cpuacct",
-        "blkio",
-        "memory",
-        "devices",
-        "freezer",
-        "net_cls",
-        "perf_event",
-        "net_prio",
-        "hugetlb",
-        "pids",
-        "rdma"};
-
-    for (const auto* e : cgroups)
-    {
-        Mount(m_initChannel, nullptr, std::format("/sys/fs/cgroup/{}", e).c_str(), "cgroup", e, 0);
-    }
+    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
 
     // Configure GPU if requested.
     if (FeatureEnabled(WslaFeatureFlagsGPU))
