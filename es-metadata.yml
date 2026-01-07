@@ -1,0 +1,12 @@
+schemaVersion: 1.0.0
+providers:
+- provider: InventoryAsCode
+  version: 1.0.0
+  metadata:
+    isProduction: true
+    accountableOwners:
+      service: d8846bef-e9b5-4542-bcfc-98ebabac8a7b
+    routing:
+      defaultAreaPath:
+        org: microsoft
+        path: OS\Core\Base\VMAC - Virtual Machines and Containers\LOW-Linux on Windows\WSL
