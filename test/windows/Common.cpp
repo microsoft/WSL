@@ -2082,7 +2082,7 @@ Return Value:
         -ExecutionPolicy Bypass \
         -Command \"" +
         setupScript.value() + L" -Version '" + getTestParam(L"Version") + L"'" + L" -DistroPath " + g_testDistroPath +
-        L" -DistroName " + LXSS_DISTRO_NAME_TEST_L + L" -Package '" + getTestParam(L"Package") + L"'" + L" -UnitTestsPath " +
+        L" -DistroName " + LXSS_DISTRO_NAME_TEST_L + L" -Package '" + getTestParam(L"Package") + L"'" + L" -WslaPackage '" + getTestParam(L"WslaPackage") + L"'" + L" -UnitTestsPath " +
         getOptionalTestParam(L"UnitTestsPath").value_or(L"$null");
 
     if (getOptionalTestParam(L"AllowUnsigned") == L"1")

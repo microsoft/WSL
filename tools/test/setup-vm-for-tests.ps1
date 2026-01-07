@@ -138,6 +138,7 @@ Invoke-Command -Session $Session -ArgumentList $RemoteFolder -ScriptBlock {
     New-Item -ItemType Directory -Path "$Using:RemoteFolder" -Force
 }
 Copy-Item -ToSession $Session -Path "$Bin/installer.msix"  -Destination $RemoteFolder -Force
+Copy-Item -ToSession $Session -Path "$Bin/wsla.msi"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$Bin/wsltests.dll"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$Bin/testplugin.dll"  -Destination $RemoteFolder -Force
 Copy-Item -ToSession $Session -Path "$Bin/wslaclient.dll"  -Destination $RemoteFolder -Force

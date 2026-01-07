@@ -9,6 +9,8 @@
     The name to be given to the imported distro.
 .PARAMETER Package
     Path to the wsl.msix package to install. Optional.
+.PARAMETER WslaPackage
+    Path to the wsla.msi package to install. Optional.
 .PARAMETER UnitTestsPath
     Path to the linux/unit_tests directory to copy and install the unit tests. Optional.
 .PARAMETER PostInstallCommand
@@ -23,6 +25,7 @@ Param (
     $DistroPath,
     $DistroName,
     $Package = $null,
+    $WslaPackage = $null,
     $UnitTestsPath = $null,
     $PostInstallCommand = $null,
     [switch]$AllowUnsigned)
@@ -40,14 +43,13 @@ function Run {
     }
 }
 
-if ($Package) {
-    $installedPackage = Get-AppxPackage MicrosoftCorporationII.WindowsSubsystemforLinux -AllUsers
-    if ($installedPackage) {
-        Write-Host "Removing previous package installation"
-        Remove-AppxPackage $installedPackage -AllUsers
-    }
+# Removes an installed MSI using a ProductCode extracted from the registry.
+function RemoveMSI
+{
+    [CmdletBinding()]
+    param([string]$MSIDataRegistryPath)
 
-    $installedMsi = (Get-ItemProperty -Path "HKLM:Software\Microsoft\Windows\CurrentVersion\Lxss\MSI" -Name ProductCode -ErrorAction Ignore)
+    $installedMsi = (Get-ItemProperty -Path $MSIDataRegistryPath -Name ProductCode -ErrorAction Ignore)
     if ($installedMsi)
     {
         Write-Host "Removing MSI package: $($installedMsi.ProductCode)"
@@ -66,6 +68,16 @@ if ($Package) {
         }
 
     }
+}
+
+if ($Package) {
+    $installedPackage = Get-AppxPackage MicrosoftCorporationII.WindowsSubsystemforLinux -AllUsers
+    if ($installedPackage) {
+        Write-Host "Removing previous package installation"
+        Remove-AppxPackage $installedPackage -AllUsers
+    }
+
+    RemoveMSI -MSIDataRegistryPath "HKLM:Software\Microsoft\Windows\CurrentVersion\Lxss\MSI"
 
     Write-Host "Installing package: $Package"
     try {
@@ -106,6 +118,28 @@ if ($Package) {
     catch {
         Write-Host "Error installing package: $_"
         Get-AppPackageLog | Select-Object -First 64 | Format-List
+        exit 1
+    }
+}
+
+if ($WslaPackage) {
+    RemoveMSI -MSIDataRegistryPath "HKLM:Software\Microsoft\Windows\CurrentVersion\WSLA\MSI"
+
+    # msiexec.exe is very picky about path formats, so use the canonical path
+    $WslaPackage = Resolve-Path $WslaPackage
+
+    Write-Host "Installing MSI package: $WslaPackage"
+    $MSIArguments = @(
+        "/norestart"
+        "/qn"
+        "/i"
+        $WslaPackage
+    )
+
+    $exitCode = (Start-Process -Wait "msiexec.exe" -ArgumentList $MSIArguments -NoNewWindow -PassThru).ExitCode
+    if ($exitCode -Ne 0)
+    {
+        Write-Host "Failed to remove package: $exitCode"
         exit 1
     }
 }

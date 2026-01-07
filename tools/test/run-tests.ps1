@@ -32,6 +32,7 @@ param (
     [string]$DistroPath = ".\test_distro.tar.gz",
     [string]$TestDataPath = ".\test_data",
     [string]$Package = ".\installer.msix",
+    [string]$WslaPackage = ".\wsla.msi",
     [string]$UnitTestsPath = ".\unit_tests",
     [switch]$PullRequest = $false,
     [string]$TestDllPath = ".\wsltests.dll",
@@ -48,7 +49,7 @@ if ($Fast)
     $SetupScript = $null
 }
 
-te.exe $TestDllPath /p:SetupScript=$SetupScript /p:Version=$Version /p:DistroPath=$DistroPath /p:TestDataPath=$TestDataPath /p:Package=$Package /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
+te.exe $TestDllPath /p:SetupScript=$SetupScript /p:Version=$Version /p:DistroPath=$DistroPath /p:TestDataPath=$TestDataPath /p:Package=$Package /p:WslaPackage=$WslaPackage /p:UnitTestsPath=$UnitTestsPath /p:PullRequest=$PullRequest /p:AllowUnsigned=1 @TeArgs
 
 if (!$?)
 {

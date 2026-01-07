@@ -3,7 +3,7 @@ set(OUTPUT_PACKAGE ${BIN}/wsla.msi)
 set(PACKAGE_WIX_IN ${CMAKE_CURRENT_LIST_DIR}/wslamsi.wix.in)
 set(PACKAGE_WIX ${BIN}/wslamsi.wix)
 set(CAB_CACHE ${BIN}/cab)
-set(BINARIES wslaservice.exe;wslaserviceproxystub.dll;wsladiag.exe)
+set(BINARIES wslaservice.exe;wslaserviceproxystub.dll;wsladiag.exe;wslrelay.exe;wsldevicehost.dll)
 
 set(BINARIES_DEPENDENCIES)
 foreach(binary ${BINARIES})
@@ -35,7 +35,7 @@ add_custom_command(
 
 add_custom_target(wslamsi DEPENDS ${OUTPUT_PACKAGE})
 set_target_properties(wslamsi PROPERTIES EXCLUDE_FROM_ALL FALSE SOURCES ${PACKAGE_WIX_IN})
-add_dependencies(wslamsi wslaservice wslaserviceproxystub wsladiag)
+add_dependencies(wslamsi wslaservice wslaserviceproxystub wsladiag wslrelay)
 
 set_source_files_properties(${OUTPUT_PACKAGE} PROPERTIES GENERATED TRUE)
 
