@@ -103,7 +103,7 @@ struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
 struct WSLA_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
-    LPWSTR Hash;
+    char Hash[256];
     ULONGLONG Size;
     ULONGLONG DownloadTimestamp;
 };
@@ -179,7 +179,6 @@ enum WSLA_CONTAINER_STATE
     WslaContainerStateRunning = 2,
     WslaContainerStateExited = 3,
     WslaContainerStateDeleted = 4,
-    // TODO: More states might be added to reflect all nerdctl's states.
 };
 
 struct WSLA_CONTAINER
@@ -211,6 +210,7 @@ interface IWSLAProcess : IUnknown
     HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
+    HRESULT ResizeTty([in] ULONG Rows, [in] ULONG Columns);
 
     // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
 }
@@ -277,10 +277,12 @@ struct WSLA_SESSION_SETTINGS {
 interface IWSLAContainer : IUnknown
 {
     HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
+    HRESULT Start();
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT Inspect([out] LPSTR* Output);
 
     // Anonymous host port allocation (P1).
     //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
@@ -296,8 +298,8 @@ interface IWSLASession : IUnknown
 {
     // Image management.
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] LPCWSTR Image);
 

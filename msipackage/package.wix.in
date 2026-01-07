@@ -262,6 +262,12 @@
                     <RegistryValue Value="WSLAProcess" Type="string" />
                 </RegistryKey>
 
+                <!-- WSLAContainerProcess -->
+                <RegistryKey Root="HKCR" Key="CLSID\{3A5DB29D-6D1D-4619-B89D-578EB34C8E52}">
+                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
+                    <RegistryValue Value="WSLAContainerProcess" Type="string" />
+                </RegistryKey>
+
                 <!-- WSLAUserSession -->
                 <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />

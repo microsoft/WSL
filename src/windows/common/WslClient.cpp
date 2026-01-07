@@ -1539,9 +1539,12 @@ int WslaShell(_In_ std::wstring_view commandLine)
     sessionSettings.MaximumStorageSizeMb = 4096;
 
     std::string shell = "/bin/bash";
+    std::string cmd;
 
     std::string containerImage;
     bool help = false;
+    bool noTty = false;
+    bool exec = false;
     std::wstring debugShell;
 
     std::wstring storagePath;
@@ -1563,6 +1566,9 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Integer(reinterpret_cast<int&>(sessionSettings.NetworkingMode)), L"--networking-mode");
     parser.AddArgument(Utf8String(containerImage), L"--image");
     parser.AddArgument(debugShell, L"--debug-shell");
+    parser.AddArgument(noTty, L"--no-tty");
+    parser.AddArgument(Utf8String(cmd), L"--cmd");
+    parser.AddArgument(exec, L"--exec");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
@@ -1645,11 +1651,21 @@ int WslaShell(_In_ std::wstring_view commandLine)
     }
     else
     {
-        std::vector<WSLA_PROCESS_FD> fds{
-            WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput},
-            WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput},
-            WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl},
-        };
+        THROW_IF_FAILED(session->PullImage(containerImage.c_str(), nullptr, nullptr));
+
+        std::vector<WSLA_PROCESS_FD> fds;
+
+        if (noTty)
+        {
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
+        }
+        else
+        {
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+        }
 
         WSLA_CONTAINER_OPTIONS containerOptions{};
         containerOptions.Image = containerImage.c_str();
@@ -1659,70 +1675,149 @@ int WslaShell(_In_ std::wstring_view commandLine)
         containerOptions.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
         containerOptions.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
 
+        std::vector<std::string> cmdStorage;
+        for (const auto& e : cmd | std::views::split(' '))
+        {
+            cmdStorage.emplace_back(e.begin(), e.end());
+        }
+
+        std::vector<const char*> cmdPtr;
+        for (auto&& e : cmdStorage)
+        {
+            cmdPtr.push_back(e.c_str());
+        }
+
+        if (!cmdPtr.empty())
+        {
+            containerOptions.InitProcessOptions.CommandLine = cmdPtr.data();
+            containerOptions.InitProcessOptions.CommandLineCount = gsl::narrow_cast<DWORD>(cmdPtr.size());
+        }
+
         container.emplace();
         THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
+        THROW_IF_FAILED((*container)->Start());
 
-        wil::com_ptr<IWSLAProcess> initProcess;
-        THROW_IF_FAILED((*container)->GetInitProcess(&initProcess));
-        process.emplace(std::move(initProcess), std::move(fds));
+        wil::com_ptr<IWSLAProcess> createdProcess;
+
+        if (exec)
+        {
+            int error = -1;
+            THROW_IF_FAILED((*container)->Exec(&containerOptions.InitProcessOptions, &createdProcess, &error));
+        }
+        else
+        {
+            THROW_IF_FAILED((*container)->GetInitProcess(&createdProcess));
+        }
+
+        process.emplace(std::move(createdProcess), std::move(fds));
     }
 
-    // Save original console modes so they can be restored on exit.
-    DWORD OriginalInputMode{};
-    DWORD OriginalOutputMode{};
-    UINT OriginalOutputCP = GetConsoleOutputCP();
-    THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
-    THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
-
-    auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        SetConsoleMode(Stdin, OriginalInputMode);
-        SetConsoleMode(Stdout, OriginalOutputMode);
-        SetConsoleOutputCP(OriginalOutputCP);
-    });
-
-    // Configure console for interactive usage.
-    DWORD InputMode = OriginalInputMode;
-    WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
-    WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
-    THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
-
-    DWORD OutputMode = OriginalOutputMode;
-    WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-    THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
-
-    THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
-
+    if (noTty)
     {
+        using namespace wsl::windows::common::relay;
+        wsl::windows::common::relay::MultiHandleWait io;
+
         // Create a thread to relay stdin to the pipe.
-        auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
-        wsl::shared::SocketChannel controlChannel{
-            wil::unique_socket{(SOCKET)process->GetStdHandle(2).release()}, "TerminalControl", exitEvent.get()};
-
-        std::thread inputThread([&]() {
-            auto updateTerminal = [&controlChannel, &Stdout]() {
-                CONSOLE_SCREEN_BUFFER_INFOEX info{};
-                info.cbSize = sizeof(info);
-
-                THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
-
-                WSLA_TERMINAL_CHANGED message{};
-                message.Columns = info.srWindow.Right - info.srWindow.Left + 1;
-                message.Rows = info.srWindow.Bottom - info.srWindow.Top + 1;
-
-                controlChannel.SendMessage(message);
-            };
-
-            wsl::windows::common::relay::StandardInputRelay(Stdin, process->GetStdHandle(0).get(), updateTerminal, exitEvent.get());
-        });
+        std::thread inputThread;
+        wil::unique_event exitEvent{wil::EventOptions::ManualReset};
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            exitEvent.SetEvent();
-            inputThread.join();
+            if (inputThread.joinable())
+            {
+                exitEvent.SetEvent();
+                inputThread.join();
+            }
         });
 
-        // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(process->GetStdHandle(1).get(), Stdout);
+        // Required because ReadFile() blocks if stdin is a tty.
+        if (IsInteractiveConsole())
+        {
+            inputThread = std::thread{[&]() {
+                wsl::windows::common::relay::StandardInputRelay(Stdin, process->GetStdHandle(0).get(), []() {}, exitEvent.get());
+            }};
+        }
+        else
+        {
+            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), process->GetStdHandle(0)));
+        }
+
+        io.AddHandle(std::make_unique<RelayHandle>(process->GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle>(process->GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
+
+        io.Run({});
+    }
+    else
+    {
+        // Save original console modes so they can be restored on exit.
+        DWORD OriginalInputMode{};
+        DWORD OriginalOutputMode{};
+        UINT OriginalOutputCP = GetConsoleOutputCP();
+        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
+        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
+
+        auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            SetConsoleMode(Stdin, OriginalInputMode);
+            SetConsoleMode(Stdout, OriginalOutputMode);
+            SetConsoleOutputCP(OriginalOutputCP);
+        });
+
+        // Configure console for interactive usage.
+        DWORD InputMode = OriginalInputMode;
+        WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
+        WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
+        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
+
+        DWORD OutputMode = OriginalOutputMode;
+        WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
+
+        THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
+
+        auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
+
+        std::vector<wil::unique_handle> handleStorage;
+        HANDLE ttyInput = nullptr;
+        HANDLE ttyOutput = nullptr;
+        if (!containerImage.empty())
+        {
+            auto& it = handleStorage.emplace_back(process->GetStdHandle(0));
+            ttyInput = it.get();
+            ttyOutput = it.get();
+        }
+        else
+        {
+            ttyInput = handleStorage.emplace_back(process->GetStdHandle(0)).get();
+            ttyOutput = handleStorage.emplace_back(process->GetStdHandle(1)).get();
+        }
+
+        {
+            // Create a thread to relay stdin to the pipe.
+
+            std::thread inputThread([&]() {
+                auto updateTerminal = [&Stdout, &process]() {
+                    CONSOLE_SCREEN_BUFFER_INFOEX info{};
+                    info.cbSize = sizeof(info);
+
+                    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
+
+                    WSLA_TERMINAL_CHANGED message{};
+                    message.Columns = info.srWindow.Right - info.srWindow.Left + 1;
+                    message.Rows = info.srWindow.Bottom - info.srWindow.Top + 1;
+                    LOG_IF_FAILED(process->Get().ResizeTty(message.Rows, message.Columns));
+                };
+
+                wsl::windows::common::relay::StandardInputRelay(Stdin, ttyInput, updateTerminal, exitEvent.get());
+            });
+
+            auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                exitEvent.SetEvent();
+                inputThread.join();
+            });
+
+            // Relay the contents of the pipe to stdout.
+            wsl::windows::common::relay::InterruptableRelay(ttyOutput, Stdout);
+        }
     }
 
     process->GetExitEvent().wait();

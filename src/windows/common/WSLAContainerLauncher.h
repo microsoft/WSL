@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 #include "WSLAProcessLauncher.h"
+#include "docker_schema.h"
 
 namespace wsl::windows::common {
 
@@ -28,6 +29,7 @@ public:
     WSLA_CONTAINER_STATE State();
     ClientRunningWSLAProcess GetInitProcess();
     void Reset();
+    docker_schema::InspectContainer Inspect();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;
@@ -51,6 +53,8 @@ public:
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
+
+    std::pair<HRESULT, std::optional<RunningWSLAContainer>> CreateNoThrow(IWSLASession& Session);
 
     RunningWSLAContainer Launch(IWSLASession& Session);
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> LaunchNoThrow(IWSLASession& Session);

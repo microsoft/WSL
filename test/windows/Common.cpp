@@ -2588,3 +2588,34 @@ std::string ReadToString(SOCKET Handle)
 
     return output;
 }
+
+std::string EscapeString(const std::string& Input)
+{
+    std::string Output;
+
+    for (auto e : Input)
+    {
+        if (e == '\n')
+        {
+            Output += "\\n";
+        }
+        else if (e == '\r')
+        {
+            Output += "\\r";
+        }
+        else if (e == '\0')
+        {
+            Output += "\\0";
+        }
+        else if (e == '\t')
+        {
+            Output += "\\t";
+        }
+        else
+        {
+            Output += e;
+        }
+    }
+
+    return Output;
+}

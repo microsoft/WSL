@@ -80,6 +80,19 @@ void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& 
 
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
 {
+    auto [result, container] = CreateNoThrow(Session);
+    if (FAILED(result))
+    {
+        return std::make_pair(result, std::optional<RunningWSLAContainer>{});
+    }
+
+    result = container.value().Get().Start();
+
+    return std::make_pair(result, std::move(container));
+}
+
+std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::CreateNoThrow(IWSLASession& Session)
+{
     WSLA_CONTAINER_OPTIONS options{};
     options.Image = m_image.c_str();
     options.Name = m_name.c_str();
@@ -114,4 +127,12 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
     THROW_IF_FAILED(result);
 
     return std::move(container.value());
+}
+
+wsl::windows::common::docker_schema::InspectContainer wsl::windows::common::RunningWSLAContainer::Inspect()
+{
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(m_container->Inspect(&output));
+
+    return wsl::shared::FromJson<docker_schema::InspectContainer>(output.get());
 }

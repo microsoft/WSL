@@ -23,7 +23,22 @@ using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
-constexpr auto c_containerdStorage = "/var/lib/containerd";
+constexpr auto c_containerdStorage = "/var/lib/docker";
+
+namespace {
+
+std::pair<std::string, std::string> ParseImage(const std::string& Input)
+{
+    size_t separator = Input.find(':');
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        separator == std::string::npos || separator >= Input.size() - 1 || separator == 0,
+        "Invalid image: %hs",
+        Input.c_str());
+
+    return {Input.substr(0, separator), Input.substr(separator + 1)};
+}
+} // namespace
 
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
 
@@ -55,8 +70,8 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
     // Launch containerd
     // TODO: Rework the daemon logic so we can have only one thread watching all daemons.
     ServiceProcessLauncher launcher{
-        "/usr/bin/containerd",
-        {"/usr/bin/containerd"},
+        "/usr/bin/dockerd",
+        {"/usr/bin/dockerd" /*, "--debug"*/}, // TODO: Flag for --debug.
         {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}},
         common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
     m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine.Get()));
@@ -65,8 +80,12 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
     // TODO: Configurable timeout.
     THROW_WIN32_IF_MSG(ERROR_TIMEOUT, !m_containerdReadyEvent.wait(10 * 1000), "Timed out waiting for containerd to start");
 
-    // Start the event tracker.
-    m_eventTracker.emplace(*m_virtualMachine.Get());
+    auto [_, __, channel] = m_virtualMachine->Fork(WSLA_FORK::Thread);
+
+    m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+
+    //  Start the event tracker.
+    m_eventTracker.emplace(m_dockerClient.value());
 
     errorCleanup.release();
 }
@@ -239,22 +258,16 @@ try
         return;
     }
 
-    constexpr auto c_containerdReadyLogLine = "containerd successfully booted";
+    constexpr auto c_containerdReadyLogLine = "API listen on /var/run/docker.sock";
 
     std::string entry = {buffer.begin(), buffer.end()};
     WSL_LOG("ContainerdLog", TraceLoggingValue(entry.c_str(), "Content"), TraceLoggingValue(m_displayName.c_str(), "Name"));
 
-    auto parsed = nlohmann::json::parse(entry);
-
     if (!m_containerdReadyEvent.is_signaled())
     {
-        auto it = parsed.find("msg");
-        if (it != parsed.end())
+        if (entry.find(c_containerdReadyLogLine) != std::string::npos)
         {
-            if (it->get<std::string>().starts_with(c_containerdReadyLogLine))
-            {
-                m_containerdReadyEvent.SetEvent();
-            }
+            m_containerdReadyEvent.SetEvent();
         }
     }
 }
@@ -267,10 +280,10 @@ try
 
     // Read stdout & stderr.
     io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }));
+        process.GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }, false));
 
     io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }));
+        process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }, false));
 
     // Exit if either the VM terminates or containerd exits.
     io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), [&]() { io.Cancel(); }));
@@ -286,9 +299,11 @@ try
     else
     {
         // Otherwise, the session is shutting down; terminate containerd before exiting.
-        process.Get().Signal(15); // SIGTERM
+        LOG_IF_FAILED(process.Get().Signal(15)); // SIGTERM
 
-        process.Wait(30 * 1000); // TODO: Configurable timeout.
+        auto [code, signaled] = process.Wait(30 * 1000); // TODO: Configurable timeout.
+
+        WSL_LOG("DockerdExit", TraceLoggingValue(code, "code"));
     }
 }
 CATCH_LOG();
@@ -301,81 +316,149 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
+    auto [repo, tag] = ParseImage(ImageUri);
+
     std::lock_guard lock{m_lock};
 
-    ServiceProcessLauncher launcher{nerdctlPath, {nerdctlPath, "pull", ImageUri}};
-    auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
+    auto callback = [&](const std::string& content) {
+        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(content.c_str(), "Content"));
+    };
 
-    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Pull image failed: %hs", launcher.FormatResult(result).c_str());
+    auto code = m_dockerClient->PullImage(repo.c_str(), tag.c_str(), callback);
+
+    THROW_HR_IF_MSG(E_FAIL, code != 200, "Failed to pull image: %hs", ImageUri);
 
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
 
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
-    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
-
     std::lock_guard lock{m_lock};
 
-    // Directly invoking "nerdctl load" will immediately return with failure
-    // "stdin is empty and input flag is not specified".
-    // TODO: Change the workaround when nerdctl has a fix.
-    ServiceProcessLauncher launcher{
-        "/bin/sh", {"/bin/sh", "-c", "cat | /usr/bin/nerdctl load"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
-    auto loadProcess = launcher.Launch(*m_virtualMachine.Get());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto loadProcessStdin = loadProcess.GetStdHandle(0);
-    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
-    wsl::windows::common::relay::InterruptableRelay(
-        imageFileHandle.get(), loadProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
-    loadProcessStdin.reset();
+    auto requestContext = m_dockerClient->LoadImage(ContentSize);
 
-    auto result = loadProcess.WaitAndCaptureOutput();
-
-    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Load image failed: %hs", launcher.FormatResult(result).c_str());
-
+    ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
-
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ImageHandle))};
-    RETURN_HR_IF(E_INVALIDARG, INVALID_HANDLE_VALUE == imageFileHandle.get());
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
 
+    auto [repo, tag] = ParseImage(ImageName);
+
     std::lock_guard lock{m_lock};
 
-    ServiceProcessLauncher launcher{
-        nerdctlPath, {nerdctlPath, "import", "-", ImageName}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr};
-    auto importProcess = launcher.Launch(*m_virtualMachine.Get());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto importProcessStdin = importProcess.GetStdHandle(0);
-    // TODO: Create a new OverlappedIOHandle that relays a handle to process's stdin.
-    wsl::windows::common::relay::InterruptableRelay(
-        imageFileHandle.get(), importProcessStdin.get(), m_sessionTerminatingEvent.get(), 4 * 1024 * 1024 /* 4MB buffer */);
-    importProcessStdin.reset();
+    auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
 
-    auto result = importProcess.WaitAndCaptureOutput();
-
-    RETURN_HR_IF_MSG(E_FAIL, result.Code != 0, "Import image failed: %hs", launcher.FormatResult(result).c_str());
-
+    ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
 {
-    return E_NOTIMPL;
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(InputHandle))};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    relay::MultiHandleWait io;
+
+    std::optional<boost::beast::http::status> importResult;
+
+    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
+        WSL_LOG("ImageImportHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+
+        importResult = response.result();
+    };
+
+    std::string errorJson;
+    auto onProgress = [&](const gsl::span<char>& buffer) {
+        WI_ASSERT(importResult.has_value());
+
+        if (importResult.value() != boost::beast::http::status::ok)
+        {
+            // If the import failed, accumulate the error message.
+            errorJson.append(buffer.data(), buffer.size());
+        }
+        else
+        {
+            // TODO: report progress to caller.
+            std::string entry = {buffer.begin(), buffer.end()};
+            WSL_LOG("ImageImportProgress", TraceLoggingValue(entry.c_str(), "Content"));
+        }
+    };
+
+    auto onCompleted = [&]() { io.Cancel(); };
+
+    io.AddHandle(std::make_unique<relay::RelayHandle>(
+        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
+
+    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
+        Request, std::move(onHttpResponse), std::move(onProgress), std::move(onCompleted)));
+
+    io.Run({});
+
+    THROW_HR_IF(E_UNEXPECTED, !importResult.has_value());
+
+    if (importResult.value() != boost::beast::http::status::ok)
+    {
+        // Import failed, parse the error message.
+        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+
+        // TODO: Return error message to client.
+        THROW_HR_MSG(E_FAIL, "Image import failed: %hs", error.message.c_str());
+    }
 }
+
+HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+try
+{
+    *Count = 0;
+    *Images = nullptr;
+
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto images = m_dockerClient->ListImages();
+
+    auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(images.size());
+
+    size_t index = 0;
+    for (const auto& e : images)
+    {
+        // TODO: Find a better way to encode tags;
+        // TODO: download_timestamp
+        if (!e.RepoTags.empty())
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e.RepoTags[0].c_str()) != 0);
+        }
+
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+        output[index].Size = e.Size;
+
+        index++;
+    }
+
+    *Count = static_cast<ULONG>(images.size());
+    *Images = output.release();
+    return S_OK;
+}
+CATCH_RETURN();
 
 HRESULT WSLASession::DeleteImage(LPCWSTR Image)
 {
@@ -406,10 +489,13 @@ try
     auto [container, inserted] = m_containers.emplace(
         containerOptions->Name,
         WSLAContainerImpl::Create(
-            *containerOptions, *m_virtualMachine.Get(), *m_eventTracker, std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1)));
-    WI_ASSERT(inserted);
+            *containerOptions,
+            *m_virtualMachine.Get(),
+            std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
+            m_eventTracker.value(),
+            m_dockerClient.value()));
 
-    container->second->Start(*containerOptions);
+    WI_ASSERT(inserted);
 
     THROW_IF_FAILED(container->second->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
 
@@ -511,6 +597,10 @@ CATCH_RETURN();
 
 void WSLASession::OnUserSessionTerminating()
 {
+    // m_sessionTerminatingEvent is always valid, so it can be signalled with the lock.
+    // This allows a session to be unblocked if a stuck operation is holding the lock.
+    m_sessionTerminatingEvent.SetEvent();
+
     std::lock_guard lock{m_lock};
     WI_ASSERT(m_userSession != nullptr);
 

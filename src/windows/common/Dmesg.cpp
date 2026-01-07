@@ -100,7 +100,11 @@ std::pair<std::wstring, std::thread> DmesgCollector::StartDmesgThread(InputSourc
                 ProcessInput(Source, validBuffer);
             }
         }
-        CATCH_LOG()
+        catch (...)
+        {
+            auto error = wil::ResultFromCaughtException();
+            LOG_HR_IF(error, error != E_ABORT); // E_ABORT is expected during shutdown.
+        }
     });
 
     return std::pair{std::move(pipeName), std::move(workerThread)};

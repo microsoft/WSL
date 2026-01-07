@@ -97,6 +97,17 @@ public:
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
     const wil::unique_event& TerminatingEvent();
+    wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
+    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
+    HANDLE ExitingEvent() const
+    {
+        return m_vmTerminatingEvent.get();
+    }
+
+    GUID VmId() const
+    {
+        return m_vmId;
+    }
 
 private:
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
@@ -110,7 +121,6 @@ private:
     void OnCrash(_In_ const HCS_EVENT* Event);
     bool FeatureEnabled(WSLAFeatureFlags Flag) const;
 
-    std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(
         wsl::shared::SocketChannel& Channel, enum WSLA_FORK::ForkType Type, ULONG TtyRows = 0, ULONG TtyColumns = 0);
     int32_t ExpectClosedChannelOrError(wsl::shared::SocketChannel& Channel);

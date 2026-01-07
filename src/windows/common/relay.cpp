@@ -16,12 +16,16 @@ Abstract:
 #include "relay.hpp"
 #pragma hdrstop
 
+using wsl::windows::common::relay::DockerIORelayHandle;
 using wsl::windows::common::relay::EventHandle;
+using wsl::windows::common::relay::HandleWrapper;
+using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
 using wsl::windows::common::relay::IOHandleStatus;
 using wsl::windows::common::relay::LineBasedReadHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
+using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
 using wsl::windows::common::relay::WriteHandle;
@@ -967,7 +971,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         // Remove completed handles from m_handles.
         std::erase_if(m_handles, [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; });
 
-        if (m_handles.empty())
+        if (m_handles.empty() || m_cancel)
         {
             break;
         }
@@ -1037,8 +1041,8 @@ HANDLE EventHandle::GetHandle() const
     return Handle;
 }
 
-ReadHandle::ReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
-    Handle(std::move(MovedHandle)), OnRead(OnRead)
+ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
+    Handle(std::move(MovedHandle)), OnRead(OnRead), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
 }
@@ -1048,9 +1052,13 @@ ReadHandle::~ReadHandle()
     if (State == IOHandleStatus::Pending)
     {
         DWORD bytesRead{};
-        if (CancelIoEx(Handle.get(), &Overlapped))
+        if (CancelIoEx(Handle.Get(), &Overlapped))
         {
-            LOG_LAST_ERROR_IF(!GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true) && GetLastError() != ERROR_CONNECTION_ABORTED);
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
+            {
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            }
         }
         else
         {
@@ -1068,8 +1076,12 @@ void ReadHandle::Schedule()
 
     // Schedule the read.
     DWORD bytesRead{};
-    if (ReadFile(Handle.get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesRead, &Overlapped))
+    Overlapped.Offset = Offset.LowPart;
+    Overlapped.OffsetHigh = Offset.HighPart;
+    if (ReadFile(Handle.Get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesRead, &Overlapped))
     {
+        Offset.QuadPart += bytesRead;
+
         // Signal the read.
         OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
 
@@ -1087,11 +1099,14 @@ void ReadHandle::Schedule()
         auto error = GetLastError();
         if (error == ERROR_HANDLE_EOF || error == ERROR_BROKEN_PIPE)
         {
+            // Signal an empty read for EOF.
+            OnRead({});
+
             State = IOHandleStatus::Completed;
             return;
         }
 
-        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.get());
+        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.Get());
 
         // The read is pending, update to 'Pending'
         State = IOHandleStatus::Pending;
@@ -1107,7 +1122,7 @@ void ReadHandle::Collect()
 
     // Complete the read.
     DWORD bytesRead{};
-    if (!GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, false))
+    if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, false))
     {
         auto error = GetLastError();
         THROW_WIN32_IF(error, error != ERROR_HANDLE_EOF && error != ERROR_BROKEN_PIPE);
@@ -1115,6 +1130,8 @@ void ReadHandle::Collect()
         // We received ERROR_HANDLE_EOF or ERROR_BROKEN_PIPE. Validate that this was indeed a zero byte read.
         WI_ASSERT(bytesRead == 0);
     }
+
+    Offset.QuadPart += bytesRead;
 
     // Signal the read.
     OnRead(gsl::make_span<char>(Buffer.data(), static_cast<size_t>(bytesRead)));
@@ -1131,39 +1148,158 @@ HANDLE ReadHandle::GetHandle() const
     return Event.get();
 }
 
-LineBasedReadHandle::LineBasedReadHandle(wil::unique_handle&& MovedHandle, std::function<void(const gsl::span<char>& Line)>&& OnLine) :
-    ReadHandle(std::move(MovedHandle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnLine(OnLine)
+LineBasedReadHandle::LineBasedReadHandle(HandleWrapper&& Handle, std::function<void(const gsl::span<char>& Line)>&& OnLine, bool Crlf) :
+    ReadHandle(std::move(Handle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnLine(OnLine), Crlf(Crlf)
 {
 }
 
 LineBasedReadHandle::~LineBasedReadHandle()
 {
-    // Call the callback with any pending data (in case of an incomplete line).
-    if (!PendingBuffer.empty())
-    {
-        OnLine(PendingBuffer);
-    }
+    // N.B. PendingBuffer can contain remaining data is an exception was thrown during parsing.
 }
 
 void LineBasedReadHandle::OnRead(const gsl::span<char>& Buffer)
 {
-    auto begin = Buffer.begin();
-    auto end = std::ranges::find(Buffer, '\n');
-    while (end != Buffer.end())
+    // If we reach of the end, signal a line with the remaining buffer.
+    if (Buffer.empty() && !PendingBuffer.empty())
     {
-        PendingBuffer.insert(PendingBuffer.end(), begin, end);
-
         OnLine(PendingBuffer);
         PendingBuffer.clear();
+        return;
+    }
+
+    auto begin = Buffer.begin();
+    auto end = std::ranges::find(Buffer, Crlf ? '\r' : '\n');
+    while (end != Buffer.end())
+    {
+        if (Crlf)
+        {
+            end++; // Move to the following '\n'
+
+            if (end == Buffer.end() || *end != '\n') // Incomplete CRLF sequence. Append to buffer and continue.
+            {
+                PendingBuffer.insert(PendingBuffer.end(), begin, end);
+                begin = end;
+                end = std::ranges::find(end, Buffer.end(), '\r');
+                continue;
+            }
+        }
+
+        // Discard the '\r' in CRLF mode.
+        PendingBuffer.insert(PendingBuffer.end(), begin, Crlf ? end - 1 : end);
+
+        if (!PendingBuffer.empty())
+        {
+            OnLine(PendingBuffer);
+            PendingBuffer.clear();
+        }
 
         begin = end + 1;
-        end = std::ranges::find(begin, Buffer.end(), '\n');
+        end = std::ranges::find(begin, Buffer.end(), Crlf ? '\r' : '\n');
     }
 
     PendingBuffer.insert(PendingBuffer.end(), begin, end);
 }
 
-WriteHandle::WriteHandle(wil::unique_handle&& MovedHandle, const std::vector<char>& Buffer) :
+HTTPChunkBasedReadHandle::HTTPChunkBasedReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Line)>&& OnChunk) :
+    ReadHandle(std::move(MovedHandle), [this](const gsl::span<char>& Buffer) { OnRead(Buffer); }), OnChunk(std::move(OnChunk))
+{
+}
+
+HTTPChunkBasedReadHandle::~HTTPChunkBasedReadHandle()
+{
+    // N.B. PendingBuffer can contain remaining data is an exception was thrown during parsing.
+    LOG_HR_IF(E_UNEXPECTED, !PendingBuffer.empty() || PendingChunkSize != 0 || ExpectHeader);
+}
+
+void HTTPChunkBasedReadHandle::OnRead(const gsl::span<char>& Input)
+{
+    // See: https://httpwg.org/specs/rfc9112.html#field.transfer-encoding
+
+    if (Input.empty())
+    {
+        // N.B. The body can be terminated by a zero-length chunk.
+        THROW_HR_IF(E_INVALIDARG, PendingChunkSize != 0 || ExpectHeader);
+    }
+
+    auto buffer = Input;
+
+    auto advance = [&](size_t count) {
+        WI_ASSERT(buffer.size() >= count);
+        buffer = buffer.subspan(count);
+    };
+
+    while (!buffer.empty())
+    {
+        if (PendingChunkSize == 0)
+        {
+            if (buffer.front() == '\r' || buffer.front() == '\n')
+            {
+                // Consume CRLF's between chunks.
+                advance(1);
+                continue;
+            }
+
+            ExpectHeader = true;
+
+            auto end = std::ranges::find(buffer, '\n');
+            PendingBuffer.insert(PendingBuffer.end(), buffer.begin(), end);
+            if (end == buffer.end())
+            {
+                // Incomplete size header, buffer until next read.
+                break;
+            }
+
+            THROW_HR_IF_MSG(E_INVALIDARG, end - buffer.begin() < 2, "Malformed chunk header: %hs", PendingBuffer.c_str());
+            PendingBuffer.erase(PendingBuffer.end() - 1, PendingBuffer.end()); // Remove CRLF.
+
+#ifdef WSLA_HTTP_DEBUG
+
+            WSL_LOG("HTTPChunkHeader", TraceLoggingValue(PendingBuffer.c_str(), "Size"));
+
+#endif
+
+            try
+            {
+                size_t parsed{};
+                PendingChunkSize = std::stoul(PendingBuffer.c_str(), &parsed, 16);
+                THROW_HR_IF(E_INVALIDARG, parsed != PendingBuffer.size());
+            }
+            catch (...)
+            {
+                THROW_HR_MSG(E_INVALIDARG, "Failed to parse chunk size: %hs", PendingBuffer.c_str());
+            }
+
+            ExpectHeader = false;
+            advance(PendingBuffer.size() + 2);
+            PendingBuffer.clear();
+        }
+        else
+        {
+            // Consume the chunk.
+            auto consumedBytes = std::min(PendingChunkSize, buffer.size());
+            PendingBuffer.append(buffer.data(), consumedBytes);
+            advance(consumedBytes);
+
+            WI_ASSERT(PendingChunkSize >= consumedBytes);
+            PendingChunkSize -= consumedBytes;
+
+            if (PendingChunkSize == 0)
+            {
+
+#ifdef WSLA_HTTP_DEBUG
+
+                WSL_LOG("HTTPChunk", TraceLoggingValue(PendingBuffer.c_str(), "Content"));
+
+#endif
+                OnChunk(PendingBuffer);
+                PendingBuffer.clear();
+            }
+        }
+    }
+}
+
+WriteHandle::WriteHandle(HandleWrapper&& MovedHandle, const std::vector<char>& Buffer) :
     Handle(std::move(MovedHandle)), Buffer(Buffer)
 {
     Overlapped.hEvent = Event.get();
@@ -1174,9 +1310,13 @@ WriteHandle::~WriteHandle()
     if (State == IOHandleStatus::Pending)
     {
         DWORD bytesRead{};
-        if (CancelIoEx(Handle.get(), &Overlapped))
+        if (CancelIoEx(Handle.Get(), &Overlapped))
         {
-            LOG_LAST_ERROR_IF(!GetOverlappedResult(Handle.get(), &Overlapped, &bytesRead, true) && GetLastError() != ERROR_CONNECTION_ABORTED);
+            if (!GetOverlappedResult(Handle.Get(), &Overlapped, &bytesRead, true))
+            {
+                auto error = GetLastError();
+                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+            }
         }
         else
         {
@@ -1194,10 +1334,10 @@ void WriteHandle::Schedule()
 
     // Schedule the write.
     DWORD bytesWritten{};
-    if (WriteFile(Handle.get(), Buffer.data() + Offset, static_cast<DWORD>(Buffer.size() - Offset), &bytesWritten, &Overlapped))
+    if (WriteFile(Handle.Get(), Buffer.data(), static_cast<DWORD>(Buffer.size()), &bytesWritten, &Overlapped))
     {
-        Offset += bytesWritten;
-        if (Offset >= Buffer.size())
+        Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
+        if (Buffer.empty())
         {
             State = IOHandleStatus::Completed;
         }
@@ -1205,7 +1345,7 @@ void WriteHandle::Schedule()
     else
     {
         auto error = GetLastError();
-        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.get());
+        THROW_LAST_ERROR_IF_MSG(error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)Handle.Get());
 
         // The write is pending, update to 'Pending'
         State = IOHandleStatus::Pending;
@@ -1221,16 +1361,251 @@ void WriteHandle::Collect()
 
     // Complete the write.
     DWORD bytesWritten{};
-    THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.get(), &Overlapped, &bytesWritten, false));
+    THROW_IF_WIN32_BOOL_FALSE(GetOverlappedResult(Handle.Get(), &Overlapped, &bytesWritten, false));
 
-    Offset += bytesWritten;
-    if (Offset >= Buffer.size())
+    Buffer.erase(Buffer.begin(), Buffer.begin() + bytesWritten);
+    if (Buffer.empty())
     {
         State = IOHandleStatus::Completed;
     }
 }
 
+void WriteHandle::Push(const gsl::span<char>& Content)
+{
+    // Don't write if a WriteFile() is pending, since that could cause the buffer to reallocate.
+    WI_ASSERT(State == IOHandleStatus::Standby || State == IOHandleStatus::Completed);
+    WI_ASSERT(!Content.empty());
+
+    Buffer.insert(Buffer.end(), Content.begin(), Content.end());
+
+    State = IOHandleStatus::Standby;
+}
+
 HANDLE WriteHandle::GetHandle() const
 {
     return Event.get();
+}
+
+RelayHandle::RelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& WriteHandle) :
+    Read(std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(WriteHandle))
+{
+}
+
+void RelayHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    // If the Buffer is empty, then we're reading.
+    if (PendingBuffer.empty())
+    {
+        // If the output buffer is empty and the reading end is completed, then we're done.
+        if (Read.GetState() == IOHandleStatus::Completed)
+        {
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
+        Read.Schedule();
+
+        // If the read is pending, update to 'Pending'
+        if (Read.GetState() == IOHandleStatus::Pending)
+        {
+            State = IOHandleStatus::Pending;
+        }
+    }
+    else
+    {
+        Write.Push(PendingBuffer);
+        PendingBuffer.clear();
+
+        Write.Schedule();
+
+        if (Write.GetState() == IOHandleStatus::Pending)
+        {
+            // The write is pending, update to 'Pending'
+            State = IOHandleStatus::Pending;
+        }
+    }
+}
+
+void RelayHandle::OnRead(const gsl::span<char>& Content)
+{
+    WI_ASSERT(PendingBuffer.empty());
+
+    PendingBuffer.insert(PendingBuffer.end(), Content.begin(), Content.end());
+}
+
+void RelayHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    // Transition back to standby
+    State = IOHandleStatus::Standby;
+
+    if (Read.GetState() == IOHandleStatus::Pending)
+    {
+        Read.Collect();
+    }
+    else
+    {
+        WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
+        Write.Collect();
+    }
+}
+
+HANDLE RelayHandle::GetHandle() const
+{
+    if (Read.GetState() == IOHandleStatus::Pending)
+    {
+        return Read.GetHandle();
+    }
+    else
+    {
+        WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
+        return Write.GetHandle();
+    }
+}
+
+DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr) :
+    Read(std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }),
+    WriteStdout(std::move(Stdout)),
+    WriteStderr(std::move(Stderr))
+{
+}
+
+void DockerIORelayHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    // If we have an active handle and a buffer, try to flush that first.
+    if (ActiveHandle != nullptr)
+    {
+        // Push the data to the selected handle.
+        DWORD bytesToWrite = std::min(static_cast<DWORD>(RemainingBytes), static_cast<DWORD>(PendingBuffer.size()));
+
+        ActiveHandle->Push(gsl::make_span(PendingBuffer.data(), bytesToWrite));
+
+        // Consume the written bytes.
+        RemainingBytes -= bytesToWrite;
+        PendingBuffer.erase(PendingBuffer.begin(), PendingBuffer.begin() + bytesToWrite);
+
+        // Schedule the write.
+        ActiveHandle->Schedule();
+
+        // If the write is pending, update to 'Pending'
+        if (ActiveHandle->GetState() == IOHandleStatus::Pending)
+        {
+            State = IOHandleStatus::Pending;
+        }
+        else if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+        {
+            // Switch back to reading if we've written all bytes for this chunk.
+            ActiveHandle = nullptr;
+
+            ProcessNextHeader();
+        }
+    }
+    else
+    {
+        if (Read.GetState() == IOHandleStatus::Completed)
+        {
+            // No more data to read, we're done.
+            State = IOHandleStatus::Completed;
+            return;
+        }
+
+        // Schedule a read from the input.
+        Read.Schedule();
+        if (Read.GetState() == IOHandleStatus::Pending)
+        {
+            State = IOHandleStatus::Pending;
+        }
+    }
+}
+
+void DockerIORelayHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    if (ActiveHandle != nullptr)
+    {
+        // Complete the write.
+        ActiveHandle->Collect();
+
+        // If the write is completed, switch back to reading.
+        if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+        {
+            ActiveHandle = nullptr;
+        }
+
+        // Transition back to standby if there's still data to read.
+        // Otherwise switch to Completed since everything is done.
+        if (Read.GetState() == IOHandleStatus::Completed)
+        {
+            State = IOHandleStatus::Completed;
+        }
+        else
+        {
+            State = IOHandleStatus::Standby;
+        }
+    }
+    else
+    {
+        // Complete the read.
+        Read.Collect();
+
+        // Transition back to standby.
+        State = IOHandleStatus::Standby;
+    }
+}
+
+HANDLE DockerIORelayHandle::GetHandle() const
+{
+    if (ActiveHandle != nullptr)
+    {
+        return ActiveHandle->GetHandle();
+    }
+    else
+    {
+        return Read.GetHandle();
+    }
+}
+
+void DockerIORelayHandle::ProcessNextHeader()
+{
+    if (PendingBuffer.size() < sizeof(MultiplexedHeader))
+    {
+        // Not enough data for a header yet.
+        return;
+    }
+
+    const auto* header = reinterpret_cast<const MultiplexedHeader*>(PendingBuffer.data());
+    RemainingBytes = ntohl(header->Length);
+
+    if (header->Fd == 1)
+    {
+        ActiveHandle = &WriteStdout;
+    }
+    else if (header->Fd == 2)
+    {
+        ActiveHandle = &WriteStderr;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid Docker IO multiplexed header fd: %u", header->Fd);
+    }
+
+    // Consume the header.
+    PendingBuffer.erase(PendingBuffer.begin(), PendingBuffer.begin() + sizeof(MultiplexedHeader));
+}
+
+void DockerIORelayHandle::OnRead(const gsl::span<char>& Buffer)
+{
+    PendingBuffer.insert(PendingBuffer.end(), Buffer.begin(), Buffer.end());
+
+    if (ActiveHandle == nullptr)
+    {
+        // If no handle is active, expect a header.
+        ProcessNextHeader();
+    }
 }

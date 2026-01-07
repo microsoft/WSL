@@ -40,6 +40,19 @@ FetchContent_Declare(nlohmannjson
 FetchContent_MakeAvailable(nlohmannjson)
 FetchContent_GetProperties(nlohmannjson SOURCE_DIR NLOHMAN_JSON_SOURCE_DIR)
 
+set(BOOST_VERSION "1.90.0")
+set(BOOST_TARBALL "boost_${BOOST_VERSION}")
+string(REPLACE "." "_" BOOST_TARBALL "${BOOST_TARBALL}")
+
+FetchContent_Declare(
+  boost_headers
+  URL https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_TARBALL}.tar.gz
+  URL_HASH SHA256=5e93d582aff26868d581a52ae78c7d8edf3f3064742c6e77901a1f18a437eea9
+)
+
+FetchContent_MakeAvailable(boost_headers)
+
+
 # Import modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(IDL REQUIRED)
@@ -383,6 +396,7 @@ endif()
 
 # Common include paths
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wil/include)
+include_directories(${boost_headers_SOURCE_DIR})
 include_directories(${WSLDEPS_SOURCE_DIR}/include)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/Windows)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/schemas)

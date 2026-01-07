@@ -535,3 +535,5 @@ std::string ReadToString(SOCKET Handle);
 
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
+
+std::string EscapeString(const std::string& Input);

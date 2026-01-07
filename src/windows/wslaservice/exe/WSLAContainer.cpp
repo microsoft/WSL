@@ -21,18 +21,13 @@ using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
-// Constants for required default arguments for "nerdctl create..."
-static std::vector<std::string> defaultNerdctlCreateArgs{//"--pull=never", // TODO: Uncomment once PullImage() is implemented.
-                                                         "--ulimit",
-                                                         "nofile=65536:65536"};
-
-static std::vector<std::string> defaultNerdctlEnv{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"};
+using namespace wsl::windows::common::docker_schema;
 
 namespace {
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
 
-auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm, std::vector<std::string>& args)
+auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm)
 {
     THROW_HR_IF_MSG(
         E_INVALIDARG,
@@ -122,9 +117,6 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     {
         THROW_IF_FAILED(vm.MapPort(e.Family, e.HostPort, e.VmPort, false));
         e.MappedToHost = true;
-
-        args.push_back("-p");
-        args.push_back(std::format("{}{}:{}", e.Family == AF_INET6 ? "[::]:" : "", e.VmPort, e.ContainerPort));
     }
 
     return std::make_pair(std::move(mappedPorts), std::move(errorCleanup));
@@ -138,21 +130,27 @@ WSLAContainerImpl::WSLAContainerImpl(
     WSLAVirtualMachine* parentVM,
     const WSLA_CONTAINER_OPTIONS& Options,
     std::string&& Id,
-    ContainerEventTracker& tracker,
     std::vector<VolumeMountInfo>&& volumes,
     std::vector<PortMapping>&& ports,
-    std::function<void(const WSLAContainerImpl*)>&& onDeleted) :
+    std::function<void(const WSLAContainerImpl*)>&& onDeleted,
+    ContainerEventTracker& EventTracker,
+    DockerHTTPClient& DockerClient) :
     m_parentVM(parentVM),
     m_name(Options.Name),
     m_image(Options.Image),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
-    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted)))
+    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
+    m_dockerClient(DockerClient),
+    m_eventTracker(EventTracker),
+    m_containerEvents(EventTracker.RegisterContainerStateUpdates(
+        m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2)))
 {
     m_state = WslaContainerStateCreated;
 
-    m_trackingReference = tracker.RegisterContainerStateUpdates(m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1));
+    // TODO: Move this to an API flag.
+    m_tty = ParseFdStatus(Options.InitProcessOptions).second;
 }
 
 WSLAContainerImpl::~WSLAContainerImpl()
@@ -162,6 +160,23 @@ WSLAContainerImpl::~WSLAContainerImpl()
         TraceLoggingValue(m_name.c_str(), "Name"),
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
+
+    // Remove container callback from any outstanding processes.
+    {
+        std::lock_guard lock(m_lock);
+
+        if (m_initProcess)
+        {
+            m_initProcess->OnContainerReleased();
+        }
+
+        for (auto& process : m_processes)
+        {
+            process->OnContainerReleased();
+        }
+    }
+
+    m_containerEvents.Reset();
 
     // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
     m_comWrapper->Disconnect();
@@ -178,8 +193,6 @@ WSLAContainerImpl::~WSLAContainerImpl()
         }
         CATCH_LOG();
     }
-
-    m_trackingReference.Reset();
 
     // Release port mappings.
     std::set<uint16_t> allocatedGuestPorts;
@@ -200,6 +213,24 @@ WSLAContainerImpl::~WSLAContainerImpl()
     m_parentVM->ReleasePorts(allocatedGuestPorts);
 }
 
+void WSLAContainerImpl::OnProcessReleased(WSLAContainerProcess* process)
+{
+    std::lock_guard lock(m_lock);
+
+    if (process == m_initProcess.Get())
+    {
+        m_initProcess.Reset();
+
+        // TODO: Consider switching to Stopped state.
+        return;
+    }
+
+    auto remove = std::ranges::remove_if(m_processes, [process](const auto* e) { return e == process; });
+    WI_ASSERT(remove.size() == 1);
+
+    m_processes.erase(remove.begin(), remove.end());
+}
+
 const std::string& WSLAContainerImpl::Image() const noexcept
 {
     return m_image;
@@ -210,7 +241,7 @@ IWSLAContainer& WSLAContainerImpl::ComWrapper()
     return *m_comWrapper.Get();
 }
 
-void WSLAContainerImpl::Start(const WSLA_CONTAINER_OPTIONS& Options)
+void WSLAContainerImpl::Start()
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
@@ -221,43 +252,42 @@ void WSLAContainerImpl::Start(const WSLA_CONTAINER_OPTIONS& Options)
         m_name.c_str(),
         m_state);
 
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "start", "-a", m_id}, defaultNerdctlEnv, common::ProcessFlags::None);
-    for (auto i = 0; i < Options.InitProcessOptions.FdsCount; i++)
-    {
-        launcher.AddFd(Options.InitProcessOptions.Fds[i]);
-    }
+    // Attach to the container's init process so no IO is lost.
+    m_initProcess =
+        wil::MakeOrThrow<WSLAContainerProcess>(m_id, m_tty, m_dockerClient, std::optional<std::string>{}, m_eventTracker, *this);
 
-    m_containerProcess = launcher.Launch(*m_parentVM);
+    m_initProcess->AssignIoStream(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
 
-    auto cleanup = wil::scope_exit([&]() { m_containerProcess.reset(); });
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.Reset(); });
 
-    // Wait for either the container to get into a 'started' state, or the nerdctl process to exit.
-    common::relay::MultiHandleWait wait;
-    wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_containerProcess->GetExitEvent(), [&]() { wait.Cancel(); }));
-    wait.AddHandle(std::make_unique<common::relay::EventHandle>(m_startedEvent.get(), [&]() { wait.Cancel(); }));
-    wait.Run({});
+    m_dockerClient.StartContainer(m_id);
 
-    if (!m_startedEvent.is_signaled())
-    {
-        auto status = GetNerdctlStatus();
-
-        THROW_HR_IF_MSG(
-            E_FAIL,
-            status != "exited",
-            "Failed to start container %hs, nerdctl status: %hs",
-            m_name.c_str(),
-            status.value_or("<empty>").c_str());
-    }
-
-    cleanup.release();
     m_state = WslaContainerStateRunning;
+    cleanup.release();
 }
 
-void WSLAContainerImpl::OnEvent(ContainerEvent event)
+void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode)
 {
-    if (event == ContainerEvent::Start)
+    if (event == ContainerEvent::Stop)
     {
-        m_startedEvent.SetEvent();
+        THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
+
+        std::lock_guard<std::recursive_mutex> lock(m_lock);
+        m_state = WslaContainerStateExited;
+
+        if (m_initProcess)
+        {
+            m_initProcess->OnExited(exitCode.value());
+        }
+
+        // Notify all processes that the container has exited.
+        // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
+        for (auto& process : m_processes)
+        {
+            process->OnContainerReleased();
+        }
+
+        m_processes.clear();
     }
 
     WSL_LOG(
@@ -276,30 +306,25 @@ void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
         return;
     }
 
-    /* 'nerdctl stop ...'
-     *   returns success and <containerId> on stdout if the container is running or already stopped
-     *   returns error "No such container: <containerId>" on stderr if the container is in 'Created' state or does not exist
-     *
-     * For our case, we treat stopping an already-exited container as a no-op and return success.
-     * Stopping a deleted or created container returns ERROR_INVALID_STATE.
-     * TODO: Discuss and return stdout/stderr or corresponding HRESULT from nerdctl stop for better diagnostics.
-     */
+    try
+    {
+        m_dockerClient.StopContainer(m_id, Signal, static_cast<ULONG>(std::round<ULONG>(TimeoutMs / 1000)));
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // HTTP 304 is returned when the container is already stopped.
+        if (e.StatusCode() == 304)
+        {
+            return;
+        }
 
-    // Validate that the container is in the running state.
-    THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        m_state != WslaContainerStateRunning,
-        "Container '%hs' is not in a stoppable state: %i",
-        m_name.c_str(),
-        m_state);
-    ServiceProcessLauncher launcher(
-        nerdctlPath, {nerdctlPath, "stop", m_name, "--time", std::to_string(static_cast<ULONG>(std::round(TimeoutMs / 1000)))}, defaultNerdctlEnv);
-
-    // TODO: Figure out how we want to handle custom signals.
-    // nerdctl stop has a --time and a --signal option that can be used
-    // By default, it uses SIGTERM and a default timeout of 10 seconds.
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+        WSL_LOG(
+            "StopContainerFailed",
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(m_id.c_str(), "Id"),
+            TraceLoggingValue(e.what(), "Error"));
+        throw;
+    }
 
     m_state = WslaContainerStateExited;
 }
@@ -316,9 +341,7 @@ void WSLAContainerImpl::Delete()
         m_name.c_str(),
         m_state);
 
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "rm", "-f", m_name}, defaultNerdctlEnv);
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput(deleteTimeout);
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
+    m_dockerClient.DeleteContainer(m_id);
 
     UnmountVolumes(m_mountedVolumes, *m_parentVM);
 
@@ -329,11 +352,9 @@ WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    // If the container is running, refresh the init process state before returning.
-    if (m_state == WslaContainerStateRunning && m_containerProcess->State() != WSLAProcessStateRunning)
+    if (m_state == WslaContainerStateRunning && m_initProcess->State().first != WSLAProcessStateRunning)
     {
         m_state = WslaContainerStateExited;
-        m_containerProcess.reset();
     }
 
     return m_state;
@@ -348,8 +369,8 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_containerProcess.has_value());
-    THROW_IF_FAILED(m_containerProcess->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_initProcess);
+    THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
 }
 
 void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
@@ -358,48 +379,65 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
     std::lock_guard lock{m_lock};
 
+    auto state = State();
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        State() != WslaContainerStateRunning,
+        state != WslaContainerStateRunning,
         "Container %hs is not running. State: %i",
         m_name.c_str(),
-        m_state);
+        state);
 
     auto [hasStdin, hasTty] = ParseFdStatus(*Options);
 
-    std::vector<std::string> args{nerdctlPath, "exec"};
-
-    if (hasStdin)
+    common::docker_schema::CreateExec request{};
+    request.AttachStdout = true;
+    request.AttachStderr = true;
+    for (ULONG i = 0; i < Options->CommandLineCount; i++)
     {
-        args.push_back("-i");
+        request.Cmd.push_back(Options->CommandLine[i]);
+    }
+
+    for (ULONG i = 0; i < Options->EnvironmentCount; i++)
+    {
+        request.Env.push_back(Options->Environment[i]);
+    }
+
+    if (Options->CurrentDirectory != nullptr)
+    {
+        request.WorkingDir = Options->CurrentDirectory;
     }
 
     if (hasTty)
     {
-        args.push_back("-t");
+        request.Tty = true;
     }
 
-    AddEnvironmentVariables(args, *Options);
-
-    args.emplace_back(m_id);
-
-    for (ULONG i = 0; i < Options->CommandLineCount; i++)
+    if (hasStdin)
     {
-        args.emplace_back(Options->CommandLine[i]);
+        request.AttachStdin = true;
     }
 
-    ServiceProcessLauncher launcher(nerdctlPath, args, defaultNerdctlEnv, common::ProcessFlags::None);
-    for (auto i = 0; i < Options->FdsCount; i++)
+    try
     {
-        launcher.AddFd(Options->Fds[i]);
+        auto result = m_dockerClient.CreateExec(m_id, request);
+
+        // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
+        auto process = wil::MakeOrThrow<WSLAContainerProcess>(result.Id, hasTty, m_dockerClient, m_id, m_eventTracker, *this);
+
+        // Store a non owning reference to the process.
+        m_processes.push_back(process.Get());
+
+        process->AssignIoStream(wil::unique_handle{
+            (HANDLE)m_dockerClient
+                .StartExec(result.Id, common::docker_schema::StartExec{.Tty = hasTty, .ConsoleSize = request.ConsoleSize})
+                .release()});
+
+        THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
     }
-
-    std::optional<ServiceRunningProcess> process;
-    HRESULT result = E_FAIL;
-    std::tie(result, *Errno, process) = launcher.LaunchNoThrow(*m_parentVM);
-    THROW_IF_FAILED(result);
-
-    THROW_IF_FAILED(process->Get().QueryInterface(__uuidof(IWSLAProcess), (void**)Process));
+    catch (DockerHTTPException& e)
+    {
+        THROW_HR_MSG(E_FAIL, "Failed to exec process in container %hs: %hs", m_id.c_str(), e.what());
+    }
 }
 
 std::pair<bool, bool> WSLAContainerImpl::ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options)
@@ -447,7 +485,7 @@ std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainerImpl::Mou
             auto result = parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly);
             THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath, parentVMPath.c_str());
 
-            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, volume.ReadOnly});
+            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
         }
         catch (...)
         {
@@ -471,150 +509,120 @@ void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::v
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
-    ContainerEventTracker& eventTracker,
-    std::function<void(const WSLAContainerImpl*)>&& OnDeleted)
+    std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+    ContainerEventTracker& EventTracker,
+    DockerHTTPClient& DockerClient)
 {
+    // TODO: Think about when 'StdinOnce' should be set.
     auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
 
-    // Don't support stdin for now since it will hang.
-    // TODO: Remove once stdin is fixed in nerdctl.
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), hasStdin && !hasTty);
-
-    std::vector<std::string> inputOptions;
-    if (hasStdin)
-    {
-        inputOptions.push_back("-i");
-    }
+    common::docker_schema::CreateContainer request;
+    request.Image = containerOptions.Image;
 
     if (hasTty)
     {
-        inputOptions.push_back("-t");
+        request.Tty = true;
     }
 
-    AddEnvironmentVariables(inputOptions, containerOptions.InitProcessOptions);
-
-    // TODO: Rethink command line generation logic.
-    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM, inputOptions);
-
-    auto volumes = MountVolumes(containerOptions, parentVM);
-    auto args = PrepareNerdctlCreateCommand(containerOptions, std::move(inputOptions), volumes);
-
-    ServiceProcessLauncher launcher(nerdctlPath, args, defaultNerdctlEnv);
-    auto result = launcher.Launch(parentVM).WaitAndCaptureOutput();
-
-    // TODO: Have better error codes.
-    THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "Failed to create container: %hs", launcher.FormatResult(result).c_str());
-
-    auto id = result.Output[1];
-    while (!id.empty() && (id.back() == '\n'))
+    if (hasStdin)
     {
-        id.pop_back();
+        request.OpenStdin = true;
+        request.StdinOnce = true;
     }
 
-    // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
-    auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM, containerOptions, std::move(id), eventTracker, std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted));
-
-    errorCleanup.release();
-
-    return container;
-}
-
-std::vector<std::string> WSLAContainerImpl::PrepareNerdctlCreateCommand(
-    const WSLA_CONTAINER_OPTIONS& options, std::vector<std::string>&& inputOptions, std::vector<VolumeMountInfo>& volumes)
-{
-    std::vector<std::string> args{nerdctlPath};
-    args.push_back("create");
-    args.push_back("--name");
-    args.push_back(options.Name);
-
-    switch (options.ContainerNetwork.ContainerNetworkType)
+    if (containerOptions.InitProcessOptions.CommandLineCount > 0)
     {
-    case WSLA_CONTAINER_NETWORK_HOST:
-        args.push_back("--net=host");
-        break;
-    case WSLA_CONTAINER_NETWORK_NONE:
-        args.push_back("--net=none");
-        break;
-    case WSLA_CONTAINER_NETWORK_BRIDGE:
-        args.push_back("--net=bridge");
-        break;
-    // TODO: uncomment and implement when we have custom networks
-    // case WSLA_CONTAINER_NETWORK_CUSTOM:
-    //     args.push_back(std::format("--net={}", options.ContainerNetwork.ContainerNetworkName));
-    //     break;
-    default:
-        THROW_HR_MSG(
+        request.Cmd.insert(
+            request.Cmd.end(),
+            containerOptions.InitProcessOptions.CommandLine,
+            containerOptions.InitProcessOptions.CommandLine + containerOptions.InitProcessOptions.CommandLineCount);
+    }
+
+    if (containerOptions.InitProcessOptions.Executable != nullptr)
+    {
+        request.Entrypoint = std::vector<std::string>{containerOptions.InitProcessOptions.Executable};
+    }
+
+    for (DWORD i = 0; i < containerOptions.InitProcessOptions.EnvironmentCount; i++)
+    {
+        THROW_HR_IF_MSG(
             E_INVALIDARG,
-            "No such network: type: %i, name: %hs",
-            options.ContainerNetwork.ContainerNetworkType,
-            options.ContainerNetwork.ContainerNetworkName);
-        break;
+            containerOptions.InitProcessOptions.Environment[i][0] == '-',
+            "Invalid environment string at index: %i: %hs",
+            i,
+            containerOptions.InitProcessOptions.Environment[i]);
+
+        request.Env.push_back(containerOptions.InitProcessOptions.Environment[i]);
     }
 
-    if (options.ShmSize > 0)
+    // Mount volumes.
+    auto volumes = MountVolumes(containerOptions, parentVM);
+
+    for (const auto& e : volumes)
     {
-        args.push_back(std::format("--shm-size={}m", options.ShmSize));
+        request.HostConfig.Mounts.emplace_back(
+            common::docker_schema::Mount{.Source = e.ParentVMPath, .Target = e.ContainerPath, .Type = "bind", .ReadOnly = e.ReadOnly});
     }
-    if (options.Flags & WSLA_CONTAINER_FLAG_ENABLE_GPU)
+
+    // Set the networking mode.
+    if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_BRIDGE)
     {
-        args.push_back("--gpus");
-        // TODO: Parse GPU device list from WSLA_CONTAINER_OPTIONS. For now, just enable all GPUs.
-        args.push_back("all");
+        request.HostConfig.NetworkMode = "bridge";
     }
-
-    args.insert(args.end(), defaultNerdctlCreateArgs.begin(), defaultNerdctlCreateArgs.end());
-    args.insert(args.end(), inputOptions.begin(), inputOptions.end());
-
-    if (options.InitProcessOptions.Executable != nullptr)
+    else if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_HOST)
     {
-        args.push_back("--entrypoint");
-        args.push_back(options.InitProcessOptions.Executable);
+        request.HostConfig.NetworkMode = "host";
     }
-
-    for (const auto& volume : volumes)
+    else if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_NONE)
     {
-        args.emplace_back(std::format("-v{}:{}{}", volume.ParentVMPath, volume.ContainerPath, volume.ReadOnly ? ":ro" : ""));
+        request.HostConfig.NetworkMode = "none";
     }
-
-    // TODO:
-    // - Implement port mapping
-
-    args.push_back(options.Image);
-
-    if (options.InitProcessOptions.CommandLineCount > 0)
+    else
     {
-        args.push_back("--");
-
-        for (ULONG i = 0; i < options.InitProcessOptions.CommandLineCount; i++)
-        {
-            args.push_back(options.InitProcessOptions.CommandLine[i]);
-        }
+        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %i", containerOptions.ContainerNetwork.ContainerNetworkType);
     }
 
-    return args;
+    // Process port bindings.
+    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM);
+
+    for (const auto& e : *mappedPorts)
+    {
+        // TODO: UDP support
+        // TODO: Investigate ipv6 support.
+        auto& portEntry = request.HostConfig.PortBindings[std::format("{}/tcp", e.ContainerPort)];
+        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
+    }
+
+    // Send the request to docker.
+    try
+    {
+        auto result = DockerClient.CreateContainer(request);
+
+        // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
+        auto container = std::make_unique<WSLAContainerImpl>(
+            &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), EventTracker, DockerClient);
+
+        errorCleanup.release();
+
+        return container;
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // TODO: propagate error message to caller.
+        THROW_HR_MSG(E_FAIL, "Failed to create container: %hs ", e.what());
+    }
 }
 
-std::optional<std::string> WSLAContainerImpl::GetNerdctlStatus()
+void WSLAContainerImpl::Inspect(LPSTR* Output)
 {
-    ServiceProcessLauncher launcher(nerdctlPath, {nerdctlPath, "inspect", "-f", "{{.State.Status}}", m_name});
-    auto result = launcher.Launch(*m_parentVM).WaitAndCaptureOutput();
-    if (result.Code != 0)
+    try
     {
-        // Can happen if the container is not found.
-        // TODO: Find a way to validate that the container is indeed not found, and not some other error.
-        return {};
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_dockerClient.InspectContainer(m_id).data()).release();
     }
-
-    auto& status = result.Output[1];
-
-    while (!status.empty() && status.back() == '\n')
+    catch (const DockerHTTPException& e)
     {
-        status.pop_back();
+        THROW_HR_MSG(E_FAIL, "Failed to inspect container: %hs ", e.what());
     }
-
-    // N.B. nerdctl inspect can return with exit code 0 and no output. Return an empty optional if that happens.
-    return status.empty() ? std::optional<std::string>{} : status;
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
@@ -651,6 +659,18 @@ HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** 
 HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
 {
     return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutMs);
+}
+
+HRESULT WSLAContainer::Start()
+{
+    return CallImpl(&WSLAContainerImpl::Start);
+}
+
+HRESULT WSLAContainer::Inspect(LPSTR* Output)
+{
+    *Output = nullptr;
+
+    return CallImpl(&WSLAContainerImpl::Inspect, Output);
 }
 
 HRESULT WSLAContainer::Delete()

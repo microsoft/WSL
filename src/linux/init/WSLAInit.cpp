@@ -182,6 +182,106 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_OPEN& Mes
     result = 0;
 }
 
+void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONNECT& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    // Make sure to close the channel since no more messages can be processed after this.
+    auto closeChannel = wil::scope_exit([&]() { Channel.Close(); });
+
+    int result = -1;
+    auto sendResult = wil::scope_exit([&]() { Channel.SendResultMessage(result); });
+
+    const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathOffset);
+    THROW_ERRNO_IF(EINVAL, path == nullptr);
+
+    wil::unique_fd socket;
+
+    try
+    {
+        socket = UtilConnectUnix(path);
+        result = 0;
+    }
+    catch (...)
+    {
+        result = wil::ResultFromCaughtException();
+    }
+
+    if (result != 0)
+    {
+        return;
+    }
+
+    sendResult.reset();
+
+    // Relay data between the two sockets.
+    pollfd pollDescriptors[2];
+    pollDescriptors[0].fd = socket.get();
+    pollDescriptors[0].events = POLLIN;
+    pollDescriptors[1].fd = Channel.Socket();
+    pollDescriptors[1].events = POLLIN;
+
+    std::vector<gsl::byte> relayBuffer;
+    while (true)
+    {
+        auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
+        THROW_LAST_ERROR_IF(result < 0);
+
+        if (pollDescriptors[0].revents & (POLLIN | POLLHUP | POLLERR))
+        {
+            auto bytesRead = UtilReadBuffer(pollDescriptors[0].fd, relayBuffer);
+            if (bytesRead < 0)
+            {
+                LOG_ERROR("read failed {}", errno);
+                break;
+            }
+            else if (bytesRead == 0)
+            {
+                // Unix socket has been closed.
+                pollDescriptors[0].fd = -1;
+                break;
+            }
+            else
+            {
+                auto bytesWritten = write(Channel.Socket(), relayBuffer.data(), bytesRead);
+                if (bytesWritten < 0)
+                {
+                    LOG_ERROR("write failed {}", errno);
+                    break;
+                }
+            }
+        }
+
+        if (pollDescriptors[1].revents & (POLLIN | POLLHUP | POLLERR))
+        {
+            auto bytesRead = UtilReadBuffer(pollDescriptors[1].fd, relayBuffer);
+            if (bytesRead < 0)
+            {
+                LOG_ERROR("read failed {}", errno);
+                break;
+            }
+            else if (bytesRead == 0)
+            {
+                // hvsocket has been closed.
+                pollDescriptors[1].fd = -1;
+
+                // Shutdown the write side of the socket. This is required so docker knows when stdin is in EOF for instance.
+                if (shutdown(socket.get(), SHUT_WR) < 0)
+                {
+                    LOG_ERROR("shutdown({}, SHUT_WR) failed {}", socket.get(), errno);
+                }
+            }
+            else
+            {
+                auto bytesWritten = write(socket.get(), relayBuffer.data(), bytesRead);
+                if (bytesWritten < 0)
+                {
+                    LOG_ERROR("write failed {}", errno);
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY& Message, const gsl::span<gsl::byte>&)
 {
     THROW_LAST_ERROR_IF(fcntl(Message.TtyMaster, F_SETFL, O_NONBLOCK) < 0);
@@ -766,7 +866,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_WAITPID, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT, WSLA_WATCH_PROCESSES>(
+        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_WAITPID, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT, WSLA_WATCH_PROCESSES, WSLA_UNIX_CONNECT>(
             Channel, Type, Buffer);
     }
     catch (...)

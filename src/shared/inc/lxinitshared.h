@@ -400,7 +400,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLADetach,
     LxMessageWSLATerminalChanged,
     LxMessageWSLAWatchProcesses,
-    LxMessageWSLAProcessExited
+    LxMessageWSLAProcessExited,
+    LxMessageWSLAUnixConnect,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -512,6 +513,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLATerminalChanged)
         X(LxMessageWSLAWatchProcesses)
         X(LxMessageWSLAProcessExited)
+        X(LxMessageWSLAUnixConnect)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1882,6 +1884,20 @@ struct WSLA_PROCESS_EXITED
     bool Signaled;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Code), FIELD(Signaled));
+};
+
+struct WSLA_UNIX_CONNECT
+{
+    static inline auto Type = LxMessageWSLAUnixConnect;
+    using TResponse = RESULT_MESSAGE<int32_t>;
+
+    DECLARE_MESSAGE_CTOR(WSLA_UNIX_CONNECT);
+
+    MESSAGE_HEADER Header;
+    unsigned int PathOffset;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

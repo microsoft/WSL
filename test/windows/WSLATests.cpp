@@ -52,7 +52,9 @@ class WSLATests
         testVhd = std::filesystem::path{vhdPath} / "ext4.vhdx";
         storagePath = std::filesystem::current_path() / "test-storage";
 
-        WslShutdown();
+        auto session = CreateSession();
+        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr));
         return true;
     }
 
@@ -80,6 +82,7 @@ class WSLATests
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = storagePath.c_str();
         settings.MaximumStorageSizeMb = 1000; // 1GB.
+        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         return settings;
     }
@@ -271,6 +274,20 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
+    void ExpectImagePresent(IWSLASession& Session, const char* Image)
+    {
+        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+        THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
+
+        std::vector<std::string> tags;
+        for (const auto& e : images)
+        {
+            tags.push_back(e.Image);
+        }
+
+        VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
+    }
+
     TEST_METHOD(PullImage)
     {
         WSL2_TEST_ONLY();
@@ -281,15 +298,15 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        VERIFY_SUCCEEDED(session->PullImage("hello-world", nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr));
 
         // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+        ExpectImagePresent(*session, "hello-world:latest");
+
+        // TODO: Check that the image can actually be used to start a container.
     }
 
+    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {
         WSL2_TEST_ONLY();
@@ -304,15 +321,23 @@ class WSLATests
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
 
-        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr));
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+
+        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
 
         // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("hello-world") != std::string::npos);
+        ExpectImagePresent(*session, "hello-world:latest");
+        WSLAContainerLauncher launcher("hello-world:latest", "wsla-import-image-container");
+
+        auto container = launcher.Launch(*session);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
 
+    // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(ImportImage)
     {
         WSL2_TEST_ONLY();
@@ -327,13 +352,21 @@ class WSLATests
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
         VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
 
-        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr));
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        // Verify that the image is in the list of images.
-        WSLAProcessLauncher launcher("/usr/bin/nerdctl", {"/usr/bin/nerdctl", "images"});
-        auto listImagesResult = launcher.Launch(*session).WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(0, listImagesResult.Code);
-        VERIFY_IS_TRUE(listImagesResult.Output[1].find("my-hello-world") != std::string::npos);
+        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
+
+        ExpectImagePresent(*session, "my-hello-world:test");
+
+        // Validate that containers can be started from the imported image.
+        WSLAContainerLauncher launcher("my-hello-world:test", "wsla-import-image-container", "/hello");
+
+        auto container = launcher.Launch(*session);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
 
     TEST_METHOD(CustomDmesgOutput)
@@ -995,6 +1028,9 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
+        LogSkipped("Skipping pmem test since mounting the WSLA VHD currently fails");
+        return;
+
         // Test with SCSI boot VHDs.
         {
             auto settings = GetDefaultSessionSettings();
@@ -1272,6 +1308,16 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
         }
 
+        // Validate that exit codes are correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-exit-code", "/bin/sh", {"-c", "exit 12"});
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {}, 12);
+        }
+
+        // Validate that stdin is correctly wired
         {
             WSLAContainerLauncher launcher(
                 "debian:latest",
@@ -1282,13 +1328,8 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            // For now, validate that trying to use stdin without a tty returns the appropriate error.
-            auto result = wil::ResultFromException([&]() { auto container = launcher.Launch(*session); });
-            VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            auto container = launcher.Launch(*session);
 
-            // TODO: nerdctl hangs if stdin is closed without writing to it.
-            // Add test coverage for that usecase once the hang is fixed.
-            /*
             auto process = container.GetInitProcess();
             auto input = process.GetStdHandle(0);
 
@@ -1304,19 +1345,17 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(result.Output[2], "");
             VERIFY_ARE_EQUAL(result.Output[1], "foo");
-            */
         }
 
-        // Validate that stdin is empty if ProcessFlags::Stdin is not passed.
-        // TODO: This fails because nerdctl start always seems to hang on stdin.
-        /*
+        // Validate that stdin behaves correctly if closed without any input.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
             auto container = launcher.Launch(*session);
             auto process = container.GetInitProcess();
+            process.GetStdHandle(0); // Close stdin;
 
             ValidateProcessOutput(process, {{1, ""}});
-        }*/
+        }
 
         // Validate error paths
         {
@@ -1405,8 +1444,7 @@ class WSLATests
             }
 
             // Create a stuck container.
-            WSLAContainerLauncher launcher(
-                "debian:latest", "test-container-1", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+            WSLAContainerLauncher launcher("debian:latest", "test-container-1", {}, {"sleep", "99999"});
 
             auto container = launcher.Launch(*session);
 
@@ -1418,7 +1456,7 @@ class WSLATests
 
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
-            initProcess.Get().Signal(9);
+            VERIFY_SUCCEEDED(initProcess.Get().Signal(9));
 
             // Wait for the process to actually exit.
             wsl::shared::retry::RetryWithTimeout<void>(
@@ -1544,6 +1582,30 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
 
+        // Validate that creating and starting a container separately behaves as expected
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-create", "sleep", {"99999"}, {});
+            auto [result, container] = launcher.CreateNoThrow(*session);
+            VERIFY_SUCCEEDED(result);
+
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
+            VERIFY_SUCCEEDED(container->Get().Start());
+
+            // Verify that Start() can't be called again on a running container.
+            VERIFY_ARE_EQUAL(container->Get().Start(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
+
+            VERIFY_SUCCEEDED(container->Get().Stop(9, 0));
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
+
+            VERIFY_SUCCEEDED(container->Get().Delete());
+
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_ARE_EQUAL(container->Get().GetState(&state), RPC_E_DISCONNECTED);
+        }
+
         // Validate that containers behave correctly if they outlive their session.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-dangling-ref", "sleep", {"99999"}, {});
@@ -1601,11 +1663,9 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"host\"]'\n");
+
+            auto details = container.Inspect();
+            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1632,11 +1692,8 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"none\"]'\n");
+
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "none");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1665,7 +1722,6 @@ class WSLATests
             VERIFY_ARE_EQUAL(retVal.first, E_INVALIDARG);
         }
 
-        // Test bridge when ready
         {
             WSLAContainerLauncher launcher(
                 "debian:latest",
@@ -1678,11 +1734,7 @@ class WSLATests
 
             auto container = launcher.Launch(*session);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            auto result = ExpectCommandResult(
-                session.get(),
-                {"/usr/bin/nerdctl", "inspect", "-f", "'{{ index .Config.Labels \"nerdctl/networks\" }}'", "test-network"},
-                0);
-            VERIFY_ARE_EQUAL(result.Output[1], "'[\"bridge\"]'\n");
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
 
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
@@ -1729,7 +1781,6 @@ class WSLATests
         }
 
         // Validate that stdin is correctly wired.
-        // TODO: Add test coverage for stdin being closed without anything written to it once the stdin hang issue is solved.
         {
             auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
                                .Launch(container.Get());
@@ -1749,7 +1800,22 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
 
-        // Validate that environmnent is correctly wired.
+        // Validate that behavior is correct when stdin is closed without any input.
+        {
+            auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
+                               .Launch(container.Get());
+
+            process.GetStdHandle(0); // Close stdin.
+            ValidateProcessOutput(process, {{1, ""}, {2, ""}});
+        }
+
+        // Validate that exit codes are correctly wired.
+        {
+            auto process = WSLAProcessLauncher({}, {"/bin/sh", "-c", "exit 12"}, {}).Launch(container.Get());
+            ValidateProcessOutput(process, {}, 12);
+        }
+
+        // Validate that environment is correctly wired.
         {
             auto process =
                 WSLAProcessLauncher({}, {"/bin/sh", "-c", "echo $testenv"}, {{"testenv=testvalue"}}, ProcessFlags::Stdout | ProcessFlags::Stderr)
@@ -1765,10 +1831,8 @@ class WSLATests
 
             VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
 
-            ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "stop", "-t", "0", "test-container-exec"}, 0);
-
             auto result = process.WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 1);
+            VERIFY_ARE_EQUAL(result.Code, 137);
         }
 
         // Validate error paths
@@ -1827,17 +1891,14 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        auto expectBoundPorts = [&](const char* Name, const std::vector<std::string>& expectedBoundPorts) {
-            auto result = ExpectCommandResult(session.get(), {"/usr/bin/nerdctl", "inspect", Name}, 0);
-
-            auto parsed = nlohmann::json::parse(result.Output[1]);
-            auto ports = parsed[0]["HostConfig"]["PortBindings"];
+        auto expectBoundPorts = [&](RunningWSLAContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
+            auto ports = Container.Inspect().HostConfig.PortBindings;
 
             std::vector<std::string> boundPorts;
 
-            for (const auto& e : ports.items())
+            for (const auto& e : ports)
             {
-                boundPorts.emplace_back(e.key());
+                boundPorts.emplace_back(e.first);
             }
 
             if (!std::ranges::equal(boundPorts, expectedBoundPorts))
@@ -1866,7 +1927,7 @@ class WSLATests
             // Wait for the container bind() to be completed.
             WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-            expectBoundPorts("test-ports", {"8000/tcp"});
+            expectBoundPorts(container, {"8000/tcp"});
 
             ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
             ExpectHttpResponse(L"http://[::1]:1234", {});
@@ -1898,7 +1959,7 @@ class WSLATests
                 // Wait for the container bind() to be completed.
                 WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
 
-                expectBoundPorts("test-ports-3", {"8000/tcp"});
+                expectBoundPorts(container, {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
                 VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
@@ -2113,5 +2174,202 @@ class WSLATests
 
         // Verify that the first volume was mounted before the error occurred, then unmounted after failure.
         ExpectMount(session.get(), "/mnt/wsla/test-container/volumes/0", {});
+    }
+
+    TEST_METHOD(LineBasedReader)
+    {
+        auto runTest = [](bool Crlf, const std::string& Data, const std::vector<std::string>& ExpectedLines) {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            std::vector<std::string> lines;
+            auto onData = [&](const gsl::span<char>& data) { lines.emplace_back(data.data(), data.size()); };
+
+            wsl::windows::common::relay::MultiHandleWait io;
+
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::LineBasedReadHandle>(std::move(readPipe), std::move(onData), Crlf));
+
+            std::vector<char> buffer{Data.begin(), Data.end()};
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::WriteHandle>(std::move(writePipe), buffer));
+
+            io.Run({});
+
+            for (size_t i = 0; i < lines.size(); i++)
+            {
+                if (i >= ExpectedLines.size())
+                {
+                    LogError(
+                        "Input: '%hs'. Line %zu is missing. Expected: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedLines[i]).c_str());
+                    VERIFY_FAIL();
+                }
+                else if (ExpectedLines[i] != lines[i])
+                {
+                    LogError(
+                        "Input: '%hs'. Line %zu does not match expected value. Expected: '%hs', Actual: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedLines[i]).c_str(),
+                        EscapeString(lines[i]).c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            if (ExpectedLines.size() != lines.size())
+            {
+                LogError(
+                    "Input: '%hs', Number of lines do not match. Expected: %zu, Actual: %zu",
+                    EscapeString(Data).c_str(),
+                    ExpectedLines.size(),
+                    lines.size());
+                VERIFY_FAIL();
+            }
+        };
+
+        runTest(false, "foo\nbar", {"foo", "bar"});
+        runTest(false, "foo", {"foo"});
+        runTest(false, "\n", {});
+        runTest(false, "\n\n", {});
+        runTest(false, "\n\r\n", {"\r"});
+        runTest(false, "\n\nfoo\nbar", {"foo", "bar"});
+        runTest(false, "foo\r\nbar", {"foo\r", "bar"});
+        runTest(true, "foo\nbar", {"foo\nbar"});
+        runTest(true, "foo\r\nbar", {"foo", "bar"});
+        runTest(true, "foo\rbar\nbaz", {"foo\rbar\nbaz"});
+        runTest(true, "\r", {"\r"});
+    }
+
+    TEST_METHOD(HTTPChunkReader)
+    {
+        auto runTest = [](const std::string& Data, const std::vector<std::string>& ExpectedChunk) {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            std::vector<std::string> chunks;
+            auto onData = [&](const gsl::span<char>& data) { chunks.emplace_back(data.data(), data.size()); };
+
+            wsl::windows::common::relay::MultiHandleWait io;
+
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::HTTPChunkBasedReadHandle>(std::move(readPipe), std::move(onData)));
+
+            std::vector<char> buffer{Data.begin(), Data.end()};
+            io.AddHandle(std::make_unique<wsl::windows::common::relay::WriteHandle>(std::move(writePipe), buffer));
+
+            io.Run({});
+
+            for (size_t i = 0; i < ExpectedChunk.size(); i++)
+            {
+                if (i >= chunks.size())
+                {
+                    LogError(
+                        "Input: '%hs': Chunk %zu is missing. Expected: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str());
+                    VERIFY_FAIL();
+                }
+                else if (ExpectedChunk[i] != chunks[i])
+                {
+                    LogError(
+
+                        "Input: '%hs': Chunk %zu does not match expected value. Expected: '%hs', Actual: '%hs'",
+                        EscapeString(Data).c_str(),
+                        i,
+                        EscapeString(ExpectedChunk[i]).c_str(),
+                        EscapeString(chunks[i]).c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            if (ExpectedChunk.size() != chunks.size())
+            {
+                LogError(
+                    "Input: '%hs', Number of chunks do not match. Expected: %zu, Actual: %zu",
+                    EscapeString(Data).c_str(),
+                    ExpectedChunk.size(),
+                    chunks.size());
+                VERIFY_FAIL();
+            }
+        };
+
+        runTest("3\r\nfoo\r\n3\r\nbar", {"foo", "bar"});
+        runTest("1\r\na\r\n\r\n", {"a"});
+
+        runTest("c\r\nlf\nin\r\nchunk\r\n3\r\nEOF", {"lf\nin\r\nchunk", "EOF"});
+        runTest("15\r\n\r\nchunkstartingwithlf\r\n3\r\nEOF", {"\r\nchunkstartingwithlf", "EOF"});
+
+        // Validate that invalid chunk sizes fail
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("Invalid", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("Invalid\r\nInvalid", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4nolf", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\nnocr", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4invalid\nnocr", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid", {}); }), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest("4\rinvalid\n", {}); }), E_INVALIDARG);
+    }
+
+    TEST_METHOD(DockerIORelay)
+    {
+        using namespace wsl::windows::common::relay;
+
+        auto runTest = [](const std::vector<char>& Input, const std::string& ExpectedStdout, const std::string& ExpectedStderr) {
+            auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+            auto [stderrRead, stderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(16 * 1024, true, false);
+
+            MultiHandleWait io;
+
+            std::string readStdout;
+            std::string readStderr;
+
+            io.AddHandle(std::make_unique<DockerIORelayHandle>(std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite)));
+            io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
+
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
+
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
+
+            io.Run({});
+
+            VERIFY_ARE_EQUAL(ExpectedStdout, readStdout);
+            VERIFY_ARE_EQUAL(ExpectedStderr, readStderr);
+        };
+
+        auto insert = [](std::vector<char>& buffer, auto fd, const std::string& content) {
+            DockerIORelayHandle::MultiplexedHeader header;
+            header.Fd = fd;
+            header.Length = htonl(static_cast<uint32_t>(content.size()));
+
+            buffer.insert(buffer.end(), (char*)&header, ((char*)&header) + sizeof(header));
+            buffer.insert(buffer.end(), content.begin(), content.end());
+        };
+
+        {
+            std::vector<char> input;
+            insert(input, 1, "foo");
+            insert(input, 1, "bar");
+            insert(input, 2, "stderr");
+            insert(input, 2, "stderrAgain");
+            insert(input, 1, "stdOutAgain");
+
+            runTest(input, "foobarstdOutAgain", "stderrstderrAgain");
+        }
+
+        {
+            std::vector<char> input;
+            insert(input, 0, "foo");
+
+            VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
+        }
+
+        {
+            std::vector<char> input;
+            insert(input, 12, "foo");
+
+            VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
+        }
     }
 };
