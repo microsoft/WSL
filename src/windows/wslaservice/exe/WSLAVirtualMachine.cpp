@@ -32,7 +32,7 @@ constexpr auto MAX_CRASH_DUMPS = 10;
 constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
 constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
 constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
-constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20001, 65535);
+constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
@@ -112,16 +112,16 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
         CATCH_LOG()
     }
 
-    try
+    if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
     {
         // If the VM did not crash, the saved state file should be empty, so we can remove it.
-        if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
+        try
         {
             WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
             std::filesystem::remove(m_vmSavedStateFile);
         }
+        CATCH_LOG()
     }
-    CATCH_LOG()
 
     if (m_processExitThread.joinable())
     {
@@ -146,8 +146,19 @@ void WSLAVirtualMachine::Start()
     hcs::ComputeSystem systemSettings{};
     systemSettings.Owner = L"WSL";
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
-    systemSettings.SchemaVersion.Major = 2;
-    systemSettings.SchemaVersion.Minor = 7;
+
+    // Determine which schema version to use based on the Windows version. Windows 10 does not support
+    // newer schema versions and some features may be disabled as a result.
+    if (wsl::windows::common::helpers::IsWindows11OrAbove())
+    {
+        systemSettings.SchemaVersion.Major = 2;
+        systemSettings.SchemaVersion.Minor = 7;
+    }
+    else
+    {
+        systemSettings.SchemaVersion.Major = 2;
+        systemSettings.SchemaVersion.Minor = 3;
+    }
 
     hcs::VirtualMachine vmSettings{};
     vmSettings.StopOnReset = true;
@@ -162,12 +173,8 @@ void WSLAVirtualMachine::Start()
     // Configure backing page size, fault cluster shift size, and cold discard hint size to favor density (lower vmmem usage).
     //
     // N.B. Cold discard hint size should be a multiple of the fault cluster shift size.
-    //
-    // N.B. This is only done on builds that have the fix for the VID deadlock on partition teardown.
-    if ((m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Cobalt && m_windowsVersion.UpdateBuildRevision >= 2360) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Iron && m_windowsVersion.UpdateBuildRevision >= 1970) ||
-        (m_windowsVersion.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && m_windowsVersion.UpdateBuildRevision >= 3393))
+    const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+    if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
     {
         vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
         vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;          // 64k
@@ -275,29 +282,87 @@ void WSLAVirtualMachine::Start()
         vmSettings.Chipset.Uefi = std::move(uefiSettings);
     }
 
-    // Initialize other devices.
-    vmSettings.Devices.Scsi["0"] = hcs::Scsi{};
-    hcs::HvSocket hvSocketConfig{};
+#ifdef WSL_KERNEL_MODULES_PATH
+
+    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
+
+#else
+
+    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
+
+#endif
+
+    // Initialize the boot VHDs.
+    std::variant<ULONG, std::string> rootVhd;
+    std::variant<ULONG, std::string> modulesVhd;
+    hcs::Scsi scsiController{};
+    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
+    {
+        ULONG nextLun = 0;
+        auto attachScsiDisk = [&](PCWSTR path) {
+            auto lun = nextLun;
+            nextLun += 1;
+            hcs::Attachment disk{};
+            disk.Type = hcs::AttachmentType::VirtualDisk;
+            disk.Path = path;
+            disk.ReadOnly = true;
+            disk.SupportCompressedVolumes = true;
+            disk.AlwaysAllowSparseFiles = true;
+            disk.SupportEncryptedFiles = true;
+            scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+            AttachedDisk attachedDisk{path};
+            m_attachedDisks.emplace(lun, std::move(attachedDisk));
+            return lun;
+        };
+
+        rootVhd = attachScsiDisk(m_settings.RootVhd.c_str());
+        modulesVhd = attachScsiDisk(kernelModulesPath.c_str());
+    }
+    else
+    {
+        hcs::VirtualPMemController pmemController;
+        pmemController.MaximumCount = 0;
+        pmemController.MaximumSizeBytes = 0;
+        pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
+        auto attachPmemDisk = [&](PCWSTR path) {
+            ULONG deviceId = pmemController.MaximumCount;
+            pmemController.MaximumCount += 1;
+            hcs::VirtualPMemDevice vhd;
+            vhd.HostPath = path;
+            vhd.ReadOnly = true;
+            vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
+            pmemController.Devices[std::to_string(deviceId)] = std::move(vhd);
+            return std::format("/dev/pmem{}", deviceId);
+        };
+
+        rootVhd = attachPmemDisk(m_settings.RootVhd.c_str());
+        modulesVhd = attachPmemDisk(kernelModulesPath.c_str());
+        vmSettings.Devices.VirtualPMem = std::move(pmemController);
+    }
+
+    // Initialize the SCSI controller.
+    vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 
     // Construct a security descriptor that allows system and the current user.
     wil::unique_hlocal_string userSidString;
     THROW_LAST_ERROR_IF(!ConvertSidToStringSidW(m_userSid, &userSidString));
 
-    std::wstring securityDescriptor{L"D:P(A;;FA;;;SY)(A;;FA;;;"};
-    securityDescriptor += userSidString.get();
-    securityDescriptor += L")";
+    std::wstring securityDescriptor = std::format(L"D:P(A;;FA;;;SY)(A;;FA;;;{})", userSidString.get());
+    hcs::HvSocket hvSocketConfig{};
     hvSocketConfig.HvSocketConfig.DefaultBindSecurityDescriptor = securityDescriptor;
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
 
-    CreateVmSavedStateFile();
-    WI_ASSERT(!m_vmSavedStateFile.empty());
+    // Enable .vmrs dump collection if supported.
+    if (wsl::windows::common::helpers::IsWindows11OrAbove())
+    {
+        CreateVmSavedStateFile();
+        WI_ASSERT(!m_vmSavedStateFile.empty());
 
-    // Prepare debug options: create saved state (.vmrs) file and grant vmwp access.
-    hcs::DebugOptions debugOptions{};
-    debugOptions.BugcheckSavedStateFileName = m_vmSavedStateFile;
-
-    vmSettings.DebugOptions = std::move(debugOptions);
+        hcs::DebugOptions debugOptions{};
+        debugOptions.BugcheckSavedStateFileName = m_vmSavedStateFile;
+        vmSettings.DebugOptions = std::move(debugOptions);
+    }
 
     systemSettings.VirtualMachine = std::move(vmSettings);
     auto json = wsl::shared::ToJsonW(systemSettings);
@@ -343,51 +408,29 @@ void WSLAVirtualMachine::Start()
 
     ConfigureNetworking();
 
-    // Mount the kernel modules VHD.
-
-#ifdef WSL_KERNEL_MODULES_PATH
-
-    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
-
-#else
-
-    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
-
-#endif
-
-    auto [_, device] = AttachDisk(kernelModulesPath.c_str(), true);
-    Mount(m_initChannel, device.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
-
-    // Configure GPU if requested.
-    if (FeatureEnabled(WslaFeatureFlagsGPU))
-    {
-        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
-        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
-        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
-        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
-        gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
+    // Configure mounts.
+    auto getDevicePath = [&](std::variant<ULONG, std::string>& vhd) -> const std::string& {
+        // If the variant holds the SCSI LUN, query the guest for the device path.
+        if (std::holds_alternative<ULONG>(vhd))
         {
-            gpuRequest.Settings.DisableGdiAcceleration = true;
-            gpuRequest.Settings.DisablePresentation = true;
+            const auto lun = std::get<ULONG>(vhd);
+            auto it = m_attachedDisks.find(lun);
+            WI_ASSERT(it != m_attachedDisks.end() && it->second.Device.empty());
+
+            it->second.Device = GetVhdDevicePath(lun);
+            vhd = it->second.Device;
         }
 
-        wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
-    }
+        return std::get<std::string>(vhd);
+    };
 
-    ConfigureMounts();
-}
-
-void WSLAVirtualMachine::ConfigureMounts()
-{
-    auto [_, device] = AttachDisk(m_settings.RootVhd.c_str(), true);
-
-    Mount(m_initChannel, device.c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
+    Mount(m_initChannel, getDevicePath(rootVhd).c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
     Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
-    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "tmpfs", "uid=0,gid=0,mode=0755", 0);
+    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
+    Mount(m_initChannel, getDevicePath(modulesVhd).c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
 
     std::vector<const char*> cgroups = {
         "cpuset",
@@ -409,9 +452,21 @@ void WSLAVirtualMachine::ConfigureMounts()
         Mount(m_initChannel, nullptr, std::format("/sys/fs/cgroup/{}", e).c_str(), "cgroup", e, 0);
     }
 
-    if (FeatureEnabled(WslaFeatureFlagsGPU)) // TODO: re-think how GPU settings should work at the session level API.
+    // Configure GPU if requested.
+    if (FeatureEnabled(WslaFeatureFlagsGPU))
     {
-        MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
+        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
+        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
+        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
+        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
+        gpuRequest.Settings.AllowVendorExtension = true;
+        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
+        {
+            gpuRequest.Settings.DisableGdiAcceleration = true;
+            gpuRequest.Settings.DisablePresentation = true;
+        }
+
+        wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
     }
 }
 
@@ -538,11 +593,11 @@ void WSLAVirtualMachine::ConfigureNetworking()
         // TODO: refactor this to avoid using wsl config
         static wsl::core::Config config(nullptr);
 
-        // TODO-WSLA: Implement firewall logic
-        /*if (!wsl::core::MirroredNetworking::IsHyperVFirewallSupported(config))
+        // Disable HyperV Firewall if not supported
+        if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(config))
         {
             config.FirewallConfig.reset();
-        }*/
+        }
 
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
             m_computeSystem.get(),
@@ -691,17 +746,10 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
 
         vhdAdded = true;
 
-        WSLA_GET_DISK message{};
-        message.Header.MessageSize = sizeof(message);
-        message.Header.MessageType = WSLA_GET_DISK::Type;
-        message.ScsiLun = Lun;
-        const auto& response = m_initChannel.Transaction(message);
-
-        THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to attach disk, init returned: %lu", response.Result);
-
+        const auto devicePath = GetVhdDevicePath(Lun);
         cleanup.release();
 
-        disk.Device = response.Buffer;
+        disk.Device = std::move(devicePath);
         Device = disk.Device;
         m_attachedDisks.emplace(Lun, std::move(disk));
     });
@@ -810,6 +858,18 @@ WSLAVirtualMachine::ConnectedSocket WSLAVirtualMachine::ConnectSocket(wsl::share
     }
 
     return socket;
+}
+
+std::string WSLAVirtualMachine::GetVhdDevicePath(ULONG Lun)
+{
+    WSLA_GET_DISK message{};
+    message.Header.MessageSize = sizeof(message);
+    message.Header.MessageType = WSLA_GET_DISK::Type;
+    message.ScsiLun = Lun;
+    const auto& response = m_initChannel.Transaction(message);
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to get disk path, init returned: %lu", response.Result);
+
+    return response.Buffer;
 }
 
 void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd)

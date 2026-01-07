@@ -287,8 +287,11 @@ Abstract:
 // Definitions used by WSLA
 //
 
-constexpr auto c_ephemeralPortRange = std::pair<uint16_t, uint16_t>(10000, 20000);
+constexpr auto c_ephemeralPortRange = std::pair<uint16_t, uint16_t>(10000, 20001);
 
+static_assert((c_ephemeralPortRange.first & 1) ^ (c_ephemeralPortRange.second & 1), "port range must have different parities");
+
+//
 // The types of messages that can be sent to init and mini init.
 //
 
