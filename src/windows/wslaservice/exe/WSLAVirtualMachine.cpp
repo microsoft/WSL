@@ -429,8 +429,8 @@ void WSLAVirtualMachine::Start()
     Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
     Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
     Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
-    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
     Mount(m_initChannel, getDevicePath(modulesVhd).c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
+    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "tmpfs", "uid=0,gid=0,mode=0755", 0);
 
     std::vector<const char*> cgroups = {
         "cpuset",

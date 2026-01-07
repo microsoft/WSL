@@ -598,7 +598,7 @@ CATCH_RETURN();
 void WSLASession::OnUserSessionTerminating()
 {
     // m_sessionTerminatingEvent is always valid, so it can be signalled with the lock.
-    // This allows a sesssion to be unblocked if a stuck operation is holding the lock.
+    // This allows a session to be unblocked if a stuck operation is holding the lock.
     m_sessionTerminatingEvent.SetEvent();
 
     std::lock_guard lock{m_lock};
