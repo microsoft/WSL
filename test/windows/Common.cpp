@@ -932,7 +932,7 @@ for pid in "${pids_to_dump[@]}" ; do
          echo "Failed to dump process $pid"
      fi
 
-     rm "core.$pid" 
+     rm "core.$pid"
    fi
 done
 
@@ -2082,8 +2082,8 @@ Return Value:
         -ExecutionPolicy Bypass \
         -Command \"" +
         setupScript.value() + L" -Version '" + getTestParam(L"Version") + L"'" + L" -DistroPath " + g_testDistroPath +
-        L" -DistroName " + LXSS_DISTRO_NAME_TEST_L + L" -Package '" + getTestParam(L"Package") + L"'" + L" -WslaPackage '" + getTestParam(L"WslaPackage") + L"'" + L" -UnitTestsPath " +
-        getOptionalTestParam(L"UnitTestsPath").value_or(L"$null");
+        L" -DistroName " + LXSS_DISTRO_NAME_TEST_L + L" -Package '" + getTestParam(L"Package") + L"'" + L" -WslaPackage '" +
+        getTestParam(L"WslaPackage") + L"'" + L" -UnitTestsPath " + getOptionalTestParam(L"UnitTestsPath").value_or(L"$null");
 
     if (getOptionalTestParam(L"AllowUnsigned") == L"1")
     {
