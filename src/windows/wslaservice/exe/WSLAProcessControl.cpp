@@ -167,7 +167,7 @@ void VMProcessControl::Signal(int Signal)
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), m_vm == nullptr || m_exitEvent.is_signaled());
 
-    m_vm->Signal(m_pid, Signal);
+    THROW_IF_FAILED(m_vm->Signal(m_pid, Signal));
 }
 
 void VMProcessControl::ResizeTty(ULONG Rows, ULONG Columns)

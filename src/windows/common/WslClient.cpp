@@ -1820,10 +1820,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     process->GetExitEvent().wait();
 
-    auto [code, signalled] = process->GetExitState();
-    wprintf(L"%hs exited with: %i%hs", shell.c_str(), code, signalled ? " (signalled)" : "");
+    auto exitCode = process->GetExitCode();
+    wprintf(L"%hs exited with: %i", shell.c_str(), exitCode);
 
-    return code;
+    return exitCode;
 }
 
 int WslMain(_In_ std::wstring_view commandLine)

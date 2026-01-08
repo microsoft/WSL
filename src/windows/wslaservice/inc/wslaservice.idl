@@ -49,8 +49,7 @@ typedef enum _WSLAProcessState
 {
     WSLAProcessStateUnknown,
     WSLAProcessStateRunning,
-    WSLAProcessStateExited,
-    WSLAProcessStateSignaled
+    WSLAProcessStateExited
 } WSLAProcessState;
 
 typedef struct _WSLA_PROCESS_FD
@@ -91,6 +90,7 @@ typedef enum _WSLAFDFlags
 typedef enum _WSLASignal
 {
     WSLASignalSIGKILL = 9,
+    WSLASignalSIGSEV = 11,
     WSLASignalSIGTERM = 15
 } WSLASignal;
 
