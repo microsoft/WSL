@@ -72,8 +72,9 @@ Abstract:
 #define CROSS_DISTRO_SHARE_PATH "/mnt/wsl"
 #define DEVFS_PATH "/dev"
 #define DEVNULL_PATH DEVFS_PATH "/null"
-#define DHCLIENT_CONF_PATH "/dhclient.conf"
-#define DHCLIENT_PATH "/usr/sbin/dhclient"
+#define DHCPCD_CONF_PATH "/dhcpcd.conf"
+#define DHCPCD_PATH "/usr/sbin/dhcpcd"
+
 #define DISTRO_PATH "/distro"
 #define ETC_PATH "/etc"
 #define GPU_SHARE_PREFIX "/gpu_"
@@ -1245,14 +1246,14 @@ Return Value:
 {
     int ChildPid = UtilCreateChildProcess("dhcp", [DhcpTimeout]() {
         //
-        // Create a new mount namespace for dhclient.
+        // Create a new mount namespace for dhcpcd.
         //
 
         THROW_LAST_ERROR_IF(unshare(CLONE_NEWNS) < 0);
 
         //
-        // When dhclient receives a DHCP response, it calls dhclient-script
-        // which creates a new file, and then moves it to /etc/resolv.conf.
+        // When dhcpcd receives a DHCP response, it calls dhcpcd hooks
+        // which create a new file, and then move it to /etc/resolv.conf.
         // Because it's moved, it will overwrite any symlinks / hardlinks.
         // Mounting /etc over /share allows resolv.conf to be written to /share.
         //
@@ -1260,19 +1261,17 @@ Return Value:
         THROW_LAST_ERROR_IF(mount(CROSS_DISTRO_SHARE_PATH, ETC_PATH, NULL, MS_BIND, NULL) < 0);
 
         //
-        // Write the dhclient.conf config file.
+        // Write the dhcpcd.conf config file and run in oneshot mode.
         //
 
         std::string Config = std::format(
-            "request subnet-mask, broadcast-address, routers,"
-            "domain-name, domain-name-servers, domain-search, host-name,"
-            "interface-mtu;\n"
-            "timeout {};\n",
+            "option subnet_mask, routers, domain_name, domain_name_servers, domain_search, host_name, interface_mtu\n"
+            "timeout {}\n",
             DhcpTimeout);
 
-        THROW_LAST_ERROR_IF(WriteToFile(DHCLIENT_CONF_PATH, Config.c_str()) < 0);
+        THROW_LAST_ERROR_IF(WriteToFile(DHCPCD_CONF_PATH, Config.c_str()) < 0);
 
-        execl(DHCLIENT_PATH, DHCLIENT_PATH, "-4", "eth0", "-cf", DHCLIENT_CONF_PATH, NULL);
+        execl(DHCPCD_PATH, DHCPCD_PATH, "-1", "-4", "-f", DHCPCD_CONF_PATH, "eth0", NULL);
         LOG_ERROR("execl() failed, {}", errno);
     });
 
@@ -1282,11 +1281,11 @@ Return Value:
     }
 
     //
-    // Note: dhclient returns when the interface is successfully configured,
+    // Note: dhcpcd returns when the interface is successfully configured,
     // but keeps a daemon running to maintain it.
     //
 
-    return WaitForChild(ChildPid, DHCLIENT_PATH);
+    return WaitForChild(ChildPid, DHCPCD_PATH);
 }
 
 int StartGuestNetworkService(int GnsFd, wil::unique_fd&& DnsTunnelingFd, uint32_t DnsTunnelingIpAddress)
