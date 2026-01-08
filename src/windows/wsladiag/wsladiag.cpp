@@ -28,15 +28,15 @@ using wsl::windows::common::WSLAProcessLauncher;
 // Adding a helper to factor error handling between all the arguments.
 static int ReportError(const std::wstring& context, HRESULT hr)
 {
-    const std::wstring hrMessage = wslutil::ErrorCodeToString(hr);
+    const std::wstring hrMessage = wslutil::GetErrorString(hr);
 
     if (!hrMessage.empty())
     {
-        wslutil::PrintMessage(std::format(L"{}: 0x{:08x} - {}", context, static_cast<unsigned int>(hr), hrMessage), stderr);
+        wslutil::PrintMessage(std::format(L"{}: 0x{:08x} - {}", context, static_cast<uint32_t>(hr), hrMessage), stderr);
     }
     else
     {
-        wslutil::PrintMessage(std::format(L"{}: 0x{:08x}", context, static_cast<unsigned int>(hr)), stderr);
+        wslutil::PrintMessage(std::format(L"{}: 0x{:08x}", context, static_cast<uint32_t>(hr)), stderr);
     }
 
     return 1;
@@ -64,11 +64,11 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     {
         if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
         {
-            wslutil::PrintMessage(std::format(L"Session not found: '{}'", sessionName), stderr);
+            wslutil::PrintMessage(Localization::MessageWslaSessionNotFound(sessionName.c_str()), stderr);
             return 1;
         }
 
-        return ReportError(std::format(L"OpenSessionByName('{}') failed", sessionName), hr);
+        return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
     }
 
     log(L"[diag] OpenSessionByName succeeded");
@@ -179,10 +179,17 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), consoleOut, exitEvent.get());
 
     process.GetExitEvent().wait();
-    auto [code, signalled] = process.GetExitState();
+    auto [exitCode, signalled] = process.GetExitState();
 
     std::wstring shellWide(shell.begin(), shell.end());
-    wslutil::PrintMessage(std::format(L"{} exited with: {}{}", shellWide, code, signalled ? L" (signalled)" : L""), stdout);
+    std::wstring message = Localization::MessageWslaShellExited(shellWide.c_str(), exitCode);
+
+    if (signalled)
+    {
+        message += Localization::MessageWslaShellSignalled();
+    }
+
+    wslutil::PrintMessage(message, stdout);
 
     return 0;
 }
@@ -198,46 +205,72 @@ static int RunListCommand(bool /*verbose*/)
 
     if (sessions.size() == 0)
     {
-        wslutil::PrintMessage(L"No WSLA sessions found.", stdout);
+        wslutil::PrintMessage(Localization::MessageWslaNoSessionsFound(), stdout);
         return 0;
     }
 
-    wslutil::PrintMessage(std::format(L"Found {} WSLA session{}:", sessions.size(), sessions.size() > 1 ? L"s" : L""), stdout);
+    wslutil::PrintMessage(Localization::MessageWslaSessionsFound(sessions.size(), sessions.size() == 1 ? L"" : L"s"), stdout);
+    // Compute column widths from headers + data.
+    const auto idHeader = Localization::MessageWslaHeaderId();
+    const auto pidHeader = Localization::MessageWslaHeaderCreatorPid();
+    const auto nameHeader = Localization::MessageWslaHeaderDisplayName();
 
-    // Compute column widths from headers + data (same pattern as wsl --list).
-    size_t idWidth = wcslen(L"ID");
-    size_t pidWidth = wcslen(L"Creator PID");
+    size_t idWidth = idHeader.size();
+    size_t pidWidth = pidHeader.size();
+    size_t nameWidth = nameHeader.size();
 
     for (const auto& s : sessions)
     {
         idWidth = std::max(idWidth, std::to_wstring(s.SessionId).size());
         pidWidth = std::max(pidWidth, std::to_wstring(s.CreatorPid).size());
+        nameWidth = std::max(nameWidth, static_cast<size_t>(s.DisplayName ? wcslen(s.DisplayName) : 0));
     }
 
     // Header
-    wprintf(L"%-*ls  %-*ls  %ls\n", static_cast<int>(idWidth), L"ID", static_cast<int>(pidWidth), L"Creator PID", L"Display Name");
+    wprintf(
+        L"%-*ls  %-*ls  %-*ls\n",
+        static_cast<int>(idWidth),
+        idHeader.c_str(),
+        static_cast<int>(pidWidth),
+        pidHeader.c_str(),
+        static_cast<int>(nameWidth),
+        nameHeader.c_str());
 
     // Underline
     std::wstring idDash(idWidth, L'-');
     std::wstring pidDash(pidWidth, L'-');
-    std::wstring nameDash(wcslen(L"Display Name"), L'-');
+    std::wstring nameDash(nameWidth, L'-');
 
     wprintf(
-        L"%-*ls  %-*ls  %ls\n", static_cast<int>(idWidth), idDash.c_str(), static_cast<int>(pidWidth), pidDash.c_str(), nameDash.c_str());
+        L"%-*ls  %-*ls  %-*ls\n",
+        static_cast<int>(idWidth),
+        idDash.c_str(),
+        static_cast<int>(pidWidth),
+        pidDash.c_str(),
+        static_cast<int>(nameWidth),
+        nameDash.c_str());
 
     // Rows
     for (const auto& s : sessions)
     {
+        const wchar_t* displayName = s.DisplayName ? s.DisplayName : L"";
+
         wprintf(
-            L"%-*lu  %-*lu  %ls\n",
+            L"%-*lu  %-*lu  %-*ls\n",
             static_cast<int>(idWidth),
             static_cast<unsigned long>(s.SessionId),
             static_cast<int>(pidWidth),
             static_cast<unsigned long>(s.CreatorPid),
-            s.DisplayName);
+            static_cast<int>(nameWidth),
+            displayName);
     }
 
     return 0;
+}
+
+static void PrintUsage()
+{
+    wslutil::PrintMessage(Localization::MessageWsladiagUsage(), stderr);
 }
 
 int wsladiag_main(std::wstring_view commandLine)
@@ -269,16 +302,6 @@ int wsladiag_main(std::wstring_view commandLine)
     parser.AddArgument(help, L"--help", L'h');
     parser.AddArgument(verbose, L"--verbose", L'v');
 
-    auto printUsage = []() {
-        wslutil::PrintMessage(
-            L"wsladiag - WSLA diagnostics tool\n"
-            L"Usage:\n"
-            L"  wsladiag list\n"
-            L"  wsladiag shell <SessionName> [--verbose]\n"
-            L"  wsladiag --help\n",
-            stderr);
-    };
-
     try
     {
         parser.Parse();
@@ -288,7 +311,7 @@ int wsladiag_main(std::wstring_view commandLine)
         const auto hr = wil::ResultFromCaughtException();
         if (hr == E_INVALIDARG)
         {
-            printUsage();
+            PrintUsage();
             return 1;
         }
         throw;
@@ -296,7 +319,7 @@ int wsladiag_main(std::wstring_view commandLine)
 
     if (help || verb.empty())
     {
-        printUsage();
+        PrintUsage();
         return 0;
     }
     else if (verb == L"list")
@@ -307,15 +330,16 @@ int wsladiag_main(std::wstring_view commandLine)
     {
         if (shellSession.empty())
         {
-            printUsage();
+            PrintUsage();
             return 1;
         }
         return RunShellCommand(shellSession, verbose);
     }
     else
     {
-        wslutil::PrintMessage(std::format(L"Unknown command: '{}'", verb), stderr);
-        printUsage();
+        wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
+        PrintUsage();
+
         return 1;
     }
 }
