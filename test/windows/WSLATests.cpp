@@ -127,7 +127,6 @@ class WSLATests
     {
         auto result = RunCommand(session, command, timeout);
 
-
         if (result.Code != expectResult)
         {
             auto cmd = wsl::shared::string::Join(command, ' ');
@@ -1137,7 +1136,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(process.Get().GetStdHandle(1, reinterpret_cast<ULONG*>(&dummyHandle)), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that trying to acquire a std handle that doesn't exist fails as expected.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), E_INVALIDARG);
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             VERIFY_SUCCEEDED(session->Shutdown(30 * 1000));
