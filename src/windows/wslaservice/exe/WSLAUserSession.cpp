@@ -84,7 +84,7 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
     std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
 
     ForEachSession<void>([&](const auto& session) {
-        auto it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{
+        const auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{
             .SessionId = session.GetId(),
             .CreatorPid = 0,
         });
@@ -95,7 +95,7 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());
     for (auto i = 0; i < sessionInfo.size(); i++)
     {
-        memcpy(&output[i], &sessionInfo[i], sizeof(output[i]));
+        memcpy(&output[i], &sessionInfo[i], sizeof(WSLA_SESSION_INFORMATION));
     }
 
     *Sessions = output.release();
