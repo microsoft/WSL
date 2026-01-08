@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAProcessControl.cpp
+
+Abstract:
+
+    Contains the different WSLAProcessControl definitions for process control logic.
+
+--*/
+
 #include "precomp.h"
 
 #include "WSLAProcessControl.h"

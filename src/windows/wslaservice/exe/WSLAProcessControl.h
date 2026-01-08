@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAProcessControl.h
+
+Abstract:
+
+    Contains the different WSLAProcessControl definitions for process control logic.
+
+--*/
+
 #pragma once
 #include "wslaservice.h"
 #include "DockerHTTPClient.h"

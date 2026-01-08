@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAProcessIO.h
+
+Abstract:
+
+    Contains the different WSLAProcessIO definitions for process IO handling.
+
+--*/
+
 #pragma once
 #include "wslaservice.h"
 

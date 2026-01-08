@@ -185,11 +185,6 @@ static int RunShellCommand(const std::wstring& sessionName, bool verbose)
     std::wstring shellWide(shell.begin(), shell.end());
     std::wstring message = Localization::MessageWslaShellExited(shellWide.c_str(), exitCode);
 
-    if (signalled)
-    {
-        message += Localization::MessageWslaShellSignalled();
-    }
-
     wslutil::PrintMessage(message, stdout);
 
     return 0;

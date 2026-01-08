@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLAProcessIO.cpp
+
+Abstract:
+
+    Contains the different WSLAProcessIO implementations for process IO handling.
+
+--*/
+
 #include "precomp.h"
 
 #include "WSLAProcessIO.h"
