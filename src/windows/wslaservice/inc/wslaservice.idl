@@ -90,7 +90,7 @@ typedef enum _WSLAFDFlags
 typedef enum _WSLASignal
 {
     WSLASignalSIGKILL = 9,
-    WSLASignalSIGSEV = 11,
+    WSLASignalSIGSEGV = 11,
     WSLASignalSIGTERM = 15
 } WSLASignal;
 

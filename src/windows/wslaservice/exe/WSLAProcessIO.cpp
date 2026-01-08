@@ -87,8 +87,8 @@ wil::unique_handle RelayedProcessIO::OpenFd(ULONG Fd, WSLAFDFlags Flags)
 
     auto it = m_relayedHandles->find(Fd);
 
-    THROW_HR_IF_MSG(E_INVALIDARG, it == m_relayedHandles->end(), "Invalid fd type for relayed process: %i", static_cast<int>(Fd));
-    THROW_WIN32_IF_MSG(ERROR_INVALID_STATE, it == m_relayedHandles->end(), "Fd not found in relayed handles: %i", static_cast<int>(Fd));
+    THROW_HR_IF_MSG(E_INVALIDARG, it == m_relayedHandles->end(), "Fd not found in relayed handles: %i", static_cast<int>(Fd));
+    THROW_WIN32_IF_MSG(ERROR_INVALID_STATE, !it->second.is_valid(), "Fd already consumed: %i", static_cast<int>(Fd));
 
     return std::move(it->second);
 }
@@ -100,7 +100,7 @@ TTYProcessIO::TTYProcessIO(wil::unique_handle&& IoStream) : m_ioStream(std::move
 wil::unique_handle TTYProcessIO::OpenFd(ULONG Fd, WSLAFDFlags Flags)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Fd != WSLAFDTty, "Invalid fd type for TTY process: %i", static_cast<int>(Fd));
-    THROW_HR_IF_MSG(E_INVALIDARG, Flags != WSLAFDFlagsStream, "Invalid flags TTY process: %i", static_cast<int>(Flags));
+    THROW_HR_IF_MSG(E_INVALIDARG, Flags != WSLAFDFlagsStream, "Invalid flags for TTY process: %i", static_cast<int>(Flags));
 
     return std::move(m_ioStream);
 }

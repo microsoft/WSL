@@ -1185,10 +1185,10 @@ class WSLATests
             VERIFY_SUCCEEDED(process.Get().GetPid(&processId));
 
             // Send SIGSEV(11) to crash the process.
-            VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGSEV));
+            VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGSEGV));
 
             auto result = process.WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 128 + WSLASignalSIGSEV);
+            VERIFY_ARE_EQUAL(result.Code, 128 + WSLASignalSIGSEGV);
             VERIFY_ARE_EQUAL(result.Output[1], "");
             VERIFY_ARE_EQUAL(result.Output[2], "");
 

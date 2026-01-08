@@ -428,7 +428,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
                                       .StartExec(result.Id, common::docker_schema::StartExec{.Tty = hasTty, .ConsoleSize = request.ConsoleSize})
                                       .release()};
         std::unique_ptr<WSLAProcessIO> io;
-        if (m_tty)
+        if (hasTty)
         {
             io = std::make_unique<TTYProcessIO>(std::move(stream));
         }
