@@ -19,8 +19,7 @@ Abstract:
 using wsl::windows::service::wsla::WSLAProcess;
 
 WSLAProcess::WSLAProcess(std::unique_ptr<WSLAProcessControl>&& Control, std::unique_ptr<WSLAProcessIO>&& Io) :
-    m_control(std::move(Control)),
-    m_io(std::move(Io))
+    m_control(std::move(Control)), m_io(std::move(Io))
 {
 }
 

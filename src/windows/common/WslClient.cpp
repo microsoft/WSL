@@ -1781,14 +1781,14 @@ int WslaShell(_In_ std::wstring_view commandLine)
         HANDLE ttyOutput = nullptr;
         if (!containerImage.empty())
         {
-            auto& it = handleStorage.emplace_back(process->GetStdHandle(0));
+            auto& it = handleStorage.emplace_back(process->GetStdHandle(WSLAFDTty));
             ttyInput = it.get();
             ttyOutput = it.get();
         }
         else
         {
-            ttyInput = handleStorage.emplace_back(process->GetStdHandle(0)).get();
-            ttyOutput = handleStorage.emplace_back(process->GetStdHandle(1)).get();
+            ttyInput = handleStorage.emplace_back(process->GetStdHandle(WSLAFDStdin)).get();
+            ttyOutput = handleStorage.emplace_back(process->GetStdHandle(WSLAFDStdout)).get();
         }
 
         {
@@ -1802,7 +1802,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
                     THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
 
                     LOG_IF_FAILED(process->Get().ResizeTty(
-                        info.srWindow.Bottom - info.srWindow.Top + 1,  info.srWindow.Right - info.srWindow.Left + 1));
+                        info.srWindow.Bottom - info.srWindow.Top + 1, info.srWindow.Right - info.srWindow.Left + 1));
                 };
 
                 wsl::windows::common::relay::StandardInputRelay(Stdin, ttyInput, updateTerminal, exitEvent.get());

@@ -438,7 +438,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
         }
 
         auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
-        
+
         // Store a non owning reference to the process.
         m_processes.push_back(control.get());
 
