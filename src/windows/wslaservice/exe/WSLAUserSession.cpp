@@ -84,7 +84,7 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
     std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
 
     ForEachSession<void>([&](const auto& session) {
-        const auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{
+        auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{
             .SessionId = session.GetId(),
             .CreatorPid = 0,
         });
