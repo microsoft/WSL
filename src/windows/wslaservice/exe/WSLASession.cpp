@@ -621,6 +621,10 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 
 HRESULT WSLASession::GetImpl(_Out_ void** Session)
 {
+    // N.B. This returns a raw pointer to the implementation without calling AddRef.
+    // The caller must hold a separate strong reference to the owning WSLASession
+    // object for at least as long as this pointer is used, and must not store it
+    // beyond that lifetime.
     *Session = this;
     return S_OK;
 }
