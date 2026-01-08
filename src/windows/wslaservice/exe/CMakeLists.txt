@@ -1,6 +1,5 @@
 set(SOURCES
     application.manifest
-    WSLAContainerProcess.cpp
     ContainerEventTracker.cpp
     DockerHTTPClient.cpp
     main.rc
@@ -8,6 +7,8 @@ set(SOURCES
     ServiceProcessLauncher.cpp
     WSLAContainer.cpp
     WSLAProcess.cpp
+    WSLAProcessControl.cpp
+    WSLAProcessIO.cpp
     WSLASession.cpp
     WSLAUserSession.cpp
     WSLAUserSessionFactory.cpp
@@ -16,11 +17,12 @@ set(SOURCES
 
 set(HEADERS
     ContainerEventTracker.h
-    WSLAContainerProcess.h
     DockerHTTPClient.h
     ServiceProcessLauncher.h
     WSLAContainer.h
     WSLAProcess.h
+    WSLAProcessControl.h
+    WSLAProcessIO.h
     WSLASession.h
     WSLAUserSession.h
     WSLAUserSessionFactory.h

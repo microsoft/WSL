@@ -105,7 +105,7 @@ std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, cons
 
 [[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE handleInTarget);
 
-[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle);
+[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> Permissions = {});
 
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
 

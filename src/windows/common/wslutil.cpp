@@ -613,13 +613,14 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     return handle;
 }
 
-[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(_In_ HANDLE Handle)
+[[nodiscard]] HANDLE wsl::windows::common::wslutil::DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> Permissions)
 {
     const wil::unique_handle caller = OpenCallingProcess(PROCESS_DUP_HANDLE);
     THROW_LAST_ERROR_IF(!caller);
 
     HANDLE handle;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(GetCurrentProcess(), Handle, caller.get(), &handle, 0, FALSE, DUPLICATE_SAME_ACCESS));
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
+        GetCurrentProcess(), Handle, caller.get(), &handle, Permissions.value_or(0), FALSE, Permissions.has_value() ? 0 : DUPLICATE_SAME_ACCESS));
 
     return handle;
 }

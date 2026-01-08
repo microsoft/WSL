@@ -1801,10 +1801,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
                     THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
 
-                    WSLA_TERMINAL_CHANGED message{};
-                    message.Columns = info.srWindow.Right - info.srWindow.Left + 1;
-                    message.Rows = info.srWindow.Bottom - info.srWindow.Top + 1;
-                    LOG_IF_FAILED(process->Get().ResizeTty(message.Rows, message.Columns));
+                    LOG_IF_FAILED(process->Get().ResizeTty(
+                        info.srWindow.Bottom - info.srWindow.Top + 1,  info.srWindow.Right - info.srWindow.Left + 1));
                 };
 
                 wsl::windows::common::relay::StandardInputRelay(Stdin, ttyInput, updateTerminal, exitEvent.get());

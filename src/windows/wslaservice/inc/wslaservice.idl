@@ -73,6 +73,27 @@ typedef enum _WSLAVirtualMachineTerminationReason
     WSLAVirtualMachineTerminationReasonCrashed,
 } WSLAVirtualMachineTerminationReason;
 
+typedef enum _WSLAFD
+{
+    WSLAFDStdin = 0,
+    WSLAFDStdout = 1,
+    WSLAFDStderr = 2,
+    WSLAFDTty = 3,
+} WSLAFD;
+
+typedef enum _WSLAFDFlags
+{
+    WSLAFDFlagsNone = 0,
+    WSLAFDFlagsLogs = 1, // Replay previous logs
+    WSLAFDFlagsStream = 2, // Stream new logs.
+} WSLAFDFlags;
+
+typedef enum _WSLASignal
+{
+    WSLASignalSIGKILL = 9,
+    WSLASignalSIGTERM = 15
+} WSLASignal;
+
 [
     uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
     pointer_default(unique),

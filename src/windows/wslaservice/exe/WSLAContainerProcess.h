@@ -17,6 +17,7 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "wslaservice.h"
 #include "ContainerEventTracker.h"
+#include "WSLAProcessIO.h"
 
 namespace wsl::windows::service::wsla {
 
