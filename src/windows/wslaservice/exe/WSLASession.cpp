@@ -42,7 +42,7 @@ std::pair<std::string, std::string> ParseImage(const std::string& Input)
 
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
 
-    m_id(id), m_sessionSettings(Settings), m_userSession(&userSessionImpl), m_displayName(Settings.DisplayName)
+    m_id(id), m_sessionSettings(Settings), m_displayName(Settings.DisplayName)
 {
     WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
@@ -55,7 +55,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
 
     m_virtualMachine->Start();
 
-    ConfigureStorage(Settings);
+    ConfigureStorage(Settings, userSessionImpl.GetUserSid());
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -162,14 +162,9 @@ WSLASession::~WSLASession()
 
         m_virtualMachine.Reset();
     }
-
-    if (m_userSession != nullptr)
-    {
-        m_userSession->OnSessionTerminated(this);
-    }
 }
 
-void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
+void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid)
 {
     if (Settings.StoragePath == nullptr)
     {
@@ -217,8 +212,7 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings)
         auto runAsUser = wil::CoImpersonateClient();
 
         std::filesystem::create_directories(storagePath);
-        wsl::core::filesystem::CreateVhd(
-            m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, m_userSession->GetUserSid(), false, false);
+        wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, false, false);
         vhdCreated = true;
 
         // Then attach the new disk.
@@ -602,9 +596,7 @@ void WSLASession::OnUserSessionTerminating()
     m_sessionTerminatingEvent.SetEvent();
 
     std::lock_guard lock{m_lock};
-    WI_ASSERT(m_userSession != nullptr);
-
-    m_userSession = nullptr;
+    m_dockerClient.reset();
     m_virtualMachine.Reset();
 }
 

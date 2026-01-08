@@ -26,20 +26,7 @@ WSLAUserSessionImpl::~WSLAUserSessionImpl()
 {
     // In case there are still COM references on sessions, signal that the user session is terminating
     // so the sessions are all in a 'terminated' state.
-    {
-        std::lock_guard lock(m_wslaSessionsLock);
-
-        for (auto& e : m_sessions)
-        {
-            e->OnUserSessionTerminating();
-        }
-    }
-}
-
-void WSLAUserSessionImpl::OnSessionTerminated(WSLASession* Session)
-{
-    std::lock_guard lock(m_wslaSessionsLock);
-    WI_VERIFY(m_sessions.erase(Session) == 1);
+    ForEachSession<void>([](WSLASession& e) { e.OnUserSessionTerminating(); });
 }
 
 PSID WSLAUserSessionImpl::GetUserSid() const
@@ -52,8 +39,10 @@ HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
     ULONG id = m_nextSessionId++;
     auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this);
 
-    std::lock_guard lock(m_wslaSessionsLock);
-    auto it = m_sessions.emplace(session.Get());
+    Microsoft::WRL::ComPtr<IWeakReference> weakRef;
+    THROW_IF_FAILED(session->GetWeakReference(&weakRef));
+
+    m_sessions.emplace_back(std::move(weakRef));
 
     // Client now owns the session.
     // TODO: Add a flag for the client to specify that the session should outlive its process.
@@ -69,16 +58,20 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 
     // TODO: ACL check
     // TODO: Check for duplicate on session creation.
-    for (auto& e : m_sessions)
-    {
-        if (e->DisplayName() == DisplayName)
-        {
-            THROW_IF_FAILED(e->QueryInterface(__uuidof(IWSLASession), (void**)Session));
-            return S_OK;
-        }
-    }
 
-    return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    auto result = ForEachSession<HRESULT>([&](auto& e) {
+        if (e.DisplayName() == DisplayName)
+        {
+            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASession), (void**)Session));
+            return std::make_optional(S_OK);
+        }
+        else
+        {
+            return std::optional<HRESULT>{};
+        }
+    });
+
+    return result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 }
 
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
@@ -87,15 +80,15 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_sessions.size());
 
     size_t index = 0;
-    for (auto* session : m_sessions)
-    {
-        output[index].SessionId = session->GetId();
+    ForEachSession<void>([&](const auto& session) {
+        output[index].SessionId = session.GetId();
         output[index].CreatorPid = 0; // placeholder until we populate this later
 
-        session->CopyDisplayName(output[index].DisplayName, _countof(output[index].DisplayName));
+        session.CopyDisplayName(output[index].DisplayName, _countof(output[index].DisplayName));
 
         ++index;
-    }
+    });
+
     *Sessions = output.release();
     *SessionsCount = static_cast<ULONG>(m_sessions.size());
     return S_OK;
