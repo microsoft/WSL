@@ -57,9 +57,10 @@ void DockerContainerProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
 
 void DockerContainerProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode)
 {
-    if (Event == ContainerEvent::Exit && !m_exitEvent.is_signaled())
+    if (Event == ContainerEvent::Stop && !m_exitEvent.is_signaled())
     {
         WI_ASSERT(ExitCode.has_value());
+        WI_ASSERT(!m_exitedCode.has_value());
         m_exitedCode = ExitCode.value();
         m_exitEvent.SetEvent();
     }
@@ -85,11 +86,21 @@ void DockerContainerProcessControl::OnContainerReleased()
 
 DockerExecProcessControl::DockerExecProcessControl(
     WSLAContainerImpl& Container, const std::string& Id, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker) :
+    m_container(&Container),
     m_id(Id),
     m_client(DockerClient),
     m_trackingReference(EventTracker.RegisterExecStateUpdates(
         Container.ID(), Id, std::bind(&DockerExecProcessControl::OnEvent, this, std::placeholders::_1, std::placeholders::_2)))
 {
+}
+
+DockerExecProcessControl::~DockerExecProcessControl()
+{
+    std::lock_guard lock{m_lock};
+    if (m_container != nullptr)
+    {
+        m_container->OnProcessReleased(this);
+    }
 }
 
 int DockerExecProcessControl::GetPid() const
@@ -118,15 +129,6 @@ void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> 
         WI_ASSERT(ExitCode.has_value());
         m_exitedCode = ExitCode.value();
         m_exitEvent.SetEvent();
-    }
-}
-
-DockerExecProcessControl::~DockerExecProcessControl()
-{
-    std::lock_guard lock{m_lock};
-    if (m_container != nullptr)
-    {
-        m_container->OnProcessReleased(this);
     }
 }
 
