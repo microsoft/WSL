@@ -618,3 +618,9 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
     std::lock_guard lock{m_lock};
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.second.get() == Container; }) == 1);
 }
+
+HRESULT WSLASession::GetImpl(_Out_ void** Session)
+{
+    *Session = this;
+    return S_OK;
+}

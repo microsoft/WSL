@@ -67,11 +67,7 @@ public:
 
     IFACEMETHOD(Shutdown(_In_ ULONG)) override;
 
-    IFACEMETHOD(GetImpl)(_Out_ void** Session) override
-    {
-        *Session = this;
-        return S_OK;
-    }
+    IFACEMETHOD(GetImpl)(_Out_ void** Session) override;
 
     void OnUserSessionTerminating();
 
