@@ -42,7 +42,10 @@ HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
     Microsoft::WRL::ComPtr<IWeakReference> weakRef;
     THROW_IF_FAILED(session->GetWeakReference(&weakRef));
 
-    m_sessions.emplace_back(std::move(weakRef));
+    {
+        std::lock_guard lock(m_wslaSessionsLock);
+        m_sessions.emplace_back(std::move(weakRef));
+    }
 
     // Client now owns the session.
     // TODO: Add a flag for the client to specify that the session should outlive its process.
@@ -77,20 +80,26 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
 {
     std::lock_guard lock(m_wslaSessionsLock);
-    auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(m_sessions.size());
 
-    size_t index = 0;
+    std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
+
     ForEachSession<void>([&](const auto& session) {
-        output[index].SessionId = session.GetId();
-        output[index].CreatorPid = 0; // placeholder until we populate this later
+        auto it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{
+            .SessionId = session.GetId(),
+            .CreatorPid = 0,
+        });
 
-        session.CopyDisplayName(output[index].DisplayName, _countof(output[index].DisplayName));
-
-        ++index;
+        session.CopyDisplayName(it.DisplayName, _countof(it.DisplayName));
     });
 
+    auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());
+    for (auto i = 0; i < sessionInfo.size(); i++)
+    {
+        output[i] = sessionInfo[i];
+    }
+
     *Sessions = output.release();
-    *SessionsCount = static_cast<ULONG>(m_sessions.size());
+    *SessionsCount = static_cast<ULONG>(sessionInfo.size());
     return S_OK;
 }
 

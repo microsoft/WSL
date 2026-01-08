@@ -86,7 +86,6 @@ private:
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslaSessionsLock;
 
-    // TODO-WSLA: Consider using a weak_ptr to easily destroy when the last client reference is released.
     std::vector<Microsoft::WRL::ComPtr<IWeakReference>> m_sessions;
 };
 
