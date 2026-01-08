@@ -78,7 +78,6 @@ CATCH_RETURN();
 
 int WSLAProcess::GetPid() const
 {
-    // m_pid is immutable, so m_mutex doesn't need to be acquired.
     return m_control->GetPid();
 }
 
