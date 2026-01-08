@@ -95,7 +95,7 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());
     for (auto i = 0; i < sessionInfo.size(); i++)
     {
-        output[i] = sessionInfo[i];
+        memcpy(&output[i], &sessionInfo[i], sizeof(output[i]));
     }
 
     *Sessions = output.release();
