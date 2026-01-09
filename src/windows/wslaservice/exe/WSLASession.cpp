@@ -295,7 +295,7 @@ try
         // Otherwise, the session is shutting down; terminate containerd before exiting.
         LOG_IF_FAILED(process.Get().Signal(15)); // SIGTERM
 
-        auto [code, signaled] = process.Wait(30 * 1000); // TODO: Configurable timeout.
+        auto code = process.Wait(30 * 1000); // TODO: Configurable timeout.
 
         WSL_LOG("DockerdExit", TraceLoggingValue(code, "code"));
     }
