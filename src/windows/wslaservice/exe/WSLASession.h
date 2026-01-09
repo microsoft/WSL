@@ -22,8 +22,18 @@ Abstract:
 
 namespace wsl::windows::service::wsla {
 
+class WSLASession;
+
+// This private interface is used to get a WSLASession pointer from its weak reference. It's only used within the service.
+class DECLSPEC_UUID("4559499B-4F07-4BD4-B098-9F4A432E9456") IWSLASessionImpl : public IInspectable
+{
+public:
+    // N.B. The caller must maintain a reference to the COM object for the return pointer to be used safely.
+    IFACEMETHOD(GetImplNoRef)(_Out_ WSLASession** Session) = 0;
+};
+
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASession, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown>
 {
 public:
     WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl);
@@ -60,6 +70,8 @@ public:
 
     IFACEMETHOD(Shutdown(_In_ ULONG)) override;
 
+    IFACEMETHOD(GetImplNoRef)(_Out_ WSLASession** Session) override;
+
     void OnUserSessionTerminating();
 
 private:
@@ -67,7 +79,7 @@ private:
 
     static WSLAVirtualMachine::Settings CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings);
 
-    void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings);
+    void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnContainerdLog(const gsl::span<char>& Data);
@@ -76,7 +88,6 @@ private:
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     std::optional<DockerHTTPClient> m_dockerClient;
-    WSLAUserSessionImpl* m_userSession = nullptr;
     Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
     wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
