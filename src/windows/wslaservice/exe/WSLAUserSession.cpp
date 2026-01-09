@@ -43,7 +43,6 @@ try
 
     // Check for an existing session first.
     auto result = ForEachSession<HRESULT>([&](auto& session) -> std::optional<HRESULT> {
-
         // TODO: ACL check.
         if (session.DisplayName() == Settings->DisplayName)
         {
