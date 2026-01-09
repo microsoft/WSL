@@ -654,5 +654,5 @@ HRESULT WSLASession::GetImplNoRef(_Out_ WSLASession** Session)
 bool WSLASession::Terminated()
 {
     std::lock_guard lock{m_lock};
-    return !!m_virtualMachine;
+    return !m_virtualMachine;
 }

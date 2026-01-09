@@ -35,6 +35,7 @@ PSID WSLAUserSessionImpl::GetUserSid() const
 }
 
 HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
+try
 {
     ULONG id = m_nextSessionId++;
 
@@ -42,12 +43,13 @@ HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 
     // Check for an existing session first.
     auto result = ForEachSession<HRESULT>([&](auto& session) -> std::optional<HRESULT> {
+
         // TODO: ACL check.
         if (session.DisplayName() == Settings->DisplayName)
         {
-            RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALIAS_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
+            RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
 
-            RETURN_IF_FAILED(session.QueryInterface(__uuidof(IWSLASession), (void**)WslaSession));
+            return session.QueryInterface(__uuidof(IWSLASession), (void**)WslaSession);
         }
 
         return std::optional<HRESULT>{};
@@ -75,6 +77,7 @@ HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)
 {

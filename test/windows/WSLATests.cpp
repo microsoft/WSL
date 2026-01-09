@@ -2380,8 +2380,7 @@ class WSLATests
                 auto it = displayNames.find(e);
                 if (it == displayNames.end())
                 {
-                    __debugbreak();
-                    LogError("Session not found: %hs", e.c_str());
+                    LogError("Session not found: %ls", e.c_str());
                     VERIFY_FAIL();
                 }
 
@@ -2390,7 +2389,7 @@ class WSLATests
 
             for (const auto& e : displayNames)
             {
-                LogError("Unexpected session found: %hs", e.c_str());
+                LogError("Unexpected session found: %ls", e.c_str());
                 VERIFY_FAIL();
             }
         };
@@ -2419,8 +2418,10 @@ class WSLATests
 
             session1.reset();
             expectSessions({L"session-1"});
+            session1 = create(L"session-1", WSLASessionFlagsOpenExisting);
 
             VERIFY_SUCCEEDED(session1->Terminate());
+            session1.reset();
             expectSessions({});
         }
 
@@ -2438,9 +2439,13 @@ class WSLATests
             expectSessions({L"session-1"});
 
             // Verify that name conflicts are correctly handled.
-            VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { create(L"session-1", WSLASessionFlagsNone); }), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            auto settings = GetDefaultSessionSettings();
+            settings.DisplayName = L"session-1";
 
-            VERIFY_SUCCEEDED(session1->Terminate());
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(userSession->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+            VERIFY_SUCCEEDED(session1Copy->Terminate());
             expectSessions({});
         }
     }

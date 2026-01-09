@@ -57,7 +57,7 @@ private:
             WSLASession* SessionImpl{};
             THROW_IF_FAILED(lockedSession->GetImplNoRef(&SessionImpl));
 
-            // Special case for persistent session. If the session is terminated, drop its reference so it can be deleted.
+            // If the session is terminated, drop its reference so it can be deleted (in case of persistent sessions)
             if (SessionImpl->Terminated())
             {
                 auto remove =
@@ -66,6 +66,7 @@ private:
                 WI_ASSERT(remove.end() - remove.begin() <= 1);
 
                 m_persistentSessions.erase(remove.begin(), remove.end());
+                return true;
             }
 
             if constexpr (std::is_same_v<T, void>)
