@@ -169,7 +169,7 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Sağlanan yükleme konumu zaten kullanılıyor.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Sağlanan ada sahip bir dağıtım zaten var. Farklı --name bir ad seçin.</value>
+    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir isim seçmek için --name seçeneğini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -185,7 +185,7 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Bu dağıtım sistemi için Linux için Windows Alt Sistemi dosya sisteminin bir kez yükseltilemedi...</value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
-    <value>Başka bir örnek yükseltilmeyen olarak çalıştığından başlatılamıyor.  Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
+    <value>Başka bir örnek yükseltilmeyen olarak çalıştığından başlatılamıyor. Yükseltilmiş ve yükseltilmemiş örneklerin aynı anda çalışmasına izin verilmez.</value>
   </data>
   <data name="MessageImportFailed" xml:space="preserve">
     <value>Dağıtım içeri aktarılamadı.</value>
@@ -210,11 +210,11 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInstallContinue" xml:space="preserve">
-    <value>Linux için Windows Alt Sistemi önceki bir yükleme işlemi devam...</value>
+    <value>Linux için Windows Alt Sistemi, önceki bir kurulumu devam ettiriyor...</value>
   </data>
   <data name="MessageInvalidDistributionName" xml:space="preserve">
     <value>Geçersiz dağıtım adı: '{}'.
-Geçerli dağıtımların listesini almak için 'wsl.exe --list --online'.</value>
+Geçerli dağıtımların listesini almak için 'wsl.exe --list --online' komutunu kullanın.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInstanceTerminated" xml:space="preserve">
@@ -222,12 +222,12 @@ Geçerli dağıtımların listesini almak için 'wsl.exe --list --online'.</valu
   </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
     <value>Geçersiz komut satırı bağımsız değişkeni: {}
-Desteklenen bağımsız değişkenlerin --help' almak için lütfen '{} öğesini kullanın.</value>
+Desteklenen bağımsız değişkenlerin listesini almak için lütfen '{} --help' komutunu kullanın.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageMissingArgument" xml:space="preserve">
     <value>{} komut satırı bağımsız değişkeni bir değer gerektiriyor.
-Desteklenen bağımsız değişkenlerin --help' almak için lütfen '{} öğesini kullanın.</value>
+Desteklenen bağımsız değişkenlerin listesini almak için lütfen '{} --help' komutunu kullanın.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--help'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidConsole" xml:space="preserve">
@@ -293,9 +293,9 @@ ve 'wsl.exe --install &lt;Distro&gt;' kullanın.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 geçerli makine yapılandırmanız ile desteklenmiyor.
-Lütfen "Sanal Makine Platformu" isteğe bağlı bileşenini etkinleştirin ve sanallaştırmanın BIOS'da etkinleştirildiğinden emin olun.
-Şu komutu çalıştırarak "Sanal Makine Platformu"nu  wsl.exe --install --no-distribution
-Bilgi için lütfen şu adresi ziyaret https://aka.ms/enablevirtualization</value>
+Lütfen "Sanal Makine Platformu" isteğe bağlı bileşenini etkinleştirin ve sanallaştırmanın BIOS'ta etkinleştirildiğinden emin olun.
+Ş"Sanal Makine Platformu"nu etkinleştirmek için şu komutu çalıştırın: wsl.exe --install --no-distribution
+Daha fazla bilgi için lütfen https://aka.ms/enablevirtualization adresini ziyaret edin.</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -691,16 +691,16 @@ Bağımsız değişkenler:
     <comment>{Locked="--mount "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUpdateNotNeeded" xml:space="preserve">
-    <value>Bu uygulamanın en Linux için Windows Alt Sistemi sürümü zaten yüklü.</value>
+    <value>Linux için Windows Alt Sistemi'nin en son sürümü zaten yüklü.</value>
   </data>
   <data name="MessageUpdatingToVersion" xml:space="preserve">
-    <value>Güncelleştirme Linux için Windows Alt Sistemi sürümüne güncelleştiriliyor: {}.</value>
+    <value>Linux için Windows Alt Sistemi şu sürüme güncelleniyor: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
     <value>Bu uygulama isteğe bağlı Linux için Windows Alt Sistemi gerektirir.
 Şu işlemi çalıştırarak yükleyin: wsl.exe --install --no-distribution
-Değişikliklerin etkili olması için sistemin yeniden başlatılması gerekebilir.</value>
+Değişikliklerin etkinleşmesi için sistemin yeniden başlatılması gerekebilir.</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -734,9 +734,9 @@ Değişikliklerin etkili olması için sistemin yeniden başlatılması gerekebi
     <value>Değer bulunamadı.</value>
   </data>
   <data name="MessageOsNotSupported" xml:space="preserve">
-    <value>{} Windows sürümü, uygulamanın paketlenmiş sürümünü Linux için Windows Alt Sistemi.
-Gerekli güncelleştirmeyi Windows Update veya {} aracılığıyla yükleyin
-Bilgi için lütfen şu adresi ziyaret https://aka.ms/wslinstall</value>
+    <value>{} Windows sürümü, paketlenmiş Linux için Windows Alt Sistemi sürümünü desteklemiyor.
+Gerekli güncellemeyi Windows Update üzerinden veya şu adresten yükleyin: {}
+Daha fazla bilgi için lütfen https://aka.ms/wslinstall adresini ziyaret edin.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageAdministratorAccessRequiredForDebugShell" xml:space="preserve">
@@ -801,7 +801,7 @@ Bilgi için lütfen şu adresi ziyaret https://aka.ms/wslinstall</value>
     <value>EventViewer'ı aç</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım --name seçmek için bu adı kullanın.</value>
+    <value>Bu dağıtım varsayılan bir ad içermiyor. Dağıtım adını seçmek için --name seçeneğini kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -817,7 +817,7 @@ Bilgi için lütfen şu adresi ziyaret https://aka.ms/wslinstall</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
-    <value>Eski dağıtım kaydı kullanılarak. Bunun yerine tar tabanlı bir dağıtım kullanmayı düşünün.</value>
+    <value>Eski dağıtım kaydı kullanılıyor. Bunun yerine tar tabanlı bir dağıtım kullanmayı düşünün.</value>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Eski dağıtım kayıtları bağımsız değişken --version desteklemez.</value>
@@ -1057,7 +1057,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Bu bir VHD dosyası gibi görünüyor. Katran --vhd VHD içeri aktarın.</value>
+    <value>Bu bir VHD dosyası gibi görünüyor. Tar yerine VHD dosyasını içeri aktarmak için --vhd kullanın.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1102,7 +1102,7 @@ Hata kodu: {}</value>
     <value>Ağ modu sorgulanamadı</value>
   </data>
   <data name="MessageMismatchedKernelModulesError" xml:space="preserve">
-    <value>Özelleştirilmiş çekirdek modülleri özelleştirilmiş bir çekirdek belirtilmeden sağlandı. Daha fazla https://aka.ms/wslcustomkernel için lütfen ayrıntılara bakın.</value>
+    <value>Özelleştirilmiş çekirdek modülleri özelleştirilmiş bir çekirdek belirtilmeden sağlandı. Daha fazla bilgi için lütfen https://aka.ms/wslcustomkernel adresine bakın.</value>
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Küresel Güvenli Erişim İstemcisiyle ilgili mevcut bir uyumluluk sorunu nedeniyle DNS Tünelleme devre dışı bırakıldı.</value>
@@ -1121,7 +1121,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>/etc/fstab with mount -a işlenemedi.</value>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
-    <value>Dağıtım diski bağlanırken bir hata oluştu, geri dönüş olarak salt okunur olarak bağlandı.
+    <value>ağıtım diski bağlanırken bir hata oluştu, yedek plan olarak salt okunur şekilde bağlandı.
 Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
@@ -1362,7 +1362,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
     <value>Yoksayılan bağlantı noktaları</value>
   </data>
   <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
-    <value>Yalnızca wsl2.networkingMode olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'da değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin: 3000.9000.9090.</value>
+    <value>Yalnızca wsl2.networkingMode olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'ta değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin: 3000.9000.9090.</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
@@ -1372,7 +1372,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
     <value>Yoksayılan bağlantı noktaları</value>
   </data>
   <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Yalnızca wsl2.networkingMode yansıtılmış olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'da değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin, 3000, 9000, 9090.</value>
+    <value>Yalnızca wsl2.networkingMode yansıtılmış olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'ta değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin, 3000, 9000, 9090.</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
     <value>İlk Otomatik Ara Sunucu zaman aşımı</value>
@@ -1513,7 +1513,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
     <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
   </data>
   <data name="Settings_OOBEDisplayName" xml:space="preserve">
-    <value>Linux için Windows Alt Sistemi'a hoş geldiniz</value>
+    <value>Linux için Windows Alt Sistemi'ne hoş geldiniz</value>
   </data>
   <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
    <value>WSL, farklı Linux dağıtımlarını denemenin harika bir yoludur.</value>
