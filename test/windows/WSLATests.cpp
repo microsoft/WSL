@@ -127,30 +127,6 @@ class WSLATests
     {
         auto result = RunCommand(session, command, timeout);
 
-        if (result.Signalled != expectSignal)
-        {
-            auto cmd = wsl::shared::string::Join(command, ' ');
-
-            if (expectSignal)
-            {
-                LogError(
-                    "Command: %hs didn't get signalled as expected. ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
-                    cmd.c_str(),
-                    result.Code,
-                    result.Output[1].c_str(),
-                    result.Output[2].c_str());
-            }
-            else
-            {
-                LogError(
-                    "Command: %hs didn't receive an unexpected signal: %i. Stdout: '%hs', Stderr: '%hs'",
-                    cmd.c_str(),
-                    result.Code,
-                    result.Output[1].c_str(),
-                    result.Output[2].c_str());
-            }
-        }
-
         if (result.Code != expectResult)
         {
             auto cmd = wsl::shared::string::Join(command, ' ');
@@ -1120,16 +1096,15 @@ class WSLATests
             VERIFY_ARE_EQUAL(process.Get().Signal(9999), E_FAIL);
 
             // Send SIGKILL(9) to the process.
-            VERIFY_SUCCEEDED(process.Get().Signal(9));
+            VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGKILL));
 
             auto result = process.WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 9);
-            VERIFY_ARE_EQUAL(result.Signalled, true);
+            VERIFY_ARE_EQUAL(result.Code, WSLASignalSIGKILL + 128);
             VERIFY_ARE_EQUAL(result.Output[1], "");
             VERIFY_ARE_EQUAL(result.Output[2], "");
 
             // Validate that process can't be signalled after it exited.
-            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
         // Validate that errno is correctly propagated
@@ -1161,11 +1136,11 @@ class WSLATests
             VERIFY_ARE_EQUAL(process.Get().GetStdHandle(1, reinterpret_cast<ULONG*>(&dummyHandle)), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that trying to acquire a std handle that doesn't exist fails as expected.
-            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), E_INVALIDARG);
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             VERIFY_SUCCEEDED(session->Shutdown(30 * 1000));
-            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
         {
@@ -1210,15 +1185,14 @@ class WSLATests
             VERIFY_SUCCEEDED(process.Get().GetPid(&processId));
 
             // Send SIGSEV(11) to crash the process.
-            VERIFY_SUCCEEDED(process.Get().Signal(11));
+            VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGSEGV));
 
             auto result = process.WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 11);
-            VERIFY_ARE_EQUAL(result.Signalled, true);
+            VERIFY_ARE_EQUAL(result.Code, 128 + WSLASignalSIGSEGV);
             VERIFY_ARE_EQUAL(result.Output[1], "");
             VERIFY_ARE_EQUAL(result.Output[2], "");
 
-            VERIFY_ARE_EQUAL(process.Get().Signal(9), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
         // Dumps files are named with the format: wsl-crash-<sessionId>-<pid>-<processname>-<code>.dmp
@@ -1456,12 +1430,12 @@ class WSLATests
 
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
-            VERIFY_SUCCEEDED(initProcess.Get().Signal(9));
+            VERIFY_SUCCEEDED(initProcess.Get().Signal(WSLASignalSIGKILL));
 
             // Wait for the process to actually exit.
             wsl::shared::retry::RetryWithTimeout<void>(
                 [&]() {
-                    initProcess.GetExitState(); // Throw if the process hasn't exited yet.
+                    initProcess.GetExitCode(); // Throw if the process hasn't exited yet.
                 },
                 std::chrono::milliseconds{100},
                 std::chrono::seconds{30});
@@ -1537,12 +1511,12 @@ class WSLATests
 
             // Kill the container.
             auto initProcess = container.GetInitProcess();
-            initProcess.Get().Signal(9);
+            initProcess.Get().Signal(WSLASignalSIGKILL);
 
             // Wait for the process to actually exit.
             wsl::shared::retry::RetryWithTimeout<void>(
                 [&]() {
-                    initProcess.GetExitState(); // Throw if the process hasn't exited yet.
+                    initProcess.GetExitCode(); // Throw if the process hasn't exited yet.
                 },
                 std::chrono::milliseconds{100},
                 std::chrono::seconds{30});
@@ -1597,7 +1571,7 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
 
-            VERIFY_SUCCEEDED(container->Get().Stop(9, 0));
+            VERIFY_SUCCEEDED(container->Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
 
             VERIFY_SUCCEEDED(container->Get().Delete());
@@ -1829,10 +1803,10 @@ class WSLATests
             auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr)
                                .Launch(container.Get());
 
-            VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
             auto result = process.WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(result.Code, 137);
+            VERIFY_ARE_EQUAL(result.Code, 128 + WSLASignalSIGKILL);
         }
 
         // Validate error paths
@@ -1940,7 +1914,7 @@ class WSLATests
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(*session);
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
-            VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());
 
             container.Reset(); // TODO: Re-think container lifetime management.
@@ -1962,7 +1936,7 @@ class WSLATests
                 expectBoundPorts(container, {"8000/tcp"});
                 ExpectHttpResponse(L"http://127.0.0.1:1234", 200);
 
-                VERIFY_SUCCEEDED(container.Get().Stop(9, 0));
+                VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
                 VERIFY_SUCCEEDED(container.Get().Delete());
                 container.Reset(); // TODO: Re-think container lifetime management.
             }

@@ -19,7 +19,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
-#include "WSLAContainerProcess.h"
+#include "WSLAProcessControl.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -73,7 +73,9 @@ public:
     const std::string& Image() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
-    void OnProcessReleased(WSLAContainerProcess* process);
+    void OnProcessReleased(DockerExecProcessControl* process);
+
+    const std::string& ID() const noexcept;
 
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
@@ -91,14 +93,15 @@ private:
     std::string m_image;
     std::string m_id;
     bool m_tty{}; // TODO: have a flag for this at the API level.
-    std::vector<WSLAContainerProcess*> m_processes;
+    std::vector<DockerExecProcessControl*> m_processes;
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
     std::vector<PortMapping> m_mappedPorts;
     std::vector<VolumeMountInfo> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
-    Microsoft::WRL::ComPtr<WSLAContainerProcess> m_initProcess;
+    Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
+    DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
 

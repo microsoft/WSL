@@ -80,7 +80,7 @@ RunningWSLAProcess::RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds) : m_f
 {
 }
 
-std::pair<int, bool> RunningWSLAProcess::GetExitState()
+int RunningWSLAProcess::GetExitCode()
 {
     WSLA_PROCESS_STATE state{};
     int code{};
@@ -92,7 +92,7 @@ std::pair<int, bool> RunningWSLAProcess::GetExitState()
         "Process is not exited. State: %i",
         state);
 
-    return {code, state == WslaProcessStateSignalled};
+    return code;
 }
 
 WSLA_PROCESS_STATE RunningWSLAProcess::State()
@@ -123,10 +123,10 @@ std::string WSLAProcessLauncher::FormatResult(const int code)
     return std::format("{} [{}] exited with: {}.", m_executable, wsl::shared::string::Join(m_arguments, ','), code);
 }
 
-std::pair<int, bool> RunningWSLAProcess::Wait(DWORD TimeoutMs)
+int RunningWSLAProcess::Wait(DWORD TimeoutMs)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !GetExitEvent().wait(TimeoutMs));
-    return GetExitState();
+    return GetExitCode();
 }
 
 RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
@@ -160,7 +160,7 @@ RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD
     }
 
     // Add a callback for when the process exits.
-    auto exitCallback = [&]() { std::tie(result.Code, result.Signalled) = GetExitState(); };
+    auto exitCallback = [&]() { result.Code = GetExitCode(); };
 
     io.AddHandle(std::make_unique<relay::EventHandle>(GetExitEvent(), std::move(exitCallback)));
 

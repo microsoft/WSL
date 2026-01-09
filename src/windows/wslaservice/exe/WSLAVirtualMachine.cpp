@@ -481,7 +481,7 @@ try
 
                     try
                     {
-                        e->OnTerminated(message->Signaled, message->Code);
+                        e->OnExited(message->Signaled ? 128 + message->Code : message->Code);
                     }
                     CATCH_LOG();
 
@@ -961,18 +961,29 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ 
         }
     }
 
-    std::map<int, wil::unique_handle> stdHandles;
+    wil::unique_socket ttyControlHandle;
+
+    std::map<ULONG, wil::unique_handle> stdHandles;
     for (auto& [fd, handle] : sockets)
     {
+        if (ttyControl != nullptr && fd == ttyControl->Fd)
+        {
+            ttyControlHandle = std::move(handle);
+            continue;
+        }
+
         stdHandles.emplace(fd, reinterpret_cast<HANDLE>(handle.release()));
     }
 
-    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(stdHandles), pid, this);
+    auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
+    auto control = std::make_unique<VMProcessControl>(*this, pid, std::move(ttyControlHandle));
 
     {
         std::lock_guard lock{m_trackedProcessesLock};
-        m_trackedProcesses.emplace_back(process.Get());
+        m_trackedProcesses.emplace_back(control.get());
     }
+
+    auto process = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
 
     setErrno(0);
 

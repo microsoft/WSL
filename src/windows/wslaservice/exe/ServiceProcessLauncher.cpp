@@ -36,7 +36,7 @@ wil::unique_event ServiceRunningProcess::GetExitEvent()
     // to signal it once the process exits.
     wil::unique_event event;
     THROW_IF_WIN32_BOOL_FALSE(
-        DuplicateHandle(GetCurrentProcess(), m_process->GetExitEvent().get(), GetCurrentProcess(), &event, SYNCHRONIZE, false, 0));
+        DuplicateHandle(GetCurrentProcess(), m_process->GetExitEvent(), GetCurrentProcess(), &event, SYNCHRONIZE, false, 0));
 
     return event;
 }

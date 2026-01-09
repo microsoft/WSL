@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "WSLAContainer.h"
 #include "WSLAProcess.h"
+#include "WSLAProcessIO.h"
 
 using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
@@ -165,9 +166,9 @@ WSLAContainerImpl::~WSLAContainerImpl()
     {
         std::lock_guard lock(m_lock);
 
-        if (m_initProcess)
+        if (m_initProcessControl)
         {
-            m_initProcess->OnContainerReleased();
+            m_initProcessControl->OnContainerReleased();
         }
 
         for (auto& process : m_processes)
@@ -213,17 +214,9 @@ WSLAContainerImpl::~WSLAContainerImpl()
     m_parentVM->ReleasePorts(allocatedGuestPorts);
 }
 
-void WSLAContainerImpl::OnProcessReleased(WSLAContainerProcess* process)
+void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process)
 {
     std::lock_guard lock(m_lock);
-
-    if (process == m_initProcess.Get())
-    {
-        m_initProcess.Reset();
-
-        // TODO: Consider switching to Stopped state.
-        return;
-    }
 
     auto remove = std::ranges::remove_if(m_processes, [process](const auto* e) { return e == process; });
     WI_ASSERT(remove.size() == 1);
@@ -253,12 +246,25 @@ void WSLAContainerImpl::Start()
         m_state);
 
     // Attach to the container's init process so no IO is lost.
-    m_initProcess =
-        wil::MakeOrThrow<WSLAContainerProcess>(m_id, m_tty, m_dockerClient, std::optional<std::string>{}, m_eventTracker, *this);
+    std::unique_ptr<WSLAProcessIO> io;
+    if (m_tty)
+    {
+        io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+    }
+    else
+    {
+        io = std::make_unique<RelayedProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+    }
 
-    m_initProcess->AssignIoStream(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+    auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient, m_eventTracker);
+    m_initProcessControl = control.get();
 
-    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable { m_initProcess.Reset(); });
+    m_initProcess = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
+
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable {
+        m_initProcess.Reset();
+        m_initProcessControl = nullptr;
+    });
 
     m_dockerClient.StartContainer(m_id);
 
@@ -274,11 +280,6 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
         std::lock_guard<std::recursive_mutex> lock(m_lock);
         m_state = WslaContainerStateExited;
-
-        if (m_initProcess)
-        {
-            m_initProcess->OnExited(exitCode.value());
-        }
 
         // Notify all processes that the container has exited.
         // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
@@ -352,7 +353,7 @@ WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    if (m_state == WslaContainerStateRunning && m_initProcess->State().first != WSLAProcessStateRunning)
+    if (m_state == WslaContainerStateRunning && m_initProcessControl && m_initProcessControl->GetState().first != WSLAProcessStateRunning)
     {
         m_state = WslaContainerStateExited;
     }
@@ -422,15 +423,26 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
         auto result = m_dockerClient.CreateExec(m_id, request);
 
         // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
-        auto process = wil::MakeOrThrow<WSLAContainerProcess>(result.Id, hasTty, m_dockerClient, m_id, m_eventTracker, *this);
+
+        wil::unique_handle stream{(HANDLE)m_dockerClient
+                                      .StartExec(result.Id, common::docker_schema::StartExec{.Tty = hasTty, .ConsoleSize = request.ConsoleSize})
+                                      .release()};
+        std::unique_ptr<WSLAProcessIO> io;
+        if (hasTty)
+        {
+            io = std::make_unique<TTYProcessIO>(std::move(stream));
+        }
+        else
+        {
+            io = std::make_unique<RelayedProcessIO>(std::move(stream));
+        }
+
+        auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
 
         // Store a non owning reference to the process.
-        m_processes.push_back(process.Get());
+        m_processes.push_back(control.get());
 
-        process->AssignIoStream(wil::unique_handle{
-            (HANDLE)m_dockerClient
-                .StartExec(result.Id, common::docker_schema::StartExec{.Tty = hasTty, .ConsoleSize = request.ConsoleSize})
-                .release()});
+        auto process = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
 
         THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
     }
@@ -611,6 +623,11 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         // TODO: propagate error message to caller.
         THROW_HR_MSG(E_FAIL, "Failed to create container: %hs ", e.what());
     }
+}
+
+const std::string& WSLAContainerImpl::ID() const noexcept
+{
+    return m_id;
 }
 
 void WSLAContainerImpl::Inspect(LPSTR* Output)

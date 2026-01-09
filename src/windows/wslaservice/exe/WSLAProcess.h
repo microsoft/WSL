@@ -14,6 +14,8 @@ Abstract:
 #pragma once
 
 #include "wslaservice.h"
+#include "WSLAProcessControl.h"
+#include "WSLAProcessIO.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -23,8 +25,7 @@ class DECLSPEC_UUID("AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B") WSLAProcess
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAProcess, IFastRundown>
 {
 public:
-    WSLAProcess(std::map<int, wil::unique_handle>&& handles, int pid, WSLAVirtualMachine* virtualMachine);
-    ~WSLAProcess();
+    WSLAProcess(std::unique_ptr<WSLAProcessControl>&& Control, std::unique_ptr<WSLAProcessIO>&& Io);
     WSLAProcess(const WSLAProcess&) = delete;
     WSLAProcess& operator=(const WSLAProcess&) = delete;
 
@@ -35,19 +36,12 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code) override;
     IFACEMETHOD(ResizeTty)(_In_ ULONG Rows, _In_ ULONG Columns) override;
 
-    void OnTerminated(bool Signalled, int Code);
-    void OnVmTerminated();
-    wil::unique_handle& GetStdHandle(int Index);
-    wil::unique_event& GetExitEvent();
+    wil::unique_handle GetStdHandle(int Index);
+    HANDLE GetExitEvent();
     int GetPid() const;
 
 private:
-    std::recursive_mutex m_mutex;
-    std::map<int, wil::unique_handle> m_handles;
-    int m_pid = -1;
-    int m_exitedCode = -1;
-    WSLA_PROCESS_STATE m_state = WslaProcessStateRunning;
-    wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
-    WSLAVirtualMachine* m_virtualMachine{};
+    std::unique_ptr<WSLAProcessControl> m_control;
+    std::unique_ptr<WSLAProcessIO> m_io;
 };
 } // namespace wsl::windows::service::wsla

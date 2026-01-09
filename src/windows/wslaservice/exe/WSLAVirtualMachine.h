@@ -166,7 +166,7 @@ private:
     GUID m_virtioFsClassId;
 
     std::mutex m_trackedProcessesLock;
-    std::vector<WSLAProcess*> m_trackedProcesses;
+    std::vector<VMProcessControl*> m_trackedProcesses;
 
     wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
 
