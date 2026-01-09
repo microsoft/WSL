@@ -16,7 +16,6 @@ if(WSL_DEV_BINARY_PATH)
     execute_process(
         COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/system.vhd" "/grant:r" "Everyone:(R)" /Q
         COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/modules.vhd" "/grant:r" "Everyone:(R)" /Q
-        COMMAND icacls.exe "${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd" "/grant:r" "Everyone:(R)" /Q
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         COMMAND_ERROR_IS_FATAL ANY)
 
