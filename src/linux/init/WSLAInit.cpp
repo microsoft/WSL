@@ -855,7 +855,7 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     }
 
     //
-    // Enable dump colleciton when processes crash.
+    // Enable dump collection when processes crash.
     //
     WSLAEnableCrashDumpCollection();
 
