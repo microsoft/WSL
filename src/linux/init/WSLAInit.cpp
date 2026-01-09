@@ -63,11 +63,21 @@ struct WSLAState
 
 static WSLAState g_state;
 
-void WSLAEnableCrashDumpCollection()
+int CreateCaptureCrashSymlink()
 {
     if (symlink("/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0)
     {
         LOG_ERROR("symlink({}, {}) failed {}", "/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH, errno);
+        return errno;
+    }
+
+    return 0;
+}
+
+void WSLAEnableCrashDumpCollection()
+{
+    if (CreateCaptureCrashSymlink() < 0)
+    {
         return;
     }
 
@@ -513,6 +523,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         if (WI_IsFlagSet(Message.Flags, WSLA_MOUNT::Chroot))
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
+
+            // Recreate the crash dump symlink inside the new root.
+            CreateCaptureCrashSymlink();
         }
 
         response.Result = 0;
