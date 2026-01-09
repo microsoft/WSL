@@ -57,8 +57,6 @@ HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 
 HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)
 {
-    std::lock_guard lock(m_wslaSessionsLock);
-
     // TODO: ACL check
     // TODO: Check for duplicate on session creation.
 
@@ -79,8 +77,6 @@ HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 
 HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
 {
-    std::lock_guard lock(m_wslaSessionsLock);
-
     std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
 
     ForEachSession<void>([&](const auto& session) {
