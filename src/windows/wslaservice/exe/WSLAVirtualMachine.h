@@ -79,7 +79,6 @@ public:
     HRESULT UnmountWindowsFolder(_In_ LPCSTR LinuxPath);
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
-
     void OnProcessReleased(int Pid);
     void RegisterCallback(_In_ ITerminationCallback* callback);
 
