@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="WSLAMoviePlayer.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WSLAMoviePlayer"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="WSLA Movie Player">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Video Player -->
+        <MediaPlayerElement x:Name="MediaPlayerElement" 
+                           Grid.Row="0" 
+                           AreTransportControlsEnabled="False"
+                           Stretch="Uniform"
+                           MinHeight="400"/>
+
+        <!-- Native Subtitle Label -->
+        <Border Grid.Row="1" 
+                Background="#B3000000" 
+                Padding="10,5"
+                HorizontalAlignment="Center"
+                Margin="0,5">
+            <TextBlock x:Name="NativeSubtitleText"
+                       Text=""
+                       Foreground="White"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       MaxWidth="800"/>
+        </Border>
+
+        <!-- Translated Subtitle Label -->
+        <Border Grid.Row="2" 
+                Background="#B3000000" 
+                Padding="10,5"
+                HorizontalAlignment="Center"
+                Margin="0,5">
+            <TextBlock x:Name="TranslatedSubtitleText"
+                       Text=""
+                       Foreground="Yellow"
+                       FontSize="16"
+                       FontStyle="Italic"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       MaxWidth="800"/>
+        </Border>
+
+        <!-- Loading Indicator -->
+        <Border x:Name="LoadingIndicator"
+                Grid.Row="3" 
+                Background="#CC000000" 
+                Padding="15,8"
+                HorizontalAlignment="Center"
+                Visibility="Collapsed"
+                Margin="0,5">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <ProgressRing IsActive="True" Width="20" Height="20"/>
+                <TextBlock x:Name="LoadingText"
+                           Text="Processing subtitles..."
+                           Foreground="Orange"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Time Label -->
+        <TextBlock x:Name="TimeLabel"
+                   Grid.Row="4"
+                   Text="00:00 / 00:00"
+                   HorizontalAlignment="Center"
+                   Margin="0,5"
+                   FontSize="14"/>
+
+        <!-- Progress Slider with Buffer Visualization -->
+        <Grid Grid.Row="5" Margin="10,5">
+            <!-- Buffer indicator (shows processed areas) -->
+            <ProgressBar x:Name="BufferProgress"
+                         Value="0"
+                         Maximum="100"
+                         Height="8"
+                         VerticalAlignment="Center"
+                         Foreground="#4000FF00"/>
+            
+            <!-- Main slider -->
+            <Slider x:Name="ProgressSlider"
+                    Minimum="0"
+                    Maximum="100"
+                    Value="0"
+                    IsThumbToolTipEnabled="True"
+                    ValueChanged="ProgressSlider_ValueChanged"
+                    PointerPressed="ProgressSlider_PointerPressed"
+                    PointerReleased="ProgressSlider_PointerReleased"/>
+        </Grid>
+
+        <!-- Control Buttons -->
+        <Grid Grid.Row="6" Margin="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Open File Button -->
+            <Button x:Name="OpenFileButton"
+                    Grid.Column="0"
+                    Content="📂 Open File"
+                    Click="OpenFileButton_Click"
+                    Padding="15,8"/>
+
+            <!-- Skip Back Button -->
+            <Button x:Name="SkipBackButton"
+                    Grid.Column="2"
+                    Content="⏪ -15s"
+                    Click="SkipBackButton_Click"
+                    Padding="15,8"
+                    Margin="5,0"/>
+
+            <!-- Play/Pause Button -->
+            <Button x:Name="PlayPauseButton"
+                    Grid.Column="3"
+                    Content="▶ Play"
+                    Click="PlayPauseButton_Click"
+                    IsEnabled="False"
+                    Padding="20,8"
+                    Margin="5,0"/>
+
+            <!-- Skip Forward Button -->
+            <Button x:Name="SkipForwardButton"
+                    Grid.Column="4"
+                    Content="+15s ⏩"
+                    Click="SkipForwardButton_Click"
+                    Padding="15,8"
+                    Margin="5,0"/>
+        </Grid>
+    </Grid>
+</Window>
