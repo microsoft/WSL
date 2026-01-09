@@ -4486,6 +4486,12 @@ class BridgedTests
         WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET) && !NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have internet connectivity. Skipping...");
+            return;
+        }
+
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
 
         // Verify that we have a working connection
@@ -4497,15 +4503,31 @@ class BridgedTests
         WSL2_TEST_ONLY();
         WINDOWS_11_TEST_ONLY();
 
-        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
-
         if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
         {
             LogSkipped("Host does not have IPv4 internet connectivity. Skipping...");
             return;
         }
 
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
+
         NetworkTests::GuestClient(L"tcp4-connect:bing.com:80");
+    }
+
+    TEST_METHOD(InternetConnectivityV6)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Bridged, .vmSwitch = L"Default Switch"}));
+
+        NetworkTests::GuestClient(L"tcp6-connect:bing.com:80");
     }
 };
 
