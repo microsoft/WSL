@@ -34,8 +34,7 @@ enum WSLAMountFlags
 
 class WSLAUserSessionImpl;
 
-class DECLSPEC_UUID("0CFC5DC1-B6A7-45FC-8034-3FA9ED73CE30") WSLAVirtualMachine
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAVirtualMachine, IFastRundown>
+class WSLAVirtualMachine
 
 {
 public:
@@ -73,14 +72,13 @@ public:
     void Start();
     void OnSessionTerminated();
 
-    IFACEMETHOD(CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)) override;
-    IFACEMETHOD(WaitPid(_In_ LONG Pid, _In_ ULONGLONG TimeoutMs, _Out_ ULONG* State, _Out_ int* Code)) override;
-    IFACEMETHOD(Signal(_In_ LONG Pid, _In_ int Signal)) override;
-    IFACEMETHOD(Shutdown(ULONGLONG _In_ TimeoutMs)) override;
-    IFACEMETHOD(MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)) override;
-    IFACEMETHOD(Unmount(_In_ const char* Path)) override;
-    IFACEMETHOD(MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)) override;
-    IFACEMETHOD(UnmountWindowsFolder(_In_ LPCSTR LinuxPath)) override;
+    void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove);
+    void Unmount(_In_ const char* Path);
+
+    HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);
+    HRESULT UnmountWindowsFolder(_In_ LPCSTR LinuxPath);
+    void Signal(_In_ LONG Pid, _In_ int Signal);
+
 
     void OnProcessReleased(int Pid);
     void RegisterCallback(_In_ ITerminationCallback* callback);

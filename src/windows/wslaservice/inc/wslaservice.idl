@@ -236,25 +236,6 @@ interface IWSLAProcess : IUnknown
     // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
 }
 
-
-// TODO: Delete once the new API is wired.
-[
-    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8761),
-    pointer_default(unique),
-    object
-]
-interface IWSLAVirtualMachine : IUnknown
-{
-    HRESULT CreateLinuxProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
-    HRESULT WaitPid([in] LONG Pid, [in] ULONGLONG TimeoutMs,  [out] ULONG* State, [out] int* Code);
-    HRESULT Signal([in] LONG Pid, [in] int Signal);
-    HRESULT Shutdown([in] ULONGLONG TimeoutMs);
-    HRESULT MapPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
-    HRESULT Unmount([in] LPCSTR Path);
-    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
-}
-
 typedef enum _WSLANetworkingMode
 {
     WSLANetworkingModeNone,
@@ -338,10 +319,12 @@ interface IWSLASession : IUnknown
     HRESULT FormatVirtualDisk([in] LPCWSTR Path);
 
     // Terminate the VM and containers.
-    HRESULT Shutdown([in] ULONG TimeoutMs);
+    HRESULT Terminate();
 
-     // To be deleted.
-    HRESULT GetVirtualMachine([out] IWSLAVirtualMachine **VirtualMachine);
+    // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
+    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
+    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
+    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
 }
 
 struct WSLA_SESSION_INFORMATION
@@ -350,6 +333,13 @@ struct WSLA_SESSION_INFORMATION
     DWORD CreatorPid;
     wchar_t DisplayName[256];
 };
+
+typedef enum _WSLASessionFlags
+{
+    WSLASessionFlagsNone = 0,
+    WSLASessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
+    WSLASessionFlagsOpenExisting = 2 // Open an existing session if the name is in use.
+} WSLASessionFlags;
 
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
@@ -361,7 +351,7 @@ interface IWSLAUserSession : IUnknown
     HRESULT GetVersion([out] WSLA_VERSION* Version);
 
     // Session managment.
-    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, [out]IWSLASession** Session);
+    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out]IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
     HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);

@@ -1596,7 +1596,6 @@ int WslaShell(_In_ std::wstring_view commandLine)
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-    wil::com_ptr<IWSLAVirtualMachine> virtualMachine;
     wil::com_ptr<IWSLASession> session;
 
     if (!rootVhdOverride.empty())
@@ -1623,8 +1622,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     }
     else
     {
-        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, &session));
-        THROW_IF_FAILED(session->GetVirtualMachine(&virtualMachine));
+        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, WSLASessionFlagsNone, &session));
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
     }

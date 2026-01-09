@@ -46,7 +46,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
 {
     WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
-    m_virtualMachine = wil::MakeOrThrow<WSLAVirtualMachine>(CreateVmSettings(Settings), userSessionImpl.GetUserSid());
+    m_virtualMachine.emplace(CreateVmSettings(Settings), userSessionImpl.GetUserSid());
 
     if (Settings.TerminationCallback != nullptr)
     {
@@ -74,7 +74,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
         {"/usr/bin/dockerd" /*, "--debug"*/}, // TODO: Flag for --debug.
         {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}},
         common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
-    m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine.Get()));
+    m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine));
 
     // Wait for containerd to be ready before starting the event tracker.
     // TODO: Configurable timeout.
@@ -134,34 +134,7 @@ WSLASession::~WSLASession()
 {
     WSL_LOG("SessionTerminated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
-    std::lock_guard lock{m_lock};
-
-    // Stop the event tracker
-    if (m_eventTracker.has_value())
-    {
-        m_eventTracker->Stop();
-    }
-
-    // This will delete all containers. Needs to be done before the VM is terminated.
-    // TODO: If callers still have references to containers, the instances won't actually be deleted.
-    m_containers.clear();
-
-    m_sessionTerminatingEvent.SetEvent();
-
-    // N.B. The containerd thread can only run if the VM is running.
-    if (m_containerdThread.joinable())
-    {
-        m_containerdThread.join();
-    }
-
-    if (m_virtualMachine)
-    {
-        // N.B. containerd has exited by this point, so unmounting the VHD is safe since no container can be running.
-        LOG_IF_FAILED(m_virtualMachine->Unmount(c_containerdStorage));
-        m_virtualMachine->OnSessionTerminated();
-
-        m_virtualMachine.Reset();
-    }
+    Terminate();
 }
 
 void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid)
@@ -484,7 +457,7 @@ try
         containerOptions->Name,
         WSLAContainerImpl::Create(
             *containerOptions,
-            *m_virtualMachine.Get(),
+            *m_virtualMachine,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value()));
@@ -535,15 +508,6 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::GetVirtualMachine(IWSLAVirtualMachine** VirtualMachine)
-{
-    std::lock_guard lock{m_lock};
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
-
-    THROW_IF_FAILED(m_virtualMachine->QueryInterface(__uuidof(IWSLAVirtualMachine), (void**)VirtualMachine));
-    return S_OK;
-}
-
 HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
@@ -555,7 +519,10 @@ try
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    return m_virtualMachine->CreateLinuxProcess(Options, Process, Errno);
+    auto process = m_virtualMachine->CreateLinuxProcess(*Options, Errno);
+    THROW_IF_FAILED(process.CopyTo(Process));
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -563,7 +530,7 @@ void WSLASession::Ext4Format(const std::string& Device)
 {
     constexpr auto mkfsPath = "/usr/sbin/mkfs.ext4";
     ServiceProcessLauncher launcher(mkfsPath, {mkfsPath, Device});
-    auto result = launcher.Launch(*m_virtualMachine.Get()).WaitAndCaptureOutput();
+    auto result = launcher.Launch(*m_virtualMachine).WaitAndCaptureOutput();
 
     THROW_HR_IF_MSG(E_FAIL, result.Code != 0, "%hs", launcher.FormatResult(result).c_str());
 }
@@ -591,24 +558,79 @@ CATCH_RETURN();
 
 void WSLASession::OnUserSessionTerminating()
 {
+    LOG_IF_FAILED(Terminate());
+}
+
+HRESULT WSLASession::Terminate()
+try
+{
     // m_sessionTerminatingEvent is always valid, so it can be signalled with the lock.
     // This allows a session to be unblocked if a stuck operation is holding the lock.
     m_sessionTerminatingEvent.SetEvent();
 
     std::lock_guard lock{m_lock};
-    m_dockerClient.reset();
-    m_virtualMachine.Reset();
-}
 
-HRESULT WSLASession::Shutdown(ULONG Timeout)
+    // Stop the event tracker
+    if (m_eventTracker.has_value())
+    {
+        m_eventTracker->Stop();
+    }
+
+    // This will delete all containers. Needs to be done before the VM is terminated.
+    m_containers.clear();
+
+    m_dockerClient.reset();
+
+    // N.B. The containerd thread can only run if the VM is running.
+    if (m_containerdThread.joinable())
+    {
+        m_containerdThread.join();
+    }
+
+    if (m_virtualMachine)
+    {
+        // N.B. containerd has exited by this point, so unmounting the VHD is safe since no container can be running.
+        try
+        {
+            m_virtualMachine->Unmount(c_containerdStorage);
+        }
+        CATCH_LOG();
+
+        m_virtualMachine->OnSessionTerminated();
+        m_virtualMachine.reset();
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly)
 try
 {
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    THROW_IF_FAILED(m_virtualMachine->Shutdown(Timeout));
+    return m_virtualMachine->MountWindowsFolder(WindowsPath, LinuxPath, ReadOnly);
+}
+CATCH_RETURN();
 
-    m_virtualMachine.Reset();
+HRESULT WSLASession::UnmountWindowsFolder(LPCSTR LinuxPath)
+try
+{
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    return m_virtualMachine->UnmountWindowsFolder(LinuxPath);
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::MapVmPort(int Family, short WindowsPort, short LinuxPort, BOOL Remove)
+try
+{
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort, Remove != FALSE);
     return S_OK;
 }
 CATCH_RETURN();
@@ -627,4 +649,10 @@ HRESULT WSLASession::GetImplNoRef(_Out_ WSLASession** Session)
     // beyond that lifetime.
     *Session = this;
     return S_OK;
+}
+
+bool WSLASession::Terminated()
+{
+    std::lock_guard lock{m_lock};
+    return !!m_virtualMachine;
 }

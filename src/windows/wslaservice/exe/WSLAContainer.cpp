@@ -58,12 +58,11 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
         {
             if (e.MappedToHost)
             {
-                LOG_IF_FAILED_MSG(
-                    vm.MapPort(e.Family, e.HostPort, e.VmPort, true),
-                    "Failed to unmap port (family=%i, guestPort=%u, hostPort=%u)",
-                    e.Family,
-                    e.VmPort,
-                    e.HostPort);
+                try
+                {
+                    vm.MapPort(e.Family, e.HostPort, e.VmPort, true);
+                }
+                CATCH_LOG();
             }
         }
     });
@@ -116,7 +115,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     // Map Windows <-> VM ports.
     for (auto& e : *mappedPorts)
     {
-        THROW_IF_FAILED(vm.MapPort(e.Family, e.HostPort, e.VmPort, false));
+        vm.MapPort(e.Family, e.HostPort, e.VmPort, false);
         e.MappedToHost = true;
     }
 
@@ -201,12 +200,11 @@ WSLAContainerImpl::~WSLAContainerImpl()
     {
         WI_ASSERT(e.MappedToHost);
 
-        LOG_IF_FAILED_MSG(
-            m_parentVM->MapPort(e.Family, e.HostPort, e.VmPort, true),
-            "Failed to delete port mapping (family=%i, guestPort=%u, hostPort=%u)",
-            e.Family,
-            e.VmPort,
-            e.HostPort);
+        try
+        {
+            m_parentVM->MapPort(e.Family, e.HostPort, e.VmPort, true);
+        }
+        CATCH_LOG();
 
         allocatedGuestPorts.insert(e.VmPort);
     }

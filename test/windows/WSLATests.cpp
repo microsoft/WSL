@@ -87,7 +87,7 @@ class WSLATests
         return settings;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings = GetDefaultSessionSettings())
+    wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings = GetDefaultSessionSettings(), WSLASessionFlags Flags = WSLASessionFlagsNone)
     {
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
@@ -95,7 +95,7 @@ class WSLATests
 
         wil::com_ptr<IWSLASession> session;
 
-        VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, &session));
+        VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, Flags, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         return session;
@@ -208,8 +208,7 @@ class WSLATests
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        wil::com_ptr<IWSLASession> session;
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
+        wil::com_ptr<IWSLASession> session = CreateSession(settings);
 
         // Act: list sessions
         {
@@ -226,9 +225,8 @@ class WSLATests
 
         // List multiple sessions.
         {
-            wil::com_ptr<IWSLASession> session2;
             settings.DisplayName = L"wsla-test-list-2";
-            VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session2));
+            auto session2 = CreateSession(settings);
 
             wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
             VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
@@ -261,8 +259,7 @@ class WSLATests
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
-        wil::com_ptr<IWSLASession> created;
-        VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &created));
+        wil::com_ptr<IWSLASession> created = CreateSession(settings);
 
         // Act: open by the same display name
         wil::com_ptr<IWSLASession> opened;
@@ -409,7 +406,7 @@ class WSLATests
 
             auto session = CreateSession(settings);
             auto detach = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                session->Shutdown(30 * 1000);
+                session.reset();
                 if (thread.joinable())
                 {
                     thread.join();
@@ -420,7 +417,7 @@ class WSLATests
 
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo DmesgTest > /dev/kmsg"}, 0);
 
-            VERIFY_ARE_EQUAL(session->Shutdown(30 * 1000), S_OK);
+            session.reset();
             detach.reset();
 
             auto contentString = std::string(dmesgContent.begin(), dmesgContent.end());
@@ -487,9 +484,7 @@ class WSLATests
 
         auto session = CreateSession(sessionSettings);
 
-        wil::com_ptr<IWSLAVirtualMachine> vm;
-        VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
-        VERIFY_SUCCEEDED(vm->Shutdown(30 * 1000));
+        session.reset();
         auto future = promise.get_future();
         auto result = future.wait_for(std::chrono::seconds(30));
         auto [reason, details] = future.get();
@@ -760,9 +755,6 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        wil::com_ptr<IWSLAVirtualMachine> vm;
-        VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
-
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
             auto process = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", cmd}).Launch(*session);
@@ -796,10 +788,10 @@ class WSLATests
         };
 
         // Map port
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, false));
 
         // Validate that the same port can't be bound twice
-        VERIFY_ARE_EQUAL(vm->MapPort(AF_INET, 1234, 80, false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80, false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Check simple case
         listen(80, "port80", false);
@@ -813,34 +805,34 @@ class WSLATests
         expectContent(1234, AF_INET, "");
 
         // Add a ipv6 binding
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1234, 80, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1234, 80, false));
 
         // Validate that ipv6 bindings work as well.
         listen(80, "port80ipv6", true);
         expectContent(1234, AF_INET6, "port80ipv6");
 
         // Unmap the ipv4 port
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, true));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, true));
 
         // Verify that a proper error is returned if the mapping doesn't exist
-        VERIFY_ARE_EQUAL(vm->MapPort(AF_INET, 1234, 80, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Unmap the v6 port
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1234, 80, true));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1234, 80, true));
 
         // Map another port as v6 only
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1235, 81, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1235, 81, false));
 
         listen(81, "port81ipv6", true);
         expectContent(1235, AF_INET6, "port81ipv6");
         expectNotBound(1235, AF_INET);
 
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET6, 1235, 81, true));
-        VERIFY_ARE_EQUAL(vm->MapPort(AF_INET6, 1235, 81, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1235, 81, true));
+        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET6, 1235, 81, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         expectNotBound(1235, AF_INET6);
 
         // Create a forking relay and stress test
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, false));
 
         auto process =
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
@@ -853,7 +845,7 @@ class WSLATests
             expectContent(1234, AF_INET, "OK");
         }
 
-        VERIFY_SUCCEEDED(vm->MapPort(AF_INET, 1234, 80, true));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, true));
     }
 
     TEST_METHOD(StuckVmTermination)
@@ -876,10 +868,6 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        wil::com_ptr<IWSLAVirtualMachine> vm;
-        VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(vm.get());
-
         auto expectedMountOptions = [&](bool readOnly) -> std::string {
             if (enableVirtioFs)
             {
@@ -898,45 +886,45 @@ class WSLATests
 
         // Validate writeable mount.
         {
-            VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(false));
 
             // Validate that mount can't be stacked on each other
-            VERIFY_ARE_EQUAL(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(testFolder.c_str(), "/win-path", false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that folder is writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt && sync"}, 0);
             VERIFY_ARE_EQUAL(ReadFileContent(testFolder / "file.txt"), L"content");
 
-            VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate read-only mount.
         {
-            VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             // Validate that folder is not writeable from linux
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo -n content > /win-path/file.txt"}, 1);
 
-            VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
             ExpectMount(session.get(), "/win-path", {});
         }
 
         // Validate various error paths
         {
-            VERIFY_ARE_EQUAL(vm->MountWindowsFolder(L"relative-path", "/win-path", true), E_INVALIDARG);
-            VERIFY_ARE_EQUAL(vm->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
-            VERIFY_ARE_EQUAL(vm->UnmountWindowsFolder("/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            VERIFY_ARE_EQUAL(vm->UnmountWindowsFolder("/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"relative-path", "/win-path", true), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(session->MountWindowsFolder(L"C:\\does-not-exist", "/win-path", true), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/not-mounted"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(session->UnmountWindowsFolder("/proc"), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
             // Validate that folders that are manually unmounted from the guest are handled properly
-            VERIFY_SUCCEEDED(vm->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
+            VERIFY_SUCCEEDED(session->MountWindowsFolder(testFolder.c_str(), "/win-path", true));
             ExpectMount(session.get(), "/win-path", expectedMountOptions(true));
 
             ExpectCommandResult(session.get(), {"/usr/bin/umount", "/win-path"}, 0);
-            VERIFY_SUCCEEDED(vm->UnmountWindowsFolder("/win-path"));
+            VERIFY_SUCCEEDED(session->UnmountWindowsFolder("/win-path"));
         }
     }
 
@@ -999,9 +987,6 @@ class WSLATests
 
             WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
             session = CreateSession(settings);
-
-            wil::com_ptr<IWSLAVirtualMachine> vm;
-            VERIFY_SUCCEEDED(session->GetVirtualMachine(&vm));
 
             // Validate that the GPU device is not available.
             ExpectMount(session.get(), "/usr/lib/wsl/drivers", {});
@@ -1164,7 +1149,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), E_INVALIDARG);
 
             // Validate that the process object correctly handle requests after the VM has terminated.
-            VERIFY_SUCCEEDED(session->Shutdown(30 * 1000));
+            session.reset();
             VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
 
@@ -1266,7 +1251,7 @@ class WSLATests
         wsl::core::filesystem::CreateVhd(formatedVhd, 100 * 1024 * 1024, tokenInfo->User.Sid, false, false);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            LOG_IF_FAILED(session->Shutdown(30 * 1000));
+            session.reset();
             LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(formatedVhd));
         });
 
@@ -2369,6 +2354,94 @@ class WSLATests
             insert(input, 12, "foo");
 
             VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
+        }
+    }
+
+    TEST_METHOD(PersistentSession)
+    {
+        wil::com_ptr<IWSLAUserSession> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+        auto expectSessions = [&](const std::vector<std::wstring>& expectedSessions) {
+            wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+            VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
+
+            std::set<std::wstring> displayNames;
+            for (const auto& e : sessions)
+            {
+                auto [_, inserted] = displayNames.insert(e.DisplayName);
+
+                VERIFY_IS_TRUE(inserted);
+            }
+
+            for (const auto& e : expectedSessions)
+            {
+                auto it = displayNames.find(e);
+                if (it == displayNames.end())
+                {
+                    __debugbreak();
+                    LogError("Session not found: %hs", e.c_str());
+                    VERIFY_FAIL();
+                }
+
+                displayNames.erase(it);
+            }
+
+            for (const auto& e : displayNames)
+            {
+                LogError("Unexpected session found: %hs", e.c_str());
+                VERIFY_FAIL();
+            }
+        };
+
+        auto create = [this](LPCWSTR Name, WSLASessionFlags Flags) {
+            auto settings = GetDefaultSessionSettings();
+            settings.DisplayName = Name;
+            settings.NetworkingMode = WSLANetworkingModeNone;
+
+            return CreateSession(settings, Flags);
+        };
+
+        // Validate that non-persistent sessions are dropped when released
+        {
+            auto session1 = create(L"session-1", WSLASessionFlagsNone);
+            expectSessions({L"session-1"});
+
+            session1.reset();
+            expectSessions({});
+        }
+
+        // Validate that persistent sessions are only dropped when explicitely terminated.
+        {
+            auto session1 = create(L"session-1", WSLASessionFlagsPersistent);
+            expectSessions({L"session-1"});
+
+            session1.reset();
+            expectSessions({L"session-1"});
+
+            VERIFY_SUCCEEDED(session1->Terminate());
+            expectSessions({});
+        }
+
+        // Validate that sessions can be reopened by name.
+        {
+            auto session1 = create(L"session-1", WSLASessionFlagsPersistent);
+            expectSessions({L"session-1"});
+
+            session1.reset();
+            expectSessions({L"session-1"});
+
+            auto session1Copy =
+                create(L"session-1", static_cast<WSLASessionFlags>(WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting));
+
+            expectSessions({L"session-1"});
+
+            // Verify that name conflicts are correctly handled.
+            VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { create(L"session-1", WSLASessionFlagsNone); }), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+
+            VERIFY_SUCCEEDED(session1->Terminate());
+            expectSessions({});
         }
     }
 };
