@@ -53,8 +53,9 @@ private:
                 return true; // Object is released, remove from the session list.
             }
 
+            // N.B. lockedSession has a reference to the COM object.
             WSLASession* SessionImpl{};
-            THROW_IF_FAILED(lockedSession->GetImpl(reinterpret_cast<void**>(&SessionImpl)));
+            THROW_IF_FAILED(lockedSession->GetImplNoRef(&SessionImpl));
 
             if constexpr (std::is_same_v<T, void>)
             {
@@ -62,7 +63,10 @@ private:
             }
             else
             {
-                result = Routine(*SessionImpl);
+                if (!result.has_value())
+                {
+                    result = Routine(*SessionImpl);
+                }
             }
 
             return false;

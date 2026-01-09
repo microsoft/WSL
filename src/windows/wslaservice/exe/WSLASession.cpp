@@ -619,7 +619,7 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.second.get() == Container; }) == 1);
 }
 
-HRESULT WSLASession::GetImpl(_Out_ void** Session)
+HRESULT WSLASession::GetImplNoRef(_Out_ WSLASession** Session)
 {
     *Session = this;
     return S_OK;

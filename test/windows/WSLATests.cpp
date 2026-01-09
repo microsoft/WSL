@@ -212,15 +212,40 @@ class WSLATests
         VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session));
 
         // Act: list sessions
-        wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-        VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+            VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
-        // Assert
-        VERIFY_ARE_EQUAL(sessions.size(), 1u);
-        const auto& info = sessions[0];
+            // Assert
+            VERIFY_ARE_EQUAL(sessions.size(), 1u);
+            const auto& info = sessions[0];
 
-        // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
-        VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), std::wstring(L"wsla-test-list"));
+            // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
+            VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), std::wstring(L"wsla-test-list"));
+        }
+
+        // List multiple sessions.
+        {
+            wil::com_ptr<IWSLASession> session2;
+            settings.DisplayName = L"wsla-test-list-2";
+            VERIFY_SUCCEEDED(userSession->CreateSession(&settings, &session2));
+
+            wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
+            VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
+
+            VERIFY_ARE_EQUAL(sessions.size(), 2);
+
+            std::vector<std::wstring> displayNames;
+            for (const auto& e : sessions)
+            {
+                displayNames.push_back(e.DisplayName);
+            }
+
+            std::ranges::sort(displayNames);
+
+            VERIFY_ARE_EQUAL(displayNames[0], L"wsla-test-list");
+            VERIFY_ARE_EQUAL(displayNames[1], L"wsla-test-list-2");
+        }
     }
 
     TEST_METHOD(OpenSessionByNameFindsExistingSession)
