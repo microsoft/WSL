@@ -55,7 +55,7 @@ unique_hcs_operation CreateOperation();
 
 wsl::shared::hns::HNSEndpoint GetEndpointProperties(HCN_ENDPOINT endpoint);
 
-std::vector<std::string> GetProcessorFeatures();
+const std::vector<std::string>& GetProcessorFeatures();
 
 GUID GetRuntimeId(_In_ HCS_SYSTEM ComputeSystem);
 
