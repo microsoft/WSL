@@ -1259,7 +1259,7 @@ Return Value:
         THROW_LAST_ERROR_IF(WriteToFile(DHCPCD_CONF_PATH, Config.c_str()) < 0);
 
         execl(DHCPCD_PATH, DHCPCD_PATH, "-w", "-4", "-f", DHCPCD_CONF_PATH, "eth0", NULL);
-        LOG_ERROR("execl({}) failed {}", DHCPCD_PATH, errno);
+        LOG_ERROR("execl({}) failed, {}", DHCPCD_PATH, errno);
     });
 
     if (ChildPid < 0)
