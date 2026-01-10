@@ -1251,8 +1251,7 @@ Return Value:
         //
 
         std::string Config = std::format(
-            "option subnet_mask, routers, domain_name, domain_name_servers, domain_search, host_name, interface_mtu\n"
-            "noarp\n"
+            "option subnet_mask, routers, broadcast, domain_name, domain_name_servers, domain_search, host_name, interface_mtu\n"
             "timeout {}\n",
             DhcpTimeout);
 
