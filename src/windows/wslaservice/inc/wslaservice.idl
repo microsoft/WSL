@@ -111,7 +111,7 @@ interface ITerminationCallback : IUnknown
 ]
 interface IProgressCallback : IUnknown
 {
-    HRESULT OnProgress(ULONG Progress, ULONG Total);
+    HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
 
 struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION

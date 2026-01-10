@@ -264,6 +264,130 @@ static int RunListCommand(bool /*verbose*/)
     return 0;
 }
 
+DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
+
+static wil::com_ptr<IWSLASession> OpenCLISession()
+{
+    wil::com_ptr<IWSLAUserSession> userSession;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+    auto dataFolder = std::filesystem::path(wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr)) / "wsla";
+
+    // TODO: Have a configuration file for those.
+    WSLA_SESSION_SETTINGS settings{};
+    settings.DisplayName = L"wsla-cli";
+    settings.CpuCount = 4;
+    settings.MemoryMb = 2024;
+    settings.BootTimeoutMs = 30 * 1000;
+    settings.StoragePath = dataFolder.c_str();
+    settings.MaximumStorageSizeMb = 10000; // 10GB.
+    settings.NetworkingMode = WSLANetworkingModeNAT;
+
+    wil::com_ptr<IWSLASession> session;
+    THROW_IF_FAILED(userSession->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    return session;
+}
+
+static int Pull(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
+
+    std::string image;
+    parser.AddPositionalArgument(Utf8String{image}, 0);
+
+    parser.Parse();
+
+    system("pause");
+
+    THROW_HR_IF(E_INVALIDARG, image.empty());
+
+    class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") Callback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
+    {
+    public:
+        auto MoveToLine(CONSOLE_SCREEN_BUFFER_INFO& Current, SHORT Line)
+        {
+            THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), COORD{.X = 0, .Y = Line}));
+
+            return wil::scope_exit([&]() {
+                THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), Current.dwCursorPosition));
+            });
+        }
+
+        HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total) override
+        try
+        {
+            if (Id == nullptr) // Print all 'global' statuses on their own line
+            {
+                wprintf(L"%hs\n", Status);
+                return S_OK;
+            }
+
+            auto info = Info();
+
+            auto it = m_statuses.find(Id);
+            if (it == m_statuses.end())
+            {
+                // If this is the first time we see this ID, create a new line for it.
+                m_statuses.emplace(Id, Info().dwCursorPosition.Y);
+                wprintf(L"%ls\n", GenerateStatusLine(Status, Id, Current, Total, info).c_str());
+            }
+            else
+            {
+                auto revert = MoveToLine(info, it->second);
+                wprintf(L"%ls\n", GenerateStatusLine(Status, Id, Current, Total, info).c_str());
+            }
+
+            return S_OK;
+        }
+        CATCH_RETURN();
+
+    private:
+        static CONSOLE_SCREEN_BUFFER_INFO Info()
+        {
+            CONSOLE_SCREEN_BUFFER_INFO info{};
+
+            THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
+
+            return info;
+        }
+
+        std::wstring GenerateStatusLine(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total, const CONSOLE_SCREEN_BUFFER_INFO& Info)
+        {
+            std::wstring line;
+            if (Total != 0)
+            {
+                line = std::format(L"{} '{}': {}%", Status, Id, Current * 100 / Total);
+            }
+            else
+            {
+                line = std::format(L"{} '{}'", Status, Id);
+            }
+
+            // Erase any previously written char on that line.
+            while (line.size() < Info.dwSize.X)
+            {
+                line += L' ';
+            }
+
+            return line;
+        }
+
+        std::map<std::string, SHORT> m_statuses;
+        SHORT m_currentLine = Info().dwCursorPosition.Y;
+    };
+
+    wil::com_ptr<IWSLASession> session = OpenCLISession();
+
+    Callback callback;
+    THROW_IF_FAILED(session->PullImage(image.c_str(), nullptr, &callback));
+
+    return 0;
+}
+
 static void PrintUsage()
 {
     wslutil::PrintMessage(Localization::MessageWsladiagUsage(), stderr);
@@ -330,6 +454,10 @@ int wsladiag_main(std::wstring_view commandLine)
             return 1;
         }
         return RunShellCommand(shellSession, verbose);
+    }
+    else if (verb == L"pull")
+    {
+        return Pull(commandLine);
     }
     else
     {

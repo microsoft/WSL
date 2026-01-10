@@ -279,7 +279,6 @@ HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATI
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
-    UNREFERENCED_PARAMETER(ProgressCallback);
 
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
@@ -287,13 +286,44 @@ try
 
     std::lock_guard lock{m_lock};
 
-    auto callback = [&](const std::string& content) {
-        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(content.c_str(), "Content"));
+    wil::unique_socket socket;
+
+    try
+    {
+        socket = m_dockerClient->PullImage(repo.c_str(), tag.c_str());
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_MSG(E_FAIL, "Failed to pull image %hs:%hs, %hs", repo.c_str(), tag.c_str(), e.what());
+    }
+
+    auto onChunk = [&](const gsl::span<char>& Content) {
+        std::string contentString{Content.begin(), Content.end()};
+        WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
+
+        if (ProgressCallback == nullptr)
+        {
+            return;
+        }
+
+        auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
+
+        THROW_IF_FAILED(ProgressCallback->OnProgress(
+            parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
     };
 
-    auto code = m_dockerClient->PullImage(repo.c_str(), tag.c_str(), callback);
 
-    THROW_HR_IF_MSG(E_FAIL, code != 200, "Failed to pull image: %hs", ImageUri);
+    relay::MultiHandleWait io;
+    auto onCompleted = [&]() { io.Cancel(); };
+
+    io.AddHandle(std::make_unique<relay::HTTPChunkBasedReadHandle>(relay::HandleWrapper{std::move(socket), onCompleted}, onChunk));
+    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+    io.Run({});
+
+    if (m_sessionTerminatingEvent.is_signaled())
+    {
+        return E_ABORT;
+    }
 
     return S_OK;
 }

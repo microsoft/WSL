@@ -171,6 +171,12 @@ struct HandleWrapper
     }
 
     HandleWrapper(
+        wil::unique_socket&& handle, std::function<void()>&& OnClose = []() {}) :
+        OwnedHandle((HANDLE)handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(
         SOCKET handle, std::function<void()>&& OnClose = []() {}) :
         Handle(reinterpret_cast<HANDLE>(handle)), OnClose(std::move(OnClose))
     {
