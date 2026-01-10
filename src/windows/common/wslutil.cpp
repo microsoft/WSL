@@ -191,7 +191,8 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
     X(HNS),
     X(ReadDistroConfig),
     X(MoveDistro),
-    X(VerifyChecksum)};
+    X(VerifyChecksum),
+    X(WslaDiag)};
 
 #undef X
 
