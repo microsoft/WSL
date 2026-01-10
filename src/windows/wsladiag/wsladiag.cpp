@@ -32,7 +32,7 @@ using wsl::windows::common::WSLAProcessLauncher;
 static int ReportError(const std::wstring& context, HRESULT hr)
 {
     auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
-    wslutil::PrintMessage(context, stderr);
+    wslutil::PrintMessage(Localization::MessageErrorCode(context, errorString), stderr);
     return 1;
 }
 
@@ -71,6 +71,11 @@ static int RunShellCommand(std::wstring_view commandLine)
         return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
     }
 
+    if (verbose)
+    {
+        wslutil::PrintMessage(std::format(L"[diag] Session opened: '{}'", sessionName), stdout);
+    }
+
     // Console size for TTY.
     CONSOLE_SCREEN_BUFFER_INFO info{};
     THROW_LAST_ERROR_IF(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
@@ -90,6 +95,11 @@ static int RunShellCommand(std::wstring_view commandLine)
     launcher.SetTtySize(rows, cols);
 
     auto process = launcher.Launch(*session);
+
+    if (verbose)
+    {
+        wslutil::PrintMessage(L"[diag] Shell process launched", stdout);
+    }
 
     auto ttyIn = process.GetStdHandle(0);
     auto ttyOut = process.GetStdHandle(1);
@@ -205,7 +215,8 @@ static int RunListCommand(std::wstring_view commandLine)
 
     if (verbose)
     {
-        wslutil::PrintMessage(std::format(L"[diag] Found {} session(s)", sessions.size()), stdout);
+        const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
+        wslutil::PrintMessage(std::format(L"[diag] Found {} session{}", sessions.size(), plural), stdout);
     }
 
     if (sessions.size() == 0)
