@@ -1,27 +1,19 @@
 <?xml version="1.0"?>
 <!--
-  Available Profiles:
+  Available Profiles (use profile name with wpr -start):
   - WSL: General WSL tracing (default)
   - WSL-Storage: WSL with enhanced storage tracing
   - WSL-Networking: WSL with comprehensive networking tracing
   - WSL-HvSocket: WSL with HvSocket-specific tracing
+  
+  Example: wpr -start wsl.wprp!WSL-Networking -filemode
 -->
 <WindowsPerformanceRecorder Version="1">
   <Profiles>
     <!-- Event Collectors -->
     <EventCollector Id="Collector" Name="Collector">
-      <BufferSize Value="256"/>
-      <Buffers Value="1024"/>
-    </EventCollector>
-
-    <EventCollector Id="NetworkingCollector" Name="NetworkingCollector">
-      <BufferSize Value="256"/>
+      <BufferSize Value="512"/>
       <Buffers Value="4096"/>
-    </EventCollector>
-
-    <EventCollector Id="HvSocketCollector" Name="HvSocketCollector">
-      <BufferSize Value="512" />
-      <Buffers Value="10" PercentageOfTotalMemory="true"/>
     </EventCollector>
    
     <!-- Event Providers -->
@@ -367,7 +359,7 @@
       Base="WSL.Verbose.File"
       >
       <Collectors>
-        <EventCollectorId Value="NetworkingCollector">
+        <EventCollectorId Value="Collector">
           <EventProviders>
             <!-- Additional networking-specific providers -->
             <EventProviderId Value="aad_WPP"/>
@@ -529,7 +521,7 @@
       Base="WSL.Verbose.File"
       >
       <Collectors>
-        <EventCollectorId Value="HvSocketCollector">
+        <EventCollectorId Value="Collector">
           <EventProviders>
             <!-- Additional providers specific to HvSocket profile -->
             <EventProviderId Value="EventProvider_HvSocketTraceProvider"/>

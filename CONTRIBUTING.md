@@ -81,8 +81,9 @@ The script will output the path of the log file once done.
 
 For specific scenarios, you can use different log profiles:
 - `.\collect-wsl-logs.ps1 -LogProfile storage` - Enhanced storage tracing
+- `.\collect-wsl-logs.ps1 -LogProfile networking` - Networking-focused tracing
 - `.\collect-wsl-logs.ps1 -LogProfile hvsocket` - HvSocket-specific tracing
-- `.\collect-networking-logs.ps1` - Comprehensive networking tracing
+- `.\collect-networking-logs.ps1` - Alternative script for networking tracing
 
 ### 10) Reporting a Windows crash (BSOD)
 
