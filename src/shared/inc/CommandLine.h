@@ -307,7 +307,8 @@ class ArgumentParser
 public:
 #ifdef WIN32
 
-    ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1) : m_startIndex(StartIndex), m_name(Name)
+    ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool ignoreUnknownArgs = false) :
+        m_startIndex(StartIndex), m_name(Name), m_ignoreUnknownArgs(ignoreUnknownArgs)
     {
         m_argv.reset(CommandLineToArgvW(std::wstring(CommandLine).c_str(), &m_argc));
         THROW_LAST_ERROR_IF(!m_argv);
@@ -315,7 +316,8 @@ public:
 
 #else
 
-    ArgumentParser(int argc, const char* const* argv) : m_argc(argc), m_argv(argv), m_startIndex(1)
+    ArgumentParser(int argc, const char* const* argv, bool ignoreUnknownArgs = false) :
+        m_argc(argc), m_argv(argv), m_startIndex(1), m_ignoreUnknownArgs(ignoreUnknownArgs)
     {
     }
 
@@ -400,7 +402,7 @@ public:
                         const TChar* value = nullptr;
                         if (e.Positional)
                         {
-                            value = m_argv[i]; // Positional arguments directly receive arvg[i]
+                            value = m_argv[i]; // Positional arguments directly receive argv[i]
                         }
                         else if (i + 1 < m_argc)
                         {
@@ -429,6 +431,11 @@ public:
 
             if (!foundMatch)
             {
+                if (m_ignoreUnknownArgs)
+                {
+                    break;
+                }
+
                 THROW_USER_ERROR(wsl::shared::Localization::MessageInvalidCommandLine(m_argv[i], m_name ? m_name : m_argv[0]));
             }
 
@@ -535,6 +542,7 @@ private:
 
     int m_startIndex{};
     const TChar* m_name{};
+    bool m_ignoreUnknownArgs{false};
 };
 } // namespace wsl::shared
 

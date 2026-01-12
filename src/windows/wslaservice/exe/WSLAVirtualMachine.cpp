@@ -309,14 +309,13 @@ void WSLAVirtualMachine::Start()
     }
     else
     {
-        hcs::VirtualPMemController pmemController;
-        pmemController.MaximumCount = 0;
-        pmemController.MaximumSizeBytes = 0;
+        hcs::VirtualPMemController pmemController{};
         pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
+        ULONG nextDeviceId = 0;
         auto attachPmemDisk = [&](PCWSTR path) {
-            ULONG deviceId = pmemController.MaximumCount;
-            pmemController.MaximumCount += 1;
-            hcs::VirtualPMemDevice vhd;
+            auto deviceId = nextDeviceId;
+            nextDeviceId += 1;
+            hcs::VirtualPMemDevice vhd{};
             vhd.HostPath = path;
             vhd.ReadOnly = true;
             vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
