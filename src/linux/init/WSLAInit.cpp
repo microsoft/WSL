@@ -829,7 +829,7 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
     while (Channel.Connected())
     {
         auto [Message, Range] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
-        if (Message == nullptr || Message->MessageType == LxMessageWSLAShutdown)
+        if (Message == nullptr)
         {
             break;
         }
