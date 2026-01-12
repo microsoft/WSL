@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <!--
   Available Profiles:
-  - WSL.Verbose.File: General WSL tracing (default)
-  - WSL.Storage.Verbose.File: WSL with enhanced storage tracing
-  - WSL.Networking.Verbose.File: WSL with comprehensive networking tracing
-  - WSL.HvSocket.Verbose.File: WSL with HvSocket-specific tracing
+  - WSL: General WSL tracing (default)
+  - WSL-Storage: WSL with enhanced storage tracing
+  - WSL-Networking: WSL with comprehensive networking tracing
+  - WSL-HvSocket: WSL with HvSocket-specific tracing
 -->
 <WindowsPerformanceRecorder Version="1">
   <Profiles>
@@ -271,7 +271,7 @@
     <EventProvider Id="wslaservice" Name="0383CE62-8F86-4766-AFB2-9D66A7FB1E90"/>
     <EventProvider Id="wslclient" Name="8cbb7724-7223-5d6f-8137-564dac45104d"/>
 
-    <!-- PROFILE: General WSL Tracing (Default) -->
+    <!-- PROFILE: General WSL Tracing (Default, also serves as base for other profiles) -->
     <Profile
       Id="WSL.Verbose.File"
       Name="WSL"
@@ -290,9 +290,11 @@
             <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.Datastore"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PhoneProvisioner"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PPOEM"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.API"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CommandCsp"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CSP"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Engine"/>
+            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Handlers"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Migration"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Operations"/>
             <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Platform"/>
@@ -342,35 +344,14 @@
       Description="WSL traces with enhanced storage providers"
       LoggingMode="File"
       DetailLevel="Verbose"
+      Base="WSL.Verbose.File"
       >
       <Collectors>
         <EventCollectorId Value="Collector">
           <EventProviders>
-            <EventProviderId Value="9p"/>
-            <EventProviderId Value="EventProvider_Telemetry_StorVSP"/>
-            <EventProviderId Value="EventProvider_Trace_Vhdmp"/>
-            <EventProviderId Value="hns"/>
-            <EventProviderId Value="HyperV_EmulatedStorage"/>
-            <EventProviderId Value="hyperv_storage"/>
-            <EventProviderId Value="HyperV_SyntheticStorage"/>
-            <EventProviderId Value="lxcore_kernel"/>
-            <EventProviderId Value="lxcore_service"/>
-            <EventProviderId Value="lxcore_user"/>
-            <EventProviderId Value="mup"/>
-            <EventProviderId Value="netmgmt"/>
-            <EventProviderId Value="p9rdr"/>
-            <EventProviderId Value="rfsmon"/>
+            <!-- Additional storage-specific providers -->
             <EventProviderId Value="storvsp_io"/>
             <EventProviderId Value="storvsp_wpp"/>
-            <EventProviderId Value="vhdmp"/>
-            <EventProviderId Value="vhdmp_wpp"/>
-            <EventProviderId Value="virtdisk"/>
-            <EventProviderId Value="virtdisk_wpp"/>
-            <EventProviderId Value="vm_chipset"/>
-            <EventProviderId Value="vmcompute"/>
-            <EventProviderId Value="vmcompute_dll"/>
-            <EventProviderId Value="vmmm"/>
-            <EventProviderId Value="vmwp"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>
@@ -383,12 +364,12 @@
       Description="WSL traces with comprehensive networking providers"
       LoggingMode="File"
       DetailLevel="Verbose"
+      Base="WSL.Verbose.File"
       >
       <Collectors>
         <EventCollectorId Value="NetworkingCollector">
           <EventProviders>
-            <EventProviderId Value="9p"/>
-            <EventProviderId Value="9p_errors"/>
+            <!-- Additional networking-specific providers -->
             <EventProviderId Value="aad_WPP"/>
             <EventProviderId Value="basecsp_WPP"/>
             <EventProviderId Value="BCRYPT_WPP"/>
@@ -403,26 +384,8 @@
             <EventProviderId Value="digest_WPP"/>
             <EventProviderId Value="DNS_WPP"/>
             <EventProviderId Value="dpapis_WPP"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.EMPS.Enrollment"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.AppDownload"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.Datastore"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PhoneProvisioner"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PPOEM"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CommandCsp"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CSP"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Engine"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Migration"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Operations"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Platform"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.Engine"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.RemovableMedia"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvTool"/>
             <EventProviderId Value="gMSAClient_WPP"/>
-            <EventProviderId Value="hns"/>
             <EventProviderId Value="HTTP_sys_WPP"/>
-            <EventProviderId Value="hyperv_storage"/>
             <EventProviderId Value="idcommon_WPP"/>
             <EventProviderId Value="idlisten_WPP"/>
             <EventProviderId Value="idstore_WPP"/>
@@ -437,9 +400,6 @@
             <EventProviderId Value="LsaDs_WPP"/>
             <EventProviderId Value="LsaIso_WPP"/>
             <EventProviderId Value="LsaTrace_WPP"/>
-            <EventProviderId Value="lxcore_kernel"/>
-            <EventProviderId Value="lxcore_service"/>
-            <EventProviderId Value="lxcore_user"/>
             <EventProviderId Value="Microsoft_OneCore_NetworkingTriage_GetConnected"/>
             <EventProviderId Value="Microsoft_OneCore_NetworkingTriage_OnDemand"/>
             <EventProviderId Value="Microsoft_OneCore_NetworkingTriage_RoutePolicyManagement"/>
@@ -530,35 +490,22 @@
             <EventProviderId Value="mpssvcService"/>
             <EventProviderId Value="MsQuic_WPP"/>
             <EventProviderId Value="msxml_WPP"/>
-            <EventProviderId Value="mup"/>
             <EventProviderId Value="NCRYPT_WPP"/>
             <EventProviderId Value="NCRYPTSSLP_WPP"/>
             <EventProviderId Value="ndis_wpp"/>
             <EventProviderId Value="negoexts_WPP"/>
             <EventProviderId Value="Netio_WPP"/>
-            <EventProviderId Value="netmgmt"/>
             <EventProviderId Value="ntlm_WPP"/>
             <EventProviderId Value="NtlmShared_WPP"/>
-            <EventProviderId Value="p9rdr"/>
             <EventProviderId Value="pku2u_WPP"/>
             <EventProviderId Value="PortTrackerServer_WPP"/>
-            <EventProviderId Value="rfsmon"/>
             <EventProviderId Value="SharedAccessWPP"/>
             <EventProviderId Value="TLS_WPP"/>
             <EventProviderId Value="TokenBinding_WPP"/>
             <EventProviderId Value="TPM_WPP"/>
             <EventProviderId Value="UrlMon_WPP"/>
             <EventProviderId Value="vault_WPP"/>
-            <EventProviderId Value="vhdmp"/>
-            <EventProviderId Value="vhdmp_wpp"/>
-            <EventProviderId Value="virtdisk"/>
-            <EventProviderId Value="virtdisk_wpp"/>
-            <EventProviderId Value="vm_chipset"/>
-            <EventProviderId Value="vmcompute"/>
-            <EventProviderId Value="vmcompute_dll"/>
-            <EventProviderId Value="vmmm"/>
             <EventProviderId Value="VmSwitch_wpp"/>
-            <EventProviderId Value="vmwp"/>
             <EventProviderId Value="webauth_WPP"/>
             <EventProviderId Value="Webio_WPP"/>
             <EventProviderId Value="webplatform_WPP"/>
@@ -567,8 +514,6 @@
             <EventProviderId Value="WinNatSys"/>
             <EventProviderId Value="Winsock_WPP"/>
             <EventProviderId Value="wlidsvc_WPP"/>
-            <EventProviderId Value="wsl_devicehost"/>
-            <EventProviderId Value="wslclient"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>
@@ -581,57 +526,13 @@
       Description="WSL traces with HvSocket-specific providers"
       LoggingMode="File"
       DetailLevel="Verbose"
+      Base="WSL.Verbose.File"
       >
       <Collectors>
         <EventCollectorId Value="HvSocketCollector">
           <EventProviders>
-            <EventProviderId Value="9p"/>
-            <EventProviderId Value="9p_errors"/>
+            <!-- Additional providers specific to HvSocket profile -->
             <EventProviderId Value="EventProvider_HvSocketTraceProvider"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.EMPS.Enrollment"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.EnterpriseManagement.Enrollment"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.AppDownload"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.Datastore"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PhoneProvisioner"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Mobile.Provisioning.PPOEM"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CommandCsp"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.CSP"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Engine"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Migration"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Operations"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Platform"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.Engine"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.Plugin.RemovableMedia"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvLaunch"/>
-            <EventProviderId Value="EventProvider_Microsoft.Windows.Provisioning.ProvTool"/>
-            <EventProviderId Value="EventProvider_Telemetry_StorVSP"/>
-            <EventProviderId Value="EventProvider_Trace_Vhdmp"/>
-            <EventProviderId Value="hns"/>
-            <EventProviderId Value="HyperV_EmulatedStorage"/>
-            <EventProviderId Value="hyperv_storage"/>
-            <EventProviderId Value="HyperV_SyntheticStorage"/>
-            <EventProviderId Value="lxcore_kernel"/>
-            <EventProviderId Value="lxcore_service"/>
-            <EventProviderId Value="lxcore_user"/>
-            <EventProviderId Value="Microsoft-Windows-HyperV-Vid"/>
-            <EventProviderId Value="Microsoft.Windows.HyperV.Vid"/>
-            <EventProviderId Value="mup"/>
-            <EventProviderId Value="netmgmt"/>
-            <EventProviderId Value="p9rdr"/>
-            <EventProviderId Value="rfsmon"/>
-            <EventProviderId Value="storvsp"/>
-            <EventProviderId Value="vhdmp"/>
-            <EventProviderId Value="vhdmp_wpp"/>
-            <EventProviderId Value="virtdisk"/>
-            <EventProviderId Value="virtdisk_wpp"/>
-            <EventProviderId Value="vm_chipset"/>
-            <EventProviderId Value="vmcompute"/>
-            <EventProviderId Value="vmcompute_dll"/>
-            <EventProviderId Value="vmmm"/>
-            <EventProviderId Value="vmwp"/>
-            <EventProviderId Value="wsl_devicehost"/>
-            <EventProviderId Value="wslapi"/>
-            <EventProviderId Value="wslclient"/>
           </EventProviders>
         </EventCollectorId>
       </Collectors>
