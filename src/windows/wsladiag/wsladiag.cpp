@@ -360,21 +360,15 @@ int wmain(int, wchar_t**)
 
     if (FAILED(result))
     {
-        try
+        if (auto reported = context.ReportedError())
         {
-            if (auto reported = context.ReportedError())
-            {
-                auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
-                wslutil::PrintMessage(wsl::shared::Localization::MessageErrorCode(strings.Message, strings.Code), stderr);
-            }
-            else
-            {
-                wslutil::PrintMessage(wslutil::GetErrorString(result), stderr);
-            }
+            auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
+            wslutil::PrintMessage(strings.Message.empty() ? strings.Code : strings.Message, stderr);
         }
-        catch (...)
+        else
         {
-            LOG_CAUGHT_EXCEPTION();
+            // Fallback for errors without context
+            wslutil::PrintMessage(wslutil::GetErrorString(result), stderr);
         }
     }
 
