@@ -2398,7 +2398,7 @@ class WSLATests
             expectSessions({});
         }
 
-        // Validate that persistent sessions are only dropped when explicitely terminated.
+        // Validate that persistent sessions are only dropped when explicitly terminated.
         {
             auto session1 = create(L"session-1", WSLASessionFlagsPersistent);
             expectSessions({L"session-1"});
