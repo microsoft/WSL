@@ -3,7 +3,9 @@
 #include <winrt/Windows.Media.MediaProperties.h>
 #include <winrt/Windows.Media.Transcoding.h>
 #include <winrt/Windows.Storage.Streams.h>
+#include <winrt/Windows.Storage.h>
 #include <algorithm>
+#include <sysinfoapi.h>
 
 using namespace winrt;
 using namespace Windows::Foundation;
@@ -185,19 +187,7 @@ namespace winrt::WSLAMoviePlayer::implementation
 
         try
         {
-            // Read the video file
-            auto stream = co_await videoFile.OpenReadAsync();
-            auto size = static_cast<uint32_t>(stream.Size());
-
-            OutputDebugStringW((L"Subtitler: Video file size: " + to_hstring(size / 1024 / 1024) + L" MB\n").c_str());
-
-            auto dataReader = DataReader(stream);
-            co_await dataReader.LoadAsync(size);
-
-            m_audioBuffer = dataReader.DetachBuffer();
-            OutputDebugStringW(L"Subtitler: Video file loaded into buffer\n");
-
-            // Get video duration using MediaSource
+            // Get video duration first using MediaSource
             auto mediaSource = MediaSource::CreateFromStorageFile(videoFile);
             co_await mediaSource.OpenAsync();
 
@@ -207,6 +197,58 @@ namespace winrt::WSLAMoviePlayer::implementation
                 OutputDebugStringW((L"Subtitler: Video duration: " + to_hstring(m_audioDuration) + L" ms\n").c_str());
             }
             mediaSource.Close();
+
+            // Create a temporary output file for the extracted audio
+            auto tempFolder = Windows::Storage::ApplicationData::Current().TemporaryFolder();
+            hstring tempFileName = L"temp_audio_" + to_hstring(GetTickCount64()) + L".wav";
+            auto outputFile = co_await tempFolder.CreateFileAsync(tempFileName, Windows::Storage::CreationCollisionOption::ReplaceExisting);
+
+            OutputDebugStringW((L"Subtitler: Transcoding audio to: " + outputFile.Path() + L"\n").c_str());
+
+            // Set up transcoding to extract audio as WAV (16kHz, 16-bit, mono)
+            MediaTranscoder transcoder;
+            
+            // Create audio encoding profile: 16kHz, 16-bit, Mono WAV
+            auto audioProfile = MediaEncodingProfile::CreateWav(AudioEncodingQuality::Low);
+            audioProfile.Audio().SampleRate(16000);  // 16kHz
+            audioProfile.Audio().BitsPerSample(16);  // 16-bit
+            audioProfile.Audio().ChannelCount(1);    // Mono
+            audioProfile.Video(nullptr);  // No video
+
+            // Prepare transcode
+            auto prepareResult = co_await transcoder.PrepareFileTranscodeAsync(videoFile, outputFile, audioProfile);
+
+            if (!prepareResult.CanTranscode())
+            {
+                OutputDebugStringW((L"Subtitler: Cannot transcode - " + to_hstring(static_cast<int>(prepareResult.FailureReason())) + L"\n").c_str());
+                co_return;
+            }
+
+            OutputDebugStringW(L"Subtitler: Starting transcoding...\n");
+
+            // Perform the transcode
+            co_await prepareResult.TranscodeAsync();
+
+            OutputDebugStringW(L"Subtitler: Transcoding completed\n");
+
+            // Read the transcoded audio file
+            auto audioStream = co_await outputFile.OpenReadAsync();
+            auto audioSize = static_cast<uint32_t>(audioStream.Size());
+
+            OutputDebugStringW((L"Subtitler: Transcoded audio size: " + to_hstring(audioSize / 1024) + L" KB\n").c_str());
+
+            auto dataReader = DataReader(audioStream);
+            co_await dataReader.LoadAsync(audioSize);
+
+            m_audioBuffer = dataReader.DetachBuffer();
+            OutputDebugStringW(L"Subtitler: Audio loaded into buffer\n");
+
+            // Clean up temp file
+            try
+            {
+                co_await outputFile.DeleteAsync();
+            }
+            catch (...) {}
 
             // Send audio to server
             if (m_socket && m_socket->IsConnected())
