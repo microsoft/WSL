@@ -312,7 +312,6 @@ try
             parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
     };
 
-
     relay::MultiHandleWait io;
     auto onCompleted = [&]() { io.Cancel(); };
 

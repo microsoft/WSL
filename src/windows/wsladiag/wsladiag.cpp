@@ -25,6 +25,31 @@ using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::WSLAProcessLauncher;
 
+class ChangeTerminalMode
+{
+public:
+    NON_COPYABLE(ChangeTerminalMode);
+    NON_MOVABLE(ChangeTerminalMode);
+
+    ChangeTerminalMode(HANDLE Console, bool CursorVisible) : m_console(Console)
+    {
+        THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(Console, &m_originalCursorInfo));
+        CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
+        newCursorInfo.bVisible = CursorVisible;
+
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(Console, &newCursorInfo));
+    }
+
+    ~ChangeTerminalMode()
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    }
+
+private:
+    HANDLE m_console{};
+    CONSOLE_CURSOR_INFO m_originalCursorInfo{};
+};
+
 // Adding a helper to factor error handling between all the arguments.
 static int ReportError(const std::wstring& context, HRESULT hr)
 {
@@ -318,24 +343,6 @@ static int Pull(std::wstring_view commandLine)
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
     {
     public:
-        Callback()
-        {
-            SetCursorVisible(false);
-        }
-        ~Callback()
-        {
-            SetCursorVisible(true); // TODO: restore previous flag.
-        }
-
-        void SetCursorVisible(bool Visible)
-        {
-            CONSOLE_CURSOR_INFO info{};
-            THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-
-            info.bVisible = Visible;
-            THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-        }
-
         auto MoveToLine(SHORT Line, bool Revert = true)
         {
             if (Line > 0)
@@ -417,6 +424,7 @@ static int Pull(std::wstring_view commandLine)
 
         std::map<std::string, SHORT> m_statuses;
         SHORT m_currentLine = 0;
+        ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
     };
 
     wil::com_ptr<IWSLASession> session = OpenCLISession();
