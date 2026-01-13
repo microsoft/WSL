@@ -65,7 +65,11 @@ static int ReportError(const std::wstring& context, HRESULT hr)
     return 1;
 }
 
+<<<<<<< HEAD
 // Handler for `wsladiag shell <SessionName>` command.
+=======
+// Handler for `wsladiag shell <SessionName> [--verbose]` command - launches TTY-backed interactive shell.
+>>>>>>> ea162030 (Localize Wsladiag tests)
 static int RunShellCommand(std::wstring_view commandLine)
 {
     std::wstring sessionName;
@@ -727,7 +731,6 @@ int wmain(int, wchar_t**)
     wsl::windows::common::EnableContextualizedErrors(false);
 
     ExecutionContext context{Context::WslaDiag};
-
     int exitCode = 1;
     HRESULT result = S_OK;
 
