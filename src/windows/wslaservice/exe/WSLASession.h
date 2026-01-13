@@ -57,7 +57,7 @@ public:
     IFACEMETHOD(DeleteImage)(_In_ LPCWSTR Image) override;
 
     // Container management.
-    IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
+    IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container, _Inout_opt_ WSLA_ERROR_INFO* Error) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Name, _In_ IWSLAContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
 
@@ -100,7 +100,7 @@ private:
     std::thread m_containerdThread;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
-    std::map<std::string, std::unique_ptr<WSLAContainerImpl>> m_containers;
+    std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
     std::recursive_mutex m_lock;
 };

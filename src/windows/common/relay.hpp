@@ -177,6 +177,12 @@ struct HandleWrapper
     }
 
     HandleWrapper(
+        wil::unique_event&& handle, std::function<void()>&& OnClose = []() {}) :
+        OwnedHandle(handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(
         SOCKET handle, std::function<void()>&& OnClose = []() {}) :
         Handle(reinterpret_cast<HANDLE>(handle)), OnClose(std::move(OnClose))
     {
@@ -243,15 +249,13 @@ public:
     NON_COPYABLE(EventHandle)
     NON_MOVABLE(EventHandle)
 
-    EventHandle(wil::unique_event&& EventHandle, std::function<void()>&& OnSignalled);
-    EventHandle(HANDLE EventHandle, std::function<void()>&& OnSignalled);
+    EventHandle(HandleWrapper&& EventHandle, std::function<void()>&& OnSignalled = []() {});
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
 
 private:
-    wil::unique_event OwnedHandle;
-    HANDLE Handle;
+    HandleWrapper Handle;
     std::function<void()> OnSignalled;
 };
 

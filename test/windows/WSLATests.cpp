@@ -1367,7 +1367,7 @@ class WSLATests
             options.InitProcessOptions.CommandLineCount = 0;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container);
+            auto hr = session->CreateContainer(&options, &container, nullptr);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
@@ -1380,7 +1380,7 @@ class WSLATests
             options.InitProcessOptions.CommandLineCount = 0;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container);
+            auto hr = session->CreateContainer(&options, &container, nullptr);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
     }

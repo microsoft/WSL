@@ -37,7 +37,7 @@ public:
     }
 
     template <typename T = docker_schema::ErrorResponse>
-    T DockerMessage()
+    T DockerMessage() const
     {
         return wsl::shared::FromJson<T>(m_response.c_str());
     }

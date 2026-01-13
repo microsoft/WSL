@@ -112,17 +112,9 @@ struct ShellExecOptions
     }
 };
 
-bool IsInteractiveConsole()
-{
-    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode{};
-
-    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
-}
-
 void PromptForKeyPress()
 {
-    if (IsInteractiveConsole())
+    if (wsl::windows::common::wslutil::IsInteractiveConsole())
     {
         wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessagePressAnyKeyToExit());
         LOG_IF_WIN32_BOOL_FALSE(FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE)));
@@ -1692,7 +1684,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         }
 
         container.emplace();
-        THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value()));
+        THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value(), nullptr));
         THROW_IF_FAILED((*container)->Start());
 
         wil::com_ptr<IWSLAProcess> createdProcess;
@@ -1729,7 +1721,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
         });
 
         // Required because ReadFile() blocks if stdin is a tty.
-        if (IsInteractiveConsole())
+        if (wsl::windows::common::wslutil::IsInteractiveConsole())
         {
             inputThread = std::thread{[&]() {
                 wsl::windows::common::relay::StandardInputRelay(Stdin, process->GetStdHandle(0).get(), []() {}, exitEvent.get());

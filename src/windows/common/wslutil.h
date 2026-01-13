@@ -143,6 +143,8 @@ std::vector<BYTE> HashFile(HANDLE File, DWORD Algorithm);
 
 void InitializeWil();
 
+bool IsInteractiveConsole();
+
 bool IsRunningInMsix();
 
 bool IsVhdFile(_In_ const std::filesystem::path& path);

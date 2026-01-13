@@ -1197,6 +1197,14 @@ void wsl::windows::common::wslutil::InitializeWil()
     }
 }
 
+bool wsl::windows::common::wslutil::IsInteractiveConsole()
+{
+    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode{};
+
+    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
+}
+
 bool wsl::windows::common::wslutil::IsRunningInMsix()
 {
     UINT32 dummy{};
