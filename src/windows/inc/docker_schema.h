@@ -151,4 +151,38 @@ struct StartExec
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, Detach, ConsoleSize);
 };
 
+enum class ContainerState
+{
+    Created,
+    Running,
+    Paused,
+    Restarting,
+    Exited,
+    Removing,
+    Dead,
+    Unknown
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(ContainerState, {
+    {ContainerState::Unknown, nullptr},
+    {ContainerState::Created, "created"},
+    {ContainerState::Running, "running"},
+    {ContainerState::Paused, "paused"},
+    {ContainerState::Restarting, "restarting"},
+    {ContainerState::Exited, "exited"},
+    {ContainerState::Removing, "removing"},
+    {ContainerState::Dead, "dead"},
+});
+
+struct ContainerInfo
+{
+    std::string Id;
+    std::vector<std::string> Names;
+    std::string Image;
+    std::map<std::string, std::string> Labels;
+    ContainerState State{ContainerState::Unknown};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, State);
+};
+
 } // namespace wsl::windows::common::docker_schema

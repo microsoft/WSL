@@ -77,6 +77,12 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
 }
 
+std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
+{
+    auto url = all ? "http://localhost/containers/json?all=true" : "http://localhost/containers/json";
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Container>>(verb::get, url);
+}
+
 docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
 {
     // TODO: Url escaping.

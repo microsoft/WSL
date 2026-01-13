@@ -80,6 +80,7 @@ public:
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
     // Container management.
+    std::vector<common::docker_schema::ContainerInfo> ListContainers(bool all = false);
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request);
     void StartContainer(const std::string& Id);
     void StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds);
