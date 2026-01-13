@@ -99,6 +99,28 @@ HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::ListSessions(_Out_ WSL
     return S_OK;
 }
 
+HRESULT wsl::windows::service::wsla::WSLAUserSessionImpl::OpenSessionById(ULONG Id, IWSLASession** Session)
+{
+    if (!Session)
+    {
+        return E_INVALIDARG;
+    }
+
+    auto result = ForEachSession<HRESULT>([&](auto& e) {
+        if (e.GetId() == Id)
+        {
+            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASession), (void**)Session));
+            return std::make_optional(S_OK);
+        }
+        else
+        {
+            return std::optional<HRESULT>{};
+        }
+    });
+
+    return result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+}
+
 wsl::windows::service::wsla::WSLAUserSession::WSLAUserSession(std::weak_ptr<WSLAUserSessionImpl>&& Session) :
     m_session(std::move(Session))
 {
@@ -112,16 +134,6 @@ HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSLA_VERS
 
     return S_OK;
 }
-
-HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession)
-try
-{
-    auto session = m_session.lock();
-    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-
-    return session->CreateSession(Settings, WslaSession);
-}
-CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::ListSessions(WSLA_SESSION_INFORMATION** Sessions, ULONG* SessionsCount)
 try
@@ -139,10 +151,21 @@ try
 }
 CATCH_RETURN();
 
-HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, IWSLASession** WslaSession)
+try
 {
-    return E_NOTIMPL;
+    if (!WslaSessionSettings || !WslaSession)
+    {
+        return E_INVALIDARG;
+    }
+
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    // Forward to the impl
+    return session->CreateSession(WslaSessionSettings, WslaSession);
 }
+CATCH_RETURN();
 
 HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)
 try
@@ -151,5 +174,20 @@ try
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
     return session->OpenSessionByName(DisplayName, Session);
+}
+CATCH_RETURN();
+
+HRESULT wsl::windows::service::wsla::WSLAUserSession::OpenSession(ULONG Id, IWSLASession** Session)
+try
+{
+    if (!Session)
+    {
+        return E_INVALIDARG;
+    }
+
+    auto session = m_session.lock();
+    RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
+
+    return session->OpenSessionById(Id, Session);
 }
 CATCH_RETURN();

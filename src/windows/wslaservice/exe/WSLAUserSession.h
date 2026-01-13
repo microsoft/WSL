@@ -36,6 +36,7 @@ public:
     HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession);
     HRESULT OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
     HRESULT ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount);
+    HRESULT OpenSessionById(ULONG Id, IWSLASession** Session);
 
 private:
     template <typename T>
