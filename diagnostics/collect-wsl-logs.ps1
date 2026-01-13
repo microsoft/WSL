@@ -44,12 +44,10 @@ else
     $wprpFile = "$folder/wsl.wprp"
     if (Test-Path "$PSScriptRoot/wsl.wprp")
     {
-        Write-Host -ForegroundColor Yellow "Using local copy of wsl.wprp"
         Copy-Item "$PSScriptRoot/wsl.wprp" $wprpFile
     }
     else
     {
-        Write-Host -ForegroundColor Yellow "wsl.wprp not found in the current directory. Downloading it from GitHub."
         Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp" -OutFile $wprpFile
     }
 }
