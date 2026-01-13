@@ -544,9 +544,10 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
         // Required because ReadFile() blocks if stdin is a tty.
         if (wsl::windows::common::wslutil::IsInteractiveConsole())
         {
-            inputThread = std::thread{[&]() {
-                wsl::windows::common::relay::StandardInputRelay(Stdin, Process.GetStdHandle(0).get(), []() {}, exitEvent.get());
-            }};
+            // TODO: Will output CR instead of LF's which can confuse the linux app.
+            // Consider a custom relay logic to fix this.
+            inputThread = std::thread{
+                [&]() { wsl::windows::common::relay::InterruptableRelay(Stdin, Process.GetStdHandle(0).get(), exitEvent.get()); }};
         }
         else
         {
