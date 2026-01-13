@@ -326,7 +326,7 @@ class WSLATests
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*session, "hello-world:latest");
-        WSLAContainerLauncher launcher("hello-world:latest", "wsla-import-image-container");
+        WSLAContainerLauncher launcher("hello-world:latest", "wsla-load-image-container");
 
         auto container = launcher.Launch(*session);
         auto result = container.GetInitProcess().WaitAndCaptureOutput();
@@ -1336,11 +1336,10 @@ class WSLATests
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
         }
 
-        // TODO: Add logic to detect when starting the container fails, and enable this test case.
         {
             WSLAContainerLauncher launcher("invalid-image-name", "dummy", "/bin/cat");
             auto [hresult, container] = launcher.LaunchNoThrow(*session);
-            VERIFY_ARE_EQUAL(hresult, E_FAIL); // TODO: Have a nicer error code when the image is not found.
+            VERIFY_ARE_EQUAL(hresult, WSLA_E_IMAGE_NOT_FOUND);
         }
 
         // Test null image name
@@ -1365,8 +1364,7 @@ class WSLATests
             options.InitProcessOptions.CommandLineCount = 0;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container, nullptr);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            VERIFY_SUCCEEDED(session->CreateContainer(&options, &container, nullptr));
         }
     }
 

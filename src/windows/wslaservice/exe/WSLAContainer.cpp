@@ -602,7 +602,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Send the request to docker.
-    auto result = DockerClient.CreateContainer(request);
+    auto result =
+        DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
     // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
     auto container = std::make_unique<WSLAContainerImpl>(

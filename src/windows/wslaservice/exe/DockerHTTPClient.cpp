@@ -80,10 +80,15 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
 }
 
-docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
+docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request, const std::optional<std::string>& Name)
 {
-    // TODO: Url escaping.
-    return Transaction<docker_schema::CreateContainer>(verb::post, "http://localhost/containers/create", Request);
+    std::string url = "http://localhost/containers/create";
+    if (Name.has_value())
+    {
+        url += std::format("?name={}", Name.value());
+    }
+
+    return Transaction<docker_schema::CreateContainer>(verb::post, url, Request);
 }
 
 void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns)

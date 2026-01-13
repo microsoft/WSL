@@ -493,15 +493,24 @@ try
     }
     catch (const DockerHTTPException& e)
     {
-        if ((e.StatusCode() >= 400 || e.StatusCode() < 500) && Error != nullptr)
+        std::string errorMessage;
+        if ((e.StatusCode() >= 400 || e.StatusCode() < 500))
         {
-            auto message = e.DockerMessage<docker_schema::ErrorResponse>().message;
-            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(message.c_str()).release();
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+        }
+
+        if (Error != nullptr)
+        {
+            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
         }
 
         if (e.StatusCode() == 404)
         {
-            THROW_HR(WSLA_E_IMAGE_NOT_FOUND);
+            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
+        }
+        else if (e.StatusCode() == 409)
+        {
+            THROW_WIN32_MSG(ERROR_ALREADY_EXISTS, "%hs", errorMessage.c_str());
         }
 
         return E_FAIL;
