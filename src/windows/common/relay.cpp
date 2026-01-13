@@ -1034,7 +1034,7 @@ void EventHandle::Collect()
 
 HANDLE EventHandle::GetHandle() const
 {
-    return Handle;
+    return Handle.Get();
 }
 
 ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
