@@ -57,6 +57,39 @@ private:
     CONSOLE_CURSOR_INFO m_originalCursorInfo{};
 };
 
+struct ErrorDetails
+{
+    ~ErrorDetails()
+    {
+        Reset();
+    }
+
+    void Reset()
+    {
+        CoTaskMemFree(Error.UserErrorMessage);
+        Error = {};
+    }
+
+    void ThrowIfFailed(HRESULT Result)
+    {
+        if (SUCCEEDED(Result))
+        {
+            return;
+        }
+
+        if (Error.UserErrorMessage != nullptr)
+        {
+            THROW_HR_WITH_USER_ERROR(Result, Error.UserErrorMessage);
+        }
+        else
+        {
+            THROW_HR(Result);
+        }
+    }
+
+    WSLA_ERROR_INFO Error{};
+};
+
 static int ReportError(const std::wstring& context, HRESULT hr)
 {
     auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
@@ -339,7 +372,7 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
     return session;
 }
 
-static int PullImpl(IWSLASession& Session, const std::string& Image)
+static void PullImpl(IWSLASession& Session, const std::string& Image)
 {
     HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     // Configure console for interactive usage.
@@ -445,9 +478,9 @@ static int PullImpl(IWSLASession& Session, const std::string& Image)
     wil::com_ptr<IWSLASession> session = OpenCLISession();
 
     Callback callback;
-    THROW_IF_FAILED(session->PullImage(Image.c_str(), nullptr, &callback));
-
-    return 0;
+    ErrorDetails error{};
+    auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
+    error.ThrowIfFailed(result);
 }
 
 static int Pull(std::wstring_view commandLine)
@@ -460,7 +493,9 @@ static int Pull(std::wstring_view commandLine)
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, image.empty());
 
-    return PullImpl(*OpenCLISession(), image);
+    PullImpl(*OpenCLISession(), image);
+
+    return 0;
 }
 
 static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
@@ -632,23 +667,19 @@ static int Run(std::wstring_view commandLine)
     options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
 
     wil::com_ptr<IWSLAContainer> container;
-    WSLA_ERROR_INFO error{};
-    auto result = session->CreateContainer(&options, &container, &error);
+    ErrorDetails error{};
+    auto result = session->CreateContainer(&options, &container, &error.Error);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         wslutil::PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
 
-        auto exitCode = PullImpl(*session.get(), image);
-        if (exitCode != 0)
-        {
-            return exitCode;
-        }
+        PullImpl(*session.get(), image);
 
-        error = {};
-        result = session->CreateContainer(&options, &container, &error);
+        error.Reset();
+        result = session->CreateContainer(&options, &container, &error.Error);
     }
 
-    THROW_IF_FAILED(result); // TODO: error message.
+    error.ThrowIfFailed(result);
 
     THROW_IF_FAILED(container->Start()); // TODO: Error message
 
@@ -742,15 +773,16 @@ int wmain(int, wchar_t**)
 
     if (FAILED(result))
     {
-        if (auto reported = context.ReportedError())
+        if (const auto& reported = context.ReportedError())
         {
             auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
-            wslutil::PrintMessage(strings.Message.empty() ? strings.Code : strings.Message, stderr);
+            auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
+            wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
         }
         else
         {
             // Fallback for errors without context
-            wslutil::PrintMessage(wslutil::GetErrorString(result), stderr);
+            wslutil::PrintMessage(Localization::MessageErrorCode("", wslutil::ErrorCodeToString(result)), stderr);
         }
     }
 

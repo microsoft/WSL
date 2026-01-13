@@ -367,6 +367,11 @@ LXSS_ERROR_INFO* ClientExecutionContext::OutError() noexcept
     return &m_outError;
 }
 
+void wsl::windows::common::SetErrorMessage(std::string&& message)
+{
+    return SetErrorMessage(wsl::shared::string::MultiByteToWide(message));
+}
+
 void wsl::windows::common::SetErrorMessage(std::wstring&& message)
 {
     if (g_currentContext == nullptr || message.empty())

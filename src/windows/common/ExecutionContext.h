@@ -182,6 +182,7 @@ private:
 void EnableContextualizedErrors(bool service);
 
 void SetErrorMessage(std::wstring&& message);
+void SetErrorMessage(std::string&& message);
 
 void SetEventLog(HANDLE eventLog);
 

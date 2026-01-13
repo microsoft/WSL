@@ -16,6 +16,7 @@ Abstract:
 #include "wslutil.h"
 #include "WslPluginApi.h"
 #include "wslinstallerservice.h"
+#include "wslaservice.h"
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
@@ -145,7 +146,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_WIN32(ERROR_BAD_PATHNAME),
     X(WININET_E_TIMEOUT),
     X_WIN32(ERROR_INVALID_SID),
-    X_WIN32(ERROR_INVALID_STATE)};
+    X_WIN32(ERROR_INVALID_STATE),
+    X(WSLA_E_IMAGE_NOT_FOUND)};
 
 #undef X
 

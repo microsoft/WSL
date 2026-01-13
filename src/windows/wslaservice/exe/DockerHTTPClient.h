@@ -89,7 +89,7 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
     // Image management.
-    wil::unique_socket PullImage(const char* Name, const char* Tag);
+    std::unique_ptr<HTTPRequestContext> PullImage(const char* Name, const char* Tag);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);

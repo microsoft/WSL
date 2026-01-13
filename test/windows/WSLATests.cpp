@@ -53,8 +53,8 @@ class WSLATests
         storagePath = std::filesystem::current_path() / "test-storage";
 
         auto session = CreateSession();
-        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr));
-        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
         return true;
     }
 
@@ -296,7 +296,7 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr, nullptr));
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*session, "hello-world:latest");

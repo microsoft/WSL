@@ -38,18 +38,10 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 {
 }
 
-wil::unique_socket DockerHTTPClient::PullImage(const char* Name, const char* Tag)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const char* Name, const char* Tag)
 {
     auto url = std::format("http://localhost/images/create?fromImage=library/{}&tag={}", Name, Tag);
-    auto [status, socket] = SendRequest(verb::post, url, {}, {}, {});
-
-    if (status != 200)
-    {
-        // TODO: Read response body on error;
-        throw DockerHTTPException(status, verb::post, url, "", "");
-    }
-
-    return std::move(socket);
+    return SendRequestImpl(verb::post, url, {}, {});
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)

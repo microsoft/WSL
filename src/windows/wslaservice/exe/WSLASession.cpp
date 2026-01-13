@@ -275,7 +275,11 @@ try
 }
 CATCH_LOG();
 
-HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::PullImage(
+    LPCSTR ImageUri,
+    const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
+    IProgressCallback* ProgressCallback,
+    WSLA_ERROR_INFO* Error)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
@@ -286,18 +290,27 @@ try
 
     std::lock_guard lock{m_lock};
 
-    wil::unique_socket socket;
+    auto requestContext = m_dockerClient->PullImage(repo.c_str(), tag.c_str());
 
-    try
-    {
-        socket = m_dockerClient->PullImage(repo.c_str(), tag.c_str());
-    }
-    catch (const DockerHTTPException& e)
-    {
-        THROW_HR_MSG(E_FAIL, "Failed to pull image %hs:%hs, %hs", repo.c_str(), tag.c_str(), e.what());
-    }
+    relay::MultiHandleWait io;
 
+    std::optional<boost::beast::http::status> pullResult;
+
+    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
+        WSL_LOG("PullHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+
+        pullResult = response.result();
+    };
+
+    std::string errorJson;
     auto onChunk = [&](const gsl::span<char>& Content) {
+        if (pullResult.has_value() && pullResult.value() != boost::beast::http::status::ok)
+        {
+            // If the status code is an error, then this is an error message, not a progress update.
+            errorJson.append(Content.data(), Content.size());
+            return;
+        }
+
         std::string contentString{Content.begin(), Content.end()};
         WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
 
@@ -312,16 +325,37 @@ try
             parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
     };
 
-    relay::MultiHandleWait io;
     auto onCompleted = [&]() { io.Cancel(); };
 
-    io.AddHandle(std::make_unique<relay::HTTPChunkBasedReadHandle>(relay::HandleWrapper{std::move(socket), onCompleted}, onChunk));
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
+        *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+
     io.Run({});
 
-    if (m_sessionTerminatingEvent.is_signaled())
+    THROW_HR_IF(E_ABORT, m_sessionTerminatingEvent.is_signaled());
+    THROW_HR_IF(E_UNEXPECTED, !pullResult.has_value());
+
+    if (pullResult.value() != boost::beast::http::status::ok)
     {
-        return E_ABORT;
+        std::string errorMessage;
+        if (static_cast<int>(pullResult.value()) >= 400 && static_cast<int>(pullResult.value()) < 500)
+        {
+            // pull failed, parse the error message.
+            errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
+            if (Error != nullptr)
+            {
+                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
+            }
+        }
+
+        if (pullResult.value() == boost::beast::http::status::not_found)
+        {
+            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
+        }
+
+        THROW_HR_MSG(E_FAIL, "Image import failed: %hs", errorMessage.c_str());
     }
 
     return S_OK;
@@ -494,7 +528,7 @@ try
     catch (const DockerHTTPException& e)
     {
         std::string errorMessage;
-        if ((e.StatusCode() >= 400 || e.StatusCode() < 500))
+        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
