@@ -390,7 +390,6 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLAWaitPid,
     LxMessageWSLAWaitPidResponse,
     LxMessageWSLASignal,
-    LxMessageWSLAShutdown,
     LxMessageWSLARelayTty,
     LxMessageWSLAMapPort,
     LxMessageWSLAConnectRelay,
@@ -502,7 +501,6 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLAWaitPid)
         X(LxMessageWSLAWaitPidResponse)
         X(LxMessageWSLASignal)
-        X(LxMessageWSLAShutdown)
         X(LxMessageWSLARelayTty)
         X(LxMessageWSLAMapPort)
         X(LxMessageWSLAConnectRelay)

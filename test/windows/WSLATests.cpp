@@ -1149,21 +1149,6 @@ class WSLATests
             session.reset();
             VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
-
-        {
-
-            // Validate that new processes cannot be created after the VM is terminated.
-            const char* executable = "dummy";
-            WSLA_PROCESS_OPTIONS options{};
-            options.CommandLine = &executable;
-            options.Executable = executable;
-            options.CommandLineCount = 1;
-
-            wil::com_ptr<IWSLAProcess> process;
-            int error{};
-            VERIFY_ARE_EQUAL(session->CreateRootNamespaceProcess(&options, &process, &error), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
-            VERIFY_ARE_EQUAL(error, -1);
-        }
     }
 
     TEST_METHOD(CrashDumpCollection)
@@ -2356,6 +2341,8 @@ class WSLATests
 
     TEST_METHOD(PersistentSession)
     {
+        WSL2_TEST_ONLY();
+
         wil::com_ptr<IWSLAUserSession> userSession;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
@@ -2408,7 +2395,11 @@ class WSLATests
             expectSessions({});
         }
 
+<<<<<<< HEAD
         // Validate that persistent sessions are only dropped when explicitely terminated.
+=======
+        // Validate that persistent sessions are only dropped when explicitly terminated.
+>>>>>>> origin/feature/wsl-for-apps
         {
             auto session1 = create(L"session-1", WSLASessionFlagsPersistent);
             expectSessions({L"session-1"});

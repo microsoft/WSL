@@ -1157,6 +1157,7 @@ void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ s
     THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
 
     THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
+    THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
