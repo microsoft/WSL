@@ -63,11 +63,21 @@ struct WSLAState
 
 static WSLAState g_state;
 
-void WSLAEnableCrashDumpCollection()
+int CreateCaptureCrashSymlink()
 {
     if (symlink("/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH) < 0)
     {
         LOG_ERROR("symlink({}, {}) failed {}", "/wsl-init", "/" LX_INIT_WSL_CAPTURE_CRASH, errno);
+        return errno;
+    }
+
+    return 0;
+}
+
+void WSLAEnableCrashDumpCollection()
+{
+    if (CreateCaptureCrashSymlink() < 0)
+    {
         return;
     }
 
@@ -614,8 +624,8 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_MOUNT& Me
         {
             THROW_LAST_ERROR_IF(Chroot(target) < 0);
 
-            // Reconfigure crash dump collection after chroot so symlink & core_pattern resolve correctly.
-            WSLAEnableCrashDumpCollection();
+            // Recreate the crash dump symlink inside the new root.
+            CreateCaptureCrashSymlink();
         }
 
         response.Result = 0;
@@ -863,9 +873,6 @@ int WSLAEntryPoint(int Argc, char* Argv[])
         return -1;
     }
 
-    // Enable crash dump collection.
-    WSLAEnableCrashDumpCollection();
-
     //
     // Open kmesg for logging and ensure that the file descriptor is not set to one of the standard file descriptors.
     //
@@ -906,6 +913,11 @@ int WSLAEntryPoint(int Argc, char* Argv[])
         LOG_ERROR("setrlimit(RLIMIT_MEMLOCK) failed {}", errno);
         return -1;
     }
+
+    //
+    // Enable dump collection when processes crash.
+    //
+    WSLAEnableCrashDumpCollection();
 
     //
     // Enable logging when processes receive fatal signals.
