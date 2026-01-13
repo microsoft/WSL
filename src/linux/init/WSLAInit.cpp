@@ -656,59 +656,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_PORT_RELA
     RunLocalHostRelay(SocketAddress, ListenSocket.get());
 }
 
-void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_WAITPID& Message, const gsl::span<gsl::byte>& Buffer)
-{
-    WSLA_WAITPID_RESULT response{};
-    response.State = WSLAOpenFlagsUnknown;
-
-    auto sendResponse = wil::scope_exit([&]() { Channel.SendMessage(response); });
-
-    wil::unique_fd process = syscall(SYS_pidfd_open, Message.Pid, 0);
-    if (!process)
-    {
-        LOG_ERROR("pidfd_open({}) failed, {}", Message.Pid, errno);
-        response.Errno = errno;
-        return;
-    }
-
-    pollfd pollResult{};
-    pollResult.fd = process.get();
-    pollResult.events = POLLIN | POLLERR;
-
-    int result = poll(&pollResult, 1, Message.TimeoutMs);
-    if (result < 0)
-    {
-        LOG_ERROR("poll failed {}", errno);
-        response.Errno = errno;
-        return;
-    }
-    else if (result == 0) // Timed out
-    {
-        response.State = WSLAOpenFlagsRunning;
-        response.Errno = 0;
-        return;
-    }
-
-    if (WI_IsFlagSet(pollResult.revents, POLLIN))
-    {
-        siginfo_t childState{};
-        auto result = waitid(P_PIDFD, process.get(), &childState, WEXITED);
-        if (result < 0)
-        {
-            LOG_ERROR("waitid({}) failed, {}", process.get(), errno);
-            response.Errno = errno;
-            return;
-        }
-
-        response.Code = childState.si_status;
-        response.Errno = 0;
-        response.State = childState.si_code == CLD_EXITED ? WSLAOpenFlagsExited : WSLAOpenFlagsSignaled;
-        return;
-    }
-
-    LOG_ERROR("Poll returned an unexpected error state on fd: {} for pid: {}", process.get(), Message.Pid);
-}
-
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_SIGNAL& Message, const gsl::span<gsl::byte>& Buffer)
 {
     auto result = kill(Message.Pid, Message.Signal);
@@ -866,7 +813,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, LX_MESSAGE_TYPE Type, c
 {
     try
     {
-        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_WAITPID, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT, WSLA_WATCH_PROCESSES, WSLA_UNIX_CONNECT>(
+        HandleMessage<WSLA_GET_DISK, WSLA_MOUNT, WSLA_EXEC, WSLA_FORK, WSLA_CONNECT, WSLA_SIGNAL, WSLA_TTY_RELAY, WSLA_PORT_RELAY, WSLA_OPEN, WSLA_UNMOUNT, WSLA_DETACH, WSLA_ACCEPT, WSLA_WATCH_PROCESSES, WSLA_UNIX_CONNECT>(
             Channel, Type, Buffer);
     }
     catch (...)
@@ -882,7 +829,7 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
     while (Channel.Connected())
     {
         auto [Message, Range] = Channel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
-        if (Message == nullptr || Message->MessageType == LxMessageWSLAShutdown)
+        if (Message == nullptr)
         {
             break;
         }

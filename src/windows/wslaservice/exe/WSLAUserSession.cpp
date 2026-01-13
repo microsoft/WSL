@@ -34,26 +34,49 @@ PSID WSLAUserSessionImpl::GetUserSid() const
     return m_tokenInfo->User.Sid;
 }
 
-HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession)
+HRESULT WSLAUserSessionImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
+try
 {
     ULONG id = m_nextSessionId++;
+
+    std::lock_guard lock(m_wslaSessionsLock);
+
+    // Check for an existing session first.
+    auto result = ForEachSession<HRESULT>([&](auto& session) -> std::optional<HRESULT> {
+        // TODO: ACL check.
+        if (session.DisplayName() == Settings->DisplayName)
+        {
+            RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
+
+            return session.QueryInterface(__uuidof(IWSLASession), (void**)WslaSession);
+        }
+
+        return std::optional<HRESULT>{};
+    });
+
+    if (result.has_value())
+    {
+        return result.value();
+    }
+
+    // No session was found, create a new one.
     auto session = wil::MakeOrThrow<WSLASession>(id, *Settings, *this);
+
+    if (WI_IsFlagSet(Flags, WSLASessionFlagsPersistent))
+    {
+        m_persistentSessions.push_back(session);
+    }
 
     Microsoft::WRL::ComPtr<IWeakReference> weakRef;
     THROW_IF_FAILED(session->GetWeakReference(&weakRef));
 
-    {
-        std::lock_guard lock(m_wslaSessionsLock);
-        m_sessions.emplace_back(std::move(weakRef));
-    }
-
-    // Client now owns the session.
-    // TODO: Add a flag for the client to specify that the session should outlive its process.
+    m_sessions.emplace_back(std::move(weakRef));
 
     THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
 
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLAUserSessionImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)
 {
@@ -113,13 +136,13 @@ HRESULT wsl::windows::service::wsla::WSLAUserSession::GetVersion(_Out_ WSLA_VERS
     return S_OK;
 }
 
-HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession)
+HRESULT wsl::windows::service::wsla::WSLAUserSession::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
 try
 {
     auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->CreateSession(Settings, WslaSession);
+    return session->CreateSession(Settings, Flags, WslaSession);
 }
 CATCH_RETURN();
 

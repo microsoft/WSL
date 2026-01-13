@@ -735,8 +735,7 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
     return {Lun, Device};
 }
 
-HRESULT WSLAVirtualMachine::Unmount(_In_ const char* Path)
-try
+void WSLAVirtualMachine::Unmount(_In_ const char* Path)
 {
     auto [pid, _, subChannel] = Fork(WSLA_FORK::Thread);
 
@@ -748,10 +747,7 @@ try
     // TODO: Return errno to caller
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), response.Result == EINVAL);
     THROW_HR_IF(E_FAIL, response.Result != 0);
-
-    return S_OK;
 }
-CATCH_RETURN()
 
 void WSLAVirtualMachine::DetachDisk(_In_ ULONG Lun)
 {
@@ -857,15 +853,6 @@ void WSLAVirtualMachine::OpenLinuxFile(wsl::shared::SocketChannel& Channel, cons
 
     THROW_HR_IF_MSG(E_FAIL, result != 0, "Failed to open %hs (flags: %u), %i", Path, Flags, result);
 }
-
-HRESULT WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno)
-try
-{
-    CreateLinuxProcess(*Options, Errno).CopyTo(Process);
-
-    return S_OK;
-}
-CATCH_RETURN();
 
 Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(_In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
@@ -1045,46 +1032,7 @@ int32_t WSLAVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChanne
     }
 }
 
-HRESULT WSLAVirtualMachine::WaitPid(LONG Pid, ULONGLONG TimeoutMs, ULONG* State, int* Code)
-try
-{
-    auto [pid, _, subChannel] = Fork(WSLA_FORK::Thread);
-
-    WSLA_WAITPID message{};
-    message.Pid = Pid;
-    message.TimeoutMs = TimeoutMs;
-
-    const auto& response = subChannel.Transaction(message);
-
-    THROW_HR_IF(E_FAIL, response.State == WSLAOpenFlagsUnknown);
-
-    *State = response.State;
-    *Code = response.Code;
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLAVirtualMachine::Shutdown(ULONGLONG TimeoutMs)
-try
-{
-    std::lock_guard lock(m_lock);
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
-
-    WSLA_SHUTDOWN message{};
-    m_initChannel.SendMessage(message);
-    auto response = m_initChannel.ReceiveMessageOrClosed<MESSAGE_HEADER>(static_cast<wsl::shared::TTimeout>(TimeoutMs));
-
-    RETURN_HR_IF(E_UNEXPECTED, response.first != nullptr);
-
-    m_running = false;
-    return S_OK;
-}
-CATCH_RETURN();
-
-HRESULT WSLAVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
-try
+void WSLAVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
 {
     std::lock_guard lock(m_lock);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
@@ -1094,10 +1042,8 @@ try
     message.Signal = Signal;
     const auto& response = m_initChannel.Transaction(message);
 
-    RETURN_HR_IF(E_FAIL, response.Result != 0);
-    return S_OK;
+    THROW_HR_IF(E_FAIL, response.Result != 0);
 }
-CATCH_RETURN();
 
 void WSLAVirtualMachine::RegisterCallback(ITerminationCallback* callback)
 {
@@ -1191,12 +1137,11 @@ void WSLAVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-HRESULT WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)
-try
+void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)
 {
     std::lock_guard lock(m_portRelaylock);
 
-    RETURN_HR_IF(E_ILLEGAL_STATE_CHANGE, !m_portRelayChannelWrite);
+    THROW_HR_IF(E_ILLEGAL_STATE_CHANGE, !m_portRelayChannelWrite);
 
     WSLA_MAP_PORT message;
     message.WindowsPort = WindowsPort;
@@ -1212,10 +1157,8 @@ try
     THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
 
     THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
-
-    return result;
+    THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
-CATCH_RETURN();
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)
 {
@@ -1331,7 +1274,6 @@ void WSLAVirtualMachine::RemoveShare(_In_ const MountedFolderInfo& MountInfo)
 }
 
 HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
-try
 {
     std::lock_guard lock(m_lock);
 
@@ -1340,7 +1282,7 @@ try
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_mountedWindowsFolders.end());
 
     // Unmount the folder from the guest. If the mount is not found, this most likely means that the guest unmounted it.
-    auto result = Unmount(LinuxPath);
+    auto result = wil::ResultFromException([&]() { Unmount(LinuxPath); });
     THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
     auto mountInfo = it->second;
@@ -1351,7 +1293,6 @@ try
 
     return S_OK;
 }
-CATCH_RETURN();
 
 void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {
