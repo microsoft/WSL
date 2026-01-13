@@ -33,7 +33,7 @@ public:
 
     PSID GetUserSid() const;
 
-    HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, IWSLASession** WslaSession);
+    HRESULT CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession);
     HRESULT OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
     HRESULT ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount);
     HRESULT OpenSessionById(ULONG Id, IWSLASession** Session);
@@ -57,6 +57,18 @@ private:
             // N.B. lockedSession has a reference to the COM object.
             WSLASession* SessionImpl{};
             THROW_IF_FAILED(lockedSession->GetImplNoRef(&SessionImpl));
+
+            // If the session is terminated, drop its reference so it can be deleted (in case of persistent sessions)
+            if (SessionImpl->Terminated())
+            {
+                auto remove =
+                    std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return SessionImpl->GetId() == e->GetId(); });
+
+                WI_ASSERT(remove.end() - remove.begin() <= 1);
+
+                m_persistentSessions.erase(remove.begin(), remove.end());
+                return true;
+            }
 
             if constexpr (std::is_same_v<T, void>)
             {
@@ -91,6 +103,8 @@ private:
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslaSessionsLock;
 
+    // Persistent sessions that outlive their creating process.
+    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_persistentSessions;
     std::vector<Microsoft::WRL::ComPtr<IWeakReference>> m_sessions;
 };
 
@@ -103,7 +117,7 @@ public:
     WSLAUserSession& operator=(const WSLAUserSession&) = delete;
 
     IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
-    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, IWSLASession** WslaSession) override;
+    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
     IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASession** Session) override;
     IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session) override;

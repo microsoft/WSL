@@ -62,17 +62,23 @@ public:
     IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
 
     // VM management.
-    IFACEMETHOD(GetVirtualMachine)(IWSLAVirtualMachine** VirtualMachine) override;
     IFACEMETHOD(CreateRootNamespaceProcess)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** VirtualMachine, _Out_ int* Errno) override;
 
     // Disk management.
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
-    IFACEMETHOD(Shutdown(_In_ ULONG)) override;
+    IFACEMETHOD(Terminate()) override;
 
     IFACEMETHOD(GetImplNoRef)(_Out_ WSLASession** Session) override;
 
+    // Testing.
+    IFACEMETHOD(MountWindowsFolder)(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly) override;
+    IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
+    IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove) override;
+
     void OnUserSessionTerminating();
+
+    bool Terminated();
 
 private:
     ULONG m_id = 0;
@@ -88,7 +94,7 @@ private:
 
     WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     std::optional<DockerHTTPClient> m_dockerClient;
-    Microsoft::WRL::ComPtr<WSLAVirtualMachine> m_virtualMachine;
+    std::optional<WSLAVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
     wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
     std::thread m_containerdThread;

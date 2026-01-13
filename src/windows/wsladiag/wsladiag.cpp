@@ -308,14 +308,6 @@ static int RunShellCommand(std::wstring_view commandLine)
             E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wsladiag shell"));
     }
 
-    const auto log = [&](std::wstring_view msg) {
-        if (verbose)
-        {
-            wslutil::PrintMessage(std::wstring(msg), stdout);
-        }
-    };
-    log(std::format(L"[diag] shell='{}'", sessionName));
-
     wil::com_ptr<IWSLAUserSession> userSession;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
@@ -332,7 +324,11 @@ static int RunShellCommand(std::wstring_view commandLine)
 
         return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
     }
-    log(L"[diag] OpenSessionByName succeeded");
+
+    if (verbose)
+    {
+        wslutil::PrintMessage(std::format(L"[diag] Session opened: '{}'", sessionName), stdout);
+    }
 
     // Console size for TTY.
     CONSOLE_SCREEN_BUFFER_INFO info{};
@@ -349,9 +345,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput, .Path = nullptr});
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput, .Path = nullptr});
     launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl, .Path = nullptr});
-
-    launcher.SetTtySize(rows, cols);
-    log(L"[diag] launching shell process...");
+  
     auto process = launcher.Launch(*session);
 
     if (verbose)
@@ -630,7 +624,8 @@ static int RunStartCommand(std::wstring_view commandLine)
             E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<container>", L"wsladiag start"));
     }
 
-    const auto log = [&](std::wstring_view m) {
+    const auto log = [&](std::wstring_view m)
+    {
         if (verbose)
         {
             wslutil::PrintMessage(std::wstring(m), stdout);
@@ -729,6 +724,7 @@ static int RunDeleteCommand(std::wstring_view commandLine)
     return 0;
 }
 
+// Print localized usage message to stderr.
 static void PrintUsage()
 {
     wslutil::PrintMessage(Localization::MessageWsladiagUsage(), stderr);
@@ -762,7 +758,7 @@ int wsladiag_main(std::wstring_view commandLine)
     parser.AddArgument(help, L"--help", L'h');
 
     parser.Parse();
-
+  
     if (help || verb.empty())
     {
         PrintUsage();
@@ -799,6 +795,7 @@ int wsladiag_main(std::wstring_view commandLine)
         return RunDeleteCommand(commandLine);
     }
 
+
     // Unknown verb - show usage and fail.
     wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
     PrintUsage();
@@ -827,12 +824,15 @@ int wmain(int, wchar_t**)
         if (auto reported = context.ReportedError())
         {
             auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
-            wslutil::PrintMessage(wsl::shared::Localization::MessageErrorCode(strings.Message, strings.Code), stderr);
+
+            wslutil::PrintMessage(strings.Message.empty() ? strings.Code : strings.Message, stderr);
         }
         else
         {
+            // Fallback for errors without context
             wslutil::PrintMessage(wslutil::GetErrorString(result), stderr);
         }
     }
+
     return exitCode;
 }

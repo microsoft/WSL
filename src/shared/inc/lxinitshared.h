@@ -390,7 +390,6 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLAWaitPid,
     LxMessageWSLAWaitPidResponse,
     LxMessageWSLASignal,
-    LxMessageWSLAShutdown,
     LxMessageWSLARelayTty,
     LxMessageWSLAMapPort,
     LxMessageWSLAConnectRelay,
@@ -502,7 +501,6 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLAWaitPid)
         X(LxMessageWSLAWaitPidResponse)
         X(LxMessageWSLASignal)
-        X(LxMessageWSLAShutdown)
         X(LxMessageWSLARelayTty)
         X(LxMessageWSLAMapPort)
         X(LxMessageWSLAConnectRelay)
@@ -1734,33 +1732,6 @@ enum WSLAOpenFlags
     WSLAOpenFlagsSignaled
 };
 
-struct WSLA_WAITPID_RESULT
-{
-    static inline auto Type = LxMessageWSLAWaitPidResponse;
-
-    DECLARE_MESSAGE_CTOR(WSLA_WAITPID_RESULT);
-
-    MESSAGE_HEADER Header;
-    WSLAOpenFlags State = WSLAOpenFlagsUnknown;
-    int32_t Code = -1;
-    int32_t Errno = -1;
-    PRETTY_PRINT(FIELD(Header), FIELD(State), FIELD(Code), FIELD(Errno));
-};
-
-struct WSLA_WAITPID
-{
-    static inline auto Type = LxMessageWSLAWaitPid;
-    using TResponse = WSLA_WAITPID_RESULT;
-
-    DECLARE_MESSAGE_CTOR(WSLA_WAITPID);
-
-    MESSAGE_HEADER Header;
-    int32_t Pid = -1;
-    uint64_t TimeoutMs = 0;
-
-    PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(TimeoutMs));
-};
-
 struct WSLA_SIGNAL
 {
     static inline auto Type = LxMessageWSLASignal;
@@ -1773,17 +1744,6 @@ struct WSLA_SIGNAL
     int32_t Signal = -1;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Signal));
-};
-
-struct WSLA_SHUTDOWN
-{
-    static inline auto Type = LxMessageWSLAShutdown;
-    using TResponse = RESULT_MESSAGE<int32_t>;
-
-    DECLARE_MESSAGE_CTOR(WSLA_SHUTDOWN);
-    MESSAGE_HEADER Header;
-
-    PRETTY_PRINT(FIELD(Header));
 };
 
 struct WSLA_MAP_PORT
