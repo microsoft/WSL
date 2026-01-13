@@ -21,14 +21,14 @@ EXTERN_C_START
 
 STDAPI WslaCanRun(_Out_ BOOL* canRun);
 
-typedef struct WSLA_VERSION
+typedef struct WSLA_VERSION_TST
 {
     UINT32 major;
     UINT32 minor;
     UINT32 revision;
-} WSLA_VERSION;
+} WSLA_VERSION_TST;
 
-STDAPI WslaGetVersion(_Out_ WSLA_VERSION* version);
+STDAPI WslaGetVersion(_Out_ WSLA_VERSION_TST* version);
 
 typedef enum WSLA_INSTALL_COMPONENT
 {
@@ -136,7 +136,7 @@ typedef struct WSLA_CONTAINER_PROCESS_OPTIONS
     PCSTR currentDirectory;
 } WSLA_CONTAINER_PROCESS_OPTIONS;
 
-typedef struct WSLA_CONTAINER_OPTIONS
+typedef struct WSLA_CONTAINER_OPTIONS_TST
 {
     PCSTR image; // Image name (repository:tag)
     PCSTR name;  // Container runtime name (expected to allow DNS resolution between containers)
@@ -146,7 +146,7 @@ typedef struct WSLA_CONTAINER_OPTIONS
     UINT32 volumesCount;
     const WSLA_CONTAINER_GPU_OPTIONS* gpuOptions;
     const WSLA_CONTAINER_PROCESS_OPTIONS* initProcessOptions;
-} WSLA_CONTAINER_OPTIONS;
+} WSLA_CONTAINER_OPTIONS_TST;
 
 typedef struct WSLA_CONTAINER_PROCESS
 {
@@ -160,7 +160,7 @@ typedef struct WSLA_CONTAINER_PROCESS
 DECLARE_HANDLE(WslaRuntimeContainer);
 
 STDAPI WslaCreateNewContainer(
-    _In_ WslaSession session, _In_ const WSLA_CONTAINER_OPTIONS* options, _Out_ WslaRuntimeContainer* container, _Out_ WSLA_CONTAINER_PROCESS* initProcess);
+    _In_ WslaSession session, _In_ const WSLA_CONTAINER_OPTIONS_TST* options, _Out_ WslaRuntimeContainer* container, _Out_ WSLA_CONTAINER_PROCESS* initProcess);
 
 STDAPI WslaStartContainer(_In_ WslaRuntimeContainer container);
 
@@ -170,16 +170,16 @@ STDAPI WslaDeleteContainer(_In_ WslaRuntimeContainer container);
 
 STDAPI WslaRestartContainer(_In_ WslaRuntimeContainer container);
 
-typedef enum WSLA_CONTAINER_STATE
+typedef enum WSLA_CONTAINER_STATE_TST
 {
     WSLA_CONTAINER_STATE_INVALID = 0,
     WSLA_CONTAINER_STATE_CREATED = 1,
     WSLA_CONTAINER_STATE_RUNNING = 2,
     WSLA_CONTAINER_STATE_EXITED = 3,
     WSLA_CONTAINER_STATE_FAILED = 4,
-} WSLA_CONTAINER_STATE;
+} WSLA_CONTAINER_STATE_TST;
 
-STDAPI WslaGetContainerState(_In_ WslaRuntimeContainer container, _Out_ WSLA_CONTAINER_STATE* state);
+STDAPI WslaGetContainerState(_In_ WslaRuntimeContainer container, _Out_ WSLA_CONTAINER_STATE_TST* state);
 
 // Container Process
 

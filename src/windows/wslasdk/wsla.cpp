@@ -11,15 +11,41 @@ Abstract:
     This file contains the public WSLA api implementations.
 
 --*/
+#include "wslaservice.h" //this contains the COM interface definitions
+#include <wil/com.h>        // COM helpers
+#include <wil/resource.h>   // handle wrappers
+#include <wil/result.h>     // error handling
+//#include <wil/scope_exit.h> // scope guards
+#include "WslSecurity.h"
 
 #include "wsla.h"
 
 HRESULT WslaCanRun(_Out_ BOOL* canRun)
 {
-    return E_NOTIMPL;//richfr change test
+    WSLA_SESSION_SETTINGS sessionSettings{};
+    sessionSettings.DisplayName = L"wsla-test";
+    sessionSettings.CpuCount = 4;
+    sessionSettings.MemoryMb = 2024;
+    sessionSettings.BootTimeoutMs = 30 * 1000;
+    
+    //This is just test code to confirm object creation
+    wil::com_ptr<IWSLAUserSession> userSession;
+    WI_VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession),
+                        nullptr,
+                        CLSCTX_LOCAL_SERVER,
+                        IID_PPV_ARGS(&userSession)));
+    //wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+    wil::com_ptr<IWSLASession> session;
+
+    WI_VERIFY_SUCCEEDED(userSession->CreateSession(&sessionSettings, &session));
+    //should not be needed wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+
+    return S_OK;//richfr change test
 }
 
-HRESULT WslaGetVersion(_Out_ WSLA_VERSION* version)
+HRESULT WslaGetVersion(_Out_ WSLA_VERSION_TST* version)
 {
     return E_NOTIMPL;
 }
@@ -59,7 +85,7 @@ HRESULT WslaDeleteContainerImage(_In_ WslaSession session, _In_ PCSTR imageName)
     return E_NOTIMPL;
 }
 
-HRESULT WslaCreateNewContainer(_In_ WslaSession session, _In_ const WSLA_CONTAINER_OPTIONS* options, _Out_ WslaRuntimeContainer* container, _Out_ WSLA_CONTAINER_PROCESS* initProcess)
+HRESULT WslaCreateNewContainer(_In_ WslaSession session, _In_ const WSLA_CONTAINER_OPTIONS_TST* options, _Out_ WslaRuntimeContainer* container, _Out_ WSLA_CONTAINER_PROCESS* initProcess)
 {
     return E_NOTIMPL;
 }
@@ -84,7 +110,7 @@ HRESULT WslaRestartContainer(_In_ WslaRuntimeContainer container)
     return E_NOTIMPL;
 }
 
-HRESULT WslaGetContainerState(_In_ WslaRuntimeContainer container, _Out_ WSLA_CONTAINER_STATE* state)
+HRESULT WslaGetContainerState(_In_ WslaRuntimeContainer container, _Out_ WSLA_CONTAINER_STATE_TST* state)
 {
     return E_NOTIMPL;
 }
