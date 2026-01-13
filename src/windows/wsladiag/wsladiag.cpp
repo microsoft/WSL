@@ -31,6 +31,7 @@ using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::RelayHandle;
+using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 class ChangeTerminalMode
 {
@@ -55,39 +56,6 @@ public:
 private:
     HANDLE m_console{};
     CONSOLE_CURSOR_INFO m_originalCursorInfo{};
-};
-
-struct ErrorDetails
-{
-    ~ErrorDetails()
-    {
-        Reset();
-    }
-
-    void Reset()
-    {
-        CoTaskMemFree(Error.UserErrorMessage);
-        Error = {};
-    }
-
-    void ThrowIfFailed(HRESULT Result)
-    {
-        if (SUCCEEDED(Result))
-        {
-            return;
-        }
-
-        if (Error.UserErrorMessage != nullptr)
-        {
-            THROW_HR_WITH_USER_ERROR(Result, Error.UserErrorMessage);
-        }
-        else
-        {
-            THROW_HR(Result);
-        }
-    }
-
-    WSLA_ERROR_INFO Error{};
 };
 
 static int ReportError(const std::wstring& context, HRESULT hr)
@@ -478,7 +446,7 @@ static void PullImpl(IWSLASession& Session, const std::string& Image)
     wil::com_ptr<IWSLASession> session = OpenCLISession();
 
     Callback callback;
-    ErrorDetails error{};
+    WSLAErrorDetails error{};
     auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
     error.ThrowIfFailed(result);
 }
@@ -667,7 +635,7 @@ static int Run(std::wstring_view commandLine)
     options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
 
     wil::com_ptr<IWSLAContainer> container;
-    ErrorDetails error{};
+    WSLAErrorDetails error{};
     auto result = session->CreateContainer(&options, &container, &error.Error);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {

@@ -28,6 +28,7 @@ using wsl::windows::common::WSLAContainerLauncher;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
+using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 
@@ -296,12 +297,28 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr, nullptr));
+        {
+            VERIFY_SUCCEEDED(session->PullImage("hello-world:linux", nullptr, nullptr, nullptr));
 
-        // Verify that the image is in the list of images.
-        ExpectImagePresent(*session, "hello-world:latest");
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*session, "hello-world:linux");
+            WSLAContainerLauncher launcher("hello-world:linux", "wsla-pull-image-container");
 
-        // TODO: Check that the image can actually be used to start a container.
+            auto container = launcher.Launch(*session);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        {
+            std::string expectedError =
+                "pull access denied for does-not, repository does not exist or may require 'docker login'";
+
+            WSLAErrorDetails error;
+            VERIFY_ARE_EQUAL(session->PullImage("does-not:exist", nullptr, nullptr, &error.Error), WSLA_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(expectedError, error.Error.UserErrorMessage);
+        }
     }
 
     // TODO: Test that invalid tars are correctly handled.
