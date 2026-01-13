@@ -201,7 +201,7 @@
         ],
         "eLxr": [
             {
-                "Name": "eLxr-12",
+                "Name": "eLxr",
                 "FriendlyName": "eLxr 12.12.0.0 GNU/Linux",
                 "Default": true,
                 "Amd64Url": {
