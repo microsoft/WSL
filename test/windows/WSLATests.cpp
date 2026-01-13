@@ -2395,11 +2395,7 @@ class WSLATests
             expectSessions({});
         }
 
-<<<<<<< HEAD
-        // Validate that persistent sessions are only dropped when explicitely terminated.
-=======
         // Validate that persistent sessions are only dropped when explicitly terminated.
->>>>>>> origin/feature/wsl-for-apps
         {
             auto session1 = create(L"session-1", WSLASessionFlagsPersistent);
             expectSessions({L"session-1"});

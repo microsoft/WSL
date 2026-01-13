@@ -353,6 +353,7 @@ static int PullImpl(IWSLASession& Session, const std::string& Image)
 
     THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
 
+    // TODO: Handle terminal resizes.
     class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") Callback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
     {
