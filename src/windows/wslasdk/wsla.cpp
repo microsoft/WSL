@@ -16,7 +16,7 @@ Abstract:
 
 HRESULT WslaCanRun(_Out_ BOOL* canRun)
 {
-    return E_NOTIMPL;
+    return E_NOTIMPL;//richfr change test
 }
 
 HRESULT WslaGetVersion(_Out_ WSLA_VERSION* version)
