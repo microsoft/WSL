@@ -272,7 +272,7 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
-    void ExpectImagePresent(IWSLASession& Session, const char* Image)
+    void ExpectImagePresent(IWSLASession& Session, const char* Image, bool Present = true)
     {
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
         THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
@@ -283,7 +283,14 @@ class WSLATests
             tags.push_back(e.Image);
         }
 
-        VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
+        if (Present)
+        {
+            VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
+        }
+        else
+        {
+            VERIFY_IS_TRUE(std::ranges::find(tags, Image) == tags.end());
+        }
     }
 
     TEST_METHOD(PullImage)
@@ -365,6 +372,38 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+    }
+
+    TEST_METHOD(DeleteImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-delete-image-test";
+
+        auto session = CreateSession(settings);
+
+        // Prepare hello-world image to delete.
+        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+        wil::unique_handle imageTarFileHandle{
+            CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+
+        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+
+        // Verify that the image is in the list of images.
+        ExpectImagePresent(*session, "hello-world:latest");
+
+        VERIFY_SUCCEEDED(session->DeleteImage("hello-world:latest", FALSE));
+
+        // Verify that the image is no longer in the list of images.
+        ExpectImagePresent(*session, "hello-world:latest", false);
+
+        // Test delete failed if image not exists.
+        VERIFY_FAILED(session->DeleteImage("hello-world:latest", FALSE));
     }
 
     TEST_METHOD(CustomDmesgOutput)
