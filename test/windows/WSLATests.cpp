@@ -815,7 +815,7 @@ class WSLATests
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
 
         // Verify that a proper error is returned if the mapping doesn't exist
-        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Unmap the v6 port
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1234, 80));
