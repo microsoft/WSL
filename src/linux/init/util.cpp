@@ -197,7 +197,7 @@ InteropServer::~InteropServer()
     Reset();
 }
 
-int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout)
+int UtilAcceptVsock(int SocketFd, sockaddr_vm SocketAddress, int Timeout, int SocketFlags)
 
 /*++
 
@@ -214,6 +214,8 @@ Arguments:
         address of the peer socket.
 
     Timeout - Supplies a timeout.
+
+    SocketFlags - Supplies the socket flags.
 
 Return Value:
 
@@ -263,7 +265,7 @@ Return Value:
     if (Result != -1)
     {
         socklen_t SocketAddressSize = sizeof(SocketAddress);
-        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SOCK_CLOEXEC);
+        Result = accept4(SocketFd, reinterpret_cast<sockaddr*>(&SocketAddress), &SocketAddressSize, SocketFlags);
     }
 
     if (Result < 0)
@@ -1664,6 +1666,25 @@ Return Value:
 
     return 0;
 }
+
+int UtilMountFile(const char* Source, const char* Destination)
+try
+{
+    // Is the file is a symlink, delete it since that would break the mount.
+    if (std::filesystem::is_symlink(Destination))
+    {
+        std::filesystem::remove(Destination);
+    }
+
+    wil::unique_fd Fd{open(Destination, (O_CREAT | O_WRONLY), 0755)};
+    THROW_LAST_ERROR_IF(!Fd);
+
+    THROW_LAST_ERROR_IF(mount(Source, Destination, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);
+    THROW_LAST_ERROR_IF(mount(nullptr, Destination, nullptr, (MS_RDONLY | MS_REMOUNT | MS_BIND), nullptr) < 0);
+
+    return 0;
+}
+CATCH_RETURN_ERRNO();
 
 int UtilMount(const char* Source, const char* Target, const char* Type, unsigned long MountFlags, const char* Options, std::optional<std::chrono::seconds> TimeoutSeconds)
 

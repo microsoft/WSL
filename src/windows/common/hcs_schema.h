@@ -22,6 +22,12 @@ Abstract:
         Json[#Value] = (Object).Value.value(); \
     }
 
+#define ASSIGN_IF_PRESENT(Json, Object, Value) \
+    if (Json.contains(#Value)) \
+    { \
+        (Object).Value = Json.at(#Value).get_to((Object).Value); \
+    }
+
 namespace wsl::windows::common::hcs {
 
 enum class ModifyRequestType
@@ -439,6 +445,66 @@ struct Scsi
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(Scsi, Attachments);
 };
 
+struct DebugOptions
+{
+    std::optional<std::wstring> BugcheckSavedStateFileName;
+    std::optional<std::wstring> ShutdownOrResetSavedStateFileName;
+};
+
+inline void to_json(nlohmann::json& j, const DebugOptions& d)
+{
+    j = nlohmann::json::object();
+    OMIT_IF_EMPTY(j, d, BugcheckSavedStateFileName);
+    OMIT_IF_EMPTY(j, d, ShutdownOrResetSavedStateFileName);
+}
+
+enum class VirtualPMemImageFormat
+{
+    Vhdx,
+    Vhd1
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    VirtualPMemImageFormat,
+    {
+        {VirtualPMemImageFormat::Vhdx, "Vhdx"},
+        {VirtualPMemImageFormat::Vhd1, "Vhd1"},
+    })
+
+struct VirtualPMemDevice
+{
+    std::wstring HostPath;
+    bool ReadOnly;
+    VirtualPMemImageFormat ImageFormat;
+    // uint64_t SizeBytes;
+    // std::map<uint64_t, VirtualPMemMapping> Mappings;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualPMemDevice, HostPath, ReadOnly, ImageFormat);
+};
+
+enum class VirtualPMemBackingType
+{
+    Virtual,
+    Physical
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    VirtualPMemBackingType,
+    {
+        {VirtualPMemBackingType::Virtual, "Virtual"},
+        {VirtualPMemBackingType::Physical, "Physical"},
+    })
+
+struct VirtualPMemController
+{
+    std::map<std::string, VirtualPMemDevice> Devices;
+    uint8_t MaximumCount;
+    uint64_t MaximumSizeBytes;
+    VirtualPMemBackingType Backing;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualPMemController, Devices, MaximumCount, MaximumSizeBytes, Backing);
+};
+
 struct Devices
 {
     std::optional<VirtioSerial> VirtioSerial;
@@ -447,6 +513,7 @@ struct Devices
     EmptyObject Battery;
     HvSocket HvSocket;
     std::map<std::string, Scsi> Scsi;
+    std::optional<VirtualPMemController> VirtualPMem;
 };
 
 inline void to_json(nlohmann::json& j, const Devices& devices)
@@ -459,6 +526,7 @@ inline void to_json(nlohmann::json& j, const Devices& devices)
         {"Scsi", devices.Scsi}};
 
     OMIT_IF_EMPTY(j, devices, VirtioSerial);
+    OMIT_IF_EMPTY(j, devices, VirtualPMem);
 }
 
 struct VirtualMachine
@@ -467,8 +535,9 @@ struct VirtualMachine
     Chipset Chipset;
     Topology ComputeTopology;
     Devices Devices;
+    DebugOptions DebugOptions;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualMachine, StopOnReset, Chipset, ComputeTopology, Devices);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(VirtualMachine, StopOnReset, Chipset, ComputeTopology, Devices, DebugOptions);
 };
 
 struct ComputeSystem
@@ -481,12 +550,116 @@ struct ComputeSystem
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ComputeSystem, Owner, ShouldTerminateOnLastHandleClosed, SchemaVersion, VirtualMachine)
 };
 
+struct GuestErrorSaveReport
+{
+    std::optional<std::wstring> SaveStateFile;
+    std::optional<long> Status;
+};
+
+inline void to_json(nlohmann::json& j, const GuestErrorSaveReport& g)
+{
+    j = nlohmann::json::object();
+    OMIT_IF_EMPTY(j, g, SaveStateFile);
+    OMIT_IF_EMPTY(j, g, Status);
+}
+
+inline void from_json(const nlohmann::json& j, GuestErrorSaveReport& r)
+{
+    ASSIGN_IF_PRESENT(j, r, SaveStateFile);
+    ASSIGN_IF_PRESENT(j, r, Status);
+}
+
 struct CrashReport
 {
     std::wstring CrashLog;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CrashReport, CrashLog);
+    std::optional<GuestErrorSaveReport> GuestCrashSaveInfo;
 };
+
+inline void to_json(nlohmann::json& j, const CrashReport& c)
+{
+    j = nlohmann::json::object();
+    j.at("CrashLog") = c.CrashLog;
+    OMIT_IF_EMPTY(j, c, GuestCrashSaveInfo);
+}
+
+inline void from_json(const nlohmann::json& j, CrashReport& c)
+{
+    ASSIGN_IF_PRESENT(j, c, CrashLog);
+    ASSIGN_IF_PRESENT(j, c, GuestCrashSaveInfo);
+}
+
+enum class NotificationType
+{
+    None,
+    GracefulExit,
+    ForcedExit,
+    UnexpectedExit,
+    Unknown
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    NotificationType,
+    {
+        {NotificationType::None, "None"},
+        {NotificationType::GracefulExit, "GracefulExit"},
+        {NotificationType::ForcedExit, "ForcedExit"},
+        {NotificationType::UnexpectedExit, "UnexpectedExit"},
+        {NotificationType::Unknown, "Unknown"},
+    })
+
+struct GuestCrashAttribution
+{
+    std::optional<std::vector<uint64_t>> CrashParameters;
+};
+
+inline void to_json(nlohmann::json& j, const GuestCrashAttribution& g)
+{
+    j = nlohmann::json::object();
+    OMIT_IF_EMPTY(j, g, CrashParameters)
+}
+
+inline void from_json(const nlohmann::json& j, GuestCrashAttribution& g)
+{
+    ASSIGN_IF_PRESENT(j, g, CrashParameters);
+}
+
+// Attribution record (trimmed to GuestCrash only for now)
+struct AttributionRecord
+{
+    std::optional<GuestCrashAttribution> GuestCrash;
+};
+
+inline void to_json(nlohmann::json& j, const AttributionRecord& a)
+{
+    j = nlohmann::json::object();
+    OMIT_IF_EMPTY(j, a, GuestCrash)
+}
+
+inline void from_json(const nlohmann::json& j, AttributionRecord& a)
+{
+    ASSIGN_IF_PRESENT(j, a, GuestCrash);
+}
+
+struct SystemExitStatus
+{
+    int32_t Status;
+    std::optional<NotificationType> ExitType;
+    std::optional<std::vector<AttributionRecord>> Attribution;
+};
+
+inline void to_json(nlohmann::json& j, const SystemExitStatus& s)
+{
+    j = nlohmann::json{{"Status", s.Status}};
+    OMIT_IF_EMPTY(j, s, ExitType);
+    OMIT_IF_EMPTY(j, s, Attribution);
+}
+
+inline void from_json(const nlohmann::json& j, SystemExitStatus& s)
+{
+    s.Status = j.at("Status").get<int32_t>();
+    ASSIGN_IF_PRESENT(j, s, ExitType);
+    ASSIGN_IF_PRESENT(j, s, Attribution);
+}
 
 } // namespace wsl::windows::common::hcs
 

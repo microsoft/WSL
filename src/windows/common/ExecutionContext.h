@@ -66,6 +66,7 @@ enum Context : ULONGLONG
     UpdatePackage = 0x10000000000,
     QueryLatestGitHubRelease = 0x20000000000,
     VerifyChecksum = 0x40000000000,
+    WslaDiag = 0x80000000000,
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(Context)
@@ -181,6 +182,7 @@ private:
 void EnableContextualizedErrors(bool service);
 
 void SetErrorMessage(std::wstring&& message);
+void SetErrorMessage(std::string&& message);
 
 void SetEventLog(HANDLE eventLog);
 

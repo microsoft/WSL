@@ -107,6 +107,7 @@ Abstract:
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslg.exe") \
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msrdc.exe") \
         TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"msal.wsl.proxy.exe") \
+        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"wslaservice.exe") \
     END_TEST_CLASS()
 
 //
@@ -163,10 +164,8 @@ template <typename T>
 class RegistryKeyChange
 {
 public:
-    RegistryKeyChange(HKEY Hive, LPCWSTR Key, LPCWSTR Name, const T& Value) : m_value(Name)
+    RegistryKeyChange(HKEY Hive, LPCWSTR Key, LPCWSTR Name, const T& Value) : m_hive(Hive), m_key(Key), m_value(Name)
     {
-        m_key = wsl::windows::common::registry::CreateKey(Hive, Key, KEY_ALL_ACCESS);
-
         m_originalValue = Get();
 
         Set(Value);
@@ -174,38 +173,51 @@ public:
 
     ~RegistryKeyChange()
     {
-        if (m_key)
+        if (m_key != nullptr)
         {
+            auto key = wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
+
             if (m_originalValue.has_value())
             {
                 Set(m_originalValue.value());
             }
             else
             {
-                wsl::windows::common::registry::DeleteKeyValue(m_key.get(), m_value.c_str());
+                wsl::windows::common::registry::DeleteKeyValue(key.get(), m_value.c_str());
             }
         }
+    }
+
+    wil::unique_hkey OpenKey()
+    {
+        return;
     }
 
     RegistryKeyChange(const RegistryKeyChange&) = delete;
     RegistryKeyChange(RegistryKeyChange&& other) = default;
     const RegistryKeyChange& operator=(RegistryKeyChange&& other)
     {
+        m_hive = std::move(other.m_hive);
         m_key = std::move(other.m_key);
         m_value = std::move(other.m_value);
+
+        other.m_hive = nullptr;
+        other.m_key = nullptr;
     }
 
     const RegistryKeyChange& operator=(RegistryKeyChange&) = delete;
 
     void Set(const T& Value)
     {
+        auto key = wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
+
         if constexpr (std::is_same_v<std::remove_reference_t<T>, DWORD>)
         {
-            wsl::windows::common::registry::WriteDword(m_key.get(), nullptr, m_value.c_str(), Value);
+            wsl::windows::common::registry::WriteDword(key.get(), nullptr, m_value.c_str(), Value);
         }
         else if constexpr (std::is_same_v<std::remove_reference_t<T>, std::wstring>)
         {
-            wsl::windows::common::registry::WriteString(m_key.get(), nullptr, m_value.c_str(), Value.c_str());
+            wsl::windows::common::registry::WriteString(key.get(), nullptr, m_value.c_str(), Value.c_str());
         }
         else
         {
@@ -215,11 +227,14 @@ public:
 
     auto Get() const
     {
+
+        auto key = wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
+
         if constexpr (std::is_same_v<T, DWORD>)
         {
             DWORD Value = 0;
             DWORD Size = sizeof(Value);
-            const auto Result = RegGetValueW(m_key.get(), nullptr, m_value.c_str(), RRF_RT_REG_DWORD, nullptr, &Value, &Size);
+            const auto Result = RegGetValueW(key.get(), nullptr, m_value.c_str(), RRF_RT_REG_DWORD, nullptr, &Value, &Size);
             if (Result == ERROR_SUCCESS)
             {
                 WI_ASSERT(Size == sizeof(Value));
@@ -236,7 +251,7 @@ public:
         }
         else if constexpr (std::is_same_v<std::remove_reference_t<T>, std::wstring>)
         {
-            return wsl::windows::common::registry::ReadOptionalString(m_key.get(), nullptr, m_value.c_str());
+            return wsl::windows::common::registry::ReadOptionalString(key.get(), nullptr, m_value.c_str());
         }
         else
         {
@@ -245,7 +260,8 @@ public:
     }
 
 private:
-    wil::unique_hkey m_key;
+    HKEY m_hive = nullptr;
+    LPCWSTR m_key = nullptr;
     std::wstring m_value;
     std::optional<T> m_originalValue;
 };
@@ -508,8 +524,16 @@ inline auto EnableSystemd(const std::string& extraConfig = "")
 std::wstring EscapePath(std::wstring_view Path);
 
 void StopWslService();
+void StopWslaService();
 
 std::optional<GUID> GetDistributionId(LPCWSTR Name);
 wil::unique_hkey OpenDistributionKey(LPCWSTR Name);
 
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings = L"", int ExitCode = -1);
+
+std::string ReadToString(SOCKET Handle);
+
+std::wstring ReadFileContent(const std::string& Path);
+std::wstring ReadFileContent(const std::wstring& Path);
+
+std::string EscapeString(const std::string& Input);

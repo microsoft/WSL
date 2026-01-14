@@ -27,6 +27,7 @@
                 </File>
 
                 <File Id="wslg.exe" Name="wslg.exe" Source="${PACKAGE_INPUT_DIR}/wslg.exe" />
+                <File Id="wsladiag.exe" Name="wsladiag.exe" Source="${PACKAGE_INPUT_DIR}/wsladiag.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
@@ -40,6 +41,12 @@
                 <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
                 <?endif?>
 
+
+                <!-- Temporary runtime VHD. TODO: Update once the final VHD is available. -->
+                <?if "${WSL_DEV_BINARY_PATH}" = "" AND "${TARGET_PLATFORM}" = "x64" ?>
+                <File Id="wslarootfs.vhd" Name="wslarootfs.vhd" Source="${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd"/>
+                <?endif?>
+
                 <!-- Installation folder -->
                 <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\MSI">
                     <RegistryValue Name="InstallLocation" Value="[INSTALLDIR]" Type="string" />
@@ -50,75 +57,75 @@
 
             <Component Id="explorerplan9shortcut" Guid="{93CBFF23-A04C-4344-A332-238CE5B97AED}" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <!-- Explorer extensions -->
-              <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\CLSID\{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}">
-                <RegistryValue Value="Linux" Type="string"/>
-                <RegistryValue Name="SortOrderIndex" Value="119" Type="integer"/>
-                <!--0x77-->
-                <RegistryValue Name="System.IsPinnedToNameSpaceTree" Value="1" Type="integer"/>
+                <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\CLSID\{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}">
+                    <RegistryValue Value="Linux" Type="string"/>
+                    <RegistryValue Name="SortOrderIndex" Value="119" Type="integer"/>
+                    <!--0x77-->
+                    <RegistryValue Name="System.IsPinnedToNameSpaceTree" Value="1" Type="integer"/>
 
-                <RegistryKey Key="DefaultIcon">
-                    <RegistryValue Value="[System64Folder]wsl.exe,-1" Type="string"/>
-                </RegistryKey>
+                    <RegistryKey Key="DefaultIcon">
+                        <RegistryValue Value="[System64Folder]wsl.exe,-1" Type="string"/>
+                    </RegistryKey>
 
-                <RegistryKey Key="InProcServer32">
-                    <RegistryValue Value="[System64Folder]windows.storage.dll" Type="string"/>
-                </RegistryKey>
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[System64Folder]windows.storage.dll" Type="string"/>
+                    </RegistryKey>
 
-                <RegistryKey Key="ShellFolder">
-                    <RegistryValue Name="Attributes" Value="2692743245" Type="integer"/>
-                    <!--0xa080004d"-->
-                    <RegistryValue Name="FolderValueFlags" Value="40" Type="integer"/>
-                    <!--0x28-->
-                </RegistryKey>
+                    <RegistryKey Key="ShellFolder">
+                        <RegistryValue Name="Attributes" Value="2692743245" Type="integer"/>
+                        <!--0xa080004d"-->
+                        <RegistryValue Name="FolderValueFlags" Value="40" Type="integer"/>
+                        <!--0x28-->
+                    </RegistryKey>
 
-                <RegistryKey Key="Instance">
-                    <RegistryValue Name="CLSID" Value="{4FE04BFD-85B9-49DD-B914-F4C9556B9DA6}" Type="string"/>
+                    <RegistryKey Key="Instance">
+                        <RegistryValue Name="CLSID" Value="{4FE04BFD-85B9-49DD-B914-F4C9556B9DA6}" Type="string"/>
 
-                    <RegistryKey Key="InitPropertyBag">
-                        <RegistryValue Name="DisplayType" Value="2" Type="integer"/>
-                        <RegistryValue Name="EnumObjectsTelemetryValue" Value="WSL" Type="string"/>
-                        <RegistryValue Name="Provider" Value="Plan 9 Network Provider" Type="string"/>
-                        <RegistryValue Name="ResName" Value="\\wsl.localhost" Type="string"/>
+                        <RegistryKey Key="InitPropertyBag">
+                            <RegistryValue Name="DisplayType" Value="2" Type="integer"/>
+                            <RegistryValue Name="EnumObjectsTelemetryValue" Value="WSL" Type="string"/>
+                            <RegistryValue Name="Provider" Value="Plan 9 Network Provider" Type="string"/>
+                            <RegistryValue Name="ResName" Value="\\wsl.localhost" Type="string"/>
+                        </RegistryKey>
                     </RegistryKey>
                 </RegistryKey>
-              </RegistryKey>
 
-              <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel">
-                <RegistryValue Name="{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}" Value="1" Type="integer"/>
-              </RegistryKey>
+                <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel">
+                    <RegistryValue Name="{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}" Value="1" Type="integer"/>
+                </RegistryKey>
 
-              <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}">
-                <RegistryValue Value="Linux" Type="string"/>
-              </RegistryKey>
+                <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}">
+                    <RegistryValue Value="Linux" Type="string"/>
+                </RegistryKey>
 
-              <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\IdListAliasTranslations\WSL">
-                <RegistryValue Name="Target" Value="::{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}" Type="string"/>
-                <RegistryValue Name="Source" Value="\\wsl.localhost" Type="string"/>
-              </RegistryKey>
+                <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\IdListAliasTranslations\WSL">
+                    <RegistryValue Name="Target" Value="::{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}" Type="string"/>
+                    <RegistryValue Name="Source" Value="\\wsl.localhost" Type="string"/>
+                </RegistryKey>
 
-              <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\IdListAliasTranslations\WSLLegacy">
-                <RegistryValue Name="Target" Value="::{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}" Type="string"/>
-                <RegistryValue Name="Source" Value="\\wsl$" Type="string"/>
-              </RegistryKey>
+                <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\IdListAliasTranslations\WSLLegacy">
+                    <RegistryValue Name="Target" Value="::{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}" Type="string"/>
+                    <RegistryValue Name="Source" Value="\\wsl$" Type="string"/>
+                </RegistryKey>
             </Component>
 
             <Component Id="explorershell" Guid="{93CBFF23-A04C-4344-A332-238CE5B97AEC}" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <?foreach PATH in SOFTWARE\Classes\Directory\shell\WSL;SOFTWARE\Classes\Directory\Background\shell\WSL;SOFTWARE\Classes\Drive\shell\WSL?>
-                <RegistryKey Root="HKLM" Key="$(var.PATH)">
-                    <RegistryValue Value="@wsl.exe,-2" Type="string"/>
-                    <RegistryValue Name="Extended" Value="" Type="string"/>
-                    <RegistryValue Name="NoWorkingDirectory" Value="" Type="string"/>
-                    <RegistryKey Key="command">
-                        <RegistryValue Value='wsl.exe --cd "%V"' Type="string"/>
+                    <RegistryKey Root="HKLM" Key="$(var.PATH)">
+                        <RegistryValue Value="@wsl.exe,-2" Type="string"/>
+                        <RegistryValue Name="Extended" Value="" Type="string"/>
+                        <RegistryValue Name="NoWorkingDirectory" Value="" Type="string"/>
+                        <RegistryKey Key="command">
+                            <RegistryValue Value='wsl.exe --cd "%V"' Type="string"/>
+                        </RegistryKey>
                     </RegistryKey>
-                </RegistryKey>
-              <?endforeach?>
+                <?endforeach?>
 
-              <ProgId Id="WSLDistributionTar" Description="WSL tar distribution" Icon="wsl.exe">
-                  <Extension Id="wsl">
-                      <Verb Id="open" Command="open" TargetFile="wsl.exe" Argument="--install --prompt-before-exit --from-file &quot;%1&quot;" />
-                  </Extension>
-              </ProgId>
+                <ProgId Id="WSLDistributionTar" Description="WSL tar distribution" Icon="wsl.exe">
+                    <Extension Id="wsl">
+                        <Verb Id="open" Command="open" TargetFile="wsl.exe" Argument="--install --prompt-before-exit --from-file &quot;%1&quot;" />
+                    </Extension>
+                </ProgId>
             </Component>
 
             <Component Id="wslservice" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134735" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
@@ -131,12 +138,13 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- WSLServiceProxyStub. -->
                 <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}">
                     <RegistryValue Value="PSFactoryBuffer" Type="string" />
-                </RegistryKey>
-                <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC60}\InProcServer32">
-                    <RegistryValue Value="[INSTALLDIR]wslserviceproxystub.dll" Type="string" />
-                    <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wslserviceproxystub.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
                 </RegistryKey>
 
                 <!-- ILxssUserSession -->
@@ -223,6 +231,158 @@
                 <ServiceControl Id="StopService" Stop="both" Remove="uninstall" Name="WSLService" Wait="yes" />
             </Component>
 
+            <Component Id="wslaservice" Guid="DC97520E-BFA5-4559-960F-D580E151629F" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
+                <!-- WSLAServiceProxyStub. -->
+                <RegistryKey Root="HKCR" Key="CLSID\{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}">
+                    <RegistryValue Value="PSFactoryBuffer" Type="string" />
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wslaserviceproxystub.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WSLAService COM app -->
+                <RegistryKey Root="HKCR" Key="AppID\{E9B79997-57E3-4201-AECC-6A464E530DD2}">
+
+                    <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
+                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="LocalService" Value="WSLAService" Type="string" />
+                </RegistryKey>
+
+                <!-- WSLAContainer -->
+                <RegistryKey Root="HKCR" Key="CLSID\{B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4}">
+                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
+                    <RegistryValue Value="WSLAContainer" Type="string" />
+                </RegistryKey>
+
+                <!-- WSLAProcess -->
+                <RegistryKey Root="HKCR" Key="CLSID\{AFBEA6D6-D8A4-4F81-8FED-F947EB74B33B}">
+                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
+                    <RegistryValue Value="WSLAProcess" Type="string" />
+                </RegistryKey>
+
+                <!-- WSLAUserSession -->
+                <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
+                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
+                    <RegistryValue Value="WSLAUserSession" Type="string" />
+                </RegistryKey>
+
+                <!-- WSLASession -->
+                <RegistryKey Root="HKCR" Key="CLSID\{4877FEFC-4977-4929-A958-9F36AA1892A4}">
+                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
+                    <RegistryValue Value="WSLASession" Type="string" />
+                </RegistryKey>
+
+                <!-- IWSLAUserSession-->
+                <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8760}">
+                    <RegistryValue Value="IWSLAUserSession" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLAContainer-->
+                <RegistryKey Root="HKCR" Key="Interface\{7577FE8D-DE85-471E-B870-11669986F332}">
+                    <RegistryValue Value="IWSLAContainer" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLAProcess-->
+                <RegistryKey Root="HKCR" Key="Interface\{1AD163CD-393D-4B33-83A2-8A3F3F23E608}">
+                    <RegistryValue Value="IWSLAProcess" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- ITerminationCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE}">
+                    <RegistryValue Value="ITerminationCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IProgressCallback-->
+                <RegistryKey Root="HKCR" Key="Interface\{5038842F-53DB-4F30-A6D0-A41B02C94AC1}">
+                    <RegistryValue Value="IProgressCallback" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLASession-->
+                <RegistryKey Root="HKCR" Key="Interface\{EF0661E4-6364-40EA-B433-E2FDF11F3519}">
+                    <RegistryValue Value="IWSLASession" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- wsldevicehost.dll -->
+                <!-- TODO: WSL currently has two AppID registrations for wsldevicehost, is that needed? -->
+                <RegistryKey Root="HKCR" Key="AppID\{C457EA11-5486-4174-B90D-089909EDB170}">
+                    <RegistryValue Name="DllSurrogate" Value="" Type="string" />
+                    <RegistryValue Name="AppIDFlags" Value="2048" Type="integer" />
+
+                    <!-- O:BAG:BAD:(A;;CCDCSW;;;AU)(A;;CCDCSW;;;PS)(A;;CCDCSW;;;SY) -->
+                    <RegistryValue Name="AccessPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                    <RegistryValue Name="LaunchPermission" Value="01000480580000006800000000000000140000000200440003000000000014000B00000001010000000000050B000000000014000B00000001010000000000050A000000000014000B0000000101000000000005120000000102000000000005200000002002000001020000000000052000000020020000" Type="binary" />
+                </RegistryKey>
+
+                <!-- WslDeviceHost WSLA_VIRTIO_FS_ADMIN_CLASS_ID -->
+                <RegistryKey Root="HKCR" Key="CLSID\{8F7C2A3B-D9E4-4C1F-A2B8-5E3D7C9F1A6E}">
+                    <RegistryValue Value="WslDeviceHost_VirtioFsAdmin" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost WSLA_VIRTIO_FS_CLASS_ID -->
+                <RegistryKey Root="HKCR" Key="CLSID\{06ED032F-C528-41C1-B75D-905EEE823BBA}">
+                    <RegistryValue Value="WslDeviceHost_VirtioFs" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost WSLA_VIRTIO_NET_CLASS_ID -->
+                <RegistryKey Root="HKCR" Key="CLSID\{7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}">
+                    <RegistryValue Value="WslDeviceHost_VirtioNet" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- WslDeviceHost WSLA_VIRTIO_PMEM_CLASS_ID -->
+                <RegistryKey Root="HKCR" Key="CLSID\{ABB755FC-1B86-4255-83E2-E5787ABCF6C2}">
+                    <RegistryValue Value="WslDeviceHost_VirtioPmem" Type="string" />
+                    <RegistryValue Name="AppId" Value="{C457EA11-5486-4174-B90D-089909EDB170}" Type="string" />
+
+                    <RegistryKey Key="InProcServer32">
+                        <RegistryValue Value="[INSTALLDIR]wsldevicehost.dll" Type="string" />
+                        <RegistryValue Name="ThreadingModel" Value="Both" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <File Id="wslaservice.exe" Source="${BIN}/wslaservice.exe"  KeyPath="yes" />
+                <File Id="wslaserviceproxystub.dll" Name="wslaserviceproxystub.dll" Source="${BIN}/wslaserviceproxystub.dll" />
+
+                <ServiceInstall Name="WSLAService" DisplayName="WSLA Service" Description="WSLA Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
+                <ServiceControl Id="StopWSLAService" Stop="both" Remove="uninstall" Name="WSLAService" Wait="yes" />
+            </Component>
             <Component Id="wslg" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134731" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
                     <File Id="msrdc.exe" Source="${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/msrdc.exe" />
@@ -362,6 +522,7 @@
         <Feature Id="WSL" Title="Windows Subsystem for Linux" Level="1">
             <ComponentRef Id="wsl" />
             <ComponentRef Id="wslservice" />
+            <ComponentRef Id="wslaservice" />
             <ComponentRef Id="wslg" />
             <ComponentRef Id="tools" />
             <ComponentRef Id="explorershell" />
@@ -461,21 +622,21 @@
             Return="check"
             Execute="deferred"
          />
-        
-         <CustomAction Id="RemoveRegistryKeyProtections"
-            Impersonate="no"
-            BinaryRef="wslinstall.dll"
-            DllEntry="RemoveRegistryKeyProtections"
-            Return="check"
-            Execute="deferred"
+
+        <CustomAction Id="RemoveRegistryKeyProtections"
+           Impersonate="no"
+           BinaryRef="wslinstall.dll"
+           DllEntry="RemoveRegistryKeyProtections"
+           Return="check"
+           Execute="deferred"
          />
 
-         <CustomAction Id="UnregisterLspCategories"
-            Impersonate="no"
-            BinaryRef="wslinstall.dll"
-            DllEntry="UnregisterLspCategories"
-            Return="check"
-            Execute="deferred"
+        <CustomAction Id="UnregisterLspCategories"
+           Impersonate="no"
+           BinaryRef="wslinstall.dll"
+           DllEntry="UnregisterLspCategories"
+           Return="check"
+           Execute="deferred"
          />
 
         <CustomAction Id="InstallMsix.SetProperty" Return="check" Property="InstallMsix" Value='[DATABASE]' Execute='immediate' />

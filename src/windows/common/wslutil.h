@@ -19,6 +19,7 @@ Abstract:
 #include "SubProcess.h"
 #include <winrt/windows.management.deployment.h>
 #include "JsonUtils.h"
+#include "wslaservice.h"
 
 namespace wsl::windows::common {
 struct Error;
@@ -44,7 +45,7 @@ inline auto c_msixPackageFamilyName = L"MicrosoftCorporationII.WindowsSubsystemF
 inline auto c_githubUrlOverrideRegistryValue = L"GitHubUrlOverride";
 inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
-inline constexpr auto c_vmOwner = L"WSL";
+inline constexpr auto c_vmOwner = L"WSL"; // TODO-WSLA: Does this apply to WSLA ?
 
 struct GitHubReleaseAsset
 {
@@ -62,6 +63,17 @@ struct GitHubRelease
     std::wstring created_at;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GitHubRelease, name, assets, created_at);
+};
+
+struct WSLAErrorDetails
+{
+    ~WSLAErrorDetails();
+
+    void Reset();
+
+    void ThrowIfFailed(HRESULT Result);
+
+    WSLA_ERROR_INFO Error{};
 };
 
 template <typename T>
@@ -101,7 +113,11 @@ GUID CreateV5Uuid(const GUID& namespaceGuid, const std::span<const std::byte> na
 
 std::wstring DownloadFile(std::wstring_view Url, std::wstring Filename);
 
+std::wstring DownloadFileImpl(std::wstring_view Url, std::wstring Filename, const std::function<void(uint64_t, uint64_t)>& Progress);
+
 [[nodiscard]] HANDLE DuplicateHandleFromCallingProcess(_In_ HANDLE handleInTarget);
+
+[[nodiscard]] HANDLE DuplicateHandleToCallingProcess(_In_ HANDLE Handle, _In_ std::optional<DWORD> Permissions = {});
 
 void EnforceFileLimit(LPCWSTR Folder, size_t limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred);
 
@@ -133,9 +149,13 @@ std::wstring GetSystemErrorString(_In_ HRESULT result);
 
 std::wstring GetDebugShellPipeName(_In_ PSID Sid);
 
+std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> GetInstalledPackageVersion();
+
 std::vector<BYTE> HashFile(HANDLE File, DWORD Algorithm);
 
 void InitializeWil();
+
+bool IsInteractiveConsole();
 
 bool IsRunningInMsix();
 

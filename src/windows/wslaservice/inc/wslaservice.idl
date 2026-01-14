@@ -1,0 +1,370 @@
+/*++
+
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Module Name:
+
+    wslaservice.idl
+
+Abstract:
+
+    This file contains the COM object definitions used to talk with the WSLa
+    service "WslaService"
+
+--*/
+
+import "unknwn.idl";
+import "wtypes.idl";
+
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLAUserSession;")
+cpp_quote("#endif")
+
+#define WSLA_MAX_CONTAINER_NAME_LENGTH 255
+#define WSLA_MAX_IMAGE_NAME_LENGTH 255
+
+cpp_quote("#define WSLA_MAX_CONTAINER_NAME_LENGTH 255")
+cpp_quote("#define WSLA_MAX_IMAGE_NAME_LENGTH 255")
+
+typedef
+struct _WSLA_VERSION {
+    ULONG Major;
+    ULONG Minor;
+    ULONG Revision;
+} WSLA_VERSION;
+
+typedef enum _WSLAFdType
+{
+    WSLAFdTypeDefault = 0,
+    WSLAFdTypeTerminalInput = 1,
+    WSLAFdTypeTerminalOutput = 2,
+    WSLAFdTypeLinuxFileInput = 4,
+    WSLAFdTypeLinuxFileOutput = 8,
+    WSLAFdTypeLinuxFileAppend = 16,
+    WSLAFdTypeLinuxFileCreate = 32,
+    WSLAFdTypeTerminalControl = 64,
+} WSLAFdType;
+
+typedef enum _WSLAProcessState
+{
+    WSLAProcessStateUnknown,
+    WSLAProcessStateRunning,
+    WSLAProcessStateExited
+} WSLAProcessState;
+
+typedef struct _WSLA_PROCESS_FD
+{
+    LONG Fd;
+    WSLAFdType Type;
+    [string, unique] LPCSTR Path;
+} WSLA_PROCESS_FD;
+
+typedef
+struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
+   int Errno;
+   int Pid;
+} WSLA_CREATE_PROCESS_RESULT;
+
+typedef enum _WSLAVirtualMachineTerminationReason
+{
+    WSLAlVirtualMachineTerminationReasonUnknown,
+    WSLAVirtualMachineTerminationReasonShutdown,
+    WSLAVirtualMachineTerminationReasonCrashed,
+} WSLAVirtualMachineTerminationReason;
+
+typedef enum _WSLAFD
+{
+    WSLAFDStdin = 0,
+    WSLAFDStdout = 1,
+    WSLAFDStderr = 2,
+    WSLAFDTty = 3,
+} WSLAFD;
+
+typedef enum _WSLAFDFlags
+{
+    WSLAFDFlagsNone = 0,
+    WSLAFDFlagsLogs = 1, // Replay previous logs
+    WSLAFDFlagsStream = 2, // Stream new logs.
+} WSLAFDFlags;
+
+typedef enum _WSLASignal
+{
+    WSLASignalSIGKILL = 9,
+    WSLASignalSIGSEGV = 11,
+    WSLASignalSIGTERM = 15
+} WSLASignal;
+
+[
+    uuid(7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFE),
+    pointer_default(unique),
+    object
+]
+interface ITerminationCallback : IUnknown
+{
+    HRESULT OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details);
+};
+
+[
+    uuid(5038842F-53DB-4F30-A6D0-A41B02C94AC1),
+    pointer_default(unique),
+    object
+]
+interface IProgressCallback : IUnknown
+{
+    HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
+};
+
+struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
+{
+    int Dummy; // Dummy value for the .idl file to compile.
+    // TODO: Details TBD.
+};
+
+
+struct WSLA_IMAGE_INFORMATION
+{
+    char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
+    char Hash[256];
+    ULONGLONG Size;
+    ULONGLONG DownloadTimestamp;
+};
+
+struct WSLA_PROCESS_OPTIONS
+{
+    [unique] LPCSTR Executable;
+    [unique] LPCSTR CurrentDirectory;
+    [size_is(CommandLineCount)] LPCSTR* CommandLine;
+    ULONG CommandLineCount;
+    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
+    ULONG EnvironmentCount;
+    [unique, size_is(FdsCount)] WSLA_PROCESS_FD *Fds;
+    int FdsCount;
+    ULONG TtyRows; // Only needed when tty fd's are passed.
+    ULONG TtyColumns;
+};
+
+struct WSLA_VOLUME
+{
+    LPCWSTR HostPath;
+    LPCSTR ContainerPath;
+    BOOL ReadOnly;
+};
+
+struct WSLA_PORT_MAPPING
+{
+    USHORT HostPort;
+    USHORT ContainerPort;
+    int Family;
+};
+
+enum WSLA_CONTAINER_NETWORK_TYPE
+{
+    WSLA_CONTAINER_NETWORK_BRIDGE = 0,
+    WSLA_CONTAINER_NETWORK_HOST = 1,
+    WSLA_CONTAINER_NETWORK_NONE = 2,
+    // WSLA_CONTAINER_NETWORK_CUSTOM = 3 // TODO: Implement when implementing custom networks
+};
+struct WSLA_CONTAINER_NETWORK
+{
+    // TODO: Change default to bridge when implemented
+    enum WSLA_CONTAINER_NETWORK_TYPE ContainerNetworkType;
+    LPCSTR ContainerNetworkName;
+};
+
+enum WSLA_CONTAINER_FLAGS
+{
+    WSLA_CONTAINER_FLAG_ENABLE_GPU = 1
+} ;
+
+
+struct WSLA_CONTAINER_OPTIONS
+{
+    LPCSTR Image;
+    [unique] LPCSTR Name;
+    struct WSLA_PROCESS_OPTIONS InitProcessOptions;
+    [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
+    ULONG VolumesCount;
+    [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
+    ULONG PortsCount;
+    DWORD Flags; // GPU, Privileged, ...
+    // TODO: List specific GPU devices.
+    // TODO: Flags on wether the caller wants to override entrypoint, args, or both.
+    ULONGLONG ShmSize;
+    struct WSLA_CONTAINER_NETWORK ContainerNetwork;
+};
+
+enum WSLA_CONTAINER_STATE
+{
+    WslaContainerStateInvalid = 0,
+    WslaContainerStateCreated = 1,
+    WslaContainerStateRunning = 2,
+    WslaContainerStateExited = 3,
+    WslaContainerStateDeleted = 4,
+};
+
+struct WSLA_CONTAINER
+{
+    char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1];
+    char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
+    enum WSLA_CONTAINER_STATE State;
+
+    // TODO: Add creation timestamp and other fields that the command line tool might want to display.
+};
+
+enum WSLA_PROCESS_STATE
+{
+    WslaProcessStateUnknown = 0,
+    WslaProcessStateRunning = 1,
+    WslaProcessStateExited = 2,
+    WslaProcessStateSignalled = 3
+};
+
+// TODO: Design for localization.
+typedef struct _WSLA_ERROR_INFO{
+    [string] LPSTR UserErrorMessage;
+    ULONG WarningsPipe;
+} WSLA_ERROR_INFO;
+
+[
+    uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
+    pointer_default(unique),
+    object
+]
+interface IWSLAProcess : IUnknown
+{
+    HRESULT Signal([in] int Signal);
+    HRESULT GetExitEvent([out] ULONG* EventHandle);
+    HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
+    HRESULT GetPid([out] int* Pid);
+    HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
+    HRESULT ResizeTty([in] ULONG Rows, [in] ULONG Columns);
+
+    // Note: the SDK can offer a convenience Wait() method, but that doesn't need to be part of the service API.
+}
+
+typedef enum _WSLANetworkingMode
+{
+    WSLANetworkingModeNone,
+    WSLANetworkingModeNAT,
+    WSLANetworkingModeVirtioProxy
+} WSLANetworkingMode;
+
+typedef enum _WSLAFeatureFlags
+{
+    WslaFeatureFlagsNone = 0,
+    WslaFeatureFlagsDnsTunneling = 1,
+    WslaFeatureFlagsEarlyBootDmesg = 2,
+    WslaFeatureFlagsGPU = 4,
+    WslaFeatureFlagsVirtioFs = 8,
+    WslaFeatureFlagsPmemVhds = 16,
+} WSLAFeatureFlags;
+
+struct WSLA_SESSION_SETTINGS {
+    LPCWSTR DisplayName;
+    LPCWSTR StoragePath;
+    ULONGLONG MaximumStorageSizeMb;
+    ULONG CpuCount;
+    ULONG MemoryMb;
+    ULONG BootTimeoutMs;
+    WSLANetworkingMode NetworkingMode;
+    [unique] ITerminationCallback* TerminationCallback;
+    ULONG FeatureFlags;
+    ULONG DmesgOutput;
+
+    // Below options are used for debugging purposes only.
+    [unique] LPCWSTR RootVhdOverride;
+    [unique] LPCSTR RootVhdTypeOverride;
+};
+
+
+[
+    uuid(7577FE8D-DE85-471E-B870-11669986F332),
+    pointer_default(unique),
+    object
+]
+interface IWSLAContainer : IUnknown
+{
+    HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
+    HRESULT Start();
+    HRESULT Delete(); // TODO: Look into lifetime logic.
+    HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
+    HRESULT GetInitProcess([out] IWSLAProcess** Process);
+    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT Inspect([out] LPSTR* Output);
+
+    // Anonymous host port allocation (P1).
+    //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
+    //HRESULT ReleaseHostPort([in] USHORT HostPort);
+}
+
+[
+    uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
+    pointer_default(unique),
+    object
+]
+interface IWSLASession : IUnknown
+{
+    // Image management.
+    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique, optional] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
+    HRESULT DeleteImage([in] LPCWSTR Image);
+
+    // Container management.
+    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container, [in, out, unique, optional] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT OpenContainer([in] LPCSTR Name, [out] IWSLAContainer** Container);
+    HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
+
+    // Create a process at the VM level. This is meant for debugging.
+    HRESULT CreateRootNamespaceProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+
+    // TODO: an OpenProcess() method can be added later if needed.
+
+    // Disk management.
+    HRESULT FormatVirtualDisk([in] LPCWSTR Path);
+
+    // Terminate the VM and containers.
+    HRESULT Terminate();
+
+    // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
+    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
+    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
+    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+    HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+}
+
+struct WSLA_SESSION_INFORMATION
+{
+    ULONG SessionId;
+    DWORD CreatorPid;
+    wchar_t DisplayName[256];
+};
+
+typedef enum _WSLASessionFlags
+{
+    WSLASessionFlagsNone = 0,
+    WSLASessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
+    WSLASessionFlagsOpenExisting = 2 // Open an existing session if the name is in use.
+} WSLASessionFlags;
+
+[
+    uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),
+    pointer_default(unique),
+    object
+]
+interface IWSLAUserSession : IUnknown
+{
+    HRESULT GetVersion([out] WSLA_VERSION* Version);
+
+    // Session managment.
+    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out]IWSLASession** Session);
+    HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
+    HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
+    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
+
+    // TODO: Do we need 'TerminateSession()' ?
+}
+
+cpp_quote("#define WSLA_E_BASE (0x0600)")
+cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")

@@ -16,6 +16,6 @@
   <files>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\src\windows\inc\WslPluginApi.h" target="build\native\include"/>
     <file src="${CMAKE_SOURCE_DIR_NATIVE}\Images\Square44x44Logo.altform-lightunplated_targetsize-256.png" target="images\icon.png"/>
-    <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\README.WslPluginApi.MD" target="docs\README.MD"/>
+    <file src="${CMAKE_SOURCE_DIR_NATIVE}\nuget\Microsoft.WSL.PluginApi\**"/>
   </files>
 </package>

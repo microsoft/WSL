@@ -29,8 +29,10 @@ wil::unique_hfile wsl::core::filesystem::CreateFile(
 
 void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximumSize, _In_ PSID userSid, _In_ BOOL sparse, _In_ BOOL fixed)
 {
-    WI_ASSERT(wsl::windows::common::string::IsPathComponentEqual(
-        std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
+    THROW_HR_IF(
+        E_INVALIDARG,
+        !wsl::windows::common::string::IsPathComponentEqual(
+            std::filesystem::path{target}.extension().native(), windows::common::wslutil::c_vhdxFileExtension));
 
     // Disable creation of sparse VHDs while data corruption is being debugged.
     if (sparse)
@@ -65,8 +67,10 @@ void wsl::core::filesystem::CreateVhd(_In_ LPCWSTR target, _In_ ULONGLONG maximu
     //      to the VHD because the operation is done while impersonating the user.
     auto sd = windows::common::security::CreateSecurityDescriptor(userSid);
     wil::unique_hfile vhd{};
-    THROW_IF_WIN32_ERROR(
-        ::CreateVirtualDisk(&storageType, target, VIRTUAL_DISK_ACCESS_NONE, &sd, flags, 0, &createVhdParameters, nullptr, &vhd));
+    THROW_IF_WIN32_ERROR_MSG(
+        ::CreateVirtualDisk(&storageType, target, VIRTUAL_DISK_ACCESS_NONE, &sd, flags, 0, &createVhdParameters, nullptr, &vhd),
+        "Path: %ls",
+        target);
 }
 
 wil::unique_handle wsl::core::filesystem::OpenVhd(_In_ LPCWSTR Path, _In_ VIRTUAL_DISK_ACCESS_MASK Mask)

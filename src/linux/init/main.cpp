@@ -1624,11 +1624,12 @@ Return Value:
     }
 
     // Initialize logging to the hvc console device responsible for logging telemetry.
+    // If the device is not present, error messages will be logged to kmesg.
     if (UtilIsUtilityVm())
     {
         devicePath = DEVFS_PATH "/" LX_INIT_HVC_TELEMETRY;
         g_TelemetryFd = TEMP_FAILURE_RETRY(open(devicePath, (O_WRONLY | O_CLOEXEC)));
-        if (g_TelemetryFd < 0)
+        if (g_TelemetryFd < 0 && errno != ENODEV)
         {
             LOG_ERROR("open({}) failed {}", devicePath, errno);
         }
@@ -3862,6 +3863,8 @@ Return Value:
 
 int WslEntryPoint(int Argc, char* Argv[]);
 
+extern int WSLAEntryPoint(int Argc, char* Argv[]);
+
 void EnableDebugMode(const std::string& Mode)
 {
     if (Mode == "hvsocket")
@@ -3936,6 +3939,16 @@ int main(int Argc, char* Argv[])
     //
     // Determine which entrypoint should be used.
     //
+
+    if (getenv(WSLA_ROOT_INIT_ENV))
+    {
+        if (unsetenv(WSLA_ROOT_INIT_ENV))
+        {
+            LOG_ERROR("unsetenv failed {}", errno);
+        }
+
+        return WSLAEntryPoint(Argc, Argv);
+    }
 
     if (getpid() != 1 || !getenv(WSL_ROOT_INIT_ENV))
     {

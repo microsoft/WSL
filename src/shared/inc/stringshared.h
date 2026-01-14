@@ -160,6 +160,33 @@ inline const char* FromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
     return String.data();
 }
 
+template <typename T>
+inline const char* FromMessageBuffer(const gsl::span<gsl::byte>& Span)
+{
+    return FromSpan(Span, offsetof(T, Buffer));
+}
+
+inline std::vector<const char*> ArrayFromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
+{
+    THROW_INVALID_ARG_IF(Span.size() < Offset);
+
+    Span = Span.subspan(Offset);
+
+    auto StringSpan = gsl::make_span<char>(reinterpret_cast<char*>(Span.data()), Span.size());
+
+    std::vector<const char*> Result;
+
+    auto it = StringSpan.begin();
+
+    while (*it != '\0')
+    {
+        Result.push_back(&*it);
+        it += strlen(&*it) + 1;
+    }
+
+    return Result;
+}
+
 constexpr auto c_defaultHostName = "localhost";
 
 inline std::string CleanHostname(const std::string_view Hostname)

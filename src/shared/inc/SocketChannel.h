@@ -58,6 +58,8 @@ public:
     {
         m_name = std::move(other.m_name);
         m_socket = std::move(other.m_socket);
+        m_received_messages = other.m_received_messages;
+        m_sent_messages = other.m_sent_messages;
 
 #ifdef WIN32
         m_exitEvent = std::move(other.m_exitEvent);
@@ -67,15 +69,14 @@ public:
         return *this;
     }
 
-    // Note: 'name' must be a global string, since SocketChannel doesn't make a copy of it.
-    SocketChannel(TSocket&& socket, const char* name) : m_socket(std::move(socket)), m_name(name)
+    SocketChannel(TSocket&& socket, std::string&& name) : m_socket(std::move(socket)), m_name(std::move(name))
     {
     }
 
 #ifdef WIN32
 
-    SocketChannel(TSocket&& socket, const char* name, HANDLE exitEvent) :
-        m_socket(std::move(socket)), m_exitEvent(exitEvent), m_name(name)
+    SocketChannel(TSocket&& socket, std::string&& name, HANDLE exitEvent) :
+        m_socket(std::move(socket)), m_exitEvent(exitEvent), m_name(std::move(name))
     {
     }
 
@@ -91,7 +92,7 @@ public:
 
 #ifdef WIN32
 
-            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs, message type: %hs", m_name, ToString(TMessage::Type));
+            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs, message type: %hs", m_name.c_str(), ToString(TMessage::Type));
 
 #else
 
@@ -101,7 +102,7 @@ public:
 #endif
         }
 
-        THROW_INVALID_ARG_IF(m_name == nullptr || span.size() < sizeof(TMessage));
+        THROW_INVALID_ARG_IF(m_name.empty() || span.size() < sizeof(TMessage));
 
         m_sent_messages++;
 
@@ -116,7 +117,7 @@ public:
 
         WSL_LOG(
             "SentMessage",
-            TraceLoggingValue(m_name, "Name"),
+            TraceLoggingValue(m_name.c_str(), "Name"),
             TraceLoggingValue(reinterpret_cast<const TMessage*>(span.data())->PrettyPrint().c_str(), "Content"),
             TraceLoggingValue(sentBytes, "SentBytes"));
 
@@ -150,6 +151,13 @@ public:
     }
 
     template <typename TMessage>
+    void SendMessage()
+    {
+        TMessage message;
+        SendMessage(message);
+    }
+
+    template <typename TMessage>
     void SendMessage(TMessage& message)
     {
         // Catch situations where the other SendMessage() method should be used
@@ -157,7 +165,7 @@ public:
         if (header.MessageSize != sizeof(message))
         {
 #ifdef WIN32
-            THROW_HR_MSG(E_INVALIDARG, "Incorrect header size for message type: %u on channel: %hs", header.MessageType, m_name);
+            THROW_HR_MSG(E_INVALIDARG, "Incorrect header size for message type: %u on channel: %hs", header.MessageType, m_name.c_str());
 #else
             LOG_ERROR("Incorrect header size for message type: {} on channel: {}", header.MessageType, m_name);
             THROW_ERRNO(EINVAL);
@@ -181,7 +189,7 @@ public:
     template <typename TMessage>
     std::pair<TMessage*, gsl::span<gsl::byte>> ReceiveMessageOrClosed(TTimeout timeout = DefaultSocketTimeout)
     {
-        WI_ASSERT(m_name != nullptr);
+        WI_ASSERT(!m_name.empty());
 
         // Ensure that no other thread is using this channel.
         const std::unique_lock<std::mutex> lock{m_receiveMutex, std::try_to_lock};
@@ -190,7 +198,7 @@ public:
 
 #ifdef WIN32
 
-            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs", m_name);
+            THROW_HR_MSG(E_UNEXPECTED, "Incorrect channel usage detected on channel: %hs", m_name.c_str());
 #else
 
             LOG_ERROR("Incorrect channel usage detected on channel: {}", m_name);
@@ -208,7 +216,12 @@ public:
 #ifdef WIN32
             if (errno == HCS_E_CONNECTION_TIMEOUT)
             {
-                THROW_HR_MSG(HCS_E_CONNECTION_TIMEOUT, "Timeout: %d, expected type: %hs, channel: %hs", timeout, ToString(TMessage::Type), m_name);
+                THROW_HR_MSG(
+                    HCS_E_CONNECTION_TIMEOUT,
+                    "Timeout: %d, expected type: %hs, channel: %hs",
+                    timeout,
+                    ToString(TMessage::Type),
+                    m_name.c_str());
             }
 #endif
 
@@ -221,7 +234,11 @@ public:
         {
 #ifdef WIN32
             THROW_HR_MSG(
-                E_UNEXPECTED, "Message size is too small: %zd, expected type: %hs, channel: %hs", receivedSpan.size(), ToString(TMessage::Type), m_name);
+                E_UNEXPECTED,
+                "Message size is too small: %zd, expected type: %hs, channel: %hs",
+                receivedSpan.size(),
+                ToString(TMessage::Type),
+                m_name.c_str());
 #else
             LOG_ERROR("MessageSize is too small: {}, expected type: {}, channel: {}", receivedSpan.size(), ToString(TMessage::Type), m_name);
             THROW_ERRNO(EINVAL);
@@ -232,7 +249,9 @@ public:
 
 #ifdef WIN32
         WSL_LOG(
-            "ReceivedMessage", TraceLoggingValue(m_name, "Name"), TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
+            "ReceivedMessage",
+            TraceLoggingValue(m_name.c_str(), "Name"),
+            TraceLoggingValue(message->PrettyPrint().c_str(), "Content"));
 #else
         if (LoggingEnabled())
         {
@@ -249,7 +268,7 @@ public:
         if (message == nullptr)
         {
 #ifdef WIN32
-            THROW_HR_MSG(E_UNEXPECTED, "Expected message %hs, but socket %hs was closed", ToString(TMessage::Type), m_name);
+            THROW_HR_MSG(E_UNEXPECTED, "Expected message %hs, but socket %hs was closed", ToString(TMessage::Type), m_name.c_str());
 #else
             LOG_ERROR("ExpectedMessage {}, but socket {} was closed", ToString(TMessage::Type), m_name);
             THROW_ERRNO(EINVAL);
@@ -280,6 +299,15 @@ public:
         return Transaction<TSentMessage>(gslhelpers::struct_as_writeable_bytes(message), responseSpan, timeout);
     }
 
+    template <typename TSentMessage>
+    TSentMessage::TResponse& Transaction()
+    {
+        TSentMessage message{};
+        message.Header.MessageSize = sizeof(message);
+        message.Header.MessageType = TSentMessage::Type;
+        return Transaction<TSentMessage>(message);
+    }
+
     void Close()
     {
         m_socket.reset();
@@ -288,6 +316,16 @@ public:
     auto Socket() const
     {
         return m_socket.get();
+    }
+
+    auto Release()
+    {
+        return std::move(m_socket);
+    }
+
+    bool Connected() const
+    {
+        return m_socket.get() >= 0;
     }
 
     void IgnoreSequenceNumbers()
@@ -337,12 +375,12 @@ private:
                 header.SequenceNumber,
                 expected,
                 expectedSequence,
-                m_name);
+                m_name.c_str());
 #else
 
             LOG_ERROR(
                 "Protocol error: Received message size: {}, type: {}, sequence: {}. Expected type: {}, expected sequence: {}, "
-                "channel: %s",
+                "channel: {}",
                 header.MessageSize,
                 header.MessageType,
                 header.SequenceNumber,
@@ -395,7 +433,7 @@ private:
     uint32_t m_sent_messages = 0;
     uint32_t m_received_messages = 0;
     bool m_ignore_sequence = false;
-    const char* m_name{};
+    std::string m_name{};
     std::mutex m_sendMutex;
     std::mutex m_receiveMutex;
 };

@@ -117,7 +117,7 @@ private:
     wil::unique_fd m_InteropSocket;
 };
 
-int UtilAcceptVsock(int SocketFd, sockaddr_vm Address, int Timeout = -1);
+int UtilAcceptVsock(int SocketFd, sockaddr_vm Address, int Timeout = -1, int SocketFlags = SOCK_CLOEXEC);
 
 int UtilBindVsockAnyPort(struct sockaddr_vm* SocketAddress, int Type);
 
@@ -246,6 +246,8 @@ int UtilListenVsockAnyPort(struct sockaddr_vm* Address, int Backlog, bool CloseO
 int UtilMkdir(const char* Path, mode_t Mode);
 
 int UtilMkdirPath(const char* Path, mode_t Mode, bool SkipLast = false);
+
+int UtilMountFile(const char* Source, const char* Destination);
 
 int UtilMount(const char* Source, const char* Target, const char* Type, unsigned long MountFlags, const char* Options, std::optional<std::chrono::seconds> TimeoutSeconds = {});
 

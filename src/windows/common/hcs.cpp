@@ -42,6 +42,17 @@ void wsl::windows::common::hcs::AddPlan9Share(
     ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str(), UserToken);
 }
 
+void wsl::windows::common::hcs::RemovePlan9Share(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR AccessName, _In_ UINT32 Port)
+{
+    ModifySettingRequest<Plan9Share> request{};
+    request.RequestType = ModifyRequestType::Remove;
+    request.ResourcePath = L"VirtualMachine/Devices/Plan9/Shares";
+    request.Settings.AccessName = AccessName;
+    request.Settings.Port = Port;
+
+    ModifyComputeSystem(ComputeSystem, wsl::shared::ToJsonW(request).c_str());
+}
+
 void wsl::windows::common::hcs::AddVhd(_In_ HCS_SYSTEM ComputeSystem, _In_ PCWSTR VhdPath, _In_ ULONG Lun, _In_ bool ReadOnly)
 {
     ModifySettingRequest<Attachment> request{};
@@ -251,7 +262,7 @@ void wsl::windows::common::hcs::RevokeVmAccess(_In_ PCWSTR VmId, _In_ PCWSTR Fil
 {
     WSL_LOG_DEBUG("HcsRevokeVmAccess", TraceLoggingValue(VmId, "vmId"), TraceLoggingValue(FilePath, "filePath"));
 
-    ExecutionContext context(Context::HNS);
+    ExecutionContext context(Context::HCS);
 
     THROW_IF_FAILED_MSG(::HcsRevokeVmAccess(VmId, FilePath), "HcsRevokeVmAccess(%ls, %ls)", VmId, FilePath);
 }

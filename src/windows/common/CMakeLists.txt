@@ -7,6 +7,7 @@ set(SOURCES
     Dmesg.cpp
     DnsResolver.cpp
     DnsTunnelingChannel.cpp
+    ExecutionContext.cpp
     filesystem.cpp
     GnsChannel.cpp
     GnsPortTrackerChannel.cpp
@@ -14,10 +15,8 @@ set(SOURCES
     HandleConsoleProgressBar.cpp
     hcs.cpp
     helpers.cpp
-    interop.cpp
-    ExecutionContext.cpp
-    socket.cpp
     hvsocket.cpp
+    interop.cpp
     Localization.cpp
     lxssbusclient.cpp
     lxssclient.cpp
@@ -25,14 +24,19 @@ set(SOURCES
     LxssSecurity.cpp
     LxssServerPort.cpp
     NatNetworking.cpp
+    notifications.cpp
     Redirector.cpp
     registry.cpp
     relay.cpp
     RingBuffer.cpp
+    socket.cpp
     string.cpp
     SubProcess.cpp
     svccomm.cpp
     svccommio.cpp
+    WSLAContainerLauncher.cpp
+    VirtioNetworking.cpp
+    WSLAProcessLauncher.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -43,26 +47,12 @@ set(SOURCES
     WslInstall.cpp
     WslSecurity.cpp
     WslTelemetry.cpp
-    VirtioNetworking.cpp
     wslutil.cpp
-    notifications.cpp)
+    )
 
 set(HEADERS
     ../../../generated/Localization.h
-    ../../shared/inc/CommandLine.h
-    ../../shared/inc/defs.h
-    ../../shared/inc/lxfsshares.h
-    ../../shared/inc/lxinitshared.h
-    ../../shared/inc/SocketChannel.h
-    ../../shared/inc/socketshared.h
-    ../../shared/inc/hns_schema.h
-    ../../shared/inc/JsonUtils.h
-    ../../shared/inc/stringshared.h
-    ../../shared/inc/retryshared.h
-    ../../shared/inc/message.h
-    ../../shared/inc/prettyprintshared.h
-    ../inc/WslPluginApi.h
-    ../inc/wslpolicies.h
+    ../inc/docker_schema.h
     ../inc/lxssbusclient.h
     ../inc/lxssclient.h
     ../inc/LxssDynamicFunction.h
@@ -71,7 +61,21 @@ set(HEADERS
     ../inc/wsl.h
     ../inc/wslconfig.h
     ../inc/wslhost.h
+    ../inc/wslpolicies.h
+    ../inc/WslPluginApi.h
     ../inc/wslrelay.h
+    ../../shared/inc/CommandLine.h
+    ../../shared/inc/defs.h
+    ../../shared/inc/hns_schema.h
+    ../../shared/inc/JsonUtils.h
+    ../../shared/inc/lxfsshares.h
+    ../../shared/inc/lxinitshared.h
+    ../../shared/inc/message.h
+    ../../shared/inc/prettyprintshared.h
+    ../../shared/inc/retryshared.h
+    ../../shared/inc/SocketChannel.h
+    ../../shared/inc/socketshared.h
+    ../../shared/inc/stringshared.h
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
     DeviceHostProxy.h
@@ -80,6 +84,7 @@ set(HEADERS
     Dmesg.h
     DnsResolver.h
     DnsTunnelingChannel.h
+    ExecutionContext.h
     filesystem.hpp
     GnsChannel.h
     GnsPortTrackerChannel.h
@@ -88,26 +93,29 @@ set(HEADERS
     hcs.hpp
     hcs_schema.h
     helpers.hpp
-    interop.hpp
-    ExecutionContext.h
-    socket.hpp
     hvsocket.hpp
     INetworkingEngine.h
+    interop.hpp
     LxssMessagePort.h
     LxssPort.h
     LxssSecurity.h
     LxssServerPort.h
     NatNetworking.h
+    notifications.h
     precomp.h
     Redirector.h
     registry.hpp
     relay.hpp
     RingBuffer.h
+    socket.hpp
     string.hpp
     Stringify.h
     SubProcess.h
     svccomm.hpp
     svccommio.hpp
+    WSLAContainerLauncher.h
+    VirtioNetworking.h
+    WSLAProcessLauncher.h
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h
@@ -119,12 +127,12 @@ set(HEADERS
     WslInstall.h
     WslSecurity.h
     WslTelemetry.h
-    VirtioNetworking.h
     wslutil.h
-    notifications.h)
+    )
 
+include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
 add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl)
+add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl wslaserviceproxystub)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)

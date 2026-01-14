@@ -65,6 +65,7 @@ std::optional<std::wstring> g_dumpToolPath;
 static bool g_enableWerReport = false;
 static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
+std::wstring g_testDataPath;
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -1316,6 +1317,17 @@ void StopWslService()
     StopService(service.get());
 }
 
+void StopWslaService()
+{
+    LogInfo("Stopping WSLAService");
+    const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+    VERIFY_IS_NOT_NULL(manager);
+
+    const wil::unique_schandle service{OpenService(manager.get(), L"wslaservice", SERVICE_STOP | SERVICE_QUERY_STATUS)};
+    VERIFY_IS_NOT_NULL(service);
+    StopService(service.get());
+}
+
 wil::unique_handle GetNonElevatedToken()
 {
     const auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
@@ -1363,14 +1375,24 @@ WslConfigChange::~WslConfigChange()
     }
 }
 
+std::wstring ReadFileContent(const std::string& Path)
+{
+    std::ifstream configRead(Path);
+    return std::wstring{std::istreambuf_iterator<char>(configRead), {}};
+}
+
+std::wstring ReadFileContent(const std::wstring& Path)
+{
+    std::wifstream configRead(Path);
+    return std::wstring{std::istreambuf_iterator<wchar_t>(configRead), {}};
+}
+
 // writes global WSL 2 config settings at %userprofile%/.wslconfig
 std::wstring LxssWriteWslConfig(const std::wstring& Content)
 {
     auto path = getenv("userprofile") + std::string("\\.wslconfig");
 
-    std::wifstream configRead(path);
-    auto previousContent = std::wstring{std::istreambuf_iterator<wchar_t>(configRead), {}};
-    configRead.close();
+    auto previousContent = ReadFileContent(path);
 
     std::wofstream config(path);
     VERIFY_IS_TRUE(config.good());
@@ -1943,6 +1965,8 @@ Return Value:
 --*/
 
 {
+    wsl::windows::common::wslutil::InitializeWil();
+
 // Don't crash for unknown exceptions (makes debugging testpasses harder)
 #ifndef _DEBUG
     wil::g_fResultFailFastUnknownExceptions = false;
@@ -2040,6 +2064,8 @@ Return Value:
     }
 
     g_testDistroPath = getTestParam(L"DistroPath");
+
+    g_testDataPath = getTestParam(L"TestDataPath");
 
     const auto setupScript = getOptionalTestParam(L"SetupScript");
     if (!setupScript.has_value())
@@ -2531,4 +2557,65 @@ void DistroFileChange::SetContent(LPCWSTR Content)
 void DistroFileChange::Delete()
 {
     VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root rm -f '{}'", m_path).c_str()), 0L);
+}
+
+std::string ReadToString(SOCKET Handle)
+{
+    std::string output;
+    DWORD offset = 0;
+    while (true) // TODO: timeout
+    {
+        constexpr auto bufferSize = 512;
+
+        output.resize(output.size() + bufferSize);
+        int bytesRead = 0;
+
+        if ((bytesRead = recv(Handle, &output[offset], bufferSize, 0)) < 0)
+        {
+            LogError("recv failed with %lu", GetLastError());
+            VERIFY_FAIL();
+        }
+
+        if (bytesRead == 0)
+        {
+            output.resize(offset);
+            break;
+        }
+
+        output.resize(offset + bytesRead);
+        offset += bytesRead;
+    }
+
+    return output;
+}
+
+std::string EscapeString(const std::string& Input)
+{
+    std::string Output;
+
+    for (auto e : Input)
+    {
+        if (e == '\n')
+        {
+            Output += "\\n";
+        }
+        else if (e == '\r')
+        {
+            Output += "\\r";
+        }
+        else if (e == '\0')
+        {
+            Output += "\\0";
+        }
+        else if (e == '\t')
+        {
+            Output += "\\t";
+        }
+        else
+        {
+            Output += e;
+        }
+    }
+
+    return Output;
 }

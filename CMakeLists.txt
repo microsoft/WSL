@@ -40,6 +40,19 @@ FetchContent_Declare(nlohmannjson
 FetchContent_MakeAvailable(nlohmannjson)
 FetchContent_GetProperties(nlohmannjson SOURCE_DIR NLOHMAN_JSON_SOURCE_DIR)
 
+set(BOOST_VERSION "1.90.0")
+set(BOOST_TARBALL "boost_${BOOST_VERSION}")
+string(REPLACE "." "_" BOOST_TARBALL "${BOOST_TARBALL}")
+
+FetchContent_Declare(
+  boost_headers
+  URL https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_TARBALL}.tar.gz
+  URL_HASH SHA256=5e93d582aff26868d581a52ae78c7d8edf3f3064742c6e77901a1f18a437eea9
+)
+
+FetchContent_MakeAvailable(boost_headers)
+
+
 # Import modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(IDL REQUIRED)
@@ -65,6 +78,8 @@ find_nuget_package(Microsoft.WSL.Kernel KERNEL /build/native)
 find_nuget_package(Microsoft.WSL.bsdtar BSDTARD /build/native/bin)
 find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
+find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /build/native/bin/${TARGET_PLATFORM})
+find_nuget_package(Microsoft.WSL.WslaRootfs WSLA_TEST_DISTRO /build/native/bin/${TARGET_PLATFORM})
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
 find_nuget_package(StrawberryPerl PERL /)
 find_nuget_package(vswhere VSWHERE /tools)
@@ -138,6 +153,7 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -372,10 +388,15 @@ if (DEFINED WSL_DEV_BINARY_PATH) # Development shortcut to make the package smal
                             WSL_KERNEL_MODULES_PATH="${WSL_DEV_BINARY_PATH}/modules.vhd"
                             WSL_DEV_INSTALL_PATH="${WSL_DEV_BINARY_PATH}"
                             WSL_GPU_LIB_PATH="${WSL_DEV_BINARY_PATH}/lib")
+
+    if (NOT OFFICIAL_BUILD AND ${TARGET_PLATFORM} STREQUAL "x64")
+        add_compile_definitions(WSLA_TEST_DISTRO_PATH="${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd")
+    endif()
 endif()
 
 # Common include paths
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wil/include)
+include_directories(${boost_headers_SOURCE_DIR})
 include_directories(${WSLDEPS_SOURCE_DIR}/include)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/Windows)
 include_directories(${WSLDEPS_SOURCE_DIR}/include/schemas)
@@ -383,6 +404,7 @@ include_directories(${WSLDEPS_SOURCE_DIR}/include/lxcore)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/inc)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslaservice/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/linux/init/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common)
@@ -408,6 +430,7 @@ add_subdirectory(msipackage)
 add_subdirectory(msixinstaller)
 add_subdirectory(src/windows/common)
 add_subdirectory(src/windows/service)
+add_subdirectory(src/windows/wslaservice)
 add_subdirectory(src/windows/wslinstaller/inc)
 add_subdirectory(src/windows/wslinstaller/stub)
 add_subdirectory(src/windows/wslinstaller/exe)
@@ -417,6 +440,8 @@ add_subdirectory(src/windows/wslg)
 add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
+add_subdirectory(src/windows/wslaclient)
+add_subdirectory(src/windows/wsladiag)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

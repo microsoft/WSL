@@ -24,7 +24,16 @@ Abstract:
 #include <gslhelpers.h>
 #include "registry.hpp"
 #include "versionhelpers.h"
+#include "hcs.hpp"
 #include <regstr.h>
+
+// Version numbers for various functionality that was backported.
+
+#define VIRTIO_SERIAL_CONSOLE_COBALT_RELEASE_UBR 40
+#define NICKEL_BUILD_FLOOR 22350
+#define VMEMM_SUFFIX_COBALT_REFRESH_BUILD_NUMBER 22138
+#define VMMEM_SUFFIX_COBALT_RELEASE_UBR 71
+#define VMMEM_SUFFIX_NICKEL_BUILD_NUMBER 22420
 
 using wsl::windows::common::helpers::LaunchWslRelayFlags;
 
@@ -452,6 +461,14 @@ std::filesystem::path wsl::windows::common::helpers::GetWslConfigPath(_In_opt_ H
     return wsl::windows::common::helpers::GetUserProfilePath(userToken) / L".wslconfig";
 }
 
+bool wsl::windows::common::helpers::IsDisableVgpuSettingsSupported()
+{
+    static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
+
+    // See if the Windows version has the required platform change.
+    return ((wsl::windows::common::hcs::GetSchemaVersion() >= c_schemaVersionNickel) && (GetWindowsVersion().BuildNumber >= 22545));
+}
+
 bool wsl::windows::common::helpers::IsPackageInstalled(_In_ LPCWSTR PackageFamilyName)
 {
     UINT32 packageCount = 0;
@@ -470,6 +487,29 @@ bool wsl::windows::common::helpers::IsServicePresent(_In_ LPCWSTR ServiceName)
 
     const wil::unique_schandle service{OpenService(manager.get(), ServiceName, SERVICE_QUERY_CONFIG)};
     return !!service;
+}
+
+bool wsl::windows::common::helpers::IsVirtioSerialConsoleSupported()
+{
+    // See if the Windows version has the required platform change.
+    //
+    // N.B. If the package is running on a vibranium or iron build, then it means that lifted
+    //      support is available, so virtio serial is available as well (since it was done in the same LCU).
+
+    auto windowsVersion = GetWindowsVersion();
+    return windowsVersion.BuildNumber != WindowsBuildNumbers::Cobalt ||
+           windowsVersion.UpdateBuildRevision >= VIRTIO_SERIAL_CONSOLE_COBALT_RELEASE_UBR;
+}
+
+bool wsl::windows::common::helpers::IsVmemmSuffixSupported()
+{
+    auto windowsVersion = GetWindowsVersion();
+
+    // See if the Windows version has the required platform change.
+    return (
+        (windowsVersion.BuildNumber >= VMMEM_SUFFIX_NICKEL_BUILD_NUMBER) ||
+        ((windowsVersion.BuildNumber < NICKEL_BUILD_FLOOR) && (windowsVersion.BuildNumber >= VMEMM_SUFFIX_COBALT_REFRESH_BUILD_NUMBER)) ||
+        ((windowsVersion.BuildNumber == WindowsBuildNumbers::Cobalt) && (windowsVersion.UpdateBuildRevision >= VMMEM_SUFFIX_COBALT_RELEASE_UBR)));
 }
 
 bool wsl::windows::common::helpers::IsWindows11OrAbove()

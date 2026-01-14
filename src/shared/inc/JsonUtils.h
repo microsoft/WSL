@@ -62,6 +62,7 @@ T FromJson(const char* Value)
 
 #ifdef WIN32
 
+        WSL_LOG("InvalidJson", TraceLoggingValue(Value, "JsonValue"), TraceLoggingValue(e.what(), "Error"));
         THROW_HR_WITH_USER_ERROR(WSL_E_INVALID_JSON, wsl::shared::Localization::MessageInvalidJson(e.what()));
 
 #else

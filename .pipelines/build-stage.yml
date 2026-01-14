@@ -7,6 +7,10 @@ parameters:
     type: string
     default: ""
 
+  - name: nugetSuffix
+    type: string
+    default: ""
+
   - name: isNightly
     type: boolean
     default: false
@@ -15,6 +19,7 @@ parameters:
     type: object
     default:
       - Microsoft.WSL.PluginApi.nuspec
+      - Microsoft.WSL.Api.nuspec
 
   - name: traceLoggingConfig
     type: string
@@ -23,8 +28,8 @@ parameters:
   - name: targets
     type: object
     default:
-      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll"
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;initramfs;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslaclient;wsltests"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslaclient.dll"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage"
@@ -164,7 +169,7 @@ stages:
               ${{ else }}:
                 script: |
                   Write-Host "##vso[task.setvariable variable=WSL_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}' + '.0'))"
-                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}'))"
+                  Write-Host "##vso[task.setvariable variable=WSL_NUGET_PACKAGE_VERSION;isOutput=true]$([string]('${{ parameters.packageVersion }}${{ parameters.nugetSuffix }}'))"
 
           - ${{ each platform in parameters.platforms }}:
               - task: CMake@1
@@ -388,6 +393,7 @@ stages:
 
                 Move-Item -Path "bin\$arch\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\wsltests.dll"
                 Move-Item -Path "bin\$arch\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\testplugin.dll"
+                Move-Item -Path "bin\$arch\release\wslaclient.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\wslaclient.dll"
                 Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\$arch" -Destination "$(ob_outputDirectory)\testbin\$arch\release\taef"
               }
 
@@ -400,6 +406,9 @@ stages:
               Move-Item -Path bundle\release\* -Destination $(ob_outputDirectory)\bundle
               $TestDistroVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestDistro'']/@version').Node.Value
               Copy-Item "packages\Microsoft.WSL.TestDistro.$TestDistroVersion\test_distro.tar.xz" "$(ob_outputDirectory)\testbin\x64"
+
+              $TestDataVersion = (Select-Xml -Path packages.config -XPath '/packages/package[@id=''Microsoft.WSL.TestData'']/@version').Node.Value
+              Copy-Item "packages\Microsoft.WSL.TestData.$TestDataVersion\build\native\bin\x64" "$(ob_outputDirectory)\testbin\x64\test_data" -Recurse -Force
 
             displayName: Move artifacts to drop directory
 

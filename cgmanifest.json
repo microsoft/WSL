@@ -30,6 +30,17 @@
                     "hash": "sha1:918692098b11db61aff23684ab04f375e4a68f69"
                 }
             }
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "boost",
+                    "version": "1.90.0",
+                    "downloadUrl": "https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz",
+                    "hash": "sha1:44500f8d6b279ec314a4cdce1290ddc30f530ed7"
+                }
+            }
         }
     ]
 }

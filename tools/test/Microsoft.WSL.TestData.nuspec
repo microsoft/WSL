@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/10/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.WSL.TestData</id>
+    <version>$version$</version>
+    <authors>Microsoft</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://github.com/microsoft/WSL</projectUrl>
+    <description>WSL Test Data Files</description>
+  </metadata>
+  <files>
+    <file src="**\*.*" target="" />
+  </files>
+</package>
