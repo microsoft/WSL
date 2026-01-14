@@ -18,13 +18,12 @@ Abstract:
 #include "WSLASessionManager.h"
 
 using wsl::windows::service::wsla::WSLASessionManagerFactory;
-using wsl::windows::service::wsla::WSLAUserSessionImpl;
+using wsl::windows::service::wsla::WSLASessionManager;
 
 CoCreatableClassWithFactory(IWSLASessionManager, WSLASessionManagerFactory);
 
 static std::mutex g_mutex;
-static std::optional<std::vector<std::shared_ptr<WSLAUserSessionImpl>>> g_sessions =
-    std::make_optional<std::vector<std::shared_ptr<WSLAUserSessionImpl>>>();
+static std::optional<std::shared_ptr<WSLASessionManager>> g_sessionManager = std::make_shared<WSLASessionManager>();
 
 HRESULT WSLASessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
 {
@@ -37,31 +36,9 @@ HRESULT WSLASessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_
 
     try
     {
-        const wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-
-        // Get the session ID and SID of the client process.
-        DWORD sessionId{};
-        DWORD length = 0;
-        THROW_IF_WIN32_BOOL_FALSE(::GetTokenInformation(userToken.get(), TokenSessionId, &sessionId, sizeof(sessionId), &length));
-
-        auto tokenInfo = wil::get_token_information<TOKEN_USER>(userToken.get());
-
         std::lock_guard lock{g_mutex};
 
-        THROW_HR_IF(CO_E_SERVER_STOPPING, !g_sessions.has_value());
-
-        auto session = std::find_if(g_sessions->begin(), g_sessions->end(), [&tokenInfo](auto it) {
-            return EqualSid(it->GetUserSid(), tokenInfo->User.Sid);
-        });
-
-        if (session == g_sessions->end())
-        {
-            wil::unique_hlocal_string sid;
-            THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSid(tokenInfo->User.Sid, &sid));
-            WSL_LOG("WSLAUserSession created", TraceLoggingValue(sid.get(), "sid"));
-
-            session = g_sessions->insert(g_sessions->end(), std::make_shared<WSLAUserSessionImpl>(userToken.get(), std::move(tokenInfo)));
-        }
+        THROW_HR_IF(CO_E_SERVER_STOPPING, !g_sessionManager.has_value());
 
         auto comInstance = wil::MakeOrThrow<WSLAUserSession>(std::weak_ptr<WSLAUserSessionImpl>(*session));
 
@@ -83,5 +60,5 @@ HRESULT WSLASessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_
 void wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances()
 {
     std::lock_guard lock{g_mutex};
-    g_sessions.reset();
+    g_sessionManager.reset();
 }
