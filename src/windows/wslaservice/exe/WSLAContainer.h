@@ -71,6 +71,7 @@ public:
     IWSLAContainer& ComWrapper();
 
     const std::string& Image() const noexcept;
+    const std::string& Name() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
     void OnProcessReleased(DockerExecProcessControl* process);

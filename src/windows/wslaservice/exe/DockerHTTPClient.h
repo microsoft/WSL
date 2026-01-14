@@ -37,7 +37,7 @@ public:
     }
 
     template <typename T = docker_schema::ErrorResponse>
-    T DockerMessage()
+    T DockerMessage() const
     {
         return wsl::shared::FromJson<T>(m_response.c_str());
     }
@@ -60,7 +60,6 @@ class DockerHTTPClient
 
 public:
     using OnResponseBytes = std::function<void(gsl::span<char>)>;
-    using OnImageProgress = std::function<void(const std::string&)>;
 
     struct HTTPRequestContext
     {
@@ -80,7 +79,7 @@ public:
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
     // Container management.
-    common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request);
+    common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id);
     void StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
@@ -90,7 +89,7 @@ public:
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
     // Image management.
-    uint32_t PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback);
+    std::unique_ptr<HTTPRequestContext> PullImage(const char* Name, const char* Tag);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);

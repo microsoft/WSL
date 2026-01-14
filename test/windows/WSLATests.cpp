@@ -28,6 +28,7 @@ using wsl::windows::common::WSLAContainerLauncher;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
+using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 
@@ -53,8 +54,8 @@ class WSLATests
         storagePath = std::filesystem::current_path() / "test-storage";
 
         auto session = CreateSession();
-        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr));
-        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr, nullptr));
+        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
         return true;
     }
 
@@ -296,12 +297,28 @@ class WSLATests
 
         auto session = CreateSession(settings);
 
-        VERIFY_SUCCEEDED(session->PullImage("hello-world:latest", nullptr, nullptr));
+        {
+            VERIFY_SUCCEEDED(session->PullImage("hello-world:linux", nullptr, nullptr, nullptr));
 
-        // Verify that the image is in the list of images.
-        ExpectImagePresent(*session, "hello-world:latest");
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*session, "hello-world:linux");
+            WSLAContainerLauncher launcher("hello-world:linux", "wsla-pull-image-container");
 
-        // TODO: Check that the image can actually be used to start a container.
+            auto container = launcher.Launch(*session);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        {
+            std::string expectedError =
+                "pull access denied for does-not, repository does not exist or may require 'docker login'";
+
+            WSLAErrorDetails error;
+            VERIFY_ARE_EQUAL(session->PullImage("does-not:exist", nullptr, nullptr, &error.Error), WSLA_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(expectedError, error.Error.UserErrorMessage);
+        }
     }
 
     // TODO: Test that invalid tars are correctly handled.
@@ -326,7 +343,7 @@ class WSLATests
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*session, "hello-world:latest");
-        WSLAContainerLauncher launcher("hello-world:latest", "wsla-import-image-container");
+        WSLAContainerLauncher launcher("hello-world:latest", "wsla-load-image-container");
 
         auto container = launcher.Launch(*session);
         auto result = container.GetInitProcess().WaitAndCaptureOutput();
@@ -1336,11 +1353,10 @@ class WSLATests
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
         }
 
-        // TODO: Add logic to detect when starting the container fails, and enable this test case.
         {
             WSLAContainerLauncher launcher("invalid-image-name", "dummy", "/bin/cat");
             auto [hresult, container] = launcher.LaunchNoThrow(*session);
-            VERIFY_ARE_EQUAL(hresult, E_FAIL); // TODO: Have a nicer error code when the image is not found.
+            VERIFY_ARE_EQUAL(hresult, WSLA_E_IMAGE_NOT_FOUND);
         }
 
         // Test null image name
@@ -1352,7 +1368,7 @@ class WSLATests
             options.InitProcessOptions.CommandLineCount = 0;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container);
+            auto hr = session->CreateContainer(&options, &container, nullptr);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
@@ -1365,8 +1381,7 @@ class WSLATests
             options.InitProcessOptions.CommandLineCount = 0;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            VERIFY_SUCCEEDED(session->CreateContainer(&options, &container, nullptr));
         }
     }
 

@@ -16,6 +16,7 @@ Abstract:
 #include "wslutil.h"
 #include "WslPluginApi.h"
 #include "wslinstallerservice.h"
+#include "wslaservice.h"
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
@@ -145,7 +146,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_WIN32(ERROR_BAD_PATHNAME),
     X(WININET_E_TIMEOUT),
     X_WIN32(ERROR_INVALID_SID),
-    X_WIN32(ERROR_INVALID_STATE)};
+    X_WIN32(ERROR_INVALID_STATE),
+    X(WSLA_E_IMAGE_NOT_FOUND)};
 
 #undef X
 
@@ -1197,6 +1199,14 @@ void wsl::windows::common::wslutil::InitializeWil()
     }
 }
 
+bool wsl::windows::common::wslutil::IsInteractiveConsole()
+{
+    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode{};
+
+    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
+}
+
 bool wsl::windows::common::wslutil::IsRunningInMsix()
 {
     UINT32 dummy{};
@@ -1590,4 +1600,32 @@ catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
+}
+
+wsl::windows::common::wslutil::WSLAErrorDetails::~WSLAErrorDetails()
+{
+    Reset();
+}
+
+void wsl::windows::common::wslutil::WSLAErrorDetails::Reset()
+{
+    CoTaskMemFree(Error.UserErrorMessage);
+    Error = {};
+}
+
+void wsl::windows::common::wslutil::WSLAErrorDetails::ThrowIfFailed(HRESULT Result)
+{
+    if (SUCCEEDED(Result))
+    {
+        return;
+    }
+
+    if (Error.UserErrorMessage != nullptr)
+    {
+        THROW_HR_WITH_USER_ERROR(Result, Error.UserErrorMessage);
+    }
+    else
+    {
+        THROW_HR(Result);
+    }
 }

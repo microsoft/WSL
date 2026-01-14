@@ -24,11 +24,40 @@ Abstract:
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
+using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::WSLAProcessLauncher;
+using wsl::windows::common::relay::EventHandle;
+using wsl::windows::common::relay::MultiHandleWait;
+using wsl::windows::common::relay::RelayHandle;
+using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-// Report an operation failure with localized context and HRESULT details.
+class ChangeTerminalMode
+{
+public:
+    NON_COPYABLE(ChangeTerminalMode);
+    NON_MOVABLE(ChangeTerminalMode);
+
+    ChangeTerminalMode(HANDLE Console, bool CursorVisible) : m_console(Console)
+    {
+        THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(Console, &m_originalCursorInfo));
+        CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
+        newCursorInfo.bVisible = CursorVisible;
+
+        THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(Console, &newCursorInfo));
+    }
+
+    ~ChangeTerminalMode()
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    }
+
+private:
+    HANDLE m_console{};
+    CONSOLE_CURSOR_INFO m_originalCursorInfo{};
+};
+
 static int ReportError(const std::wstring& context, HRESULT hr)
 {
     auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
@@ -284,7 +313,350 @@ static int RunListCommand(std::wstring_view commandLine)
     return 0;
 }
 
-// Print localized usage message to stderr.
+DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
+
+static wil::com_ptr<IWSLASession> OpenCLISession()
+{
+    wil::com_ptr<IWSLAUserSession> userSession;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+
+    auto dataFolder = std::filesystem::path(wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr)) / "wsla";
+
+    // TODO: Have a configuration file for those.
+    WSLA_SESSION_SETTINGS settings{};
+    settings.DisplayName = L"wsla-cli";
+    settings.CpuCount = 4;
+    settings.MemoryMb = 2024;
+    settings.BootTimeoutMs = 30 * 1000;
+    settings.StoragePath = dataFolder.c_str();
+    settings.MaximumStorageSizeMb = 10000; // 10GB.
+    settings.NetworkingMode = WSLANetworkingModeNAT;
+
+    wil::com_ptr<IWSLASession> session;
+    THROW_IF_FAILED(userSession->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+    return session;
+}
+
+static void PullImpl(IWSLASession& Session, const std::string& Image)
+{
+    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    // Configure console for interactive usage.
+    DWORD OriginalOutputMode{};
+    UINT OriginalOutputCP = GetConsoleOutputCP();
+    THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
+
+    DWORD OutputMode = OriginalOutputMode;
+    WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+    THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
+
+    THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
+
+    // TODO: Handle terminal resizes.
+    class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") Callback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
+    {
+    public:
+        auto MoveToLine(SHORT Line, bool Revert = true)
+        {
+            if (Line > 0)
+            {
+                wprintf(L"\033[%iA", Line);
+            }
+
+            return wil::scope_exit([Line = Line]() {
+                if (Line > 1)
+                {
+                    wprintf(L"\033[%iB", Line - 1);
+                }
+            });
+        }
+
+        HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total) override
+        try
+        {
+            if (Id == nullptr || *Id == '\0') // Print all 'global' statuses on their own line
+            {
+                wprintf(L"%hs\n", Status);
+                m_currentLine++;
+                return S_OK;
+            }
+
+            auto info = Info();
+
+            auto it = m_statuses.find(Id);
+            if (it == m_statuses.end())
+            {
+                // If this is the first time we see this ID, create a new line for it.
+                m_statuses.emplace(Id, m_currentLine);
+                wprintf(L"%ls\n", GenerateStatusLine(Status, Id, Current, Total, info).c_str());
+                m_currentLine++;
+            }
+            else
+            {
+                auto revert = MoveToLine(m_currentLine - it->second);
+                wprintf(L"%ls\n", GenerateStatusLine(Status, Id, Current, Total, info).c_str());
+            }
+
+            return S_OK;
+        }
+        CATCH_RETURN();
+
+    private:
+        static CONSOLE_SCREEN_BUFFER_INFO Info()
+        {
+            CONSOLE_SCREEN_BUFFER_INFO info{};
+            THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
+
+            return info;
+        }
+
+        std::wstring GenerateStatusLine(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total, const CONSOLE_SCREEN_BUFFER_INFO& Info)
+        {
+            std::wstring line;
+            if (Total != 0)
+            {
+                line = std::format(L"{} '{}': {}%", Status, Id, Current * 100 / Total);
+            }
+            else if (Current != 0)
+            {
+                line = std::format(L"{} '{}': {}s", Status, Id, Current);
+            }
+            else
+            {
+                line = std::format(L"{} '{}'", Status, Id);
+            }
+
+            // Erase any previously written char on that line.
+            while (line.size() < Info.dwSize.X)
+            {
+                line += L' ';
+            }
+
+            return line;
+        }
+
+        std::map<std::string, SHORT> m_statuses;
+        SHORT m_currentLine = 0;
+        ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
+    };
+
+    wil::com_ptr<IWSLASession> session = OpenCLISession();
+
+    Callback callback;
+    WSLAErrorDetails error{};
+    auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
+    error.ThrowIfFailed(result);
+}
+
+static int Pull(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
+
+    std::string image;
+    parser.AddPositionalArgument(Utf8String{image}, 0);
+
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, image.empty());
+
+    PullImpl(*OpenCLISession(), image);
+
+    return 0;
+}
+
+static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
+{
+    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
+    auto exitEvent = Process.GetExitEvent();
+
+    if (Tty)
+    {
+        // Save original console modes so they can be restored on exit.
+        DWORD OriginalInputMode{};
+        DWORD OriginalOutputMode{};
+        UINT OriginalOutputCP = GetConsoleOutputCP();
+        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
+        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
+
+        auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            SetConsoleMode(Stdin, OriginalInputMode);
+            SetConsoleMode(Stdout, OriginalOutputMode);
+            SetConsoleOutputCP(OriginalOutputCP);
+        });
+
+        // Configure console for interactive usage.
+        DWORD InputMode = OriginalInputMode;
+        WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
+        WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
+        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
+
+        DWORD OutputMode = OriginalOutputMode;
+        WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
+
+        THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
+
+        auto processTty = Process.GetStdHandle(WSLAFDTty);
+
+        // TODO: Study a single thread for both handles.
+
+        // Create a thread to relay stdin to the pipe.
+        std::thread inputThread([&]() {
+            auto updateTerminal = [&Stdout, &Process, &processTty]() {
+                CONSOLE_SCREEN_BUFFER_INFOEX info{};
+                info.cbSize = sizeof(info);
+
+                THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
+
+                LOG_IF_FAILED(Process.Get().ResizeTty(
+                    info.srWindow.Bottom - info.srWindow.Top + 1, info.srWindow.Right - info.srWindow.Left + 1));
+            };
+
+            wsl::windows::common::relay::StandardInputRelay(Stdin, processTty.get(), updateTerminal, exitEvent.get());
+        });
+
+        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            exitEvent.SetEvent();
+            inputThread.join();
+        });
+
+        // Relay the contents of the pipe to stdout.
+        wsl::windows::common::relay::InterruptableRelay(processTty.get(), Stdout);
+
+        // Wait for the process to exit.
+        THROW_LAST_ERROR_IF(WaitForSingleObject(exitEvent.get(), INFINITE) != WAIT_OBJECT_0);
+    }
+    else
+    {
+        wsl::windows::common::relay::MultiHandleWait io;
+
+        // Create a thread to relay stdin to the pipe.
+
+        std::thread inputThread;
+
+        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            if (inputThread.joinable())
+            {
+                exitEvent.SetEvent();
+                inputThread.join();
+            }
+        });
+
+        // Required because ReadFile() blocks if stdin is a tty.
+        if (wsl::windows::common::wslutil::IsInteractiveConsole())
+        {
+            // TODO: Will output CR instead of LF's which can confuse the linux app.
+            // Consider a custom relay logic to fix this.
+            inputThread = std::thread{
+                [&]() { wsl::windows::common::relay::InterruptableRelay(Stdin, Process.GetStdHandle(0).get(), exitEvent.get()); }};
+        }
+        else
+        {
+            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
+        }
+
+        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(std::make_unique<EventHandle>(exitEvent.get()));
+
+        io.Run({});
+    }
+
+    int exitCode = Process.GetExitCode();
+
+    return exitCode;
+}
+
+static int Run(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, true);
+
+    bool interactive{};
+    bool tty{};
+    std::string image;
+    parser.AddPositionalArgument(Utf8String{image}, 0);
+    parser.AddArgument(interactive, L"--interactive", 'i');
+    parser.AddArgument(tty, L"--tty", 't');
+
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, image.empty());
+
+    auto session = OpenCLISession();
+
+    WSLA_CONTAINER_OPTIONS options{};
+    options.Image = image.c_str();
+
+    std::vector<WSLA_PROCESS_FD> fds;
+    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
+
+    if (tty)
+    {
+        CONSOLE_SCREEN_BUFFER_INFOEX Info{};
+        Info.cbSize = sizeof(Info);
+        THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
+
+        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
+
+        options.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
+        options.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
+    }
+    else
+    {
+        if (interactive)
+        {
+            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
+        }
+
+        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
+        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
+    }
+
+    std::vector<std::string> argsStorage;
+    std::vector<const char*> args;
+    for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
+    {
+        argsStorage.emplace_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
+    }
+
+    for (const auto& e : argsStorage)
+    {
+        args.emplace_back(e.c_str());
+    }
+
+    options.InitProcessOptions.CommandLine = args.data();
+    options.InitProcessOptions.CommandLineCount = static_cast<ULONG>(args.size());
+    options.InitProcessOptions.Fds = fds.data();
+    options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
+
+    wil::com_ptr<IWSLAContainer> container;
+    WSLAErrorDetails error{};
+    auto result = session->CreateContainer(&options, &container, &error.Error);
+    if (result == WSLA_E_IMAGE_NOT_FOUND)
+    {
+        wslutil::PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
+
+        PullImpl(*session.get(), image);
+
+        error.Reset();
+        result = session->CreateContainer(&options, &container, &error.Error);
+    }
+
+    error.ThrowIfFailed(result);
+
+    THROW_IF_FAILED(container->Start()); // TODO: Error message
+
+    wil::com_ptr<IWSLAProcess> process;
+    THROW_IF_FAILED(container->GetInitProcess(&process));
+
+    return InteractiveShell(ClientRunningWSLAProcess(std::move(process), std::move(fds)), tty);
+}
+
 static void PrintUsage()
 {
     wslutil::PrintMessage(Localization::MessageWsladiagUsage(), stderr);
@@ -324,21 +696,30 @@ int wsladiag_main(std::wstring_view commandLine)
         PrintUsage();
         return 0;
     }
-
-    if (verb == L"list")
+    else if (verb == L"list")
     {
         return RunListCommand(commandLine);
     }
-
-    if (verb == L"shell")
+    else if (verb == L"shell")
     {
         return RunShellCommand(commandLine);
     }
+    else if (verb == L"pull")
+    {
+        return Pull(commandLine);
+    }
+    else if (verb == L"run")
+    {
+        return Run(commandLine);
+    }
+    else
+    {
+        wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
+        PrintUsage();
 
-    // Unknown verb - show usage and fail.
-    wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
-    PrintUsage();
-    return 1;
+        // Unknown verb - show usage and fail.
+        return 1;
+    }
 }
 
 int wmain(int, wchar_t**)
@@ -360,15 +741,16 @@ int wmain(int, wchar_t**)
 
     if (FAILED(result))
     {
-        if (auto reported = context.ReportedError())
+        if (const auto& reported = context.ReportedError())
         {
             auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
-            wslutil::PrintMessage(strings.Message.empty() ? strings.Code : strings.Message, stderr);
+            auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
+            wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
         }
         else
         {
             // Fallback for errors without context
-            wslutil::PrintMessage(wslutil::GetErrorString(result), stderr);
+            wslutil::PrintMessage(Localization::MessageErrorCode("", wslutil::ErrorCodeToString(result)), stderr);
         }
     }
 
