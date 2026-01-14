@@ -427,10 +427,22 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::DeleteImage(LPCWSTR Image)
+HRESULT WSLASession::DeleteImage(LPCSTR Image, BOOL Force)
+try
 {
-    return E_NOTIMPL;
+    RETURN_HR_IF_NULL(E_POINTER, Image);
+
+    auto [repo, tag] = ParseImage(Image);
+
+    std::lock_guard lock{m_lock};
+
+    auto deletedImages = m_dockerClient->DeleteImage(Image, !!Force);
+
+    THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Image);
+
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container)
 try
