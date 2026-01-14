@@ -8,31 +8,32 @@ Module Name:
 
 Abstract:
 
-    TODO
+    Contains the implementation for WSLASessionManagerFactory.
 
 --*/
+
 #include "precomp.h"
 
-#include "WSLAUserSessionFactory.h"
-#include "WSLAUserSession.h"
+#include "WSLASessionManagerFactory.h"
+#include "WSLASessionManager.h"
 
-using wsl::windows::service::wsla::WSLAUserSessionFactory;
+using wsl::windows::service::wsla::WSLASessionManagerFactory;
 using wsl::windows::service::wsla::WSLAUserSessionImpl;
 
-CoCreatableClassWithFactory(WSLAUserSession, WSLAUserSessionFactory);
+CoCreatableClassWithFactory(IWSLASessionManager, WSLASessionManagerFactory);
 
 static std::mutex g_mutex;
 static std::optional<std::vector<std::shared_ptr<WSLAUserSessionImpl>>> g_sessions =
     std::make_optional<std::vector<std::shared_ptr<WSLAUserSessionImpl>>>();
 
-HRESULT WSLAUserSessionFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
+HRESULT WSLASessionManagerFactory::CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated)
 {
     RETURN_HR_IF_NULL(E_POINTER, ppCreated);
     *ppCreated = nullptr;
 
     RETURN_HR_IF(CLASS_E_NOAGGREGATION, pUnkOuter != nullptr);
 
-    WSL_LOG("WSLAUserSessionFactory", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
+    WSL_LOG("WSLASessionManagerFactory", TraceLoggingLevel(WINEVENT_LEVEL_VERBOSE));
 
     try
     {

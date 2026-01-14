@@ -10,8 +10,8 @@ set(SOURCES
     WSLAProcessControl.cpp
     WSLAProcessIO.cpp
     WSLASession.cpp
-    WSLAUserSession.cpp
-    WSLAUserSessionFactory.cpp
+    WSLASessionManager.cpp
+    WSLASessionManagerFactory.cpp
     WSLAVirtualMachine.cpp
     )
 
@@ -24,8 +24,8 @@ set(HEADERS
     WSLAProcessControl.h
     WSLAProcessIO.h
     WSLASession.h
-    WSLAUserSession.h
-    WSLAUserSessionFactory.h
+    WSLASessionManager.h
+    WSLASessionManagerFactory.h
     WSLAVirtualMachine.h)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)

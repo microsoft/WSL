@@ -262,7 +262,7 @@
                     <RegistryValue Value="WSLAProcess" Type="string" />
                 </RegistryKey>
 
-                <!-- WSLAUserSession -->
+                <!-- WSLASessionManager -->
                 <RegistryKey Root="HKCR" Key="CLSID\{a9b7a1b9-0671-405c-95f1-e0612cb4ce8f}">
                     <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
                     <RegistryValue Value="WSLAUserSession" Type="string" />
@@ -274,7 +274,7 @@
                     <RegistryValue Value="WSLASession" Type="string" />
                 </RegistryKey>
 
-                <!-- IWSLAUserSession-->
+                <!-- IWSLASessionManager-->
                 <RegistryKey Root="HKCR" Key="Interface\{82A7ABC8-6B50-43FC-AB96-15FBBE7E8760}">
                     <RegistryValue Value="IWSLAUserSession" Type="string" />
                     <RegistryKey Key="ProxyStubClsid32">

@@ -1584,8 +1584,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
         THROW_HR(E_INVALIDARG);
     }
 
-    wil::com_ptr<IWSLAUserSession> userSession;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+    wil::com_ptr<IWSLASessionManager> userSession;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
     wil::com_ptr<IWSLASession> session;

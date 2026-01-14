@@ -104,7 +104,7 @@ void WslaService::ServiceStopped()
 {
     WSL_LOG("Service stopping", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
-    // Terminate all user sessions.
+    // Terminate all sessions.
     wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances();
 
     // There is a potential deadlock if CoUninitialize() is called before the LanguageChangeNotifyThread

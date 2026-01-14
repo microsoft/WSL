@@ -14,7 +14,6 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLASession.h"
-#include "WSLAUserSession.h"
 #include "WSLAContainer.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
@@ -40,13 +39,21 @@ std::pair<std::string, std::string> ParseImage(const std::string& Input)
 }
 } // namespace
 
-WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl) :
+WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated) :
 
-    m_id(id), m_sessionSettings(Settings), m_displayName(Settings.DisplayName)
+    m_id(id), m_displayName(Settings.DisplayName), m_tokenInfo(std::move(TokenInfo)), m_elevatedToken(Elevated)
 {
-    WSL_LOG("SessionCreated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
+    auto callingProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
+    m_creatorPid = GetProcessId(callingProcess.get());
 
-    m_virtualMachine.emplace(CreateVmSettings(Settings), userSessionImpl.GetUserSid());
+    WSL_LOG(
+        "SessionCreated",
+        TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
+        TraceLoggingValue(GetSidString().get(), "Sid"),
+        TraceLoggingValue(Elevated, "Elevated"),
+        TraceLoggingValue(m_creatorPid, "CreatorPid"));
+
+    m_virtualMachine.emplace(CreateVmSettings(Settings), m_tokenInfo->User.Sid);
 
     if (Settings.TerminationCallback != nullptr)
     {
@@ -55,7 +62,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUs
 
     m_virtualMachine->Start();
 
-    ConfigureStorage(Settings, userSessionImpl.GetUserSid());
+    ConfigureStorage(Settings, m_tokenInfo->User.Sid);
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -206,9 +213,32 @@ const std::wstring& WSLASession::DisplayName() const
     return m_displayName;
 }
 
+DWORD WSLASession::GetCreatorPid() const noexcept
+{
+    return m_creatorPid;
+}
+
 ULONG WSLASession::GetId() const noexcept
 {
     return m_id;
+}
+
+PSID WSLASession::GetSid() const noexcept
+{
+    return m_tokenInfo->User.Sid;
+}
+
+wil::unique_hlocal_string WSLASession::GetSidString() const
+{
+    wil::unique_hlocal_string sid;
+    THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSid(m_tokenInfo->User.Sid, &sid));
+
+    return sid;
+}
+
+bool WSLASession::IsTokenElevated() const noexcept
+{
+    return m_elevatedToken;
 }
 
 void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
