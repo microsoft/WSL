@@ -60,7 +60,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
             {
                 try
                 {
-                    vm.MapPort(e.Family, e.HostPort, e.VmPort, true);
+                    vm.UnmapPort(e.Family, e.HostPort, e.VmPort);
                 }
                 CATCH_LOG();
             }
@@ -115,7 +115,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     // Map Windows <-> VM ports.
     for (auto& e : *mappedPorts)
     {
-        vm.MapPort(e.Family, e.HostPort, e.VmPort, false);
+        vm.MapPort(e.Family, e.HostPort, e.VmPort);
         e.MappedToHost = true;
     }
 
@@ -202,7 +202,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
 
         try
         {
-            m_parentVM->MapPort(e.Family, e.HostPort, e.VmPort, true);
+            m_parentVM->UnmapPort(e.Family, e.HostPort, e.VmPort);
         }
         CATCH_LOG();
 

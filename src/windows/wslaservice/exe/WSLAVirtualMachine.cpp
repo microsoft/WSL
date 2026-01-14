@@ -1137,7 +1137,7 @@ void WSLAVirtualMachine::LaunchPortRelay()
     writePipe.release();
 }
 
-void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove)
+void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove)
 {
     std::lock_guard lock(m_portRelaylock);
 
@@ -1158,6 +1158,16 @@ void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ s
 
     THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
     THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
+}
+
+void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
+{
+    MapPortImpl(Family, WindowsPort, LinuxPort, false);
+}
+
+void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
+{
+    MapPortImpl(Family, WindowsPort, LinuxPort, true);
 }
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)

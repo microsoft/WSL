@@ -330,7 +330,8 @@ interface IWSLASession : IUnknown
     // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
     HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
-    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
+    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+    HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
 }
 
 struct WSLA_SESSION_INFORMATION

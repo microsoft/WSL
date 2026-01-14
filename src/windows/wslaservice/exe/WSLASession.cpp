@@ -707,13 +707,24 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::MapVmPort(int Family, short WindowsPort, short LinuxPort, BOOL Remove)
+HRESULT WSLASession::MapVmPort(int Family, short WindowsPort, short LinuxPort)
 try
 {
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort, Remove != FALSE);
+    m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort);
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort, short LinuxPort)
+try
+{
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+
+    m_virtualMachine->UnmapPort(Family, WindowsPort, LinuxPort);
     return S_OK;
 }
 CATCH_RETURN();
