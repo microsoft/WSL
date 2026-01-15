@@ -674,7 +674,7 @@ class MountTests
         WaitForVmTimeout(keepAlive);
 
         // Restart wsl as a non-elevated user
-        const auto nonElevatedToken = GetNonElevatedToken();
+        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
 
         // Launch wsl non-elevated
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo dummy", nullptr, nullptr, nullptr, nonElevatedToken.get()), (DWORD)0);

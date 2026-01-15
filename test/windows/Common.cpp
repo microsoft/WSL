@@ -1328,24 +1328,29 @@ void StopWslaService()
     StopService(service.get());
 }
 
-wil::unique_handle GetNonElevatedToken()
+wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)
 {
     const auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
 
     wil::unique_handle nonElevatedToken;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
-        token.get(), TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ADJUST_DEFAULT | TOKEN_IMPERSONATE, nullptr, SecurityImpersonation, TokenImpersonation, &nonElevatedToken));
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
 
     auto [localAdministratorsSid, sidBuffer] =
         wsl::windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
 
-    SID_AND_ATTRIBUTES sidToDisable{};
-    sidToDisable.Sid = localAdministratorsSid;
-    sidToDisable.Attributes = 0;
+    // N.B. Calling CreateProcessAsUserW() fails if the administrator group is dropped from the token.
+    if (Type == TokenImpersonation)
+    {
+        SID_AND_ATTRIBUTES sidToDisable{};
+        sidToDisable.Sid = localAdministratorsSid;
+        sidToDisable.Attributes = 0;
 
-    wil::unique_handle restrictedToken;
-    THROW_IF_WIN32_BOOL_FALSE(
-        CreateRestrictedToken(nonElevatedToken.get(), 0, 1, &sidToDisable, 0, nullptr, 0, nullptr, restrictedToken.addressof()));
+        wil::unique_handle restrictedToken;
+        THROW_IF_WIN32_BOOL_FALSE(
+            CreateRestrictedToken(nonElevatedToken.get(), 0, 1, &sidToDisable, 0, nullptr, 0, nullptr, restrictedToken.addressof()));
+
+        nonElevatedToken = std::move(restrictedToken);
+    }
 
     wil::unique_sid mediumIntegritySid;
     THROW_LAST_ERROR_IF(!ConvertStringSidToSidA("S-1-16-8192", &mediumIntegritySid));
@@ -1353,9 +1358,9 @@ wil::unique_handle GetNonElevatedToken()
     TOKEN_MANDATORY_LABEL label = {0};
     label.Label.Attributes = SE_GROUP_INTEGRITY;
     label.Label.Sid = mediumIntegritySid.get();
-    THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(restrictedToken.get(), TokenIntegrityLevel, &label, sizeof(label)));
+    THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(nonElevatedToken.get(), TokenIntegrityLevel, &label, sizeof(label)));
 
-    return restrictedToken;
+    return nonElevatedToken;
 }
 
 WslConfigChange::WslConfigChange(const std::wstring& Content)
