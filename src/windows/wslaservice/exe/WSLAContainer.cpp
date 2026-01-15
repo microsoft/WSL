@@ -60,7 +60,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
             {
                 try
                 {
-                    vm.MapPort(e.Family, e.HostPort, e.VmPort, true);
+                    vm.UnmapPort(e.Family, e.HostPort, e.VmPort);
                 }
                 CATCH_LOG();
             }
@@ -115,7 +115,7 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     // Map Windows <-> VM ports.
     for (auto& e : *mappedPorts)
     {
-        vm.MapPort(e.Family, e.HostPort, e.VmPort, false);
+        vm.MapPort(e.Family, e.HostPort, e.VmPort);
         e.MappedToHost = true;
     }
 
@@ -136,7 +136,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient) :
     m_parentVM(parentVM),
-    m_name(Options.Name),
+    m_name(Options.Name == nullptr ? "" : Options.Name), // TODO: get name from docker.
     m_image(Options.Image),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
@@ -202,7 +202,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
 
         try
         {
-            m_parentVM->MapPort(e.Family, e.HostPort, e.VmPort, true);
+            m_parentVM->UnmapPort(e.Family, e.HostPort, e.VmPort);
         }
         CATCH_LOG();
 
@@ -225,6 +225,11 @@ void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process)
 const std::string& WSLAContainerImpl::Image() const noexcept
 {
     return m_image;
+}
+
+const std::string& WSLAContainerImpl::Name() const noexcept
+{
+    return m_name;
 }
 
 IWSLAContainer& WSLAContainerImpl::ComWrapper()
@@ -555,13 +560,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     for (DWORD i = 0; i < containerOptions.InitProcessOptions.EnvironmentCount; i++)
     {
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            containerOptions.InitProcessOptions.Environment[i][0] == '-',
-            "Invalid environment string at index: %i: %hs",
-            i,
-            containerOptions.InitProcessOptions.Environment[i]);
-
         request.Env.push_back(containerOptions.InitProcessOptions.Environment[i]);
     }
 
@@ -604,23 +602,16 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Send the request to docker.
-    try
-    {
-        auto result = DockerClient.CreateContainer(request);
+    auto result =
+        DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
-        // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
-        auto container = std::make_unique<WSLAContainerImpl>(
-            &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), EventTracker, DockerClient);
+    // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
+    auto container = std::make_unique<WSLAContainerImpl>(
+        &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), EventTracker, DockerClient);
 
-        errorCleanup.release();
+    errorCleanup.release();
 
-        return container;
-    }
-    catch (const DockerHTTPException& e)
-    {
-        // TODO: propagate error message to caller.
-        THROW_HR_MSG(E_FAIL, "Failed to create container: %hs ", e.what());
-    }
+    return container;
 }
 
 const std::string& WSLAContainerImpl::ID() const noexcept

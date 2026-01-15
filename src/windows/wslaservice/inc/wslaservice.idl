@@ -111,7 +111,7 @@ interface ITerminationCallback : IUnknown
 ]
 interface IProgressCallback : IUnknown
 {
-    HRESULT OnProgress(ULONG Progress, ULONG Total);
+    HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total);
 };
 
 struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
@@ -180,7 +180,7 @@ enum WSLA_CONTAINER_FLAGS
 struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
-    LPCSTR Name;
+    [unique] LPCSTR Name;
     struct WSLA_PROCESS_OPTIONS InitProcessOptions;
     [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
     ULONG VolumesCount;
@@ -218,6 +218,12 @@ enum WSLA_PROCESS_STATE
     WslaProcessStateExited = 2,
     WslaProcessStateSignalled = 3
 };
+
+// TODO: Design for localization.
+typedef struct _WSLA_ERROR_INFO{
+    [string] LPSTR UserErrorMessage;
+    ULONG WarningsPipe;
+} WSLA_ERROR_INFO;
 
 [
     uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
@@ -299,14 +305,14 @@ interface IWSLAContainer : IUnknown
 interface IWSLASession : IUnknown
 {
     // Image management.
-    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique, optional] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] LPCSTR Image, [in] BOOL Force); // Image can be ID or Repo:Tag.
 
     // Container management.
-    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
+    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container, [in, out, unique, optional] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT OpenContainer([in] LPCSTR Name, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
@@ -324,7 +330,8 @@ interface IWSLASession : IUnknown
     // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
     HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
-    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort, [in] BOOL Remove);
+    HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+    HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
 }
 
 struct WSLA_SESSION_INFORMATION
@@ -358,3 +365,6 @@ interface IWSLAUserSession : IUnknown
 
     // TODO: Do we need 'TerminateSession()' ?
 }
+
+cpp_quote("#define WSLA_E_BASE (0x0600)")
+cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")

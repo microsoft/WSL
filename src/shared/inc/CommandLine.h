@@ -308,7 +308,7 @@ public:
 #ifdef WIN32
 
     ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool ignoreUnknownArgs = false) :
-        m_startIndex(StartIndex), m_name(Name), m_ignoreUnknownArgs(ignoreUnknownArgs)
+        m_parseIndex(StartIndex), m_name(Name), m_ignoreUnknownArgs(ignoreUnknownArgs)
     {
         m_argv.reset(CommandLineToArgvW(std::wstring(CommandLine).c_str(), &m_argc));
         THROW_LAST_ERROR_IF(!m_argv);
@@ -317,7 +317,7 @@ public:
 #else
 
     ArgumentParser(int argc, const char* const* argv, bool ignoreUnknownArgs = false) :
-        m_argc(argc), m_argv(argv), m_startIndex(1), m_ignoreUnknownArgs(ignoreUnknownArgs)
+        m_argc(argc), m_argv(argv), m_parseIndex(1), m_ignoreUnknownArgs(ignoreUnknownArgs)
     {
     }
 
@@ -354,13 +354,13 @@ public:
         m_arguments.emplace_back(std::move(match), BuildParseMethod(std::forward<T>(Output)), true);
     }
 
-    void Parse() const
+    void Parse()
     {
         int argumentPosition = 0;
         bool stopParameters = false;
-        for (size_t i = m_startIndex; i < m_argc; i++)
+        for (; m_parseIndex < m_argc; m_parseIndex++)
         {
-            if (!stopParameters && wsl::shared::string::IsEqual(m_argv[i], TEXT("--")))
+            if (!stopParameters && wsl::shared::string::IsEqual(m_argv[m_parseIndex], TEXT("--")))
             {
                 stopParameters = true;
                 continue;
@@ -370,9 +370,10 @@ public:
             int offset = 0;
 
             // Special case for short argument with multiple values like -abc
-            if (!stopParameters && m_argv[i][0] == '-' && m_argv[i][1] != '-' && m_argv[i][1] != '\0' && m_argv[i][2] != '\0')
+            if (!stopParameters && m_argv[m_parseIndex][0] == '-' && m_argv[m_parseIndex][1] != '-' &&
+                m_argv[m_parseIndex][1] != '\0' && m_argv[m_parseIndex][2] != '\0')
             {
-                for (const auto* arg = &m_argv[i][1]; *arg != '\0'; arg++)
+                for (const auto* arg = &m_argv[m_parseIndex][1]; *arg != '\0'; arg++)
                 {
                     foundMatch = false;
                     for (const auto& e : m_arguments)
@@ -397,23 +398,26 @@ public:
             {
                 for (const auto& e : m_arguments)
                 {
-                    if (e.Matches(stopParameters ? nullptr : m_argv[i], m_argv[i][0] == '-' && m_argv[i][1] != '\0' && !stopParameters ? -1 : argumentPosition))
+                    if (e.Matches(
+                            stopParameters ? nullptr : m_argv[m_parseIndex],
+                            m_argv[m_parseIndex][0] == '-' && m_argv[m_parseIndex][1] != '\0' && !stopParameters ? -1 : argumentPosition))
                     {
                         const TChar* value = nullptr;
                         if (e.Positional)
                         {
-                            value = m_argv[i]; // Positional arguments directly receive argv[i]
+                            value = m_argv[m_parseIndex]; // Positional arguments directly receive argv[i]
                         }
-                        else if (i + 1 < m_argc)
+                        else if (m_parseIndex + 1 < m_argc)
                         {
-                            value = m_argv[i + 1];
+                            value = m_argv[m_parseIndex + 1];
                         }
 
                         offset = e.Consume(value);
                         if (offset < 0)
                         {
                             WI_ASSERT(value == nullptr);
-                            THROW_USER_ERROR(wsl::shared::Localization::MessageMissingArgument(m_argv[i], m_name ? m_name : m_argv[0]));
+                            THROW_USER_ERROR(
+                                wsl::shared::Localization::MessageMissingArgument(m_argv[m_parseIndex], m_name ? m_name : m_argv[0]));
                         }
 
                         if (e.Positional) // Positional arguments can't consume extra arguments.
@@ -421,7 +425,7 @@ public:
                             offset = 0;
                         }
 
-                        i += offset;
+                        m_parseIndex += offset;
                         foundMatch = true;
 
                         break;
@@ -436,14 +440,30 @@ public:
                     break;
                 }
 
-                THROW_USER_ERROR(wsl::shared::Localization::MessageInvalidCommandLine(m_argv[i], m_name ? m_name : m_argv[0]));
+                THROW_USER_ERROR(wsl::shared::Localization::MessageInvalidCommandLine(m_argv[m_parseIndex], m_name ? m_name : m_argv[0]));
             }
 
-            if (i < m_argc && m_argv[i - offset][0] != '-')
+            if (m_parseIndex < m_argc && m_argv[m_parseIndex - offset][0] != '-')
             {
                 argumentPosition++;
             }
         }
+    }
+
+    size_t ParseIndex() const noexcept
+    {
+        return m_parseIndex;
+    }
+
+    size_t Argc() const noexcept
+    {
+        return m_argc;
+    }
+
+    const auto* Argv(size_t Index) const noexcept
+    {
+        WI_ASSERT(Index < static_cast<size_t>(m_argc));
+        return m_argv[Index];
     }
 
 private:
@@ -540,7 +560,7 @@ private:
 
 #endif
 
-    int m_startIndex{};
+    int m_parseIndex{};
     const TChar* m_name{};
     bool m_ignoreUnknownArgs{false};
 };
