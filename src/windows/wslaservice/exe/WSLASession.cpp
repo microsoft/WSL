@@ -432,13 +432,38 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, Image);
 
-    auto [repo, tag] = ParseImage(Image);
-
     std::lock_guard lock{m_lock};
 
-    auto deletedImages = m_dockerClient->DeleteImage(Image, !!Force);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Image);
+    std::vector<docker_schema::DeletedImage> deletedImages;
+    try
+    {
+        deletedImages = m_dockerClient->DeleteImage(Image, !!Force);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage;
+        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+        }
+
+        if (e.StatusCode() == 404)
+        {
+            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
+        }
+        else if (e.StatusCode() == 409)
+        {
+            THROW_WIN32_MSG(ERROR_ALREADY_EXISTS, "%hs", errorMessage.c_str());
+        }
+        else
+        {
+            THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
+        }
+
+        THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Image);
+    }
 
     return S_OK;
 }

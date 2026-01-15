@@ -54,7 +54,7 @@ public:
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
-    IFACEMETHOD(DeleteImage)(_In_ LPCSTR Image, _In_ BOOL Force) override;
+    IFACEMETHOD(DeleteImage)(_In_ LPCSTR Image, _In_ BOOL Force) override; // Image can be ID or Repo:Tag.
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;

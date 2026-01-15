@@ -77,10 +77,11 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
 }
 
-std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTPClient::DeleteImage(const char* Name, bool Force)
+std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTPClient::DeleteImage(const char* Image, bool Force)
 {
+    // TODO: Url escaping.
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::DeletedImage>>(
-        verb::delete_, std::format("http://localhost/images/{}?force={}", Name, Force));
+        verb::delete_, std::format("http://localhost/images/{}?force={}", Image, Force ? "true" : "false"));
 }
 
 docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)

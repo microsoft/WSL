@@ -303,7 +303,7 @@ interface IWSLASession : IUnknown
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
-    HRESULT DeleteImage([in] LPCSTR Image, [in] BOOL Force);
+    HRESULT DeleteImage([in] LPCSTR Image, [in] BOOL Force); // Image can be ID or Repo:Tag.
 
     // Container management.
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
