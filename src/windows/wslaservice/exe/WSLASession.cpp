@@ -518,7 +518,7 @@ try
         }
         else if (e.StatusCode() == 409)
         {
-            THROW_WIN32_MSG(ERROR_ALREADY_EXISTS, "%hs", errorMessage.c_str());
+            THROW_WIN32_MSG(ERROR_SHARING_VIOLATION, "%hs", errorMessage.c_str());
         }
         else
         {

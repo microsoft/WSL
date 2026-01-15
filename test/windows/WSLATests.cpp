@@ -414,13 +414,13 @@ class WSLATests
         // Verify that the image is in the list of images.
         ExpectImagePresent(*session, "hello-world:latest");
 
-        VERIFY_SUCCEEDED(session->DeleteImage("hello-world:latest", FALSE));
+        VERIFY_SUCCEEDED(session->DeleteImage("hello-world:latest", TRUE));
 
         // Verify that the image is no longer in the list of images.
         ExpectImagePresent(*session, "hello-world:latest", false);
 
         // Test delete failed if image not exists.
-        VERIFY_FAILED(session->DeleteImage("hello-world:latest", FALSE));
+        VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, session->DeleteImage("hello-world:latest", TRUE));
     }
 
     TEST_METHOD(CustomDmesgOutput)
