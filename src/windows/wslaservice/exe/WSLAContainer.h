@@ -131,8 +131,6 @@ public:
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
 
 private:
-    WSLAContainerImpl* m_impl = nullptr;
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;
-    std::recursive_mutex m_lock;
 };
 } // namespace wsl::windows::service::wsla

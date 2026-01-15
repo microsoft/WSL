@@ -632,7 +632,7 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
-    COMImplClass<WSLAContainerImpl>(impl), m_impl(impl), m_onDeleted(std::move(OnDeleted))
+    COMImplClass<WSLAContainerImpl>(impl), m_onDeleted(std::move(OnDeleted))
 {
 }
 
@@ -675,11 +675,10 @@ HRESULT WSLAContainer::Delete()
 try
 {
     // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
-    std::lock_guard lock{m_lock};
-    RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
+    auto [lock, impl] = LockImpl();
 
-    m_impl->Delete();
-    m_onDeleted(m_impl);
+    impl->Delete();
+    m_onDeleted(impl);
 
     return S_OK;
 }

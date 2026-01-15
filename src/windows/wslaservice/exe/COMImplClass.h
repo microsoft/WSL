@@ -26,7 +26,7 @@ public:
 
     void Disconnect() noexcept
     {
-        std::lock_guard lock(m_lock);
+        std::unique_lock lock(m_lock);
 
         WI_ASSERT(m_impl != nullptr);
         m_impl = nullptr;
@@ -37,14 +37,20 @@ protected:
     HRESULT CallImpl(void (TImpl::*routine)(Args... args), Args... args)
     try
     {
-        std::lock_guard lock{m_lock};
-        RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
-
-        (m_impl->*routine)(std::forward<Args>(args)...);
+        auto [lock, impl] = LockImpl();
+        (impl->*routine)(std::forward<Args>(args)...);
 
         return S_OK;
     }
     CATCH_RETURN();
+
+    auto LockImpl()
+    {
+        std::unique_lock lock{m_lock};
+        THROW_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
+
+        return std::make_pair(std::move(lock), m_impl);
+    }
 
 private:
     std::recursive_mutex m_lock;
