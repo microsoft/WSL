@@ -80,13 +80,13 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
 {
     auto url = all ? "http://localhost/containers/json?all=true" : "http://localhost/containers/json";
-    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Container>>(verb::get, url);
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::ContainerInfo>>(verb::get, url);
 }
 
-docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request)
+docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const std::string& Name, const docker_schema::CreateContainer& Request)
 {
     // TODO: Url escaping.
-    return Transaction<docker_schema::CreateContainer>(verb::post, "http://localhost/containers/create", Request);
+    return Transaction<docker_schema::CreateContainer>(verb::post, std::format("http://localhost/containers/create?name={}", Name), Request);
 }
 
 void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns)

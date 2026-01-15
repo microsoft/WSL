@@ -174,15 +174,24 @@ NLOHMANN_JSON_SERIALIZE_ENUM(ContainerState, {
     {ContainerState::Dead, "dead"},
 });
 
+struct Port
+{
+    uint16_t PrivatePort{};
+    uint16_t PublicPort{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Port, PrivatePort, PublicPort);
+};
+
 struct ContainerInfo
 {
     std::string Id;
     std::vector<std::string> Names;
     std::string Image;
     std::map<std::string, std::string> Labels;
+    std::vector<Port> Ports;
     ContainerState State{ContainerState::Unknown};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, State);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State);
 };
 
 } // namespace wsl::windows::common::docker_schema

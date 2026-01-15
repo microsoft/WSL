@@ -122,22 +122,42 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
     return std::make_pair(std::move(mappedPorts), std::move(errorCleanup));
 }
 
+std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
+{
+    if (names.empty())
+    {
+        return id;
+    }
+
+    // Docker container names have a leading '/', strip it.
+    std::string name = names[0];
+    if (!name.empty() && name[0] == '/')
+    {
+        name = name.substr(1);
+    }
+
+    return name;
+}
+
 } // namespace
 
-static constexpr DWORD deleteTimeout = 60000; // 60 seconds
+static constexpr DWORD stopTimeout = 60000; // 60 seconds
 
 WSLAContainerImpl::WSLAContainerImpl(
     WSLAVirtualMachine* parentVM,
-    const WSLA_CONTAINER_OPTIONS& Options,
     std::string&& Id,
+    std::string&& Name,
+    std::string&& Image,
     std::vector<VolumeMountInfo>&& volumes,
     std::vector<PortMapping>&& ports,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient) :
+    DockerHTTPClient& DockerClient,
+    WSLA_CONTAINER_STATE InitialState,
+    bool Tty) :
     m_parentVM(parentVM),
-    m_name(Options.Name),
-    m_image(Options.Image),
+    m_name(std::move(Name)),
+    m_image(std::move(Image)),
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
@@ -145,12 +165,10 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2)))
+        m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2))),
+    m_state(InitialState),
+    m_tty(Tty)
 {
-    m_state = WslaContainerStateCreated;
-
-    // TODO: Move this to an API flag.
-    m_tty = ParseFdStatus(Options.InitProcessOptions).second;
 }
 
 WSLAContainerImpl::~WSLAContainerImpl()
@@ -181,15 +199,12 @@ WSLAContainerImpl::~WSLAContainerImpl()
     // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
     m_comWrapper->Disconnect();
 
-    // TODO: Stop and delete running containers when the session is shutting down
-    // so that we don't leak resources since we do not have means to track them after
-    // restarting a session from a persisted storage.
-
-    if (m_state == WslaContainerStateExited)
+    // Stop running containers.
+    if (m_state == WslaContainerStateRunning)
     {
         try
         {
-            Delete();
+            Stop(WSLASignalSIGKILL, stopTimeout);
         }
         CATCH_LOG();
     }
@@ -606,11 +621,21 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     // Send the request to docker.
     try
     {
-        auto result = DockerClient.CreateContainer(request);
+        auto result = DockerClient.CreateContainer(containerOptions.Name, request);
 
         // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
         auto container = std::make_unique<WSLAContainerImpl>(
-            &parentVM, containerOptions, std::move(result.Id), std::move(volumes), std::vector<PortMapping>(*mappedPorts), std::move(OnDeleted), EventTracker, DockerClient);
+            &parentVM,
+            std::move(result.Id),
+            std::move(std::string(containerOptions.Name)),
+            std::move(std::string(containerOptions.Image)),
+            std::move(volumes),
+            std::vector<PortMapping>(*mappedPorts),
+            std::move(OnDeleted),
+            EventTracker,
+            DockerClient,
+            WslaContainerStateCreated,
+            hasTty);
 
         errorCleanup.release();
 
@@ -623,9 +648,63 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 }
 
+std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
+    const common::docker_schema::ContainerInfo& dockerContainer,
+    WSLAVirtualMachine& parentVM,
+    std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+    ContainerEventTracker& EventTracker,
+    DockerHTTPClient& DockerClient)
+{
+    // Extract container name from Docker's names list.
+    std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
+
+    // Convert Docker ports to PortMapping.
+    // TODO: Recover host port mapping info from metadata.
+    std::vector<PortMapping> ports;
+    for (const auto& port : dockerContainer.Ports)
+    {
+        if (port.PublicPort != 0)
+        {
+            ports.push_back({port.PublicPort, port.PublicPort, port.PrivatePort, AF_INET, false});
+        }
+    }
+
+    // Create a WSLAContainerImpl directly without going through Create().
+    // TODO: Recover TTY from metadata.
+    // TODO: Recover volumes from metadata.
+    // TODO: Recover container state from Docker. 
+    // For now, assume the container has exited since we can't run containers in the new session until 
+    // we can recover all the necessary state.
+    auto container = std::make_unique<WSLAContainerImpl>(
+        &parentVM,
+        std::string(dockerContainer.Id),
+        std::move(name),
+        std::string(dockerContainer.Image),
+        std::vector<VolumeMountInfo>{},
+        std::move(ports),
+        std::move(OnDeleted),
+        EventTracker,
+        DockerClient,
+        WslaContainerStateExited,
+        false);
+
+    WSL_LOG(
+        "ContainerOpened",
+        TraceLoggingValue(container->m_name.c_str(), "Name"),
+        TraceLoggingValue(container->m_id.c_str(), "Id"),
+        TraceLoggingValue((int)container->m_state, "State"));
+
+    return container;
+}
+
 const std::string& WSLAContainerImpl::ID() const noexcept
 {
     return m_id;
+}
+
+const std::string& WSLAContainerImpl::Name() const noexcept
+{
+    return m_name;
 }
 
 void WSLAContainerImpl::Inspect(LPSTR* Output)

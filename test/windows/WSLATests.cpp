@@ -2339,6 +2339,62 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ContainerRecoveryFromStorage)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+
+        std::string containerName = "test-container";
+
+        // Phase 1: Create session and container, then stop the container
+        {
+            auto session = CreateSession(settings);
+
+            // Create and start a container
+            WSLAContainerLauncher launcher("debian:latest", containerName.c_str(), "/bin/echo", {"OK"});
+
+            auto container = launcher.Launch(*session);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            // Stop the container so it can be recovered and deleted later
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+        }
+
+        // Phase 2: Create new session from same storage, recover and delete container
+        {
+            auto session = CreateSession(settings);
+
+            // Try to open the container from the previous session
+            wil::com_ptr<IWSLAContainer> recoveredContainer;
+            VERIFY_SUCCEEDED(session->OpenContainer(containerName.c_str(), &recoveredContainer));
+
+            // Verify container state
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_SUCCEEDED(recoveredContainer->GetState(&state));
+            VERIFY_ARE_EQUAL(state, WslaContainerStateExited);
+
+            // Delete the container
+            VERIFY_SUCCEEDED(recoveredContainer->Delete());
+
+            // Verify container is no longer accessible
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Phase 3: Create new session from same storage, verify no containers exist
+        {
+            auto session = CreateSession(settings);
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+
+            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.get() ? containers.size() : 0, 0u);
+        }
+    }
+
     TEST_METHOD(PersistentSession)
     {
         WSL2_TEST_ONLY();
