@@ -66,7 +66,7 @@ void wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances()
     // Disconnect the COM instance from its implementation.
     if (g_sessionManager)
     {
-        // g_sessionManager->Disconnect();
+        g_sessionManager->Disconnect();
         g_sessionManager.Reset();
 
         // N.B. Callers might still have references to the COM instance. If that's the case, calls will all fail with RPC_E_DISCONNECTED.
