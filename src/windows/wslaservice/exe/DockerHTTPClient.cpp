@@ -38,15 +38,10 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 {
 }
 
-uint32_t DockerHTTPClient::PullImage(const char* Name, const char* Tag, const OnImageProgress& Callback)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const char* Name, const char* Tag)
 {
-    auto [code, _] = SendRequest(
-        verb::post,
-        std::format("http://localhost/images/create?fromImage=library/{}&tag={}", Name, Tag),
-        {},
-        [Callback](const gsl::span<char>& span) { Callback(std::string{span.data(), span.size()}); });
-
-    return code;
+    auto url = std::format("http://localhost/images/create?fromImage=library/{}&tag={}", Name, Tag);
+    return SendRequestImpl(verb::post, url, {}, {});
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)
@@ -83,10 +78,15 @@ std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool 
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::ContainerInfo>>(verb::get, url);
 }
 
-docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const std::string& Name, const docker_schema::CreateContainer& Request)
+docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request, const std::optional<std::string>& Name)
 {
-    // TODO: Url escaping.
-    return Transaction<docker_schema::CreateContainer>(verb::post, std::format("http://localhost/containers/create?name={}", Name), Request);
+    std::string url = "http://localhost/containers/create";
+    if (Name.has_value())
+    {
+        url += std::format("?name={}", Name.value());
+    }
+
+    return Transaction<docker_schema::CreateContainer>(verb::post, url, Request);
 }
 
 void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns)

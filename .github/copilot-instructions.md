@@ -173,6 +173,13 @@ python3 distributions/validate.py distributions/DistributionInfo.json
 wpr -start diagnostics\wsl.wprp -filemode
 # [reproduce issue]  
 wpr -stop logs.ETL
+
+# Available profiles:
+# - WSL (default) - General WSL tracing
+# - WSL-Storage - Enhanced storage tracing
+# - WSL-Networking - Comprehensive networking tracing
+# - WSL-HvSocket - HvSocket-specific tracing
+# Example: wpr -start diagnostics\wsl.wprp!WSL -filemode
 ```
 
 ### Log Analysis Tools

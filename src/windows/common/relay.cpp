@@ -1016,12 +1016,8 @@ IOHandleStatus OverlappedIOHandle::GetState() const
     return State;
 }
 
-EventHandle::EventHandle(HANDLE Handle, std::function<void()>&& OnSignalled) : Handle(Handle), OnSignalled(std::move(OnSignalled))
-{
-}
-
-EventHandle::EventHandle(wil::unique_event&& Handle, std::function<void()>&& OnSignalled) :
-    OwnedHandle(std::move(Handle)), Handle(OwnedHandle.get()), OnSignalled(std::move(OnSignalled))
+EventHandle::EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled) :
+    Handle(std::move(Handle)), OnSignalled(std::move(OnSignalled))
 {
 }
 
@@ -1038,7 +1034,7 @@ void EventHandle::Collect()
 
 HANDLE EventHandle::GetHandle() const
 {
-    return Handle;
+    return Handle.Get();
 }
 
 ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :

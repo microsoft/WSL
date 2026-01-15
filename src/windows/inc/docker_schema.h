@@ -192,6 +192,24 @@ struct ContainerInfo
     ContainerState State{ContainerState::Unknown};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State);
+
+struct CreateImageProgressDetails
+{
+    uint64_t current{};
+    uint64_t total{};
+    std::string unit;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgressDetails, current, total, unit);
+};
+
+struct CreateImageProgress
+{
+    std::string status;
+    std::string id;
+
+    CreateImageProgressDetails progressDetail;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail);
 };
 
 } // namespace wsl::windows::common::docker_schema

@@ -19,6 +19,7 @@ Abstract:
 #include "SubProcess.h"
 #include <winrt/windows.management.deployment.h>
 #include "JsonUtils.h"
+#include "wslaservice.h"
 
 namespace wsl::windows::common {
 struct Error;
@@ -62,6 +63,17 @@ struct GitHubRelease
     std::wstring created_at;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GitHubRelease, name, assets, created_at);
+};
+
+struct WSLAErrorDetails
+{
+    ~WSLAErrorDetails();
+
+    void Reset();
+
+    void ThrowIfFailed(HRESULT Result);
+
+    WSLA_ERROR_INFO Error{};
 };
 
 template <typename T>
@@ -142,6 +154,8 @@ std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> GetInstalledPackageVersi
 std::vector<BYTE> HashFile(HANDLE File, DWORD Algorithm);
 
 void InitializeWil();
+
+bool IsInteractiveConsole();
 
 bool IsRunningInMsix();
 
