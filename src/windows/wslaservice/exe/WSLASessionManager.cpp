@@ -167,8 +167,7 @@ HRESULT WSLASessionManagerImpl::CheckTokenAccess(const WSLASession& Session, con
     return S_OK;
 }
 
-WSLASessionManager::WSLASessionManager(WSLASessionManagerImpl* Impl) :
-    COMImplClass<WSLASessionManagerImpl>(Impl)
+WSLASessionManager::WSLASessionManager(WSLASessionManagerImpl* Impl) : COMImplClass<WSLASessionManagerImpl>(Impl)
 {
 }
 
@@ -177,8 +176,7 @@ HRESULT WSLASessionManager::GetVersion(_Out_ WSLA_VERSION* Version)
     return CallImpl(&WSLASessionManagerImpl::GetVersion, Version);
 }
 
-HRESULT WSLASessionManager::CreateSession(
-    const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession)
+HRESULT WSLASessionManager::CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession)
 {
     return CallImpl(&WSLASessionManagerImpl::CreateSession, WslaSessionSettings, Flags, WslaSession);
 }
