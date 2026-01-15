@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 #include "WSLAVirtualMachine.h"
 #include "WSLASession.h"
+#include "COMImplClass.h"
 #include <atomic>
 #include <vector>
 #include <mutex>
@@ -22,31 +23,28 @@ Abstract:
 
 namespace wsl::windows::service::wsla {
 
-class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLASessionManager
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASessionManager, IFastRundown>
+class WSLASessionManagerImpl
 {
 public:
-    NON_COPYABLE(WSLASessionManager);
-    NON_MOVEABLE(WSLASessionManager);
+    NON_COPYABLE(WSLASessionManagerImpl);
+    NON_MOVABLE(WSLASessionManagerImpl);
 
-    WSLASessionManager();
+    WSLASessionManagerImpl() = default;
+    ~WSLASessionManagerImpl();
 
-    ~WSLASessionManager();
-
-    IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
-    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession) override;
-    IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
-    IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASession** Session) override;
-    IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session) override;
+    void GetVersion(_Out_ WSLA_VERSION* Version);
+    void CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession);
+    void ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount);
+    void OpenSession(_In_ ULONG Id, _Out_ IWSLASession** Session);
+    void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
 
 private:
     struct CallingProcessTokenInfo
     {
-        wil::unique_tokeninfo_ptr<TOKEN_USER> TokenUser;
+        wil::unique_tokeninfo_ptr<TOKEN_USER> Info;
         bool Elevated;
     };
 
-    
     template <typename T>
     inline auto ForEachSession(const auto& Routine)
     {
@@ -110,11 +108,27 @@ private:
     static HRESULT CheckTokenAccess(const WSLASession& Session, const CallingProcessTokenInfo& TokenInfo);
 
     std::atomic<ULONG> m_nextSessionId{1};
-    std::shared_mutex m_wslaSessionsLock;
+    std::recursive_mutex m_wslaSessionsLock;
 
     // Persistent sessions that outlive their creating process.
     std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_persistentSessions;
     std::vector<Microsoft::WRL::ComPtr<IWeakReference>> m_sessions;
 };
-
 } // namespace wsl::windows::service::wsla
+
+class DECLSPEC_UUID("a9b7a1b9-0671-405c-95f1-e0612cb4ce8f") WSLASessionManager
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASessionManager, IFastRundown>,
+      public wsl::windows::service::wsla::COMImplClass<wsl::windows::service::wsla::WSLASessionManagerImpl>
+{
+public:
+    NON_COPYABLE(WSLASessionManager);
+    NON_MOVABLE(WSLASessionManager);
+
+    WSLASessionManager(wsl::windows::service::wsla::WSLASessionManagerImpl* Impl);
+
+    IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
+    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession) override;
+    IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
+    IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASession** Session) override;
+    IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session) override;
+};

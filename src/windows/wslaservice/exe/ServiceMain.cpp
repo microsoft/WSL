@@ -16,7 +16,7 @@ Abstract:
 #include "comservicehelper.h"
 #include "LxssSecurity.h"
 #include "WslCoreFilesystem.h"
-#include "WSLAUserSessionFactory.h"
+#include "WSLASessionManagerFactory.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -26,8 +26,8 @@ using namespace wsl::windows::policies;
 
 wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
-// Declare the WSLAUserSession COM class.
-CoCreatableClassWrlCreatorMapInclude(WSLAUserSession);
+// Declare the WSLASessionManager COM class.
+CoCreatableClassWrlCreatorMapInclude(WSLASessionManager);
 
 struct WslaServiceSecurityPolicy
 {
