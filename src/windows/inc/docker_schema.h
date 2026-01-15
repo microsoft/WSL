@@ -163,15 +163,17 @@ enum class ContainerState
     Unknown
 };
 
-NLOHMANN_JSON_SERIALIZE_ENUM(ContainerState, {
-    {ContainerState::Created, "created"},
-    {ContainerState::Running, "running"},
-    {ContainerState::Paused, "paused"},
-    {ContainerState::Restarting, "restarting"},
-    {ContainerState::Exited, "exited"},
-    {ContainerState::Removing, "removing"},
-    {ContainerState::Dead, "dead"},
-});
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    ContainerState,
+    {
+        {ContainerState::Created, "created"},
+        {ContainerState::Running, "running"},
+        {ContainerState::Paused, "paused"},
+        {ContainerState::Restarting, "restarting"},
+        {ContainerState::Exited, "exited"},
+        {ContainerState::Removing, "removing"},
+        {ContainerState::Dead, "dead"},
+    });
 
 struct Port
 {
