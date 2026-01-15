@@ -632,16 +632,8 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
-    m_impl(impl), m_onDeleted(std::move(OnDeleted))
+    COMImplClass<WSLAContainerImpl>(impl), m_impl(impl), m_onDeleted(std::move(OnDeleted))
 {
-}
-
-void WSLAContainer::Disconnect() noexcept
-{
-    std::lock_guard lock(m_lock);
-
-    WI_ASSERT(m_impl != nullptr);
-    m_impl = nullptr;
 }
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)

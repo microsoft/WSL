@@ -81,7 +81,7 @@ void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
         }
     });
 
-    THROW_WIN32_MSG(ERROR_NOT_FOUND, "Session '%lu' not found", Id);
+    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%lu' not found", Id);
 }
 
 void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)

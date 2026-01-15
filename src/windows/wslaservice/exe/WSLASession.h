@@ -54,6 +54,8 @@ public:
 
     void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
 
+    IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
+
     // Image management.
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR ImageUri,

@@ -223,6 +223,13 @@ ULONG WSLASession::GetId() const noexcept
     return m_id;
 }
 
+HRESULT WSLASession::GetId(ULONG* Id)
+{
+    *Id = m_id;
+
+    return S_OK;
+}
+
 PSID WSLASession::GetSid() const noexcept
 {
     return m_tokenInfo->User.Sid;

@@ -2354,7 +2354,7 @@ class WSLATests
         }
     }
 
-    TEST_METHOD(PersistentSession)
+    TEST_METHOD(SessionManagement)
     {
         WSL2_TEST_ONLY();
 
@@ -2397,6 +2397,7 @@ class WSLATests
             auto settings = GetDefaultSessionSettings();
             settings.DisplayName = Name;
             settings.NetworkingMode = WSLANetworkingModeNone;
+            settings.StoragePath = nullptr;
 
             return CreateSession(settings, Flags);
         };
@@ -2446,6 +2447,29 @@ class WSLATests
 
             VERIFY_SUCCEEDED(session1Copy->Terminate());
             expectSessions({});
+        }
+
+        // Validate that elevated session can't be opened by non-elevated tokens
+        {
+            auto elevatedSession = create(L"elevated-session", WSLASessionFlagsNone);
+
+            auto nonElevatedToken = GetNonElevatedToken();
+
+            auto revert = wil::impersonate_token(nonElevatedToken.get());
+            auto nonElevatedSession = create(L"non-elevated-session", WSLASessionFlagsNone);
+
+            // Validate that non-elevated tokens can't open an elevated session.
+            wil::com_ptr<IWSLASession> openedSession;
+            ULONG elevatedId{};
+            VERIFY_SUCCEEDED(elevatedSession->GetId(&elevatedId));
+            VERIFY_ARE_EQUAL(manager->OpenSession(elevatedId, &openedSession), HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED));
+            VERIFY_IS_FALSE(!!openedSession);
+
+            // Validate that non-elevated tokens can open non-elevated sessions.
+            ULONG nonElevatedId{};
+            VERIFY_SUCCEEDED(nonElevatedSession->GetId(&nonElevatedId));
+            VERIFY_SUCCEEDED(manager->OpenSession(nonElevatedId, &openedSession));
+            VERIFY_IS_TRUE(!!openedSession);
         }
     }
 };
