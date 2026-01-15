@@ -82,8 +82,6 @@ public:
 
     const std::string& ID() const noexcept;
 
-    const std::string& Name() const noexcept;
-
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLAVirtualMachine& parentVM,

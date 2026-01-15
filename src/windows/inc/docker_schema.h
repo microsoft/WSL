@@ -164,7 +164,6 @@ enum class ContainerState
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(ContainerState, {
-    {ContainerState::Unknown, nullptr},
     {ContainerState::Created, "created"},
     {ContainerState::Running, "running"},
     {ContainerState::Paused, "paused"},
@@ -192,6 +191,7 @@ struct ContainerInfo
     ContainerState State{ContainerState::Unknown};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State);
+};
 
 struct CreateImageProgressDetails
 {

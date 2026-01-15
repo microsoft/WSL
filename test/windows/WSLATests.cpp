@@ -2406,7 +2406,7 @@ class WSLATests
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
 
             VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
-            VERIFY_ARE_EQUAL(containers.get() ? containers.size() : 0, 0u);
+            VERIFY_ARE_EQUAL(containers.size(), 0u);
         }
     }
 

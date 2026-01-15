@@ -773,7 +773,7 @@ void WSLASession::RecoverExistingContainers()
                 m_eventTracker.value(),
                 m_dockerClient.value());
 
-            m_containers.emplace(container->Name(), std::move(container));
+            m_containers.emplace_back(std::move(container));
         }
         catch (...)
         {
@@ -782,5 +782,8 @@ void WSLASession::RecoverExistingContainers()
         }
     }
 
-    WSL_LOG("ContainersRecovered", TraceLoggingValue(m_displayName.c_str(), "SessionName"), TraceLoggingValue(m_containers.size(), "ContainerCount"));
+    WSL_LOG(
+        "ContainersRecovered",
+        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+        TraceLoggingValue(m_containers.size(), "ContainerCount"));
 }

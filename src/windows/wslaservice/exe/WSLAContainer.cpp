@@ -624,7 +624,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     auto container = std::make_unique<WSLAContainerImpl>(
         &parentVM,
         std::move(result.Id),
-        std::move(std::string(containerOptions.Name == nullptr ? "", containerOptions.Name)),
+        std::move(std::string(containerOptions.Name == nullptr ? "" : containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::vector<PortMapping>(*mappedPorts),
@@ -663,8 +663,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     // Create a WSLAContainerImpl directly without going through Create().
     // TODO: Recover TTY from metadata.
     // TODO: Recover volumes from metadata.
-    // TODO: Recover container state from Docker. 
-    // For now, assume the container has exited since we can't run containers in the new session until 
+    // TODO: Recover container state from Docker.
+    // For now, assume the container has exited since we can't run containers in the new session until
     // we can recover all the necessary state.
     auto container = std::make_unique<WSLAContainerImpl>(
         &parentVM,
@@ -691,11 +691,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 const std::string& WSLAContainerImpl::ID() const noexcept
 {
     return m_id;
-}
-
-const std::string& WSLAContainerImpl::Name() const noexcept
-{
-    return m_name;
 }
 
 void WSLAContainerImpl::Inspect(LPSTR* Output)
