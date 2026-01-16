@@ -1342,7 +1342,7 @@ wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)
     wil::unique_handle restrictedToken;
     THROW_IF_WIN32_BOOL_FALSE(SaferComputeTokenFromLevel(saferLevel, token.get(), &restrictedToken, 0, nullptr));
 
-    if (TokenType == TokenPrimary)
+    if (Type == TokenPrimary)
     {
         return restrictedToken;
     }

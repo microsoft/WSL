@@ -116,7 +116,7 @@ void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessi
     });
 
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());
-    for (auto i = 0; i < sessionInfo.size(); i++)
+    for (size_t i = 0; i < sessionInfo.size(); i++)
     {
         memcpy(&output[i], &sessionInfo[i], sizeof(WSLA_SESSION_INFORMATION));
     }

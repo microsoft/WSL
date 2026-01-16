@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    COMImplClass.cpp
+    COMImplClass.h
 
 Abstract:
 
