@@ -2457,7 +2457,6 @@ class WSLATests
             auto elevatedSession = create(L"elevated-session", WSLASessionFlagsNone);
 
             auto nonElevatedToken = GetNonElevatedToken(TokenImpersonation);
-
             auto revert = wil::impersonate_token(nonElevatedToken.get());
             auto nonElevatedSession = create(L"non-elevated-session", WSLASessionFlagsNone);
 

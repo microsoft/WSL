@@ -1348,7 +1348,7 @@ wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)
     }
 
     wil::unique_handle nonElevatedToken;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(restrictedToken.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
 
     return nonElevatedToken;
 }
