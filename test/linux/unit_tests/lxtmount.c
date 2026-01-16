@@ -28,6 +28,7 @@ Abstract:
 #define PATH_MAX (4096)
 
 void MountEscapeString(const char* Source, char* Dest, size_t Length);
+int MountCheckFsOptionsPattern(const char* Pattern, const char* Actual);
 
 int MountCheckIsMount(
     const char* Path,
@@ -127,7 +128,14 @@ Return Value:
     LxtCheckStringEqual(ExpectedMountOptions, mnt_fs_get_vfs_options(FileSystem));
     if (ExpectedFsOptions != NULL)
     {
-        LxtCheckStringEqual(ExpectedFsOptions, mnt_fs_get_fs_options(FileSystem));
+        if (strchr(ExpectedFsOptions, '*') != NULL)
+        {
+            LxtCheckResult(MountCheckFsOptionsPattern(ExpectedFsOptions, mnt_fs_get_fs_options(FileSystem)));
+        }
+        else
+        {
+            LxtCheckStringEqual(ExpectedFsOptions, mnt_fs_get_fs_options(FileSystem));
+        }
     }
 
     LxtCheckEqual(Stat.st_dev, mnt_fs_get_devno(FileSystem), "%lu");
@@ -230,6 +238,109 @@ ErrorExit:
     if (Table != NULL)
     {
         mnt_free_table(Table);
+    }
+
+    return Result;
+}
+
+int MountCheckFsOptionsPattern(const char* Pattern, const char* Actual)
+
+/*++
+
+Description:
+
+    This routine checks if mount options match a pattern with wildcards.
+    The '*' wildcard matches any sequence of characters.
+
+Arguments:
+
+    Pattern - Supplies the expected pattern (e.g., "rfd=*,wfd=*").
+
+    Actual - Supplies the actual mount options string.
+
+Return Value:
+
+    Returns 0 on success, -1 on failure.
+
+--*/
+
+{
+
+    const char* ActualPtr;
+    const char* MatchPosition;
+    const char* PatternPtr;
+    int Result;
+    const char* StarPosition;
+
+    PatternPtr = Pattern;
+    ActualPtr = Actual;
+    StarPosition = NULL;
+    MatchPosition = NULL;
+    Result = LXT_RESULT_FAILURE;
+
+    while (*ActualPtr != '\0')
+    {
+        if (*PatternPtr == '*')
+        {
+            //
+            // Remember position of * and where we are in actual string.
+            //
+
+            StarPosition = PatternPtr++;
+            MatchPosition = ActualPtr;
+        }
+        else if (*PatternPtr == *ActualPtr)
+        {
+            //
+            // Characters match, advance both.
+            //
+
+            PatternPtr++;
+            ActualPtr++;
+        }
+        else if (StarPosition != NULL)
+        {
+            //
+            // Mismatch but we have a *, backtrack and try matching one more character.
+            //
+
+            PatternPtr = StarPosition + 1;
+            ActualPtr = ++MatchPosition;
+        }
+        else
+        {
+            //
+            // Mismatch and no * to backtrack to.
+            //
+
+            goto ErrorExit;
+        }
+    }
+
+    //
+    // Consume any trailing *'s in pattern.
+    //
+
+    while (*PatternPtr == '*')
+    {
+        PatternPtr++;
+    }
+
+    //
+    // Both should be at end of string.
+    //
+
+    if (*PatternPtr != '\0')
+    {
+        goto ErrorExit;
+    }
+
+    Result = LXT_RESULT_SUCCESS;
+
+ErrorExit:
+    if (!LXT_SUCCESS(Result))
+    {
+        LxtLogError("Mount options mismatch: expected '%s', got '%s'", Pattern, Actual);
     }
 
     return Result;

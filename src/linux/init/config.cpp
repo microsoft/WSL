@@ -1729,10 +1729,6 @@ Return Value:
         if (strcmp(MountEnum.Current().FileSystemType, PLAN9_FS_TYPE) == 0)
         {
             MountSource = UtilParsePlan9MountSource(MountEnum.Current().SuperOptions);
-            if (MountSource.empty())
-            {
-                continue;
-            }
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {
@@ -1744,6 +1740,11 @@ Return Value:
             MountSource = UtilParseVirtiofsMountSource(MountEnum.Current().Source);
         }
         else
+        {
+            continue;
+        }
+
+        if (MountSource.empty())
         {
             continue;
         }
@@ -2445,7 +2446,7 @@ try
                 NewMountOptions += ',';
             }
 
-            MountPlan9Filesystem(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin, Config);
+            MountPlan9Share(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin, Config);
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {

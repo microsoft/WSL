@@ -226,12 +226,6 @@ public:
     {
         SKIP_TEST_ARM64();
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("VirtioFS currently only supports mounting full drives");
-            return;
-        }
-
         constexpr auto MountPoint = "C:\\lxss_fat";
         constexpr auto VhdPath = "C:\\lxss_fat.vhdx";
         auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteVolume(MountPoint, VhdPath); });
@@ -352,12 +346,6 @@ public:
         SKIP_TEST_ARM64();
         WSL_TEST_VERSION_REQUIRED(wsl::windows::common::helpers::WindowsBuildNumbers::Germanium);
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("VirtioFS currently only supports mounting full drives");
-            return;
-        }
-
         constexpr auto MountPoint = "C:\\lxss_refs";
         constexpr auto VhdPath = "C:\\lxss_refs.vhdx";
         auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteVolume(MountPoint, VhdPath); });
@@ -365,6 +353,28 @@ public:
         VERIFY_NO_THROW(CreateVolume("refs", 50000, MountPoint, VhdPath));
         VERIFY_NO_THROW(
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 6'").c_str(), L"drvfs6"));
+    }
+
+    void WslPath(DrvFsMode Mode)
+    {
+        VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests wslpath", L"wslpath"));
+
+        constexpr auto testDir = "wslpath-test-dir";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { std::filesystem::remove_all(testDir); });
+
+        std::filesystem::create_directory(testDir);
+
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -aw {}", testDir));
+        VERIFY_ARE_EQUAL((std::filesystem::canonical(std::filesystem::current_path()) / testDir).wstring() + L"\n", out);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -wa {}", testDir));
+        VERIFY_ARE_EQUAL((std::filesystem::canonical(std::filesystem::current_path()) / testDir).wstring() + L"\n", out);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath {}", testDir));
+        VERIFY_ARE_EQUAL(std::format(L"{}\n", testDir), out);
+
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -a {}", testDir));
+        VERIFY_IS_TRUE(out.find(L"/mnt/") == 0);
     }
 
     // DrvFsTests Private Methods
@@ -1149,6 +1159,12 @@ class WSL1 : public DrvFsTests
         WSL1_TEST_ONLY();
         DrvFsTests::XattrDrvFs(DrvFsMode::WSL1);
     }
+
+    TEST_METHOD(WslPath)
+    {
+        WSL1_TEST_ONLY();
+        DrvFsTests::WslPath(DrvFsMode::WSL1);
+    }
 };
 
 #define WSL2_DRVFS_TEST_CLASS(_mode) \
@@ -1265,6 +1281,12 @@ class WSL1 : public DrvFsTests
         { \
             WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFsReFs(DrvFsMode::##_mode##); \
+        } \
+\
+        TEST_METHOD(WslPath) \
+        { \
+            WSL2_TEST_ONLY(); \
+            DrvFsTests::WslPath(DrvFsMode::##_mode##); \
         } \
     }
 
