@@ -1610,13 +1610,13 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     if (!debugShell.empty())
     {
-        THROW_IF_FAILED(userSession->OpenSessionByName(debugShell.c_str(), &session));
+        THROW_IF_FAILED(sessionManager->OpenSessionByName(debugShell.c_str(), &session));
     }
     else
     {
-        THROW_IF_FAILED(userSession->CreateSession(&sessionSettings, WSLASessionFlagsNone, &session));
+        THROW_IF_FAILED(sessionManager->CreateSession(&sessionSettings, WSLASessionFlagsNone, &session));
 
-        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
     }
 
     std::optional<wil::com_ptr<IWSLAContainer>> container;
