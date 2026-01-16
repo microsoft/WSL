@@ -2143,7 +2143,11 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
 
     // Ensure that the path has a trailing path separator and canonicalize.
     std::wstring sharePath(Path);
-    sharePath += L"\\";
+    if (!sharePath.ends_with(L'\\') && !sharePath.ends_with(L'/'))
+    {
+        sharePath.push_back(L'\\');
+    }
+
     sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
 
     // Check if a matching share already exists.

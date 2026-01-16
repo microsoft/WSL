@@ -364,7 +364,7 @@ Arguments:
     Target - Supplies the mount target.
 
     Options - Supplies the mount options.
-d
+
     Admin - Supplies a boolean specifying if the admin share should be used.
 
     Config - Supplies the distribution configuration.
@@ -555,7 +555,7 @@ try
     const auto& Response = Channel.Transaction<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(AddShare.Span(), &ResponseSpan);
     if (Response.Result != 0)
     {
-        LOG_ERROR("Add virtiofs share for {} failed {}, falling back to Plan9", Source, Response.Result);
+        LOG_WARNING("Add virtiofs share for {} failed {}, falling back to Plan9", Source, Response.Result);
         return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
     }
 
