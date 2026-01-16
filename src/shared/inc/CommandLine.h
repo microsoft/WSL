@@ -307,13 +307,9 @@ class ArgumentParser
 public:
 #ifdef WIN32
 
-<<<<<<< HEAD
     ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool ignoreUnknownArgs = false) :
         m_parseIndex(StartIndex), m_name(Name), m_ignoreUnknownArgs(ignoreUnknownArgs)
-=======
-    ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool IgnoreUnknownArgs = false) :
-        m_startIndex(StartIndex), m_name(Name), m_ignoreUnknownArgs(IgnoreUnknownArgs)
->>>>>>> ea162030 (Localize Wsladiag tests)
+
     {
         m_argv.reset(CommandLineToArgvW(std::wstring(CommandLine).c_str(), &m_argc));
         THROW_LAST_ERROR_IF(!m_argv);
@@ -321,13 +317,9 @@ public:
 
 #else
 
-<<<<<<< HEAD
     ArgumentParser(int argc, const char* const* argv, bool ignoreUnknownArgs = false) :
         m_argc(argc), m_argv(argv), m_parseIndex(1), m_ignoreUnknownArgs(ignoreUnknownArgs)
-=======
-    ArgumentParser(int argc, const char* const* argv, bool IgnoreUnknownArgs = false) :
-        m_argc(argc), m_argv(argv), m_startIndex(1), m_ignoreUnknownArgs(IgnoreUnknownArgs)
->>>>>>> ea162030 (Localize Wsladiag tests)
+
     {
     }
 
