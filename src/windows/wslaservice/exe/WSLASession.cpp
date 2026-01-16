@@ -490,10 +490,12 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::DeleteImage(LPCSTR Image, BOOL Force)
+HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count, WSLA_ERROR_INFO* Error)
 try
 {
-    RETURN_HR_IF_NULL(E_POINTER, Image);
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF(E_POINTER, DeletedImages != nullptr && Count == nullptr);
 
     std::lock_guard lock{m_lock};
 
@@ -502,7 +504,7 @@ try
     std::vector<docker_schema::DeletedImage> deletedImages;
     try
     {
-        deletedImages = m_dockerClient->DeleteImage(Image, !!Force);
+        deletedImages = m_dockerClient->DeleteImage(Options->Image, !!Options->Force, !!Options->NoPrune);
     }
     catch (const DockerHTTPException& e)
     {
@@ -510,6 +512,10 @@ try
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            if (Error != nullptr)
+            {
+                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
+            }
         }
 
         if (e.StatusCode() == 404)
@@ -524,8 +530,36 @@ try
         {
             THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
         }
+    }
 
-        THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Image);
+    THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Options->Image);
+
+    if (DeletedImages != nullptr)
+    {
+        auto output = wil::make_unique_cotaskmem<WSLA_DELETED_IMAGE_INFORMATION[]>(deletedImages.size());
+
+        size_t index = 0;
+        for (const auto& image : deletedImages)
+        {
+            THROW_HR_IF(
+                E_UNEXPECTED, (image.Deleted.empty() && image.Untagged.empty()) || (!image.Deleted.empty() && !image.Untagged.empty()));
+
+            if (!image.Deleted.empty())
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Deleted.c_str()) != 0);
+                output[index].Type = WSLADeletedImageTypeDeleted;
+            }
+            else
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Untagged.c_str()) != 0);
+                output[index].Type = WSLADeletedImageTypeUntagged;
+            }
+
+            index++;
+        }
+
+        *Count = static_cast<ULONG>(deletedImages.size());
+        *DeletedImages = output.release();
     }
 
     return S_OK;

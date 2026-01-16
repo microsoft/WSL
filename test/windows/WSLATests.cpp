@@ -390,37 +390,48 @@ class WSLATests
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
-
     TEST_METHOD(DeleteImage)
     {
         WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings();
         settings.DisplayName = L"wsla-delete-image-test";
+        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         auto session = CreateSession(settings);
 
-        // Prepare hello-world image to delete.
-        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
-        wil::unique_handle imageTarFileHandle{
-            CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-
-        LARGE_INTEGER fileSize{};
-        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-
-        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+        // Prepare alpine image to delete.
+        VERIFY_SUCCEEDED(session->PullImage("alpine:latest", nullptr, nullptr, nullptr));
 
         // Verify that the image is in the list of images.
-        ExpectImagePresent(*session, "hello-world:latest");
+        ExpectImagePresent(*session, "alpine:latest");
 
-        VERIFY_SUCCEEDED(session->DeleteImage("hello-world:latest", TRUE));
+        // Launch a container to ensure that image deletion fails when in use.
+        WSLAContainerLauncher launcher(
+            "alpine:latest", "test-delete-container-in-use", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+
+        auto container = launcher.Launch(*session);
+
+        // Verify that the container is in running state.
+        VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+        // Test delete failed if image in use.
+        WSLA_DELETE_IMAGE_OPTIONS options{};
+        options.Image = "alpine:latest";
+        options.Force = FALSE;
+
+        VERIFY_ARE_EQUAL(E_FAIL, session->DeleteImage(&options, nullptr, nullptr, nullptr));
+
+        // Force should suuceed.
+        options.Force = TRUE;
+        wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+        VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
 
         // Verify that the image is no longer in the list of images.
-        ExpectImagePresent(*session, "hello-world:latest", false);
+        ExpectImagePresent(*session, "alpine:latest", false);
 
         // Test delete failed if image not exists.
-        VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, session->DeleteImage("hello-world:latest", TRUE));
+        VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, session->DeleteImage(&options, nullptr, nullptr, nullptr));
     }
 
     TEST_METHOD(CustomDmesgOutput)
