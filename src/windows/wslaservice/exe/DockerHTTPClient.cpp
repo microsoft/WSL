@@ -137,6 +137,30 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     return std::move(socket);
 }
 
+wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, std::optional<ULONGLONG> Tail)
+{
+    auto url = std::format(
+        "http://localhost/containers/{}/logs?follow={}&stdout=true&stderr=true&since={}&until={}&timestamp={}",
+        Id,
+        WI_IsFlagSet(Flags, WSLALogsFlagsFollow) ? "true" : "false",
+        Since,
+        Until,
+        WI_IsFlagClear(Flags, WSLALogsFlagsTimestamps));
+
+    if (Tail.has_value())
+    {
+        url += std::format("&tail={}", Tail.value());
+    }
+
+    auto [status, socket] = SendRequest(verb::get, url, {}, {});
+    if (status != 200)
+    {
+        throw DockerHTTPException(status, verb::post, url, "", "");
+    }
+
+    return std::move(socket);
+}
+
 docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string& Container, const docker_schema::CreateExec& Request)
 {
     return Transaction<docker_schema::CreateExec>(verb::post, std::format("http://localhost/containers/{}/exec", Container), Request);

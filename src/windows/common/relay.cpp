@@ -948,6 +948,8 @@ void MultiHandleWait::Cancel()
 
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
+    m_cancel = false; // Run may be called multiple times.
+
     std::optional<std::chrono::steady_clock::time_point> deadline;
 
     if (Timeout.has_value())
@@ -1009,6 +1011,11 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
     }
 
     return !m_cancel;
+}
+
+std::function<void()> MultiHandleWait::CancelRoutine()
+{
+    return [this]() { this->Cancel(); };
 }
 
 IOHandleStatus OverlappedIOHandle::GetState() const

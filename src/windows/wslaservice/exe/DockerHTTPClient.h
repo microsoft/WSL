@@ -87,6 +87,7 @@ public:
     std::string InspectContainer(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
+    wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, std::optional<ULONGLONG> Tail);
 
     // Image management.
     std::unique_ptr<HTTPRequestContext> PullImage(const char* Name, const char* Tag);

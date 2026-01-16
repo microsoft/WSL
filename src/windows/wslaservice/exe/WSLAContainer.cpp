@@ -621,6 +621,8 @@ const std::string& WSLAContainerImpl::ID() const noexcept
 
 void WSLAContainerImpl::Inspect(LPSTR* Output)
 {
+    std::lock_guard lock(m_lock);
+
     try
     {
         *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_dockerClient.InspectContainer(m_id).data()).release();
@@ -629,6 +631,26 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     {
         THROW_HR_MSG(E_FAIL, "Failed to inspect container: %hs ", e.what());
     }
+}
+
+void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+{
+    std::lock_guard lock(m_lock);
+
+    wil::unique_socket socket;
+    try
+    {
+        socket = m_dockerClient.ContainerLogs(m_id, Flags, Since, Until, Tail);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_MSG(E_FAIL, "Failed to get container logs: %hs ", e.what());
+    }
+
+    auto [stdoutHandle, stderrHandle] = m_logsRelay.Add(std::move(socket));
+
+    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutHandle.get()));
+    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrHandle.get()));
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
@@ -692,3 +714,13 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+{
+    RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
+
+    *Stdout = 0;
+    *Stderr = 0;
+
+    return CallImpl(&WSLAContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
+}

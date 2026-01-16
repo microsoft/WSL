@@ -397,6 +397,7 @@ public:
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
+    std::function<void()> CancelRoutine();
 
 private:
     std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;
