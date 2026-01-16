@@ -74,7 +74,7 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
 {
-    auto url = all ? "http://localhost/containers/json?all=true" : "http://localhost/containers/json";
+    auto url = std::format("http://localhost/containers/json?all={}", all ? "true" : "false");
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::ContainerInfo>>(verb::get, url);
 }
 
