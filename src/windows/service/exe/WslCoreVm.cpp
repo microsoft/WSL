@@ -855,9 +855,6 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
     {
         // Add virtiofs devices associating indices with paths from the fixed drive bitmap. These devices support
         // multiple mounts in the guest, so this only needs to be done once.
-        // EX: drvfsC1 => C:\
-        //     drvfsD2 => D:\
-        //     drvfsaC3 => C:\ (elevated)
         auto fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives(UserToken).first;
         while (fixedDrives != 0)
         {
@@ -2125,7 +2122,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 _Requires_lock_held_(m_guestDeviceLock)
 std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
-    WI_ASSERT(m_vmConfig.EnableVirtioFs && wsl::shared::string::IsDriveRoot(wsl::shared::string::WideToMultiByte(Path)));
+    WI_ASSERT(m_vmConfig.EnableVirtioFs);
 
     if (!ARGUMENT_PRESENT(UserToken))
     {
@@ -2136,11 +2133,13 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
     WI_ASSERT(Admin == wsl::windows::common::security::IsTokenElevated(UserToken));
 
     // Ensure that the path has a trailing path separator.
-    std::wstring sharePath{Path};
-    if (sharePath.back() != L'\\')
+    std::wstring sharePath(Path);
+    if (!sharePath.ends_with(L'\\') && !sharePath.ends_with(L'/'))
     {
-        sharePath += L'\\';
+        sharePath.push_back(L'\\');
     }
+
+    sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
 
     // Check if a matching share already exists.
     bool created = false;
@@ -2148,10 +2147,13 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
     VirtioFsShare key(sharePath.c_str(), Options, Admin);
     if (!m_virtioFsShares.contains(key))
     {
-        // Generate a new tag for the share.
-        tag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
-        tag += sharePath[0];
-        tag += std::to_wstring(m_virtioFsShares.size());
+        // Generate a new unique tag for the share.
+        //
+        // N.B. The tag can be maximum 36 characters long so a GUID withouts braces fits perfectly.
+        GUID tagGuid{};
+        THROW_IF_FAILED(CoCreateGuid(&tagGuid));
+
+        tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
         WI_ASSERT(!FindVirtioFsShare(tag.c_str(), Admin));
 
         (void)m_guestDeviceManager->AddGuestDevice(
@@ -2585,8 +2587,6 @@ try
                         THROW_HR_IF(E_UNEXPECTED, !addShare);
 
                         const auto path = wsl::shared::string::FromSpan(span, addShare->PathOffset);
-                        THROW_HR_IF_MSG(E_INVALIDARG, !wsl::shared::string::IsDriveRoot(path), "%hs is not the root of a drive", path);
-
                         const auto pathWide = wsl::shared::string::MultiByteToWide(path);
                         const auto options = wsl::shared::string::FromSpan(span, addShare->OptionsOffset);
                         const auto optionsWide = wsl::shared::string::MultiByteToWide(options);
@@ -2606,25 +2606,30 @@ try
                         THROW_HR_IF(E_UNEXPECTED, !remountShare);
 
                         const std::string tag = wsl::shared::string::FromSpan(span, remountShare->TagOffset);
-                        if (tag.find(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG, 0) == 0)
-                        {
-                            THROW_HR_IF(E_UNEXPECTED, remountShare->Admin);
-                        }
-                        else if (tag.find(LX_INIT_DRVFS_VIRTIO_TAG, 0) == 0)
-                        {
-                            THROW_HR_IF(E_UNEXPECTED, !remountShare->Admin);
-                        }
-                        else
-                        {
-                            THROW_HR_MSG(E_UNEXPECTED, "Unexpected tag %hs", tag.data());
-                        }
-
                         const auto tagWide = wsl::shared::string::MultiByteToWide(tag);
                         auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
                         const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
                         THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
 
                         newTag = AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
+                    });
+
+                    respondWithTag(newTag, result);
+                }
+                else if (message->MessageType == LxInitMessageQueryVirtioFsDevice)
+                {
+                    std::wstring newTag;
+                    const auto result = wil::ResultFromException([this, span, &newTag]() {
+                        const auto* query = gslhelpers::try_get_struct<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE>(span);
+                        THROW_HR_IF(E_UNEXPECTED, !query);
+
+                        const std::string tag = wsl::shared::string::FromSpan(span, query->TagOffset);
+                        const auto tagWide = wsl::shared::string::MultiByteToWide(tag);
+                        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+                        const auto foundShare = FindVirtioFsShare(tagWide.c_str());
+                        THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
+
+                        newTag = foundShare->Path;
                     });
 
                     respondWithTag(newTag, result);
