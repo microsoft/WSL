@@ -2046,19 +2046,38 @@ Return Value:
 --*/
 
 {
-    std::string MountSource{};
-    if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) && (Source.size() >= sizeof(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG)))
+    size_t PrefixLength = 0;
+    if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_ADMIN_VIRTIO_TAG))
     {
-        MountSource = Source[sizeof(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) - 1];
-        MountSource += ":";
+        PrefixLength = sizeof(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) - 1;
     }
-    else if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_VIRTIO_TAG) && (Source.size() >= sizeof(LX_INIT_DRVFS_VIRTIO_TAG)))
+    else if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_VIRTIO_TAG))
     {
-        MountSource = Source[sizeof(LX_INIT_DRVFS_VIRTIO_TAG) - 1];
-        MountSource += ":";
+        PrefixLength = sizeof(LX_INIT_DRVFS_VIRTIO_TAG) - 1;
+    }
+    else
+    {
+        return {};
     }
 
-    return MountSource;
+    //
+    // Extract the path portion after the tag prefix.
+    // The tag format is: <prefix><path><share_number>
+    // For example: "drvfsC:\lxss_fat\0" or "drvfsC:\0"
+    // The path always ends with '\', so find the last backslash to separate the path from the share number.
+    //
+
+    size_t LastBackslash = Source.rfind('\\');
+    if (LastBackslash == std::string_view::npos || LastBackslash < PrefixLength)
+    {
+        return {};
+    }
+
+    //
+    // Extract the path portion including the trailing backslash.
+    //
+
+    return std::string{Source.substr(PrefixLength, LastBackslash - PrefixLength + 1)};
 }
 
 std::vector<char> UtilParseWslEnv(char* NtEnvironment)
