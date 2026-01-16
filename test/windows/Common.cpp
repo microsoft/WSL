@@ -1331,24 +1331,32 @@ void StopWslaService()
 
 wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)
 {
-    const auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
+    auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
 
-    SAFER_LEVEL_HANDLE saferLevel = nullptr;
-
-    auto closeSaferLevel = wil::scope_exit([&]() { SaferCloseLevel(saferLevel); });
-
-    THROW_IF_WIN32_BOOL_FALSE(SaferCreateLevel(SAFER_SCOPEID_USER, SAFER_LEVELID_NORMALUSER, SAFER_LEVEL_OPEN, &saferLevel, nullptr));
-
-    wil::unique_handle restrictedToken;
-    THROW_IF_WIN32_BOOL_FALSE(SaferComputeTokenFromLevel(saferLevel, token.get(), &restrictedToken, 0, nullptr));
-
-    if (Type == TokenPrimary)
+    if (Type != TokenPrimary)
     {
-        return restrictedToken;
+        // N.B. Using the Safer API to create a non-elevated primary token break drvfs, so skipping this for primary tokens.
+        SAFER_LEVEL_HANDLE saferLevel = nullptr;
+        auto closeSaferLevel = wil::scope_exit([&]() { SaferCloseLevel(saferLevel); });
+
+        THROW_IF_WIN32_BOOL_FALSE(SaferCreateLevel(SAFER_SCOPEID_MACHINE, SAFER_LEVELID_NORMALUSER, SAFER_LEVEL_OPEN, &saferLevel, nullptr));
+
+        wil::unique_handle restrictedToken;
+        THROW_IF_WIN32_BOOL_FALSE(SaferComputeTokenFromLevel(saferLevel, token.get(), &restrictedToken, 0, nullptr));
+
+        token = std::move(restrictedToken);
     }
 
     wil::unique_handle nonElevatedToken;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(restrictedToken.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
+
+    wil::unique_sid mediumIntegritySid;
+    THROW_LAST_ERROR_IF(!ConvertStringSidToSidA("S-1-16-8192", &mediumIntegritySid));
+
+    TOKEN_MANDATORY_LABEL label = {0};
+    label.Label.Attributes = SE_GROUP_INTEGRITY;
+    label.Label.Sid = mediumIntegritySid.get();
+    THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(nonElevatedToken.get(), TokenIntegrityLevel, &label, sizeof(label)));
 
     return nonElevatedToken;
 }
