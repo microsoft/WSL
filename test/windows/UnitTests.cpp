@@ -6062,7 +6062,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
-        auto privilege = wsl::windows::common::security::AcquirePrivilege(SE_INCREASE_QUOTA_NAME);
 
         VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"echo dummy", nullptr, nullptr, nullptr, nonElevatedToken.get()));
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"mountpoint /mnt/c", 0u);

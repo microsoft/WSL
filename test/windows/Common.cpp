@@ -20,6 +20,7 @@ Abstract:
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
+#include <winsafer.h>
 
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -1332,33 +1333,22 @@ wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)
 {
     const auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
 
-    wil::unique_handle nonElevatedToken;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
+    SAFER_LEVEL_HANDLE saferLevel = nullptr;
 
-    auto [localAdministratorsSid, sidBuffer] =
-        wsl::windows::common::security::CreateSid(SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
+    auto closeSaferLevel = wil::scope_exit([&]() { SaferCloseLevel(saferLevel); });
 
-    // N.B. Calling CreateProcessAsUserW() fails if the administrator group is dropped from the token.
-    if (Type == TokenImpersonation)
+    THROW_IF_WIN32_BOOL_FALSE(SaferCreateLevel(SAFER_SCOPEID_USER, SAFER_LEVELID_NORMALUSER, SAFER_LEVEL_OPEN, &saferLevel, nullptr));
+
+    wil::unique_handle restrictedToken;
+    THROW_IF_WIN32_BOOL_FALSE(SaferComputeTokenFromLevel(saferLevel, token.get(), &restrictedToken, 0, nullptr));
+
+    if (TokenType == TokenPrimary)
     {
-        SID_AND_ATTRIBUTES sidToDisable{};
-        sidToDisable.Sid = localAdministratorsSid;
-        sidToDisable.Attributes = 0;
-
-        wil::unique_handle restrictedToken;
-        THROW_IF_WIN32_BOOL_FALSE(
-            CreateRestrictedToken(nonElevatedToken.get(), 0, 1, &sidToDisable, 0, nullptr, 0, nullptr, restrictedToken.addressof()));
-
-        nonElevatedToken = std::move(restrictedToken);
+        return restrictedToken;
     }
 
-    wil::unique_sid mediumIntegritySid;
-    THROW_LAST_ERROR_IF(!ConvertStringSidToSidA("S-1-16-8192", &mediumIntegritySid));
-
-    TOKEN_MANDATORY_LABEL label = {0};
-    label.Label.Attributes = SE_GROUP_INTEGRITY;
-    label.Label.Sid = mediumIntegritySid.get();
-    THROW_IF_WIN32_BOOL_FALSE(SetTokenInformation(nonElevatedToken.get(), TokenIntegrityLevel, &label, sizeof(label)));
+    wil::unique_handle nonElevatedToken;
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
 
     return nonElevatedToken;
 }
