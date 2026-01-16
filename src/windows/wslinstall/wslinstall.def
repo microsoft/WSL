@@ -4,6 +4,8 @@ EXPORTS
     CleanExplorerState
     CleanMsixState
     DeprovisionMsix
+    CreateInitrd
+    RemoveInitrd
     WslValidateInstallation
     WslFinalizeInstallation
     InstallMsix
