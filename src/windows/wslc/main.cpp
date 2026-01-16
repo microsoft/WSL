@@ -79,8 +79,7 @@ static int RunShellCommand(std::wstring_view commandLine)
 
     if (sessionName.empty())
     {
-        THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wslc shell"));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wslc shell"));
     }
 
     wil::com_ptr<IWSLAUserSession> userSession;
@@ -327,7 +326,7 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
     WSLA_SESSION_SETTINGS settings{};
     settings.DisplayName = L"wsla-cli";
     settings.CpuCount = 4;
-    settings.MemoryMb = 2024;
+    settings.MemoryMb = 2048;
     settings.BootTimeoutMs = 30 * 1000;
     settings.StoragePath = dataFolder.c_str();
     settings.MaximumStorageSizeMb = 10000; // 10GB.

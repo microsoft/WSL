@@ -1,5 +1,5 @@
 set(SOURCES
-    main.cpp         
+    main.cpp
 )
 
 add_executable(wslc ${SOURCES})
