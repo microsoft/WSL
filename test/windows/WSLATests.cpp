@@ -805,10 +805,10 @@ class WSLATests
         };
 
         // Map port
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
 
         // Validate that the same port can't be bound twice
-        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80, false), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
         // Check simple case
         listen(80, "port80", false);
@@ -822,34 +822,34 @@ class WSLATests
         expectContent(1234, AF_INET, "");
 
         // Add a ipv6 binding
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1234, 80, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1234, 80));
 
         // Validate that ipv6 bindings work as well.
         listen(80, "port80ipv6", true);
         expectContent(1234, AF_INET6, "port80ipv6");
 
         // Unmap the ipv4 port
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, true));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
 
         // Verify that a proper error is returned if the mapping doesn't exist
-        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1234, 80, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Unmap the v6 port
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1234, 80, true));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1234, 80));
 
         // Map another port as v6 only
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1235, 81, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1235, 81));
 
         listen(81, "port81ipv6", true);
         expectContent(1235, AF_INET6, "port81ipv6");
         expectNotBound(1235, AF_INET);
 
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1235, 81, true));
-        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET6, 1235, 81, true), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1235, 81));
+        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET6, 1235, 81), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         expectNotBound(1235, AF_INET6);
 
         // Create a forking relay and stress test
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, false));
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
 
         auto process =
             WSLAProcessLauncher{"/usr/bin/socat", {"/usr/bin/socat", "-dd", "TCP-LISTEN:80,fork,reuseaddr", "system:'echo -n OK'"}}
@@ -862,7 +862,7 @@ class WSLATests
             expectContent(1234, AF_INET, "OK");
         }
 
-        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80, true));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
     }
 
     TEST_METHOD(StuckVmTermination)
@@ -2447,6 +2447,9 @@ class WSLATests
 
             VERIFY_SUCCEEDED(session1Copy->Terminate());
             expectSessions({});
+
+            // Validate that a new session is created if WSLASessionFlagsOpenExisting is set and no match is found.
+            auto session2 = create(L"session-2", static_cast<WSLASessionFlags>(WSLASessionFlagsOpenExisting));
         }
 
         // Validate that elevated session can't be opened by non-elevated tokens

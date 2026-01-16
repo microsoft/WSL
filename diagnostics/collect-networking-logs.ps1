@@ -124,7 +124,8 @@ function Collect-WindowsNetworkState {
 $folder = "WslNetworkingLogs-" + (Get-Date -Format "yyyy-MM-dd_HH-mm-ss")
 mkdir -p $folder
 
-$logProfile = "$folder/wsl_networking.wprp"
+$wprpFile = "$folder/wsl.wprp"
+$wprpProfile = "WSL-Networking"
 $networkingBashScript = "$folder/networking.sh"
 
 # Detect the super user first.
@@ -132,14 +133,14 @@ $networkingBashScript = "$folder/networking.sh"
 $superUser = & wsl.exe -- id -nu 0  # user name of the super user.
 
 # Copy/Download supporting files
-if (Test-Path "$PSScriptRoot/wsl_networking.wprp")
+if (Test-Path "$PSScriptRoot/wsl.wprp")
 {
-    Copy-Item "$PSScriptRoot/wsl_networking.wprp" $logProfile
+    Copy-Item "$PSScriptRoot/wsl.wprp" $wprpFile
 }
 else
 {
-    Write-Host -ForegroundColor Yellow "wsl_networking.wprp not found in the current directory. Downloading it from GitHub."
-    Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl_networking.wprp" -OutFile $logProfile
+    Write-Host -ForegroundColor Yellow "wsl.wprp not found in the current directory. Downloading it from GitHub."
+    Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/wsl.wprp" -OutFile $wprpFile
 }
 
 if (Test-Path "$PSScriptRoot/networking.sh")
@@ -183,13 +184,13 @@ if ($RestartWslReproMode)
 # Start logging.
 $wprOutputLog = "$folder/wpr.txt"
 
-wpr.exe -start $logProfile -filemode 2>&1 >> $wprOutputLog
+wpr.exe -start "$wprpFile!$wprpProfile" -filemode 2>&1 >> $wprOutputLog
 if ($LastExitCode -Ne 0)
 {
     Write-Host -ForegroundColor Yellow "Log collection failed to start (exit code: $LastExitCode), trying to reset it."
     wpr.exe -cancel 2>&1 >> $wprOutputLog
 
-    wpr.exe -start $logProfile -filemode 2>&1 >> $wprOutputLog
+    wpr.exe -start "$wprpFile!$wprpProfile" -filemode 2>&1 >> $wprOutputLog
     if ($LastExitCode -Ne 0)
     {
         Write-Host -ForegroundColor Red "Couldn't start log collection (exitCode: $LastExitCode)"
@@ -309,7 +310,7 @@ if (Test-Path $setupApiPath)
     Copy-Item $setupApiPath $folder
 }
 
-Remove-Item $logProfile
+Remove-Item $wprpFile
 Remove-Item $networkingBashScript
 
 $logArchive = "$(Resolve-Path $folder).zip"

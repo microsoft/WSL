@@ -69,7 +69,8 @@ public:
     void Start();
     void OnSessionTerminated();
 
-    void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ BOOL Remove);
+    void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
+    void UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
     void Unmount(_In_ const char* Path);
 
     HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);
@@ -104,6 +105,8 @@ public:
     }
 
 private:
+    void MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove);
+
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
