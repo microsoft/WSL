@@ -28,6 +28,7 @@
 
                 <File Id="wslg.exe" Name="wslg.exe" Source="${PACKAGE_INPUT_DIR}/wslg.exe" />
                 <File Id="wsladiag.exe" Name="wsladiag.exe" Source="${PACKAGE_INPUT_DIR}/wsladiag.exe" />
+                <File Id="wslc.exe" Name="wslc.exe" Source="${PACKAGE_INPUT_DIR}/wslc.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
