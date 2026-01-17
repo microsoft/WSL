@@ -66,6 +66,7 @@ static int ReportError(const std::wstring& context, HRESULT hr)
 }
 
 // Handler for `wsladiag shell <SessionName>` command.
+
 static int RunShellCommand(std::wstring_view commandLine)
 {
     std::wstring sessionName;

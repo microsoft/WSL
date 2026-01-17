@@ -309,6 +309,7 @@ public:
 
     ArgumentParser(const std::wstring& CommandLine, LPCWSTR Name, int StartIndex = 1, bool ignoreUnknownArgs = false) :
         m_parseIndex(StartIndex), m_name(Name), m_ignoreUnknownArgs(ignoreUnknownArgs)
+
     {
         m_argv.reset(CommandLineToArgvW(std::wstring(CommandLine).c_str(), &m_argc));
         THROW_LAST_ERROR_IF(!m_argv);
@@ -318,6 +319,7 @@ public:
 
     ArgumentParser(int argc, const char* const* argv, bool ignoreUnknownArgs = false) :
         m_argc(argc), m_argv(argv), m_parseIndex(1), m_ignoreUnknownArgs(ignoreUnknownArgs)
+
     {
     }
 
