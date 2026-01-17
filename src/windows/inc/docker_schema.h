@@ -112,6 +112,14 @@ struct Image
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Image, Id, RepoTags, Size);
 };
 
+struct DeletedImage
+{
+    std::string Untagged;
+    std::string Deleted;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(DeletedImage, Untagged, Deleted);
+};
+
 struct ImportStatus
 {
     std::string status;
