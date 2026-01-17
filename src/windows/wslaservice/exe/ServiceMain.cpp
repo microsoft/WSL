@@ -16,7 +16,7 @@ Abstract:
 #include "comservicehelper.h"
 #include "LxssSecurity.h"
 #include "WslCoreFilesystem.h"
-#include "WSLAUserSessionFactory.h"
+#include "WSLASessionManagerFactory.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -26,8 +26,8 @@ using namespace wsl::windows::policies;
 
 wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
-// Declare the WSLAUserSession COM class.
-CoCreatableClassWrlCreatorMapInclude(WSLAUserSession);
+// Declare the WSLASessionManager COM class.
+CoCreatableClassWrlCreatorMapInclude(WSLASessionManager);
 
 struct WslaServiceSecurityPolicy
 {
@@ -104,7 +104,7 @@ void WslaService::ServiceStopped()
 {
     WSL_LOG("Service stopping", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
-    // Terminate all user sessions.
+    // Terminate all sessions.
     wsl::windows::service::wsla::ClearWslaSessionsAndBlockNewInstances();
 
     // There is a potential deadlock if CoUninitialize() is called before the LanguageChangeNotifyThread

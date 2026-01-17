@@ -83,12 +83,12 @@ static int RunShellCommand(std::wstring_view commandLine)
             E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wsladiag shell"));
     }
 
-    wil::com_ptr<IWSLAUserSession> userSession;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+    wil::com_ptr<IWSLASessionManager> manager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
     wil::com_ptr<IWSLASession> session;
-    HRESULT hr = userSession->OpenSessionByName(sessionName.c_str(), &session);
+    HRESULT hr = manager->OpenSessionByName(sessionName.c_str(), &session);
     if (FAILED(hr))
     {
         if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
@@ -235,12 +235,12 @@ static int RunListCommand(std::wstring_view commandLine)
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWsladiagUsage());
     }
 
-    wil::com_ptr<IWSLAUserSession> userSession;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+    wil::com_ptr<IWSLASessionManager> manager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
     wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-    THROW_IF_FAILED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
+    THROW_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
     if (verbose)
     {
@@ -317,9 +317,9 @@ DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
 
 static wil::com_ptr<IWSLASession> OpenCLISession()
 {
-    wil::com_ptr<IWSLAUserSession> userSession;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+    wil::com_ptr<IWSLASessionManager> manager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
     auto dataFolder = std::filesystem::path(wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr)) / "wsla";
 
@@ -334,7 +334,7 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
     settings.NetworkingMode = WSLANetworkingModeNAT;
 
     wil::com_ptr<IWSLASession> session;
-    THROW_IF_FAILED(userSession->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
+    THROW_IF_FAILED(manager->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     return session;

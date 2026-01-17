@@ -90,8 +90,8 @@ class WSLATests
 
     wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings = GetDefaultSessionSettings(), WSLASessionFlags Flags = WSLASessionFlagsNone)
     {
-        wil::com_ptr<IWSLAUserSession> userSession;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wil::com_ptr<IWSLASessionManager> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
         wil::com_ptr<IWSLASession> session;
@@ -104,8 +104,8 @@ class WSLATests
 
     TEST_METHOD(GetVersion)
     {
-        wil::com_ptr<IWSLAUserSession> userSession;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wil::com_ptr<IWSLASessionManager> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
 
         WSLA_VERSION version{};
 
@@ -204,8 +204,8 @@ class WSLATests
         settings.StoragePath = nullptr;
         settings.DisplayName = L"wsla-test-list";
 
-        wil::com_ptr<IWSLAUserSession> userSession;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wil::com_ptr<IWSLASessionManager> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
@@ -255,8 +255,8 @@ class WSLATests
         settings.StoragePath = nullptr;
         settings.DisplayName = L"wsla-open-by-name-test";
 
-        wil::com_ptr<IWSLAUserSession> userSession;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
+        wil::com_ptr<IWSLASessionManager> userSession;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
 
@@ -2354,17 +2354,17 @@ class WSLATests
         }
     }
 
-    TEST_METHOD(PersistentSession)
+    TEST_METHOD(SessionManagement)
     {
         WSL2_TEST_ONLY();
 
-        wil::com_ptr<IWSLAUserSession> userSession;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLAUserSession), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&userSession)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(userSession.get());
+        wil::com_ptr<IWSLASessionManager> manager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
         auto expectSessions = [&](const std::vector<std::wstring>& expectedSessions) {
             wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-            VERIFY_SUCCEEDED(userSession->ListSessions(&sessions, sessions.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
             std::set<std::wstring> displayNames;
             for (const auto& e : sessions)
@@ -2397,6 +2397,7 @@ class WSLATests
             auto settings = GetDefaultSessionSettings();
             settings.DisplayName = Name;
             settings.NetworkingMode = WSLANetworkingModeNone;
+            settings.StoragePath = nullptr;
 
             return CreateSession(settings, Flags);
         };
@@ -2442,13 +2443,35 @@ class WSLATests
             settings.DisplayName = L"session-1";
 
             wil::com_ptr<IWSLASession> session;
-            VERIFY_ARE_EQUAL(userSession->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(manager->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             VERIFY_SUCCEEDED(session1Copy->Terminate());
             expectSessions({});
 
             // Validate that a new session is created if WSLASessionFlagsOpenExisting is set and no match is found.
             auto session2 = create(L"session-2", static_cast<WSLASessionFlags>(WSLASessionFlagsOpenExisting));
+        }
+
+        // Validate that elevated session can't be opened by non-elevated tokens
+        {
+            auto elevatedSession = create(L"elevated-session", WSLASessionFlagsNone);
+
+            auto nonElevatedToken = GetNonElevatedToken(TokenImpersonation);
+            auto revert = wil::impersonate_token(nonElevatedToken.get());
+            auto nonElevatedSession = create(L"non-elevated-session", WSLASessionFlagsNone);
+
+            // Validate that non-elevated tokens can't open an elevated session.
+            wil::com_ptr<IWSLASession> openedSession;
+            ULONG elevatedId{};
+            VERIFY_SUCCEEDED(elevatedSession->GetId(&elevatedId));
+            VERIFY_ARE_EQUAL(manager->OpenSession(elevatedId, &openedSession), HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED));
+            VERIFY_IS_FALSE(!!openedSession);
+
+            // Validate that non-elevated tokens can open non-elevated sessions.
+            ULONG nonElevatedId{};
+            VERIFY_SUCCEEDED(nonElevatedSession->GetId(&nonElevatedId));
+            VERIFY_SUCCEEDED(manager->OpenSession(nonElevatedId, &openedSession));
+            VERIFY_IS_TRUE(!!openedSession);
         }
     }
 };

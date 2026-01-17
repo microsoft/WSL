@@ -294,7 +294,7 @@ public:
 
         TerminateDistribution();
 
-        const auto nonElevatedToken = GetNonElevatedToken();
+        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
         WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
@@ -308,7 +308,7 @@ public:
 
         TerminateDistribution();
 
-        const auto nonElevatedToken = GetNonElevatedToken();
+        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
         WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
@@ -334,7 +334,7 @@ public:
 
         WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true, .drvFsMode = Mode}));
 
-        const auto nonElevatedToken = GetNonElevatedToken();
+        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
         WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
@@ -963,7 +963,7 @@ private:
         // Validate that mount types are correct in both namespaces
         validate(elevatedType, nullptr);
 
-        const auto nonElevatedToken = GetNonElevatedToken();
+        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
         validate(nonElevatedType, nonElevatedToken.get());
 
         // Elevated token should be able to create files at the root of the drive (/mnt/c)

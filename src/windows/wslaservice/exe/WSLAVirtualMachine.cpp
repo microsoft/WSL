@@ -18,7 +18,6 @@ Abstract:
 #include "hcs_schema.h"
 #include "VirtioNetworking.h"
 #include "NatNetworking.h"
-#include "WSLAUserSession.h"
 #include "ServiceProcessLauncher.h"
 
 using namespace wsl::windows::common;
