@@ -361,7 +361,13 @@ public:
     NON_COPYABLE(DockerIORelayHandle);
     NON_MOVABLE(DockerIORelayHandle);
 
-    DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr);
+    enum class Format
+    {
+        Raw,
+        HttpChunked
+    };
+
+    DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat);
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -381,7 +387,7 @@ private:
     void OnRead(const gsl::span<char>& Buffer);
     void ProcessNextHeader();
 
-    ReadHandle Read;
+    std::unique_ptr<OverlappedIOHandle> Read;
     WriteHandle WriteStdout;
     WriteHandle WriteStderr;
     std::vector<char> PendingBuffer;
@@ -397,6 +403,7 @@ public:
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
+    std::function<void()> CancelRoutine();
 
 private:
     std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;

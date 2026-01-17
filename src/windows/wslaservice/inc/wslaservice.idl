@@ -276,6 +276,12 @@ struct WSLA_SESSION_SETTINGS {
     [unique] LPCSTR RootVhdTypeOverride;
 };
 
+typedef enum _WSLALogsFlags
+{
+    WSLALogsFlagsNone = 0,
+    WSLALogsFlagsFollow = 1,
+    WSLALogsFlagsTimestamps = 2,
+} WSLALogsFlags;
 
 [
     uuid(7577FE8D-DE85-471E-B870-11669986F332),
@@ -291,6 +297,7 @@ interface IWSLAContainer : IUnknown
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
     HRESULT Inspect([out] LPSTR* Output);
+    HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
 
     // Anonymous host port allocation (P1).
     //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);

@@ -20,6 +20,7 @@ Abstract:
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLAProcessControl.h"
+#include "LogsRelay.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -67,6 +68,10 @@ public:
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
     void Inspect(LPSTR* Output);
+    void Logs(
+        WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr,
+        ULONGLONG Since,
+        ULONGLONG Until, ULONGLONG Tail);
 
     IWSLAContainer& ComWrapper();
 
@@ -105,6 +110,7 @@ private:
     DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
+    LogsRelay m_logsRelay;
 
     static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);
     static void AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options);
@@ -127,6 +133,7 @@ public:
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
     IFACEMETHOD(Start)() override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
+    IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _Out_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
 
     void Disconnect() noexcept;
 

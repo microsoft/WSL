@@ -948,6 +948,8 @@ void MultiHandleWait::Cancel()
 
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
+    m_cancel = false; // Run may be called multiple times.
+
     std::optional<std::chrono::steady_clock::time_point> deadline;
 
     if (Timeout.has_value())
@@ -1009,6 +1011,11 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
     }
 
     return !m_cancel;
+}
+
+std::function<void()> MultiHandleWait::CancelRoutine()
+{
+    return [this]() { this->Cancel(); };
 }
 
 IOHandleStatus OverlappedIOHandle::GetState() const
@@ -1462,11 +1469,19 @@ HANDLE RelayHandle::GetHandle() const
     }
 }
 
-DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr) :
-    Read(std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }),
-    WriteStdout(std::move(Stdout)),
-    WriteStderr(std::move(Stderr))
+DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat) :
+    WriteStdout(std::move(Stdout)), WriteStderr(std::move(Stderr))
 {
+    if (ReadFormat == Format::HttpChunked)
+    {
+        Read = std::make_unique<HTTPChunkBasedReadHandle>(
+            std::move(ReadHandle), [this](const gsl::span<char>& Line) { this->OnRead(Line); });
+    }
+    else
+    {
+        Read = std::make_unique<relay::ReadHandle>(
+            std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { this->OnRead(Buffer); });
+    }
 }
 
 void DockerIORelayHandle::Schedule()
@@ -1503,7 +1518,7 @@ void DockerIORelayHandle::Schedule()
     }
     else
     {
-        if (Read.GetState() == IOHandleStatus::Completed)
+        if (Read->GetState() == IOHandleStatus::Completed)
         {
             // No more data to read, we're done.
             State = IOHandleStatus::Completed;
@@ -1511,8 +1526,8 @@ void DockerIORelayHandle::Schedule()
         }
 
         // Schedule a read from the input.
-        Read.Schedule();
-        if (Read.GetState() == IOHandleStatus::Pending)
+        Read->Schedule();
+        if (Read->GetState() == IOHandleStatus::Pending)
         {
             State = IOHandleStatus::Pending;
         }
@@ -1536,7 +1551,7 @@ void DockerIORelayHandle::Collect()
 
         // Transition back to standby if there's still data to read.
         // Otherwise switch to Completed since everything is done.
-        if (Read.GetState() == IOHandleStatus::Completed)
+        if (Read->GetState() == IOHandleStatus::Completed)
         {
             State = IOHandleStatus::Completed;
         }
@@ -1548,7 +1563,7 @@ void DockerIORelayHandle::Collect()
     else
     {
         // Complete the read.
-        Read.Collect();
+        Read->Collect();
 
         // Transition back to standby.
         State = IOHandleStatus::Standby;
@@ -1563,7 +1578,7 @@ HANDLE DockerIORelayHandle::GetHandle() const
     }
     else
     {
-        return Read.GetHandle();
+        return Read->GetHandle();
     }
 }
 
