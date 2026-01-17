@@ -3,6 +3,8 @@
 #include "LogsRelay.h"
 
 using wsl::windows::service::wsla::LogsRelay;
+using wsl::windows::common::relay::DockerIORelayHandle;
+using wsl::windows::common::relay::OverlappedIOHandle;
 
 LogsRelay::~LogsRelay()
 {
@@ -14,7 +16,7 @@ std::pair<wil::unique_hfile, wil::unique_hfile> LogsRelay::Add(wil::unique_socke
     auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
     auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
 
-    auto handle = std::make_unique<common::relay::DockerIORelayHandle>(std::move(socket), std::move(stdoutWrite), std::move(stderrWrite));
+    auto handle = std::make_unique<DockerIORelayHandle>(std::move(socket), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::HttpChunked);
 
     AddHandle(std::move(handle));
 

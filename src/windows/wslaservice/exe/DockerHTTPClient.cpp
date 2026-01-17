@@ -140,7 +140,7 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, std::optional<ULONGLONG> Tail)
 {
     auto url = std::format(
-        "http://localhost/containers/{}/logs?follow={}&stdout=true&stderr=true&since={}&until={}&timestamp={}",
+        "http://localhost/containers/{}/logs?follow={}&stdout=true&stderr=true",
         Id,
         WI_IsFlagSet(Flags, WSLALogsFlagsFollow) ? "true" : "false",
         Since,
@@ -149,8 +149,10 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALo
 
     if (Tail.has_value())
     {
-        url += std::format("&tail={}", Tail.value());
+        //url += std::format("&tail={}", Tail.value());
     }
+
+    // TODO: since, until, timestamps
 
     auto [status, socket] = SendRequest(verb::get, url, {}, {});
     if (status != 200)

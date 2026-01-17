@@ -2304,7 +2304,8 @@ class WSLATests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(std::make_unique<DockerIORelayHandle>(std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite)));
+            io.AddHandle(std::make_unique<DockerIORelayHandle>(
+                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
             io.AddHandle(std::make_unique<ReadHandle>(
