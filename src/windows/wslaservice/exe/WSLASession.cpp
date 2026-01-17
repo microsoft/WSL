@@ -495,7 +495,11 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
-    RETURN_HR_IF(E_POINTER, DeletedImages != nullptr && Count == nullptr);
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *DeletedImages = nullptr;
+    *Count = 0;
 
     std::lock_guard lock{m_lock};
 
@@ -534,33 +538,29 @@ try
 
     THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Options->Image);
 
-    if (DeletedImages != nullptr)
+    auto output = wil::make_unique_cotaskmem<WSLA_DELETED_IMAGE_INFORMATION[]>(deletedImages.size());
+
+    size_t index = 0;
+    for (const auto& image : deletedImages)
     {
-        auto output = wil::make_unique_cotaskmem<WSLA_DELETED_IMAGE_INFORMATION[]>(deletedImages.size());
+        THROW_HR_IF(E_UNEXPECTED, (image.Deleted.empty() && image.Untagged.empty()) || (!image.Deleted.empty() && !image.Untagged.empty()));
 
-        size_t index = 0;
-        for (const auto& image : deletedImages)
+        if (!image.Deleted.empty())
         {
-            THROW_HR_IF(
-                E_UNEXPECTED, (image.Deleted.empty() && image.Untagged.empty()) || (!image.Deleted.empty() && !image.Untagged.empty()));
-
-            if (!image.Deleted.empty())
-            {
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Deleted.c_str()) != 0);
-                output[index].Type = WSLADeletedImageTypeDeleted;
-            }
-            else
-            {
-                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Untagged.c_str()) != 0);
-                output[index].Type = WSLADeletedImageTypeUntagged;
-            }
-
-            index++;
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Deleted.c_str()) != 0);
+            output[index].Type = WSLADeletedImageTypeDeleted;
+        }
+        else
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Untagged.c_str()) != 0);
+            output[index].Type = WSLADeletedImageTypeUntagged;
         }
 
-        *Count = static_cast<ULONG>(deletedImages.size());
-        *DeletedImages = output.release();
+        index++;
     }
+
+    *Count = static_cast<ULONG>(deletedImages.size());
+    *DeletedImages = output.release();
 
     return S_OK;
 }

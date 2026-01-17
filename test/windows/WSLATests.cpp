@@ -419,19 +419,24 @@ class WSLATests
         WSLA_DELETE_IMAGE_OPTIONS options{};
         options.Image = "alpine:latest";
         options.Force = FALSE;
+        wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
 
-        VERIFY_ARE_EQUAL(E_FAIL, session->DeleteImage(&options, nullptr, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
+            session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
 
         // Force should suuceed.
         options.Force = TRUE;
-        wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
         VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+        VERIFY_IS_TRUE(deletedImages.size() > 0);
+        VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);
 
         // Verify that the image is no longer in the list of images.
         ExpectImagePresent(*session, "alpine:latest", false);
 
         // Test delete failed if image not exists.
-        VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, session->DeleteImage(&options, nullptr, nullptr, nullptr));
+        VERIFY_ARE_EQUAL(
+            WSLA_E_IMAGE_NOT_FOUND, session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
     }
 
     TEST_METHOD(CustomDmesgOutput)
