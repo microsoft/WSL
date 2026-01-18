@@ -7,6 +7,12 @@
     xmlns:controls="using:WslSettings.Controls"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
+    <Page.Resources>
+        <DataTemplate x:Key="UnderlinedHyperlinkTemplate">
+            <TextBlock Text="{Binding}" TextDecorations="Underline" />
+        </DataTemplate>
+    </Page.Resources>
+
     <Grid Margin="{ThemeResource ContentPageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -20,10 +26,10 @@
                     <ctControls:SettingsExpander.Items>
                         <ctControls:SettingsCard HorizontalContentAlignment="Left" ContentAlignment="Left" Margin="-42,0,0,0">
                             <StackPanel Orientation="Vertical">
-                                <HyperlinkButton x:Uid="Settings_IssuesLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" />
-                                <HyperlinkButton x:Uid="Settings_DocumentationLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" />
-                                <HyperlinkButton x:Uid="Settings_ReleaseNotesLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" />
-                                <HyperlinkButton x:Uid="Settings_PrivacyPolicyLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" />
+                                <HyperlinkButton x:Uid="Settings_IssuesLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
+                                <HyperlinkButton x:Uid="Settings_DocumentationLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
+                                <HyperlinkButton x:Uid="Settings_ReleaseNotesLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
+                                <HyperlinkButton x:Uid="Settings_PrivacyPolicyLink" Margin="{StaticResource HyperlinkButtonNegativeMargin}" ContentTemplate="{StaticResource UnderlinedHyperlinkTemplate}" />
                             </StackPanel>
                         </ctControls:SettingsCard>
                     </ctControls:SettingsExpander.Items>

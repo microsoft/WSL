@@ -1,9 +1,16 @@
 set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
+    DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
+    Dmesg.cpp
+    DnsResolver.cpp
+    DnsTunnelingChannel.cpp
     filesystem.cpp
+    GnsChannel.cpp
+    GnsPortTrackerChannel.cpp
+    GuestDeviceManager.cpp
     HandleConsoleProgressBar.cpp
     hcs.cpp
     helpers.cpp
@@ -15,21 +22,28 @@ set(SOURCES
     lxssbusclient.cpp
     lxssclient.cpp
     LxssMessagePort.cpp
+    LxssSecurity.cpp
     LxssServerPort.cpp
+    NatNetworking.cpp
     Redirector.cpp
     registry.cpp
     relay.cpp
+    RingBuffer.cpp
     string.cpp
     SubProcess.cpp
     svccomm.cpp
     svccommio.cpp
     WslClient.cpp
     WslCoreConfig.cpp
+    WslCoreFilesystem.cpp
     WslCoreFirewallSupport.cpp
+    WslCoreHostDnsInfo.cpp
+    WslCoreNetworkEndpointSettings.cpp
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
     WslTelemetry.cpp
+    VirtioNetworking.cpp
     wslutil.cpp
     notifications.cpp)
 
@@ -60,24 +74,35 @@ set(HEADERS
     ../inc/wslrelay.h
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
+    DeviceHostProxy.h
     disk.hpp
     Distribution.h
+    Dmesg.h
+    DnsResolver.h
+    DnsTunnelingChannel.h
     filesystem.hpp
+    GnsChannel.h
+    GnsPortTrackerChannel.h
+    GuestDeviceManager.h
+    HandleConsoleProgressBar.h
     hcs.hpp
     hcs_schema.h
     helpers.hpp
-    HandleConsoleProgressBar.h
     interop.hpp
     ExecutionContext.h
     socket.hpp
     hvsocket.hpp
+    INetworkingEngine.h
     LxssMessagePort.h
     LxssPort.h
+    LxssSecurity.h
     LxssServerPort.h
+    NatNetworking.h
     precomp.h
     Redirector.h
     registry.hpp
     relay.hpp
+    RingBuffer.h
     string.hpp
     Stringify.h
     SubProcess.h
@@ -85,11 +110,16 @@ set(HEADERS
     svccommio.hpp
     WslClient.h
     WslCoreConfig.h
+    WslCoreFilesystem.h
     WslCoreFirewallSupport.h
+    WslCoreHostDnsInfo.h
+    WslCoreMessageQueue.h
+    WslCoreNetworkEndpointSettings.h
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
     WslTelemetry.h
+    VirtioNetworking.h
     wslutil.h
     notifications.h)
 

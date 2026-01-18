@@ -28,6 +28,7 @@ WslDistributionConfig::WslDistributionConfig(const char* configFilePath)
         ConfigKey("automount.options", DrvFsOptions),
         ConfigKey(c_ConfigMountFsTabOption, MountFsTab),
         ConfigKey(c_ConfigLinkOsLibsOption, LinkOsLibs),
+        ConfigKey("automount.cgroups", {{"v1", CGroupVersion::v1}, {"v2", CGroupVersion::v2}}, CGroup, nullptr),
 
         ConfigKey("filesystem.umask", Umask),
 

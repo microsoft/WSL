@@ -537,7 +537,7 @@ Return Value:
     return Socket;
 }
 
-wil::unique_fd UtilConnectVsock(unsigned int Port, bool CloseOnExec, std::optional<int> SocketBuffer) noexcept
+wil::unique_fd UtilConnectVsock(unsigned int Port, bool CloseOnExec, std::optional<int> SocketBuffer, const std::source_location& Source) noexcept
 
 /*++
 
@@ -553,6 +553,8 @@ Arguments:
 
     SocketBuffer - Optionally supplies the size to use for the socket send and receive buffers.
 
+    Source - Supplies the caller location.
+
 Return Value:
 
     A file descriptor representing the connected socket, -1 on failure.
@@ -565,7 +567,7 @@ Return Value:
     wil::unique_fd SocketFd{socket(AF_VSOCK, Type, 0)};
     if (!SocketFd)
     {
-        LOG_ERROR("socket failed {}", errno);
+        LOG_ERROR("socket failed {} (from: {})", errno, Source);
         return {};
     }
 
@@ -577,7 +579,7 @@ Return Value:
     Timeout.tv_sec = LX_INIT_HVSOCKET_TIMEOUT_SECONDS;
     if (setsockopt(SocketFd.get(), AF_VSOCK, SO_VM_SOCKETS_CONNECT_TIMEOUT, &Timeout, sizeof(Timeout)) < 0)
     {
-        LOG_ERROR("setsockopt SO_VM_SOCKETS_CONNECT_TIMEOUT failed {}", errno);
+        LOG_ERROR("setsockopt SO_VM_SOCKETS_CONNECT_TIMEOUT failed {}, (from: {})", errno, Source);
         return {};
     }
 
@@ -586,13 +588,13 @@ Return Value:
         int BufferSize = *SocketBuffer;
         if (setsockopt(SocketFd.get(), SOL_SOCKET, SO_SNDBUF, &BufferSize, sizeof(BufferSize)) < 0)
         {
-            LOG_ERROR("setsockopt(SO_SNDBUF, {}) failed {}", BufferSize, errno);
+            LOG_ERROR("setsockopt(SO_SNDBUF, {}) failed {}, (from: {})", BufferSize, errno, Source);
             return {};
         }
 
         if (setsockopt(SocketFd.get(), SOL_SOCKET, SO_RCVBUF, &BufferSize, sizeof(BufferSize)) < 0)
         {
-            LOG_ERROR("setsockopt(SO_RCVBUF, {}) failed {}", BufferSize, errno);
+            LOG_ERROR("setsockopt(SO_RCVBUF, {}) failed {}, (from: {})", BufferSize, errno, Source);
             return {};
         }
     }
@@ -603,7 +605,7 @@ Return Value:
     SocketAddress.svm_port = Port;
     if (connect(SocketFd.get(), (const struct sockaddr*)&SocketAddress, sizeof(SocketAddress)) < 0)
     {
-        LOG_ERROR("connect port {} failed {}", Port, errno);
+        LOG_ERROR("connect port {} failed {} (from: {})", Port, errno, Source);
         return {};
     }
 
@@ -1201,8 +1203,7 @@ std::optional<LX_MINI_INIT_NETWORKING_MODE> UtilGetNetworkingMode(void)
 
 Routine Description:
 
-    This routine gets the feature flags, either directly, from an environment
-    variable, or by querying it from the init process.
+    This routine queries the networking mode from the init process.
 
 Arguments:
 
@@ -1210,16 +1211,12 @@ Arguments:
 
 Return Value:
 
-    The feature flags.
+    The networking mode if successful, std::nullopt otherwise.
 
 --*/
 
 try
 {
-    //
-    // Query init for the value.
-    //
-
     wsl::shared::SocketChannel channel{UtilConnectUnix(WSL_INIT_INTEROP_SOCKET), "wslinfo"};
     THROW_LAST_ERROR_IF(channel.Socket() < 0);
 
@@ -1295,6 +1292,40 @@ Return Value:
     }
 
     return Result;
+}
+
+std::string UtilGetVmId(void)
+
+/*++
+
+Routine Description:
+
+    This routine queries the VM ID from the init process.
+
+Arguments:
+
+    None.
+
+Return Value:
+
+    The VM ID if successful, an empty string otherwise.
+
+--*/
+
+try
+{
+    wsl::shared::SocketChannel channel{UtilConnectUnix(WSL_INIT_INTEROP_SOCKET), "wslinfo"};
+    THROW_LAST_ERROR_IF(channel.Socket() < 0);
+
+    wsl::shared::MessageWriter<LX_INIT_QUERY_VM_ID> Message(LxInitMessageQueryVmId);
+    channel.SendMessage<LX_INIT_QUERY_VM_ID>(Message.Span());
+
+    return channel.ReceiveMessage<LX_INIT_QUERY_VM_ID>().Buffer;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return {};
 }
 
 void UtilInitGroups(const char* User, gid_t Gid)
@@ -1675,8 +1706,10 @@ Return Value:
     //
     // Mount the device to the mount point.
     //
-    // N.B. The mount operation is only retried if the mount source does not yet exist,
-    //      which can happen when hot-added devices are not yet available in the guest.
+    // N.B. The mount operation is retried if:
+    //      - The mount source does not yet exist (hot-added devices)
+    //      - For Plan9 (9p): device is busy or not found
+    //      - For VirtioFS: invalid tag (device not ready)
     //
 
     try
@@ -1689,7 +1722,23 @@ Return Value:
                 TimeoutSeconds.value(),
                 [&]() {
                     errno = wil::ResultFromCaughtException();
-                    return errno == ENOENT || errno == ENXIO || errno == EIO;
+
+                    // Generic device not ready errors
+                    if (errno == ENXIO || errno == EIO || errno == ENOENT)
+                    {
+                        return true;
+                    }
+
+                    // Filesystem-specific device readiness errors
+                    if (Type != nullptr)
+                    {
+                        if ((strcmp(Type, PLAN9_FS_TYPE) == 0 && errno == EBUSY) || (strcmp(Type, VIRTIO_FS_TYPE) == 0 && errno == EINVAL))
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
                 });
         }
         else
@@ -1700,7 +1749,7 @@ Return Value:
     catch (...)
     {
         errno = wil::ResultFromCaughtException();
-        LOG_ERROR("mount({}, {}, {}, 0x{}x, {}) failed {}", Source, Target, Type, MountFlags, Options, errno);
+        LOG_ERROR("mount({}, {}, {}, {:#x}, {}) failed {}", Source, Target, Type, MountFlags, Options, errno);
         return -errno;
     }
 
@@ -2853,14 +2902,16 @@ Return Value:
         std::string TranslatedPath = WslPathTranslate(Path, 0, Mode);
         if (TranslatedPath.empty())
         {
+            auto WarningMessage = wsl::shared::Localization::MessageFailedToTranslate(Path);
             if (wil::ScopedWarningsCollector::CanCollectWarning())
             {
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToTranslate(Path));
+                EMIT_USER_WARNING(std::move(WarningMessage));
             }
             else
             {
-                LOG_ERROR("Failed to translate {}", Path);
+                LOG_WARNING("{}", WarningMessage);
             }
+
             continue;
         }
 

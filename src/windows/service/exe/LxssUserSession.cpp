@@ -510,7 +510,7 @@ try
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
 
-    return session->Shutdown(false, Force);
+    return session->Shutdown(false, Force ? ShutdownBehavior::Force : ShutdownBehavior::Wait);
 }
 CATCH_RETURN()
 
@@ -927,7 +927,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     std::filesystem::path newVhdPath = Location;
     RETURN_HR_IF(E_INVALIDARG, newVhdPath.empty());
 
-    newVhdPath /= LXSS_VM_MODE_VHD_NAME;
+    newVhdPath /= distro.VhdFilePath.filename();
 
     auto impersonate = wil::CoImpersonateClient();
 
@@ -952,7 +952,7 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
 
     // Update the registry location
     registration.Write(Property::BasePath, Location);
-    registration.Write(Property::VhdFileName, LXSS_VM_MODE_VHD_NAME);
+    registration.Write(Property::VhdFileName, newVhdPath.filename().c_str());
 
     revert.release();
 
@@ -1079,6 +1079,22 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
             {
                 const wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
                 auto runAsUser = wil::impersonate_token(userToken.get());
+
+                // Ensure the target file has the correct file extension.
+                if (GetFileType(FileHandle) == FILE_TYPE_DISK)
+                {
+                    std::wstring exportPath;
+                    THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(FileHandle, exportPath));
+
+                    const auto sourceFileExtension = configuration.VhdFilePath.extension().native();
+                    const auto targetFileExtension = std::filesystem::path(exportPath).extension().native();
+                    if (!wsl::windows::common::string::IsPathComponentEqual(sourceFileExtension, targetFileExtension))
+                    {
+                        THROW_HR_WITH_USER_ERROR(
+                            WSL_E_EXPORT_FAILED, wsl::shared::Localization::MessageRequiresFileExtension(sourceFileExtension.c_str()));
+                    }
+                }
+
                 const wil::unique_hfile vhdFile(CreateFileW(
                     configuration.VhdFilePath.c_str(), GENERIC_READ, (FILE_SHARE_READ | FILE_SHARE_DELETE), nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 
@@ -1258,13 +1274,9 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
 
     s_ValidateDistroName(DistributionName);
 
-    // Return an error if the path is not absolute or does not end in the .vhdx file extension.
+    // Return an error if the path is not absolute or does not have a valid VHD file extension.
     const std::filesystem::path path{VhdPath};
-    RETURN_HR_IF(
-        E_INVALIDARG,
-        !path.is_absolute() ||
-            (!wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), wsl::windows::common::wslutil::c_vhdFileExtension) &&
-             !wsl::windows::common::string::IsPathComponentEqual(path.extension().c_str(), wsl::windows::common::wslutil::c_vhdxFileExtension)));
+    RETURN_HR_IF(E_INVALIDARG, !path.is_absolute() || !wsl::windows::common::wslutil::IsVhdFile(path));
 
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey();
     std::lock_guard lock(m_instanceLock);
@@ -1448,6 +1460,24 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 wil::CreateDirectoryDeep(distributionPath.c_str());
             }
 
+            // If importing a vhd, determine if it is a .vhd or .vhdx.
+            std::wstring vhdName{LXSS_VM_MODE_VHD_NAME};
+            if ((WI_IsFlagSet(Flags, LXSS_IMPORT_DISTRO_FLAGS_VHD)) && (GetFileType(FileHandle) == FILE_TYPE_DISK))
+            {
+                std::wstring pathBuffer;
+                THROW_IF_FAILED(wil::GetFinalPathNameByHandleW(FileHandle, pathBuffer));
+
+                std::filesystem::path vhdPath{std::move(pathBuffer)};
+                if (!wsl::windows::common::wslutil::IsVhdFile(vhdPath))
+                {
+                    using namespace wsl::windows::common::wslutil;
+                    THROW_HR_WITH_USER_ERROR(
+                        WSL_E_IMPORT_FAILED, wsl::shared::Localization::MessageRequiresFileExtensions(c_vhdFileExtension, c_vhdxFileExtension));
+                }
+
+                vhdName = vhdPath.filename();
+            }
+
             registration = DistributionRegistration::Create(
                 lxssKey.get(),
                 DistributionId,
@@ -1457,7 +1487,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
                 flags,
                 LX_UID_ROOT,
                 PackageFamilyName,
-                LXSS_VM_MODE_VHD_NAME,
+                vhdName.c_str(),
                 WI_IsFlagClear(Flags, LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE));
 
             configuration = s_GetDistributionConfiguration(registration, DistributionName == nullptr);
@@ -1926,7 +1956,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             if (m_utilityVm->GetConfig().SetVersionDebug)
             {
-                commandLine += " -v";
+                commandLine += " -vv --totals";
             }
 
             // Run the bsdtar elf binary expand the tar file using the socket as stdin.
@@ -1991,7 +2021,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
 
             if (m_utilityVm->GetConfig().SetVersionDebug)
             {
-                commandLine += " -v";
+                commandLine += " -vv --totals";
             }
 
             // Run the bsdtar elf binary to create the tar file using the socket as stdout.
@@ -2052,13 +2082,11 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
     return result;
 }
 
-HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceTerminate)
+HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, ShutdownBehavior Behavior)
 {
     try
     {
-        // If the user asks for a forced termination, kill the VM
-        if (ForceTerminate)
-        {
+        auto forceTerminate = [this]() {
             auto vmId = m_vmId.load();
             if (!IsEqualGUID(vmId, GUID_NULL))
             {
@@ -2071,11 +2099,43 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceT
 
                 WSL_LOG("ForceTerminateVm", TraceLoggingValue(result, "Result"));
             }
+        };
+
+        // If the user asks for a forced termination, kill the VM
+        if (Behavior == ShutdownBehavior::Force)
+        {
+            forceTerminate();
         }
 
         {
+            bool locked = false;
+            auto unlock = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, &locked]() {
+                if (locked)
+                {
+                    m_instanceLock.unlock();
+                }
+            });
+
+            if (Behavior == ShutdownBehavior::ForceAfter30Seconds)
+            {
+                if (m_instanceLock.try_lock_for(std::chrono::seconds(30)))
+                {
+                    locked = true;
+                }
+                else
+                {
+                    WSL_LOG("VmShutdownLockTimedOut");
+                    forceTerminate();
+                }
+            }
+
+            if (!locked)
+            {
+                m_instanceLock.lock();
+                locked = true;
+            }
+
             // Stop each instance with the lock held.
-            std::lock_guard lock(m_instanceLock);
             while (!m_runningInstances.empty())
             {
                 _TerminateInstanceInternal(&m_runningInstances.begin()->first, false);
@@ -2112,12 +2172,21 @@ HRESULT LxssUserSessionImpl::Shutdown(_In_ bool PreventNewInstances, bool ForceT
     return S_OK;
 }
 
-void LxssUserSessionImpl::TelemetryWorker(_In_ wil::unique_socket&& socket, _In_ bool drvFsNotifications) const
+void LxssUserSessionImpl::TelemetryWorker(_In_ wil::unique_socket&& socket) const
 try
 {
     wsl::windows::common::wslutil::SetThreadDescription(L"Telemetry");
 
     wsl::shared::SocketChannel channel(std::move(socket), "Telemetry", m_vmTerminating.get());
+
+    // Check if drvfs notifications are enabled for the user.
+    bool drvFsNotifications{};
+    {
+        auto impersonate = wil::impersonate_token(m_userToken.get());
+        const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
+        drvFsNotifications =
+            wsl::windows::common::registry::ReadDword(lxssKey.get(), LXSS_NOTIFICATIONS_KEY, LXSS_NOTIFICATION_DRVFS_PERF_DISABLED, 0) == 0;
+    }
 
     // Aggregate information about what is running inside the VM. This is logged
     // periodically because logging each event individually would be too noisy.
@@ -2614,8 +2683,7 @@ try
     THROW_IF_FAILED(shellLink->SetArguments(commandLine.c_str()));
     THROW_IF_FAILED(shellLink->SetIconLocation(ShortcutIcon, 0));
 
-    Microsoft::WRL::ComPtr<IPersistFile> storage;
-    THROW_IF_FAILED(shellLink->QueryInterface(IID_IPersistFile, &storage));
+    auto storage = shellLink.query<IPersistFile>();
     THROW_IF_FAILED(storage->Save(shortcutPath.c_str(), true));
 
     registration.Write(Property::ShortcutPath, shortcutPath.c_str());
@@ -2678,12 +2746,19 @@ try
         std::wstring systemDirectory;
         THROW_IF_FAILED(wil::GetSystemDirectory(systemDirectory));
 
-        e["commandline"] = WideToMultiByte(std::format(
-            L"{}\\{} {} {} {} {}", systemDirectory, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distributionIdString, WSL_CHANGE_DIRECTORY_ARG, WSL_CWD_HOME));
+        e["commandline"] =
+            WideToMultiByte(std::format(L"{}\\{} {} {}", systemDirectory, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distributionIdString));
 
         e["name"] = WideToMultiByte(Configuration.Name);
         e["guid"] = WideToMultiByte(distributionProfileId);
-        e["icon"] = IconPath.string();
+        e["icon"] = WideToMultiByte(IconPath.native());
+
+        // Set default starting directory to home directory if not already specified
+        // This allows Windows Terminal to override with startingDirectory setting
+        if (e.find("startingDirectory") == e.end())
+        {
+            e["startingDirectory"] = "~";
+        }
 
         // See https://github.com/microsoft/terminal/pull/18195. Supported in terminal >= 1.23
         e["pathTranslationStyle"] = "wsl";
@@ -2769,8 +2844,6 @@ void LxssUserSessionImpl::_CreateVm()
         // Create the utility VM and register for callbacks.
         m_utilityVm = WslCoreVm::Create(m_userToken, std::move(config), vmId);
 
-        m_utilityVm->GetRuntimeId();
-
         if (m_httpProxyStateTracker)
         {
             // this needs to be done after the VM has finished in case we fell back to NAT mode
@@ -2779,30 +2852,6 @@ void LxssUserSessionImpl::_CreateVm()
 
         try
         {
-            auto callback = [this](auto Pid) {
-                // If the vm is currently being destroyed, the instance lock might be held
-                // while WslCoreVm's destructor is waiting on this thread.
-                // Cancel the call if the vm destruction is signaled.
-                // Note: This is safe because m_instanceLock is always initialized
-                // and because WslCoreVm's destructor waits for this thread, the session can't be gone
-                // until this callback completes.
-
-                auto lock = m_instanceLock.try_lock();
-                while (!lock)
-                {
-                    if (m_vmTerminating.wait(100))
-                    {
-                        return;
-                    }
-                    lock = m_instanceLock.try_lock();
-                }
-
-                auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
-                TerminateByClientIdLockHeld(Pid);
-            };
-
-            m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
-
             // Mount disks after the system distro vhd is mounted in case filesystem detection is needed.
             _LoadDiskMounts();
 
@@ -2812,17 +2861,9 @@ void LxssUserSessionImpl::_CreateVm()
             // If the telemetry is enabled, launch the telemetry agent inside the VM.
             if (m_utilityVm->GetConfig().EnableTelemetry && TraceLoggingProviderEnabled(g_hTraceLoggingProvider, WINEVENT_LEVEL_INFO, 0))
             {
-                bool drvFsNotifications = false;
-                {
-                    auto impersonate = wil::impersonate_token(m_userToken.get());
-                    const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-                    drvFsNotifications = wsl::windows::common::registry::ReadDword(
-                                             lxssKey.get(), LXSS_NOTIFICATIONS_KEY, LXSS_NOTIFICATION_DRVFS_PERF_DISABLED, 0) == 0;
-                }
-
                 LPCSTR Arguments[] = {LX_INIT_TELEMETRY_AGENT, nullptr};
                 auto socket = m_utilityVm->CreateRootNamespaceProcess(LX_INIT_PATH, Arguments);
-                m_telemetryThread = std::thread(&LxssUserSessionImpl::TelemetryWorker, this, std::move(socket), drvFsNotifications);
+                m_telemetryThread = std::thread(&LxssUserSessionImpl::TelemetryWorker, this, std::move(socket));
             }
 
             m_pluginManager.OnVmStarted(&m_session, &userSettings);
@@ -2834,6 +2875,34 @@ void LxssUserSessionImpl::_CreateVm()
             _VmTerminate();
             throw;
         }
+
+        auto callback = [this](auto Pid) {
+            // If the vm is currently being destroyed, the instance lock might be held
+            // while WslCoreVm's destructor is waiting on this thread.
+            // Cancel the call if the vm destruction is signaled.
+            // Note: This is safe because m_instanceLock is always initialized
+            // and because WslCoreVm's destructor waits for this thread, the session can't be gone
+            // until this callback completes.
+
+            auto lock = m_instanceLock.try_lock();
+            while (!lock)
+            {
+                if (m_vmTerminating.wait(100))
+                {
+                    return;
+                }
+                lock = m_instanceLock.try_lock();
+            }
+
+            auto unlock = wil::scope_exit([&]() { m_instanceLock.unlock(); });
+            TerminateByClientIdLockHeld(Pid);
+        };
+
+        // N.B. The callbacks must be registered outside of the above try/catch.
+        // Otherwise if an exception is thrown, calling _VmTerminate() will trigger the 's_VmTerminated' termination callback
+        // Which can deadlock since this thread holds the instance lock and HCS can block until the VM termination callback returns before deleting the VM.
+
+        m_utilityVm->RegisterCallbacks(std::bind(callback, _1), std::bind(s_VmTerminated, this, _1));
     }
 
     _VmCheckIdle();
@@ -2883,11 +2952,13 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         if (PathFileExistsW(Configuration.VhdFilePath.c_str()))
         {
             if (m_utilityVm)
+            {
                 try
                 {
                     m_utilityVm->EjectVhd(Configuration.VhdFilePath.c_str());
                 }
-            CATCH_LOG()
+                CATCH_LOG()
+            }
 
             if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_VHD))
             {
@@ -2928,13 +2999,15 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
 
     // Remove start menu shortcuts for WSLg applications.
     if (WI_IsFlagSet(Flags, LXSS_DELETE_DISTRO_FLAGS_WSLG_SHORTCUTS))
+    {
         try
         {
             const auto dllPath = wsl::windows::common::wslutil::GetBasePath() / WSLG_TS_PLUGIN_DLL;
             static LxssDynamicFunction<decltype(RemoveAppProvider)> removeAppProvider(dllPath.c_str(), "RemoveAppProvider");
             LOG_IF_FAILED(removeAppProvider(Configuration.Name.c_str()));
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // If the basepath is empty, delete it.
     try
@@ -2990,11 +3063,13 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
 
     // Ensure that the default distribution is still valid.
     if (!orphanedDistributions.empty())
+    {
         try
         {
             _GetDefaultDistro(LxssKey);
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     return distributions;
 }

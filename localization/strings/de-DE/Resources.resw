@@ -163,17 +163,17 @@ Mit "wsl.exe {} &lt;Distro&gt;" installieren.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroAlreadySet" xml:space="preserve">
-    <value>Der Verteilungsname wurde bereits festgelegt.</value>
+    <value>Der Distributionsname wurde bereits festgelegt.</value>
   </data>
   <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
     <value>Der angegebene Installationsspeicherort wird bereits verwendet.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Eine Verteilung mit dem angegebenen Namen ist bereits vorhanden. Verwenden Sie --name , um einen anderen Namen zu wählen.</value>
+    <value>Eine Distribution mit dem angegebenen Namen ist bereits vorhanden. Verwenden Sie --name , um einen anderen Namen zu wählen.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
-    <value>Es ist keine Verteilung mit dem angegebenen Namen vorhanden.</value>
+    <value>Es ist keine Distribution mit dem angegebenen Namen vorhanden.</value>
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>Zum Bereitstellen eines Datenträgers ist Administratorzugriff erforderlich.</value>
@@ -205,7 +205,7 @@ Mit "wsl.exe {} &lt;Distro&gt;" installieren.
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageImportingDistribution" xml:space="preserve">
-    <value>Verteilung importieren</value>
+    <value>Distribution importieren</value>
   </data>
   <data name="MessageDownloadComplete" xml:space="preserve">
     <value>{} wurde heruntergeladen.</value>
@@ -215,7 +215,7 @@ Mit "wsl.exe {} &lt;Distro&gt;" installieren.
     <value>Windows-Subsystem für Linux setzt eine vorherige Installation... fort.</value>
   </data>
   <data name="MessageInvalidDistributionName" xml:space="preserve">
-    <value>Ungültiger Verteilungsname: '{}'.
+    <value>Ungültiger Distributionsname: '{}'.
 Um eine Liste gültiger Distributionen abzurufen, verwenden Sie "wsl.exe --list --online'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -295,7 +295,7 @@ und "wsl.exe --install &lt;Distro&gt;".</value>
     <value>Die Distribution ist bereits die angeforderte Version.</value>
   </data>
   <data name="MessageVmModeNotSupported" xml:space="preserve">
-    <value>WSL 2 wird von der Legacyverteilung nicht unterstützt.</value>
+    <value>WSL 2 wird von der Legacy Distribution nicht unterstütztt.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 wird von Ihrer aktuellen Computerkonfiguration nicht unterstützt.
@@ -364,24 +364,24 @@ Beispiel: wslpath 'c:\\users'</value>
 
 Verbrauch:
     /l, /list [Option]
-        Listet registrierte Verteilungen auf.
-        /all – Optional alle Distributionen auflisten, einschließlich Verteilungen, die
+        Listet registrierte Distributionen auf.
+       /all – Optional alle Distributionen auflisten, einschließlich Distributionen, die
                zurzeit installiert oder deinstalliert werden.
 
-        /running – Listet nur Verteilungen auf, die derzeit ausgeführt werden.
+        /running – Listet nur Distributionen auf, die derzeit ausgeführt werden.
 
     /s, /setdefault &lt;DistributionName&gt;
         Legt die Distribution als Standard fest.
 
     /t, /terminate &lt;DistributionName&gt;
-        Beendet die Verteilung.
+        Beendet die Distribution.
 
     /u, /unregister &lt;DistributionName&gt;
         Hebt die Registrierung der Distribution auf und löscht das Stammdateisystem.</value>
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
-    <value>Copyright (c) Microsoft Corporation. Alle Rechte vorbehalten.
+    <value>Copyright (c) Microsoft Corporation. Alle Rechte vorbehalten.
 Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/privacy.
 
 Syntax: wsl.exe [Argument] [Optionen...] [CommandLine]
@@ -478,7 +478,7 @@ Argumente für die Verwaltung des Windows-Subsystems für Linux:
                 Den Standardbenutzer der Verteilung festlegen.
 
             --resize &lt;MemoryString&gt;
-                Passen Sie die Größe des Datenträgers der Verteilung auf die angegebene Größe an.
+                Passen Sie die Größe des Datenträgers der Distribution auf die angegebene Größe an.
 
     --mount &lt;Disk&gt;
         Fügt einen physischen oder virtuellen Datenträger an alle WSL2-Distributionen an und bindet ihn ein.
@@ -589,7 +589,7 @@ Argumente für die Verwaltung von Distributionen in Windows-Subsystem für Linux
         Beendet die angegebene Distribution.
 
     --unregister &lt;Distro&gt;
-        Hebt die Registrierung der Verteilung auf und löscht das Stammdateisystem.</value>
+        Hebt die Registrierung der Distribution auf und löscht das Stammdateisystem.</value>
   <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
@@ -632,11 +632,11 @@ Buildzeit: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>Die benutzerdefinierte Kernelmodul-VHD in "{}" wurde nicht gefunden: "{}".</value>
+    <value>Die benutzerdefinierte Kernelmodule-VHD in {} wurde nicht gefunden: „{}“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
-    <value>Die in {} angegebene benutzerdefinierte Systemverteilung wurde nicht gefunden oder weist nicht das richtige Format auf.</value>
+    <value>Die in {} angegebene benutzerdefinierte Systemdistribution wurde nicht gefunden oder weist nicht das richtige Format auf.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslgUsage" xml:space="preserve">
@@ -690,7 +690,7 @@ Argumente:
     <value>Es wird nach Updates gesucht.</value>
   </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
-    <value>Diese Verteilung ist nur im Microsoft Store verfügbar.</value>
+    <value>Diese Distribution ist nur im Microsoft Store verfügbar.</value>
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>wsl.exe --mount auf ARM64 erfordert Windows 27653 oder höher.</value>
@@ -710,8 +710,13 @@ Das System muss möglicherweise neu gestartet werden, damit die Änderungen wirk
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Die angegebene Datei muss die Dateierweiterung ".vhdx" aufweisen.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Die angegebene Datei muss die Dateierweiterung {} aufweisen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Die angegebene Datei muss die Dateierweiterung {} oder {} besitzen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>VmSwitch „{}“ wurde nicht gefunden. Verfügbare Switches: {}</value>
@@ -721,7 +726,7 @@ Das System muss möglicherweise neu gestartet werden, damit die Änderungen wirk
     <value>Für Bridged Networking muss wsl2.vmSwitch eingestellt sein.</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>Fehler beim Abrufen der Listenverteilung von „{}“. {}</value>
+    <value>Fehler beim Abrufen der Liste der Distributionen von „{}“. {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -730,9 +735,6 @@ Das System muss möglicherweise neu gestartet werden, damit die Änderungen wirk
   </data>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Fehler beim Ändern der Größe des Datenträgers.</value>
-  </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Fehler beim Übersetzen des Pfads.</value>
   </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Kein Wert gefunden.</value>
@@ -747,7 +749,7 @@ Weitere Informationen finden Sie unter https://aka.ms/wslinstall</value>
     <value>Zum Ausführen der Debug-Shell muss wsl.exe als Administrator ausgeführt werden.</value>
   </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
-    <value>Fehler beim Installationsprozess für die Verteilung „{}“. Exitcode: {}.</value>
+    <value>Fehler beim Installationsprozess für die Distribution „{}“. Exitcode: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidGuid" xml:space="preserve">
@@ -805,7 +807,7 @@ Weitere Informationen finden Sie unter https://aka.ms/wslinstall</value>
     <value>Open EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>Diese Verteilung enthält keinen Standardnamen. Verwenden Sie --name , um den Verteilungsnamen zu wählen.</value>
+    <value>Diese Distribution enthält keinen Standardnamen. Verwenden Sie --name , um den Distributionsnamen zu wählen.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -817,22 +819,22 @@ Weitere Informationen finden Sie unter https://aka.ms/wslinstall</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
-    <value>Ungültiger Verteilungsname: „{}“.</value>
+    <value>Ungültiger Distributionsname: „{}“.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
-    <value>Es wird die Legacy-Verteilungsregistrierung verwendet. Erwägen Sie, stattdessen eine TAR-basierte Verteilung zu verwenden.</value>
+    <value>Es wird die Legacy-Verteilungsregistrierung verwendet. Erwägen Sie, stattdessen eine TAR-basierte Distribution zu verwenden.</value>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Ältere Distributionsregistrierungen unterstützen das Argument --version nicht.</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionOverridden" xml:space="preserve">
-    <value>Die Verteilung "{}" wird durch ein Überschreibungsmanifest bereitgestellt.</value>
+    <value>Die Distribution "{}" wird durch ein Überschreibungsmanifest bereitgestellt.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHashMismatch" xml:space="preserve">
-    <value>Der Verteilungshash stimmt nicht überein. Erwartet: {}, tatsächlicher Hash: {}</value>
+    <value>Der Distributionshash stimmt nicht überein. Erwartet: {}, tatsächlicher Hash: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidHexString" xml:space="preserve">
@@ -840,11 +842,11 @@ Weitere Informationen finden Sie unter https://aka.ms/wslinstall</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
-    <value>„{}“ wird bei der Installation von Legacy-Verteilungen nicht unterstützt.</value>
+    <value>„{}“ wird bei der Installation von Legacy-Distributionen nicht unterstützt.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionInstalled" xml:space="preserve">
-    <value>Die Verteilung wurde erfolgreich installiert. Sie kann über "wsl.exe -d {}" gestartet werden.</value>
+    <value>Die Distribution wurde erfolgreich installiert. Sie kann über "wsl.exe -d {}" gestartet werden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidNumberString" xml:space="preserve">
@@ -1004,7 +1006,7 @@ Fallback auf NAT-Netzwerk.</value>
     <value>Dokumente anzeigen</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Der Vorgang konnte nicht abgeschlossen werden, da die VHDX zurzeit verwendet wird. So erzwingen Sie, dass WSL die Verwendung beendet: wsl.exe --shutdown</value>
+    <value>Der Vorgang konnte nicht abgeschlossen werden, da die VHD zurzeit verwendet wird. So erzwingen Sie, dass WSL die Verwendung beendet: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1012,7 +1014,7 @@ Fallback auf NAT-Netzwerk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>VHDX mit geringer Dichte wird nur für WSL2 unterstützt.</value>
+    <value>VHD mit geringer Dichte wird nur unter WSL2 unterstützt.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Das Ausführen von WSL als lokales System wird nicht unterstützt.</value>
@@ -1038,11 +1040,11 @@ Fallback auf NAT-Netzwerk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionFailedToStart" xml:space="preserve">
-    <value>Fehler beim Starten der Verteilung. Fehlercode: {}, Fehlerschritt: {}</value>
+    <value>Fehler beim Starten der Distribution. Fehlercode: {}, Fehlerschritt: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDiskCorrupted" xml:space="preserve">
-    <value>Die Verteilung konnte nicht gestartet werden, da der virtuelle Datenträger beschädigt ist.</value>
+    <value>Die Distribution konnte nicht gestartet werden, da der virtuelle Datenträger beschädigt ist.</value>
   </data>
   <data name="MessageConfigKeyDuplicated" xml:space="preserve">
     <value>Doppelter Konfigurationsschlüssel '{}' in {}:{} (widersprüchlicher Schlüssel: '{}' in {}:{})</value>
@@ -1053,15 +1055,15 @@ Fallback auf NAT-Netzwerk.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWaitingForOobe" xml:space="preserve">
-    <value>Warten auf den Abschluss des OOBE-Befehls für die Verteilung „{}“...</value>
+    <value>Warten auf den Abschluss des OOBE-Befehls für die Distribution "{}"...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>Fehler beim Lesen der Eigenschaft "{}" aus der Verteilung {} </value>
+    <value>Fehler beim Lesen der Eigenschaft "{}" aus der Distribution {} </value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Dies scheint eine VHDX-Datei zu sein. Verwenden Sie --vhd anstelle eines TAR-Archivs, um eine VHDX-Datei zu importieren.</value>
+    <value>Dies sieht wie eine VHD-Datei aus. Verwenden Sie „--vhd “, um eine VHD anstelle eines „tar“ zu importieren.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1070,7 +1072,7 @@ Es wird versucht,...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoInstallDefault" xml:space="preserve">
-    <value>Es wurde keine Standardverteilung konfiguriert. Geben Sie eine Zu installierende Distribution an.</value>
+    <value>Es wurde keine Standarddistribution konfiguriert. Geben Sie eine Zu installierende Distribution an.</value>
   </data>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>wsl2.virtio9p ist deaktiviert und fällt mit vsock-Transport auf 9p zurück.</value>
@@ -1082,7 +1084,7 @@ Timeout für diese Eingabeaufforderung in 60 Sekunden.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
-    <value>Fehler beim Analysieren des Terminalprofils beim Registrieren der Verteilung: {}</value>
+    <value>Fehler beim Analysieren des Terminalprofils beim Registrieren der Distribution: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidSize" xml:space="preserve">
@@ -1113,8 +1115,8 @@ Fehlercode: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Die Unterstützung von Sparse VHD ist derzeit wegen möglicher Datenbeschädigung deaktiviert.
-Um eine Distribution zu zwingen, eine Sparse VHD zu verwenden, führen Sie bitte Folgendes aus:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+Um eine Distribution zu zwingen, eine spärliche VHD zu verwenden, führen Sie bitte Folgendes aus:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
@@ -1125,7 +1127,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
     <value>Fehler beim Verarbeiten von „/etc/fstab“ mit „mount -a“.</value>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
-    <value>Fehler beim Einbinden des Verteilungsdatenträgers. Er wurde schreibgeschützt als Fallback bereitgestellt.
+    <value>Fehler beim Einbinden des Distributionsdatenträgers. Er wurde schreibgeschützt als Fallback bereitgestellt.
 Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
@@ -1737,13 +1739,13 @@ Sie können auch über die Befehlspalette in VS Code selbst auf weitere VS Code 
     <value>Aktivieren des abgesicherten Modus</value>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
-    <value>Führen Sie die WSL im „abgesicherten Modus“ aus, in dem viele Features deaktiviert sind. Dieser Modus ist für die Wiederherstellung von fehlerhaften Verteilungen gedacht.</value>
+    <value>Führen Sie die WSL im „abgesicherten Modus“ aus, in dem viele Features deaktiviert sind. Dieser Modus ist für die Wiederherstellung von fehlerhaften Distributionen gedacht.</value>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Aktivieren des abgesicherten Modus.</value>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Führen Sie die WSL im „abgesicherten Modus“ aus, in dem viele Features deaktiviert sind. Dieser Modus ist für die Wiederherstellung von fehlerhaften Verteilungen gedacht.</value>
+    <value>Führen Sie die WSL im „abgesicherten Modus“ aus, in dem viele Features deaktiviert sind. Dieser Modus ist für die Wiederherstellung von fehlerhaften Distributionen gedacht.</value>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>Info</value>

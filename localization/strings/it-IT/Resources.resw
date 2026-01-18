@@ -402,7 +402,7 @@ Argomenti per l'esecuzione di file binari Linux:
 Opzioni:
     --cd &lt;Directory&gt;
         Imposta la directory specificata come directory di lavoro corrente.
-        Se si usa ~, verrà usato il percorso home dell'utente Linux. Se il percorso inizia
+        Se viene usato ~, verrà usato il percorso home dell'utente Linux. Se il percorso inizia
         con un carattere /, verrà interpretato come un percorso Linux assoluto.
         In caso contrario, il valore deve essere un percorso assoluto di Windows.
 
@@ -472,7 +472,7 @@ Argomenti per la gestione del sottosistema Windows per Linux:
                 Sposta la distribuzione in una nuova posizione.
 
             --set-sparse, -s &lt;true|false&gt;
-                Imposta il vhdx della distribuzione su sparse, consentendo il recupero automatico dello spazio su disco.
+                Imposta il VHD della distribuzione su sparse, consentendo il recupero automatico dello spazio su disco.
 
             --set-default-user &lt;Username&gt;
                 Imposta l'utente predefinito della distribuzione.
@@ -552,11 +552,11 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
                 Specifica la versione da usare per la nuova distribuzione.
 
             --vhd
-                Specifica che il file fornito è un file con estensione vhdx, non un file TAR.
-                Questa operazione crea una copia del file con estensione vhdx nel percorso di installazione specificato.
+                Specifica che il file fornito è un file con estensione vhd o vhdx, non un file TAR.
+                Questa operazione crea una copia del file VHD nel percorso di installazione specificato.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importa il file con estensione vhdx specificato come nuova distribuzione.
+        Importa il file VHD specificato come nuova distribuzione.
         Questo disco rigido virtuale deve essere formattato con il tipo di file system ext4.
 
     --list, -l [Options]
@@ -577,7 +577,7 @@ Argomenti per la gestione delle distribuzioni del sottosistema Windows per Linux
                 Mostra informazioni dettagliate su tutte le distribuzioni.
 
             --online, -o
-                Visualizza un elenco di distribuzioni disponibili per l'installazione con 'wsl--install'.
+                Visualizza un elenco di distribuzioni disponibili per l'installazione con 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
         Imposta la distribuzione come predefinita.
@@ -710,8 +710,13 @@ Potrebbe essere necessario riavviare il sistema per rendere effettive le modific
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Il file specificato deve avere l'estensione vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Il file specificato deve avere l'estensione {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Il file specificato deve avere l'estensione {} o {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>VmSwitch '{}' non è stato trovato. Switch disponibili: {}</value>
@@ -730,9 +735,6 @@ Potrebbe essere necessario riavviare il sistema per rendere effettive le modific
   </data>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Non è possibile ridimensionare il disco.</value>
-  </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Non è stato possibile tradurre il percorso.</value>
   </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Nessun valore trovato.</value>
@@ -1004,7 +1006,7 @@ Fallback alla rete NAT.</value>
     <value>Visualizza documenti</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>Non è stato possibile completare l'operazione perché vhdx è attualmente in uso. Per forzare l'arresto di WSL, usare: wsl.exe --shutdown</value>
+    <value>Impossibile completare l'operazione perché il disco rigido virtuale è attualmente in uso. Per forzare l'arresto di WSL, usare: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1012,7 +1014,7 @@ Fallback alla rete NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>VHDX di tipo sparse supportato solo in WSL2.</value>
+    <value>Disco rigido virtuale di tipo sparse supportato solo in WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>L'esecuzione di WSL come sistema locale non è supportata.</value>
@@ -1061,7 +1063,7 @@ Fallback alla rete NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Sembra un file VHDX. Usa --vhd per importare un VHDX anziché un tar.</value>
+    <value>Questo sembra un file disco rigido virtuale. Usa --vhd per importare un disco rigido virtuale anziché un tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1112,9 +1114,9 @@ Codice errore: {}</value>
     <value>A causa di un problema di compatibilità con Accesso globale sicuro, il tunneling DNS è attualmente disabilitato.</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Il supporto VHD di tipo Sparse è attualmente disabilitato a causa di un potenziale danneggiamento dei dati.
-Per forzare l'uso di un disco rigido virtuale di tipo Sparse in una distribuzione, esegui:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+    <value>Il supporto disco rigido virtuale di tipo sparse attualmente è disabilitato a causa di un potenziale danneggiamento dei dati.
+Per forzare una distribuzione per usare un disco rigido virtuale sparse, esegui:
+wsl.exe --manage &lt;NomeDistribuzione&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

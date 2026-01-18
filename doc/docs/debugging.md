@@ -14,6 +14,14 @@ wpr -start wsl.wprp -filemode
 wpr -stop logs.ETL
 ```
 
+The consolidated `wsl.wprp` file includes multiple profiles for different scenarios:
+- `WSL` - General WSL tracing (default)
+- `WSL-Storage` - Enhanced storage tracing
+- `WSL-Networking` - Comprehensive networking tracing
+- `WSL-HvSocket` - HvSocket-specific tracing
+
+To use a specific profile, append `!ProfileName` to the wprp file, e.g., `wpr -start wsl.wprp!WSL-Networking -filemode`
+
 Once the log file is saved, you can use [WPA](https://apps.microsoft.com/detail/9n58qrw40dfw?hl=en-US&gl=US) to view the logs.
 
 Notable ETL providers: 

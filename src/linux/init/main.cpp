@@ -72,8 +72,9 @@ Abstract:
 #define CROSS_DISTRO_SHARE_PATH "/mnt/wsl"
 #define DEVFS_PATH "/dev"
 #define DEVNULL_PATH DEVFS_PATH "/null"
-#define DHCLIENT_CONF_PATH "/dhclient.conf"
-#define DHCLIENT_PATH "/usr/sbin/dhclient"
+#define DHCPCD_CONF_PATH "/dhcpcd.conf"
+#define DHCPCD_PATH "/usr/sbin/dhcpcd"
+
 #define DISTRO_PATH "/distro"
 #define ETC_PATH "/etc"
 #define GPU_SHARE_PREFIX "/gpu_"
@@ -857,10 +858,10 @@ Return Value:
 
         if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
         {
-            compressionArguments += "v";
+            compressionArguments += "vv";
         }
 
-        const char* arguments[] = {
+        std::vector<const char*> arguments{
             BSDTAR_PATH,
             "-C",
             Source,
@@ -872,7 +873,13 @@ Return Value:
             "-",
             ".",
             nullptr};
-        execv(BSDTAR_PATH, const_cast<char**>(arguments));
+
+        if (WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose))
+        {
+            arguments.emplace(arguments.begin() + 3, "--totals");
+        }
+
+        execv(BSDTAR_PATH, const_cast<char**>(arguments.data()));
         LOG_ERROR("execl failed, {}", errno);
     });
 
@@ -1158,7 +1165,7 @@ Return Value:
             "-C",
             Destination,
             "-x",
-            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vp" : "-p",
+            WI_IsFlagSet(Flags, LxMiniInitMessageFlagVerbose) ? "-vvp" : "-p",
             "--xattrs",
             "--numeric-owner",
             "-f",
@@ -1194,9 +1201,27 @@ Return Value:
 --*/
 
 {
-    UtilCreateChildProcess("agetty", []() {
-        execl("/usr/bin/setsid", "/usr/bin/setsid", "/sbin/agetty", "-w", "-L", LX_INIT_HVC_DEBUG_SHELL, "-a", "root", NULL);
-        LOG_ERROR("execl failed, {}", errno);
+    // Spawn a child process to handle relaunching the debug shell if it exits.
+    UtilCreateChildProcess("DebugShell", []() {
+        for (;;)
+        {
+            const auto Pid = UtilCreateChildProcess("agetty", []() {
+                execl("/usr/bin/setsid", "/usr/bin/setsid", "/sbin/agetty", "-w", "-L", LX_INIT_HVC_DEBUG_SHELL, "-a", "root", NULL);
+                LOG_ERROR("execl failed, {}", errno);
+            });
+
+            if (Pid < 0)
+            {
+                _exit(1);
+            }
+
+            int Status = -1;
+            if (TEMP_FAILURE_RETRY(waitpid(Pid, &Status, 0)) < 0)
+            {
+                LOG_ERROR("waitpid failed {}", errno);
+                _exit(1);
+            }
+        }
     });
 }
 
@@ -1206,11 +1231,12 @@ int StartDhcpClient(int DhcpTimeout)
 
 Routine Description:
 
-    Starts the dhcp client daemon.
+    Starts the dhcp client daemon. Blocks until the initial DHCP lease is acquired,
+    then the daemon continues running in the background to handle renewals.
 
 Arguments:
 
-    None.
+    DhcpTimeout - Supplies the timeout in seconds for the DHCP request.
 
 Return Value:
 
@@ -1219,37 +1245,21 @@ Return Value:
 --*/
 
 {
-    int ChildPid = UtilCreateChildProcess("dhcp", [DhcpTimeout]() {
+    int ChildPid = UtilCreateChildProcess("dhcpcd", [DhcpTimeout]() {
         //
-        // Create a new mount namespace for dhclient.
-        //
-
-        THROW_LAST_ERROR_IF(unshare(CLONE_NEWNS) < 0);
-
-        //
-        // When dhclient receives a DHCP response, it calls dhclient-script
-        // which creates a new file, and then moves it to /etc/resolv.conf.
-        // Because it's moved, it will overwrite any symlinks / hardlinks.
-        // Mounting /etc over /share allows resolv.conf to be written to /share.
-        //
-
-        THROW_LAST_ERROR_IF(mount(CROSS_DISTRO_SHARE_PATH, ETC_PATH, NULL, MS_BIND, NULL) < 0);
-
-        //
-        // Write the dhclient.conf config file.
+        // Write the dhcpcd.conf config file.
         //
 
         std::string Config = std::format(
-            "request subnet-mask, broadcast-address, routers,"
-            "domain-name, domain-name-servers, domain-search, host-name,"
-            "interface-mtu;\n"
-            "timeout {};\n",
+            "option subnet_mask, routers, broadcast, domain_name, domain_name_servers, domain_search, host_name, interface_mtu\n"
+            "noarp\n"
+            "timeout {}\n",
             DhcpTimeout);
 
-        THROW_LAST_ERROR_IF(WriteToFile(DHCLIENT_CONF_PATH, Config.c_str()) < 0);
+        THROW_LAST_ERROR_IF(WriteToFile(DHCPCD_CONF_PATH, Config.c_str()) < 0);
 
-        execl(DHCLIENT_PATH, DHCLIENT_PATH, "-4", "eth0", "-cf", DHCLIENT_CONF_PATH, NULL);
-        LOG_ERROR("execl() failed, {}", errno);
+        execl(DHCPCD_PATH, DHCPCD_PATH, "-w", "-4", "-f", DHCPCD_CONF_PATH, "eth0", NULL);
+        LOG_ERROR("execl({}) failed, {}", DHCPCD_PATH, errno);
     });
 
     if (ChildPid < 0)
@@ -1257,12 +1267,7 @@ Return Value:
         return -1;
     }
 
-    //
-    // Note: dhclient returns when the interface is successfully configured,
-    // but keeps a daemon running to maintain it.
-    //
-
-    return WaitForChild(ChildPid, DHCLIENT_PATH);
+    return WaitForChild(ChildPid, DHCPCD_PATH);
 }
 
 int StartGuestNetworkService(int GnsFd, wil::unique_fd&& DnsTunnelingFd, uint32_t DnsTunnelingIpAddress)
@@ -3857,6 +3862,63 @@ Return Value:
 
 int WslEntryPoint(int Argc, char* Argv[]);
 
+void EnableDebugMode(const std::string& Mode)
+{
+    if (Mode == "hvsocket")
+    {
+        // Mount the debugfs.
+        THROW_LAST_ERROR_IF(UtilMount("none", "/sys/kernel/debug", "debugfs", 0, nullptr) < 0);
+
+        // Enable hvsocket events.
+        std::vector<const char*> files{
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_on_msg_dpc/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_on_message/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onoffer/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onoffer_rescind/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_onopen_result/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_ongpadl_created/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_ongpadl_torndown/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_open/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_close_internal/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_establish_gpadl_header/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_establish_gpadl_body/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_teardown_gpadl/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_release_relid/enable",
+            "/sys/kernel/debug/tracing/events/hyperv/vmbus_send_tl_connect_request/enable"};
+
+        for (auto* e : files)
+        {
+            WriteToFile(e, "1");
+        }
+
+        // Relay logs to the host.
+        std::thread relayThread{[]() {
+            constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
+            std::ifstream file(path);
+
+            if (!file)
+            {
+                LOG_ERROR("Failed to open {}, {}", path, errno);
+                return;
+            }
+
+            std::string line;
+            while (std::getline(file, line))
+            {
+                LOG_INFO("{}", line);
+            }
+
+            LOG_ERROR("{}: closed", path);
+        }};
+
+        relayThread.detach();
+    }
+    else
+    {
+        LOG_ERROR("Unknown debugging mode: '{}'", Mode);
+    }
+}
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
@@ -3980,6 +4042,37 @@ int main(int Argc, char* Argv[])
     }
 
     //
+    // Create the etc directory and mount procfs and sysfs.
+    //
+
+    if (UtilMkdir(ETC_PATH, 0755) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, PROCFS_PATH, "proc", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    if (UtilMount(nullptr, SYSFS_PATH, "sysfs", 0, nullptr) < 0)
+    {
+        return -1;
+    }
+
+    //
+    // Enable debug mode, if specified.
+    //
+
+    if (const auto* debugMode = getenv(WSL_DEBUG_ENV))
+    {
+        LOG_ERROR("Running in debug mode: '{}'", debugMode);
+        EnableDebugMode(debugMode);
+
+        unsetenv(WSL_DEBUG_ENV);
+    }
+
+    //
     // Establish the message channel with the service via hvsocket.
     //
 
@@ -4004,25 +4097,6 @@ int main(int Argc, char* Argv[])
     {
         Result = -1;
         goto ErrorExit;
-    }
-
-    //
-    // Create the etc directory and mount procfs and sysfs.
-    //
-
-    if (UtilMkdir(ETC_PATH, 0755) < 0)
-    {
-        return -1;
-    }
-
-    if (UtilMount(nullptr, PROCFS_PATH, "proc", 0, nullptr) < 0)
-    {
-        return -1;
-    }
-
-    if (UtilMount(nullptr, SYSFS_PATH, "sysfs", 0, nullptr) < 0)
-    {
-        return -1;
     }
 
     if (getenv(WSL_ENABLE_CRASH_DUMP_ENV))

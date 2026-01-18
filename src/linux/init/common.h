@@ -54,9 +54,6 @@ Abstract:
 #include <cstdarg>
 #include "lxinitshared.h"
 #include "defs.h"
-#include "retryshared.h"
-#include "socketshared.h"
-#include "stringshared.h"
 
 #define ETC_FOLDER "/etc/"
 #define NAME_ENV "NAME"
@@ -150,6 +147,11 @@ auto LogImpl(int fd, const std::format_string<Args...>& format, Args&&... args)
     }
 
 #define FATAL_ERROR(str, ...) FATAL_ERROR_EX(1, str, ##__VA_ARGS__)
+
+// Some of these files need the LOG_* macros.
+#include "retryshared.h"
+#include "socketshared.h"
+#include "stringshared.h"
 
 int InitializeLogging(bool SetStderr, wil::LogFunction* ExceptionCallback = nullptr) noexcept;
 

@@ -137,7 +137,7 @@ Return Value:
         auto translatedPath = WslPathTranslate(value.data(), TRANSLATE_FLAG_ABSOLUTE, TRANSLATE_MODE_UNIX);
         if (translatedPath.empty())
         {
-            std::cerr << Localization::MessageFailedToTranslatePath() << "\n";
+            std::cerr << Localization::MessageFailedToTranslate(value.data()) << "\n";
             return 1;
         }
 
@@ -149,14 +149,21 @@ Return Value:
     }
     else if (Mode.value() == WslInfoMode::VMId)
     {
-        auto value = UtilGetEnvironmentVariable(LX_WSL2_VM_ID_ENV);
-        if (value.empty())
+        if (UtilIsUtilityVm())
         {
-            std::cerr << Localization::MessageNoValueFound() << "\n";
-            return 1;
-        }
+            auto vmId = UtilGetVmId();
+            if (vmId.empty())
+            {
+                std::cerr << Localization::MessageNoValueFound() << "\n";
+                return 1;
+            }
 
-        std::cout << value;
+            std::cout << vmId;
+        }
+        else
+        {
+            std::cout << "wsl1";
+        }
     }
     else
     {

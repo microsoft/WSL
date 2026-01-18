@@ -135,12 +135,6 @@ public:
         Logfile << TestMode;
         VERIFY_NO_THROW(LxsstuRunTest(Command.str().c_str(), Logfile.str().c_str()));
 
-        if (DrvFsMode.has_value() && DrvFsMode.value() == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("TODO: debug test for virtiofs");
-            return;
-        }
-
         //
         // Check that the read-only attribute has been changed.
         //
@@ -176,7 +170,7 @@ public:
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink1"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink2"));
 
-        // Since target resolution is done on the Windows side in Plan 9, it is able to create an NT
+        // Since target resolution is done on the Windows side in Plan 9 and VirtioFs, it is able to create an NT
         // link if the target path traverses an existing NT link (this is actually better than WSL 1).
         if (LxsstuVmMode())
         {
@@ -191,7 +185,7 @@ public:
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink5"));
         VERIFY_NO_THROW(VerifyDrvFsLxSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink6"));
 
-        // Plan 9 doesn't know about the Linux mount point on "dir", so it creates an NT link in this case.
+        // Plan 9 and VirtioFs don't know about the Linux mount point on "dir", so it creates an NT link in this case.
         if (LxsstuVmMode())
         {
             VERIFY_NO_THROW(VerifyDrvFsSymlink(LXSST_DRVFS_SYMLINK_TEST_DIR "\\lxlink7", L"dir\\..\\file.txt", false));
@@ -228,9 +222,15 @@ public:
         VERIFY_NO_THROW(DrvFsCommon(LX_DRVFS_DISABLE_NONE, Mode));
     }
 
-    void DrvFsFat() const
+    void DrvFsFat(DrvFsMode Mode)
     {
         SKIP_TEST_ARM64();
+
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            LogSkipped("VirtioFS currently only supports mounting full drives");
+            return;
+        }
 
         constexpr auto MountPoint = "C:\\lxss_fat";
         constexpr auto VhdPath = "C:\\lxss_fat.vhdx";
@@ -241,9 +241,15 @@ public:
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 3'").c_str(), L"drvfs3"));
     }
 
-    void DrvFsSmb() const
+    void DrvFsSmb(DrvFsMode Mode)
     {
         SKIP_TEST_ARM64();
+
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            LogSkipped("TODO: debug virtiofs handling of //localhost/C$ style paths");
+            return;
+        }
 
         VERIFY_NO_THROW(
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 4'").c_str(), L"drvfs4"));
@@ -263,7 +269,7 @@ public:
         SKIP_TEST_ARM64();
 
         TerminateDistribution();
-        WslKeepAlive keelAlive;
+        WslKeepAlive keepAlive;
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
@@ -275,7 +281,7 @@ public:
         SKIP_TEST_ARM64();
 
         TerminateDistribution();
-        WslKeepAlive keelAlive;
+        WslKeepAlive keepAlive;
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
     }
@@ -289,7 +295,7 @@ public:
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken();
-        WslKeepAlive keelAlive(nonElevatedToken.get());
+        WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
@@ -303,28 +309,54 @@ public:
         TerminateDistribution();
 
         const auto nonElevatedToken = GetNonElevatedToken();
-        WslKeepAlive keelAlive(nonElevatedToken.get());
+        WslKeepAlive keepAlive(nonElevatedToken.get());
 
         ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_NEW_CONSOLE, Mode);
+    }
+
+    void DrvfsMountElevatedSystemDistroEnabled(DrvFsMode Mode)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
+        SKIP_TEST_ARM64();
+
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true, .drvFsMode = Mode}));
+        WslKeepAlive keepAlive;
+
+        ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
+    }
+
+    void DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode Mode)
+    {
+        WSL2_TEST_ONLY();
+        WINDOWS_11_TEST_ONLY(); // TODO: Enable on Windows 10 when virtio support is added
+        SKIP_TEST_ARM64();
+
+        WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true, .drvFsMode = Mode}));
+
+        const auto nonElevatedToken = GetNonElevatedToken();
+        WslKeepAlive keepAlive(nonElevatedToken.get());
+
+        ValidateDrvfsMounts(CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, Mode);
     }
 
     static void XattrDrvFs(DrvFsMode Mode)
     {
         SKIP_TEST_ARM64();
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("TODO: debug test for virtiofs");
-            return;
-        }
-
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests xattr drvfs", L"xattr_drvfs"));
     }
 
-    void DrvFsReFs() const
+    void DrvFsReFs(DrvFsMode Mode)
     {
         SKIP_TEST_ARM64();
         WSL_TEST_VERSION_REQUIRED(wsl::windows::common::helpers::WindowsBuildNumbers::Germanium);
+
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            LogSkipped("VirtioFS currently only supports mounting full drives");
+            return;
+        }
 
         constexpr auto MountPoint = "C:\\lxss_refs";
         constexpr auto VhdPath = "C:\\lxss_refs.vhdx";
@@ -791,7 +823,7 @@ private:
             } Data;
         } Reparse{};
 
-        constexpr ULONG ReparseBufferSize = REPARSE_DATA_BUFFER_HEADER_SIZE + sizeof(ULONG);
+        const ULONG ReparseBufferSize = REPARSE_DATA_BUFFER_HEADER_SIZE + sizeof(ULONG);
 
         //
         // The data length is the buffer size excluding the header.
@@ -933,6 +965,31 @@ private:
 
         const auto nonElevatedToken = GetNonElevatedToken();
         validate(nonElevatedType, nonElevatedToken.get());
+
+        // Elevated token should be able to create files at the root of the drive (/mnt/c)
+        {
+            const auto commandLine =
+                LxssGenerateWslCommandLine(L"touch /mnt/c/elevated_test_file.tmp && rm /mnt/c/elevated_test_file.tmp");
+
+            wsl::windows::common::SubProcess process(nullptr, commandLine.c_str(), CreateProcessFlags);
+            process.SetToken(nullptr);
+            process.SetShowWindow(SW_HIDE);
+
+            const auto output = process.RunAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, output.ExitCode, L"Elevated token should be able to create files at /mnt/c");
+        }
+
+        // Non-elevated token should NOT be able to create files at the root of the drive (/mnt/c)
+        {
+            const auto commandLine = LxssGenerateWslCommandLine(L"touch /mnt/c/nonelevated_test_file.tmp");
+
+            wsl::windows::common::SubProcess process(nullptr, commandLine.c_str(), CreateProcessFlags);
+            process.SetToken(nonElevatedToken.get());
+            process.SetShowWindow(SW_HIDE);
+
+            const auto output = process.RunAndCaptureOutput();
+            VERIFY_ARE_NOT_EQUAL(0, output.ExitCode, L"Non-elevated token should NOT be able to create files at /mnt/c (C:\\)");
+        }
     }
 
     static VOID VerifyDrvFsSymlink(const std::wstring& Path, const std::wstring& ExpectedTarget, bool Directory)
@@ -1072,13 +1129,13 @@ class WSL1 : public DrvFsTests
     TEST_METHOD(DrvFsFat)
     {
         WSL1_TEST_ONLY();
-        DrvFsTests::DrvFsFat();
+        DrvFsTests::DrvFsFat(DrvFsMode::WSL1);
     }
 
     TEST_METHOD(DrvFsSmb)
     {
         WSL1_TEST_ONLY();
-        DrvFsTests::DrvFsSmb();
+        DrvFsTests::DrvFsSmb(DrvFsMode::WSL1);
     }
 
     TEST_METHOD(DrvFsMetadata)
@@ -1108,8 +1165,8 @@ class WSL1 : public DrvFsTests
             else \
             { \
                 VERIFY_ARE_EQUAL(LxsstuInitialize(FALSE), TRUE); \
-                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0); \
                 m_config.reset(new WslConfigChange(LxssGenerateTestConfig({.drvFsMode = DrvFsMode::##_mode##}))); \
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(LXSST_TESTS_INSTALL_COMMAND_LINE), 0); \
             } \
 \
             return true; \
@@ -1147,13 +1204,13 @@ class WSL1 : public DrvFsTests
         TEST_METHOD(DrvFsFat) \
         { \
             WSL2_TEST_ONLY(); \
-            DrvFsTests::DrvFsFat(); \
+            DrvFsTests::DrvFsFat(DrvFsMode::##_mode##); \
         } \
 \
         TEST_METHOD(DrvFsSmb) \
         { \
             WSL2_TEST_ONLY(); \
-            DrvFsTests::DrvFsSmb(); \
+            DrvFsTests::DrvFsSmb(DrvFsMode::##_mode##); \
         } \
 \
         TEST_METHOD(DrvFsMetadata) \
@@ -1186,6 +1243,18 @@ class WSL1 : public DrvFsTests
             DrvFsTests::DrvfsMountNonElevatedDifferentConsole(DrvFsMode::##_mode##); \
         } \
 \
+        TEST_METHOD(DrvfsMountElevatedSystemDistroEnabled) \
+        { \
+            WSL2_TEST_ONLY(); \
+            DrvFsTests::DrvfsMountElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
+        } \
+\
+        TEST_METHOD(DrvfsMountNonElevatedSystemDistroEnabled) \
+        { \
+            WSL2_TEST_ONLY(); \
+            DrvFsTests::DrvfsMountNonElevatedSystemDistroEnabled(DrvFsMode::##_mode##); \
+        } \
+\
         TEST_METHOD(XattrDrvFs) \
         { \
             WSL2_TEST_ONLY(); \
@@ -1195,7 +1264,7 @@ class WSL1 : public DrvFsTests
         TEST_METHOD(DrvFsReFs) \
         { \
             WSL2_TEST_ONLY(); \
-            DrvFsTests::DrvFsReFs(); \
+            DrvFsTests::DrvFsReFs(DrvFsMode::##_mode##); \
         } \
     }
 

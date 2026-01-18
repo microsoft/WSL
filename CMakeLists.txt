@@ -34,8 +34,8 @@ FetchContent_GetProperties(GSL SOURCE_DIR GSL_SOURCE_DIR)
 
 
 FetchContent_Declare(nlohmannjson
-                     URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-                     URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d)
+                     URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+                     URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa )
 
 FetchContent_MakeAvailable(nlohmannjson)
 FetchContent_GetProperties(nlohmannjson SOURCE_DIR NLOHMAN_JSON_SOURCE_DIR)
@@ -74,13 +74,11 @@ find_nuget_package(Wix WIX /tools/net6.0/any)
 if (${TARGET_PLATFORM} STREQUAL "x64")
     find_nuget_package(Microsoft.DXCore.Linux.amd64fre DXCORE /build/native)
     find_nuget_package(Microsoft.WSL.Dependencies.amd64fre WSLDEPS /build/native)
-    find_nuget_package(Microsoft.WSL.LxUtil.amd64fre LXUTIL /build/native)
 endif()
 
 if (${TARGET_PLATFORM} STREQUAL "arm64")
     find_nuget_package(Microsoft.DXCore.Linux.arm64fre DXCORE /build/native)
     find_nuget_package(Microsoft.WSL.Dependencies.arm64fre WSLDEPS /build/native)
-    find_nuget_package(Microsoft.WSL.LxUtil.arm64fre LXUTIL /build/native)
 endif()
 
 # Wsl Settings packages
@@ -152,7 +150,6 @@ file(MAKE_DIRECTORY ${GENERATED_DIR})
 
 set(PACKAGE_CERTIFICATE ${GENERATED_DIR}/dev-cert.pfx)
 file(CREATE_LINK ${WSL_DEVICE_HOST_SOURCE_DIR}/bin/${TARGET_PLATFORM}/wsldevicehost.dll ${BIN}/wsldevicehost.dll)
-file(CREATE_LINK ${LXUTIL_SOURCE_DIR}/bin/lxutil.dll ${BIN}/lxutil.dll)
 file(CREATE_LINK ${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/${WSLG_TS_PLUGIN_DLL} ${BIN}/${WSLG_TS_PLUGIN_DLL})
 file(CREATE_LINK ${WSLDEPS_SOURCE_DIR}/bin/wsldeps.dll ${BIN}/wsldeps.dll)
 
@@ -203,7 +200,6 @@ add_compile_definitions(UNICODE
                         WSL_DEVICE_HOST_VERSION="${WSL_DEVICE_HOST_VERSION}"
                         COMMIT_HASH="${COMMIT_HASH}"
                         WSL_PACKAGE_VERSION="${PACKAGE_VERSION}"
-                        LXUTIL_VERSION="${LXUTIL_VERSION}"
                         MSRDC_VERSION="${MSRDC_VERSION}"
                         DIRECT3D_VERSION="${DIRECT3D_VERSION}"
                         DXCORE_VERSION="${DXCORE_VERSION}"
@@ -235,7 +231,6 @@ endif()
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
-link_directories(${LXUTIL_SOURCE_DIR}/lib/)
 set(COMMON_LINK_LIBRARIES
     ws2_32.lib
     Userenv.lib
@@ -266,15 +261,16 @@ else()
 endif()
 
 # Determine the Visual Studio installation directory which contains LLVM tools
+# N.B. The version is set to VS2022 to ensure local runs match pipeline behavior
 execute_process(
-    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -latest -products * -property installationPath
+    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,18.0)" -products * -property installationPath
     OUTPUT_VARIABLE VS_INSTALL_DIR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     COMMAND_ERROR_IS_FATAL ANY
 )
 
 if (NOT VS_INSTALL_DIR)
-    message(FATAL_ERROR "Could not determine Visual Studio installation directory.")
+    message(FATAL_ERROR "Could not determine Visual Studio 2022 installation directory.")
 endif()
 
 if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64")

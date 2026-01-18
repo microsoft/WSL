@@ -382,57 +382,57 @@ Uso:
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
     <value>Copyright (c) Microsoft Corporation. Todos los derechos reservados.
-Para obtener información de privacidad sobre este producto, visita https://aka.ms/privacy.
+Para obtener información de privacidad sobre este producto, visite https://aka.ms/privacy.
 
-Uso: wsl.exe [Argumento] [Opciones...] [CommandLine]
+Uso: wsl.exe [Argumento] [Opciones...] [Línea de comandos]
 
 Argumentos para ejecutar archivos binarios de Linux:
 
     Si no se proporciona ninguna línea de comandos, wsl.exe inicia el shell predeterminado.
 
     --exec, -e &lt;CommandLine&gt;
-        Ejecuta el comando especificado sin usar el shell de Linux predeterminado.
+        Ejecute el comando especificado sin usar el shell de Linux predeterminado.
 
     --shell-type &lt;standard|login|none&gt;
-        Ejecuta el comando especificado con el tipo de shell proporcionado.
+        Ejecute el comando especificado con el tipo de shell proporcionado.
 
     --
         Pasa la línea de comandos restante tal cual.
 
 Opciones:
     --cd &lt;Directory&gt;
-        Establece el directorio especificado como el directorio de trabajo actual.
-        Si se usa ~, se usará la ruta de acceso principal del usuario de Linux. Si la ruta de acceso comienza
-        con un carácter /, se interpretará como una ruta de acceso absoluta de Linux.
+        Establece el directorio especificado como directorio de trabajo actual.
+        Si se usa ~, se usará la ruta de acceso principal del usuario de Linux. Si la ruta de
+        acceso comienza con un carácter /, se interpretará como una ruta de acceso absoluta de Linux.
         De lo contrario, el valor debe ser una ruta de acceso absoluta de Windows.
 
     --distribution, -d &lt;DistroName&gt;
-        Ejecuta la distribución especificada.
+        Ejecute la distribución especificada.
 
     --distribution-id &lt;DistroGuid&gt;
-        Ejecuta la distribución especificada.
+        Ejecute el id. de distribución especificado.
 
     --user, -u &lt;UserName&gt;
-        Ejecuta como el usuario especificado.
+        Ejecutar como el usuario especificado.
 
     --system
         Inicia un shell para la distribución del sistema.
 
-Argumentos para administrar el Subsistema de Windows para Linux:
+Argumentos para administrar Subsistema de Windows para Linux:
 
     --help
-        Muestra información de uso.
+    Mostrar información de uso.
 
     --debug-shell
-        Abre un shell de depuración WSL2 con fines de diagnóstico.
+        Abra un shell de depuración WSL2 con fines de diagnóstico.
 
-    --install [Distro] [Options...]
-        Instala una distribución de Subsistema de Windows para Linux.
+    --install [Distribución] [Opciones...]
+        Instale una distribución de Subsistema de Windows para Linux.
         Para obtener una lista de distribuciones válidas, use 'wsl.exe --list --online'.
 
         Opciones:
             --enable-wsl1
-                Habilita la compatibilidad con WSL1.
+                Habilitar compatibilidad con WSL1.
 
             --fixed-vhd
                 Crea un disco de tamaño fijo para almacenar la distribución.
@@ -450,10 +450,10 @@ Argumentos para administrar el Subsistema de Windows para Linux:
                 Establece el nombre de la distribución.
 
             --no-distribution
-                Solo se instalan los componentes opcionales necesarios, no se instala una distribución.
+                Solo instalar los componentes opcionales necesarios, no instala una distribución.
 
             --no-launch, -n
-                No inicia la distribución después de la instalación.
+                No inicies la distribución después de la instalación.
 
             --version &lt;Version&gt;
                 Especifica la versión que se va a usar para la nueva distribución.
@@ -462,7 +462,7 @@ Argumentos para administrar el Subsistema de Windows para Linux:
                 Especifica el tamaño del disco para almacenar la distribución.
 
             --web-download
-                Descarga la distribución desde Internet en lugar de la Microsoft Store.
+                Descarga la distribución desde Internet en lugar de la Microsoft Store.
 
     --manage &lt;Distro&gt; &lt;Options...&gt;
         Cambia las opciones específicas de distribución.
@@ -472,7 +472,7 @@ Argumentos para administrar el Subsistema de Windows para Linux:
                 Mueve la distribución a una nueva ubicación.
 
             --set-sparse, -s &lt;true|false&gt;
-                Establece el vhdx de la distribución para que sea disperso, lo que permite que el espacio en disco se recupere automáticamente.
+                Establece el VHD de distribución en disperso, lo que permite recuperar automáticamente el espacio en disco.
 
             --set-default-user &lt;Username&gt;
                 Establece el usuario predeterminado de la distribución.
@@ -481,59 +481,59 @@ Argumentos para administrar el Subsistema de Windows para Linux:
                 Cambia el tamaño del disco de la distribución al tamaño especificado.
 
     --mount &lt;Disk&gt;
-        Conecta y monta un disco físico o virtual en todas las distribuciones de WSL 2.
+        Conecta y monta un disco físico o virtual en todas las distribuciones de WSL 2.
 
         Opciones:
             --vhd
                 Especifica que &lt;Disk&gt; hace referencia a un disco duro virtual.
 
             --bare
-                Conecta el disco a WSL2, pero no lo monta.
+                Conecta el disco a WSL2, pero no lo montes.
 
             --name &lt;Name&gt;
                 Monta el disco con un nombre personalizado para el punto de montaje.
 
-            --type &lt;Type&gt;
-                Sistema de archivos que se va a usar al montar un disco; si no se especifica, el valor predeterminado es ext4.
+            --type &lt;Tipo&gt;
+                Sistema de archivos que se va a usar al montar un disco. Si no se especifica, el valor predeterminado es ext4.
 
             --options &lt;Options&gt;
                 Opciones de montaje adicionales.
 
             --partition &lt;Index&gt;
-                Índice de la partición que se va a montar; si no se especifica, el valor predeterminado es todo el disco.
+                Índice de la partición que se va a montar. Si no se especifica, el valor predeterminado es todo el disco.
 
     --set-default-version &lt;Version&gt;
         Cambia la versión de instalación predeterminada para las nuevas distribuciones.
 
     --shutdown
-        Finaliza inmediatamente todas las distribuciones en ejecución y la
-        máquina virtual de utilidad ligera WSL 2.
+        Finaliza inmediatamente todas las distribuciones en ejecución y la máquina virtual
+        de la utilidad ligera WSL 2.
 
         Opciones:
-            --force
+             --force
                 Finaliza la máquina virtual WSL 2 incluso si hay una operación en curso. Puede provocar la pérdida de datos.
 
     --status
-        Muestra el estado del Subsistema de Windows para Linux.
+        Muestra el estado de Subsistema de Windows para Linux.
 
     --unmount [Disk]
         Desmonta y desasocia un disco de todas las distribuciones de WSL2.
         Desmonta y desasocia todos los discos si se llama sin argumento.
 
-    --uninstall
-        Desinstala el paquete de Subsistema de Windows para Linux de este equipo.
+        --uninstall
+            Desinstala el paquete de Subsistema de Windows para Linux de este equipo.
 
-    --update
-        Actualiza el paquete de Subsistema de Windows para Linux.
+        --update
+            Actualizar el paquete del Subsistema de Windows para Linux.
 
         Opciones:
             --pre-release
-                Descarga una versión preliminar si está disponible.
+                 Descargar una versión preliminar si está disponible.
 
-    --version, -v
-        Muestra información de la versión.
+            --version, -v
+                Mostrar información de versión.
 
-Argumentos para administrar distribuciones en Subsistema de Windows para Linux:
+Argumentos para administrar distribuciones en el Subsistema de Windows para Linux:
 
     --export &lt;Distro&gt; &lt;FileName&gt; [Options]
         Exporta la distribución a un archivo tar.
@@ -552,11 +552,11 @@ Argumentos para administrar distribuciones en Subsistema de Windows para Linux:
                 Especifica la versión que se va a usar para la nueva distribución.
 
             --vhd
-                Especifica que el archivo proporcionado es un archivo .vhdx, no un archivo tar.
-                Esta operación realiza una copia del archivo .vhdx en la ubicación de instalación especificada.
+                Especifica que el archivo proporcionado es un archivo .vhd o .vhdx, no un archivo tar.
+                Esta operación realiza una copia del archivo VHD en la ubicación de instalación especificada.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Importa el archivo .vhdx especificado como una nueva distribución.
+        Importa el archivo VHD especificado como una nueva distribución.
         Este disco duro virtual debe tener el formato del tipo de sistema de archivos ext4.
 
     --list, -l [Options]
@@ -564,20 +564,20 @@ Argumentos para administrar distribuciones en Subsistema de Windows para Linux:
 
         Opciones:
             --all
-                Enumera todas las distribuciones, incluidas las distribuciones que
-                actualmente se está instalando o desinstalando.
+                Enumera todas las distribuciones, incluidas las distribuciones que se están
+                instalando o desinstalando actualmente.
 
             --running
                 Enumera solo las distribuciones que se están ejecutando actualmente.
 
             --quiet, -q
-                Muestra solo los nombres de distribución.
+                Mostrar solo nombres de distribución.
 
             --verbose, -v
                 Muestra información detallada sobre todas las distribuciones.
 
             --online, -o
-                Muestra una lista de las distribuciones disponibles para instalar con 'wsl.exe --install'.
+                Muestra una lista de distribuciones disponibles para instalar con 'wsl.exe --install'.
 
     --set-default, -s &lt;Distro&gt;
         Establece la distribución como predeterminada.
@@ -710,8 +710,13 @@ Es posible que sea necesario reiniciar el sistema para que los cambios surtan ef
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>El archivo especificado debe tener la extensión de archivo .vhdx.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>El archivo especificado debe tener la extensión de archivo {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>El archivo especificado debe tener la extensión de archivo {} o {}.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>No se encontró el VmSwitch '{}'. Modificadores disponibles: {}</value>
@@ -730,9 +735,6 @@ Es posible que sea necesario reiniciar el sistema para que los cambios surtan ef
   </data>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Error al cambiar el tamaño del disco.</value>
-  </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>No se pudo traducir la ruta de acceso.</value>
   </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>No se encontró ningún valor.</value>
@@ -1004,7 +1006,7 @@ Revirtiendo a las redes NAT.</value>
     <value>Ver documentos</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>No se pudo completar la operación porque el vhdx está actualmente en uso. Para forzar que WSL deje de usar: wsl.exe --shutdown</value>
+    <value>No se pudo completar la operación porque el VHD está actualmente en uso. Para forzar que WSL deje de usar: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1012,7 +1014,7 @@ Revirtiendo a las redes NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Vhdx disperso solo se admite en WSL2.</value>
+    <value>El VHD disperso solo se admite en WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>No se admite la ejecución de WSL como sistema local.</value>
@@ -1061,7 +1063,7 @@ Revirtiendo a las redes NAT.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Parece un archivo VHDX. Use --vhd para importar un VHDX en lugar de una tar.</value>
+    <value>Parece un archivo VHD. Usa --vhd para importar un VHD en lugar de una tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1113,8 +1115,8 @@ Código de error: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>La compatibilidad con VHD disperso está deshabilitada actualmente debido a posibles daños en los datos.
-Para forzar que una distribución use un VHD disperso, ejecute:
-wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
+Para forzar que una distribución use un VHD disperso, ejecuta:
+wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">

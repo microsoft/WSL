@@ -211,6 +211,12 @@ class UnitTests
 
         auto revert = EnableSystemd();
         VERIFY_IS_TRUE(IsSystemdRunning(L"--system"));
+
+        // Validate that systemd-networkd-wait-online.service is masked.
+        auto [out, _] =
+            LxsstuLaunchWslAndCaptureOutput(L"systemctl status systemd-networkd-wait-online.service  | grep -iF Loaded:");
+
+        VERIFY_ARE_EQUAL(out, L"     Loaded: masked (Reason: Unit systemd-networkd-wait-online.service is masked.)\n");
     }
 
     TEST_METHOD(SystemdUser)
@@ -262,8 +268,12 @@ class UnitTests
         {
             validateUserSession();
 
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L"\n");
+
+            // N.B. The XDG_RUNTIME_DIR variable is always set by init even if gui apps are disabled.
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $XDG_RUNTIME_DIR", LXSST_TEST_USERNAME));
+            VERIFY_ARE_EQUAL(out, std::format(L"/run/user/{}\n", TestUid));
         }
 
         // Validate user sessions state with gui apps enabled.
@@ -271,8 +281,11 @@ class UnitTests
             WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
 
             validateUserSession();
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"echo $DISPLAY", LXSST_TEST_USERNAME));
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $DISPLAY", LXSST_TEST_USERNAME));
             VERIFY_ARE_EQUAL(out, L":0\n");
+
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--user {} echo $XDG_RUNTIME_DIR", LXSST_TEST_USERNAME));
+            VERIFY_ARE_EQUAL(out, std::format(L"/run/user/{}\n", TestUid));
         }
 
         // Create a 'broken' /run/user and validate that the warning is correctly displayed.
@@ -843,16 +856,25 @@ class UnitTests
                 L"arguments.\n");
         }
 
-        if (LxsstuVmMode())
         {
-            // Get the VM ID from the distro and validate that it not null.
-            auto [vmId, vmIdErr] = LxsstuLaunchWslAndCaptureOutput(L"env | grep 'WSL2_VM_ID' | awk -F= '{print $2}'");
-            VERIFY_ARE_NOT_EQUAL(vmId, L"");
-
-            // Ensure that the response from wslinfo matches the VM id from the distros environment
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id");
-            VERIFY_ARE_EQUAL(out, std::format(L"{}", vmId));
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
             VERIFY_ARE_EQUAL(err, L"");
+            if (LxsstuVmMode())
+            {
+                // Ensure that the response from wslinfo has the VM ID.
+                auto guid = wsl::shared::string::ToGuid(out);
+                VERIFY_IS_TRUE(guid.has_value());
+                VERIFY_IS_FALSE(IsEqualGUID(guid.value(), GUID_NULL));
+
+                // Validate that the VM ID is not propagated to user commands.
+                std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(L"echo -n \"$WSL2_VM_ID\"");
+                VERIFY_ARE_EQUAL(out, L"");
+                VERIFY_ARE_EQUAL(err, L"");
+            }
+            else
+            {
+                VERIFY_ARE_EQUAL(out, L"wsl1");
+            }
         }
     }
 
@@ -1007,7 +1029,7 @@ class UnitTests
             L"Error code: Wsl/Service/RegisterDistro/ERROR_FILE_EXISTS\r\n");
 
         commandLine = std::format(L"--import dummy {} {} --version {}", LXSST_IMPORT_DISTRO_TEST_DIR, vhdFileName, version);
-        validateOutput(commandLine.c_str(), L"This looks like a VHDX file. Use --vhd to import a VHDX instead of a tar.\r\n");
+        validateOutput(commandLine.c_str(), L"This looks like a VHD file. Use --vhd to import a VHD instead of a tar.\r\n");
 
         if (!LxsstuVmMode())
         {
@@ -1548,7 +1570,7 @@ Arguments for managing Windows Subsystem for Linux:
                 Move the distribution to a new location.
 
             --set-sparse, -s <true|false>
-                Set the vhdx of distro to be sparse, allowing disk space to be automatically reclaimed.
+                Set the VHD of distro to be sparse, allowing disk space to be automatically reclaimed.
 
             --set-default-user <Username>
                 Set the default user of the distribution.
@@ -1628,11 +1650,11 @@ Arguments for managing distributions in Windows Subsystem for Linux:
                 Specifies the version to use for the new distribution.
 
             --vhd
-                Specifies that the provided file is a .vhdx file, not a tar file.
-                This operation makes a copy of the .vhdx file at the specified install location.
+                Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
+                This operation makes a copy of the VHD file at the specified install location.
 
     --import-in-place <Distro> <FileName>
-        Imports the specified .vhdx file as a new distribution.
+        Imports the specified VHD file as a new distribution.
         This virtual hard disk must be formatted with the ext4 filesystem type.
 
     --list, -l [Options]
@@ -2297,7 +2319,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         const std::vector<LPCWSTR> serviceKeys{
             L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns\\WSLDVC_PACKAGE",
             L"SOFTWARE\\Classes\\CLSID\\{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}",
-            L"SOFTWARE\\Classes\\AppID\\{7F82AD86-755B-4870-86B1-D2E68DFE8A49}"};
+            L"SOFTWARE\\Classes\\AppID\\{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"};
 
         for (const auto* keyName : serviceKeys)
         {
@@ -2433,8 +2455,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         // Validate that the shortcut is actually in the start menu
         VERIFY_IS_TRUE(shortcutPath.find(startMenu) != std::string::npos);
 
-        Microsoft::WRL::ComPtr<IPersistFile> storage;
-        VERIFY_SUCCEEDED(shellLink->QueryInterface(IID_IPersistFile, &storage));
+        auto storage = shellLink.query<IPersistFile>();
 
         VERIFY_SUCCEEDED(storage->Load(shortcutPath.c_str(), 0));
 
@@ -2530,8 +2551,11 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         wil::GetSystemDirectoryW(systemDir);
 
         VERIFY_ARE_EQUAL(
-            std::format("{}\\{} {} {} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString, WSL_CHANGE_DIRECTORY_ARG, WSL_CWD_HOME),
+            std::format("{}\\{} {} {}", systemDir, WSL_BINARY_NAME, WSL_DISTRIBUTION_ID_ARG, distroIdString),
             launchProfile["commandline"].get<std::string>());
+
+        // Verify that startingDirectory is set to home directory
+        VERIFY_ARE_EQUAL(launchProfile["startingDirectory"].get<std::string>(), "~");
 
         auto iconLocation = wsl::shared::string::MultiByteToWide(launchProfile["icon"].get<std::string>());
         if (defaultIcon)
@@ -2785,7 +2809,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"--import {} . \"{}\" --version 2", name, g_testDistroPath)), 0L);
 
-        auto cleanupName = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+        auto cleanupName = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() {
             LxsstuLaunchWsl(std::format(L"--unregister {}", name));
             std::filesystem::remove_all(testFolder);
         });
@@ -2861,9 +2885,9 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         WslShutdown();
 
         auto cleanupName =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [name]() { LxsstuLaunchWsl(std::format(L"--unregister {}", name)); });
 
-        auto validateDistro = [](LPCWSTR size, LPCWSTR expectedSize, LPCWSTR expectedError = nullptr) {
+        auto validateDistro = [name](LPCWSTR size, LPCWSTR expectedSize, LPCWSTR expectedError = nullptr) {
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"--manage {} --resize {}", name, size), expectedError ? -1 : 0);
             if (expectedError)
             {
@@ -2884,8 +2908,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
             WslKeepAlive keepAlive;
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--manage test_distro --resize 1500GB", -1);
             VERIFY_ARE_EQUAL(
-                L"The operation could not be completed because the vhdx is currently in use. To force WSL to stop use: "
-                L"wsl.exe "
+                L"The operation could not be completed because the VHD is currently in use. To force WSL to stop use: wsl.exe "
                 L"--shutdown\r\nError code: Wsl/Service/WSL_E_DISTRO_NOT_STOPPED\r\n",
                 out);
         }
@@ -3501,6 +3524,208 @@ localhostForwarding=true
             configRead.close();
             VERIFY_ARE_EQUAL(customWslConfigContentActual, customWslConfigContentExpected);
         }
+
+        // Regression test for GitHub issue #12671:
+        // Ensure that section headers always appear BEFORE their key-value pairs.
+        // Bug: WSL Settings GUI was writing keys before the section header, causing "Unknown key" errors.
+        {
+            std::wstring bugScenarioConfig =
+                LR"([wsl2]
+[experimental]
+[wsl2]
+)";
+            WslConfigChange config{bugScenarioConfig.c_str()};
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            // Write memory setting - this should NOT appear before the first [wsl2]
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 17825792000ULL; // Value from bug report
+
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            // Read and verify
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Find FIRST occurrence of [wsl2] and memory=
+            auto firstWsl2Pos = fileContent.find(L"[wsl2]");
+            auto memoryPos = fileContent.find(L"memory=");
+
+            VERIFY_ARE_NOT_EQUAL(firstWsl2Pos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+
+            // The critical assertion: memory= must NOT appear before [wsl2]
+            VERIFY_IS_TRUE(firstWsl2Pos < memoryPos);
+
+            // Additional check: memory should appear after the first [wsl2], not after line 1
+            auto firstLineEnd = fileContent.find(L'\n');
+            VERIFY_IS_TRUE(memoryPos > firstLineEnd);
+        }
+
+        // Test: Empty file - should create proper [wsl2] section structure
+        {
+            std::wofstream emptyConfig(apiWslConfigFilePath, std::ios::trunc);
+            emptyConfig.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 4294967296ULL; // 4GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should create [wsl2] section and add memory key
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"memory=") != std::wstring::npos);
+            // Verify [wsl2] comes before memory=
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") < fileContent.find(L"memory="));
+        }
+
+        // Test: Multiple same-section instances - should update first occurrence
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]\n";
+            configFile << L"processors=4\n";
+            configFile << L"\n";
+            configFile << L"[experimental]\n";
+            configFile << L"autoProxy=true\n";
+            configFile << L"\n";
+            configFile << L"[wsl2]\n"; // Second [wsl2] section
+            configFile << L"swap=0\n";
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 8589934592ULL; // 8GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Find first and second [wsl2]
+            auto firstWsl2 = fileContent.find(L"[wsl2]");
+            auto secondWsl2 = fileContent.find(L"[wsl2]", firstWsl2 + 1);
+            auto memoryPos = fileContent.find(L"memory=");
+
+            VERIFY_ARE_NOT_EQUAL(firstWsl2, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(secondWsl2, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+
+            // Memory should be added to FIRST [wsl2] section, not second
+            VERIFY_IS_TRUE(memoryPos > firstWsl2);
+            VERIFY_IS_TRUE(memoryPos < secondWsl2);
+        }
+
+        // Test: EOF without trailing newline
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]\n";
+            configFile << L"processors=2"; // No trailing newline
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 3221225472ULL; // 3GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should properly append memory key even without trailing newline on last line
+            VERIFY_IS_TRUE(fileContent.find(L"processors=2") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"memory=") != std::wstring::npos);
+
+            // Verify both keys are in the same section
+            auto wsl2Pos = fileContent.find(L"[wsl2]");
+            auto processorsPos = fileContent.find(L"processors=2");
+            auto memoryPos = fileContent.find(L"memory=");
+            VERIFY_IS_TRUE(wsl2Pos < processorsPos);
+            VERIFY_IS_TRUE(wsl2Pos < memoryPos);
+
+            // Memory should come after processors in the same section
+            VERIFY_IS_TRUE(processorsPos < memoryPos);
+        }
+
+        // Test: Empty section followed by another section
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]\n";
+            configFile << L"[experimental]\n";
+            configFile << L"autoProxy=true\n";
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 5368709120ULL; // 5GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should insert memory into empty [wsl2] section before [experimental]
+            auto wsl2Pos = fileContent.find(L"[wsl2]");
+            auto memoryPos = fileContent.find(L"memory=");
+            auto experimentalPos = fileContent.find(L"[experimental]");
+
+            VERIFY_ARE_NOT_EQUAL(wsl2Pos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(memoryPos, std::wstring::npos);
+            VERIFY_ARE_NOT_EQUAL(experimentalPos, std::wstring::npos);
+
+            // Order should be: [wsl2], memory=, [experimental]
+            VERIFY_IS_TRUE(wsl2Pos < memoryPos);
+            VERIFY_IS_TRUE(memoryPos < experimentalPos);
+        }
+
+        // Test: Section header at EOF with no content
+        {
+            std::wofstream configFile(apiWslConfigFilePath, std::ios::trunc);
+            configFile << L"[wsl2]"; // Section at EOF, no newline, no content
+            configFile.close();
+
+            wslConfig = createWslConfig(apiWslConfigFilePath);
+            VERIFY_IS_NOT_NULL(wslConfig);
+            auto cleanupWslConfig = wil::scope_exit([&] { freeWslConfig(wslConfig); });
+
+            WslConfigSetting memorySetting{};
+            memorySetting.ConfigEntry = WslConfigEntry::MemorySizeBytes;
+            memorySetting.UInt64Value = 6442450944ULL; // 6GB
+            VERIFY_ARE_EQUAL(setWslConfigSetting(wslConfig, memorySetting), ERROR_SUCCESS);
+
+            std::wifstream configRead(apiWslConfigFilePath);
+            std::wstring fileContent{std::istreambuf_iterator<wchar_t>(configRead), {}};
+            configRead.close();
+
+            // Should properly add key to section at EOF
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"memory=") != std::wstring::npos);
+            VERIFY_IS_TRUE(fileContent.find(L"[wsl2]") < fileContent.find(L"memory="));
+        }
     }
 
     TEST_METHOD(LaunchWslSettingsFromProtocol)
@@ -3567,8 +3792,8 @@ localhostForwarding=true
 
         constexpr auto TestUser = L"testuser";
 
-        auto cleanup =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"-u root userdel -f {}", TestUser)); });
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [TestUser]() { LxsstuLaunchWsl(std::format(L"-u root userdel -f {}", TestUser)); });
 
         ULONG Uid{};
         ULONG Gid{};
@@ -3708,7 +3933,7 @@ localhostForwarding=true
         constexpr auto testTar = L"exported-distro.tar";
         constexpr auto tmpDistroName = L"tmpdistro";
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [tmpDistroName]() {
             DeleteFile(testTar);
             LxsstuLaunchWsl(std::format(L"--unregister {}", tmpDistroName));
         });
@@ -3939,7 +4164,7 @@ VERSION_ID="Invalid|Format"
             constexpr auto testDistroName = L"test-oobe-import";
 
             std::filesystem::create_directory(testDir);
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this, testDistroName]() {
                 LxsstuLaunchWsl(std::format(L"--unregister {}", testDistroName));
                 std::error_code error;
                 std::filesystem::remove_all(testDir, error);
@@ -4500,7 +4725,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"custom-terminal-profile";
             constexpr auto tarName = L"custom-terminal-profile.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4542,7 +4767,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"custom-terminal-profile-bad-json";
             constexpr auto tarName = L"custom-terminal-profile-bad-json.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4570,7 +4795,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"custom-terminal-profile-hide";
             constexpr auto tarName = L"custom-terminal-profile-hide.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4614,7 +4839,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"no-terminal-profile";
             constexpr auto tarName = L"no-terminal-profile.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -4636,7 +4861,7 @@ Error code: Wsl/Service/RegisterDistro/E_INVALIDARG\r\n";
             constexpr auto distroName = L"no-shortcut";
             constexpr auto tarName = L"no-shortcut.tar";
 
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [distroName]() {
                 DeleteFile(tarName);
                 LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
             });
@@ -5313,6 +5538,76 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
                 L"launched via 'wsl.exe -d test-url-download'\r\n");
 
             VERIFY_ARE_EQUAL(error, L"");
+        }
+
+        // Validate that manifest distribution ordering is preserved.
+        {
+            auto validateOrder = [](const std::vector<LPCWSTR>& expected) {
+                auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--list --online");
+
+                auto lines = wsl::shared::string::Split<wchar_t>(out, '\n');
+
+                for (size_t i = 0; i < expected.size(); i++)
+                {
+                    auto end = lines[i + 4].find_first_of(L" \t");
+                    VERIFY_ARE_NOT_EQUAL(end, std::wstring::npos);
+
+                    auto distro = lines[i + 4].substr(0, end);
+
+                    VERIFY_ARE_EQUAL(expected[i], distro);
+                }
+            };
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+                validateOrder({L"distro1", L"distro2"});
+            }
+
+            {
+                auto manifest =
+                    R"({
+    "ModernDistributions": {
+        "distro2": [
+            {
+                "Name": "distro2",
+                "FriendlyName": "distro2Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ],
+        "distro1": [
+            {
+                "Name": "distro1",
+                "FriendlyName": "distro1Name",
+                "Amd64Url": {"Url": "","Sha256": ""}
+            }
+        ]
+    }
+})";
+
+                auto restore = SetManifest(manifest);
+
+                validateOrder({L"distro2", L"distro1"});
+            }
         }
     }
 
@@ -6065,8 +6360,11 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
     TEST_METHOD(ImportExportStdout)
     {
         constexpr auto test_distro = L"import-test-distro";
-        auto cleanup =
-            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, [test_distro]() { LxsstuLaunchWsl(std::format(L"--unregister {}", test_distro)); });
+
+        // The below logline makes it easier to find the bsdtar output when debugging this test case.
+        fprintf(stderr, "Starting ImportExportStdout test case\n");
 
         auto commandLine = std::format(L"cmd.exe /c wsl --export {} - | wsl --import {} . -", LXSS_DISTRO_NAME_TEST_L, test_distro);
 
@@ -6132,6 +6430,128 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             LxsstuLaunchWslAndCaptureOutput(L"socat - 'EXEC:setsid --wait cmd.exe /c echo OK',pty,setsid,ctty,stderr");
 
         VERIFY_ARE_EQUAL(out, L"OK\r\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+    }
+
+    TEST_METHOD(WslDebug)
+    {
+        WSL2_TEST_ONLY();
+
+        // Verify that hvsocket debug events are logged to dmesg.
+        WslConfigChange config(LxssGenerateTestConfig({.kernelCommandLine = L"WSL_DEBUG=hvsocket"}));
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"dmesg | grep -iF 'vmbus_send_tl_connect_request'"), 0L);
+    }
+
+    TEST_METHOD(CGroupv1)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectedMount = [](const char* path, const wchar_t* expected) {
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -ln '{}' || true", path));
+
+            VERIFY_ARE_EQUAL(out, expected);
+        };
+
+        // Validate that cgroupv2 is mounted by default.
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that setting cgroup=v1 causes unified cgroups to be mounted.
+        DistroFileChange wslConf(L"/etc/wsl.conf", false);
+        wslConf.SetContent(L"[automount]\ncgroups=v1");
+
+        TerminateDistribution();
+
+        expectedMount(
+            "/sys/fs/cgroup/unified", L"/sys/fs/cgroup/unified cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        // Validate that the cgroupv1 mounts are present.
+        expectedMount("/sys/fs/cgroup/cpu", L"/sys/fs/cgroup/cpu cgroup cgroup rw,nosuid,nodev,noexec,relatime,cpu\n");
+
+        // Validate that having cgroup_no_v1=all causes the distribution to fall back to v2.
+        WslConfigChange wslConfig(LxssGenerateTestConfig({.kernelCommandLine = L"cgroup_no_v1=all"}));
+
+        expectedMount("/sys/fs/cgroup/unified", L"");
+        expectedMount("/sys/fs/cgroup", L"/sys/fs/cgroup cgroup2 cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate\n");
+
+        auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
+        VERIFY_ARE_NOT_EQUAL(
+            dmesg.find(
+                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            std::wstring::npos);
+    }
+
+    TEST_METHOD(InitPermissions)
+    {
+        WSL2_TEST_ONLY();
+
+        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"stat -c %a /init");
+
+        VERIFY_ARE_EQUAL(out, L"755\n");
+    }
+
+    TEST_METHOD(ExportImportVhd)
+    {
+        WSL2_TEST_ONLY();
+
+        WslShutdown();
+
+        constexpr auto vhdPath = L"exported-test-distro.vhd";
+        constexpr auto vhdxPath = L"exported-test-distro.vhdx";
+        constexpr auto exportedVhdPath = L"exported-vhd.vhd";
+        constexpr auto newDistroName = L"imported-test-distro";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(vhdPath));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(vhdxPath));
+            LOG_IF_WIN32_BOOL_FALSE(DeleteFile(exportedVhdPath));
+            LxsstuLaunchWsl(std::format(L"--unregister {}", newDistroName));
+        });
+
+        // Attempt to export the distribution to a .vhd (should fail).
+        auto [out, err] =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdPath), -1);
+        VERIFY_ARE_EQUAL(
+            out, L"The specified file must have the .vhdx file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Export the distribution to a .vhdx.
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", LXSS_DISTRO_NAME_TEST_L, vhdxPath));
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Convert the .vhdx to .vhd.
+        LxsstuLaunchPowershellAndCaptureOutput(std::format(L"Convert-VHD -Path '{}' -DestinationPath '{}'", vhdxPath, vhdPath));
+
+        // Import a new distribution from the .vhd file.
+        std::tie(out, err) =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"--import {} {} {} --vhd", newDistroName, newDistroName, vhdPath));
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Export the newly imported distribution to another .vhd file.
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", newDistroName, exportedVhdPath));
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Attempt to export to a .vhdx (should fail).
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"--export {} {} --format vhd", newDistroName, vhdxPath), -1);
+        VERIFY_ARE_EQUAL(
+            out, L"The specified file must have the .vhd file extension.\r\nError code: Wsl/Service/WSL_E_EXPORT_FAILED\r\n");
+        VERIFY_ARE_EQUAL(err, L"");
+
+        // Attempt to import to a non VHD file.
+        auto tempFile = wsl::windows::common::filesystem::TempFile(
+            GENERIC_ALL, 0, CREATE_ALWAYS, wsl::windows::common::filesystem::TempFileFlags::None, L"txt");
+
+        tempFile.Handle.reset();
+
+        constexpr auto negativeVariationDistro = L"negative-variation-distro";
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--import {} {} {} --vhd", negativeVariationDistro, negativeVariationDistro, tempFile.Path), -1);
+        VERIFY_ARE_EQUAL(
+            out,
+            L"The specified file must have the .vhd or .vhdx file extension.\r\nError code: "
+            L"Wsl/Service/RegisterDistro/WSL_E_IMPORT_FAILED\r\n");
         VERIFY_ARE_EQUAL(err, L"");
     }
 

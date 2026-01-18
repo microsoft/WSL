@@ -54,6 +54,13 @@ typedef struct _LXSS_VM_MODE_SETUP_CONTEXT
     std::shared_ptr<LxssRunningInstance> instance;
 } LXSS_VM_MODE_SETUP_CONTEXT, *PLXSS_VM_MODE_SETUP_CONTEXT;
 
+enum class ShutdownBehavior
+{
+    Wait,
+    Force,
+    ForceAfter30Seconds
+};
+
 /// <summary>
 /// Each COM client gets a unique LxssUserSession object which contains a std::weak_ptr to a LxssUserSessionImpl for that user.
 /// </summary>
@@ -491,12 +498,12 @@ public:
     /// <summary>
     /// Terminates all running instances and the Linux utility vm.
     /// </summary>
-    HRESULT Shutdown(_In_ bool PreventNewInstances = false, _In_ bool ForceTerminate = false);
+    HRESULT Shutdown(_In_ bool PreventNewInstances = false, ShutdownBehavior Behavior = ShutdownBehavior::Wait);
 
     /// <summary>
     /// Worker thread for logging telemetry about processes running inside of WSL.
     /// </summary>
-    void TelemetryWorker(_In_ wil::unique_socket&& socket, _In_ bool drvFsNotifications) const;
+    void TelemetryWorker(_In_ wil::unique_socket&& socket) const;
 
     /// <summary>
     /// Terminates a distribution by it's client identifier.
@@ -784,7 +791,7 @@ private:
     /// <summary>
     /// Lock for protecting various lists.
     /// </summary>
-    std::recursive_mutex m_instanceLock;
+    std::recursive_timed_mutex m_instanceLock;
 
     /// <summary>
     /// Contains the currently running utility VM's.

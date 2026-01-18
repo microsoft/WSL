@@ -21,6 +21,8 @@ class LxssServerPort;
 class LxssMessagePort : public LxssPort
 {
 public:
+    static inline DWORD c_defaultMessageTimeout = 30000;
+
     LxssMessagePort(_In_ HANDLE MessagePort);
     LxssMessagePort(_In_ LxssMessagePort&& Source);
     LxssMessagePort(_In_ std::unique_ptr<LxssMessagePort>&& SourcePointer);
@@ -46,7 +48,7 @@ public:
     LXBUS_IPC_PROCESS_ID
     MarshalProcess(_In_ HANDLE ProcessHandle, _In_ bool TerminateOnClose) const;
 
-    std::vector<gsl::byte> Receive();
+    std::vector<gsl::byte> Receive(DWORD Timeout = c_defaultMessageTimeout);
 
     void ReleaseConsole(_In_ LXBUS_IPC_CONSOLE_ID ConsoleId) const;
 

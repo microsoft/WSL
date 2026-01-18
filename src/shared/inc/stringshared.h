@@ -20,6 +20,7 @@ Abstract:
 #include <fstream>
 #include <gsl/gsl>
 #include <format>
+#include <source_location>
 
 #ifndef WIN32
 #include <string.h>
@@ -831,6 +832,22 @@ struct std::formatter<wchar_t[N], char>
     auto format(const wchar_t str[N], TCtx& ctx) const
     {
         return std::format_to(ctx.out(), "{}", wsl::shared::string::WideToMultiByte(str));
+    }
+};
+
+template <>
+struct std::formatter<std::source_location, char>
+{
+    template <typename TCtx>
+    static constexpr auto parse(TCtx& ctx)
+    {
+        return ctx.begin();
+    }
+
+    template <typename TCtx>
+    auto format(const std::source_location& location, TCtx& ctx) const
+    {
+        return std::format_to(ctx.out(), "{}[{}:{}]", location.function_name(), location.file_name(), location.line());
     }
 };
 

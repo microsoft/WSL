@@ -23,6 +23,7 @@ Abstract:
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 using namespace wsl::windows::common::registry;
+using namespace wsl::windows::common::wslutil;
 
 static constexpr auto c_progIdPrefix{L"App."};
 static constexpr auto c_protocolProgIdSuffix{L".Protocol"};
@@ -460,7 +461,7 @@ extern "C" UINT __stdcall CleanMsixState(MSIHANDLE install)
         const std::map<LPCWSTR, LPCWSTR> keys{
             {L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application", L"WSL"},
             {L"SOFTWARE\\Classes\\CLSID", L"{7e6ad219-d1b3-42d5-b8ee-d96324e64ff6}"},
-            {L"SOFTWARE\\Classes\\AppID", L"{7F82AD86-755B-4870-86B1-D2E68DFE8A49}"},
+            {L"SOFTWARE\\Classes\\AppID", L"{17696EAC-9568-4CF5-BB8C-82515AAD6C09}"},
             {L"SOFTWARE\\Microsoft\\Terminal Server Client", L"Default"},
             {L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default", L"OptionalAddIns"},
             {L"SOFTWARE\\Microsoft\\Terminal Server Client\\Default\\OptionalAddIns", L"WSLDVC_PACKAGE"}};
@@ -519,6 +520,7 @@ extern "C" UINT __stdcall DeprovisionMsix(MSIHANDLE install)
 try
 {
     WSL_LOG("DeprovisionMsix");
+    WriteInstallLog("MSI install: DeprovisionMsix");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
     const auto result = packageManager.DeprovisionPackageForAllUsersAsync(wsl::windows::common::wslutil::c_msixPackageFamilyName).get();
@@ -542,6 +544,7 @@ extern "C" UINT __stdcall RemoveMsixAsSystem(MSIHANDLE install)
 try
 {
     WSL_LOG("RemoveMsixAsSystem");
+    WriteInstallLog("MSI install: RemoveMsixAsSystem");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -571,6 +574,7 @@ extern "C" UINT __stdcall RemoveMsixAsUser(MSIHANDLE install)
 try
 {
     WSL_LOG("RemoveMsixAsUser");
+    WriteInstallLog("MSI install: RemoveMsixAsUser");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -640,6 +644,7 @@ extern "C" UINT __stdcall InstallMsixAsUser(MSIHANDLE install)
 try
 {
     WSL_LOG("InstallMsixAsUser");
+    WriteInstallLog("MSI install: InstallMsixAsUser");
 
     // RegisterPackageByFamilyNameAsync() cannot be run as SYSTEM.
     //  If this thread runs as SYSTEM, simply skip this step.
@@ -683,6 +688,7 @@ try
     msixFile.Handle.reset();
 
     WSL_LOG("InstallMsix", TraceLoggingValue(msixFile.Path.c_str(), "Path"));
+    WriteInstallLog("MSI install: InstallMsix");
 
     winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -780,10 +786,24 @@ catch (...)
     return ERROR_INSTALL_FAILURE;
 }
 
+extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
+{
+    try
+    {
+        WSL_LOG("WslFinalizeInstallation");
+        WriteInstallLog(std::format("MSI install: WslFinalizeInstallation"));
+    }
+    CATCH_LOG();
+
+    return NOERROR;
+}
+
 extern "C" UINT __stdcall WslValidateInstallation(MSIHANDLE install)
 try
 {
     WSL_LOG("WslValidateInstallation");
+
+    WriteInstallLog(std::format("MSI install: WslValidateInstallation"));
 
     // TODO: Use a more precise version check so we don't install if the Windows build doesn't support lifted.
 

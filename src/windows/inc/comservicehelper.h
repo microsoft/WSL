@@ -77,7 +77,7 @@ namespace Windows { namespace Internal {
             // Tell COM how to mask fatal exceptions.
             if (ownProcess)
             {
-                Microsoft::WRL::ComPtr<IGlobalOptions> pIGLB;
+                wil::com_ptr<IGlobalOptions> pIGLB;
                 RETURN_IF_FAILED(CoCreateInstance(CLSID_GlobalOptions, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pIGLB)));
                 RETURN_IF_FAILED(pIGLB->Set(COMGLB_EXCEPTION_HANDLING, TExceptionPolicy));
             }
@@ -294,7 +294,7 @@ namespace Windows { namespace Internal {
         bool m_addedModuleReference = false;
 
         // COM callback object to support unloading shared-process services
-        Microsoft::WRL::ComPtr<IContextCallback> m_icc;
+        wil::com_ptr<IContextCallback> m_icc;
 
         // COM Server descriptor
         ServerDescriptor m_serverDescriptor{};

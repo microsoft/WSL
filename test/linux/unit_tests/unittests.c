@@ -103,11 +103,11 @@ int main(int Argc, char* Argv[], char** Envp)
 
             if (LXT_SUCCESS(Result))
             {
-                LxtLogPassed("%s", false, LxtTests[Itr].Name);
+                LxtLogPassed("%s", LxtTests[Itr].Name);
             }
             else
             {
-                LxtLogError("%s", false, LxtTests[Itr].Name);
+                LxtLogError("%s", LxtTests[Itr].Name);
             }
 
             goto ErrorExit;

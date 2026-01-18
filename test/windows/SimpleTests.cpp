@@ -109,8 +109,8 @@ class SimpleTests
             std::format(L"{} {} {} {}", WSL_IMPORT_ARG, tempDistro, vhdDir.wstring(), tar.wstring()).c_str(),
             L"The operation completed successfully. \r\n",
             L"wsl: Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-            L"To force a distribution to use a sparse vhd, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse --allow-unsafe\r\n",
+            L"To force a distribution to use a sparse VHD, please run:\r\n"
+            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\n",
             0);
 
         std::filesystem::path vhdPath = vhdDir / LXSS_VM_MODE_VHD_NAME;
@@ -122,8 +122,8 @@ class SimpleTests
         ValidateOutput(
             std::format(L"{} {} {} {}", WSL_MANAGE_ARG, tempDistro, WSL_MANAGE_ARG_SET_SPARSE_OPTION_LONG, L"true").c_str(),
             L"Sparse VHD support is currently disabled due to potential data corruption.\r\n"
-            L"To force a distribution to use a sparse vhd, please run:\r\n"
-            L"wsl.exe --manage <DistributionName> --set-sparse --allow-unsafe\r\nError code: Wsl/Service/E_INVALIDARG\r\n",
+            L"To force a distribution to use a sparse VHD, please run:\r\n"
+            L"wsl.exe --manage <DistributionName> --set-sparse true --allow-unsafe\r\nError code: Wsl/Service/E_INVALIDARG\r\n",
             L"",
             -1);
 
@@ -261,6 +261,40 @@ class SimpleTests
         auto upperCaseGuidStringWide = wideGuidStringNoBraces;
         std::transform(upperCaseGuidStringWide.begin(), upperCaseGuidStringWide.end(), upperCaseGuidStringWide.begin(), toupper);
         VERIFY_ARE_EQUAL(upperCaseGuidStringWide, wsl::shared::string::GuidToString<wchar_t>(guid, wsl::shared::string::GuidToStringFlags::Uppercase));
+    }
+
+    TEST_METHOD(WindowsPathWithSpaces)
+    {
+        wil::unique_environstrings_ptr originalPath;
+        const DWORD pathLength = GetEnvironmentVariableW(L"PATH", nullptr, 0);
+        if (pathLength > 0)
+        {
+            originalPath.reset(static_cast<PWSTR>(HeapAlloc(GetProcessHeap(), 0, pathLength * sizeof(wchar_t))));
+            THROW_LAST_ERROR_IF_NULL(originalPath.get());
+            THROW_LAST_ERROR_IF(GetEnvironmentVariableW(L"PATH", originalPath.get(), pathLength) == 0);
+        }
+
+        auto cleanup = wil::scope_exit([&]() {
+            if (originalPath)
+            {
+                THROW_LAST_ERROR_IF(!SetEnvironmentVariableW(L"PATH", originalPath.get()));
+            }
+        });
+
+        const wchar_t* testPath =
+            L"C:\\Program Files\\Git\\cmd;"
+            L"C:\\Program Files\\PowerShell\\7;"
+            L"C:\\Program Files (x86)\\Common Files;"
+            L"C:\\Users\\Test User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin";
+
+        THROW_LAST_ERROR_IF(!SetEnvironmentVariableW(L"PATH", testPath));
+
+        auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"echo $PATH");
+
+        VERIFY_IS_TRUE(output.find(L"/mnt/c/Program Files/Git/cmd") != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(L"/mnt/c/Program Files/PowerShell/7") != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(L"/mnt/c/Program Files (x86)/Common Files") != std::wstring::npos);
+        VERIFY_IS_TRUE(output.find(L"/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin") != std::wstring::npos);
     }
 };
 } // namespace SimpleTests

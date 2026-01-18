@@ -129,6 +129,8 @@ void InitEntryUtilityVm(wsl::linux::WslDistributionConfig& Config);
 
 void InitTerminateInstance(gsl::span<gsl::byte> Buffer, wsl::shared::SocketChannel& Channel, wsl::linux::WslDistributionConfig& Config);
 
+void InitTerminateInstanceInternal(const wsl::linux::WslDistributionConfig& Config);
+
 void InstallSystemdUnit(const char* Path, const std::string& Name, const char* Content);
 
 int GenerateSystemdUnits(int Argc, char** Argv);
@@ -219,6 +221,7 @@ int WslEntryPoint(int Argc, char* Argv[])
         {
             // Handle the special case for import result messages, everything else is sent to the binfmt interpreter.
             if (Pid == 1 && strcmp(BaseName, "init") == 0 && Argc == 3 && strcmp(Argv[1], LX_INIT_IMPORT_MESSAGE_ARG) == 0)
+            {
                 try
                 {
                     wsl::shared::MessageWriter<LX_MINI_INIT_IMPORT_RESULT> message;
@@ -228,7 +231,8 @@ int WslEntryPoint(int Argc, char* Argv[])
                     read(STDIN_FILENO, buffer, sizeof(buffer));
                     exit(0);
                 }
-            CATCH_RETURN_ERRNO()
+                CATCH_RETURN_ERRNO()
+            }
 
             ExitCode = CreateNtProcess(Argc - 1, &Argv[1]);
         }
@@ -325,6 +329,10 @@ int GenerateSystemdUnits(int Argc, char** Argv)
             File.reset();
         }
 
+        // Mask systemd-networkd-wait-online.service since WSL always ensures that networking is configured during boot.
+        // That unit can cause systemd boot timeouts since WSL's network interface is unmanaged by systemd.
+        THROW_LAST_ERROR_IF(symlink("/dev/null", std::format("{}/systemd-networkd-wait-online.service", installPath).c_str()) < 0);
+
         // Only create the wslg unit if both enabled in wsl.conf, and if the wslg folder actually exists.
         if (enableGuiApps && access("/mnt/wslg/runtime-dir", F_OK) == 0)
         {
@@ -365,8 +373,8 @@ ExecStart=/bin/mount -o bind,ro,X-mount.mkdir -t none /mnt/wslg/.X11-unix /tmp/.
 ExecStop=
 ExecStart=/bin/sh -c '(echo -1 > {}/{}) ; (echo "{}" > {})' )",
                 BINFMT_MISC_MOUNT_TARGET,
-                LX_INIT_BINFMT_NAME_LATE,
-                BINFMT_INTEROP_REGISTRATION_STRING(LX_INIT_BINFMT_NAME_LATE),
+                LX_INIT_BINFMT_NAME,
+                BINFMT_INTEROP_REGISTRATION_STRING(LX_INIT_BINFMT_NAME),
                 BINFMT_MISC_REGISTER_FILE);
 
             // Install the override for systemd-binfmt.service.
@@ -682,7 +690,7 @@ try
         }
 
         Common->Environment.AddVariable("DBUS_SESSION_BUS_ADDRESS", std::format("unix:path=/run/user/{}/bus", PasswordEntry->pw_uid));
-        Common->Environment.AddVariable(XDG_RUNTIME_DIR_ENV, std::format("/run/user/{}/", PasswordEntry->pw_uid));
+        Common->Environment.AddVariable(XDG_RUNTIME_DIR_ENV, std::format("/run/user/{}", PasswordEntry->pw_uid));
     }
 
     //
@@ -2239,11 +2247,27 @@ Return Value:
         unsetenv(LX_WSL2_DISTRO_READ_ONLY_ENV);
     }
 
-    const auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
+    auto Value = getenv(LX_WSL2_NETWORKING_MODE_ENV);
     if (Value != nullptr)
     {
         Config.NetworkingMode = static_cast<LX_MINI_INIT_NETWORKING_MODE>(std::atoi(Value));
         unsetenv(LX_WSL2_NETWORKING_MODE_ENV);
+    }
+
+    Value = getenv(LX_WSL2_VM_ID_ENV);
+    if (Value != nullptr)
+    {
+        Config.VmId = Value;
+
+        //
+        // Unset the environment variable for user distros.
+        //
+
+        Value = getenv(LX_WSL2_SHARED_MEMORY_OB_DIRECTORY);
+        if (!Value)
+        {
+            unsetenv(LX_WSL2_VM_ID_ENV);
+        }
     }
 
     //
@@ -2500,18 +2524,7 @@ Return Value:
         }
     }
 
-    //
-    // If the distro init process was booted, use the shutdown command to terminate the instance.
-    //
-
-    if (Config.BootInit && !Config.BootStartWriteSocket)
-    {
-        UtilExecCommandLine("systemctl reboot", nullptr);
-    }
-
-    reboot(RB_POWER_OFF);
-    FATAL_ERROR("reboot(RB_POWER_OFF) failed {}", errno);
-
+    InitTerminateInstanceInternal(Config);
     return;
 }
 
@@ -2654,10 +2667,56 @@ try
     }
 
     //
-    // Respond to the instance termination request.
+    // Attempt to stop the plan9 server, if it is not able to be stopped because of an
+    // in-use file, reply to the service that the instance could not be terminated.
     //
 
-    Channel.SendResultMessage<bool>(StopPlan9Server(Message->Force, Config));
+    if (!StopPlan9Server(Message->Force, Config))
+    {
+        Channel.SendResultMessage<bool>(false);
+        return;
+    }
+
+    InitTerminateInstanceInternal(Config);
+}
+CATCH_LOG();
+
+void InitTerminateInstanceInternal(const wsl::linux::WslDistributionConfig& Config)
+
+/*++
+
+Routine Description:
+
+    This routine attempts to cleanly terminate the instance.
+
+Arguments:
+
+    Config - Supplies the distribution config.
+
+Return Value:
+
+    None.
+
+--*/
+try
+{
+    //
+    // If systemd is enabled, attempt to poweroff the instance via systemctl.
+    //
+
+    if (Config.BootInit && !Config.BootStartWriteSocket)
+    {
+        THROW_LAST_ERROR_IF(UtilSetSignalHandlers(g_SavedSignalActions, false) < 0);
+
+        if (UtilExecCommandLine("systemctl poweroff", nullptr) == 0)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(Config.BootInitTimeout));
+            LOG_ERROR("systemctl poweroff did not terminate the instance in {} ms, calling reboot(RB_POWER_OFF)", Config.BootInitTimeout);
+        }
+    }
+
+    reboot(RB_POWER_OFF);
+    FATAL_ERROR("reboot(RB_POWER_OFF) failed {}", errno);
 }
 CATCH_LOG();
 

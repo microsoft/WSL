@@ -39,18 +39,6 @@ using namespace std::string_literals;
 // Start of unaddressable memory if guest only supports the minimum 36-bit addressing.
 #define MAX_36_BIT_PAGE_IN_MB (0x1000000000 / _1MB)
 
-// This device type is implemented by the external virtiofs vdev.
-// {872270E1-A899-4AF6-B454-7193634435AD}
-DEFINE_GUID(VIRTIO_VIRTIOFS_DEVICE_ID, 0x872270E1, 0xA899, 0x4AF6, 0xB4, 0x54, 0x71, 0x93, 0x63, 0x44, 0x35, 0xAD);
-
-// This device type is implemented by the external virtio-pmem vdev.
-// {EDBB24BB-5E19-40F4-8A0F-8224313064FD}
-DEFINE_GUID(VIRTIO_PMEM_DEVICE_ID, 0xEDBB24BB, 0x5E19, 0x40F4, 0x8A, 0x0F, 0x82, 0x24, 0x31, 0x30, 0x64, 0xFD);
-
-// Flags for virtiofs vdev device creation.
-#define VIRTIO_FS_FLAGS_TYPE_FILES 0x8000
-#define VIRTIO_FS_FLAGS_TYPE_SECTIONS 0x4000
-
 // Version numbers for various functionality that was backported.
 #define NICKEL_BUILD_FLOOR 22350
 #define VIRTIO_SERIAL_CONSOLE_COBALT_RELEASE_UBR 40
@@ -61,12 +49,15 @@ DEFINE_GUID(VIRTIO_PMEM_DEVICE_ID, 0xEDBB24BB, 0x5E19, 0x40F4, 0x8A, 0x0F, 0x82,
 #define WSLG_SHARED_MEMORY_SIZE_MB 8192
 #define PAGE_SIZE 0x1000
 
+// WSL-specific virtio device class IDs.
+DEFINE_GUID(VIRTIO_FS_ADMIN_CLASS_ID, 0x7E6AD219, 0xD1B3, 0x42D5, 0xB8, 0xEE, 0xD9, 0x63, 0x24, 0xE6, 0x4F, 0xF6); // {7E6AD219-D1B3-42D5-B8EE-D96324E64FF6}
+DEFINE_GUID(VIRTIO_FS_CLASS_ID, 0x60285AE6, 0xAAF3, 0x4456, 0xB4, 0x44, 0xA6, 0xC2, 0xD0, 0xDE, 0xDA, 0x38); // {60285AE6-AAF3-4456-B444-A6C2D0DEDA38}
+DEFINE_GUID(VIRTIO_NET_CLASS_ID, 0x16479D2E, 0xF0C3, 0x4DBA, 0xBF, 0x7A, 0x04, 0xFF, 0xF0, 0x89, 0x2B, 0x07); // {16479D2E-F0C3-4DBA-BF7A-04FFF0892B07}
+DEFINE_GUID(VIRTIO_PMEM_CLASS_ID, 0xABB755FC, 0x1B86, 0x4255, 0x83, 0xE2, 0xE5, 0x78, 0x7A, 0xBC, 0xF6, 0xC2); // {ABB755FC-1B86-4255-83E2-E5787ABCF6C2}
+
 static constexpr size_t c_bootEntropy = 0x1000;
 static constexpr auto c_localDevicesKey = L"SOFTWARE\\Microsoft\\Terminal Server Client\\LocalDevices";
 static constexpr std::pair<uint32_t, uint32_t> c_schemaVersionNickel{2, 7};
-
-// {ABB755FC-1B86-4255-83E2-E5787ABCF6C2}
-static constexpr GUID c_pmemClassId = {0xABB755FC, 0x1B86, 0x4255, {0x83, 0xe2, 0xe5, 0x78, 0x7a, 0xbc, 0xf6, 0xc2}};
 
 #define LXSS_ENABLE_GUI_APPS() (m_vmConfig.EnableGuiApps && (m_systemDistroDeviceId != ULONG_MAX))
 
@@ -77,8 +68,6 @@ using wsl::core::networking::NetworkSettings;
 using wsl::shared::Localization;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
-
-const std::wstring WslCoreVm::c_defaultTag = L"default"s;
 
 namespace {
 INT64
@@ -231,6 +220,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         // copies of the initrd file and private kernel.
         if constexpr (wsl::shared::Arm64)
         {
+            auto impersonate = wil::impersonate_token(m_userToken.get());
+
             m_rootFsPath = m_tempPath / LXSS_ROOTFS_DIRECTORY;
             wil::CreateDirectoryDeep(m_rootFsPath.c_str());
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
@@ -280,17 +271,20 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // N.B. wslhost.exe is launched at medium integrity level and its lifetime
     //      is tied to the lifetime of the utility VM.
     if (m_vmConfig.EnableDebugConsole || !m_vmConfig.DebugConsoleLogFile.empty())
+    {
         try
         {
             m_vmConfig.EnableDebugConsole = true;
             m_comPipe0 = wsl::windows::common::helpers::GetUniquePipeName();
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // If the system supports virtio console serial ports, use dmesg capture for telemetry and/or debug output.
     // Legacy serial is much slower, so this is not enabled without virtio console support.
     m_vmConfig.EnableDebugShell &= IsVirtioSerialConsoleSupported();
     if (IsVirtioSerialConsoleSupported())
+    {
         try
         {
             bool enableTelemetry = TraceLoggingProviderEnabled(g_hTraceLoggingProvider, WINEVENT_LEVEL_INFO, 0);
@@ -307,9 +301,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             // Initialize the guest telemetry logger.
             m_gnsTelemetryLogger = GuestTelemetryLogger::Create(VmId, m_vmExitEvent);
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     if (m_vmConfig.EnableDebugConsole)
+    {
         try
         {
             // If specified, create a file to log the debug console output.
@@ -326,7 +322,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             wsl::windows::common::helpers::LaunchDebugConsole(
                 m_comPipe0.c_str(), !!m_dmesgCollector, m_restrictedToken.get(), logFile ? logFile.get() : nullptr, !m_vmConfig.EnableTelemetry);
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Create the utility VM and store the runtime ID.
     std::wstring json = GenerateConfigJson();
@@ -334,7 +331,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     m_runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_system.get());
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
-    m_deviceHostSupport = wil::MakeOrThrow<DeviceHostProxy>(m_machineId, m_runtimeId);
+    // Initialize the guest device manager.
+    m_guestDeviceManager = std::make_shared<GuestDeviceManager>(m_machineId, m_runtimeId);
 
     // Create a socket listening for connections from mini_init.
     m_listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
@@ -398,12 +396,14 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         THROW_IF_FAILED(wil::ExpandEnvironmentStringsW(L"%SystemRoot%\\System32\\lxss\\lib", path));
 
         if (wsl::windows::common::filesystem::FileExists(path.c_str()))
+        {
             try
             {
                 addShare(TEXT(LXSS_GPU_INBOX_LIB_SHARE), path.c_str());
                 m_enableInboxGpuLibs = true;
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
 #ifdef WSL_GPU_LIB_PATH
 
@@ -451,27 +451,12 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     ReadGuestCapabilities();
 
     // Mount the system distro.
+    // N.B. If using SCSI, the system distro is added during VM creation.
     switch (m_systemDistroDeviceType)
     {
-    case LxMiniInitMountDeviceTypeLun:
-        m_systemDistroDeviceId =
-            AttachDiskLockHeld(m_vmConfig.SystemDistroPath.c_str(), DiskType::VHD, MountFlags::ReadOnly, {}, false, m_userToken.get());
-        break;
-
     case LxMiniInitMountDeviceTypePmem:
-        m_systemDistroDeviceId = MountFileAsPersistentMemory(c_pmemClassId, m_vmConfig.SystemDistroPath.c_str(), true);
+        m_systemDistroDeviceId = MountFileAsPersistentMemory(m_vmConfig.SystemDistroPath.c_str(), true);
         break;
-
-    default:
-        break;
-    }
-
-    // Mount the kernel modules VHD.
-    ULONG modulesLun = ULONG_MAX;
-    if (!m_vmConfig.KernelModulesPath.empty())
-    {
-        modulesLun =
-            AttachDiskLockHeld(m_vmConfig.KernelModulesPath.c_str(), DiskType::VHD, MountFlags::ReadOnly, {}, false, m_userToken.get());
     }
 
     // Attempt to create and mount the swap vhd.
@@ -480,6 +465,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     //      the user does not have write access.
     ULONG swapLun = ULONG_MAX;
     if ((m_systemDistroDeviceId != ULONG_MAX) && (m_vmConfig.SwapSizeBytes > 0))
+    {
         try
         {
             {
@@ -522,7 +508,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
             swapLun = AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Validate that the requesting network mode is supported.
     //
@@ -541,9 +528,9 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
     message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling;
     message->DefaultKernel = m_defaultKernel;
-    message->KernelModulesDeviceId = modulesLun;
+    message->KernelModulesDeviceId = m_kernelModulesDeviceId;
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
-    message.WriteString(message->KernelModulesListOffset, wsl::shared::string::Join<wchar_t>(m_vmConfig.KernelModulesList, L','));
+    message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
 
     m_miniInitChannel.SendMessage<LX_MINI_INIT_EARLY_CONFIG_MESSAGE>(message.Span());
@@ -595,55 +582,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
-                auto virtioNetworkingEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), m_vmConfig);
-                virtioNetworkingEngine->OnAddGuestDevice([&](const GUID& Clsid, const GUID& DeviceId, PCWSTR Tag, PCWSTR Options) {
-                    auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-                    return AddHdvShareWithOptions(DeviceId, Clsid, Tag, {}, Options, 0, m_userToken.get());
-                });
-
-                virtioNetworkingEngine->OnModifyOpenPorts([&](const GUID& Clsid, PCWSTR Tag, const SOCKADDR_INET& addr, int protocol, bool isOpen) {
-                    if (protocol != IPPROTO_TCP && protocol != IPPROTO_UDP)
-                    {
-                        LOG_HR_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unsupported bind protocol %d", protocol);
-                        return 0;
-                    }
-                    else if (addr.si_family == AF_INET6)
-                    {
-                        // The virtio net adapter does not yet support IPv6 packets, so any traffic would arrive via
-                        // IPv4. If the caller wants IPv4 they will also likely listen on an IPv4 address, which will
-                        // be handled as a separate callback to this same code.
-                        return 0;
-                    }
-
-                    auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-                    const auto server = m_deviceHostSupport->GetRemoteFileSystem(Clsid, c_defaultTag);
-                    if (server)
-                    {
-                        std::wstring portString(L"tag=");
-                        portString += Tag;
-                        portString += L";port_number=";
-                        portString += std::to_wstring(addr.Ipv4.sin_port);
-                        if (protocol == IPPROTO_UDP)
-                        {
-                            portString += L";udp";
-                        }
-                        if (!isOpen)
-                        {
-                            portString += L";allocate=false";
-                        }
-                        else
-                        {
-                            std::wstring addrStr(L"000.000.000.000\0");
-                            RtlIpv4AddressToStringW(&addr.Ipv4.sin_addr, addrStr.data());
-                            portString += L";listen_addr=";
-                            portString += addrStr;
-                        }
-                        LOG_IF_FAILED(server->AddShare(portString.c_str(), nullptr, 0));
-                    }
-                    return 0;
-                });
-                virtioNetworkingEngine->OnGuestInterfaceStateChanged([&](const std::string& name, bool isUp) {});
-                m_networkingEngine.reset(virtioNetworkingEngine.release());
+                m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
+                    std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_guestDeviceManager, VIRTIO_NET_CLASS_ID, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -775,11 +715,13 @@ WslCoreVm::~WslCoreVm() noexcept
             // If the notification did not arrive within the timeout, the VM is
             // forcefully terminated.
             if (forcedTerminate)
+            {
                 try
                 {
                     wsl::windows::common::hcs::TerminateComputeSystem(m_system.get());
                 }
-            CATCH_LOG()
+                CATCH_LOG()
+            }
         }
 
         m_vmExitEvent.wait(UTILITY_VM_TERMINATE_TIMEOUT);
@@ -824,9 +766,9 @@ WslCoreVm::~WslCoreVm() noexcept
     }
 
     // Shutdown virtio device hosts.
-    if (m_deviceHostSupport)
+    if (m_guestDeviceManager)
     {
-        m_deviceHostSupport->Shutdown();
+        m_guestDeviceManager->Shutdown();
     }
 
     // Call RevokeVmAccess on each VHD that was added to the utility VM. This
@@ -838,33 +780,40 @@ WslCoreVm::~WslCoreVm() noexcept
         }
 
         if (WI_IsFlagSet(Entry.second.Flags, DiskStateFlags::AccessGranted))
+        {
             try
             {
                 wsl::windows::common::hcs::RevokeVmAccess(m_machineId.c_str(), Entry.first.Path.c_str());
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
     });
 
     // Delete the swap vhd if one was created.
     if (m_swapFileCreated)
+    {
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
             LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_vmConfig.SwapFilePath.c_str()));
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Delete the temp folder if it was created.
     if (m_tempDirectoryCreated)
+    {
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
             wil::RemoveDirectoryRecursive(m_tempPath.c_str());
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     // Delete the mstsc.exe local devices key if one was created.
     if (m_localDevicesKeyCreated)
+    {
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
@@ -872,14 +821,16 @@ WslCoreVm::~WslCoreVm() noexcept
             const auto key = wsl::windows::common::registry::CreateKey(userKey.get(), c_localDevicesKey, KEY_SET_VALUE);
             THROW_IF_WIN32_ERROR(::RegDeleteKeyValueW(key.get(), nullptr, m_machineId.c_str()));
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
     WSL_LOG("TerminateVmStop");
 }
 
-wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout) const
+wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket = wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get());
+    auto socket =
+        wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
     if (ReceiveTimeout != 0)
     {
         THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
@@ -971,7 +922,7 @@ void WslCoreVm::AddPlan9Share(
 
         if (m_vmConfig.EnableVirtio9p)
         {
-            server = m_deviceHostSupport->GetRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag);
+            server = m_guestDeviceManager->GetRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag);
         }
         else
         {
@@ -984,10 +935,10 @@ void WslCoreVm::AddPlan9Share(
 
         if (!server)
         {
-            server = CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(UserToken);
+            server = wsl::windows::common::wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(UserToken);
             if (m_vmConfig.EnableVirtio9p)
             {
-                m_deviceHostSupport->AddRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag, server);
+                m_guestDeviceManager->AddRemoteFileSystem(__uuidof(p9fs::Plan9FileSystem), VirtIoTag, server);
 
                 // Start with one device to handle the first mount request. After
                 // each mount, the Plan9 file-system will request additional
@@ -1015,64 +966,8 @@ void WslCoreVm::AddPlan9Share(
     if (addNewDevice)
     {
         // This requires more privileges than the user may have, so impersonation is disabled.
-        (void)m_deviceHostSupport->AddNewDevice(VIRTIO_PLAN9_DEVICE_ID, server, VirtIoTag);
+        (void)m_guestDeviceManager->AddNewDevice(VIRTIO_PLAN9_DEVICE_ID, server, VirtIoTag);
     }
-}
-
-WslCoreVm::DirectoryObjectLifetime WslCoreVm::CreateSectionObjectRoot(_In_ std::wstring_view RelativeRootPath, _In_ HANDLE UserToken) const
-{
-    auto revert = wil::impersonate_token(UserToken);
-    DWORD sessionId;
-    DWORD bytesWritten;
-    THROW_LAST_ERROR_IF(!GetTokenInformation(GetCurrentThreadToken(), TokenSessionId, &sessionId, sizeof(sessionId), &bytesWritten));
-
-    // /Sessions/1/BaseNamedObjects/WSL/<VM ID>/<Relative Path>
-    std::wstringstream sectionPathBuilder;
-    sectionPathBuilder << L"\\Sessions\\" << sessionId << L"\\BaseNamedObjects" << L"\\WSL\\" << m_machineId << L"\\" << RelativeRootPath;
-    auto sectionPath = sectionPathBuilder.str();
-
-    UNICODE_STRING ntPath{};
-    OBJECT_ATTRIBUTES attributes{};
-    attributes.Length = sizeof(OBJECT_ATTRIBUTES);
-    attributes.ObjectName = &ntPath;
-    std::vector<wil::unique_handle> directoryHierarchy;
-    auto remainingPath = std::wstring_view(sectionPath.data(), sectionPath.length());
-    while (remainingPath.length() > 0)
-    {
-        // Find the next path substring, ignoring the root path backslash.
-        auto nextDir = remainingPath;
-        const auto separatorPos = nextDir.find(L"\\", remainingPath[0] == L'\\' ? 1 : 0);
-        if (separatorPos != std::wstring_view::npos)
-        {
-            nextDir = nextDir.substr(0, separatorPos);
-            remainingPath = remainingPath.substr(separatorPos + 1, std::wstring_view::npos);
-
-            // Skip concurrent backslashes.
-            while (remainingPath.length() > 0 && remainingPath[0] == L'\\')
-            {
-                remainingPath = remainingPath.substr(1, std::wstring_view::npos);
-            }
-        }
-        else
-        {
-            remainingPath = remainingPath.substr(remainingPath.length(), std::wstring_view::npos);
-        }
-
-        attributes.RootDirectory = directoryHierarchy.size() > 0 ? directoryHierarchy.back().get() : nullptr;
-        ntPath.Buffer = const_cast<PWCH>(nextDir.data());
-        ntPath.Length = sizeof(WCHAR) * gsl::narrow_cast<USHORT>(nextDir.length());
-        ntPath.MaximumLength = ntPath.Length;
-        wil::unique_handle nextHandle;
-        NTSTATUS status = ZwCreateDirectoryObject(&nextHandle, DIRECTORY_ALL_ACCESS, &attributes);
-        if (status == STATUS_OBJECT_NAME_COLLISION)
-        {
-            status = NtOpenDirectoryObject(&nextHandle, MAXIMUM_ALLOWED, &attributes);
-        }
-        THROW_IF_NTSTATUS_FAILED(status);
-        directoryHierarchy.emplace_back(std::move(nextHandle));
-    }
-
-    return {std::move(sectionPath), std::move(directoryHierarchy)};
 }
 
 ULONG WslCoreVm::AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken)
@@ -1503,7 +1398,7 @@ void WslCoreVm::FreeLun(_In_ ULONG lun)
 std::wstring WslCoreVm::GenerateConfigJson()
 {
     hcs::ComputeSystem systemSettings{};
-    systemSettings.Owner = c_vmOwner;
+    systemSettings.Owner = wsl::windows::common::wslutil::c_vmOwner;
     systemSettings.ShouldTerminateOnLastHandleClosed = true;
     systemSettings.SchemaVersion.Major = 2;
     systemSettings.SchemaVersion.Minor = 3;
@@ -1610,7 +1505,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // Set the vmmem suffix which will change the process name in task manager.
     if (IsVmemmSuffixSupported())
     {
-        vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = c_vmOwner;
+        vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = wsl::windows::common::wslutil::c_vmOwner;
     }
 
     // If nested virtualization was requested, ensure the platform supports it.
@@ -1618,24 +1513,28 @@ std::wstring WslCoreVm::GenerateConfigJson()
     // N.B. This is done because arm64 and some older amd64 processors do not support nested virtualization.
     //      Nested virtualization not supported on Windows 10.
     if (m_vmConfig.EnableNestedVirtualization)
+    {
         try
         {
-            std::vector<std::string> processorFeatures{};
             if (wsl::windows::common::helpers::IsWindows11OrAbove())
             {
-                processorFeatures = wsl::windows::common::hcs::GetProcessorFeatures();
+                const auto& processorFeatures = wsl::windows::common::hcs::GetProcessorFeatures();
+                auto feature = std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt");
+                m_vmConfig.EnableNestedVirtualization = (feature != processorFeatures.end());
+            }
+            else
+            {
+                m_vmConfig.EnableNestedVirtualization = false;
             }
 
-            auto feature = std::find(processorFeatures.begin(), processorFeatures.end(), "NestedVirt");
-            m_vmConfig.EnableNestedVirtualization = (feature != processorFeatures.end());
             vmSettings.ComputeTopology.Processor.ExposeVirtualizationExtensions = m_vmConfig.EnableNestedVirtualization;
-
             if (!m_vmConfig.EnableNestedVirtualization)
             {
                 EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
             }
         }
-    CATCH_LOG()
+        CATCH_LOG()
+    }
 
 #ifdef _AMD64_
 
@@ -1817,9 +1716,33 @@ std::wstring WslCoreVm::GenerateConfigJson()
         vmSettings.Chipset.Uefi = std::move(uefiSettings);
     }
 
-    // Initialize other devices.
-    vmSettings.Devices.Scsi["0"] = hcs::Scsi{};
-    hcs::HvSocket hvSocketConfig{};
+    // Initialize SCSI devices.
+    hcs::Scsi scsiController{};
+    auto attachDisk = [&](PCWSTR path) {
+        auto lun = ReserveLun();
+        hcs::Attachment disk{};
+        disk.Type = hcs::AttachmentType::VirtualDisk;
+        disk.Path = path;
+        disk.ReadOnly = true;
+        disk.SupportCompressedVolumes = true;
+        disk.AlwaysAllowSparseFiles = true;
+        disk.SupportEncryptedFiles = true;
+        scsiController.Attachments[std::to_string(lun)] = std::move(disk);
+        m_attachedDisks.emplace(AttachedDisk{DiskType::VHD, path, false}, DiskState{lun, {}, {}});
+        return lun;
+    };
+
+    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypeLun)
+    {
+        m_systemDistroDeviceId = attachDisk(m_vmConfig.SystemDistroPath.c_str());
+    }
+
+    if (!m_vmConfig.KernelModulesPath.empty())
+    {
+        m_kernelModulesDeviceId = attachDisk(m_vmConfig.KernelModulesPath.c_str());
+    }
+
+    vmSettings.Devices.Scsi["0"] = std::move(scsiController);
 
     // Construct a security descriptor that allows system and the current user.
     wil::unique_hlocal_string userSidString;
@@ -1828,6 +1751,7 @@ std::wstring WslCoreVm::GenerateConfigJson()
     std::wstring securityDescriptor{L"D:P(A;;FA;;;SY)(A;;FA;;;"};
     securityDescriptor += userSidString.get();
     securityDescriptor += L")";
+    hcs::HvSocket hvSocketConfig{};
     hvSocketConfig.HvSocketConfig.DefaultBindSecurityDescriptor = securityDescriptor;
     hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
     vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
@@ -1878,12 +1802,17 @@ void WslCoreVm::InitializeGuest()
     if (LXSS_ENABLE_GUI_APPS())
     {
         if (m_vmConfig.EnableVirtio)
+        {
             try
             {
-                MountSharedMemoryDevice(c_virtiofsClassId, L"wslg", L"wslg", WSLG_SHARED_MEMORY_SIZE_MB);
+                // Use the appropriate virtiofs class ID based on m_userToken elevation.
+                const bool admin = wsl::windows::common::security::IsTokenElevated(m_userToken.get());
+                const GUID classId = admin ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
+                m_guestDeviceManager->AddSharedMemoryDevice(classId, L"wslg", L"wslg", WSLG_SHARED_MEMORY_SIZE_MB, m_userToken.get());
                 m_sharedMemoryRoot = std::format(L"WSL\\{}\\wslg", m_machineId);
             }
-        CATCH_LOG()
+            CATCH_LOG()
+        }
 
         try
         {
@@ -1978,7 +1907,7 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
 {
     // Before checking whether DrvFs is already initialized, make sure any existing Plan 9 servers
     // are usable.
-    VerifyDrvFsServers();
+    VerifyPlan9Servers();
 
     const auto elevated = wsl::windows::common::security::IsTokenElevated(UserToken);
     if (elevated)
@@ -2008,6 +1937,12 @@ bool WslCoreVm::IsDnsTunnelingSupported() const
     WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::Nat || m_vmConfig.NetworkingMode == NetworkingMode::Mirrored);
 
     return SUCCEEDED_LOG(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
+}
+
+bool WslCoreVm::IsVhdAttached(_In_ PCWSTR VhdPath)
+{
+    auto lock = m_lock.lock_exclusive();
+    return m_attachedDisks.contains({DiskType::VHD, VhdPath});
 }
 
 WslCoreVm::DiskMountResult WslCoreVm::MountDisk(
@@ -2109,33 +2044,8 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
         ResultMessage.Result);
 }
 
-void WslCoreVm::MountSharedMemoryDevice(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb)
-{
-    if (!m_vmConfig.EnableVirtio)
-    {
-        return;
-    }
-
-    auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-    MountSharedMemoryDeviceLockHeld(ImplementationClsid, Tag, Path, SizeMb);
-}
-
-_Requires_lock_held_(m_guestDeviceLock)
-void WslCoreVm::MountSharedMemoryDeviceLockHeld(_In_ const GUID& ImplementationClsid, _In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb)
-{
-    auto objectLifetime = CreateSectionObjectRoot(Path, m_userToken.get());
-
-    // For virtiofs hdv, the flags parameter has been overloaded. Flags are placed in the lower
-    // 16 bits, while the shared memory size in megabytes are placed in the upper 16 bits.
-    static constexpr auto VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT = 16;
-    UINT32 flags = (SizeMb << VIRTIO_FS_FLAGS_SHMEM_SIZE_SHIFT);
-    WI_SetFlag(flags, VIRTIO_FS_FLAGS_TYPE_SECTIONS);
-    (void)AddHdvShare(VIRTIO_VIRTIOFS_DEVICE_ID, ImplementationClsid, Tag, objectLifetime.Path.c_str(), flags, m_userToken.get());
-    m_objectDirectories.emplace_back(std::move(objectLifetime));
-}
-
 ULONG
-WslCoreVm::MountFileAsPersistentMemory(_In_ const GUID& ImplementationClsid, _In_ PCWSTR FilePath, _In_ bool ReadOnly)
+WslCoreVm::MountFileAsPersistentMemory(_In_ PCWSTR FilePath, _In_ bool ReadOnly)
 {
     hcs::Plan9ShareFlags flags{};
 
@@ -2157,7 +2067,7 @@ WslCoreVm::MountFileAsPersistentMemory(_In_ const GUID& ImplementationClsid, _In
     // a symlink that points to a path like:
     // /sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/<GUID>/pcicceb:00//cceb:00:00.0/virtio1/ndbus0/region0/namespace0.0/block/pmem0
     // Notice the GUID in the middle of that path. That GUID is the instance ID, which is randomly
-    // generated by AddHdvShare. So once we find a path with the instance ID, we know that
+    // generated by AddGuestDevice. So once we find a path with the instance ID, we know that
     // eventually /dev/pmemX will appear in the guest.
     auto persistentMemoryLock = m_persistentMemoryLock.lock_exclusive();
 
@@ -2168,8 +2078,8 @@ WslCoreVm::MountFileAsPersistentMemory(_In_ const GUID& ImplementationClsid, _In
     //      added as part of VM creation and therefore any failure will result in VM termination
     //      (in which case there's no need to remove the device).
     {
-        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
-        (void)AddHdvShare(VIRTIO_PMEM_DEVICE_ID, ImplementationClsid, L"", FilePath, static_cast<UINT32>(flags), m_userToken.get());
+        (void)m_guestDeviceManager->AddGuestDevice(
+            VIRTIO_PMEM_DEVICE_ID, VIRTIO_PMEM_CLASS_ID, L"", nullptr, FilePath, static_cast<UINT32>(flags), m_userToken.get());
     }
 
     // Wait for the pmem device to appear in the VM at /dev/pmemX. Guess the value of X given the
@@ -2219,56 +2129,6 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-GUID WslCoreVm::AddHdvShareWithOptions(
-    _In_ const GUID& DeviceId,
-    _In_ const GUID& ImplementationClsid,
-    _In_ std::wstring_view AccessName,
-    _In_ std::wstring_view Options,
-    _In_ std::wstring_view Path,
-    _In_ UINT32 Flags,
-    _In_ HANDLE UserToken)
-{
-    wil::com_ptr<IPlan9FileSystem> server;
-
-    THROW_HR_IF(E_NOTIMPL, !m_vmConfig.EnableVirtio);
-
-    // Options are appended to the name with a semi-colon separator.
-    //  "name;key1=value1;key2=value2"
-    // The AddSharePath implementation is responsible for separating them out and interpreting them.
-    std::wstring nameWithOptions{AccessName};
-    if (!Options.empty())
-    {
-        nameWithOptions += L";";
-        nameWithOptions += Options;
-    }
-
-    {
-        auto revert = wil::impersonate_token(UserToken);
-
-        server = m_deviceHostSupport->GetRemoteFileSystem(ImplementationClsid, c_defaultTag);
-        if (!server)
-        {
-            server = CreateComServerAsUser<IPlan9FileSystem>(ImplementationClsid, UserToken);
-            m_deviceHostSupport->AddRemoteFileSystem(ImplementationClsid, c_defaultTag, server);
-        }
-
-        const std::wstring SharePath(Path);
-        THROW_IF_FAILED(server->AddSharePath(nameWithOptions.c_str(), SharePath.c_str(), Flags));
-    }
-
-    // This requires more privileges than the user may have, so impersonation is disabled.
-    const std::wstring VirtioTag(AccessName);
-    return m_deviceHostSupport->AddNewDevice(DeviceId, server, VirtioTag.c_str());
-}
-
-_Requires_lock_held_(m_guestDeviceLock)
-GUID WslCoreVm::AddHdvShare(
-    _In_ const GUID& DeviceId, _In_ const GUID& ImplementationClsid, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Flags, _In_ HANDLE UserToken)
-{
-    return AddHdvShareWithOptions(DeviceId, ImplementationClsid, AccessName, {}, Path, Flags, UserToken);
-}
-
-_Requires_lock_held_(m_guestDeviceLock)
 std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
     WI_ASSERT(m_vmConfig.EnableVirtioFs && wsl::shared::string::IsDriveRoot(wsl::shared::string::WideToMultiByte(Path)));
@@ -2300,8 +2160,14 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
         tag += std::to_wstring(m_virtioFsShares.size());
         WI_ASSERT(!FindVirtioFsShare(tag.c_str(), Admin));
 
-        (void)AddHdvShareWithOptions(
-            VIRTIO_VIRTIOFS_DEVICE_ID, Admin ? c_virtiofsAdminClassId : c_virtiofsClassId, tag, key.OptionsString(), sharePath, VIRTIO_FS_FLAGS_TYPE_FILES, UserToken);
+        (void)m_guestDeviceManager->AddGuestDevice(
+            VIRTIO_FS_DEVICE_ID,
+            Admin ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID,
+            tag.c_str(),
+            key.OptionsString().c_str(),
+            sharePath.c_str(),
+            VIRTIO_FS_FLAGS_TYPE_FILES,
+            UserToken);
 
         m_virtioFsShares.emplace(std::move(key), tag);
         created = true;
@@ -2649,7 +2515,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountVolume(_In_ const AttachedD
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
-void WslCoreVm::VerifyDrvFsServers()
+void WslCoreVm::VerifyPlan9Servers()
 {
     for (auto it = m_plan9Servers.begin(); it != m_plan9Servers.end();)
     {
@@ -2817,12 +2683,6 @@ LX_INIT_DRVFS_MOUNT WslCoreVm::s_InitializeDrvFs(_Inout_ WslCoreVm* VmContext, _
 
         return LxInitDrvfsMountNone;
     }
-}
-
-bool WslCoreVm::IsVhdAttached(_In_ PCWSTR VhdPath)
-{
-    auto lock = m_lock.lock_exclusive();
-    return m_attachedDisks.contains({DiskType::VHD, VhdPath});
 }
 
 void CALLBACK WslCoreVm::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)

@@ -420,7 +420,7 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
     --debug-shell
         Een WSL2-foutopsporingsshell voor diagnostische doeleinden openen.
 
-    --install [Distributie] [Opties...]
+    --install [Distro] [Options...]
         Een Windows-subsysteem voor Linux-distributie installeren.
         Gebruik 'wsl.exe --list --online' voor een lijst met geldige distributies.
 
@@ -429,7 +429,7 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
                 WSL1-ondersteuning inschakelen.
 
             --fixed-vhd
-                Maak een schijf met een vaste grootte om de distributie op te slaan.
+                Een schijf met een vaste grootte maken om de distributie op te slaan.
 
             --from-file &lt;Path&gt;
                 Een distributie installeren vanaf een lokaal bestand.
@@ -450,10 +450,10 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
                 De distributie niet na de installatie starten.
 
             --version &lt;Version&gt;
-                Hiermee geeft u de versie op die moet worden gebruikt voor de nieuwe distributie.
+                Specificeert de versie die moet worden gebruikt voor de nieuwe distributie.
 
             --vhd-size &lt;MemoryString&gt;
-                Geeft de grootte van de schijf op om de distributie op te slaan.
+                Specificeert de grootte van de schijf om de distributie op te slaan.
 
             --web-download
                 De distributie downloaden van internet in plaats van Microsoft Store.
@@ -463,10 +463,10 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
 
         Opties:
             --move &lt;Location&gt;
-                Verplaats de distributie naar een nieuwe locatie.
+                De distributie naar een nieuwe locatie verplaatsen.
 
             --set-sparse, -s &lt;true|false&gt;
-                De vhdx van distro instellen op sparse, zodat schijfruimte automatisch opnieuw kan worden geclaimd.
+                De VHD van de distributie instellen op sparse, zodat schijfruimte automatisch opnieuw kan worden geclaimd.
 
             --set-default-user &lt;Username&gt;
                 De standaardgebruiker van de distributie instellen.
@@ -505,7 +505,7 @@ Argumenten voor het beheren van het Windows-subsysteem voor Linux:
 
         Opties:
             --force
-                Beëindig de WSL 2 virtuele machine, zelfs als er een bewerking wordt uitgevoerd. Dit kan gegevensverlies veroorzaken.
+                De WSL 2-VM beëindigen, zelfs als er een bewerking wordt uitgevoerd. Dit kan gegevensverlies veroorzaken.
 
     --status
         De status van het Windows-subsysteem voor Linux weergeven.
@@ -535,7 +535,7 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
 
         Opties:
             --format &lt;Format&gt;
-                De exportindeling opgeven. Ondersteunde waarden: tar, tar.gz, tar.xz, vhd.
+                Specificeert de exportindeling. Ondersteunde waarden: tar, tar.gz, tar.xz, vhd.
 
     --import &lt;Distro&gt; &lt;InstallLocation&gt; &lt;FileName&gt; [Opties]
         Hiermee importeer je het opgegeven TAR-bestand als een nieuwe distributie.
@@ -546,11 +546,11 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
                 Hiermee geef je de versie op die moet worden gebruikt voor de nieuwe distributie.
 
             --vhd
-                Hiermee geef je op dat het opgegeven bestand een VHDX-bestand is en geen TAR-bestand.
-                Met deze bewerking wordt een kopie gemaakt van het VHDX-bestand op de opgegeven installatielocatie.
+                Hiermee geef je op dat het opgegeven bestand een VHD- of VHDX-bestand is en geen TAR-bestand.
+                Met deze bewerking wordt een kopie gemaakt van het VHD-bestand op de opgegeven installatielocatie.
 
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
-        Hiermee importeer je het opgegeven VHDX-bestand als een nieuwe distributie.
+        Hiermee importeer je het opgegeven VHD-bestand als een nieuwe distributie.
         Deze virtuele harde schijf moet zijn geformatteerd met het ext4-type bestandssysteem.
 
     --list, -l [Opties]
@@ -606,7 +606,7 @@ Argumenten voor het beheren van distributies in het Windows-subsysteem voor Linu
 "}{Locked="--quiet,"}{Locked="--verbose,"}{Locked="--online,"}{Locked="--install'"}{Locked="--set-default,"}{Locked="--set-version "}{Locked="--terminate,"}{Locked="--unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePackageVersions" xml:space="preserve">
-    <value>WSL-versiie: {}
+    <value>WSL-versie: {}
 Kernelversie: {}
 WSLg-versie: {}
 MSRDC-versie: {}
@@ -626,7 +626,7 @@ Buildtijd: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomKernelModulesNotFound" xml:space="preserve">
-    <value>De VHD van de aangepaste kernelmodules in {} is niet gevonden: {}.</value>
+    <value>De aangepaste kernelmodules VHD in {} is niet gevonden: {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
@@ -704,8 +704,13 @@ Het systeem moet mogelijk opnieuw worden opgestart, zodat de wijzigingen van kra
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageRequiresVhdxFileExtension" xml:space="preserve">
-    <value>Het opgegeven bestand moet de bestandsextensie .vhdx hebben.</value>
+  <data name="MessageRequiresFileExtension" xml:space="preserve">
+    <value>Het opgegeven bestand moet de bestandsextensie {} hebben.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageRequiresFileExtensions" xml:space="preserve">
+    <value>Het opgegeven bestand moet de bestandsextensie {} of {} hebben.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageVmSwitchNotFound" xml:space="preserve">
     <value>Kan de VmSwitch {} niet vinden. Beschikbare switches: {}</value>
@@ -724,9 +729,6 @@ Het systeem moet mogelijk opnieuw worden opgestart, zodat de wijzigingen van kra
   </data>
   <data name="MessageFailedToResizeDisk" xml:space="preserve">
     <value>Kan het formaat van de schijf niet wijzigen.</value>
-  </data>
-  <data name="MessageFailedToTranslatePath" xml:space="preserve">
-    <value>Kan pad niet vertalen.</value>
   </data>
   <data name="MessageNoValueFound" xml:space="preserve">
     <value>Geen waarde gevonden.</value>
@@ -998,7 +1000,7 @@ Terugvallen op NAT-netwerken.</value>
     <value>Documenten weergeven</value>
   </data>
   <data name="MessageVhdInUse" xml:space="preserve">
-    <value>De bewerking kan niet worden voltooid omdat de VHDX momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
+    <value>De bewerking kan niet worden voltooid omdat de VHD momenteel in gebruik is. Stoppen van WSL forceren: wsl.exe --shutdown</value>
     <comment>{Locked="--shutdown"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidBoolean" xml:space="preserve">
@@ -1006,7 +1008,7 @@ Terugvallen op NAT-netwerken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageSparseVhdWsl2Only" xml:space="preserve">
-    <value>Sparse vhdx wordt alleen ondersteund op WSL2.</value>
+    <value>Sparse VHD wordt alleen ondersteund op WSL2.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
     <value>Het uitvoeren van WSL als lokaal systeem wordt niet ondersteund.</value>
@@ -1055,7 +1057,7 @@ Terugvallen op NAT-netwerken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
-    <value>Dit ziet eruit als een VHDX-bestand. Gebruik --vhd om een VHDX te importeren in plaats van een tar.</value>
+    <value>Dit ziet eruit als een VHD-bestand. Gebruik --vhd om een VHD te importeren in plaats van een tar.</value>
     <comment>{Locked="--vhd "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroStoreInstallFailed" xml:space="preserve">
@@ -1107,7 +1109,7 @@ Foutcode: {}</value>
   </data>
   <data name="MessageSparseVhdDisabled" xml:space="preserve">
     <value>Sparse VHD-ondersteuning is momenteel uitgeschakeld vanwege mogelijk beschadigde gegevens.
-Om een distributie te dwingen een sparse vhd te gebruiken, voer je het volgende uit:
+Om een distributie te dwingen een sparse VHD te gebruiken, voer je het volgende uit:
 wsl.exe --manage &lt;DistributionName&gt; --set-sparse --allow-unsafe</value>
     <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1189,7 +1191,7 @@ Zie de herstelinstructies voor: https://aka.ms/wsldiskmountrecovery</value>
     <value>Een absoluut Windows-pad naar een aangepaste Linux-kernel.</value>
   </data>
   <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
-    <value>Koor kernels bladeren</value>
+    <value>Door kernels bladeren</value>
   </data>
   <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Aangepaste kernel</value>

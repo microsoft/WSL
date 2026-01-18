@@ -134,7 +134,9 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(HCS_E_INVALID_JSON),
     X_WIN32(ERROR_INVALID_SECURITY_DESCR),
     X(VM_E_INVALID_STATE),
-    X_WIN32(STATUS_SHUTDOWN_IN_PROGRESS)};
+    X_WIN32(STATUS_SHUTDOWN_IN_PROGRESS),
+    X_WIN32(ERROR_BAD_PATHNAME),
+    X(WININET_E_TIMEOUT)};
 
 #undef X
 
@@ -592,6 +594,11 @@ std::wstring wsl::windows::common::wslutil::DownloadFile(std::wstring_view Url, 
 
 void wsl::windows::common::wslutil::EnforceFileLimit(LPCWSTR Path, size_t Limit, const std::function<bool(const std::filesystem::directory_entry&)>& pred)
 {
+    if (Limit <= 0)
+    {
+        return;
+    }
+
     std::map<std::filesystem::file_time_type, std::filesystem::path> files;
     for (auto const& e : std::filesystem::directory_iterator{Path})
     {
@@ -601,7 +608,7 @@ void wsl::windows::common::wslutil::EnforceFileLimit(LPCWSTR Path, size_t Limit,
         }
     }
 
-    if (Limit < 0 || files.size() < Limit)
+    if (files.size() < Limit)
     {
         return;
     }
@@ -1153,6 +1160,13 @@ bool wsl::windows::common::wslutil::IsRunningInMsix()
         return false;
     }
 }
+
+bool wsl::windows::common::wslutil::IsVhdFile(_In_ const std::filesystem::path& path)
+{
+    return wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdFileExtension) ||
+           wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdxFileExtension);
+}
+
 std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
 {
     std::vector<DWORD> pids(1024);
@@ -1343,10 +1357,17 @@ int WINAPI InstallRecordHandler(void* context, UINT messageType, LPCWSTR message
     try
     {
         WSL_LOG("MSIMessage", TraceLoggingValue(messageType, "type"), TraceLoggingValue(message, "message"));
+        auto type = (INSTALLMESSAGE)(0xFF000000 & (UINT)messageType);
+
+        if (type == INSTALLMESSAGE_ERROR || type == INSTALLMESSAGE_FATALEXIT || type == INSTALLMESSAGE_WARNING)
+        {
+            WriteInstallLog(std::format("MSI message: {}", message));
+        }
+
         auto* callback = reinterpret_cast<const std::function<void(UINT, LPCWSTR)>*>(context);
         if (callback != nullptr)
         {
-            (*callback)((INSTALLMESSAGE)(0xFF000000 & (UINT)messageType), message);
+            (*callback)(type, message);
         }
     }
     CATCH_LOG();
@@ -1400,6 +1421,8 @@ int wsl::windows::common::wslutil::UpdatePackage(bool PreRelease, bool Repair)
 UINT wsl::windows::common::wslutil::UpgradeViaMsi(
     _In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
 {
+    WriteInstallLog(std::format("Upgrading via MSI package: {}. Args: {}", PackageLocation, ExtraArgs != nullptr ? ExtraArgs : L""));
+
     ConfigureMsiLogging(LogFile, Callback);
 
     auto result = MsiInstallProduct(PackageLocation, ExtraArgs);
@@ -1407,6 +1430,8 @@ UINT wsl::windows::common::wslutil::UpgradeViaMsi(
         "MsiInstallResult",
         TraceLoggingValue(result, "result"),
         TraceLoggingValue(ExtraArgs != nullptr ? ExtraArgs : L"", "ExtraArgs"));
+
+    WriteInstallLog(std::format("MSI upgrade result: {}", result));
 
     return result;
 }
@@ -1416,10 +1441,15 @@ UINT wsl::windows::common::wslutil::UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _I
     const auto key = OpenLxssMachineKey(KEY_READ);
     const auto productCode = ReadString(key.get(), L"Msi", L"ProductCode", nullptr);
 
+    WriteInstallLog(std::format("Uninstalling MSI package: {}", productCode));
+
     ConfigureMsiLogging(LogFile, Callback);
 
     auto result = MsiConfigureProduct(productCode.c_str(), 0, INSTALLSTATE_ABSENT);
     WSL_LOG("MsiUninstallResult", TraceLoggingValue(result, "result"));
+
+    WriteInstallLog(std::format("MSI package uninstall result: {}", result));
+
     return result;
 }
 
@@ -1449,6 +1479,43 @@ wil::unique_hfile wsl::windows::common::wslutil::ValidateFileSignature(LPCWSTR P
 
     return fileHandle;
 }
+
+void wsl::windows::common::wslutil::WriteInstallLog(const std::string& Content)
+try
+{
+    static std::wstring path = wil::GetWindowsDirectoryW<std::wstring>() + L"\\temp\\wsl-install-log.txt";
+
+    // Wait up to 10 seconds for the log file mutex
+    wil::unique_handle mutex{CreateMutex(nullptr, true, L"Global\\WslInstallLog")};
+    THROW_LAST_ERROR_IF(!mutex);
+
+    THROW_LAST_ERROR_IF(WaitForSingleObject(mutex.get(), 10 * 1000) != WAIT_OBJECT_0);
+
+    wil::unique_handle file{CreateFile(
+        path.c_str(), GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, 0, nullptr)};
+
+    THROW_LAST_ERROR_IF(!file);
+
+    LARGE_INTEGER size{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(file.get(), &size));
+
+    // Append to the file if its size is below 10MB, otherwise truncate.
+    if (size.QuadPart < 10 * _1MB)
+    {
+        THROW_LAST_ERROR_IF(SetFilePointer(file.get(), 0, nullptr, FILE_END) == INVALID_SET_FILE_POINTER);
+    }
+    else
+    {
+        THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(file.get()));
+    }
+
+    static auto processName = wil::GetModuleFileNameW<std::wstring>();
+    auto logLine = std::format("{:%FT%TZ} {}[{}]: {}\n", std::chrono::system_clock::now(), processName, WSL_PACKAGE_VERSION, Content);
+
+    DWORD bytesWritten{};
+    THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), logLine.c_str(), static_cast<DWORD>(logLine.size()), &bytesWritten, nullptr));
+}
+CATCH_LOG();
 
 winrt::Windows::Management::Deployment::PackageVolume wsl::windows::common::wslutil::GetSystemVolume()
 try

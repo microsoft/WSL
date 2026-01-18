@@ -44,6 +44,7 @@ inline auto c_msixPackageFamilyName = L"MicrosoftCorporationII.WindowsSubsystemF
 inline auto c_githubUrlOverrideRegistryValue = L"GitHubUrlOverride";
 inline auto c_vhdFileExtension = L".vhd";
 inline auto c_vhdxFileExtension = L".vhdx";
+inline constexpr auto c_vmOwner = L"WSL";
 
 struct GitHubReleaseAsset
 {
@@ -77,6 +78,22 @@ wil::com_ptr<TInterface> CoGetCallContext();
 void CoInitializeSecurity();
 
 void ConfigureCrt();
+
+/// <summary>
+/// Creates a COM server with user impersonation.
+/// </summary>
+template <typename Interface>
+wil::com_ptr_t<Interface> CreateComServerAsUser(_In_ REFCLSID RefClsId, _In_ HANDLE UserToken)
+{
+    auto revert = wil::impersonate_token(UserToken);
+    return wil::CoCreateInstance<Interface>(RefClsId, (CLSCTX_LOCAL_SERVER | CLSCTX_ENABLE_CLOAKING | CLSCTX_ENABLE_AAA));
+}
+
+template <typename Class, typename Interface>
+wil::com_ptr_t<Interface> CreateComServerAsUser(_In_ HANDLE UserToken)
+{
+    return CreateComServerAsUser<Interface>(__uuidof(Class), UserToken);
+}
 
 std::wstring ConstructPipePath(_In_ std::wstring_view PipeName);
 
@@ -121,6 +138,8 @@ std::vector<BYTE> HashFile(HANDLE File, DWORD Algorithm);
 void InitializeWil();
 
 bool IsRunningInMsix();
+
+bool IsVhdFile(_In_ const std::filesystem::path& path);
 
 bool IsVirtualMachinePlatformInstalled();
 
@@ -180,6 +199,8 @@ int UpdatePackage(bool PreRelease, bool Repair);
 UINT UpgradeViaMsi(_In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
 
 UINT UninstallViaMsi(_In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
+
+void WriteInstallLog(const std::string& Content);
 
 winrt::Windows::Management::Deployment::PackageVolume GetSystemVolume();
 
