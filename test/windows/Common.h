@@ -433,7 +433,7 @@ std::vector<std::wstring> LxssSplitString(_In_ const std::wstring& string, _In_ 
 
 void RestartWslService();
 
-wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type);
+wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type = TokenPrimary);
 
 std::wstring LxssWriteWslConfig(const std::wstring& Content);
 

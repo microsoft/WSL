@@ -260,7 +260,7 @@ class UnitTests
             auto command = L"mount | grep -iF 'tmpfs on /run/user/" + std::to_wstring(TestUid) + L" type tmpfs (rw'";
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command), 0u);
 
-            const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
+            const auto nonElevatedToken = GetNonElevatedToken();
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(command, nullptr, nullptr, nullptr, nonElevatedToken.get()), 0u);
         };
 
@@ -963,7 +963,7 @@ class UnitTests
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mount | grep -iF 'tmpfs on /tmp type tmpfs'", nullptr, nullptr, nullptr, nullptr), 0u);
 
-        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
+        const auto nonElevatedToken = GetNonElevatedToken();
         VERIFY_ARE_EQUAL(
             LxsstuLaunchWsl(L"mount | grep -iF 'tmpfs on /tmp type tmpfs'", nullptr, nullptr, nullptr, nonElevatedToken.get()), 0u);
 
@@ -1841,7 +1841,7 @@ Error code: Wsl/InstallDistro/WSL_E_DISTRO_NOT_FOUND
         auto cleanUp = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslShutdown(); });
 
         // Validate that GPU mounts are present in both namespaces.
-        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
+        const auto nonElevatedToken = GetNonElevatedToken();
         WslShutdown();
         ValidateGpuMounts(nullptr);
         ValidateGpuMounts(nonElevatedToken.get());
@@ -6045,7 +6045,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
         distributionFstab.SetContent(L"");
         TerminateDistribution();
 
-        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
+        const auto nonElevatedToken = GetNonElevatedToken();
         VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"echo dummy", nullptr, nullptr, nullptr, nonElevatedToken.get()));
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"mountpoint /mnt/c", 32u);
         VERIFY_ARE_EQUAL(out, L"/mnt/c is not a mountpoint\n");
@@ -6061,7 +6061,7 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
 
         TerminateDistribution();
 
-        const auto nonElevatedToken = GetNonElevatedToken(TokenPrimary);
+        const auto nonElevatedToken = GetNonElevatedToken();
 
         VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"echo dummy", nullptr, nullptr, nullptr, nonElevatedToken.get()));
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"mountpoint /mnt/c", 0u);
