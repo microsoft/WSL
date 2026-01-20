@@ -597,7 +597,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     {
         // TODO: UDP support
         // TODO: Investigate ipv6 support.
-        auto& portEntry = request.HostConfig.PortBindings[std::format("{}/tcp", e.ContainerPort)];
+        auto portKey = std::format("{}/tcp", e.ContainerPort);
+        request.ExposedPorts[portKey] = {};
+        auto& portEntry = request.HostConfig.PortBindings[portKey];
         portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
     }
 
