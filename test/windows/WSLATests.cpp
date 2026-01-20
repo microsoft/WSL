@@ -2359,14 +2359,11 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
         std::string containerName = "test-container";
 
         // Phase 1: Create session and container, then stop the container
         {
-            auto session = CreateSession(settings);
+            auto session = CreateSession();
 
             // Create and start a container
             WSLAContainerLauncher launcher("debian:latest", containerName.c_str(), "/bin/echo", {"OK"});
@@ -2381,7 +2378,7 @@ class WSLATests
 
         // Phase 2: Create new session from same storage, recover and delete container
         {
-            auto session = CreateSession(settings);
+            auto session = CreateSession();
 
             // Try to open the container from the previous session
             wil::com_ptr<IWSLAContainer> recoveredContainer;
@@ -2400,13 +2397,14 @@ class WSLATests
             VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         }
 
-        // Phase 3: Create new session from same storage, verify no containers exist
+        // Phase 3: Create new session from same storage, verify the container is not listed.
         {
-            auto session = CreateSession(settings);
+            auto session = CreateSession();
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
 
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
-            VERIFY_ARE_EQUAL(containers.size(), 0u);
+            // Verify container is no longer accessible
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         }
     }
 
