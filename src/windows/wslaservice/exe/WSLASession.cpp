@@ -110,12 +110,13 @@ WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SE
     else
     {
 
-#ifdef WSLA_TEST_DISTRO_PATH
+#ifdef WSL_SYSTEM_DISTRO_PATH
 
-        vmSettings.RootVhd = TEXT(WSLA_TEST_DISTRO_PATH);
+        vmSettings.RootVhd = TEXT(WSL_SYSTEM_DISTRO_PATH);
 
 #else
-        vmSettings.RootVhd = std::filesystem::path(common::wslutil::GetMsiPackagePath().value()) / L"wslarootfs.vhd";
+
+        vmSettings.RootVhd = std::filesystem::path(common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
 
 #endif
 

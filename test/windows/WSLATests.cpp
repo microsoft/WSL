@@ -320,7 +320,8 @@ class WSLATests
 
         {
             std::string expectedError =
-                "pull access denied for does-not, repository does not exist or may require 'docker login'";
+                "pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
+                "access to the resource is denied";
 
             WSLAErrorDetails error;
             VERIFY_ARE_EQUAL(session->PullImage("does-not:exist", nullptr, nullptr, &error.Error), WSLA_E_IMAGE_NOT_FOUND);
