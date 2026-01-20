@@ -319,12 +319,16 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     std::filesystem::path filePath;
     ULONG flags = LXSS_IMPORT_DISTRO_FLAGS_NO_OOBE;
     DWORD version = LXSS_WSL_VERSION_DEFAULT;
+    std::optional<std::wstring> fsType;
+    std::optional<std::wstring> fsMountOptions;
 
     parser.AddPositionalArgument(name, 0);
     parser.AddPositionalArgument(AbsolutePath(installPath), 1);
     parser.AddPositionalArgument(filePath, 2);
     parser.AddArgument(WslVersion(version), WSL_IMPORT_ARG_VERSION);
     parser.AddArgument(SetFlag<ULONG, LXSS_IMPORT_DISTRO_FLAGS_VHD>{flags}, WSL_IMPORT_ARG_VHD);
+    parser.AddArgument(fsType, WSL_IMPORT_ARG_FS_TYPE);
+    parser.AddArgument(fsMountOptions, WSL_IMPORT_ARG_FS_MOUNT_OPTIONS);
 
     parser.Parse();
 
@@ -385,7 +389,15 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     {
         wsl::windows::common::HandleConsoleProgressBar progressBar(fileHandle, Localization::MessageImportProgress());
         wsl::windows::common::SvcComm service;
-        service.RegisterDistribution(name, version, fileHandle, installPath->c_str(), flags);
+        service.RegisterDistribution(
+            name,
+            version,
+            fileHandle,
+            installPath->c_str(),
+            flags,
+            std::nullopt,
+            fsType.has_value() ? fsType->c_str() : nullptr,
+            fsMountOptions.has_value() ? fsMountOptions->c_str() : nullptr);
     }
 
     directory_cleanup.release();

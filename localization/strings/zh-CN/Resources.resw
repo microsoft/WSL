@@ -564,6 +564,13 @@
                 指定所提供的文件是 .vhd 还是 .vhdx 文件，而不是 tar 文件。
                 此操作在指定的安装位置创建 VHD 文件的副本。
 
+            --fs-type
+                指定用于分发版根目录的文件系统类型。
+                默认为 ext4。
+
+            --fs-mount-options
+                指定根目录文件系统的其他装载选项。
+
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         将指定的 VHD 文件作为新发行版导入。
         必须使用 ext4 文件系统类型设置此虚拟硬盘的格式。

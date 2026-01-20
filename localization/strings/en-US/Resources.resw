@@ -558,6 +558,13 @@ Arguments for managing distributions in Windows Subsystem for Linux:
                 Specifies that the provided file is a .vhd or .vhdx file, not a tar file.
                 This operation makes a copy of the VHD file at the specified install location.
 
+            --fs-type
+                Specify the filesystem type to use for the distribution root.
+                Defaults to ext4.
+
+            --fs-mount-options
+                Specify additional mount options for the filesystem.
+
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Imports the specified VHD file as a new distribution.
         This virtual hard disk must be formatted with the ext4 filesystem type.

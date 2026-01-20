@@ -938,6 +938,11 @@ try
     {
         CommandLine = std::format("/usr/sbin/mkfs.btrfs '{}'", DevicePath);
     }
+    else
+    {
+        LOG_ERROR("Unsupported filesystem type: {}", FsType_s);
+        return -1;
+    }
     if (UtilExecCommandLine(CommandLine.c_str(), nullptr) < 0)
     {
         return -1;

@@ -29,6 +29,8 @@ Abstract:
 #define WSL_EXPORT_ARG_VHD_OPTION L"--vhd"
 #define WSL_HELP_ARG L"--help"
 #define WSL_IMPORT_ARG L"--import"
+#define WSL_IMPORT_ARG_FS_MOUNT_OPTIONS L"--fs-mount-options"
+#define WSL_IMPORT_ARG_FS_TYPE L"--fs-type"
 #define WSL_IMPORT_ARG_STDIN L"-"
 #define WSL_IMPORT_ARG_VERSION L"--version"
 #define WSL_IMPORT_ARG_VHD L"--vhd"
