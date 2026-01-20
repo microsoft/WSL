@@ -273,7 +273,7 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
-    void ExpectImagePresent(IWSLASession& Session, const char* Image)
+    void ExpectImagePresent(IWSLASession& Session, const char* Image, bool Present = true)
     {
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
         THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
@@ -284,7 +284,14 @@ class WSLATests
             tags.push_back(e.Image);
         }
 
-        VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
+        if (Present)
+        {
+            VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
+        }
+        else
+        {
+            VERIFY_IS_TRUE(std::ranges::find(tags, Image) == tags.end());
+        }
     }
 
     TEST_METHOD(PullImage)
@@ -382,6 +389,54 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+    }
+    TEST_METHOD(DeleteImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.DisplayName = L"wsla-delete-image-test";
+        settings.NetworkingMode = WSLANetworkingModeNAT;
+
+        auto session = CreateSession(settings);
+
+        // Prepare alpine image to delete.
+        VERIFY_SUCCEEDED(session->PullImage("alpine:latest", nullptr, nullptr, nullptr));
+
+        // Verify that the image is in the list of images.
+        ExpectImagePresent(*session, "alpine:latest");
+
+        // Launch a container to ensure that image deletion fails when in use.
+        WSLAContainerLauncher launcher(
+            "alpine:latest", "test-delete-container-in-use", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+
+        auto container = launcher.Launch(*session);
+
+        // Verify that the container is in running state.
+        VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+        // Test delete failed if image in use.
+        WSLA_DELETE_IMAGE_OPTIONS options{};
+        options.Image = "alpine:latest";
+        options.Force = FALSE;
+        wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
+            session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+
+        // Force should suuceed.
+        options.Force = TRUE;
+        VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+        VERIFY_IS_TRUE(deletedImages.size() > 0);
+        VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);
+
+        // Verify that the image is no longer in the list of images.
+        ExpectImagePresent(*session, "alpine:latest", false);
+
+        // Test delete failed if image not exists.
+        VERIFY_ARE_EQUAL(
+            WSLA_E_IMAGE_NOT_FOUND, session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
     }
 
     TEST_METHOD(CustomDmesgOutput)

@@ -55,7 +55,11 @@ public:
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
-    IFACEMETHOD(DeleteImage)(_In_ LPCWSTR Image) override;
+    IFACEMETHOD(DeleteImage)(
+        _In_ const WSLA_DELETE_IMAGE_OPTIONS* Options,
+        _Out_ WSLA_DELETED_IMAGE_INFORMATION** DeletedImages,
+        _Out_ ULONG* Count,
+        _Inout_opt_ WSLA_ERROR_INFO* ErrorInfo) override;
 
     // Container management.
     IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container, _Inout_opt_ WSLA_ERROR_INFO* Error) override;

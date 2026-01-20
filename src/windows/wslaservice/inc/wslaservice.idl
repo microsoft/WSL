@@ -297,6 +297,26 @@ interface IWSLAContainer : IUnknown
     //HRESULT ReleaseHostPort([in] USHORT HostPort);
 }
 
+typedef enum _WSLADeletedImageType
+{
+    WSLADeletedImageTypeDeleted = 0,
+    WSLADeletedImageTypeUntagged = 1
+} WSLADeletedImageType;
+
+struct WSLA_DELETED_IMAGE_INFORMATION
+{
+    char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
+    WSLADeletedImageType Type;
+};
+
+struct WSLA_DELETE_IMAGE_OPTIONS
+{
+    LPCSTR Image; // Image can be ID or Repo:Tag.
+    BOOL Force;
+    BOOL NoPrune;
+    // TODO: Platforms: a json array of OCI platform strings.
+};
+
 [
     uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
     pointer_default(unique),
@@ -305,14 +325,14 @@ interface IWSLAContainer : IUnknown
 interface IWSLASession : IUnknown
 {
     // Image management.
-    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique, optional] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
-    HRESULT DeleteImage([in] LPCWSTR Image);
+    HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
 
     // Container management.
-    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container, [in, out, unique, optional] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT OpenContainer([in] LPCSTR Name, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
