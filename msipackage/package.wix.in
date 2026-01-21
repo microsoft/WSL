@@ -28,6 +28,7 @@
 
                 <File Id="wslg.exe" Name="wslg.exe" Source="${PACKAGE_INPUT_DIR}/wslg.exe" />
                 <File Id="wsladiag.exe" Name="wsladiag.exe" Source="${PACKAGE_INPUT_DIR}/wsladiag.exe" />
+                <File Id="wslc.exe" Name="wslc.exe" Source="${PACKAGE_INPUT_DIR}/wslc.exe" />
                 <File Id="wslhost.exe" Name="wslhost.exe" Source="${PACKAGE_INPUT_DIR}/wslhost.exe" />
                 <File Id="wslrelay.exe" Name="wslrelay.exe" Source="${PACKAGE_INPUT_DIR}/wslrelay.exe" />
                 <File Id="wslserviceproxystub.dll" Name="wslserviceproxystub.dll" Source="${PACKAGE_INPUT_DIR}/wslserviceproxystub.dll" />
@@ -39,12 +40,6 @@
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
                 <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
-                <?endif?>
-
-
-                <!-- Temporary runtime VHD. TODO: Update once the final VHD is available. -->
-                <?if "${WSL_DEV_BINARY_PATH}" = "" AND "${TARGET_PLATFORM}" = "x64" ?>
-                <File Id="wslarootfs.vhd" Name="wslarootfs.vhd" Source="${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd"/>
                 <?endif?>
 
                 <!-- Installation folder -->

@@ -72,22 +72,9 @@ CATCH_LOG()
 
 namespace wsl::windows::common {
 
-std::optional<ConsoleInput> ConsoleInput::Create(HANDLE Handle)
+ConsoleInput::ConsoleInput(HANDLE Handle, DWORD SavedMode) :
+    m_Handle(Handle), m_SavedMode(SavedMode), m_SavedCodePage(GetConsoleCP())
 {
-    DWORD Mode;
-    if (GetFileType(Handle) == FILE_TYPE_CHAR && GetConsoleMode(Handle, &Mode))
-    {
-        return ConsoleInput(Handle, Mode);
-    }
-
-    return std::nullopt;
-}
-
-ConsoleInput::ConsoleInput(HANDLE Handle, DWORD SavedMode) : m_Handle(Handle), m_SavedMode(SavedMode)
-{
-    // Save code page.
-    m_SavedCodePage = GetConsoleCP();
-
     // Configure for raw input with VT support.
     DWORD NewMode = m_SavedMode;
     WI_SetAllFlags(NewMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
@@ -104,29 +91,9 @@ ConsoleInput::~ConsoleInput()
     LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(m_SavedCodePage));
 }
 
-std::optional<ConsoleOutput> ConsoleOutput::Create()
-{
-    wil::unique_hfile ConsoleHandle(
-        CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
-
-    if (ConsoleHandle)
-    {
-        DWORD Mode;
-        if (GetConsoleMode(ConsoleHandle.get(), &Mode))
-        {
-            return ConsoleOutput(std::move(ConsoleHandle), Mode);
-        }
-    }
-
-    return std::nullopt;
-}
-
 ConsoleOutput::ConsoleOutput(wil::unique_hfile&& ConsoleHandle, DWORD SavedMode) :
-    m_ConsoleHandle(std::move(ConsoleHandle)), m_SavedMode(SavedMode)
+    m_ConsoleHandle(std::move(ConsoleHandle)), m_SavedMode(SavedMode), m_SavedCodePage(GetConsoleOutputCP())
 {
-    // Save code page.
-    m_SavedCodePage = GetConsoleOutputCP();
-
     // Configure for VT output.
     DWORD NewMode = m_SavedMode;
     WI_SetAllFlags(NewMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
@@ -149,10 +116,24 @@ SvcCommIo::SvcCommIo()
     const HANDLE ErrorHandle = GetStdHandle(STD_ERROR_HANDLE);
 
     // Configure input console
-    m_ConsoleInput = ConsoleInput::Create(InputHandle);
+    DWORD InputMode;
+    if (GetFileType(InputHandle) == FILE_TYPE_CHAR && GetConsoleMode(InputHandle, &InputMode))
+    {
+        m_ConsoleInput.emplace(InputHandle, InputMode);
+    }
 
     // Configure output console
-    m_ConsoleOutput = ConsoleOutput::Create();
+    wil::unique_hfile ConsoleHandle(
+        CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr));
+
+    if (ConsoleHandle)
+    {
+        DWORD OutputMode;
+        if (GetConsoleMode(ConsoleHandle.get(), &OutputMode))
+        {
+            m_ConsoleOutput.emplace(std::move(ConsoleHandle), OutputMode);
+        }
+    }
 
     // Initialize the standard handles structure
     const bool IsConsoleInput = m_ConsoleInput.has_value();

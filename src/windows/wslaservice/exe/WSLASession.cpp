@@ -117,12 +117,13 @@ WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SE
     else
     {
 
-#ifdef WSLA_TEST_DISTRO_PATH
+#ifdef WSL_SYSTEM_DISTRO_PATH
 
-        vmSettings.RootVhd = TEXT(WSLA_TEST_DISTRO_PATH);
+        vmSettings.RootVhd = TEXT(WSL_SYSTEM_DISTRO_PATH);
 
 #else
-        vmSettings.RootVhd = std::filesystem::path(common::wslutil::GetMsiPackagePath().value()) / L"wslarootfs.vhd";
+
+        vmSettings.RootVhd = std::filesystem::path(common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
 
 #endif
 
@@ -527,10 +528,81 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::DeleteImage(LPCWSTR Image)
+HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count, WSLA_ERROR_INFO* Error)
+try
 {
-    return E_NOTIMPL;
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
+    *DeletedImages = nullptr;
+    *Count = 0;
+
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    std::vector<docker_schema::DeletedImage> deletedImages;
+    try
+    {
+        deletedImages = m_dockerClient->DeleteImage(Options->Image, !!Options->Force, !!Options->NoPrune);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage;
+        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            if (Error != nullptr)
+            {
+                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
+            }
+        }
+
+        if (e.StatusCode() == 404)
+        {
+            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
+        }
+        else if (e.StatusCode() == 409)
+        {
+            THROW_WIN32_MSG(ERROR_SHARING_VIOLATION, "%hs", errorMessage.c_str());
+        }
+        else
+        {
+            THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
+        }
+    }
+
+    THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Options->Image);
+
+    auto output = wil::make_unique_cotaskmem<WSLA_DELETED_IMAGE_INFORMATION[]>(deletedImages.size());
+
+    size_t index = 0;
+    for (const auto& image : deletedImages)
+    {
+        THROW_HR_IF(E_UNEXPECTED, (image.Deleted.empty() && image.Untagged.empty()) || (!image.Deleted.empty() && !image.Untagged.empty()));
+
+        if (!image.Deleted.empty())
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Deleted.c_str()) != 0);
+            output[index].Type = WSLADeletedImageTypeDeleted;
+        }
+        else
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, image.Untagged.c_str()) != 0);
+            output[index].Type = WSLADeletedImageTypeUntagged;
+        }
+
+        index++;
+    }
+
+    *Count = static_cast<ULONG>(deletedImages.size());
+    *DeletedImages = output.release();
+
+    return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container, WSLA_ERROR_INFO* Error)
 try
