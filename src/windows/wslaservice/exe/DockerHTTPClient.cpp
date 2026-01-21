@@ -72,6 +72,14 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
 }
 
+std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTPClient::DeleteImage(const char* Image, bool Force, bool NoPrune)
+{
+    // TODO: Url escaping.
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::DeletedImage>>(
+        verb::delete_,
+        std::format("http://localhost/images/{}?force={}&noprune={}", Image, Force ? "true" : "false", NoPrune ? "true" : "false"));
+}
+
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
 {
     auto url = std::format("http://localhost/containers/json?all={}", all ? "true" : "false");
@@ -83,6 +91,7 @@ docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_s
     std::string url = "http://localhost/containers/create";
     if (Name.has_value())
     {
+        // TODO: Url escaping.
         url += std::format("?name={}", Name.value());
     }
 

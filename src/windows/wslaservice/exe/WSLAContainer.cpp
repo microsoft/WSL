@@ -612,7 +612,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     {
         // TODO: UDP support
         // TODO: Investigate ipv6 support.
-        auto& portEntry = request.HostConfig.PortBindings[std::format("{}/tcp", e.ContainerPort)];
+        auto portKey = std::format("{}/tcp", e.ContainerPort);
+        request.ExposedPorts[portKey] = {};
+        auto& portEntry = request.HostConfig.PortBindings[portKey];
         portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
     }
 
@@ -706,16 +708,8 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
-    m_impl(impl), m_onDeleted(std::move(OnDeleted))
+    COMImplClass<WSLAContainerImpl>(impl), m_onDeleted(std::move(OnDeleted))
 {
-}
-
-void WSLAContainer::Disconnect() noexcept
-{
-    std::lock_guard lock(m_lock);
-
-    WI_ASSERT(m_impl != nullptr);
-    m_impl = nullptr;
 }
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
@@ -757,11 +751,10 @@ HRESULT WSLAContainer::Delete()
 try
 {
     // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
-    std::lock_guard lock{m_lock};
-    RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
+    auto [lock, impl] = LockImpl();
 
-    m_impl->Delete();
-    m_onDeleted(m_impl);
+    impl->Delete();
+    m_onDeleted(impl);
 
     return S_OK;
 }

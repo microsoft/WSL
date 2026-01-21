@@ -32,10 +32,7 @@ enum WSLAMountFlags
     WSLAMountFlagsWriteableOverlayFs = 4,
 };
 
-class WSLAUserSessionImpl;
-
 class WSLAVirtualMachine
-
 {
 public:
     struct ConnectedSocket
