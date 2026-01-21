@@ -22,6 +22,11 @@ RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Contai
 {
 }
 
+RunningWSLAContainer::~RunningWSLAContainer()
+{
+    Reset();
+}
+
 IWSLAContainer& RunningWSLAContainer::Get()
 {
     return *m_container;
@@ -29,6 +34,13 @@ IWSLAContainer& RunningWSLAContainer::Get()
 
 void RunningWSLAContainer::Reset()
 {
+    if (m_container && m_deleteOnClose)
+    {
+        // Attempt to stop and delete the container.
+        LOG_IF_FAILED(m_container->Stop(9, 0));
+        LOG_IF_FAILED(m_container->Delete());
+    }
+
     m_container.reset();
 }
 
@@ -45,6 +57,11 @@ ClientRunningWSLAProcess RunningWSLAContainer::GetInitProcess()
     THROW_IF_FAILED(m_container->GetInitProcess(&process));
 
     return ClientRunningWSLAProcess{std::move(process), std::move(m_fds)};
+}
+
+void RunningWSLAContainer::SetDeleteOnClose(bool deleteOnClose)
+{
+    m_deleteOnClose = deleteOnClose;
 }
 
 WSLAContainerLauncher::WSLAContainerLauncher(
@@ -118,7 +135,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
         return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});
     }
 
-    return std::make_pair(S_OK, RunningWSLAContainer{std::move(container), std::move(m_fds)});
+    return std::make_pair(S_OK, std::move(RunningWSLAContainer{std::move(container), std::move(m_fds)}));
 }
 
 RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)

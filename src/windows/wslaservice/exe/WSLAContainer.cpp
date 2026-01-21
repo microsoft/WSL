@@ -355,7 +355,7 @@ void WSLAContainerImpl::Delete()
     // Validate that the container is in the exited state.
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        State() != WslaContainerStateExited,
+        State() == WslaContainerStateRunning,
         "Cannot delete container '%hs', state: %i",
         m_name.c_str(),
         m_state);
