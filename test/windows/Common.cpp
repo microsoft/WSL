@@ -20,6 +20,7 @@ Abstract:
 #include <tlhelp32.h>
 #include <werapi.h>
 #include <Dbghelp.h>
+#include <winsafer.h>
 
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -1328,12 +1329,26 @@ void StopWslaService()
     StopService(service.get());
 }
 
-wil::unique_handle GetNonElevatedToken()
+wil::unique_handle GetNonElevatedToken(TOKEN_TYPE Type)
 {
-    const auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
+    auto token = wil::open_current_access_token(TOKEN_ALL_ACCESS);
+
+    if (Type != TokenPrimary)
+    {
+        // N.B. Using the Safer API to create a non-elevated primary token break drvfs, so skipping this for primary tokens.
+        SAFER_LEVEL_HANDLE saferLevel = nullptr;
+        auto closeSaferLevel = wil::scope_exit([&]() { SaferCloseLevel(saferLevel); });
+
+        THROW_IF_WIN32_BOOL_FALSE(SaferCreateLevel(SAFER_SCOPEID_MACHINE, SAFER_LEVELID_NORMALUSER, SAFER_LEVEL_OPEN, &saferLevel, nullptr));
+
+        wil::unique_handle restrictedToken;
+        THROW_IF_WIN32_BOOL_FALSE(SaferComputeTokenFromLevel(saferLevel, token.get(), &restrictedToken, 0, nullptr));
+
+        token = std::move(restrictedToken);
+    }
 
     wil::unique_handle nonElevatedToken;
-    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, TokenPrimary, &nonElevatedToken));
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(token.get(), TOKEN_ALL_ACCESS, nullptr, SecurityImpersonation, Type, &nonElevatedToken));
 
     wil::unique_sid mediumIntegritySid;
     THROW_LAST_ERROR_IF(!ConvertStringSidToSidA("S-1-16-8192", &mediumIntegritySid));

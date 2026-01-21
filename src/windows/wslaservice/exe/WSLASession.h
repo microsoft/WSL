@@ -36,15 +36,25 @@ class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown>
 {
 public:
-    WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, WSLAUserSessionImpl& userSessionImpl);
+    WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated);
 
     ~WSLASession();
 
     ULONG GetId() const noexcept;
 
+    PSID GetSid() const noexcept;
+
+    wil::unique_hlocal_string GetSidString() const;
+
+    DWORD GetCreatorPid() const noexcept;
+
+    bool IsTokenElevated() const noexcept;
+
     const std::wstring& DisplayName() const;
 
     void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
+
+    IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
 
     // Image management.
     IFACEMETHOD(PullImage)(
@@ -98,7 +108,6 @@ private:
     void MonitorContainerd(ServiceRunningProcess&& process);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
 
-    WSLA_SESSION_SETTINGS m_sessionSettings; // TODO: Revisit to see if we should have session settings as a member or not
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLAVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
@@ -108,6 +117,9 @@ private:
     std::filesystem::path m_storageVhdPath;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
+    wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
+    bool m_elevatedToken{};
+    DWORD m_creatorPid{};
     std::recursive_mutex m_lock;
 };
 

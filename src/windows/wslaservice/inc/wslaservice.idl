@@ -17,7 +17,7 @@ import "unknwn.idl";
 import "wtypes.idl";
 
 cpp_quote("#ifdef __cplusplus")
-cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLAUserSession;")
+cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLASessionManager;")
 cpp_quote("#endif")
 
 #define WSLA_MAX_CONTAINER_NAME_LENGTH 255
@@ -324,6 +324,8 @@ struct WSLA_DELETE_IMAGE_OPTIONS
 ]
 interface IWSLASession : IUnknown
 {
+    HRESULT GetId([out] ULONG* Id);
+
     // Image management.
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
@@ -359,13 +361,14 @@ struct WSLA_SESSION_INFORMATION
     ULONG SessionId;
     DWORD CreatorPid;
     wchar_t DisplayName[256];
+    wchar_t Sid[256 + 1]; // MAX_SID_SIZE = 256
 };
 
 typedef enum _WSLASessionFlags
 {
     WSLASessionFlagsNone = 0,
     WSLASessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
-    WSLASessionFlagsOpenExisting = 2 // Open an existing session if the name is in use.
+    WSLASessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
 } WSLASessionFlags;
 
 [
@@ -373,7 +376,7 @@ typedef enum _WSLASessionFlags
     pointer_default(unique),
     object
 ]
-interface IWSLAUserSession : IUnknown
+interface IWSLASessionManager : IUnknown
 {
     HRESULT GetVersion([out] WSLA_VERSION* Version);
 
@@ -382,8 +385,6 @@ interface IWSLAUserSession : IUnknown
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
     HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
-
-    // TODO: Do we need 'TerminateSession()' ?
 }
 
 cpp_quote("#define WSLA_E_BASE (0x0600)")
