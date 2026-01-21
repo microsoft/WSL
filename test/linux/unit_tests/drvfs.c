@@ -1389,13 +1389,6 @@ Return Value:
 
     int Result;
 
-    if (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
-    {
-        LxtLogInfo("TODO: debug this test on virtiofs.");
-        Result = 0;
-        goto ErrorExit;
-    }
-
     LxtCheckErrno(LxtFsDeleteCurrentWorkingDirectoryCommon(DRVFS_PREFIX, FS_DELETE_DRVFS));
 
 ErrorExit:
