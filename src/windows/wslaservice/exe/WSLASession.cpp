@@ -432,7 +432,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     auto onCompleted = [&]() { io.Cancel(); };
 
-    io.AddHandle(std::make_unique<relay::RelayHandle>(
+    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
         common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));

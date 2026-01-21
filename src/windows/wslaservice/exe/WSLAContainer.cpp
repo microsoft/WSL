@@ -17,6 +17,9 @@ Abstract:
 #include "WSLAProcess.h"
 #include "WSLAProcessIO.h"
 
+using wsl::windows::common::relay::DockerIORelayHandle;
+using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
+using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
@@ -647,10 +650,30 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         THROW_HR_MSG(E_FAIL, "Failed to get container logs: %hs ", e.what());
     }
 
-    auto [stdoutHandle, stderrHandle] = m_logsRelay.Add(std::move(socket));
+    if (m_tty)
+    {
+        // For tty processes, simply relay the HTTP chunks.
+        auto [ttyRead, ttyWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
 
-    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutHandle.get()));
-    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrHandle.get()));
+        auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
+        m_logsRelay.AddHandle(std::move(handle));
+
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get()));
+    }
+    else
+    {
+        // For non-tty process, stout & stderr are multiplexed.
+        auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
+        auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
+
+        auto handle = std::make_unique<DockerIORelayHandle>(
+            std::move(socket), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::HttpChunked);
+
+        m_logsRelay.AddHandle(std::move(handle));
+
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get()));
+        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get()));
+    }
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :

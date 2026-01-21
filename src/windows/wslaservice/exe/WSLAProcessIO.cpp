@@ -19,6 +19,7 @@ Abstract:
 using wsl::windows::service::wsla::RelayedProcessIO;
 using wsl::windows::service::wsla::TTYProcessIO;
 using wsl::windows::service::wsla::VMProcessIO;
+using namespace wsl::windows::common::relay;
 
 RelayedProcessIO::RelayedProcessIO(wil::unique_handle&& IoStream) : m_ioStream(std::move(IoStream))
 {
@@ -65,11 +66,11 @@ try
         LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(m_ioStream.get()), SD_SEND) == SOCKET_ERROR);
     };
 
-    io.AddHandle(std::make_unique<common::relay::RelayHandle>(
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(
         common::relay::HandleWrapper{std::move(stdinPipe), std::move(onInputComplete)}, m_ioStream.get()));
 
-    io.AddHandle(std::make_unique<common::relay::EventHandle>(m_exitEvent.get(), [&]() { io.Cancel(); }));
-    io.AddHandle(std::make_unique<common::relay::DockerIORelayHandle>(
+    io.AddHandle(std::make_unique<EventHandle>(m_exitEvent.get(), [&]() { io.Cancel(); }));
+    io.AddHandle(std::make_unique<DockerIORelayHandle>(
         m_ioStream.get(), std::move(stdoutPipe), std::move(stderrPipe), common::relay::DockerIORelayHandle::Format::Raw));
 
     io.Run({});

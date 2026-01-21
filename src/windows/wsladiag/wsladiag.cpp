@@ -30,6 +30,7 @@ using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::MultiHandleWait;
+using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
@@ -490,8 +491,12 @@ static int Logs(std::wstring_view commandLine)
 
     wsl::windows::common::relay::MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<RelayHandle>(std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
-    io.AddHandle(std::make_unique<RelayHandle>(std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
+
+    if (stderrLogs) // This handle is only used for non-tty processes.
+    {
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+    }
 
     // TODO: Handle ctrl-c.
     io.Run({});
@@ -588,11 +593,11 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
         }
         else
         {
-            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
+            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
         }
 
-        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
-        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
         io.AddHandle(std::make_unique<EventHandle>(exitEvent.get()));
 
         io.Run({});

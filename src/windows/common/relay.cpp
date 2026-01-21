@@ -936,16 +936,15 @@ try
 }
 CATCH_LOG()
 
-void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle)
+void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
-    m_handles.emplace_back(std::move(handle));
+    m_handles.emplace_back(flags, std::move(handle));
 }
 
 void MultiHandleWait::Cancel()
 {
     m_cancel = true;
 }
-
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
     m_cancel = false; // Run may be called multiple times.
@@ -964,14 +963,49 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         // Schedule IO on each handle until all are either pending, or completed.
         for (auto i = 0; i < m_handles.size(); i++)
         {
-            while (m_handles[i]->GetState() == IOHandleStatus::Standby)
+            while (m_handles[i].second->GetState() == IOHandleStatus::Standby)
             {
-                m_handles[i]->Schedule();
+                try
+                {
+                    m_handles[i].second->Schedule();
+                }
+                catch (...)
+                {
+                    if (WI_IsFlagSet(m_handles[i].first, Flags::IgnoreErrors))
+                    {
+                        m_handles[i].second.reset(); // Reset the handle so it can be deleted.
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
+        }
+
+        for (auto it = m_handles.begin(); it != m_handles.end();)
+        {
+            if (!it->second)
+            {
+                it = m_handles.erase(it);
+            }
+            else if (it->second->GetState() == IOHandleStatus::Completed)
+            {
+                if (WI_IsFlagSet(it->first, Flags::CancelOnCompleted))
+                {
+                    return false; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
+                }
+
+                it = m_handles.erase(it);
+            }
+            else
+            {
+                ++it;
             }
         }
 
         // Remove completed handles from m_handles.
-        std::erase_if(m_handles, [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; });
+        std::erase_if(m_handles, [&](const auto& e) { return !e.second || e.second->GetState() == IOHandleStatus::Completed; });
 
         if (m_handles.empty() || m_cancel)
         {
@@ -982,7 +1016,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         std::vector<HANDLE> waitHandles;
         for (const auto& e : m_handles)
         {
-            waitHandles.emplace_back(e->GetHandle());
+            waitHandles.emplace_back(e.second->GetHandle());
         }
 
         DWORD waitTimeout = INFINITE;
@@ -1002,7 +1036,22 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
         {
             auto index = result - WAIT_OBJECT_0;
-            m_handles[index]->Collect();
+
+            try
+            {
+                m_handles[index].second->Collect();
+            }
+            catch (...)
+            {
+                if (WI_IsFlagSet(m_handles[index].first, Flags::IgnoreErrors))
+                {
+                    m_handles.erase(m_handles.begin() + index);
+                }
+                else
+                {
+                    throw;
+                }
+            }
         }
         else
         {
@@ -1387,86 +1436,6 @@ void WriteHandle::Push(const gsl::span<char>& Content)
 HANDLE WriteHandle::GetHandle() const
 {
     return Event.get();
-}
-
-RelayHandle::RelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& WriteHandle) :
-    Read(std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(WriteHandle))
-{
-}
-
-void RelayHandle::Schedule()
-{
-    WI_ASSERT(State == IOHandleStatus::Standby);
-
-    // If the Buffer is empty, then we're reading.
-    if (PendingBuffer.empty())
-    {
-        // If the output buffer is empty and the reading end is completed, then we're done.
-        if (Read.GetState() == IOHandleStatus::Completed)
-        {
-            State = IOHandleStatus::Completed;
-            return;
-        }
-
-        Read.Schedule();
-
-        // If the read is pending, update to 'Pending'
-        if (Read.GetState() == IOHandleStatus::Pending)
-        {
-            State = IOHandleStatus::Pending;
-        }
-    }
-    else
-    {
-        Write.Push(PendingBuffer);
-        PendingBuffer.clear();
-
-        Write.Schedule();
-
-        if (Write.GetState() == IOHandleStatus::Pending)
-        {
-            // The write is pending, update to 'Pending'
-            State = IOHandleStatus::Pending;
-        }
-    }
-}
-
-void RelayHandle::OnRead(const gsl::span<char>& Content)
-{
-    WI_ASSERT(PendingBuffer.empty());
-
-    PendingBuffer.insert(PendingBuffer.end(), Content.begin(), Content.end());
-}
-
-void RelayHandle::Collect()
-{
-    WI_ASSERT(State == IOHandleStatus::Pending);
-
-    // Transition back to standby
-    State = IOHandleStatus::Standby;
-
-    if (Read.GetState() == IOHandleStatus::Pending)
-    {
-        Read.Collect();
-    }
-    else
-    {
-        WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
-        Write.Collect();
-    }
-}
-
-HANDLE RelayHandle::GetHandle() const
-{
-    if (Read.GetState() == IOHandleStatus::Pending)
-    {
-        return Read.GetHandle();
-    }
-    else
-    {
-        WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
-        return Write.GetHandle();
-    }
 }
 
 DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat) :

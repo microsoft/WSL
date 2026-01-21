@@ -335,22 +335,93 @@ private:
     std::vector<char> Buffer;
 };
 
+template <typename TRead = ReadHandle>
 class RelayHandle : public OverlappedIOHandle
 {
 public:
     NON_COPYABLE(RelayHandle);
     NON_MOVABLE(RelayHandle);
 
-    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output);
+    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output) :
+        Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(Output))
+    {
+    }
 
-    void Schedule() override;
-    void Collect() override;
-    HANDLE GetHandle() const override;
+    void Schedule() override
+    {
+        WI_ASSERT(State == IOHandleStatus::Standby);
+
+        // If the Buffer is empty, then we're reading.
+        if (PendingBuffer.empty())
+        {
+            // If the output buffer is empty and the reading end is completed, then we're done.
+            if (Read.GetState() == IOHandleStatus::Completed)
+            {
+                State = IOHandleStatus::Completed;
+                return;
+            }
+
+            Read.Schedule();
+
+            // If the read is pending, update to 'Pending'
+            if (Read.GetState() == IOHandleStatus::Pending)
+            {
+                State = IOHandleStatus::Pending;
+            }
+        }
+        else
+        {
+            Write.Push(PendingBuffer);
+            PendingBuffer.clear();
+
+            Write.Schedule();
+
+            if (Write.GetState() == IOHandleStatus::Pending)
+            {
+                // The write is pending, update to 'Pending'
+                State = IOHandleStatus::Pending;
+            }
+        }
+    }
+
+    void Collect() override
+    {
+        WI_ASSERT(State == IOHandleStatus::Pending);
+
+        // Transition back to standby
+        State = IOHandleStatus::Standby;
+
+        if (Read.GetState() == IOHandleStatus::Pending)
+        {
+            Read.Collect();
+        }
+        else
+        {
+            WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
+            Write.Collect();
+        }
+    }
+
+    HANDLE RelayHandle::GetHandle() const override
+    {
+        if (Read.GetState() == IOHandleStatus::Pending)
+        {
+            return Read.GetHandle();
+        }
+        else
+        {
+            WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
+            return Write.GetHandle();
+        }
+    }
 
 private:
-    void OnRead(const gsl::span<char>& Buffer);
+    void OnRead(const gsl::span<char>& Content)
+    {
+        PendingBuffer.insert(PendingBuffer.end(), Content.begin(), Content.end());
+    }
 
-    ReadHandle Read;
+    TRead Read;
     WriteHandle Write;
     std::vector<char> PendingBuffer;
 };
@@ -398,16 +469,25 @@ private:
 class MultiHandleWait
 {
 public:
+    enum class Flags
+    {
+        None,
+        CancelOnCompleted = 1,
+        IgnoreErrors = 2
+    };
+
     MultiHandleWait() = default;
 
-    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
+    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
     std::function<void()> CancelRoutine();
 
 private:
-    std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;
+    std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
     bool m_cancel = false;
 };
+
+DEFINE_ENUM_FLAG_OPERATORS(MultiHandleWait::Flags);
 
 } // namespace wsl::windows::common::relay
