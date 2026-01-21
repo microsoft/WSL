@@ -99,6 +99,9 @@ cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=x86_64\0LANG=en_US
 
 cpp_quote("#define LXSS_DISTRO_DEFAULT_KERNEL_COMMAND_LINE \"BOOT_IMAGE=/kernel init=/init\"")
 
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_TYPE L\"ext4\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS L\"discard,errors=remount-ro,data=ordered\"")
+
 cpp_quote("#define LXSS_DISTRO_FLAGS_ENABLE_INTEROP 0x1")
 cpp_quote("#define LXSS_DISTRO_FLAGS_APPEND_NT_PATH 0x2")
 cpp_quote("#define LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING 0x4")
@@ -187,8 +190,8 @@ interface ILxssUserSession : IUnknown
         [in, unique] LPCWSTR TargetDirectory,
         [in] ULONG Flags,
         [in] ULONG64 VhdSize,
-        [in] LPCWSTR FsType,
-        [in] LPCWSTR FsMountOptions,
+        [in, unique] LPCWSTR FsType,
+        [in, unique] LPCWSTR FsMountOptions,
         [in, unique] LPCWSTR PackageFamilyName,
         [out] LPWSTR* InstalledDistributionName,
         [in, out] LXSS_ERROR_INFO* Error,
@@ -203,8 +206,8 @@ interface ILxssUserSession : IUnknown
         [in, unique] LPCWSTR TargetDirectory,
         [in] ULONG Flags,
         [in] ULONG64 VhdSize,
-        [in] LPCWSTR FsType,
-        [in] LPCWSTR FsMountOptions,
+        [in, unique] LPCWSTR FsType,
+        [in, unique] LPCWSTR FsMountOptions,
         [in, unique] LPCWSTR PackageFamilyName,
         [out] LPWSTR* InstalledDistributionName,
         [in, out] LXSS_ERROR_INFO* Error,

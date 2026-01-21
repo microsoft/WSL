@@ -86,8 +86,8 @@ public:
         _In_ LPCWSTR TargetDirectory,
         _In_ ULONG Flags,
         _In_ std::optional<uint64_t> VhdSize = std::nullopt,
-        _In_ LPCWSTR FsType = L"ext4",
-        _In_ LPCWSTR FsMountOptions = L"discard,errors=remount-ro,data=ordered",
+        _In_opt_ LPCWSTR FsType = nullptr,
+        _In_opt_ LPCWSTR FsMountOptions = nullptr,
         _In_opt_ LPCWSTR PackageFamilyName = nullptr) const;
 
     HRESULT
