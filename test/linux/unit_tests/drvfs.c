@@ -2055,6 +2055,13 @@ Return Value:
 
     Fd = -1;
 
+    if (g_LxtFsInfo.FsType == LxtFsTypeDrvFs)
+    {
+        LxtLogInfo("statx is not supported on drvfs in WSL1.");
+        Result = 0;
+        goto ErrorExit;
+    }
+
     //
     // Create a test file and symlink.
     //
