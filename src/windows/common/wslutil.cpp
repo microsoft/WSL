@@ -209,13 +209,6 @@ wil::unique_hlocal_string GetWinInetErrorString(HRESULT error)
     return message;
 }
 
-bool IsInteractiveConsole()
-{
-    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode{};
-    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
-}
-
 bool IsWinInetError(HRESULT error)
 {
     const DWORD code = error - 0x80070000;
@@ -1142,6 +1135,17 @@ void wsl::windows::common::wslutil::InitializeWil()
     {
         wil::g_fResultFailFastUnknownExceptions = false;
     }
+}
+
+bool wsl::windows::common::wslutil::IsConsoleHandle(HANDLE Handle)
+{
+    DWORD Mode;
+    return GetFileType(Handle) == FILE_TYPE_CHAR && GetConsoleMode(Handle, &Mode);
+}
+
+bool wsl::windows::common::wslutil::IsInteractiveConsole()
+{
+    return IsConsoleHandle(GetStdHandle(STD_INPUT_HANDLE));
 }
 
 bool wsl::windows::common::wslutil::IsRunningInMsix()
