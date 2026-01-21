@@ -2357,13 +2357,11 @@ class WSLATests
             io.AddHandle(std::make_unique<DockerIORelayHandle>(std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite)));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
-            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
-                readStdout.append(buffer.data(), buffer.size());
-            }));
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrRead), [&](const auto& buffer) {
-                readStderr.append(buffer.data(), buffer.size());
-            }));
+            io.AddHandle(std::make_unique<ReadHandle>(
+                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
 
             io.Run({});
 
