@@ -912,6 +912,7 @@ Routine Description:
     N.B. The ext4 group size was chosen based on the best practices for Linux VHDs:
          https://docs.microsoft.com/en-us/windows-server/virtualization/hyper-v/best-practices-for-running-linux-on-hyper-v
 
+    N.B. The xfs data section options (-d) is also determined based on the VHD sector size of 1MB, as suggested in the link above.
 Arguments:
 
     Lun - Supplies the LUN number of the SCSI device.
@@ -928,12 +929,12 @@ try
     std::string DevicePath = GetLunDevicePath(Lun);
 
     WaitForBlockDevice(DevicePath.c_str());
-    
+
     if (FsType == nullptr)
     {
         FsType = "ext4";
     }
-    
+
     std::string CommandLine;
     if (strcmp(FsType, "ext4") == 0)
     {
@@ -942,6 +943,10 @@ try
     else if (strcmp(FsType, "btrfs") == 0)
     {
         CommandLine = std::format("/usr/sbin/mkfs.btrfs '{}'", DevicePath);
+    }
+    else if (strcmp(FsType, "xfs") == 0)
+    {
+        CommandLine = std::format("/usr/sbin/mkfs.xfs -s size=4096 -d su=1m,sw=1 '{}'", DevicePath);
     }
     else
     {
@@ -958,16 +963,13 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-int CreateBtrfsSubvolumeOnDevice(unsigned int Lun, const char* MountOptions) 
+int CreateBtrfsSubvolumeOnDevice(unsigned int Lun, const char* MountOptions)
 /*++
 Routine Description:
 
-    This routine creates a btrfs subvolume on the specified SCSI device. No-op if there is no subvolume name in the mount options or the subvolume already exists.
-Arguments:
-    Lun - Supplies the LUN number of the SCSI device.
-    MountOptions - The mount options to use when mounting the device. Subvolume name is extracted from it.
-Return Value:
-    0 on success, < 0 on failure.
+    This routine creates a btrfs subvolume on the specified SCSI device. No-op if there is no subvolume name in the mount options
+or the subvolume already exists. Arguments: Lun - Supplies the LUN number of the SCSI device. MountOptions - The mount options to
+use when mounting the device. Subvolume name is extracted from it. Return Value: 0 on success, < 0 on failure.
 --*/
 try
 {
