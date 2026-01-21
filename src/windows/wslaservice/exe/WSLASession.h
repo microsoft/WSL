@@ -107,6 +107,7 @@ private:
     void OnContainerdLog(const gsl::span<char>& Data);
     void MonitorContainerd(ServiceRunningProcess&& process);
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
+    void RecoverExistingContainers();
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLAVirtualMachine> m_virtualMachine;

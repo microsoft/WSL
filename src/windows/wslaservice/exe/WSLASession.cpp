@@ -94,6 +94,9 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::u
     //  Start the event tracker.
     m_eventTracker.emplace(m_dockerClient.value());
 
+    // Recover any existing containers from storage.
+    RecoverExistingContainers();
+
     errorCleanup.release();
 }
 
@@ -858,4 +861,38 @@ bool WSLASession::Terminated()
 {
     std::lock_guard lock{m_lock};
     return !m_virtualMachine;
+}
+
+void WSLASession::RecoverExistingContainers()
+{
+    WI_ASSERT(m_dockerClient.has_value());
+    WI_ASSERT(m_eventTracker.has_value());
+    WI_ASSERT(m_virtualMachine.has_value());
+
+    auto containers = m_dockerClient->ListContainers(true); // all=true to include stopped containers
+
+    for (const auto& dockerContainer : containers)
+    {
+        try
+        {
+            auto container = WSLAContainerImpl::Open(
+                dockerContainer,
+                *m_virtualMachine,
+                std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
+                m_eventTracker.value(),
+                m_dockerClient.value());
+
+            m_containers.emplace_back(std::move(container));
+        }
+        catch (...)
+        {
+            // Log but don't fail the session startup if a single container fails to recover.
+            LOG_CAUGHT_EXCEPTION_MSG("Failed to recover container: %hs", dockerContainer.Id.c_str());
+        }
+    }
+
+    WSL_LOG(
+        "ContainersRecovered",
+        TraceLoggingValue(m_displayName.c_str(), "SessionName"),
+        TraceLoggingValue(m_containers.size(), "ContainerCount"));
 }

@@ -80,6 +80,12 @@ std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTP
         std::format("http://localhost/images/{}?force={}&noprune={}", Image, Force ? "true" : "false", NoPrune ? "true" : "false"));
 }
 
+std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
+{
+    auto url = std::format("http://localhost/containers/json?all={}", all ? "true" : "false");
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::ContainerInfo>>(verb::get, url);
+}
+
 docker_schema::CreatedContainer DockerHTTPClient::CreateContainer(const docker_schema::CreateContainer& Request, const std::optional<std::string>& Name)
 {
     std::string url = "http://localhost/containers/create";
