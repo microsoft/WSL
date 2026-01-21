@@ -9,6 +9,7 @@ Module Name:
 Abstract:
 
     This file contains function definitions for the ConsoleState helper class.
+
 --*/
 
 #include "precomp.h"

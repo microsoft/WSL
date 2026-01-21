@@ -38,9 +38,10 @@ try
     wslrelay::RelayMode mode{wslrelay::RelayMode::Invalid};
     wil::unique_handle pipe{};
     wil::unique_handle exitEvent{};
-    int port{};
+    uint32_t port{};
     GUID vmId{};
     bool disableTelemetry = !wsl::shared::OfficialBuild;
+    bool connectPipe = false;
 
     ArgumentParser parser(GetCommandLineW(), wslrelay::binary_name);
     parser.AddArgument(Integer(reinterpret_cast<int&>(mode)), wslrelay::mode_option);
@@ -50,28 +51,28 @@ try
     parser.AddArgument(Handle{exitEvent}, wslrelay::exit_event_option);
     parser.AddArgument(Integer{port}, wslrelay::port_option);
     parser.AddArgument(disableTelemetry, wslrelay::disable_telemetry_option);
+    parser.AddArgument(connectPipe, wslrelay::connect_pipe_option);
     parser.Parse();
 
     // Initialize logging.
     WslTraceLoggingInitialize(LxssTelemetryProvider, disableTelemetry);
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslTraceLoggingUninitialize(); });
 
+    // Ensure that the other end of the pipe has connected if required.
+    if (connectPipe)
+    {
+        wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000), {exitEvent.get()});
+    }
+
     // Perform the requested operation.
     switch (mode)
     {
     case wslrelay::RelayMode::DebugConsole:
-    case wslrelay::RelayMode::DebugConsoleRelay:
     {
         // If not relaying to a file, create a console window.
         if (!handle)
         {
             wsl::windows::common::helpers::CreateConsole(L"WSL Debug Console");
-        }
-
-        if (mode == wslrelay::RelayMode::DebugConsole)
-        {
-            // Ensure that the other end of the pipe has connected.
-            wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000));
         }
 
         // Relay the contents of the pipe to the output handle.
@@ -98,9 +99,6 @@ try
     {
         THROW_HR_IF(E_INVALIDARG, port == 0);
 
-        // Ensure that the other end of the pipe has connected.
-        wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000), {exitEvent.get()});
-
         // Bind, listen, and accept a connection on the specified port.
         const wil::unique_socket listenSocket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
         THROW_LAST_ERROR_IF(!listenSocket);
@@ -126,7 +124,7 @@ try
     }
 
     default:
-        THROW_HR(E_INVALIDARG);
+        THROW_HR_MSG(E_INVALIDARG, "Invalid relay mode %d specified.", static_cast<int>(mode));
     }
 
     return 0;
