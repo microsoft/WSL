@@ -1583,7 +1583,7 @@ class WSLATests
             auto container = launcher.Launch(*session);
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            
+
             // Delete the container to avoid leaving it dangling after test completion.
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());
