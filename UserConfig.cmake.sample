@@ -3,7 +3,7 @@
 message(STATUS "Loading user configuration")
 
 # Uncomment to enable development packages (smaller, faster to install)
-# # Note: system.vhd fails to mount if symlink / hardlink, so COPY is needed.
+# # Note: .vhd files fail to mount via symlink / hardlink, so COPY is needed.
 # set(WSL_DEV_BINARY_PATH "C:/wsldev")
 
 if(WSL_DEV_BINARY_PATH)
@@ -16,7 +16,6 @@ if(WSL_DEV_BINARY_PATH)
     execute_process(
         COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/system.vhd" "/grant:r" "Everyone:(R)" /Q
         COMMAND icacls.exe "${WSL_DEV_BINARY_PATH}/modules.vhd" "/grant:r" "Everyone:(R)" /Q
-        COMMAND icacls.exe "${WSLA_TEST_DISTRO_SOURCE_DIR}/rootfs.vhd" "/grant:r" "Everyone:(R)" /Q
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         COMMAND_ERROR_IS_FATAL ANY)
 
@@ -27,7 +26,6 @@ if(WSL_DEV_BINARY_PATH)
     file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/rdpnanoTransport.dll" "${WSL_DEV_BINARY_PATH}/rdpnanoTransport.dll" SYMBOLIC)
     file(CREATE_LINK "${MSRDC_SOURCE_DIR}/${TARGET_PLATFORM}/RdpWinStlHelper.dll" "${WSL_DEV_BINARY_PATH}/RdpWinStlHelper.dll" SYMBOLIC)
     file(CREATE_LINK "${MSAL_SOURCE_DIR}/${TARGET_PLATFORM}/msal.wsl.proxy.exe" "${WSL_DEV_BINARY_PATH}/msal.wsl.proxy.exe" SYMBOLIC)
-    file(CREATE_LINK "${BIN}/wsldevicehost.dll" "${WSL_DEV_BINARY_PATH}/wsldevicehost.dll" SYMBOLIC)
     file(CREATE_LINK "${DIRECT3D_SOURCE_DIR}/lib/${TARGET_PLATFORM}" "${WSL_DEV_BINARY_PATH}/lib" SYMBOLIC)
 
     foreach(LANG ${SUPPORTED_LANGS})

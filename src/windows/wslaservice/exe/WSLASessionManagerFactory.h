@@ -4,22 +4,23 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLAUserSessionFactory.h
+    WSLASessionManagerFactory.h
 
 Abstract:
 
-    TODO
+    Contains the definitions for WSLASessionManagerFactory.
 
 --*/
+
 #pragma once
 #include <wil/resource.h>
 
 namespace wsl::windows::service::wsla {
 
-class WSLAUserSessionFactory : public Microsoft::WRL::ClassFactory<>
+class WSLASessionManagerFactory : public Microsoft::WRL::ClassFactory<>
 {
 public:
-    WSLAUserSessionFactory() = default;
+    WSLASessionManagerFactory() = default;
 
     STDMETHODIMP CreateInstance(_In_ IUnknown* pUnkOuter, _In_ REFIID riid, _Out_ void** ppCreated) override;
 };
