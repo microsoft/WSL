@@ -149,6 +149,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_WIN32(ERROR_INVALID_STATE),
     X(WSLA_E_IMAGE_NOT_FOUND),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE)};
+    X_WIN32(ERROR_ELEVATION_REQUIRED)};
 
 #undef X
 
@@ -195,7 +196,7 @@ static const std::map<Context, LPCWSTR> g_contextStrings{
     X(ReadDistroConfig),
     X(MoveDistro),
     X(VerifyChecksum),
-    X(WslaDiag)};
+    X(WslC)};
 
 #undef X
 

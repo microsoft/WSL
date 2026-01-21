@@ -21,6 +21,7 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "WSLAProcessControl.h"
 #include "LogsRelay.h"
+#include "COMImplClass.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -120,7 +121,8 @@ private:
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLAContainer, IFastRundown>,
+      public COMImplClass<WSLAContainerImpl>
 {
 
 public:
@@ -135,24 +137,7 @@ public:
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _Out_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
 
-    void Disconnect() noexcept;
-
 private:
-    template <typename... Args>
-    HRESULT CallImpl(void (WSLAContainerImpl::*routine)(Args... args), Args... args)
-    try
-    {
-        std::lock_guard lock{m_lock};
-        RETURN_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);
-
-        (m_impl->*routine)(std::forward<Args>(args)...);
-
-        return S_OK;
-    }
-    CATCH_RETURN();
-
-    WSLAContainerImpl* m_impl = nullptr;
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;
-    std::recursive_mutex m_lock;
 };
 } // namespace wsl::windows::service::wsla

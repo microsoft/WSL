@@ -25,38 +25,34 @@ namespace wsl::windows::common {
 class ConsoleInput
 {
 public:
-    static std::optional<ConsoleInput> Create(HANDLE Handle);
+    ConsoleInput(HANDLE Handle, DWORD SavedMode);
     ~ConsoleInput();
     ConsoleInput(const ConsoleInput&) = delete;
     ConsoleInput& operator=(const ConsoleInput&) = delete;
-    ConsoleInput(ConsoleInput&&) = default;
-    ConsoleInput& operator=(ConsoleInput&&) = default;
+    ConsoleInput(ConsoleInput&&) = delete;
+    ConsoleInput& operator=(ConsoleInput&&) = delete;
 
 private:
-    ConsoleInput(HANDLE Handle, DWORD SavedMode);
-
-    HANDLE m_Handle = nullptr;
-    DWORD m_SavedMode = 0;
-    UINT m_SavedCodePage = 0;
+    HANDLE m_Handle{};
+    DWORD m_SavedMode{};
+    UINT m_SavedCodePage{};
 };
 
 // RAII wrapper for console output configuration and restoration
 class ConsoleOutput
 {
 public:
-    static std::optional<ConsoleOutput> Create();
+    ConsoleOutput(wil::unique_hfile&& ConsoleHandle, DWORD SavedMode);
     ~ConsoleOutput();
     ConsoleOutput(const ConsoleOutput&) = delete;
     ConsoleOutput& operator=(const ConsoleOutput&) = delete;
-    ConsoleOutput(ConsoleOutput&&) = default;
-    ConsoleOutput& operator=(ConsoleOutput&&) = default;
+    ConsoleOutput(ConsoleOutput&&) = delete;
+    ConsoleOutput& operator=(ConsoleOutput&&) = delete;
 
 private:
-    ConsoleOutput(wil::unique_hfile&& ConsoleHandle, DWORD SavedMode);
-
     wil::unique_hfile m_ConsoleHandle;
-    DWORD m_SavedMode = 0;
-    UINT m_SavedCodePage = 0;
+    DWORD m_SavedMode{};
+    UINT m_SavedCodePage{};
 };
 
 class SvcCommIo

@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    wsladiag.cpp
+    main.cpp
 
 Abstract:
 
-    Entry point for the wsladiag tool. Provides diagnostic commands for WSLA sessions.
+    Entry point for the wslc CLI.
 
 --*/
 
@@ -30,7 +30,6 @@ using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::MultiHandleWait;
-using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
@@ -66,13 +65,13 @@ static int ReportError(const std::wstring& context, HRESULT hr)
     return 1;
 }
 
-// Handler for `wsladiag shell <SessionName>` command.
+// Handler for `wslc shell <SessionName>` command.
 static int RunShellCommand(std::wstring_view commandLine)
 {
     std::wstring sessionName;
     bool verbose = false;
 
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, false);
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, false);
     parser.AddPositionalArgument(sessionName, 0);
     parser.AddArgument(verbose, L"--verbose", L'v');
 
@@ -80,16 +79,15 @@ static int RunShellCommand(std::wstring_view commandLine)
 
     if (sessionName.empty())
     {
-        THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wsladiag shell"));
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wslc shell"));
     }
 
-    wil::com_ptr<IWSLASessionManager> manager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
+    wil::com_ptr<IWSLASessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::com_ptr<IWSLASession> session;
-    HRESULT hr = manager->OpenSessionByName(sessionName.c_str(), &session);
+    HRESULT hr = sessionManager->OpenSessionByName(sessionName.c_str(), &session);
     if (FAILED(hr))
     {
         if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
@@ -103,7 +101,7 @@ static int RunShellCommand(std::wstring_view commandLine)
 
     if (verbose)
     {
-        wslutil::PrintMessage(std::format(L"[diag] Session opened: '{}'", sessionName), stdout);
+        wslutil::PrintMessage(std::format(L"[wslc] Session opened: '{}'", sessionName), stdout);
     }
 
     // Console size for TTY.
@@ -128,7 +126,7 @@ static int RunShellCommand(std::wstring_view commandLine)
 
     if (verbose)
     {
-        wslutil::PrintMessage(L"[diag] Shell process launched", stdout);
+        wslutil::PrintMessage(L"[wslc] Shell process launched", stdout);
     }
 
     auto ttyIn = process.GetStdHandle(0);
@@ -219,12 +217,12 @@ static int RunShellCommand(std::wstring_view commandLine)
     return static_cast<int>(exitCode);
 }
 
-// Handler for `wsladiag list` command.
+// Handler for `wslc list` command.
 static int RunListCommand(std::wstring_view commandLine)
 {
     bool verbose = false;
 
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, false);
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, false);
     parser.AddArgument(verbose, L"--verbose", L'v');
 
     try
@@ -233,20 +231,20 @@ static int RunListCommand(std::wstring_view commandLine)
     }
     catch (...)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWsladiagUsage());
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcUsage());
     }
 
-    wil::com_ptr<IWSLASessionManager> manager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
+    wil::com_ptr<IWSLASessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-    THROW_IF_FAILED(manager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+    THROW_IF_FAILED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
 
     if (verbose)
     {
         const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        wslutil::PrintMessage(std::format(L"[diag] Found {} session{}", sessions.size(), plural), stdout);
+        wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
     }
 
     if (sessions.size() == 0)
@@ -315,13 +313,12 @@ static int RunListCommand(std::wstring_view commandLine)
 }
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
-DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
 static wil::com_ptr<IWSLASession> OpenCLISession()
 {
-    wil::com_ptr<IWSLASessionManager> manager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
+    wil::com_ptr<IWSLASessionManager> sessionManager;
+    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     auto dataFolder = std::filesystem::path(wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr)) / "wsla";
 
@@ -329,18 +326,19 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
     WSLA_SESSION_SETTINGS settings{};
     settings.DisplayName = L"wsla-cli";
     settings.CpuCount = 4;
-    settings.MemoryMb = 2024;
+    settings.MemoryMb = 2048;
     settings.BootTimeoutMs = 30 * 1000;
     settings.StoragePath = dataFolder.c_str();
     settings.MaximumStorageSizeMb = 10000; // 10GB.
     settings.NetworkingMode = WSLANetworkingModeNAT;
 
     wil::com_ptr<IWSLASession> session;
-    THROW_IF_FAILED(manager->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
+    THROW_IF_FAILED(sessionManager->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     return session;
 }
+
 static void PullImpl(IWSLASession& Session, const std::string& Image)
 {
     HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -454,7 +452,7 @@ static void PullImpl(IWSLASession& Session, const std::string& Image)
 
 static int Pull(std::wstring_view commandLine)
 {
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2);
 
     std::string image;
     parser.AddPositionalArgument(Utf8String{image}, 0);
@@ -463,43 +461,6 @@ static int Pull(std::wstring_view commandLine)
     THROW_HR_IF(E_INVALIDARG, image.empty());
 
     PullImpl(*OpenCLISession(), image);
-
-    return 0;
-}
-
-static int Logs(std::wstring_view commandLine)
-{
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
-
-    std::string id;
-    WSLALogsFlags flags = WSLALogsFlagsNone;
-    parser.AddPositionalArgument(Utf8String{id}, 0);
-    parser.AddArgument(SetFlag<WSLALogsFlags, WSLALogsFlagsFollow>(flags), L"--follow", 'f');
-
-    parser.Parse();
-    THROW_HR_IF(E_INVALIDARG, id.empty());
-
-    auto session = OpenCLISession();
-
-    wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(session->OpenContainer(id.c_str(), &container)); // TODO: nicer user error if not found.
-
-    wil::unique_handle stdoutLogs;
-    wil::unique_handle stderrLogs;
-
-    THROW_IF_FAILED(container->Logs(flags, reinterpret_cast<ULONG*>(&stdoutLogs), reinterpret_cast<ULONG*>(&stderrLogs), 0, 0, 0));
-
-    wsl::windows::common::relay::MultiHandleWait io;
-
-    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
-
-    if (stderrLogs) // This handle is only used for non-tty processes.
-    {
-        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
-    }
-
-    // TODO: Handle ctrl-c.
-    io.Run({});
 
     return 0;
 }
@@ -593,11 +554,11 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
         }
         else
         {
-            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
+            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
         }
 
-        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
-        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
         io.AddHandle(std::make_unique<EventHandle>(exitEvent.get()));
 
         io.Run({});
@@ -610,16 +571,14 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
 
 static int Run(std::wstring_view commandLine)
 {
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, true);
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, true);
 
     bool interactive{};
     bool tty{};
     std::string image;
-    std::string name;
     parser.AddPositionalArgument(Utf8String{image}, 0);
     parser.AddArgument(interactive, L"--interactive", 'i');
     parser.AddArgument(tty, L"--tty", 't');
-    parser.AddArgument(Utf8String{name}, L"--name");
 
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, image.empty());
@@ -674,11 +633,6 @@ static int Run(std::wstring_view commandLine)
     options.InitProcessOptions.Fds = fds.data();
     options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
 
-    if (!name.empty())
-    {
-        options.Name = name.c_str();
-    }
-
     wil::com_ptr<IWSLAContainer> container;
     WSLAErrorDetails error{};
     auto result = session->CreateContainer(&options, &container, &error.Error);
@@ -704,10 +658,10 @@ static int Run(std::wstring_view commandLine)
 
 static void PrintUsage()
 {
-    wslutil::PrintMessage(Localization::MessageWsladiagUsage(), stderr);
+    wslutil::PrintMessage(Localization::MessageWslcUsage(), stderr);
 }
 
-int wsladiag_main(std::wstring_view commandLine)
+int wslc_main(std::wstring_view commandLine)
 {
     // Initialize runtime and COM.
     wslutil::ConfigureCrt();
@@ -726,7 +680,7 @@ int wsladiag_main(std::wstring_view commandLine)
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
     // Parse the top-level verb (list, shell, --help).
-    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 1, true);
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 1, true);
 
     bool help = false;
     std::wstring verb;
@@ -757,10 +711,6 @@ int wsladiag_main(std::wstring_view commandLine)
     {
         return Run(commandLine);
     }
-    else if (verb == L"logs")
-    {
-        return Logs(commandLine);
-    }
     else
     {
         wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
@@ -775,14 +725,13 @@ int wmain(int, wchar_t**)
 {
     wsl::windows::common::EnableContextualizedErrors(false);
 
-    // WSLADiag will be replaced by WSLC, so using WslC's context rather than creating a new soon-to-be-removed context.
     ExecutionContext context{Context::WslC};
     int exitCode = 1;
     HRESULT result = S_OK;
 
     try
     {
-        exitCode = wsladiag_main(GetCommandLineW());
+        exitCode = wslc_main(GetCommandLineW());
     }
     catch (...)
     {

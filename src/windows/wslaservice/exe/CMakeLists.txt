@@ -11,12 +11,13 @@ set(SOURCES
     WSLAProcessControl.cpp
     WSLAProcessIO.cpp
     WSLASession.cpp
-    WSLAUserSession.cpp
-    WSLAUserSessionFactory.cpp
+    WSLASessionManager.cpp
+    WSLASessionManagerFactory.cpp
     WSLAVirtualMachine.cpp
     )
 
 set(HEADERS
+    COMImplClass.h
     ContainerEventTracker.h
     DockerHTTPClient.h
     LogsRelay.h
@@ -26,8 +27,8 @@ set(HEADERS
     WSLAProcessControl.h
     WSLAProcessIO.h
     WSLASession.h
-    WSLAUserSession.h
-    WSLAUserSessionFactory.h
+    WSLASessionManager.h
+    WSLASessionManagerFactory.h
     WSLAVirtualMachine.h)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
@@ -37,7 +38,7 @@ add_dependencies(wslaservice wslaserviceidl)
 add_compile_definitions(__WRL_CLASSIC_COM__)
 add_compile_definitions(__WRL_DISABLE_STATIC_INITIALIZE__)
 add_compile_definitions(USE_COM_CONTEXT_DEF=1)
-set_target_properties(wslaservice PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /include:__minATLObjMap_WSLAUserSession_COM")
+set_target_properties(wslaservice PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /include:__minATLObjMap_WSLASessionManager_COM")
 target_link_libraries(wslaservice
                       ${COMMON_LINK_LIBRARIES}
                       computecore
