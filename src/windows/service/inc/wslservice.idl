@@ -100,7 +100,10 @@ cpp_quote("#define LXSS_DISTRO_DEFAULT_ENVIRONMENT \"HOSTTYPE=x86_64\0LANG=en_US
 cpp_quote("#define LXSS_DISTRO_DEFAULT_KERNEL_COMMAND_LINE \"BOOT_IMAGE=/kernel init=/init\"")
 
 cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_TYPE L\"ext4\"")
-cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS L\"discard,errors=remount-ro,data=ordered\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_EXT4 L\"discard,errors=remount-ro,data=ordered\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_BTRFS L\"discard\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_XFS L\"discard\"")
+cpp_quote("#define LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS LXSS_DISTRO_DEFAULT_FS_MOUNT_OPTIONS_EXT4")
 
 cpp_quote("#define LXSS_DISTRO_FLAGS_ENABLE_INTEROP 0x1")
 cpp_quote("#define LXSS_DISTRO_FLAGS_APPEND_NT_PATH 0x2")
