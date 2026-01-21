@@ -69,10 +69,7 @@ public:
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
     void Inspect(LPSTR* Output);
-    void Logs(
-        WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr,
-        ULONGLONG Since,
-        ULONGLONG Until, ULONGLONG Tail);
+    void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
 
     IWSLAContainer& ComWrapper();
 

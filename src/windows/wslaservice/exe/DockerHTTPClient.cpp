@@ -146,19 +146,27 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     return std::move(socket);
 }
 
-wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, std::optional<ULONGLONG> Tail)
+wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     auto url = std::format(
-        "http://localhost/containers/{}/logs?follow={}&stdout=true&stderr=true",
+        "http://localhost/containers/{}/logs?follow={}&stdout=true&stderr=true&timestamps={}",
         Id,
-        WI_IsFlagSet(Flags, WSLALogsFlagsFollow) ? "true" : "false",
-        Since,
-        Until,
-        WI_IsFlagClear(Flags, WSLALogsFlagsTimestamps));
+        WI_IsFlagSet(Flags, WSLALogsFlagsFollow),
+        WI_IsFlagSet(Flags, WSLALogsFlagsTimestamps));
 
-    if (Tail.has_value())
+    if (Tail != 0)
     {
-        //url += std::format("&tail={}", Tail.value());
+        url += std::format("&tail={}", Tail);
+    }
+
+    if (Until != 0)
+    {
+        url += std::format("&until={}", Until);
+    }
+
+    if (Since != 0)
+    {
+        url += std::format("&since={}", Since);
     }
 
     // TODO: since, until, timestamps
