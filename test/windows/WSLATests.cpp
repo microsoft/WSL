@@ -2587,9 +2587,9 @@ class WSLATests
             ValidateProcessOutput(initProcess, {{1, "line1\nline2\nline3\nline4"}});
 
             expectLogs(container.Get(), "line1\nline2\nline3\nline4", "");
-            expectLogs(container.Get(), "line4", "",  1);
-            expectLogs(container.Get(), "line3\nline4", "",  2);
-            expectLogs(container.Get(), "line1\nline2\nline3\nline4", "",  4);
+            expectLogs(container.Get(), "line4", "", 1);
+            expectLogs(container.Get(), "line3\nline4", "", 2);
+            expectLogs(container.Get(), "line1\nline2\nline3\nline4", "", 4);
         }
 
         // Validate that timestamps are correctly returned.
@@ -2616,11 +2616,11 @@ class WSLATests
             // so validate that they're wired correctly.
 
             auto now = time(nullptr);
-            expectLogs(container.Get(), "OK", "",  0, now - 3600);
-            expectLogs(container.Get(), "", "",  0, now + 3600);
+            expectLogs(container.Get(), "OK", "", 0, now - 3600);
+            expectLogs(container.Get(), "", "", 0, now + 3600);
 
-            expectLogs(container.Get(), "", "",  0, 0, now - 3600);
-            expectLogs(container.Get(), "OK", "",  0, 0, now + 3600);
+            expectLogs(container.Get(), "", "", 0, 0, now - 3600);
+            expectLogs(container.Get(), "OK", "", 0, 0, now + 3600);
         }
 
         // Validate that logs work for TTY processes
