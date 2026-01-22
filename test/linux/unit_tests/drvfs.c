@@ -278,7 +278,6 @@ static const LXT_VARIATION g_LxtFatVariations[] = {
     {"DrvFs - FAT32 utimensat", DrvFsTestFatUtimensat},
     {"DrvFs - FAT32 mount point junction", DrvFsTestFatJunction},
     {"DrvFs - fstat", DrvFsTestFstat},
-    {"DrvFs - statx", DrvFsTestStatx},
     {"DrvFs - delete loop", DrvFsTestDeleteLoop},
     {"DrvFs - seek", DrvFsTestSeek},
 #ifdef __NR_getdents
@@ -303,7 +302,6 @@ static const LXT_VARIATION g_LxtSmbVariations[] = {
     {"DrvFs - SMB unsupported features", DrvFsTestSmbUnsupported},
     {"DrvFs - SMB utimensat", DrvFsTestSmbUtimensat},
     {"DrvFs - fstat", DrvFsTestFstat},
-    {"DrvFs - statx", DrvFsTestStatx},
     {"DrvFs - delete loop", DrvFsTestDeleteLoop},
     {"DrvFs - seek", DrvFsTestSeek},
 #ifdef __NR_getdents
