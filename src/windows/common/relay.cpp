@@ -993,7 +993,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             {
                 if (WI_IsFlagSet(it->first, Flags::CancelOnCompleted))
                 {
-                    return false; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
+                    m_cancel = true; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
                 }
 
                 it = m_handles.erase(it);

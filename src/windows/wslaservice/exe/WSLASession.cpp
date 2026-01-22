@@ -19,9 +19,9 @@ Abstract:
 #include "WslCoreFilesystem.h"
 
 using namespace wsl::windows::common;
+using relay::MultiHandleWait;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
-using relay::MultiHandleWait;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
 

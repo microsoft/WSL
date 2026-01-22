@@ -73,6 +73,8 @@ void DockerContainerProcessControl::OnEvent(ContainerEvent Event, std::optional<
 {
     if (Event == ContainerEvent::Stop && !m_exitEvent.is_signaled())
     {
+        std::lock_guard lock{m_lock};
+
         WI_ASSERT(ExitCode.has_value());
         WI_ASSERT(!m_exitedCode.has_value());
         m_exitedCode = ExitCode.value();
