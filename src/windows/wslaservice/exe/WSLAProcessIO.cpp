@@ -69,7 +69,7 @@ try
     io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(
         common::relay::HandleWrapper{std::move(stdinPipe), std::move(onInputComplete)}, m_ioStream.get()));
 
-    io.AddHandle(std::make_unique<EventHandle>(m_exitEvent.get(), [&]() { io.Cancel(); }));
+    io.AddHandle(std::make_unique<EventHandle>(m_exitEvent.get()), MultiHandleWait::CancelOnCompleted);
     io.AddHandle(std::make_unique<DockerIORelayHandle>(
         m_ioStream.get(), std::move(stdoutPipe), std::move(stderrPipe), common::relay::DockerIORelayHandle::Format::Raw));
 

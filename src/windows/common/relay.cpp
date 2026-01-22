@@ -1062,11 +1062,6 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
     return !m_cancel;
 }
 
-std::function<void()> MultiHandleWait::CancelRoutine()
-{
-    return [this]() { this->Cancel(); };
-}
-
 IOHandleStatus OverlappedIOHandle::GetState() const
 {
     return State;

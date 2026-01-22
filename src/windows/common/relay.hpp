@@ -469,9 +469,9 @@ private:
 class MultiHandleWait
 {
 public:
-    enum class Flags
+    enum Flags
     {
-        None,
+        None = 0,
         CancelOnCompleted = 1,
         IgnoreErrors = 2
     };
@@ -481,7 +481,6 @@ public:
     void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
-    std::function<void()> CancelRoutine();
 
 private:
     std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;

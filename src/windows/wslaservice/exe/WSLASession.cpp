@@ -21,6 +21,7 @@ Abstract:
 using namespace wsl::windows::common;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
+using relay::MultiHandleWait;
 
 constexpr auto c_containerdStorage = "/var/lib/docker";
 
@@ -291,8 +292,8 @@ try
         process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }, false));
 
     // Exit if either the VM terminates or containerd exits.
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), [&]() { io.Cancel(); }));
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { io.Cancel(); }));
+    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent()), MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(m_sessionTerminatingEvent.get()), MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
 

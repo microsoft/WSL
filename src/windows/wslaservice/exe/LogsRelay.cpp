@@ -33,7 +33,7 @@ void LogsRelay::AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& H
 
     // Append the new handle
     // N.B. IgnoreErrors is set so the IO doesn't stop on individual handle errors.
-    m_io.AddHandle(std::move(Handle), MultiHandleWait::Flags::IgnoreErrors);
+    m_io.AddHandle(std::move(Handle), MultiHandleWait::IgnoreErrors);
 
     // Restart the relay thread.
     StartRelayThread();
@@ -59,11 +59,7 @@ void LogsRelay::StopRelayThread()
 void LogsRelay::Run()
 try
 {
-    WSL_LOG("RelayStarting");
-    // TODO: restart on IO errors.
-    m_io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), m_io.CancelRoutine()));
+    m_io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get()), MultiHandleWait::CancelOnCompleted);
     m_io.Run({});
-
-    WSL_LOG("RelayStopping");
 }
 CATCH_LOG();
