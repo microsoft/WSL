@@ -35,12 +35,6 @@ constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
-// WSLA-specific virtio device class IDs.
-DEFINE_GUID(WSLA_VIRTIO_FS_ADMIN_CLASS_ID, 0x8F7C2A3B, 0xD9E4, 0x4C1F, 0xA2, 0xB8, 0x5E, 0x3D, 0x7C, 0x9F, 0x1A, 0x6E); // {8F7C2A3B-D9E4-4C1F-A2B8-5E3D7C9F1A6E}
-DEFINE_GUID(WSLA_VIRTIO_FS_CLASS_ID, 0x06ED032F, 0xC528, 0x41C1, 0xB7, 0x5D, 0x90, 0x5E, 0xEE, 0x82, 0x3B, 0xBA); // {06ED032F-C528-41C1-B75D-905EEE823BBA}
-DEFINE_GUID(WSLA_VIRTIO_NET_CLASS_ID, 0x7B3C9A42, 0x8E1F, 0x4D5A, 0x9F, 0x2E, 0xC4, 0xA7, 0xB8, 0xD3, 0xE6, 0xF1); // {7B3C9A42-8E1F-4D5A-9F2E-C4A7B8D3E6F1}
-DEFINE_GUID(WSLA_VIRTIO_PMEM_CLASS_ID, 0xABB755FC, 0x1B86, 0x4255, 0x83, 0xE2, 0xE5, 0x78, 0x7A, 0xBC, 0xF6, 0xC2); // {ABB755FC-1B86-4255-83E2-E5787ABCF6C2}
-
 WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, PSID UserSid) :
     m_settings(std::move(Settings)), m_userSid(UserSid)
 {
@@ -48,7 +42,7 @@ WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, 
 
     m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
     m_userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? WSLA_VIRTIO_FS_ADMIN_CLASS_ID : WSLA_VIRTIO_FS_CLASS_ID;
+    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
     m_crashDumpFolder = GetCrashDumpFolder();
 }
 
@@ -576,8 +570,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     }
     else
     {
-        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            std::move(gnsChannel), true, m_guestDeviceManager, WSLA_VIRTIO_NET_CLASS_ID, m_userToken);
+        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), true, m_guestDeviceManager, m_userToken);
     }
 
     m_networkEngine->Initialize();
