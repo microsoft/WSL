@@ -284,13 +284,11 @@ class WSLATests
             tags.push_back(e.Image);
         }
 
-        if (Present)
+        auto found = std::ranges::find(tags, Image) != tags.end();
+        if (Present != found)
         {
-            VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
-        }
-        else
-        {
-            VERIFY_IS_TRUE(std::ranges::find(tags, Image) == tags.end());
+            LogError("Image presence check failed for image: %hs, images: %hs", Image, wsl::shared::string::Join(tags, ',').c_str());
+            VERIFY_FAIL();
         }
     }
 
