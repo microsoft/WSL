@@ -65,3 +65,5 @@ tools/clang-format.exe
 /linux-crashes
 doc/site/
 directory.build.targets
+test-storage/
+*.vhdx

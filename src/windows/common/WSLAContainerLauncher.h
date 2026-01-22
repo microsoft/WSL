@@ -24,16 +24,19 @@ public:
     NON_COPYABLE(RunningWSLAContainer);
     DEFAULT_MOVABLE(RunningWSLAContainer);
     RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& fds);
+    ~RunningWSLAContainer();
     IWSLAContainer& Get();
 
     WSLA_CONTAINER_STATE State();
     ClientRunningWSLAProcess GetInitProcess();
+    void SetDeleteOnClose(bool deleteOnClose);
     void Reset();
     docker_schema::InspectContainer Inspect();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;
     std::vector<WSLA_PROCESS_FD> m_fds;
+    bool m_deleteOnClose = true;
 };
 
 class WSLAContainerLauncher : private WSLAProcessLauncher

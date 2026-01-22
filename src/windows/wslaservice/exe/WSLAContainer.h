@@ -52,13 +52,17 @@ public:
 
     WSLAContainerImpl(
         WSLAVirtualMachine* parentVM,
-        const WSLA_CONTAINER_OPTIONS& Options,
         std::string&& Id,
+        std::string&& Name,
+        std::string&& Image,
         std::vector<VolumeMountInfo>&& volumes,
         std::vector<PortMapping>&& ports,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient);
+        DockerHTTPClient& DockerClient,
+        WSLA_CONTAINER_STATE InitialState,
+        bool Tty);
+
     ~WSLAContainerImpl();
 
     void Start();
@@ -83,6 +87,13 @@ public:
 
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
+        WSLAVirtualMachine& parentVM,
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
+        ContainerEventTracker& EventTracker,
+        DockerHTTPClient& DockerClient);
+
+    static std::unique_ptr<WSLAContainerImpl> Open(
+        const common::docker_schema::ContainerInfo& DockerContainer,
         WSLAVirtualMachine& parentVM,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
