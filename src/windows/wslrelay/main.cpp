@@ -38,12 +38,10 @@ try
     wslrelay::RelayMode mode{wslrelay::RelayMode::Invalid};
     wil::unique_handle pipe{};
     wil::unique_handle exitEvent{};
-    wil::unique_handle terminalInputHandle{};
-    wil::unique_handle terminalOutputHandle{};
-    wil::unique_socket terminalControlHandle{};
     uint32_t port{};
     GUID vmId{};
     bool disableTelemetry = !wsl::shared::OfficialBuild;
+    bool connectPipe = false;
 
     ArgumentParser parser(GetCommandLineW(), wslrelay::binary_name);
     parser.AddArgument(Integer(reinterpret_cast<int&>(mode)), wslrelay::mode_option);
@@ -53,31 +51,28 @@ try
     parser.AddArgument(Handle{exitEvent}, wslrelay::exit_event_option);
     parser.AddArgument(Integer{port}, wslrelay::port_option);
     parser.AddArgument(disableTelemetry, wslrelay::disable_telemetry_option);
-    parser.AddArgument(Handle{terminalInputHandle}, wslrelay::input_option);
-    parser.AddArgument(Handle{terminalOutputHandle}, wslrelay::output_option);
-    parser.AddArgument(Handle<wil::unique_socket>{terminalControlHandle}, wslrelay::control_option);
+    parser.AddArgument(connectPipe, wslrelay::connect_pipe_option);
     parser.Parse();
 
     // Initialize logging.
     WslTraceLoggingInitialize(LxssTelemetryProvider, disableTelemetry);
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslTraceLoggingUninitialize(); });
 
+    // Ensure that the other end of the pipe has connected if required.
+    if (connectPipe)
+    {
+        wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000), {exitEvent.get()});
+    }
+
     // Perform the requested operation.
     switch (mode)
     {
     case wslrelay::RelayMode::DebugConsole:
-    case wslrelay::RelayMode::DebugConsoleRelay:
     {
         // If not relaying to a file, create a console window.
         if (!handle)
         {
             wsl::windows::common::helpers::CreateConsole(L"WSL Debug Console");
-        }
-
-        if (mode == wslrelay::RelayMode::DebugConsole)
-        {
-            // Ensure that the other end of the pipe has connected.
-            wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000));
         }
 
         // Relay the contents of the pipe to the output handle.
@@ -102,24 +97,13 @@ try
 
     case wslrelay::RelayMode::WSLAPortRelay:
     {
-        try
-        {
-            wsl::windows::wslrelay::localhost::RunWSLAPortRelay(vmId, port, exitEvent.get());
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-        }
-
+        wsl::windows::wslrelay::localhost::RunWSLAPortRelay(vmId, port, exitEvent.get());
         break;
     }
 
     case wslrelay::RelayMode::KdRelay:
     {
         THROW_HR_IF(E_INVALIDARG, port == 0);
-
-        // Ensure that the other end of the pipe has connected.
-        wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000), {exitEvent.get()});
 
         // Bind, listen, and accept a connection on the specified port.
         const wil::unique_socket listenSocket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
@@ -145,54 +129,8 @@ try
         break;
     }
 
-    case wslrelay::RelayMode::InteractiveConsoleRelay:
-    {
-        THROW_HR_IF(E_INVALIDARG, !terminalInputHandle || !terminalOutputHandle);
-
-        AllocConsole();
-        wsl::windows::common::ConsoleState Console;
-
-        // Create a thread to relay stdin to the pipe.
-        auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
-
-        std::optional<wsl::shared::SocketChannel> controlChannel;
-        if (terminalControlHandle)
-        {
-            controlChannel.emplace(std::move(terminalControlHandle), "TerminalControl", exitEvent.get());
-        }
-
-        std::thread inputThread([&]() {
-            auto updateTerminal = [&controlChannel, &Console]() {
-                if (controlChannel.has_value())
-                {
-                    auto windowSize = Console.GetWindowSize();
-
-                    WSLA_TERMINAL_CHANGED message{};
-                    message.Columns = windowSize.X;
-                    message.Rows = windowSize.Y;
-                    controlChannel->SendMessage(message);
-                }
-            };
-
-            wsl::windows::common::relay::StandardInputRelay(
-                GetStdHandle(STD_INPUT_HANDLE), terminalInputHandle.get(), updateTerminal, exitEvent.get());
-        });
-
-        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            exitEvent.SetEvent();
-            inputThread.join();
-        });
-
-        // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(terminalOutputHandle.get(), GetStdHandle(STD_OUTPUT_HANDLE));
-
-        // TODO: watch process exit code.
-
-        break;
-    }
-
     default:
-        THROW_HR(E_INVALIDARG);
+        THROW_HR_MSG(E_INVALIDARG, "Invalid relay mode %d specified.", static_cast<int>(mode));
     }
 
     return 0;
