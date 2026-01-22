@@ -31,8 +31,6 @@ public:
     ConsoleState(ConsoleState&&) = delete;
     ConsoleState& operator=(ConsoleState&&) = delete;
 
-    HANDLE GetInputHandle() const;
-    HANDLE GetOutputHandle() const;
     COORD GetWindowSize() const;
 
 private:

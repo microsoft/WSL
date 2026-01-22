@@ -149,16 +149,6 @@ void ConsoleState::RestoreConsoleState()
     }
 }
 
-HANDLE ConsoleState::GetInputHandle() const
-{
-    return m_InputHandle ? m_InputHandle.get() : nullptr;
-}
-
-HANDLE ConsoleState::GetOutputHandle() const
-{
-    return m_OutputHandle ? m_OutputHandle.get() : nullptr;
-}
-
 COORD ConsoleState::GetWindowSize() const
 {
     if (m_OutputHandle)

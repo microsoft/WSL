@@ -559,7 +559,7 @@ void wsl::windows::common::helpers::LaunchDebugConsole(
     }
     else
     {
-        // Create a new pipe server the child proces will connect to. The pipe should be:
+        // Create a new pipe server the child process will connect to. The pipe should be:
         //     Bi-directional: PIPE_ACCESS_DUPLEX
         //     Asynchronous: FILE_FLAG_OVERLAPPED
         //     Raw: PIPE_TYPE_BYTE | PIPE_READMODE_BYTE
