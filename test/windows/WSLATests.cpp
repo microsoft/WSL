@@ -823,8 +823,7 @@ class WSLATests
         //
         // TODO: revisit this in the future to avoid pulling packages from the network.
         auto installSocat = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", "tdnf install socat -y"}).Launch(*session);
-        auto result = installSocat.WaitAndCaptureOutput();
-        VERIFY_ARE_EQUAL(result.Code, 0);
+        ValidateProcessOutput(installSocat, {});
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
