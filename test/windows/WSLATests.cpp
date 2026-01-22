@@ -35,6 +35,7 @@ DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 static std::filesystem::path storagePath;
 
 extern std::wstring g_testDataPath;
+extern bool g_fastTestRun;
 
 class WSLATests
 {
@@ -54,14 +55,36 @@ class WSLATests
         storagePath = std::filesystem::current_path() / "test-storage";
 
         auto session = CreateSession();
-        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr, nullptr));
-        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
+
+        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+        VERIFY_SUCCEEDED(session->ListImages(&images, images.size_address<ULONG>()));
+
+        auto hasImage = [&](const std::string& imageName) {
+            return std::ranges::any_of(
+                images.get(), images.get() + images.size(), [&](const auto& e) { return e.Image == imageName; });
+        };
+
+        if (!hasImage("debian:latest"))
+        {
+            VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr, nullptr));
+        }
+
+        if (!hasImage("python:3.12-alpine"))
+        {
+            VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
+        }
+
+        // Hacky way to delete all containers.
+        // TODO: Replace with the --rm flag once available.
+        ExpectCommandResult(session.get(), {"/usr/bin/docker", "container", "prune", "-f"}, 0);
+
         return true;
     }
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
-        if (!storagePath.empty())
+        // Keep the VHD when running in -f mode, to speed up subsequent test runs.
+        if (!g_fastTestRun && !storagePath.empty())
         {
             std::error_code error;
             std::filesystem::remove_all(storagePath, error);

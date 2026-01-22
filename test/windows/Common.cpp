@@ -67,6 +67,7 @@ static bool g_enableWerReport = false;
 static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
+bool g_fastTestRun = false; // True when test.bat was invoked with -f
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -2087,6 +2088,7 @@ Return Value:
     {
         // If no setup script is present, mark test_distro as the default distro here for convenience.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--set-default " LXSS_DISTRO_NAME_TEST_L), 0L);
+        g_fastTestRun = true;
 
         return true;
     }
