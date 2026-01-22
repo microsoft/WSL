@@ -32,7 +32,7 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
-    svccommio.cpp
+    ConsoleState.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -107,7 +107,7 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
-    svccommio.hpp
+    ConsoleState.h
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h

@@ -21,7 +21,7 @@ Abstract:
 
 namespace wsl::windows::common {
 
-void RelayStandardInput(HANDLE ConsoleHandle, HANDLE OutputHandle, const std::shared_ptr<wsl::shared::SocketChannel>& ControlChannel, HANDLE ExitEvent, SvcCommIo* Io);
+void RelayStandardInput(HANDLE ConsoleHandle, HANDLE OutputHandle, const std::shared_ptr<wsl::shared::SocketChannel>& ControlChannel, HANDLE ExitEvent, ConsoleState* Io);
 
 class SvcComm
 {
