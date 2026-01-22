@@ -169,12 +169,10 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALo
         url += std::format("&since={}", Since);
     }
 
-    // TODO: since, until, timestamps
-
     auto [status, socket] = SendRequest(verb::get, url, {}, {});
     if (status != 200)
     {
-        throw DockerHTTPException(status, verb::post, url, "", "");
+        throw DockerHTTPException(status, verb::get, url, "", "");
     }
 
     return std::move(socket);

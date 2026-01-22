@@ -12,8 +12,6 @@ Abstract:
 
 --*/
 
-#pragma once
-
 #include "LogsRelay.h"
 
 using wsl::windows::common::relay::DockerIORelayHandle;

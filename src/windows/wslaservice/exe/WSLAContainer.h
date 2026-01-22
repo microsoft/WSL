@@ -132,7 +132,7 @@ public:
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
     IFACEMETHOD(Start)() override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
-    IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _Out_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
+    IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
 
 private:
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;

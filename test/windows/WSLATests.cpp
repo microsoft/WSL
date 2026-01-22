@@ -2547,7 +2547,6 @@ class WSLATests
         auto expectLogs = [](auto& container,
                              const std::string& expectedStdout,
                              const std::optional<std::string>& expectedStderr,
-                             WSLALogsFlags = WSLALogsFlagsNone,
                              ULONGLONG Tail = 0,
                              ULONGLONG Since = 0,
                              ULONGLONG Until = 0) {
@@ -2574,7 +2573,7 @@ class WSLATests
 
             expectLogs(container.Get(), "stdout\n", "stderr\n");
 
-            // validate that logs can be queried multiple times.
+            // validate that logs can be be queried multiple times.
             expectLogs(container.Get(), "stdout\n", "stderr\n");
         }
 
@@ -2588,9 +2587,9 @@ class WSLATests
             ValidateProcessOutput(initProcess, {{1, "line1\nline2\nline3\nline4"}});
 
             expectLogs(container.Get(), "line1\nline2\nline3\nline4", "");
-            expectLogs(container.Get(), "line4", "", WSLALogsFlagsNone, 1);
-            expectLogs(container.Get(), "line3\nline4", "", WSLALogsFlagsNone, 2);
-            expectLogs(container.Get(), "line1\nline2\nline3\nline4", "", WSLALogsFlagsNone, 4);
+            expectLogs(container.Get(), "line4", "",  1);
+            expectLogs(container.Get(), "line3\nline4", "",  2);
+            expectLogs(container.Get(), "line1\nline2\nline3\nline4", "",  4);
         }
 
         // Validate that timestamps are correctly returned.
@@ -2613,15 +2612,15 @@ class WSLATests
             auto container = launcher.Launch(*session);
             auto initProcess = container.GetInitProcess();
 
-            // Testing would with more granularity would be difficult, but these flags are just forwarded to docker,
+            // Testing with more granularity would be difficult, but these flags are just forwarded to docker,
             // so validate that they're wired correctly.
 
             auto now = time(nullptr);
-            expectLogs(container.Get(), "OK", "", WSLALogsFlagsNone, 0, now - 3600);
-            expectLogs(container.Get(), "", "", WSLALogsFlagsNone, 0, now + 3600);
+            expectLogs(container.Get(), "OK", "",  0, now - 3600);
+            expectLogs(container.Get(), "", "",  0, now + 3600);
 
-            expectLogs(container.Get(), "", "", WSLALogsFlagsNone, 0, 0, now - 3600);
-            expectLogs(container.Get(), "OK", "", WSLALogsFlagsNone, 0, 0, now + 3600);
+            expectLogs(container.Get(), "", "",  0, 0, now - 3600);
+            expectLogs(container.Get(), "OK", "",  0, 0, now + 3600);
         }
 
         // Validate that logs work for TTY processes

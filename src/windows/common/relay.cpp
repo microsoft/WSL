@@ -983,6 +983,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
             }
         }
 
+        // Remove completed handles from m_handles.
         for (auto it = m_handles.begin(); it != m_handles.end();)
         {
             if (!it->second)
@@ -1003,9 +1004,6 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                 ++it;
             }
         }
-
-        // Remove completed handles from m_handles.
-        std::erase_if(m_handles, [&](const auto& e) { return !e.second || e.second->GetState() == IOHandleStatus::Completed; });
 
         if (m_handles.empty() || m_cancel)
         {

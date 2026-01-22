@@ -664,7 +664,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
     }
     else
     {
-        // For non-tty process, stout & stderr are multiplexed.
+        // For non-tty process, stdout & stderr are multiplexed.
         auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
         auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
 

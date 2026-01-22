@@ -402,7 +402,7 @@ public:
         }
     }
 
-    HANDLE RelayHandle::GetHandle() const override
+    HANDLE GetHandle() const override
     {
         if (Read.GetState() == IOHandleStatus::Pending)
         {
