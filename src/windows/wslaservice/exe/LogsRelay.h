@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LogsRelay.h
+
+Abstract:
+
+    Contains the definition of the LogsRelay class.
+
+--*/
+
 #pragma once
 
 namespace wsl::windows::service::wsla {

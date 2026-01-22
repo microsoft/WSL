@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    LogsRelay.cpp
+
+Abstract:
+
+    Contains the implementation of the LogsRelay class.
+
+--*/
+
 #pragma once
 
 #include "LogsRelay.h"
