@@ -366,7 +366,7 @@ class WSLATests
             WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Force = false, .NoPrune = false};
 
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(session->DeleteImage(&options, &deletedImages, deletedImages.size_address<DWORD>(), nullptr));
+            VERIFY_SUCCEEDED(session->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
         });
 
         ExpectImagePresent(*session, "debian:test-list-images");
