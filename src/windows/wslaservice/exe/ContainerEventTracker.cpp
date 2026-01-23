@@ -16,6 +16,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include <nlohmann/json.hpp>
 
+using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::service::wsla::ContainerEventTracker;
 using wsl::windows::service::wsla::DockerHTTPClient;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
@@ -157,10 +158,10 @@ try
         }
     };
 
-    auto onStop = [&]() { io.Cancel(); };
-
-    io.AddHandle(std::make_unique<common::relay::HTTPChunkBasedReadHandle>(wil::unique_handle{(HANDLE)socket.release()}, std::move(oneLineWritten)));
-    io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), std::move(onStop)));
+    io.AddHandle(
+        std::make_unique<common::relay::HTTPChunkBasedReadHandle>(wil::unique_handle{(HANDLE)socket.release()}, std::move(oneLineWritten)),
+        MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get()), MultiHandleWait::CancelOnCompleted);
 
     if (io.Run({}))
     {

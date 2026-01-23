@@ -307,13 +307,11 @@ class WSLATests
             tags.push_back(e.Image);
         }
 
-        if (Present)
+        auto found = std::ranges::find(tags, Image) != tags.end();
+        if (Present != found)
         {
-            VERIFY_IS_TRUE(std::ranges::find(tags, Image) != tags.end());
-        }
-        else
-        {
-            VERIFY_IS_TRUE(std::ranges::find(tags, Image) == tags.end());
+            LogError("Image presence check failed for image: %hs, images: %hs", Image, wsl::shared::string::Join(tags, ',').c_str());
+            VERIFY_FAIL();
         }
     }
 
@@ -1548,6 +1546,7 @@ class WSLATests
 
             // Verify that the container is in running state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
 
             // TODO: Once 'container run' is split into 'container create' + 'container start',
@@ -2374,7 +2373,8 @@ class WSLATests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(std::make_unique<DockerIORelayHandle>(std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite)));
+            io.AddHandle(std::make_unique<DockerIORelayHandle>(
+                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
             io.AddHandle(std::make_unique<ReadHandle>(
@@ -2597,6 +2597,187 @@ class WSLATests
             VERIFY_SUCCEEDED(nonElevatedSession->GetId(&nonElevatedId));
             VERIFY_SUCCEEDED(manager->OpenSession(nonElevatedId, &openedSession));
             VERIFY_IS_TRUE(!!openedSession);
+        }
+    }
+
+    static void ValidateHandleOutput(HANDLE handle, const std::string& expectedOutput)
+    {
+        VERIFY_ARE_EQUAL(EscapeString(expectedOutput), EscapeString(ReadToString(handle)));
+    }
+
+    TEST_METHOD(ContainerLogs)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNone;
+
+        auto session = CreateSession(settings);
+
+        auto expectLogs = [](auto& container,
+                             const std::string& expectedStdout,
+                             const std::optional<std::string>& expectedStderr,
+                             WSLALogsFlags Flags = WSLALogsFlagsNone,
+                             ULONGLONG Tail = 0,
+                             ULONGLONG Since = 0,
+                             ULONGLONG Until = 0) {
+            wil::unique_handle stdoutLogs;
+            wil::unique_handle stderrLogs;
+            VERIFY_SUCCEEDED(container.Logs(Flags, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, Since, Until, Tail));
+
+            ValidateHandleOutput(stdoutLogs.get(), expectedStdout);
+
+            if (expectedStderr.has_value())
+            {
+                ValidateHandleOutput(stderrLogs.get(), expectedStderr.value());
+            }
+        };
+
+        // Test a simple scenario.
+        {
+            // Create a container with a simple command.
+            WSLAContainerLauncher launcher(
+                "debian:latest", "logs-test-1", "/bin/bash", {"-c", "echo stdout && (echo stderr >& 2)"});
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "stdout\n"}, {2, "stderr\n"}});
+
+            expectLogs(container.Get(), "stdout\n", "stderr\n");
+
+            // validate that logs can be queried multiple times.
+            expectLogs(container.Get(), "stdout\n", "stderr\n");
+        }
+
+        // Validate that tail works.
+        {
+            // Create a container with a simple command.
+            WSLAContainerLauncher launcher(
+                "debian:latest", "logs-test-2", "/bin/bash", {"-c", "echo -en 'line1\\nline2\\nline3\\nline4'"});
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "line1\nline2\nline3\nline4"}});
+
+            expectLogs(container.Get(), "line1\nline2\nline3\nline4", "");
+            expectLogs(container.Get(), "line4", "", WSLALogsFlagsNone, 1);
+            expectLogs(container.Get(), "line3\nline4", "", WSLALogsFlagsNone, 2);
+            expectLogs(container.Get(), "line1\nline2\nline3\nline4", "", WSLALogsFlagsNone, 4);
+        }
+
+        // Validate that timestamps are correctly returned.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "logs-test-3", "/bin/bash", {"-c", "echo -n OK"});
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+
+            wil::unique_handle stdoutLogs;
+            wil::unique_handle stderrLogs;
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsTimestamps, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+
+            auto output = ReadToString(stdoutLogs.get());
+            VerifyPatternMatch(output, "20*-*-* OK"); // Timestamp is in ISO 8601 format
+        }
+
+        // Validate that 'since' and 'until' work as expected.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "logs-test-4", "/bin/bash", {"-c", "echo -n OK"});
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+
+            // Testing would with more granularity would be difficult, but these flags are just forwarded to docker,
+            // so validate that they're wired correctly.
+
+            auto now = time(nullptr);
+            expectLogs(container.Get(), "OK", "", WSLALogsFlagsNone, 0, now - 3600);
+            expectLogs(container.Get(), "", "", WSLALogsFlagsNone, 0, now + 3600);
+
+            expectLogs(container.Get(), "", "", WSLALogsFlagsNone, 0, 0, now - 3600);
+            expectLogs(container.Get(), "OK", "", WSLALogsFlagsNone, 0, 0, now + 3600);
+        }
+
+        // Validate that logs work for TTY processes
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "logs-test-5", {"/bin/bash"}, {"-c", "stat -f /dev/stdin | grep -io 'Type:.*$'"}, {}, {}, ProcessFlags::None);
+            launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+            launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+
+            ValidateHandleOutput(initProcess.GetStdHandle(WSLAFDTty).get(), "Type: devpts\r\n");
+            VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
+
+            expectLogs(container.Get(), "Type: devpts\r\n", {});
+
+            // Validate that logs can queried multiple times.
+            expectLogs(container.Get(), "Type: devpts\r\n", {});
+        }
+
+        // Validate that the 'follow' flag works as expected.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "logs-test-6", "/bin/cat", {}, {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout);
+            auto container = launcher.Launch(*session);
+            auto initProcess = container.GetInitProcess();
+
+            // Without 'follow', logs return immediately.
+            expectLogs(container.Get(), "", "");
+
+            // Create a 'follow' logs call.
+            wil::unique_handle stdoutLogs;
+            wil::unique_handle stderrLogs;
+            VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsFollow, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
+
+            std::mutex mutex;
+            std::string availableLogs;
+            auto readLogs = [&]() {
+                std::string buffer(4096, '\0');
+
+                while (true)
+                {
+                    DWORD bytesRead = 0;
+                    if (!ReadFile(stdoutLogs.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+                    {
+                        VERIFY_ARE_EQUAL(GetLastError(), ERROR_BROKEN_PIPE);
+                    }
+
+                    if (bytesRead == 0)
+                    {
+                        break;
+                    }
+
+                    std::lock_guard lock{mutex};
+                    availableLogs.append(buffer.data(), bytesRead);
+                }
+            };
+
+            auto expect = [&](const std::string& expected) {
+                wsl::shared::retry::RetryWithTimeout<void>(
+                    [&]() {
+                        std::lock_guard lock{mutex};
+
+                        THROW_HR_IF(E_ABORT, availableLogs.size() < expected.size());
+                    },
+                    std::chrono::milliseconds(100),
+                    std::chrono::seconds(60));
+
+                std::lock_guard lock{mutex};
+
+                VERIFY_ARE_EQUAL(availableLogs, expected);
+            };
+
+            std::thread readerThread{readLogs};
+
+            auto containerStdin = initProcess.GetStdHandle(0);
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "line1\n", 6, nullptr, nullptr));
+
+            expect("line1\n");
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "line2\n", 6, nullptr, nullptr));
+            expect("line1\nline2\n");
+
+            containerStdin.reset();
+            readerThread.join();
+
+            expectLogs(container.Get(), "line1\nline2\n", "");
+            expectLogs(container.Get(), "line1\nline2\n", "", WSLALogsFlagsFollow);
         }
     }
 };

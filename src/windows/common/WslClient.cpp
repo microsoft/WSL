@@ -1729,11 +1729,11 @@ int WslaShell(_In_ std::wstring_view commandLine)
         }
         else
         {
-            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), process->GetStdHandle(0)));
+            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), process->GetStdHandle(0)));
         }
 
-        io.AddHandle(std::make_unique<RelayHandle>(process->GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
-        io.AddHandle(std::make_unique<RelayHandle>(process->GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(process->GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(process->GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
 
         io.Run({});
     }

@@ -57,6 +57,8 @@ public:
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
 
+    using WSLAProcessLauncher::AddFd;
+
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> CreateNoThrow(IWSLASession& Session);
 
     RunningWSLAContainer Launch(IWSLASession& Session);

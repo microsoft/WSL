@@ -2606,6 +2606,41 @@ std::string ReadToString(SOCKET Handle)
     return output;
 }
 
+std::string ReadToString(HANDLE Handle)
+{
+    std::string output;
+    DWORD offset = 0;
+    constexpr DWORD bufferSize = 4096;
+
+    while (true)
+    {
+        output.resize(offset + bufferSize);
+        DWORD bytesRead = 0;
+        if (!ReadFile(Handle, output.data() + offset, bufferSize, &bytesRead, nullptr))
+        {
+            VERIFY_ARE_EQUAL(GetLastError(), ERROR_BROKEN_PIPE);
+        }
+
+        offset += bytesRead;
+        output.resize(offset);
+        if (bytesRead == 0)
+        {
+            break;
+        }
+    }
+
+    return output;
+}
+
+void VerifyPatternMatch(const std::string& Content, const std::string& Pattern)
+{
+    if (!PathMatchSpecA(Content.c_str(), Pattern.c_str()))
+    {
+        std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", Content, Pattern);
+        VERIFY_FAIL(message.c_str());
+    }
+}
+
 std::string EscapeString(const std::string& Input)
 {
     std::string Output;

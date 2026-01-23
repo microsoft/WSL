@@ -71,12 +71,16 @@ void DockerContainerProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
 
 void DockerContainerProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode)
 {
-    if (Event == ContainerEvent::Stop && !m_exitEvent.is_signaled())
+    if (Event == ContainerEvent::Stop)
     {
-        WI_ASSERT(ExitCode.has_value());
-        WI_ASSERT(!m_exitedCode.has_value());
-        m_exitedCode = ExitCode.value();
-        m_exitEvent.SetEvent();
+        std::lock_guard lock{m_lock};
+        if (!m_exitEvent.is_signaled())
+        {
+            WI_ASSERT(ExitCode.has_value());
+            WI_ASSERT(!m_exitedCode.has_value());
+            m_exitedCode = ExitCode.value();
+            m_exitEvent.SetEvent();
+        }
     }
 }
 

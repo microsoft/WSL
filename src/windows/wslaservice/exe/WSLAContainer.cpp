@@ -17,6 +17,9 @@ Abstract:
 #include "WSLAProcess.h"
 #include "WSLAProcessIO.h"
 
+using wsl::windows::common::relay::DockerIORelayHandle;
+using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
+using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
@@ -697,6 +700,8 @@ const std::string& WSLAContainerImpl::ID() const noexcept
 
 void WSLAContainerImpl::Inspect(LPSTR* Output)
 {
+    std::lock_guard lock(m_lock);
+
     try
     {
         *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_dockerClient.InspectContainer(m_id).data()).release();
@@ -704,6 +709,46 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     catch (const DockerHTTPException& e)
     {
         THROW_HR_MSG(E_FAIL, "Failed to inspect container: %hs ", e.what());
+    }
+}
+
+void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+{
+    std::lock_guard lock(m_lock);
+
+    wil::unique_socket socket;
+    try
+    {
+        socket = m_dockerClient.ContainerLogs(m_id, Flags, Since, Until, Tail);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        THROW_HR_MSG(E_FAIL, "Failed to get container logs: %hs ", e.what());
+    }
+
+    if (m_tty)
+    {
+        // For tty processes, simply relay the HTTP chunks.
+        auto [ttyRead, ttyWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
+
+        auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
+        m_logsRelay.AddHandle(std::move(handle));
+
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get()));
+    }
+    else
+    {
+        // For non-tty process, stdout & stderr are multiplexed.
+        auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
+        auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
+
+        auto handle = std::make_unique<DockerIORelayHandle>(
+            std::move(socket), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::HttpChunked);
+
+        m_logsRelay.AddHandle(std::move(handle));
+
+        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get()));
+        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get()));
     }
 }
 
@@ -759,3 +804,13 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+{
+    RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
+
+    *Stdout = 0;
+    *Stderr = 0;
+
+    return CallImpl(&WSLAContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
+}

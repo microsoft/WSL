@@ -532,8 +532,11 @@ wil::unique_hkey OpenDistributionKey(LPCWSTR Name);
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings = L"", int ExitCode = -1);
 
 std::string ReadToString(SOCKET Handle);
+std::string ReadToString(HANDLE Handle);
 
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
 std::string EscapeString(const std::string& Input);
+
+void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);

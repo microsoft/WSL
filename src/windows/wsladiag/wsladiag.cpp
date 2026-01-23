@@ -30,6 +30,7 @@ using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::MultiHandleWait;
+using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
@@ -272,6 +273,7 @@ static int RunListCommand(std::wstring_view commandLine)
 }
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
+DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
 static wil::com_ptr<IWSLASession> OpenCLISession()
 {
@@ -297,7 +299,6 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
 
     return session;
 }
-
 static void PullImpl(IWSLASession& Session, const std::string& Image)
 {
     // Configure console for interactive usage.
@@ -415,6 +416,43 @@ static int Pull(std::wstring_view commandLine)
     return 0;
 }
 
+static int Logs(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
+
+    std::string id;
+    WSLALogsFlags flags = WSLALogsFlagsNone;
+    parser.AddPositionalArgument(Utf8String{id}, 0);
+    parser.AddArgument(SetFlag<WSLALogsFlags, WSLALogsFlagsFollow>(flags), L"--follow", 'f');
+
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, id.empty());
+
+    auto session = OpenCLISession();
+
+    wil::com_ptr<IWSLAContainer> container;
+    THROW_IF_FAILED(session->OpenContainer(id.c_str(), &container)); // TODO: nicer user error if not found.
+
+    wil::unique_handle stdoutLogs;
+    wil::unique_handle stderrLogs;
+
+    THROW_IF_FAILED(container->Logs(flags, reinterpret_cast<ULONG*>(&stdoutLogs), reinterpret_cast<ULONG*>(&stderrLogs), 0, 0, 0));
+
+    wsl::windows::common::relay::MultiHandleWait io;
+
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
+
+    if (stderrLogs) // This handle is only used for non-tty processes.
+    {
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+    }
+
+    // TODO: Handle ctrl-c.
+    io.Run({});
+
+    return 0;
+}
+
 static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
 {
     auto exitEvent = Process.GetExitEvent();
@@ -475,11 +513,11 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
         }
         else
         {
-            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
+            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
         }
 
-        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
-        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
         io.AddHandle(std::make_unique<EventHandle>(exitEvent.get()));
 
         io.Run({});
@@ -497,9 +535,11 @@ static int Run(std::wstring_view commandLine)
     bool interactive{};
     bool tty{};
     std::string image;
+    std::string name;
     parser.AddPositionalArgument(Utf8String{image}, 0);
     parser.AddArgument(interactive, L"--interactive", 'i');
     parser.AddArgument(tty, L"--tty", 't');
+    parser.AddArgument(Utf8String{name}, L"--name");
 
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, image.empty());
@@ -553,6 +593,11 @@ static int Run(std::wstring_view commandLine)
     options.InitProcessOptions.CommandLineCount = static_cast<ULONG>(args.size());
     options.InitProcessOptions.Fds = fds.data();
     options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
+
+    if (!name.empty())
+    {
+        options.Name = name.c_str();
+    }
 
     wil::com_ptr<IWSLAContainer> container;
     WSLAErrorDetails error{};
@@ -631,6 +676,10 @@ int wsladiag_main(std::wstring_view commandLine)
     else if (verb == L"run")
     {
         return Run(commandLine);
+    }
+    else if (verb == L"logs")
+    {
+        return Logs(commandLine);
     }
     else
     {

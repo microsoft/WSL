@@ -19,6 +19,7 @@ Abstract:
 #include "WslCoreFilesystem.h"
 
 using namespace wsl::windows::common;
+using relay::MultiHandleWait;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
@@ -294,8 +295,8 @@ try
         process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }, false));
 
     // Exit if either the VM terminates or containerd exits.
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent(), [&]() { io.Cancel(); }));
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { io.Cancel(); }));
+    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent()), MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(m_sessionTerminatingEvent.get()), MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
 
@@ -473,7 +474,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     auto onCompleted = [&]() { io.Cancel(); };
 
-    io.AddHandle(std::make_unique<relay::RelayHandle>(
+    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
         common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
