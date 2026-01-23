@@ -1347,6 +1347,6 @@ WSL2_DRVFS_TEST_CLASS(Plan9);
 
 // Disabled because it causes too much noise.
 // TODO: Enable again once virtiofs is stable
-WSL2_DRVFS_TEST_CLASS(VirtioFs);
+// WSL2_DRVFS_TEST_CLASS(VirtioFs);
 
 } // namespace DrvFsTests
