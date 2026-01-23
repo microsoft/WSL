@@ -321,7 +321,6 @@ class WSLATests
 
         auto settings = GetDefaultSessionSettings();
         settings.DisplayName = L"wsla-pull-image-test";
-        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         auto session = CreateSession(settings);
 
@@ -412,13 +411,13 @@ class WSLATests
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
+
     TEST_METHOD(DeleteImage)
     {
         WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings();
         settings.DisplayName = L"wsla-delete-image-test";
-        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         auto session = CreateSession(settings);
 
@@ -634,12 +633,13 @@ class WSLATests
         VERIFY_IS_TRUE(process.GetExitEvent().wait(30 * 1000));
     }
 
-    TEST_METHOD(NATNetworking)
+    void ValidateNetworking(WSLANetworkingMode mode, bool enableDnsTunneling = false)
     {
         WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.NetworkingMode = mode;
+        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
 
         auto session = CreateSession(settings);
 
@@ -652,50 +652,29 @@ class WSLATests
             0);
 
         ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}, 0);
+
+        // Verify that /etc/resolv.conf is correctly configured.
+        if (enableDnsTunneling)
+        {
+            auto result = ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"}, 0);
+
+            VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+        }
+    }
+
+    TEST_METHOD(NATNetworking)
+    {
+        ValidateNetworking(WSLANetworkingModeNAT);
     }
 
     TEST_METHOD(NATNetworkingWithDnsTunneling)
     {
-        WSL2_TEST_ONLY();
-
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-        WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling);
-
-        auto session = CreateSession(settings);
-
-        // Validate that eth0 has an ip address
-        ExpectCommandResult(
-            session.get(),
-            {"/bin/sh",
-             "-c",
-             "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"},
-            0);
-
-        // Verify that /etc/resolv.conf is correctly configured.
-        auto result = ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"}, 0);
-
-        VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+        ValidateNetworking(WSLANetworkingModeNAT, true);
     }
 
     TEST_METHOD(VirtioProxyNetworking)
     {
-        WSL2_TEST_ONLY();
-
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeVirtioProxy;
-
-        auto session = CreateSession(settings);
-
-        // Validate that eth0 has an ip address
-        ExpectCommandResult(
-            session.get(),
-            {"/bin/sh",
-             "-c",
-             "ip a  show dev eth0 | grep -iF 'inet ' |  grep -E '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'"},
-            0);
-
-        ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"}, 0);
+        ValidateNetworking(WSLANetworkingModeVirtioProxy);
     }
 
     TEST_METHOD(OpenFiles)
@@ -834,11 +813,14 @@ class WSLATests
         }
     }
 
-    TEST_METHOD(NATPortMapping)
+    void ValidatePortMapping(WSLANetworkingMode networkingMode)
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = networkingMode;
+
+        auto session = CreateSession(settings);
 
         // Install socat in the container.
         //
@@ -937,6 +919,16 @@ class WSLATests
         }
 
         VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
+    }
+
+    TEST_METHOD(PortMappingNat)
+    {
+        ValidatePortMapping(WSLANetworkingModeNAT);
+    }
+
+    TEST_METHOD(PortMappingVirtioProxy)
+    {
+        ValidatePortMapping(WSLANetworkingModeVirtioProxy);
     }
 
     TEST_METHOD(StuckVmTermination)
@@ -1342,10 +1334,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         // Test a simple container start.
         {
@@ -1465,10 +1454,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
@@ -1678,10 +1664,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
@@ -1805,10 +1788,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         // Create a container.
         WSLAContainerLauncher launcher(
@@ -1934,10 +1914,10 @@ class WSLATests
         }
     }
 
-    void RunPortMappingsTest(WSLA_CONTAINER_NETWORK_TYPE Mode)
+    void RunPortMappingsTest(WSLANetworkingMode networkingMode, WSLA_CONTAINER_NETWORK_TYPE containerNetworkType)
     {
         auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.NetworkingMode = networkingMode;
 
         auto session = CreateSession(settings);
 
@@ -1965,7 +1945,7 @@ class WSLATests
         // Test a simple port mapping.
         {
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine", "test-ports", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+                "python:3.12-alpine", "test-ports", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET6);
@@ -1984,7 +1964,7 @@ class WSLATests
 
             // Validate that the port cannot be reused while the container is running.
             WSLAContainerLauncher subLauncher(
-                "python:3.12-alpine", "test-ports-2", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+                "python:3.12-alpine", "test-ports-2", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             subLauncher.AddPort(1234, 8000, AF_INET);
             auto [hresult, newContainer] = subLauncher.LaunchNoThrow(*session);
@@ -1998,7 +1978,7 @@ class WSLATests
             // Validate that the port can be reused now that the container is stopped.
             {
                 WSLAContainerLauncher launcher(
-                    "python:3.12-alpine", "test-ports-3", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+                    "python:3.12-alpine", "test-ports-3", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
                 launcher.AddPort(1234, 8000, AF_INET);
 
@@ -2021,7 +2001,7 @@ class WSLATests
         // Validate that the same host port can't be bound twice in the same Create() call.
         {
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET);
@@ -2043,7 +2023,7 @@ class WSLATests
         {
             auto boundSocket = bindSocket(1235);
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+                "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1235, 8000, AF_INET);
             VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(WSAEACCES));
@@ -2051,7 +2031,7 @@ class WSLATests
             // Validate that Create() correctly cleans up bound ports after a port fails to map
             {
                 WSLAContainerLauncher launcher(
-                    "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, Mode);
+                    "python:3.12-alpine", "test-ports-fail", {}, {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
                 launcher.AddPort(1236, 8000, AF_INET); // Should succeed
                 launcher.AddPort(1235, 8000, AF_INET); // Should fail.
 
@@ -2071,7 +2051,7 @@ class WSLATests
                 {},
                 {"python3", "-m", "http.server", "--bind", "::1"},
                 {"PYTHONUNBUFFERED=1"},
-                Mode,
+                containerNetworkType,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
             launcher.AddPort(1234, 8000, AF_INET);
@@ -2090,14 +2070,24 @@ class WSLATests
         }*/
     }
 
-    TEST_METHOD(PortMappingsBridged)
+    TEST_METHOD(PortMappingsNatBridged)
     {
-        RunPortMappingsTest(WSLA_CONTAINER_NETWORK_BRIDGE);
+        RunPortMappingsTest(WSLANetworkingModeNAT, WSLA_CONTAINER_NETWORK_BRIDGE);
     }
 
-    TEST_METHOD(PortMappingsHost)
+    TEST_METHOD(PortMappingsNatHost)
     {
-        RunPortMappingsTest(WSLA_CONTAINER_NETWORK_HOST);
+        RunPortMappingsTest(WSLANetworkingModeNAT, WSLA_CONTAINER_NETWORK_HOST);
+    }
+
+    TEST_METHOD(PortMappingsVirtioProxyBridged)
+    {
+        RunPortMappingsTest(WSLANetworkingModeVirtioProxy, WSLA_CONTAINER_NETWORK_BRIDGE);
+    }
+
+    TEST_METHOD(PortMappingsVirtioProxyHost)
+    {
+        RunPortMappingsTest(WSLANetworkingModeVirtioProxy, WSLA_CONTAINER_NETWORK_HOST);
     }
 
     TEST_METHOD(PortMappingsNone)
@@ -2131,7 +2121,6 @@ class WSLATests
         });
 
         auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
         WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
@@ -2189,7 +2178,7 @@ class WSLATests
         ValidateContainerVolumes(true);
     }
 
-    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnError)
+    void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)
     {
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
@@ -2206,9 +2195,9 @@ class WSLATests
         });
 
         auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
         settings.StoragePath = storage.c_str();
         settings.MaximumStorageSizeMb = 1024;
+        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
 
@@ -2224,6 +2213,16 @@ class WSLATests
 
         // Verify that the first volume was mounted before the error occurred, then unmounted after failure.
         ExpectMount(session.get(), "/mnt/wsla/test-container/volumes/0", {});
+    }
+
+    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnError)
+    {
+        ValidateContainerVolumeUnmountAllFoldersOnError(false);
+    }
+
+    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnErrorVirtioFs)
+    {
+        ValidateContainerVolumeUnmountAllFoldersOnError(true);
     }
 
     TEST_METHOD(LineBasedReader)
