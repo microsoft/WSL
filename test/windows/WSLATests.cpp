@@ -1539,10 +1539,10 @@ class WSLATests
         {
             expectOpen("", E_INVALIDARG);
             expectOpen("non-existing-container", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-            expectOpen("/", HRESULT_FROM_WIN32(E_INVALIDARG));
-            expectOpen("?foo=bar", HRESULT_FROM_WIN32(E_INVALIDARG));
-            expectOpen("\n", HRESULT_FROM_WIN32(E_INVALIDARG));
-            expectOpen(" ", HRESULT_FROM_WIN32(E_INVALIDARG));
+            expectOpen("/", E_INVALIDARG);
+            expectOpen("?foo=bar", E_INVALIDARG);
+            expectOpen("\n", E_INVALIDARG);
+            expectOpen(" ", E_INVALIDARG);
         }
     }
 

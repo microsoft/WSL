@@ -42,9 +42,10 @@ std::pair<std::string, std::string> ParseImage(const std::string& Input)
 bool IsContainerNameValid(LPCSTR Name)
 {
     size_t length = 0;
+    const auto& locale = std::locale::classic();
     while (*Name != '\0')
     {
-        if (!isalnum(*Name) && *Name != '_' && *Name != '-' && *Name != '.')
+        if (!std::isalnum(*Name, locale) && *Name != '_' && *Name != '-' && *Name != '.')
         {
             return false;
         }
