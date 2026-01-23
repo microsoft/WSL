@@ -1739,31 +1739,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     }
     else
     {
-        // Save original console modes so they can be restored on exit.
-        DWORD OriginalInputMode{};
-        DWORD OriginalOutputMode{};
-        UINT OriginalOutputCP = GetConsoleOutputCP();
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
-
-        auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            SetConsoleMode(Stdin, OriginalInputMode);
-            SetConsoleMode(Stdout, OriginalOutputMode);
-            SetConsoleOutputCP(OriginalOutputCP);
-        });
-
         // Configure console for interactive usage.
-        DWORD InputMode = OriginalInputMode;
-        WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
-        WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
-
-        DWORD OutputMode = OriginalOutputMode;
-        WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
-
-        THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
-
+        wsl::windows::common::ConsoleState console;
         auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
 
         std::vector<wil::unique_handle> handleStorage;
@@ -1783,16 +1760,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
         {
             // Create a thread to relay stdin to the pipe.
-
             std::thread inputThread([&]() {
-                auto updateTerminal = [&Stdout, &process]() {
-                    CONSOLE_SCREEN_BUFFER_INFOEX info{};
-                    info.cbSize = sizeof(info);
-
-                    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
-
-                    LOG_IF_FAILED(process->Get().ResizeTty(
-                        info.srWindow.Bottom - info.srWindow.Top + 1, info.srWindow.Right - info.srWindow.Left + 1));
+                auto updateTerminal = [&console, &process]() {
+                    const auto windowSize = console.GetWindowSize();
+                    LOG_IF_FAILED(process->Get().ResizeTty(windowSize.Y, windowSize.X));
                 };
 
                 wsl::windows::common::relay::StandardInputRelay(Stdin, ttyInput, updateTerminal, exitEvent.get());

@@ -132,63 +132,21 @@ static int RunShellCommand(std::wstring_view commandLine)
     auto ttyIn = process.GetStdHandle(0);
     auto ttyOut = process.GetStdHandle(1);
 
-    // Console handles.
-    wil::unique_hfile conin{
-        CreateFileW(L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-    wil::unique_hfile conout{
-        CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-    THROW_LAST_ERROR_IF(!conin);
-    THROW_LAST_ERROR_IF(!conout);
-
-    const HANDLE consoleIn = conin.get();
-    const HANDLE consoleOut = conout.get();
-
-    // Save/restore console state.
-    DWORD originalInMode{};
-    DWORD originalOutMode{};
-    const UINT originalOutCP = GetConsoleOutputCP();
-    const UINT originalInCP = GetConsoleCP();
-
-    THROW_LAST_ERROR_IF(!GetConsoleMode(consoleIn, &originalInMode));
-    THROW_LAST_ERROR_IF(!GetConsoleMode(consoleOut, &originalOutMode));
-
-    auto restoreConsole = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleIn, originalInMode));
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleOut, originalOutMode));
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(originalOutCP));
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(originalInCP));
-    });
-
-    // Console mode for interactive terminal.
-    DWORD inMode = originalInMode;
-    WI_SetAllFlags(inMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
-    WI_ClearAllFlags(inMode, ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_INSERT_MODE | ENABLE_PROCESSED_INPUT);
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleIn, inMode));
-
-    DWORD outMode = originalOutMode;
-    WI_SetAllFlags(outMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleOut, outMode));
-
-    THROW_LAST_ERROR_IF(!SetConsoleOutputCP(CP_UTF8));
-    THROW_LAST_ERROR_IF(!SetConsoleCP(CP_UTF8));
-
-    auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
-
+    // Configure console for interactive usage.
+    wsl::windows::common::ConsoleState console;
     auto updateTerminalSize = [&]() {
-        CONSOLE_SCREEN_BUFFER_INFOEX infoEx{};
-        infoEx.cbSize = sizeof(infoEx);
-        THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(consoleOut, &infoEx));
-
-        LOG_IF_FAILED(process.Get().ResizeTty(
-            infoEx.srWindow.Bottom - infoEx.srWindow.Top + 1, infoEx.srWindow.Right - infoEx.srWindow.Left + 1));
+        const auto windowSize = console.GetWindowSize();
+        LOG_IF_FAILED(process.Get().ResizeTty(windowSize.Y, windowSize.X));
     };
 
     // Start input relay thread to forward console input to TTY
     // Runs in parallel with output relay (main thread)
+    auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread([&] {
         try
         {
-            wsl::windows::common::relay::StandardInputRelay(consoleIn, ttyIn.get(), updateTerminalSize, exitEvent.get());
+            wsl::windows::common::relay::StandardInputRelay(
+                GetStdHandle(STD_INPUT_HANDLE), ttyIn.get(), updateTerminalSize, exitEvent.get());
         }
         catch (...)
         {
@@ -205,7 +163,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     });
 
     // Relay tty output -> console (blocks until output ends).
-    wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), consoleOut, exitEvent.get());
+    wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
 
     process.GetExitEvent().wait();
 
@@ -341,17 +299,8 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
 
 static void PullImpl(IWSLASession& Session, const std::string& Image)
 {
-    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     // Configure console for interactive usage.
-    DWORD OriginalOutputMode{};
-    UINT OriginalOutputCP = GetConsoleOutputCP();
-    THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
-
-    DWORD OutputMode = OriginalOutputMode;
-    WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-    THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
-
-    THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
+    wsl::windows::common::ConsoleState console;
 
     // TODO: Handle terminal resizes.
     class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") Callback
@@ -467,54 +416,23 @@ static int Pull(std::wstring_view commandLine)
 
 static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
 {
-    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
     auto exitEvent = Process.GetExitEvent();
 
     if (Tty)
     {
-        // Save original console modes so they can be restored on exit.
-        DWORD OriginalInputMode{};
-        DWORD OriginalOutputMode{};
-        UINT OriginalOutputCP = GetConsoleOutputCP();
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
-
-        auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            SetConsoleMode(Stdin, OriginalInputMode);
-            SetConsoleMode(Stdout, OriginalOutputMode);
-            SetConsoleOutputCP(OriginalOutputCP);
-        });
-
         // Configure console for interactive usage.
-        DWORD InputMode = OriginalInputMode;
-        WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
-        WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
-
-        DWORD OutputMode = OriginalOutputMode;
-        WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
-
-        THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
-
+        wsl::windows::common::ConsoleState console;
         auto processTty = Process.GetStdHandle(WSLAFDTty);
-
-        // TODO: Study a single thread for both handles.
 
         // Create a thread to relay stdin to the pipe.
         std::thread inputThread([&]() {
-            auto updateTerminal = [&Stdout, &Process, &processTty]() {
-                CONSOLE_SCREEN_BUFFER_INFOEX info{};
-                info.cbSize = sizeof(info);
-
-                THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
-
-                LOG_IF_FAILED(Process.Get().ResizeTty(
-                    info.srWindow.Bottom - info.srWindow.Top + 1, info.srWindow.Right - info.srWindow.Left + 1));
+            auto updateTerminal = [&console, &Process]() {
+                const auto windowSize = console.GetWindowSize();
+                LOG_IF_FAILED(Process.Get().ResizeTty(windowSize.Y, windowSize.X));
             };
 
-            wsl::windows::common::relay::StandardInputRelay(Stdin, processTty.get(), updateTerminal, exitEvent.get());
+            wsl::windows::common::relay::StandardInputRelay(
+                GetStdHandle(STD_INPUT_HANDLE), processTty.get(), updateTerminal, exitEvent.get());
         });
 
         auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -523,7 +441,7 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
         });
 
         // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(processTty.get(), Stdout);
+        wsl::windows::common::relay::InterruptableRelay(processTty.get(), GetStdHandle(STD_OUTPUT_HANDLE));
 
         // Wait for the process to exit.
         THROW_LAST_ERROR_IF(WaitForSingleObject(exitEvent.get(), INFINITE) != WAIT_OBJECT_0);
@@ -549,8 +467,10 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
         {
             // TODO: Will output CR instead of LF's which can confuse the linux app.
             // Consider a custom relay logic to fix this.
-            inputThread = std::thread{
-                [&]() { wsl::windows::common::relay::InterruptableRelay(Stdin, Process.GetStdHandle(0).get(), exitEvent.get()); }};
+            inputThread = std::thread{[&]() {
+                wsl::windows::common::relay::InterruptableRelay(
+                    GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0).get(), exitEvent.get());
+            }};
         }
         else
         {
