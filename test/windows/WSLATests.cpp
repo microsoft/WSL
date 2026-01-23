@@ -35,6 +35,7 @@ DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 static std::filesystem::path storagePath;
 
 extern std::wstring g_testDataPath;
+extern bool g_fastTestRun;
 
 class WSLATests
 {
@@ -54,14 +55,36 @@ class WSLATests
         storagePath = std::filesystem::current_path() / "test-storage";
 
         auto session = CreateSession();
-        VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr, nullptr));
-        VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
+
+        wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+        VERIFY_SUCCEEDED(session->ListImages(&images, images.size_address<ULONG>()));
+
+        auto hasImage = [&](const std::string& imageName) {
+            return std::ranges::any_of(
+                images.get(), images.get() + images.size(), [&](const auto& e) { return e.Image == imageName; });
+        };
+
+        if (!hasImage("debian:latest"))
+        {
+            VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr, nullptr));
+        }
+
+        if (!hasImage("python:3.12-alpine"))
+        {
+            VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
+        }
+
+        // Hacky way to delete all containers.
+        // TODO: Replace with the --rm flag once available.
+        ExpectCommandResult(session.get(), {"/usr/bin/docker", "container", "prune", "-f"}, 0);
+
         return true;
     }
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
-        if (!storagePath.empty())
+        // Keep the VHD when running in -f mode, to speed up subsequent test runs.
+        if (!g_fastTestRun && !storagePath.empty())
         {
             std::error_code error;
             std::filesystem::remove_all(storagePath, error);
@@ -1436,6 +1459,7 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> container;
             VERIFY_SUCCEEDED(session->CreateContainer(&options, &container, nullptr));
+            VERIFY_SUCCEEDED(container->Delete());
         }
     }
 
@@ -1472,7 +1496,6 @@ class WSLATests
             {
                 WSLAContainerLauncher launcher("debian:latest", "exited-container", "echo", {"OK"});
                 auto container = launcher.Launch(*session);
-                container.SetDeleteOnClose(false); // TODO: Remove once --rm is available.
                 auto process = container.GetInitProcess();
 
                 ValidateProcessOutput(process, {{1, "OK\n"}});
@@ -1486,9 +1509,7 @@ class WSLATests
 
             // Verify that the container is in running state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            expectContainerList(
-                {{"exited-container", "debian:latest", WslaContainerStateExited},
-                 {"test-container-1", "debian:latest", WslaContainerStateRunning}});
+            expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateRunning}});
 
             // Kill the container init process and expect it to be in exited state.
             auto initProcess = container.GetInitProcess();
@@ -1504,9 +1525,7 @@ class WSLATests
 
             // Expect the container to be in exited state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
-            expectContainerList(
-                {{"exited-container", "debian:latest", WslaContainerStateExited},
-                 {"test-container-1", "debian:latest", WslaContainerStateExited}});
+            expectContainerList({{"test-container-1", "debian:latest", WslaContainerStateExited}});
 
             // Open a new reference to the same container.
             wil::com_ptr<IWSLAContainer> sameContainer;
@@ -1535,18 +1554,14 @@ class WSLATests
 
             // TODO: Once 'container run' is split into 'container create' + 'container start',
             // validate that Stop() on a container in 'Created' state returns ERROR_INVALID_STATE.
-
-            expectContainerList(
-                {{"exited-container", "debian:latest", WslaContainerStateExited},
-                 {"test-container-2", "debian:latest", WslaContainerStateExited}});
+            expectContainerList({{"test-container-2", "debian:latest", WslaContainerStateExited}});
 
             // Verify that the container is in exited state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that deleting a container stopped via Stop() works.
             VERIFY_SUCCEEDED(container.Get().Delete());
-
-            expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
+            expectContainerList({});
         }
 
         // Verify that trying to open a non existing container fails.
@@ -1583,9 +1598,7 @@ class WSLATests
                 std::chrono::milliseconds{100},
                 std::chrono::seconds{30});
 
-            expectContainerList(
-                {{"exited-container", "debian:latest", WslaContainerStateExited},
-                 {"test-unique-name", "debian:latest", WslaContainerStateExited}});
+            expectContainerList({{"test-unique-name", "debian:latest", WslaContainerStateExited}});
 
             // Verify that calling Stop() on exited containers is a no-op and state remains as WslaContainerStateExited.
             VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
@@ -1601,7 +1614,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers don't show up in the container list.
-            expectContainerList({{"exited-container", "debian:latest", WslaContainerStateExited}});
+            expectContainerList({});
 
             // Verify that the same name can be reused now that the container is deleted.
             WSLAContainerLauncher otherLauncher(
@@ -1648,6 +1661,10 @@ class WSLATests
             auto container = launcher.Launch(*session);
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            // Delete the container to avoid leaving it dangling after test completion.
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete());
 
             // Terminate the session
             session.reset();
@@ -2407,6 +2424,61 @@ class WSLATests
             insert(input, 12, "foo");
 
             VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
+        }
+    }
+
+    TEST_METHOD(ContainerRecoveryFromStorage)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        std::string containerName = "test-container";
+
+        // Phase 1: Create session and container, then stop the container
+        {
+            auto session = CreateSession();
+
+            // Create and start a container
+            WSLAContainerLauncher launcher("debian:latest", containerName.c_str(), "/bin/echo", {"OK"});
+
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+
+            // Stop the container so it can be recovered and deleted later
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+        }
+
+        // Phase 2: Create new session from same storage, recover and delete container
+        {
+            auto session = CreateSession();
+
+            // Try to open the container from the previous session
+            wil::com_ptr<IWSLAContainer> recoveredContainer;
+            VERIFY_SUCCEEDED(session->OpenContainer(containerName.c_str(), &recoveredContainer));
+
+            // Verify container state
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_SUCCEEDED(recoveredContainer->GetState(&state));
+            VERIFY_ARE_EQUAL(state, WslaContainerStateExited);
+
+            // Delete the container
+            VERIFY_SUCCEEDED(recoveredContainer->Delete());
+
+            // Verify container is no longer accessible
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Phase 3: Create new session from same storage, verify the container is not listed.
+        {
+            auto session = CreateSession();
+
+            // Verify container is no longer accessible
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         }
     }
 
