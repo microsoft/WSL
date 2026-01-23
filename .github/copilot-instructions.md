@@ -196,7 +196,7 @@ debugConsole=true
 ### Common Debugging Commands
 - Debug shell: `wsl --debug-shell`  
 - Collect WSL logs: `powershell diagnostics\collect-wsl-logs.ps1`
-- Network logs: `powershell diagnostics\collect-networking-logs.ps1`
+- Network logs: `powershell diagnostics\collect-wsl-logs.ps1 -LogProfile networking`
 
 ## Critical Timing and Timeout Guidelines
 
