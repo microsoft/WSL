@@ -61,7 +61,13 @@ try
     // Ensure that the other end of the pipe has connected if required.
     if (connectPipe)
     {
-        wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000), {exitEvent.get()});
+        std::vector<HANDLE> exitEvents;
+        if (exitEvent)
+        {
+            exitEvents.push_back(exitEvent.get());
+        }
+
+        wsl::windows::common::helpers::ConnectPipe(pipe.get(), (15 * 1000), exitEvents);
     }
 
     // Perform the requested operation.
