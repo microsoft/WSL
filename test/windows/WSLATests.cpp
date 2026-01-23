@@ -840,16 +840,13 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // TODO: Enable again once socat is available in the runtime VHD.
-        LogSkipped("Skipping test since socat is required in the runtime VHD");
-        return;
+        auto session = CreateSession();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.RootVhdOverride = testVhd.c_str(); // socat is required to run this test case.
-        settings.RootVhdTypeOverride = "ext4";
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        // Install socat in the container.
+        //
+        // TODO: revisit this in the future to avoid pulling packages from the network.
+        auto installSocat = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", "tdnf install socat -y"}).Launch(*session);
+        ValidateProcessOutput(installSocat, {});
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
