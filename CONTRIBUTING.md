@@ -53,12 +53,17 @@ Install [WPR](https://learn.microsoft.com/windows-hardware/test/wpt/windows-perf
 To collect WSL networking logs, do the following steps in an administrative powershell prompt:
 
 ```
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-networking-logs.ps1" -OutFile collect-networking-logs.ps1
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/microsoft/WSL/master/diagnostics/collect-wsl-logs.ps1" -OutFile collect-wsl-logs.ps1
 Set-ExecutionPolicy Bypass -Scope Process -Force
-.\collect-networking-logs.ps1
+.\collect-wsl-logs.ps1 -LogProfile networking
 ```
 The script will output when log collection starts. Reproduce the problem, then press any key to stop the log collection.
 The script will output the path of the log file once done.
+
+For additional network creation logs (restarts WSL), use:
+```
+.\collect-wsl-logs.ps1 -LogProfile networking -RestartWslReproMode
+```
 
 <!-- Preserving anchors -->
 <div id="8-detailed-logs"></div>
@@ -81,9 +86,9 @@ The script will output the path of the log file once done.
 
 For specific scenarios, you can use different log profiles:
 - `.\collect-wsl-logs.ps1 -LogProfile storage` - Enhanced storage tracing
-- `.\collect-wsl-logs.ps1 -LogProfile networking` - Networking-focused tracing
+- `.\collect-wsl-logs.ps1 -LogProfile networking` - Comprehensive networking tracing (includes packet capture, tcpdump, etc.)
+- `.\collect-wsl-logs.ps1 -LogProfile networking -RestartWslReproMode` - Networking tracing with WSL restart for network creation logs
 - `.\collect-wsl-logs.ps1 -LogProfile hvsocket` - HvSocket-specific tracing
-- `.\collect-networking-logs.ps1` - Alternative script for networking tracing
 
 ### 10) Reporting a Windows crash (BSOD)
 
