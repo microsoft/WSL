@@ -2149,7 +2149,7 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
     {
         // Generate a new unique tag for the share.
         //
-        // N.B. The tag can be maximum 36 characters long so a GUID withouts braces fits perfectly.
+        // N.B. The tag can be maximum 36 characters long so a GUID without braces fits perfectly.
         GUID tagGuid{};
         THROW_IF_FAILED(CoCreateGuid(&tagGuid));
 
