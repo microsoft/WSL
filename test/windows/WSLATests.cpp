@@ -350,6 +350,33 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ListImages)
+    {
+        WSL2_TEST_ONLY();
+
+        // TODO: Add more test coverage once ListImages() is fully implemented.
+
+        // Validate that images with multiple tags are correctly returned.
+        auto session = CreateSession();
+        ExpectImagePresent(*session, "debian:latest");
+
+        ExpectCommandResult(session.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
+
+        auto cleanup = wil::scope_exit([&]() {
+            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Force = false, .NoPrune = false};
+
+            wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+            VERIFY_SUCCEEDED(session->DeleteImage(&options, &deletedImages, deletedImages.size_address<DWORD>(), nullptr));
+        });
+
+        ExpectImagePresent(*session, "debian:test-list-images");
+        ExpectImagePresent(*session, "debian:latest");
+
+        cleanup.reset();
+        ExpectImagePresent(*session, "debian:test-list-images", false);
+        ExpectImagePresent(*session, "debian:latest");
+    }
+
     // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {

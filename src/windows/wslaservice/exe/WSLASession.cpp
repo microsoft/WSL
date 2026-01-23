@@ -508,25 +508,28 @@ try
 
     auto images = m_dockerClient->ListImages();
 
-    auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(images.size());
+    // Compute the number of entries.
+    auto entries = std::accumulate<decltype(images.begin()), size_t>(
+        images.begin(), images.end(), 0, [](auto sum, const auto& e) { return sum + e.RepoTags.size(); });
+
+    auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(entries);
 
     size_t index = 0;
     for (const auto& e : images)
     {
-        // TODO: Find a better way to encode tags;
         // TODO: download_timestamp
-        if (!e.RepoTags.empty())
+        for (const auto& tag : e.RepoTags)
         {
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e.RepoTags[0].c_str()) != 0);
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+            output[index].Size = e.Size;
+            index++;
         }
-
-        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
-        output[index].Size = e.Size;
-
-        index++;
     }
 
-    *Count = static_cast<ULONG>(images.size());
+    WI_ASSERT(index == entries);
+
+    *Count = static_cast<ULONG>(entries);
     *Images = output.release();
     return S_OK;
 }
