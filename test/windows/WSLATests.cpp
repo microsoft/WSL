@@ -1472,6 +1472,7 @@ class WSLATests
             {
                 WSLAContainerLauncher launcher("debian:latest", "exited-container", "echo", {"OK"});
                 auto container = launcher.Launch(*session);
+                container.SetDeleteOnClose(false); // TODO: Remove once --rm is available.
                 auto process = container.GetInitProcess();
 
                 ValidateProcessOutput(process, {{1, "OK\n"}});
