@@ -323,7 +323,6 @@ class WSLATests
 
         auto settings = GetDefaultSessionSettings();
         settings.DisplayName = L"wsla-pull-image-test";
-        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         auto session = CreateSession(settings);
 
@@ -414,13 +413,13 @@ class WSLATests
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
     }
+
     TEST_METHOD(DeleteImage)
     {
         WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings();
         settings.DisplayName = L"wsla-delete-image-test";
-        settings.NetworkingMode = WSLANetworkingModeNAT;
 
         auto session = CreateSession(settings);
 
@@ -1344,10 +1343,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         // Test a simple container start.
         {
@@ -1467,10 +1463,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
@@ -1679,10 +1672,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
@@ -1806,10 +1796,7 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         // Create a container.
         WSLAContainerLauncher launcher(
@@ -1937,10 +1924,7 @@ class WSLATests
 
     void RunPortMappingsTest(WSLA_CONTAINER_NETWORK_TYPE Mode)
     {
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
-
-        auto session = CreateSession(settings);
+        auto session = CreateSession();
 
         auto expectBoundPorts = [&](RunningWSLAContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
             auto ports = Container.Inspect().HostConfig.PortBindings;
@@ -2132,7 +2116,6 @@ class WSLATests
         });
 
         auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
         WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
@@ -2190,7 +2173,7 @@ class WSLATests
         ValidateContainerVolumes(true);
     }
 
-    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnError)
+    void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)
     {
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
@@ -2207,9 +2190,9 @@ class WSLATests
         });
 
         auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
         settings.StoragePath = storage.c_str();
         settings.MaximumStorageSizeMb = 1024;
+        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
 
@@ -2225,6 +2208,16 @@ class WSLATests
 
         // Verify that the first volume was mounted before the error occurred, then unmounted after failure.
         ExpectMount(session.get(), "/mnt/wsla/test-container/volumes/0", {});
+    }
+
+    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnError)
+    {
+        ValidateContainerVolumeUnmountAllFoldersOnError(false);
+    }
+
+    TEST_METHOD(ContainerVolumeUnmountAllFoldersOnErrorVirtioFs)
+    {
+        ValidateContainerVolumeUnmountAllFoldersOnError(true);
     }
 
     TEST_METHOD(LineBasedReader)
