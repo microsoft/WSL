@@ -32,6 +32,8 @@ public:
     void SetDeleteOnClose(bool deleteOnClose);
     void Reset();
     docker_schema::InspectContainer Inspect();
+    std::string Id();
+    std::string Name();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;
@@ -47,7 +49,7 @@ public:
 
     WSLAContainerLauncher(
         const std::string& Image,
-        const std::string& Name,
+        const std::string& Name = "",
         const std::string& EntryPoint = "",
         const std::vector<std::string>& Arguments = {},
         const std::vector<std::string>& Environment = {},

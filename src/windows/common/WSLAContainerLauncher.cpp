@@ -64,6 +64,22 @@ void RunningWSLAContainer::SetDeleteOnClose(bool deleteOnClose)
     m_deleteOnClose = deleteOnClose;
 }
 
+std::string RunningWSLAContainer::Id()
+{
+    WSLAContainerId id{};
+    THROW_IF_FAILED(m_container->GetId(id));
+
+    return id;
+}
+
+std::string RunningWSLAContainer::Name()
+{
+    wil::unique_cotaskmem_ansistring name;
+    THROW_IF_FAILED(m_container->GetName(&name));
+
+    return name.get();
+}
+
 WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& Image,
     const std::string& Name,
@@ -112,7 +128,12 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 {
     WSLA_CONTAINER_OPTIONS options{};
     options.Image = m_image.c_str();
-    options.Name = m_name.c_str();
+
+    if (!m_name.empty())
+    {
+        options.Name = m_name.c_str();
+    }
+
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
@@ -146,7 +167,7 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
     return std::move(container.value());
 }
 
-wsl::windows::common::docker_schema::InspectContainer wsl::windows::common::RunningWSLAContainer::Inspect()
+wsl::windows::common::docker_schema::InspectContainer RunningWSLAContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(m_container->Inspect(&output));

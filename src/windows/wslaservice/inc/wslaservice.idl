@@ -22,9 +22,11 @@ cpp_quote("#endif")
 
 #define WSLA_MAX_CONTAINER_NAME_LENGTH 255
 #define WSLA_MAX_IMAGE_NAME_LENGTH 255
+#define WSLA_CONTAINER_ID_LENGTH 64
 
 cpp_quote("#define WSLA_MAX_CONTAINER_NAME_LENGTH 255")
 cpp_quote("#define WSLA_MAX_IMAGE_NAME_LENGTH 255")
+cpp_quote("#define WSLA_CONTAINER_ID_LENGTH 64")
 
 typedef
 struct _WSLA_VERSION {
@@ -283,6 +285,8 @@ typedef enum _WSLALogsFlags
     WSLALogsFlagsTimestamps = 2,
 } WSLALogsFlags;
 
+typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
+
 [
     uuid(7577FE8D-DE85-471E-B870-11669986F332),
     pointer_default(unique),
@@ -298,6 +302,8 @@ interface IWSLAContainer : IUnknown
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT GetId([out, string] WSLAContainerId Id);
+    HRESULT GetName([out, string] LPSTR* Name);
 
     // Anonymous host port allocation (P1).
     //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
@@ -342,7 +348,7 @@ interface IWSLASession : IUnknown
 
     // Container management.
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
-    HRESULT OpenContainer([in] LPCSTR Name, [out] IWSLAContainer** Container);
+    HRESULT OpenContainer([in] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
@@ -396,3 +402,4 @@ interface IWSLASessionManager : IUnknown
 
 cpp_quote("#define WSLA_E_BASE (0x0600)")
 cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")
+cpp_quote("#define WSLA_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 2) /* 0x80040602 */")

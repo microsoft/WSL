@@ -1343,7 +1343,7 @@ class WSLATests
         SKIP_TEST_ARM64();
 
         auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.NetworkingMode = WSLANetworkingModeNone;
 
         auto session = CreateSession(settings);
 
@@ -1457,6 +1457,92 @@ class WSLATests
             wil::com_ptr<IWSLAContainer> container;
             VERIFY_SUCCEEDED(session->CreateContainer(&options, &container, nullptr));
             VERIFY_SUCCEEDED(container->Delete());
+        }
+    }
+
+    TEST_METHOD(OpenContainer)
+    {
+        WSL2_TEST_ONLY();
+
+        auto settings = GetDefaultSessionSettings();
+        settings.NetworkingMode = WSLANetworkingModeNone;
+
+        auto session = CreateSession(settings);
+
+        auto expectOpen = [&](const char* Id, HRESULT expectedResult = S_OK) {
+            wil::com_ptr<IWSLAContainer> container;
+            auto result = session->OpenContainer(Id, &container);
+
+            VERIFY_ARE_EQUAL(result, expectedResult);
+
+            return container;
+        };
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "named-container", "echo", {"OK"});
+            auto [result, container] = launcher.CreateNoThrow(*session);
+            VERIFY_SUCCEEDED(result);
+
+            VERIFY_ARE_EQUAL(container->Id().length(), WSLA_CONTAINER_ID_LENGTH);
+
+            VERIFY_ARE_EQUAL(container->Name(), "named-container");
+
+            // Validate that the container can be opened by name.
+            expectOpen("named-container");
+
+            // Validate that the container can be opened by ID.
+            expectOpen(container->Id().c_str());
+
+            // Validate that the container can be opened by a prefix of the ID.
+            expectOpen(container->Id().substr(0, 8).c_str());
+            expectOpen(container->Id().substr(0, 1).c_str());
+
+            // Validate that prefix conflicts are correctly handled.
+            std::vector<RunningWSLAContainer> createdContainers;
+            createdContainers.emplace_back(std::move(container.value()));
+
+            auto findConflict = [&]() {
+                for (auto& e : createdContainers)
+                {
+                    auto firstChar = e.Id()[0];
+
+                    if (std::ranges::count_if(createdContainers, [&](auto& container) { return container.Id()[0] == firstChar; }) > 1)
+                    {
+                        return firstChar;
+                    }
+                }
+
+                return '\0';
+            };
+
+            // Create containers until we get two containers with the same first character in their ID.
+            while (true)
+            {
+                VERIFY_IS_LESS_THAN(createdContainers.size(), 16);
+
+                auto [result, newContainer] = WSLAContainerLauncher("debian:latest").CreateNoThrow(*session);
+                VERIFY_SUCCEEDED(result);
+
+                createdContainers.emplace_back(std::move(newContainer.value()));
+                char conflictChar = findConflict();
+                if (conflictChar == '\0')
+                {
+                    continue;
+                }
+
+                expectOpen(std::string{&conflictChar, 1}.c_str(), WSLA_E_CONTAINER_PREFIX_AMBIGUOUS);
+                break;
+            }
+        }
+
+        // Test error paths
+        {
+            expectOpen("", E_INVALIDARG);
+            expectOpen("non-existing-container", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            expectOpen("/", HRESULT_FROM_WIN32(E_INVALIDARG));
+            expectOpen("?foo=bar", HRESULT_FROM_WIN32(E_INVALIDARG));
+            expectOpen("\n", HRESULT_FROM_WIN32(E_INVALIDARG));
+            expectOpen(" ", HRESULT_FROM_WIN32(E_INVALIDARG));
         }
     }
 

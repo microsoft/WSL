@@ -144,6 +144,8 @@ public:
     IFACEMETHOD(Start)() override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
+    IFACEMETHOD(GetId)(_Out_ WSLAContainerId Id) override;
+    IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
 
 private:
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;
