@@ -570,7 +570,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     }
     else
     {
-        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), true, m_guestDeviceManager, m_userToken);
+        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), false, m_guestDeviceManager, m_userToken);
     }
 
     m_networkEngine->Initialize();
