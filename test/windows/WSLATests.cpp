@@ -469,7 +469,7 @@ class WSLATests
 
             auto settings = GetDefaultSessionSettings();
             settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
-            WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsEarlyBootDmesg, earlyBootLogging);
+            WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
             std::vector<char> dmesgContent;
             auto readDmesg = [read = read.get(), &dmesgContent]() mutable {
@@ -639,7 +639,7 @@ class WSLATests
 
         auto settings = GetDefaultSessionSettings();
         settings.NetworkingMode = mode;
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
 
         auto session = CreateSession(settings);
 
@@ -947,7 +947,7 @@ class WSLATests
     void ValidateWindowsMounts(bool enableVirtioFs)
     {
         auto settings = GetDefaultSessionSettings();
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
 
@@ -2121,7 +2121,7 @@ class WSLATests
         });
 
         auto settings = GetDefaultSessionSettings();
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
 
@@ -2197,7 +2197,7 @@ class WSLATests
         auto settings = GetDefaultSessionSettings();
         settings.StoragePath = storage.c_str();
         settings.MaximumStorageSizeMb = 1024;
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
 
