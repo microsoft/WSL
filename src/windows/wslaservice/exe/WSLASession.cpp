@@ -38,6 +38,25 @@ std::pair<std::string, std::string> ParseImage(const std::string& Input)
 
     return {Input.substr(0, separator), Input.substr(separator + 1)};
 }
+
+bool IsContainerNameValid(LPCSTR Name)
+{
+    size_t length = 0;
+    const auto& locale = std::locale::classic();
+    while (*Name != '\0')
+    {
+        if (!std::isalnum(*Name, locale) && *Name != '_' && *Name != '-' && *Name != '.')
+        {
+            return false;
+        }
+
+        Name++;
+        length++;
+    }
+
+    return length > 0 && length <= WSLA_MAX_CONTAINER_NAME_LENGTH;
+}
+
 } // namespace
 
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated) :
@@ -619,8 +638,13 @@ try
     std::lock_guard lock{m_lock};
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    // Validate that name & images are within length limits.
-    RETURN_HR_IF(E_INVALIDARG, containerOptions->Name != nullptr && strlen(containerOptions->Name) > WSLA_MAX_CONTAINER_NAME_LENGTH);
+    // Validate that name & images are valid.
+    RETURN_HR_IF_MSG(
+        E_INVALIDARG,
+        containerOptions->Name != nullptr && !IsContainerNameValid(containerOptions->Name),
+        "Invalid container name: %hs",
+        containerOptions->Name);
+
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     // TODO: Log entrance into the function.
@@ -665,16 +689,39 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::OpenContainer(LPCSTR Name, IWSLAContainer** Container)
+HRESULT WSLASession::OpenContainer(LPCSTR Id, IWSLAContainer** Container)
 try
 {
-    // TODO: Rethink name / id usage here.
+    THROW_HR_IF_MSG(E_INVALIDARG, !IsContainerNameValid(Id), "Invalid container name: %hs", Id);
+
+    // Look for an exact ID match first.
     std::lock_guard lock{m_lock};
-    auto it = std::ranges::find_if(m_containers, [Name](const auto& e) { return e->Name() == Name; });
-    RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_containers.end(), "Container not found: '%hs'", Name);
+    auto it = std::ranges::find_if(m_containers, [Id](const auto& e) { return e->ID() == Id; });
+
+    // If no match is found, call Inspect() so that partial IDs and names are matched.
+    if (it == m_containers.end())
+    {
+        // TODO: consider a trimmed down version of inspect to avoid parsing the full response.
+        docker_schema::InspectContainer inspectResult;
+
+        try
+        {
+            inspectResult = wsl::shared::FromJson<docker_schema::InspectContainer>(m_dockerClient->InspectContainer(Id).c_str());
+        }
+        catch (DockerHTTPException& e)
+        {
+            RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), e.StatusCode() == 404, "Container not found: '%hs'", Id);
+            RETURN_HR_IF_MSG(WSLA_E_CONTAINER_PREFIX_AMBIGUOUS, e.StatusCode() == 400, "Ambiguous prefix: '%hs'", Id);
+
+            THROW_HR_MSG(E_FAIL, "Unexpected error inspecting container '%hs': %hs", Id, e.what());
+        }
+
+        it = std::ranges::find_if(m_containers, [&](const auto& e) { return e->ID() == inspectResult.Id; });
+        RETURN_HR_IF_MSG(
+            E_UNEXPECTED, it == m_containers.end(), "Resolved container ID (%hs -> %hs) not found", Id, inspectResult.Id.c_str());
+    }
 
     THROW_IF_FAILED((*it)->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
-
     return S_OK;
 }
 CATCH_RETURN();

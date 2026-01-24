@@ -814,3 +814,26 @@ HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, U
 
     return CallImpl(&WSLAContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }
+
+HRESULT WSLAContainer::GetId(WSLAContainerId Id)
+try
+{
+    auto [lock, impl] = LockImpl();
+    WI_VERIFY(strcpy_s(Id, std::size<char>(WSLAContainerId{}), impl->ID().c_str()) == 0);
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLAContainer::GetName(LPSTR* Name)
+try
+{
+    *Name = nullptr;
+
+    auto [lock, impl] = LockImpl();
+
+    *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN();
