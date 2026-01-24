@@ -150,4 +150,4 @@ public:
 private:
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;
 };
-} // namespace wsl::windows::service::wslaB
+} // namespace wsl::windows::service::wsla
