@@ -1421,7 +1421,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Memoria y procesador</value>
   </data>
   <data name="Settings_MemorySize.Header" xml:space="preserve">
-    <value>Cantidad de  memoria</value>
+    <value>Cantidad de memoria</value>
   </data>
   <data name="Settings_MemorySize.Description" xml:space="preserve">
     <value>Cantidad de memoria que se asignará a la VM de WSL2.</value>
