@@ -1,6 +1,7 @@
 set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
+    ConsoleState.cpp
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
@@ -32,7 +33,6 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
-    ConsoleState.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -74,6 +74,7 @@ set(HEADERS
     ../inc/wslrelay.h
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
+    ConsoleState.h
     DeviceHostProxy.h
     disk.hpp
     Distribution.h
@@ -107,7 +108,6 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
-    ConsoleState.h
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h
