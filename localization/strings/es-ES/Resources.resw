@@ -1519,7 +1519,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked}Uri to the Working across Windows and Linux file systems documentation</comment>
   </data>
   <data name="Settings_OOBEDisplayName" xml:space="preserve">
-    <value>Te damos la bienvenida al Subsistema de Windows para Linux</value>
+    <value>Le damos la bienvenida al Subsistema de Windows para Linux</value>
   </data>
   <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
     <value>WSL es una excelente forma de probar distintas distribuciones de Linux.</value>
@@ -1622,7 +1622,7 @@ Tómese un momento para ver algunas de las características favoritas de la comu
 Los binarios de Linux que se ejecutan en WSL pueden usar automáticamente su GPU en Windows para acelerar el rendimiento. Solo necesita instalar y ejecutar esos flujos de trabajo de la misma forma que lo haría en una máquina Linux normal. Hay muchas maneras de empezar, desde ejecutar CUDA en un contenedor de Docker si tiene una tarjeta gráfica NVIDIA, hasta ejecutar PyTorch o TensorFlow con DirectML en su tarjeta gráfica AMD, Intel o NVIDIA. Consulte nuestra guía de primeros pasos a continuación para obtener más información.</value>
   </data>
   <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
-    <value>Aceleración de GPU</value>
+    <value>Aceleración por GPU</value>
   </data>
   <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
     <value>Más información sobre la aceleración de GPU</value>
@@ -1836,7 +1836,7 @@ También puede acceder a más opciones de VS Code Remote a través de la paleta 
     <value>Ruta absoluta de Windows al disco duro virtual de intercambio.</value>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
-    <value>Tamaño del archivo intercambio</value>
+    <value>Tamaño del archivo de intercambio</value>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
     <value>Cuánto espacio de intercambio asignar a la VM de WSL2; 0 para no usar archivo de intercambio. El almacenamiento de intercambio es RAM basada en disco que se usa cuando la demanda de memoria supera el límite del hardware.</value>
@@ -1845,7 +1845,7 @@ También puede acceder a más opciones de VS Code Remote a través de la paleta 
     <value>Restablecer tamaño</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Tamaño del archivo intercambio</value>
+    <value>Tamaño del archivo de intercambio</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Cuánto espacio de intercambio, especificado en megabytes, asignar a la VM de WSL2; 0 para no usar archivo de intercambio. El almacenamiento de intercambio es RAM basada en disco que se usa cuando la demanda de memoria supera el límite del hardware.</value>
