@@ -26,10 +26,8 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
         address,
         route,
         properties.MacAddress,
-        L"unuseddevicename",
         properties.InterfaceConstraint.InterfaceIndex,
-        properties.InterfaceConstraint.InterfaceMediaType,
-        properties.DNSServerList);
+        properties.InterfaceConstraint.InterfaceMediaType);
 }
 
 std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::GetHostEndpointSettings()
@@ -95,16 +93,6 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
         route.NextHopString = windows::common::string::SockAddrInetToWstring(route.NextHop);
     }
 
-    std::wstring dnsServerList;
-    for (const auto& serverAddress : dnsInfo.GetDnsSettings(DnsSettingsFlags::IncludeVpn).Servers)
-    {
-        if (!dnsServerList.empty())
-        {
-            dnsServerList += L",";
-        }
-        dnsServerList += wsl::shared::string::MultiByteToWide(serverAddress);
-    }
-
-    return std::shared_ptr<NetworkSettings>(new NetworkSettings(
-        bestInterface->NetworkGuid, address, route, macAddress, {}, bestInterface->IfIndex, bestInterface->IfType, dnsServerList));
+    return std::make_shared<NetworkSettings>(
+        bestInterface->NetworkGuid, address, route, macAddress, bestInterface->IfIndex, bestInterface->IfType);
 }
