@@ -52,7 +52,6 @@ class WSLATests
         auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
 
         auto vhdPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath");
-        auto testVhd = std::filesystem::path{vhdPath} / "ext4.vhdx";
         storagePath = std::filesystem::current_path() / "test-storage";
 
         defaultSession = CreateSession(GetDefaultSessionSettings(testSessionName, true, WSLANetworkingModeNAT));
@@ -161,7 +160,7 @@ class WSLATests
     {
         WSLAProcessLauncher process(command[0], command);
 
-        return process.Launch(*session).WaitAndCaptureOutput();
+        return process.Launch(*session).WaitAndCaptureOutput(timeout);
     }
 
     static RunningWSLAProcess::ProcessResult ExpectCommandResult(
@@ -2188,7 +2187,6 @@ class WSLATests
         auto settings = GetDefaultSessionSettings(L"volumes-tests", true);
         WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
-        // Reuse the test session if VirtioFS is not enabled to speed up tests.
         auto session = CreateSession(settings);
 
         // Validate both folders exist in the container and that the readonly one cannot be written to.
@@ -2626,7 +2624,7 @@ class WSLATests
             expectSessions({L"session-1", testSessionName});
 
             // Verify that name conflicts are correctly handled.
-            auto settings = GetDefaultSessionSettings(L"session-1", testSessionName);
+            auto settings = GetDefaultSessionSettings(L"session-1");
 
             wil::com_ptr<IWSLASession> session;
             VERIFY_ARE_EQUAL(manager->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
