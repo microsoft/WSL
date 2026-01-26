@@ -293,7 +293,7 @@ and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 is unable to start since virtualization is not enabled on this machine.
-Please ensure the "Virtual Machine Platform" optional component is enabled and virtualization is turned on in your computer's firmware settings
+Please ensure the "Virtual Machine Platform" optional component is enabled and virtualization is turned on in your computer's firmware settings.
 
 Enable "Virtual Machine Platform" by running: wsl.exe --install --no-distribution
 
