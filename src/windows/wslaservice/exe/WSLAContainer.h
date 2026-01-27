@@ -67,6 +67,7 @@ public:
 
     void Start();
 
+    void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
     void Stop(_In_ int Signal, _In_ ULONG TimeoutMs);
     void Delete();
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
@@ -136,6 +137,7 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
+    IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;

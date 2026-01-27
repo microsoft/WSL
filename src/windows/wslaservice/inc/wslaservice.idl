@@ -294,6 +294,7 @@ typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
 ]
 interface IWSLAContainer : IUnknown
 {
+    HRESULT Attach([out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
     HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
     HRESULT Start();
     HRESULT Delete(); // TODO: Look into lifetime logic.

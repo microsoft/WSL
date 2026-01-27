@@ -25,6 +25,7 @@ public:
     LogsRelay() = default;
     ~LogsRelay();
 
+    void AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles);
     void AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle);
 
 private:

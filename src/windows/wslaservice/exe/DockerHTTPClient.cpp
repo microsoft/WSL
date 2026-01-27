@@ -141,7 +141,7 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     std::map<boost::beast::http::field, std::string> headers{
         {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
 
-    auto url = std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1&logs=true", Id);
+    auto url = std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1", Id);
     auto [status, socket] = SendRequest(verb::post, url, {}, {}, headers);
 
     if (status != 101)

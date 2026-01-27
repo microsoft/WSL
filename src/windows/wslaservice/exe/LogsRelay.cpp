@@ -26,12 +26,24 @@ LogsRelay::~LogsRelay()
 
 void LogsRelay::AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle)
 {
+    std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>> handles;
+    handles.emplace_back(std::move(Handle));
+
+    AddHandles(std::move(handles));
+}
+
+void LogsRelay::AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles)
+{
     // Stop the relay thread.
     StopRelayThread();
 
-    // Append the new handle
+    // Append the new handles
     // N.B. IgnoreErrors is set so the IO doesn't stop on individual handle errors.
-    m_io.AddHandle(std::move(Handle), MultiHandleWait::IgnoreErrors);
+
+    for (auto& e : Handles)
+    {
+        m_io.AddHandle(std::move(e), MultiHandleWait::IgnoreErrors);
+    }
 
     // Restart the relay thread.
     StartRelayThread();
