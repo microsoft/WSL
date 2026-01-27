@@ -529,8 +529,6 @@ static void RelayNonTtyProcess(HANDLE Stdin, HANDLE Stdout, HANDLE Stderr)
 
 static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
 {
-    auto exitEvent = Process.GetExitEvent();
-
     if (Tty)
     {
         RelayInteractiveTty(Process, Process.GetStdHandle(WSLAFDTty).get());

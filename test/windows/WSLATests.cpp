@@ -2838,7 +2838,7 @@ class WSLATests
             attachedReader.Expect("line1\n");
 
             // Write content on the attached stdin.
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(originalStdin.get(), "line2\n", 6, nullptr, nullptr));
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.get(), "line2\n", 6, nullptr, nullptr));
 
             // Content should be relayed on both stdouts.
             originalReader.Expect("line1\nline2\n");

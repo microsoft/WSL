@@ -2706,7 +2706,7 @@ void PartialHandleRead::Expect(const std::string& Expected)
 {
     auto content = ReadBytes(Expected.size());
 
-    VERIFY_ARE_EQUAL(m_data, Expected);
+    VERIFY_ARE_EQUAL(content, Expected);
 }
 
 void PartialHandleRead::ExpectClosed(DWORD Timeout)
