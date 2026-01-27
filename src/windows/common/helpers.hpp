@@ -62,7 +62,8 @@ enum class LaunchWslRelayFlags
 {
     None = 0,
     DisableTelemetry = 1,
-    HideWindow = 2
+    HideWindow = 2,
+    ConnectPipe = 4
 };
 
 DEFINE_ENUM_FLAG_OPERATORS(LaunchWslRelayFlags);

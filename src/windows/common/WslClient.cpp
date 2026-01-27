@@ -1501,7 +1501,7 @@ int RunDebugShell()
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(pipe.get(), "\n", 1, nullptr, nullptr));
 
     // Create a thread to relay stdin to the pipe.
-    wsl::windows::common::SvcCommIo Io;
+    wsl::windows::common::ConsoleState Io;
     auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
     std::thread inputThread(
         [&]() { wsl::windows::common::RelayStandardInput(GetStdHandle(STD_INPUT_HANDLE), pipe.get(), {}, exitEvent.get(), &Io); });

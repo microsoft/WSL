@@ -13,7 +13,7 @@ namespace wsl::core {
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, GUID classId, wil::shared_handle userToken);
+    VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
     ~VirtioNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -51,7 +51,6 @@ private:
     bool m_enableLocalhostRelay;
     GUID m_localhostAdapterId;
     GUID m_adapterId;
-    GUID m_virtioNetworkClsid;
 
     std::optional<ULONGLONG> m_interfaceLuid;
     ULONG m_networkMtu = 0;

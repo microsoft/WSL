@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 
 #include <winsock2.h>
-#include "svccommio.hpp"
+#include "ConsoleState.h"
 
 #define LX_RELAY_BUFFER_SIZE 0x1000
 
