@@ -2805,16 +2805,27 @@ class WSLATests
         // Validate attach behavior in a non-tty process.
         {
             WSLAContainerLauncher launcher("debian:latest", "attach-test-1", "/bin/cat", {}, {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout);
-            auto container = launcher.Launch(*m_defaultSession);
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_SUCCEEDED(result);
 
-            auto process = container.GetInitProcess();
-            auto originalStdin = process.GetStdHandle(0);
-            auto originalStdout = process.GetStdHandle(1);
-
+            // Verify that attaching to a created container fails.
             wil::unique_handle attachedStdin;
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_ARE_EQUAL(
+                container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
+                HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Start the container.
+            VERIFY_SUCCEEDED(container->Get().Start());
+
+            // Get its original std handles.
+            auto process = container->GetInitProcess();
+            auto originalStdin = process.GetStdHandle(0);
+            auto originalStdout = process.GetStdHandle(1);
+
+            // Attach to the container with separate handles.
+            VERIFY_SUCCEEDED(container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead originalReader(originalStdout.get());
             PartialHandleRead attachedReader(attachedStdout.get());
@@ -2839,6 +2850,24 @@ class WSLATests
             // Expect both readers to be closed.
             originalReader.ExpectClosed();
             attachedReader.ExpectClosed();
+
+            process.Wait();
+
+            attachedStdin.reset();
+            attachedStdout.reset();
+            attachedStderr.reset();
+
+            // Validate that attaching to an exited container fails.
+            VERIFY_ARE_EQUAL(container->State(), WslaContainerStateExited);
+            VERIFY_ARE_EQUAL(
+                container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr),
+                HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+
+            // Validate that attaching to a deleted container fails.
+            VERIFY_SUCCEEDED(container->Get().Delete());
+            VERIFY_ARE_EQUAL(container->Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr), RPC_E_DISCONNECTED);
+
+            container->SetDeleteOnClose(false);
         }
 
         // Validate that closing an attached stdin terminates the container.
