@@ -18,7 +18,10 @@ Abstract:
 #include "WSLAProcessIO.h"
 
 using wsl::windows::common::relay::DockerIORelayHandle;
+using wsl::windows::common::relay::HandleWrapper;
 using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
+using wsl::windows::common::relay::OverlappedIOHandle;
+using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wsla::VolumeMountInfo;
 using wsl::windows::service::wsla::WSLAContainer;
@@ -253,6 +256,50 @@ const std::string& WSLAContainerImpl::Name() const noexcept
 IWSLAContainer& WSLAContainerImpl::ComWrapper()
 {
     return *m_comWrapper.Get();
+}
+
+void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        m_state != WslaContainerStateRunning,
+        "Cannot attach to container '%hs', state: %i",
+        m_id.c_str(),
+        m_state);
+
+    auto ioHandle = m_dockerClient.AttachContainer(m_id);
+
+    // If this is a TTY process, the PTY handle can be returned directly.
+    if (m_tty)
+    {
+        *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(ioHandle.get())));
+        return;
+    }
+
+    // Otherwise the stream is multiplexed and needs to be relayed.
+    auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+
+    std::vector<std::unique_ptr<OverlappedIOHandle>> handles;
+
+        // This is required for docker to know when stdin is closed.
+    auto onInputComplete = [&]() {
+        LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR);
+    };
+
+    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
+        ioHandle.get(), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+
+    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, std::move(ioHandle)));
+
+    m_logsRelay.AddHandles(std::move(handles));
+
+    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE));
+    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ));
+    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ));
 }
 
 void WSLAContainerImpl::Start()
@@ -755,6 +802,15 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
     COMImplClass<WSLAContainerImpl>(impl), m_onDeleted(std::move(OnDeleted))
 {
+}
+
+HRESULT WSLAContainer::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
+{
+    *Stdin = 0;
+    *Stdout = 0;
+    *Stderr = 0;
+
+    return CallImpl(&WSLAContainerImpl::Attach, Stdin, Stdout, Stderr);
 }
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)

@@ -2781,58 +2781,123 @@ class WSLATests
             wil::unique_handle stderrLogs;
             VERIFY_SUCCEEDED(container.Get().Logs(WSLALogsFlagsFollow, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs, 0, 0, 0));
 
-            std::mutex mutex;
-            std::string availableLogs;
-            auto readLogs = [&]() {
-                std::string buffer(4096, '\0');
-
-                while (true)
-                {
-                    DWORD bytesRead = 0;
-                    if (!ReadFile(stdoutLogs.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
-                    {
-                        VERIFY_ARE_EQUAL(GetLastError(), ERROR_BROKEN_PIPE);
-                    }
-
-                    if (bytesRead == 0)
-                    {
-                        break;
-                    }
-
-                    std::lock_guard lock{mutex};
-                    availableLogs.append(buffer.data(), bytesRead);
-                }
-            };
-
-            auto expect = [&](const std::string& expected) {
-                wsl::shared::retry::RetryWithTimeout<void>(
-                    [&]() {
-                        std::lock_guard lock{mutex};
-
-                        THROW_HR_IF(E_ABORT, availableLogs.size() < expected.size());
-                    },
-                    std::chrono::milliseconds(100),
-                    std::chrono::seconds(60));
-
-                std::lock_guard lock{mutex};
-
-                VERIFY_ARE_EQUAL(availableLogs, expected);
-            };
-
-            std::thread readerThread{readLogs};
+            PartialHandleRead reader(stdoutLogs.get());
 
             auto containerStdin = initProcess.GetStdHandle(0);
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "line1\n", 6, nullptr, nullptr));
 
-            expect("line1\n");
+            reader.Expect("line1\n");
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(containerStdin.get(), "line2\n", 6, nullptr, nullptr));
-            expect("line1\nline2\n");
+            reader.Expect("line1\nline2\n");
 
             containerStdin.reset();
-            readerThread.join();
+            reader.ExpectClosed();
 
             expectLogs(container.Get(), "line1\nline2\n", "");
             expectLogs(container.Get(), "line1\nline2\n", "", WSLALogsFlagsFollow);
+        }
+    }
+
+    TEST_METHOD(ContainerAttach)
+    {
+        WSL2_TEST_ONLY();
+
+        // Validate attach behavior in a non-tty process.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "attach-test-1", "/bin/cat", {}, {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto process = container.GetInitProcess();
+            auto originalStdin = process.GetStdHandle(0);
+            auto originalStdout = process.GetStdHandle(1);
+
+            wil::unique_handle attachedStdin;
+            wil::unique_handle attachedStdout;
+            wil::unique_handle attachedStderr;
+            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+
+            PartialHandleRead originalReader(originalStdout.get());
+            PartialHandleRead attachedReader(attachedStdout.get());
+
+            // Write content on the original stdin.
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(originalStdin.get(), "line1\n", 6, nullptr, nullptr));
+
+            // Content should be relayed on both stdouts.
+            originalReader.Expect("line1\n");
+            attachedReader.Expect("line1\n");
+
+            // Write content on the attached stdin.
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(originalStdin.get(), "line2\n", 6, nullptr, nullptr));
+
+            // Content should be relayed on both stdouts.
+            originalReader.Expect("line1\nline2\n");
+            attachedReader.Expect("line1\nline2\n");
+
+            // Close the original stdin.
+            originalStdin.reset();
+
+            // Expect both readers to be closed.
+            originalReader.ExpectClosed();
+            attachedReader.ExpectClosed();
+        }
+
+        // Validate that closing an attached stdin terminates the container.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "attach-test-2", "/bin/cat", {}, {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout);
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto process = container.GetInitProcess();
+            auto originalStdin = process.GetStdHandle(0);
+            auto originalStdout = process.GetStdHandle(1);
+
+            wil::unique_handle attachedStdin;
+            wil::unique_handle attachedStdout;
+            wil::unique_handle attachedStderr;
+            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+
+            PartialHandleRead originalReader(originalStdout.get());
+            PartialHandleRead attachedReader(attachedStdout.get());
+
+            attachedStdin.reset();
+
+            // Expect both readers to be closed.
+            originalReader.ExpectClosed();
+            attachedReader.ExpectClosed();
+        }
+
+        // Validate behavior for tty containers
+        {
+            WSLAContainerLauncher launcher("debian:latest", "attach-test-3", {"/bin/bash"}, {}, {}, {}, ProcessFlags::None);
+            launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
+            launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            auto originalTty = process.GetStdHandle(WSLAFDTty);
+
+            wil::unique_handle attachedTty;
+            wil::unique_handle dummy;
+            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedTty, (ULONG*)&dummy, (ULONG*)&dummy));
+
+            PartialHandleRead originalReader(originalTty.get());
+            PartialHandleRead attachedReader(attachedTty.get());
+
+            // Read the prompt from the original tty (hardcoded bytes since behavior is constant).
+            auto prompt = originalReader.ReadBytes(13);
+            VerifyPatternMatch(prompt, "*root@*");
+
+            // Resize the tty to force the prompt to redraw.
+            process.Get().ResizeTty(61, 81);
+
+            auto attachedPrompt = attachedReader.ReadBytes(13);
+            VerifyPatternMatch(attachedPrompt, "*root@*");
+
+            // Close the tty.
+            originalTty.reset();
+            attachedTty.reset();
+
+            originalReader.ExpectClosed();
+            attachedReader.ExpectClosed();
         }
     }
 };

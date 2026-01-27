@@ -2671,3 +2671,64 @@ std::string EscapeString(const std::string& Input)
 
     return Output;
 }
+
+PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
+{
+    m_thread = std::thread(std::bind(&PartialHandleRead::Run, this));
+}
+
+PartialHandleRead::~PartialHandleRead()
+{
+    m_exitEvent.SetEvent();
+    if (m_thread.joinable())
+    {
+        m_thread.join();
+    }
+}
+
+std::string PartialHandleRead::ReadBytes(size_t Length)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&]() {
+            std::lock_guard lock{m_mutex};
+
+            THROW_HR_IF(E_ABORT, m_data.size() < Length);
+        },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(60));
+
+    std::lock_guard lock{m_mutex};
+
+    return m_data.substr(0, Length);
+}
+
+void PartialHandleRead::Expect(const std::string& Expected)
+{
+    auto content = ReadBytes(Expected.size());
+
+    VERIFY_ARE_EQUAL(m_data, Expected);
+}
+
+void PartialHandleRead::ExpectClosed(DWORD Timeout)
+{
+    VERIFY_ARE_EQUAL(WaitForSingleObject(m_thread.native_handle(), Timeout), WAIT_OBJECT_0);
+}
+
+void PartialHandleRead::Run()
+try
+{
+    std::vector<gsl::byte> buffer(4096);
+
+    while (!m_exitEvent.is_signaled())
+    {
+        auto bytesRead = wsl::windows::common::relay::InterruptableRead(m_handle, gsl::make_span(buffer), {m_exitEvent.get()});
+        if (bytesRead == 0)
+        {
+            break;
+        }
+
+        std::lock_guard lock{m_mutex};
+        m_data.append(reinterpret_cast<char*>(buffer.data()), bytesRead);
+    }
+}
+CATCH_LOG();
