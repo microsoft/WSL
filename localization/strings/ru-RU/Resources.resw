@@ -299,10 +299,12 @@
     <value>Устаревшее распределение не поддерживает WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 не поддерживается текущей конфигурацией компьютера.
-Включите дополнительный компонент "Платформа виртуальной машины" и включите виртуализацию в BIOS.
-Чтобы включить компонент "Платформа виртуальной машины", выполните команду wsl.exe --install --no-distribution
-Дополнительные сведения см. на странице https://aka.ms/enablevirtualization</value>
+    <value>Не удалось запустить WSL2, так как на этом компьютере не включена виртуализация.
+Убедитесь, что дополнительный компонент "Платформа виртуальной машины" включен и виртуализация включена в параметрах встроенного ПО компьютера.
+
+Включите "Платформу виртуальной машины", выстроив команду: wsl.exe --install --no-distribution
+
+Дополнительные сведения см. в https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

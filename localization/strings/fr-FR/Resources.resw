@@ -298,9 +298,11 @@ et 'wsl.exe --install &lt;Distro&gt;' à installer.</value>
     <value>La distribution héritée ne prend pas en charge WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 n’est pas pris en charge avec votre configuration d’ordinateur actuelle.
-Activez le composant facultatif « Plateforme d’ordinateur virtuel » et assurez-vous que la virtualisation est activée dans le BIOS.
-Activez « Plateforme d’ordinateur virtuel » en exécutant : wsl.exe --install --no-distribution
+    <value>WSL2 ne peut pas démarrer, car la virtualisation n’est pas activée sur cet ordinateur.
+Vérifiez que le composant facultatif « Plateforme d’ordinateur virtuel » est activé et que la virtualisation est activée dans les paramètres du microprogramme de votre ordinateur.
+
+Activer « Plateforme d’ordinateur virtuel » en exécutant : wsl.exe --install --no-distribution
+
 Pour plus d’informations, visitez https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
