@@ -32,6 +32,18 @@ enum WSLAMountFlags
     WSLAMountFlagsWriteableOverlayFs = 4,
 };
 
+typedef enum _WSLAFdType
+{
+    WSLAFdTypeDefault = 0,
+    WSLAFdTypeTerminalInput = 1,
+    WSLAFdTypeTerminalOutput = 2,
+    WSLAFdTypeLinuxFileInput = 4,
+    WSLAFdTypeLinuxFileOutput = 8,
+    WSLAFdTypeLinuxFileAppend = 16,
+    WSLAFdTypeLinuxFileCreate = 32,
+    WSLAFdTypeTerminalControl = 64,
+} WSLAFdType;
+
 class WSLAVirtualMachine
 {
 public:

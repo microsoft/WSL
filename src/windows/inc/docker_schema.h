@@ -85,6 +85,10 @@ struct CreateContainer
     bool AttachStdin{};
     bool AttachStdout{};
     bool AttachStderr{};
+    bool ArgsEscaped{};
+    std::string User;
+    std::string StopSignal;
+    std::string WorkingDir;
     std::vector<std::string> Cmd;
     std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
     std::vector<std::string> Env;

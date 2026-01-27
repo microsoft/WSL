@@ -35,17 +35,6 @@ struct _WSLA_VERSION {
     ULONG Revision;
 } WSLA_VERSION;
 
-typedef enum _WSLAFdType
-{
-    WSLAFdTypeDefault = 0,
-    WSLAFdTypeTerminalInput = 1,
-    WSLAFdTypeTerminalOutput = 2,
-    WSLAFdTypeLinuxFileInput = 4,
-    WSLAFdTypeLinuxFileOutput = 8,
-    WSLAFdTypeLinuxFileAppend = 16,
-    WSLAFdTypeLinuxFileCreate = 32,
-    WSLAFdTypeTerminalControl = 64,
-} WSLAFdType;
 
 typedef enum _WSLAProcessState
 {
@@ -53,19 +42,6 @@ typedef enum _WSLAProcessState
     WSLAProcessStateRunning,
     WSLAProcessStateExited
 } WSLAProcessState;
-
-typedef struct _WSLA_PROCESS_FD
-{
-    LONG Fd;
-    WSLAFdType Type;
-    [string, unique] LPCSTR Path;
-} WSLA_PROCESS_FD;
-
-typedef
-struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
-   int Errno;
-   int Pid;
-} WSLA_CREATE_PROCESS_RESULT;
 
 typedef enum _WSLAVirtualMachineTerminationReason
 {
@@ -81,13 +57,6 @@ typedef enum _WSLAFD
     WSLAFDStderr = 2,
     WSLAFDTty = 3,
 } WSLAFD;
-
-typedef enum _WSLAFDFlags
-{
-    WSLAFDFlagsNone = 0,
-    WSLAFDFlagsLogs = 1, // Replay previous logs
-    WSLAFDFlagsStream = 2, // Stream new logs.
-} WSLAFDFlags;
 
 typedef enum _WSLASignal
 {
@@ -131,16 +100,26 @@ struct WSLA_IMAGE_INFORMATION
     ULONGLONG DownloadTimestamp;
 };
 
+typedef enum _WSLAProcessFlags
+{
+    WSLAProcessFlagsNone = 0,
+    WSLAProcessFlagsStdin = 1,
+    WSLAProcessFlagsTty = 2
+} WSLAProcessFlags;
+
+typedef struct _WSLAStringArray
+{
+    [unique, size_is(Count)] LPCSTR* Values;
+    ULONG Count;
+} WSLAStringArray;
+
 struct WSLA_PROCESS_OPTIONS
 {
-    [unique] LPCSTR Executable;
     [unique] LPCSTR CurrentDirectory;
-    [size_is(CommandLineCount)] LPCSTR* CommandLine;
-    ULONG CommandLineCount;
-    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
-    ULONG EnvironmentCount;
-    [unique, size_is(FdsCount)] WSLA_PROCESS_FD *Fds;
-    int FdsCount;
+    [unique] LPCSTR User;
+    WSLAStringArray CommandLine;
+    WSLAStringArray Environment;
+    WSLAProcessFlags Flags;
     ULONG TtyRows; // Only needed when tty fd's are passed.
     ULONG TtyColumns;
 };
@@ -176,21 +155,31 @@ struct WSLA_CONTAINER_NETWORK
 enum WSLA_CONTAINER_FLAGS
 {
     WSLA_CONTAINER_FLAG_ENABLE_GPU = 1
-} ;
+};
 
+typedef enum _WSLAContainerFlags
+{
+    WSLAContainerFlagsNone = 0,
+    WSLAContainerFlagsRm = 1,
+    WSLAContainerFlagsGpu = 2,
+    WSLAContainerFlagsAttach = 4,
+} WSLAContainerFlags;
 
 struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
     [unique] LPCSTR Name;
+    [unique] LPCSTR Entrypoint;
     struct WSLA_PROCESS_OPTIONS InitProcessOptions;
     [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
     ULONG VolumesCount;
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
     ULONG PortsCount;
-    DWORD Flags; // GPU, Privileged, ...
+    WSLAContainerFlags Flags;
     // TODO: List specific GPU devices.
-    // TODO: Flags on wether the caller wants to override entrypoint, args, or both.
+    [unique] LPCSTR HostName;
+    [unique] LPCSTR DomainName;
+
     ULONGLONG ShmSize;
     struct WSLA_CONTAINER_NETWORK ContainerNetwork;
 };
@@ -353,7 +342,7 @@ interface IWSLASession : IUnknown
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT CreateRootNamespaceProcess([in] LPCWSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
