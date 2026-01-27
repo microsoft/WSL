@@ -73,7 +73,28 @@ auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
         }
     });
 
-    // Allocate VM ports.
+    // Check if we need to allocate VM ports for bridge mode (VmPort == 0).
+    size_t portsToAllocate = std::count_if(ports.begin(), ports.end(), [](const auto& p) { return p.VmPort == 0; });
+    
+    if (portsToAllocate > 0)
+    {
+        // Allocate VM ports in batch for bridge mode.
+        auto allocatedPorts = vm.AllocatePorts(static_cast<uint16_t>(portsToAllocate));
+        auto allocatedIt = allocatedPorts.begin();
+        
+        for (auto& port : ports)
+        {
+            if (port.VmPort == 0)
+            {
+                WI_ASSERT(allocatedIt != allocatedPorts.end());
+                port.VmPort = *allocatedIt;
+                vmPorts->insert(*allocatedIt);
+                ++allocatedIt;
+            }
+        }
+    }
+
+    // Allocate VM ports for host mode (VmPort != 0).
     for (const auto& port : ports)
     {
         if (vmPorts->find(port.VmPort) == vmPorts->end())
@@ -95,9 +116,8 @@ auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
 }
 
 // Builds port mapping list from container options and returns the network mode string.
-std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(
-    const WSLA_CONTAINER_OPTIONS& options,
-    WSLAVirtualMachine& parentVM)
+// Note: For bridge mode, VM ports are set to 0 and will be allocated later by MapPorts().
+std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options)
 {
     WSLA_CONTAINER_NETWORK_TYPE networkType = options.ContainerNetwork.ContainerNetworkType;
     
@@ -129,27 +149,19 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(
     std::vector<WSLAPortMapping> ports;
     ports.reserve(options.PortsCount);
 
-    if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+    for (ULONG i = 0; i < options.PortsCount; i++)
     {
-        // In bridged mode, allocate VM ports for each port mapping.
-        auto vmPorts = parentVM.AllocatePorts(static_cast<uint16_t>(options.PortsCount));
-        auto vmPortIt = vmPorts.begin();
-        for (ULONG i = 0; i < options.PortsCount; i++)
+        const auto& port = options.Ports[i];
+        THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
+        
+        if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
         {
-            WI_ASSERT(vmPortIt != vmPorts.end());
-            const auto& port = options.Ports[i];
-            THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
-            ports.push_back({port.HostPort, *vmPortIt, port.ContainerPort, port.Family});
-            vmPortIt++;
+            // In bridged mode, VM port will be allocated by MapPorts() - set to 0 as placeholder.
+            ports.push_back({port.HostPort, 0, port.ContainerPort, port.Family});
         }
-    }
-    else if (networkType == WSLA_CONTAINER_NETWORK_HOST)
-    {
-        // In host mode, the container port is the same as the VM port.
-        for (ULONG i = 0; i < options.PortsCount; i++)
+        else if (networkType == WSLA_CONTAINER_NETWORK_HOST)
         {
-            const auto& port = options.Ports[i];
-            THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
+            // In host mode, the container port is the same as the VM port.
             ports.push_back({port.HostPort, port.ContainerPort, port.ContainerPort, port.Family});
         }
     }
@@ -157,23 +169,23 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(
     return {std::move(ports), std::move(networkMode)};
 }
 
-WSLA_CONTAINER_STATE DockerStateToWSLAState(common::docker_schema::ContainerState state)
+WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
 {
     switch (state)
     {
-    case common::docker_schema::ContainerState::Created:
-        return WslaContainerStateCreated;
-    case common::docker_schema::ContainerState::Running:
-    case common::docker_schema::ContainerState::Restarting:
-        return WslaContainerStateRunning;
-    case common::docker_schema::ContainerState::Paused:
-    case common::docker_schema::ContainerState::Exited:
-    case common::docker_schema::ContainerState::Dead:
-        return WslaContainerStateExited;
-    case common::docker_schema::ContainerState::Removing:
-        return WslaContainerStateDeleted;
+    case ContainerState::Created:
+        return WSLA_CONTAINER_STATE::WslaContainerStateCreated;
+    case ContainerState::Running:
+    case ContainerState::Restarting:
+        return WSLA_CONTAINER_STATE::WslaContainerStateRunning;
+    case ContainerState::Paused:
+    case ContainerState::Exited:
+    case ContainerState::Dead:
+        return WSLA_CONTAINER_STATE::WslaContainerStateExited;
+    case ContainerState::Removing:
+        return WSLA_CONTAINER_STATE::WslaContainerStateDeleted;
     default:
-        return WslaContainerStateInvalid;
+        return WSLA_CONTAINER_STATE::WslaContainerStateInvalid;
     }
 }
 
@@ -654,7 +666,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Process port mappings from container options.
-    auto [ports, networkMode] = ProcessPortMappings(containerOptions, parentVM);
+    auto [ports, networkMode] = ProcessPortMappings(containerOptions);
     request.HostConfig.NetworkMode = networkMode;
 
     auto [vmPorts, errorCleanup] = MapPorts(ports, parentVM);
