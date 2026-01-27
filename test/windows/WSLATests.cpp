@@ -54,7 +54,7 @@ class WSLATests
         auto vhdPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath");
         storagePath = std::filesystem::current_path() / "test-storage";
 
-        m_defaultSession = CreateSession(Getm_defaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
+        m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
 
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
         VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
@@ -97,7 +97,7 @@ class WSLATests
         return true;
     }
 
-    static WSLA_SESSION_SETTINGS Getm_defaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
+    static WSLA_SESSION_SETTINGS GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
     {
         WSLA_SESSION_SETTINGS settings{};
         settings.DisplayName = Name;
@@ -116,7 +116,7 @@ class WSLATests
         m_defaultSession.reset();
 
         return wil::scope_exit([this]() {
-            m_defaultSession = CreateSession(Getm_defaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
+            m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
         });
     }
 
@@ -258,7 +258,7 @@ class WSLATests
 
         // List multiple sessions.
         {
-            auto session2 = CreateSession(Getm_defaultSessionSettings(L"wsla-test-list-2"));
+            auto session2 = CreateSession(GetDefaultSessionSettings(L"wsla-test-list-2"));
 
             wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
             VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
@@ -474,7 +474,7 @@ class WSLATests
         auto createVmWithDmesg = [this](bool earlyBootLogging) {
             auto [read, write] = CreateSubprocessPipe(false, false);
 
-            auto settings = Getm_defaultSessionSettings(L"dmesg-output-test");
+            auto settings = GetDefaultSessionSettings(L"dmesg-output-test");
             settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
             WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
@@ -579,7 +579,7 @@ class WSLATests
             promise.set_value(std::make_pair(reason, details));
         }};
 
-        WSLA_SESSION_SETTINGS sessionSettings = Getm_defaultSessionSettings(L"termination-callback-test");
+        WSLA_SESSION_SETTINGS sessionSettings = GetDefaultSessionSettings(L"termination-callback-test");
         sessionSettings.TerminationCallback = &callback;
 
         auto session = CreateSession(sessionSettings);
@@ -642,7 +642,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = Getm_defaultSessionSettings(L"networking-test", false, mode);
+        auto settings = GetDefaultSessionSettings(L"networking-test", false, mode);
         WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
 
         auto session = CreateSession(settings);
@@ -819,7 +819,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = Getm_defaultSessionSettings(L"port-mapping-test");
+        auto settings = GetDefaultSessionSettings(L"port-mapping-test");
         settings.NetworkingMode = networkingMode;
 
         auto session = networkingMode != WSLANetworkingModeNAT ? CreateSession(settings) : m_defaultSession;
@@ -948,7 +948,7 @@ class WSLATests
 
     void ValidateWindowsMounts(bool enableVirtioFs)
     {
-        auto settings = Getm_defaultSessionSettings(L"windows-mount-tests");
+        auto settings = GetDefaultSessionSettings(L"windows-mount-tests");
         WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         // Reuse the default session if possible.
@@ -1053,7 +1053,7 @@ class WSLATests
             ExpectMount(m_defaultSession.get(), "/usr/lib/wsl/lib", {});
         }
 
-        auto settings = Getm_defaultSessionSettings(L"gpu-test");
+        auto settings = GetDefaultSessionSettings(L"gpu-test");
         WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
 
         {
@@ -1098,7 +1098,7 @@ class WSLATests
 
         // Test with SCSI boot VHDs.
         {
-            auto settings = Getm_defaultSessionSettings(L"pmem-vhd-test");
+            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
             WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
 
             auto session = CreateSession(settings);
@@ -1115,7 +1115,7 @@ class WSLATests
 
         // Test with PMEM boot VHDs enabled.
         {
-            auto settings = Getm_defaultSessionSettings(L"pmem-vhd-test");
+            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
             WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
 
             auto session = CreateSession(settings);
@@ -1982,7 +1982,7 @@ class WSLATests
     {
         auto restore = ResetTestSession(); // Required to access the python container image.
 
-        auto settings = Getm_defaultSessionSettings(L"port-mapping-test", true);
+        auto settings = GetDefaultSessionSettings(L"port-mapping-test", true);
         settings.NetworkingMode = networkingMode;
 
         auto session = CreateSession(settings);
@@ -2185,7 +2185,7 @@ class WSLATests
             std::filesystem::remove_all(hostFolderReadOnly, ec);
         });
 
-        auto settings = Getm_defaultSessionSettings(L"volumes-tests", true);
+        auto settings = GetDefaultSessionSettings(L"volumes-tests", true);
         WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
@@ -2259,7 +2259,7 @@ class WSLATests
             std::filesystem::remove_all(storage, ec);
         });
 
-        auto settings = Getm_defaultSessionSettings(L"unmount-test");
+        auto settings = GetDefaultSessionSettings(L"unmount-test");
         WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = enableVirtioFs ? CreateSession(settings) : m_defaultSession;
@@ -2497,7 +2497,7 @@ class WSLATests
 
         // Phase 1: Create session and container, then stop the container
         {
-            auto session = CreateSession(Getm_defaultSessionSettings(L"recovery-test", true));
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Create and start a container
             WSLAContainerLauncher launcher("debian:latest", containerName.c_str(), "/bin/echo", {"OK"});
@@ -2514,7 +2514,7 @@ class WSLATests
 
         // Phase 2: Create new session from same storage, recover and delete container
         {
-            auto session = CreateSession(Getm_defaultSessionSettings(L"recovery-test", true));
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Try to open the container from the previous session
             wil::com_ptr<IWSLAContainer> recoveredContainer;
@@ -2535,7 +2535,7 @@ class WSLATests
 
         // Phase 3: Create new session from same storage, verify the container is not listed.
         {
-            auto session = CreateSession(Getm_defaultSessionSettings(L"recovery-test", true));
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLAContainer> notFound;
@@ -2581,7 +2581,7 @@ class WSLATests
         };
 
         auto create = [this](LPCWSTR Name, WSLASessionFlags Flags) {
-            auto settings = Getm_defaultSessionSettings(Name);
+            auto settings = GetDefaultSessionSettings(Name);
             settings.NetworkingMode = WSLANetworkingModeNone;
             settings.StoragePath = nullptr;
 
@@ -2625,7 +2625,7 @@ class WSLATests
             expectSessions({L"session-1", c_testSessionName});
 
             // Verify that name conflicts are correctly handled.
-            auto settings = Getm_defaultSessionSettings(L"session-1");
+            auto settings = GetDefaultSessionSettings(L"session-1");
 
             wil::com_ptr<IWSLASession> session;
             VERIFY_ARE_EQUAL(manager->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
