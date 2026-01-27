@@ -32,9 +32,7 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
 
 std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::GetHostEndpointSettings()
 {
-    HostDnsInfo dnsInfo;
-    dnsInfo.UpdateNetworkInformation();
-    auto addresses = dnsInfo.CurrentAddresses();
+    auto addresses = AdapterAddresses::GetCurrent();
     auto bestIndex = GetBestInterface();
     auto bestInterfacePtr =
         std::find_if(addresses.cbegin(), addresses.cend(), [&](const auto& address) { return address->IfIndex == bestIndex; });
