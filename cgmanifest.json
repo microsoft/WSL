@@ -22,12 +22,37 @@
         },
         {
             "component": {
-                "type": "other",
-                "other": {
-                    "name": "libarchive",
-                    "version": "3.7.7",
-                    "downloadUrl": "https://github.com/libarchive/libarchive/releases/download/v3.7.7/libarchive-3.7.7.tar.gz",
-                    "hash": "sha1:918692098b11db61aff23684ab04f375e4a68f69"
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/libarchive/libarchive",
+                    "commitHash": "b439d586f53911c84be5e380445a8a259e19114c"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/microsoft/wslg",
+                    "commitHash": "23e4d92dd13d1a614357e30c4b5a96f9981abc2c"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/microsoft/WindowsAppSDK",
+                    "commitHash": "0cddda05034d6aaceb5bfd88ab00a0269345737d"
+                }
+            }
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/microsoft/wil",
+                    "commitHash": "cbf677fb0a942557d08fd129f4c106a76247b2ec"
                 }
             }
         }
