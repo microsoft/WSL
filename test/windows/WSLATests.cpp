@@ -452,7 +452,7 @@ class WSLATests
             HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
             m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
 
-        // Force should suuceed.
+        // Force should succeed.
         options.Force = TRUE;
         VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
         VERIFY_IS_TRUE(deletedImages.size() > 0);
@@ -461,7 +461,7 @@ class WSLATests
         // Verify that the image is no longer in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
 
-        // Test delete failed if image not exists.
+        // Test delete failed if image does not exist.
         VERIFY_ARE_EQUAL(
             WSLA_E_IMAGE_NOT_FOUND,
             m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
