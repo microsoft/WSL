@@ -147,7 +147,7 @@ struct WSLA_PROCESS_OPTIONS
 
 struct WSLA_VOLUME
 {
-    LPCWSTR HostPath;
+    LPCSTR HostPath;
     LPCSTR ContainerPath;
     BOOL ReadOnly;
 };

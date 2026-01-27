@@ -56,7 +56,7 @@ public:
         WSLA_CONTAINER_NETWORK_TYPE containerNetworkType = WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
         ProcessFlags Flags = ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-    void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
+    void AddVolume(const std::string& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
 
     using WSLAProcessLauncher::AddFd;
@@ -71,7 +71,7 @@ private:
     std::string m_name;
     std::vector<WSLA_PORT_MAPPING> m_ports;
     std::vector<WSLA_VOLUME> m_volumes;
-    std::deque<std::wstring> m_hostPaths;
+    std::deque<std::string> m_hostPaths;
     std::deque<std::string> m_containerPaths;
     WSLA_CONTAINER_NETWORK_TYPE m_containerNetworkType;
 };

@@ -2216,8 +2216,8 @@ class WSLATests
             "fi ";
 
         WSLAContainerLauncher launcher("debian:latest", containerName, "/bin/sh", {"-c", script});
-        launcher.AddVolume(hostFolder.wstring(), containerPath, false);
-        launcher.AddVolume(hostFolderReadOnly.wstring(), containerReadOnlyPath, true);
+        launcher.AddVolume(hostFolder.string(), containerPath, false);
+        launcher.AddVolume(hostFolderReadOnly.string(), containerReadOnlyPath, true);
 
         {
             auto container = launcher.Launch(*session);
@@ -2266,10 +2266,10 @@ class WSLATests
 
         // Create a container with a simple command.
         WSLAContainerLauncher launcher("debian:latest", "test-container", "/bin/echo", {"OK"});
-        launcher.AddVolume(hostFolder.wstring(), "/volume", false);
+        launcher.AddVolume(hostFolder.string(), "/volume", false);
 
         // Add a volume with an invalid (non-existing) host path
-        launcher.AddVolume(L"does-not-exist", "/volume-invalid", false);
+        launcher.AddVolume("does-not-exist", "/volume-invalid", false);
 
         auto [result, container] = launcher.LaunchNoThrow(*session);
         VERIFY_FAILED(result);
