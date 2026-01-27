@@ -483,7 +483,7 @@ void MirroredNetworking::AddNetworkEndpoint(const GUID& NetworkId) noexcept
             hnsEndpoint.Policies.emplace_back(std::move(endpointFirewallPolicy));
             endpointSettings = ToJsonW(hnsEndpoint);
         }
-        else if (isLoopbackNetwork)
+        else if (m_config.FirewallConfig.Enabled() && isLoopbackNetwork)
         {
             // Loopback networks require HostComputeNetwork (not VirtualNetwork) and don't support policies
             hns::HostComputeEndpoint hnsEndpoint{};
