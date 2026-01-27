@@ -476,7 +476,7 @@ class WSLATests
 
             auto settings = GetDefaultSessionSettings(L"dmesg-output-test");
             settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
-            WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsEarlyBootDmesg, earlyBootLogging);
+            WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
             std::vector<char> dmesgContent;
             auto readDmesg = [read = read.get(), &dmesgContent]() mutable {
@@ -643,7 +643,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings(L"networking-test", false, mode);
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
 
         auto session = CreateSession(settings);
 
@@ -949,7 +949,7 @@ class WSLATests
     void ValidateWindowsMounts(bool enableVirtioFs)
     {
         auto settings = GetDefaultSessionSettings(L"windows-mount-tests");
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         // Reuse the default session if possible.
         auto session = enableVirtioFs ? CreateSession(settings) : m_defaultSession;
@@ -2186,7 +2186,7 @@ class WSLATests
         });
 
         auto settings = GetDefaultSessionSettings(L"volumes-tests", true);
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
 
@@ -2260,7 +2260,7 @@ class WSLATests
         });
 
         auto settings = GetDefaultSessionSettings(L"unmount-test");
-        WI_SetFlagIf(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
+        WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = enableVirtioFs ? CreateSession(settings) : m_defaultSession;
 
