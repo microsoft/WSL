@@ -298,10 +298,12 @@ e 'wsl.exe --install &lt;Distro&gt;' per l'installazione.</value>
     <value>La distribuzione legacy non supporta WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 non è supportato con la configurazione corrente del computer.
-Abilitare il componente facoltativo "Piattaforma macchina virtuale" e assicurarsi che la virtualizzazione sia abilitata nel BIOS.
-Abilitare "Piattaforma macchina virtuale" eseguendo: wsl.exe --install --no-distribution
-Per informazioni, vedere https://aka.ms/enablevirtualization</value>
+    <value>Impossibile avviare WSL2 perché la virtualizzazione non è abilitata in questo computer.
+Verificare che il componente facoltativo "Piattaforma macchina virtuale" sia abilitato e che la virtualizzazione sia attivata nelle impostazioni del firmware del computer.
+
+Abilitare "Virtual Machine Platform" eseguendo: wsl.exe --install --no-distribution
+
+Per informazioni, visitare https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
