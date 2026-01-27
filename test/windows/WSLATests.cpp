@@ -40,24 +40,24 @@ extern bool g_fastTestRun;
 class WSLATests
 {
     WSL_TEST_CLASS(WSLATests)
-    wil::unique_couninitialize_call coinit = wil::CoInitializeEx();
-    WSADATA Data;
-    std::filesystem::path testVhd;
+    wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
+    WSADATA m_wsadata;
+    wil::com_ptr<IWSLASession> m_defaultSession;
+    static inline auto c_testSessionName = L"wsla-test";
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
-        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &Data));
+        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
 
         auto vhdPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath");
-        testVhd = std::filesystem::path{vhdPath} / "ext4.vhdx";
         storagePath = std::filesystem::current_path() / "test-storage";
 
-        auto session = CreateSession();
+        m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
 
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        VERIFY_SUCCEEDED(session->ListImages(&images, images.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
 
         auto hasImage = [&](const std::string& imageName) {
             return std::ranges::any_of(
@@ -66,17 +66,17 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            VERIFY_SUCCEEDED(session->PullImage("debian:latest", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("debian:latest", nullptr, nullptr, nullptr));
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            VERIFY_SUCCEEDED(session->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
         }
 
         // Hacky way to delete all containers.
         // TODO: Replace with the --rm flag once available.
-        ExpectCommandResult(session.get(), {"/usr/bin/docker", "container", "prune", "-f"}, 0);
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "container", "prune", "-f"}, 0);
 
         return true;
     }
@@ -97,21 +97,39 @@ class WSLATests
         return true;
     }
 
-    static WSLA_SESSION_SETTINGS GetDefaultSessionSettings()
+    static WSLA_SESSION_SETTINGS GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
     {
         WSLA_SESSION_SETTINGS settings{};
-        settings.DisplayName = L"wsla-test";
+        settings.DisplayName = Name;
         settings.CpuCount = 4;
         settings.MemoryMb = 2024;
         settings.BootTimeoutMs = 30 * 1000;
-        settings.StoragePath = storagePath.c_str();
+        settings.StoragePath = enableStorage ? storagePath.c_str() : nullptr;
         settings.MaximumStorageSizeMb = 1000; // 1GB.
-        settings.NetworkingMode = WSLANetworkingModeNAT;
+        settings.NetworkingMode = networkingMode;
 
         return settings;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings = GetDefaultSessionSettings(), WSLASessionFlags Flags = WSLASessionFlagsNone)
+    auto ResetTestSession()
+    {
+        m_defaultSession.reset();
+
+        return wil::scope_exit([this]() {
+            m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
+        });
+    }
+
+    static wil::com_ptr<IWSLASessionManager> OpenSessionManager()
+    {
+        wil::com_ptr<IWSLASessionManager> sessionManager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+        return sessionManager;
+    }
+
+    wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings, WSLASessionFlags Flags = WSLASessionFlagsNone)
     {
         wil::com_ptr<IWSLASessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
@@ -139,14 +157,14 @@ class WSLATests
         VERIFY_ARE_EQUAL(version.Revision, WSL_PACKAGE_VERSION_REVISION);
     }
 
-    RunningWSLAProcess::ProcessResult RunCommand(IWSLASession* session, const std::vector<std::string>& command, int timeout = 600000)
+    static RunningWSLAProcess::ProcessResult RunCommand(IWSLASession* session, const std::vector<std::string>& command, int timeout = 600000)
     {
         WSLAProcessLauncher process(command[0], command);
 
-        return process.Launch(*session).WaitAndCaptureOutput();
+        return process.Launch(*session).WaitAndCaptureOutput(timeout);
     }
 
-    RunningWSLAProcess::ProcessResult ExpectCommandResult(
+    static RunningWSLAProcess::ProcessResult ExpectCommandResult(
         IWSLASession* session, const std::vector<std::string>& command, int expectResult, bool expectSignal = false, int timeout = 600000)
     {
         auto result = RunCommand(session, command, timeout);
@@ -166,9 +184,9 @@ class WSLATests
         return result;
     }
 
-    void ValidateProcessOutput(RunningWSLAProcess& process, const std::map<int, std::string>& expectedOutput, int expectedResult = 0)
+    void ValidateProcessOutput(RunningWSLAProcess& process, const std::map<int, std::string>& expectedOutput, int expectedResult = 0, DWORD Timeout = INFINITE)
     {
-        auto result = process.WaitAndCaptureOutput();
+        auto result = process.WaitAndCaptureOutput(Timeout);
 
         if (result.Code != expectedResult)
         {
@@ -223,16 +241,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.StoragePath = nullptr;
-        settings.DisplayName = L"wsla-test-list";
-
-        wil::com_ptr<IWSLASessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
-
-        wil::com_ptr<IWSLASession> session = CreateSession(settings);
+        auto sessionManager = OpenSessionManager();
 
         // Act: list sessions
         {
@@ -244,13 +253,12 @@ class WSLATests
             const auto& info = sessions[0];
 
             // SessionId is implementation detail (starts at 1), so we only assert DisplayName here.
-            VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), std::wstring(L"wsla-test-list"));
+            VERIFY_ARE_EQUAL(std::wstring(info.DisplayName), c_testSessionName);
         }
 
         // List multiple sessions.
         {
-            settings.DisplayName = L"wsla-test-list-2";
-            auto session2 = CreateSession(settings);
+            auto session2 = CreateSession(GetDefaultSessionSettings(L"wsla-test-list-2"));
 
             wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
             VERIFY_SUCCEEDED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
@@ -265,7 +273,7 @@ class WSLATests
 
             std::ranges::sort(displayNames);
 
-            VERIFY_ARE_EQUAL(displayNames[0], L"wsla-test-list");
+            VERIFY_ARE_EQUAL(displayNames[0], c_testSessionName);
             VERIFY_ARE_EQUAL(displayNames[1], L"wsla-test-list-2");
         }
     }
@@ -274,20 +282,11 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.StoragePath = nullptr;
-        settings.DisplayName = L"wsla-open-by-name-test";
-
-        wil::com_ptr<IWSLASessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
-
-        wil::com_ptr<IWSLASession> created = CreateSession(settings);
+        auto sessionManager = OpenSessionManager();
 
         // Act: open by the same display name
         wil::com_ptr<IWSLASession> opened;
-        VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(L"wsla-open-by-name-test", &opened));
+        VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(c_testSessionName, &opened));
         VERIFY_IS_NOT_NULL(opened.get());
 
         // And verify we get ERROR_NOT_FOUND for a nonexistent name
@@ -319,19 +318,14 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.DisplayName = L"wsla-pull-image-test";
-
-        auto session = CreateSession(settings);
-
         {
-            VERIFY_SUCCEEDED(session->PullImage("hello-world:linux", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr, nullptr));
 
             // Verify that the image is in the list of images.
-            ExpectImagePresent(*session, "hello-world:linux");
+            ExpectImagePresent(*m_defaultSession, "hello-world:linux");
             WSLAContainerLauncher launcher("hello-world:linux", "wsla-pull-image-container");
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
             VERIFY_ARE_EQUAL(0, result.Code);
@@ -344,7 +338,7 @@ class WSLATests
                 "access to the resource is denied";
 
             WSLAErrorDetails error;
-            VERIFY_ARE_EQUAL(session->PullImage("does-not:exist", nullptr, nullptr, &error.Error), WSLA_E_IMAGE_NOT_FOUND);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr, &error.Error), WSLA_E_IMAGE_NOT_FOUND);
             VERIFY_ARE_EQUAL(expectedError, error.Error.UserErrorMessage);
         }
     }
@@ -356,35 +350,29 @@ class WSLATests
         // TODO: Add more test coverage once ListImages() is fully implemented.
 
         // Validate that images with multiple tags are correctly returned.
-        auto session = CreateSession();
-        ExpectImagePresent(*session, "debian:latest");
+        ExpectImagePresent(*m_defaultSession, "debian:latest");
 
-        ExpectCommandResult(session.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
 
         auto cleanup = wil::scope_exit([&]() {
             WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Force = false, .NoPrune = false};
 
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(session->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
         });
 
-        ExpectImagePresent(*session, "debian:test-list-images");
-        ExpectImagePresent(*session, "debian:latest");
+        ExpectImagePresent(*m_defaultSession, "debian:test-list-images");
+        ExpectImagePresent(*m_defaultSession, "debian:latest");
 
         cleanup.reset();
-        ExpectImagePresent(*session, "debian:test-list-images", false);
-        ExpectImagePresent(*session, "debian:latest");
+        ExpectImagePresent(*m_defaultSession, "debian:test-list-images", false);
+        ExpectImagePresent(*m_defaultSession, "debian:latest");
     }
 
     // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {
         WSL2_TEST_ONLY();
-
-        auto settings = GetDefaultSessionSettings();
-        settings.DisplayName = L"wsla-load-image-test";
-
-        auto session = CreateSession(settings);
 
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
         wil::unique_handle imageTarFileHandle{
@@ -394,13 +382,13 @@ class WSLATests
         LARGE_INTEGER fileSize{};
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        VERIFY_SUCCEEDED(session->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+        VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
 
         // Verify that the image is in the list of images.
-        ExpectImagePresent(*session, "hello-world:latest");
+        ExpectImagePresent(*m_defaultSession, "hello-world:latest");
         WSLAContainerLauncher launcher("hello-world:latest", "wsla-load-image-container");
 
-        auto container = launcher.Launch(*session);
+        auto container = launcher.Launch(*m_defaultSession);
         auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
         VERIFY_ARE_EQUAL(0, result.Code);
@@ -412,11 +400,6 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.DisplayName = L"wsla-import-image-test";
-
-        auto session = CreateSession(settings);
-
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         wil::unique_handle imageTarFileHandle{
             CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
@@ -425,14 +408,15 @@ class WSLATests
         LARGE_INTEGER fileSize{};
         VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
 
-        VERIFY_SUCCEEDED(session->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
+        VERIFY_SUCCEEDED(
+            m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world:test", nullptr, fileSize.QuadPart));
 
-        ExpectImagePresent(*session, "my-hello-world:test");
+        ExpectImagePresent(*m_defaultSession, "my-hello-world:test");
 
         // Validate that containers can be started from the imported image.
         WSLAContainerLauncher launcher("my-hello-world:test", "wsla-import-image-container", "/hello");
 
-        auto container = launcher.Launch(*session);
+        auto container = launcher.Launch(*m_defaultSession);
         auto result = container.GetInitProcess().WaitAndCaptureOutput();
 
         VERIFY_ARE_EQUAL(0, result.Code);
@@ -443,22 +427,17 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.DisplayName = L"wsla-delete-image-test";
-
-        auto session = CreateSession(settings);
-
         // Prepare alpine image to delete.
-        VERIFY_SUCCEEDED(session->PullImage("alpine:latest", nullptr, nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage("alpine:latest", nullptr, nullptr, nullptr));
 
         // Verify that the image is in the list of images.
-        ExpectImagePresent(*session, "alpine:latest");
+        ExpectImagePresent(*m_defaultSession, "alpine:latest");
 
         // Launch a container to ensure that image deletion fails when in use.
         WSLAContainerLauncher launcher(
             "alpine:latest", "test-delete-container-in-use", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
-        auto container = launcher.Launch(*session);
+        auto container = launcher.Launch(*m_defaultSession);
 
         // Verify that the container is in running state.
         VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -471,20 +450,21 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
-            session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+            m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
 
         // Force should suuceed.
         options.Force = TRUE;
-        VERIFY_SUCCEEDED(session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
         VERIFY_IS_TRUE(deletedImages.size() > 0);
         VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);
 
         // Verify that the image is no longer in the list of images.
-        ExpectImagePresent(*session, "alpine:latest", false);
+        ExpectImagePresent(*m_defaultSession, "alpine:latest", false);
 
         // Test delete failed if image not exists.
         VERIFY_ARE_EQUAL(
-            WSLA_E_IMAGE_NOT_FOUND, session->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+            WSLA_E_IMAGE_NOT_FOUND,
+            m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
     }
 
     TEST_METHOD(CustomDmesgOutput)
@@ -494,7 +474,7 @@ class WSLATests
         auto createVmWithDmesg = [this](bool earlyBootLogging) {
             auto [read, write] = CreateSubprocessPipe(false, false);
 
-            auto settings = GetDefaultSessionSettings();
+            auto settings = GetDefaultSessionSettings(L"dmesg-output-test");
             settings.DmesgOutput = (ULONG) reinterpret_cast<ULONG_PTR>(write.get());
             WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsEarlyBootDmesg, earlyBootLogging);
 
@@ -599,7 +579,7 @@ class WSLATests
             promise.set_value(std::make_pair(reason, details));
         }};
 
-        WSLA_SESSION_SETTINGS sessionSettings = GetDefaultSessionSettings();
+        WSLA_SESSION_SETTINGS sessionSettings = GetDefaultSessionSettings(L"termination-callback-test");
         sessionSettings.TerminationCallback = &callback;
 
         auto session = CreateSession(sessionSettings);
@@ -616,14 +596,12 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
-
         WSLAProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, ProcessFlags::None);
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
         launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
 
-        auto process = launcher.Launch(*session);
+        auto process = launcher.Launch(*m_defaultSession);
 
         wil::unique_handle ttyInput = process.GetStdHandle(0);
         wil::unique_handle ttyOutput = process.GetStdHandle(1);
@@ -664,8 +642,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = mode;
+        auto settings = GetDefaultSessionSettings(L"networking-test", false, mode);
         WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
 
         auto session = CreateSession(settings);
@@ -708,8 +685,6 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
-
         struct FileFd
         {
             int Fd;
@@ -725,7 +700,7 @@ class WSLATests
                 launcher.AddFd(WSLA_PROCESS_FD{.Fd = e.Fd, .Type = e.Flags, .Path = e.Path});
             }
 
-            auto [hresult, _, process] = launcher.LaunchNoThrow(*session);
+            auto [hresult, _, process] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, expectedError);
 
             return std::move(process);
@@ -844,16 +819,16 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
+        auto settings = GetDefaultSessionSettings(L"port-mapping-test");
         settings.NetworkingMode = networkingMode;
 
-        auto session = CreateSession(settings);
+        auto session = networkingMode != WSLANetworkingModeNAT ? CreateSession(settings) : m_defaultSession;
 
         // Install socat in the container.
         //
         // TODO: revisit this in the future to avoid pulling packages from the network.
         auto installSocat = WSLAProcessLauncher("/bin/sh", {"/bin/sh", "-c", "tdnf install socat -y"}).Launch(*session);
-        ValidateProcessOutput(installSocat, {});
+        ValidateProcessOutput(installSocat, {}, 0, 300 * 1000);
 
         auto listen = [&](short port, const char* content, bool ipv6) {
             auto cmd = std::format("echo -n '{}' | /usr/bin/socat -dd TCP{}-LISTEN:{},reuseaddr -", content, ipv6 ? "6" : "", port);
@@ -962,21 +937,22 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
-
         // Create a 'stuck' process
-        auto process = WSLAProcessLauncher{"/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout}.Launch(*session);
+        auto process = WSLAProcessLauncher{"/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout}.Launch(*m_defaultSession);
 
         // Stop the service
         StopWslaService();
+
+        ResetTestSession(); // Reopen the session since the service was stopped.
     }
 
     void ValidateWindowsMounts(bool enableVirtioFs)
     {
-        auto settings = GetDefaultSessionSettings();
+        auto settings = GetDefaultSessionSettings(L"windows-mount-tests");
         WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
-        auto session = CreateSession(settings);
+        // Reuse the default session if possible.
+        auto session = enableVirtioFs ? CreateSession(settings) : m_defaultSession;
 
         auto expectedMountOptions = [&](bool readOnly) -> std::string {
             if (enableVirtioFs)
@@ -1055,9 +1031,8 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
-        auto result =
-            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
+        auto result = ExpectCommandResult(
+            m_defaultSession.get(), {"/bin/sh", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
 
         // Note: fd/0 is opened by readlink to read the actual content of /proc/self/fd.
         if (!PathMatchSpecA(result.Output[1].c_str(), "/proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2\nsocket:*\nsocket:*"))
@@ -1071,36 +1046,35 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
+        // Validate that trying to mount the shares without GPU support enabled fails.
+        {
+            // Validate that the GPU device is not available.
+            ExpectMount(m_defaultSession.get(), "/usr/lib/wsl/drivers", {});
+            ExpectMount(m_defaultSession.get(), "/usr/lib/wsl/lib", {});
+        }
+
+        auto settings = GetDefaultSessionSettings(L"gpu-test");
         WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
 
-        auto session = CreateSession(settings);
-
-        // Validate that the GPU device is available.
-        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
-
-        ExpectMount(
-            session.get(),
-            "/usr/lib/wsl/drivers",
-            "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
-
-        ExpectMount(
-            session.get(), "/usr/lib/wsl/lib", "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
-
-        // Validate that the mount points are not writeable.
-        VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 1L);
-        VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 1L);
-
-        // Validate that trying to mount the shares without GPU support disabled fails.
         {
-            session.reset(); // Required to close the storage VHD.
+            auto session = CreateSession(settings);
 
-            WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
-            session = CreateSession(settings);
+            // Validate that the GPU device is available.
+            ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
 
-            // Validate that the GPU device is not available.
-            ExpectMount(session.get(), "/usr/lib/wsl/drivers", {});
-            ExpectMount(session.get(), "/usr/lib/wsl/lib", {});
+            ExpectMount(
+                session.get(),
+                "/usr/lib/wsl/drivers",
+                "/usr/lib/wsl/drivers*9p*relatime,aname=*,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*");
+
+            ExpectMount(
+                session.get(),
+                "/usr/lib/wsl/lib",
+                "/usr/lib/wsl/lib none*overlay ro,relatime,lowerdir=/usr/lib/wsl/lib/packaged*");
+
+            // Validate that the mount points are not writeable.
+            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/drivers/test"}).Code, 1L);
+            VERIFY_ARE_EQUAL(RunCommand(session.get(), {"/usr/bin/touch", "/usr/lib/wsl/lib/test"}).Code, 1L);
         }
     }
 
@@ -1108,16 +1082,14 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
-
         // Sanity check.
-        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 1);
+        ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 1);
 
         // Validate that modules can be loaded.
-        ExpectCommandResult(session.get(), {"/usr/sbin/modprobe", "xsk_diag"}, 0);
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/sbin/modprobe", "xsk_diag"}, 0);
 
         // Validate that xsk_diag is now loaded.
-        ExpectCommandResult(session.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
+        ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 0);
     }
 
     TEST_METHOD(PmemVhds)
@@ -1126,7 +1098,7 @@ class WSLATests
 
         // Test with SCSI boot VHDs.
         {
-            auto settings = GetDefaultSessionSettings();
+            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
             WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
 
             auto session = CreateSession(settings);
@@ -1143,7 +1115,7 @@ class WSLATests
 
         // Test with PMEM boot VHDs enabled.
         {
-            auto settings = GetDefaultSessionSettings();
+            auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
             WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
 
             auto session = CreateSession(settings);
@@ -1161,11 +1133,9 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
-
         // Simple case
         {
-            auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo OK"}, 0);
+            auto result = ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo OK"}, 0);
             VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
             VERIFY_ARE_EQUAL(result.Output[2], "");
         }
@@ -1173,7 +1143,7 @@ class WSLATests
         // Stdout + stderr
         {
 
-            auto result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"}, 0);
+            auto result = ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "echo stdout && (echo stderr 1>& 2)"}, 0);
             VERIFY_ARE_EQUAL(result.Output[1], "stdout\n");
             VERIFY_ARE_EQUAL(result.Output[2], "stderr\n");
         }
@@ -1191,7 +1161,7 @@ class WSLATests
             WSLAProcessLauncher launcher(
                 "/bin/sh", {"/bin/sh", "-c", "cat && (echo completed 1>& 2)"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto process = launcher.Launch(*session);
+            auto process = launcher.Launch(*m_defaultSession);
 
             std::unique_ptr<OverlappedIOHandle> writeStdin(new WriteHandle(process.GetStdHandle(0), largeBuffer));
             std::vector<std::unique_ptr<OverlappedIOHandle>> extraHandles;
@@ -1207,7 +1177,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto process = launcher.Launch(*session);
+            auto process = launcher.Launch(*m_defaultSession);
 
             // Try to send invalid signal to the process
             VERIFY_ARE_EQUAL(process.Get().Signal(9999), E_FAIL);
@@ -1228,7 +1198,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("doesnotexist", {});
 
-            auto [hresult, error, process] = launcher.LaunchNoThrow(*session);
+            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
             VERIFY_ARE_EQUAL(error, 2); // ENOENT
             VERIFY_IS_FALSE(process.has_value());
@@ -1237,7 +1207,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("/", {});
 
-            auto [hresult, error, process] = launcher.LaunchNoThrow(*session);
+            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
             VERIFY_ARE_EQUAL(error, 13); // EACCESS
             VERIFY_IS_FALSE(process.has_value());
@@ -1246,7 +1216,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto process = launcher.Launch(*session);
+            auto process = launcher.Launch(*m_defaultSession);
             auto dummyHandle = process.GetStdHandle(1);
 
             // Verify that the same handle can only be acquired once.
@@ -1256,7 +1226,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(process.Get().GetStdHandle(3, reinterpret_cast<ULONG*>(&dummyHandle)), E_INVALIDARG);
 
             // Validate that the process object correctly handle requests after the VM has terminated.
-            session.reset();
+            ResetTestSession();
             VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }
@@ -1265,7 +1235,6 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
         int processId = 0;
 
         // Cache the existing crash dumps so we can check that a new one is created.
@@ -1281,7 +1250,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("/bin/cat", {"/bin/cat"}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto process = launcher.Launch(*session);
+            auto process = launcher.Launch(*m_defaultSession);
 
             // Get the process id. This is need to identify the crash dump file.
             VERIFY_SUCCEEDED(process.Get().GetPid(&processId));
@@ -1334,26 +1303,21 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto session = CreateSession();
-
         constexpr auto formatedVhd = L"test-format-vhd.vhdx";
 
         // TODO: Replace this by a proper SDK method once it exists
         auto tokenInfo = wil::get_token_information<TOKEN_USER>();
         wsl::core::filesystem::CreateVhd(formatedVhd, 100 * 1024 * 1024, tokenInfo->User.Sid, false, false);
 
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            session.reset();
-            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(formatedVhd));
-        });
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(formatedVhd)); });
 
         // Format the disk.
         auto absoluteVhdPath = std::filesystem::absolute(formatedVhd).wstring();
-        VERIFY_SUCCEEDED(session->FormatVirtualDisk(absoluteVhdPath.c_str()));
+        VERIFY_SUCCEEDED(m_defaultSession->FormatVirtualDisk(absoluteVhdPath.c_str()));
 
         // Validate error paths.
-        VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"DoesNotExist.vhdx"), E_INVALIDARG);
-        VERIFY_ARE_EQUAL(session->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+        VERIFY_ARE_EQUAL(m_defaultSession->FormatVirtualDisk(L"DoesNotExist.vhdx"), E_INVALIDARG);
+        VERIFY_ARE_EQUAL(m_defaultSession->FormatVirtualDisk(L"C:\\DoesNotExist.vhdx"), HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
     }
 
     TEST_METHOD(CreateContainer)
@@ -1361,12 +1325,10 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto session = CreateSession();
-
         // Test a simple container start.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-simple", "echo", {"OK"});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {{1, "OK\n"}});
@@ -1375,7 +1337,7 @@ class WSLATests
         // Validate that env is correctly wired.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-env", "/bin/sh", {"-c", "echo $testenv"}, {{"testenv=testvalue"}});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
@@ -1384,7 +1346,7 @@ class WSLATests
         // Validate that exit codes are correctly wired.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-exit-code", "/bin/sh", {"-c", "exit 12"});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {}, 12);
@@ -1401,7 +1363,7 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdin | ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
 
             auto process = container.GetInitProcess();
             auto input = process.GetStdHandle(0);
@@ -1423,7 +1385,7 @@ class WSLATests
         // Validate that stdin behaves correctly if closed without any input.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-stdin", "/bin/cat");
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
             process.GetStdHandle(0); // Close stdin;
 
@@ -1433,19 +1395,19 @@ class WSLATests
         // Validate error paths
         {
             WSLAContainerLauncher launcher("debian:latest", std::string(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), "/bin/cat");
-            auto [hresult, container] = launcher.LaunchNoThrow(*session);
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
         }
 
         {
             WSLAContainerLauncher launcher(std::string(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a'), "dummy", "/bin/cat");
-            auto [hresult, container] = launcher.LaunchNoThrow(*session);
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_INVALIDARG);
         }
 
         {
             WSLAContainerLauncher launcher("invalid-image-name", "dummy", "/bin/cat");
-            auto [hresult, container] = launcher.LaunchNoThrow(*session);
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, WSLA_E_IMAGE_NOT_FOUND);
         }
 
@@ -1458,7 +1420,7 @@ class WSLATests
             options.InitProcessOptions.CommandLineCount = 0;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container, nullptr);
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
@@ -1471,7 +1433,7 @@ class WSLATests
             options.InitProcessOptions.CommandLineCount = 0;
 
             wil::com_ptr<IWSLAContainer> container;
-            VERIFY_SUCCEEDED(session->CreateContainer(&options, &container, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, &container, nullptr));
             VERIFY_SUCCEEDED(container->Delete());
         }
     }
@@ -1480,14 +1442,9 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNone;
-
-        auto session = CreateSession(settings);
-
         auto expectOpen = [&](const char* Id, HRESULT expectedResult = S_OK) {
             wil::com_ptr<IWSLAContainer> container;
-            auto result = session->OpenContainer(Id, &container);
+            auto result = m_defaultSession->OpenContainer(Id, &container);
 
             VERIFY_ARE_EQUAL(result, expectedResult);
 
@@ -1496,7 +1453,7 @@ class WSLATests
 
         {
             WSLAContainerLauncher launcher("debian:latest", "named-container", "echo", {"OK"});
-            auto [result, container] = launcher.CreateNoThrow(*session);
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_SUCCEEDED(result);
 
             VERIFY_ARE_EQUAL(container->Id().length(), WSLA_CONTAINER_ID_LENGTH);
@@ -1536,7 +1493,7 @@ class WSLATests
             {
                 VERIFY_IS_LESS_THAN(createdContainers.size(), 16);
 
-                auto [result, newContainer] = WSLAContainerLauncher("debian:latest").CreateNoThrow(*session);
+                auto [result, newContainer] = WSLAContainerLauncher("debian:latest").CreateNoThrow(*m_defaultSession);
                 VERIFY_SUCCEEDED(result);
 
                 createdContainers.emplace_back(std::move(newContainer.value()));
@@ -1567,12 +1524,10 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto session = CreateSession();
-
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
 
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -1591,7 +1546,7 @@ class WSLATests
             // Start one container and wait for it to exit.
             {
                 WSLAContainerLauncher launcher("debian:latest", "exited-container", "echo", {"OK"});
-                auto container = launcher.Launch(*session);
+                auto container = launcher.Launch(*m_defaultSession);
                 auto process = container.GetInitProcess();
 
                 ValidateProcessOutput(process, {{1, "OK\n"}});
@@ -1601,7 +1556,7 @@ class WSLATests
             // Create a stuck container.
             WSLAContainerLauncher launcher("debian:latest", "test-container-1", {}, {"sleep", "99999"});
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
 
             // Verify that the container is in running state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -1625,7 +1580,7 @@ class WSLATests
 
             // Open a new reference to the same container.
             wil::com_ptr<IWSLAContainer> sameContainer;
-            VERIFY_SUCCEEDED(session->OpenContainer("test-container-1", &sameContainer));
+            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer("test-container-1", &sameContainer));
 
             // Verify that the state matches.
             WSLA_CONTAINER_STATE state{};
@@ -1641,7 +1596,7 @@ class WSLATests
             WSLAContainerLauncher launcher(
                 "debian:latest", "test-container-2", "sleep", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
 
             // Verify that the container is in running state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -1663,7 +1618,7 @@ class WSLATests
         // Verify that trying to open a non existing container fails.
         {
             wil::com_ptr<IWSLAContainer> sameContainer;
-            VERIFY_ARE_EQUAL(session->OpenContainer("does-not-exist", &sameContainer), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("does-not-exist", &sameContainer), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         }
 
         // Validate that container names are unique.
@@ -1671,12 +1626,12 @@ class WSLATests
             WSLAContainerLauncher launcher(
                 "debian:latest", "test-unique-name", "sleep", {"99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             // Validate that a container with the same name cannot be started
             VERIFY_ARE_EQUAL(
-                WSLAContainerLauncher("debian:latest", "test-unique-name", "echo", {"OK"}).LaunchNoThrow(*session).first,
+                WSLAContainerLauncher("debian:latest", "test-unique-name", "echo", {"OK"}).LaunchNoThrow(*m_defaultSession).first,
                 HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             // Validate that running containers can't be deleted.
@@ -1722,7 +1677,7 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto result = otherLauncher.Launch(*session).GetInitProcess().WaitAndCaptureOutput();
+            auto result = otherLauncher.Launch(*m_defaultSession).GetInitProcess().WaitAndCaptureOutput();
             VERIFY_ARE_EQUAL(result.Output[1], "OK\n");
             VERIFY_ARE_EQUAL(result.Code, 0);
         }
@@ -1731,7 +1686,7 @@ class WSLATests
 
         {
             WSLAContainerLauncher launcher("debian:latest", "test-create", "sleep", {"99999"}, {});
-            auto [result, container] = launcher.CreateNoThrow(*session);
+            auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_SUCCEEDED(result);
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
@@ -1754,7 +1709,7 @@ class WSLATests
         // Validate that containers behave correctly if they outlive their session.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-dangling-ref", "sleep", {"99999"}, {});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
@@ -1763,7 +1718,7 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().Delete());
 
             // Terminate the session
-            session.reset();
+            ResetTestSession();
 
             // Validate that calling into the container returns RPC_E_DISCONNECTED.
             WSLA_CONTAINER_STATE state = WslaContainerStateRunning;
@@ -1777,12 +1732,10 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto session = CreateSession();
-
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
             wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
 
-            VERIFY_SUCCEEDED(session->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
             VERIFY_ARE_EQUAL(expectedContainers.size(), containers.size());
 
             for (size_t i = 0; i < expectedContainers.size(); i++)
@@ -1807,7 +1760,7 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             auto details = container.Inspect();
@@ -1836,7 +1789,7 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "none");
@@ -1864,7 +1817,7 @@ class WSLATests
                 (WSLA_CONTAINER_NETWORK_TYPE)6, // WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto retVal = launcher.LaunchNoThrow(*session);
+            auto retVal = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(retVal.first, E_INVALIDARG);
         }
 
@@ -1878,7 +1831,7 @@ class WSLATests
                 WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_BRIDGE,
                 ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
 
@@ -1901,8 +1854,6 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto session = CreateSession();
-
         // Create a container.
         WSLAContainerLauncher launcher(
             "debian:latest",
@@ -1913,7 +1864,7 @@ class WSLATests
             WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE,
             ProcessFlags::Stdout | ProcessFlags::Stderr);
 
-        auto container = launcher.Launch(*session);
+        auto container = launcher.Launch(*m_defaultSession);
 
         // Simple exec case.
         {
@@ -2029,7 +1980,9 @@ class WSLATests
 
     void RunPortMappingsTest(WSLANetworkingMode networkingMode, WSLA_CONTAINER_NETWORK_TYPE containerNetworkType)
     {
-        auto settings = GetDefaultSessionSettings();
+        auto restore = ResetTestSession(); // Required to access the python container image.
+
+        auto settings = GetDefaultSessionSettings(L"port-mapping-test", true);
         settings.NetworkingMode = networkingMode;
 
         auto session = CreateSession(settings);
@@ -2211,7 +2164,7 @@ class WSLATests
 
         launcher.AddPort(1234, 8000, AF_INET);
 
-        VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*CreateSession()).first, E_INVALIDARG);
+        VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*m_defaultSession).first, E_INVALIDARG);
     }
 
     void ValidateContainerVolumes(bool enableVirtioFs)
@@ -2219,9 +2172,9 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
+        auto restore = ResetTestSession();
         auto hostFolder = std::filesystem::current_path() / "test-volume";
         auto hostFolderReadOnly = std::filesystem::current_path() / "test-volume-ro";
-        auto storage = std::filesystem::current_path() / "storage";
 
         std::filesystem::create_directories(hostFolder);
         std::filesystem::create_directories(hostFolderReadOnly);
@@ -2230,10 +2183,9 @@ class WSLATests
             std::error_code ec;
             std::filesystem::remove_all(hostFolder, ec);
             std::filesystem::remove_all(hostFolderReadOnly, ec);
-            std::filesystem::remove_all(storage, ec);
         });
 
-        auto settings = GetDefaultSessionSettings();
+        auto settings = GetDefaultSessionSettings(L"volumes-tests", true);
         WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         auto session = CreateSession(settings);
@@ -2307,12 +2259,10 @@ class WSLATests
             std::filesystem::remove_all(storage, ec);
         });
 
-        auto settings = GetDefaultSessionSettings();
-        settings.StoragePath = storage.c_str();
-        settings.MaximumStorageSizeMb = 1024;
+        auto settings = GetDefaultSessionSettings(L"unmount-test");
         WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
-        auto session = CreateSession(settings);
+        auto session = enableVirtioFs ? CreateSession(settings) : m_defaultSession;
 
         // Create a container with a simple command.
         WSLAContainerLauncher launcher("debian:latest", "test-container", "/bin/echo", {"OK"});
@@ -2541,11 +2491,13 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
+        auto restore = ResetTestSession(); // Required to access the storage folder.
+
         std::string containerName = "test-container";
 
         // Phase 1: Create session and container, then stop the container
         {
-            auto session = CreateSession();
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Create and start a container
             WSLAContainerLauncher launcher("debian:latest", containerName.c_str(), "/bin/echo", {"OK"});
@@ -2562,7 +2514,7 @@ class WSLATests
 
         // Phase 2: Create new session from same storage, recover and delete container
         {
-            auto session = CreateSession();
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Try to open the container from the previous session
             wil::com_ptr<IWSLAContainer> recoveredContainer;
@@ -2583,7 +2535,7 @@ class WSLATests
 
         // Phase 3: Create new session from same storage, verify the container is not listed.
         {
-            auto session = CreateSession();
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLAContainer> notFound;
@@ -2595,9 +2547,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        wil::com_ptr<IWSLASessionManager> manager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
+        auto manager = OpenSessionManager();
 
         auto expectSessions = [&](const std::vector<std::wstring>& expectedSessions) {
             wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
@@ -2631,8 +2581,7 @@ class WSLATests
         };
 
         auto create = [this](LPCWSTR Name, WSLASessionFlags Flags) {
-            auto settings = GetDefaultSessionSettings();
-            settings.DisplayName = Name;
+            auto settings = GetDefaultSessionSettings(Name);
             settings.NetworkingMode = WSLANetworkingModeNone;
             settings.StoragePath = nullptr;
 
@@ -2642,48 +2591,47 @@ class WSLATests
         // Validate that non-persistent sessions are dropped when released
         {
             auto session1 = create(L"session-1", WSLASessionFlagsNone);
-            expectSessions({L"session-1"});
+            expectSessions({L"session-1", c_testSessionName});
 
             session1.reset();
-            expectSessions({});
+            expectSessions({c_testSessionName});
         }
 
         // Validate that persistent sessions are only dropped when explicitly terminated.
         {
             auto session1 = create(L"session-1", WSLASessionFlagsPersistent);
-            expectSessions({L"session-1"});
+            expectSessions({L"session-1", c_testSessionName});
 
             session1.reset();
-            expectSessions({L"session-1"});
+            expectSessions({L"session-1", c_testSessionName});
             session1 = create(L"session-1", WSLASessionFlagsOpenExisting);
 
             VERIFY_SUCCEEDED(session1->Terminate());
             session1.reset();
-            expectSessions({});
+            expectSessions({c_testSessionName});
         }
 
         // Validate that sessions can be reopened by name.
         {
             auto session1 = create(L"session-1", WSLASessionFlagsPersistent);
-            expectSessions({L"session-1"});
+            expectSessions({L"session-1", c_testSessionName});
 
             session1.reset();
-            expectSessions({L"session-1"});
+            expectSessions({L"session-1", c_testSessionName});
 
             auto session1Copy =
                 create(L"session-1", static_cast<WSLASessionFlags>(WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting));
 
-            expectSessions({L"session-1"});
+            expectSessions({L"session-1", c_testSessionName});
 
             // Verify that name conflicts are correctly handled.
-            auto settings = GetDefaultSessionSettings();
-            settings.DisplayName = L"session-1";
+            auto settings = GetDefaultSessionSettings(L"session-1");
 
             wil::com_ptr<IWSLASession> session;
             VERIFY_ARE_EQUAL(manager->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             VERIFY_SUCCEEDED(session1Copy->Terminate());
-            expectSessions({});
+            expectSessions({c_testSessionName});
 
             // Validate that a new session is created if WSLASessionFlagsOpenExisting is set and no match is found.
             auto session2 = create(L"session-2", static_cast<WSLASessionFlags>(WSLASessionFlagsOpenExisting));
@@ -2721,11 +2669,6 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto settings = GetDefaultSessionSettings();
-        settings.NetworkingMode = WSLANetworkingModeNone;
-
-        auto session = CreateSession(settings);
-
         auto expectLogs = [](auto& container,
                              const std::string& expectedStdout,
                              const std::optional<std::string>& expectedStderr,
@@ -2750,7 +2693,7 @@ class WSLATests
             // Create a container with a simple command.
             WSLAContainerLauncher launcher(
                 "debian:latest", "logs-test-1", "/bin/bash", {"-c", "echo stdout && (echo stderr >& 2)"});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
             ValidateProcessOutput(initProcess, {{1, "stdout\n"}, {2, "stderr\n"}});
 
@@ -2765,7 +2708,7 @@ class WSLATests
             // Create a container with a simple command.
             WSLAContainerLauncher launcher(
                 "debian:latest", "logs-test-2", "/bin/bash", {"-c", "echo -en 'line1\\nline2\\nline3\\nline4'"});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
             ValidateProcessOutput(initProcess, {{1, "line1\nline2\nline3\nline4"}});
 
@@ -2778,7 +2721,7 @@ class WSLATests
         // Validate that timestamps are correctly returned.
         {
             WSLAContainerLauncher launcher("debian:latest", "logs-test-3", "/bin/bash", {"-c", "echo -n OK"});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
 
             wil::unique_handle stdoutLogs;
@@ -2792,7 +2735,7 @@ class WSLATests
         // Validate that 'since' and 'until' work as expected.
         {
             WSLAContainerLauncher launcher("debian:latest", "logs-test-4", "/bin/bash", {"-c", "echo -n OK"});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
 
             // Testing would with more granularity would be difficult, but these flags are just forwarded to docker,
@@ -2812,7 +2755,7 @@ class WSLATests
                 "debian:latest", "logs-test-5", {"/bin/bash"}, {"-c", "stat -f /dev/stdin | grep -io 'Type:.*$'"}, {}, {}, ProcessFlags::None);
             launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
             launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
 
             ValidateHandleOutput(initProcess.GetStdHandle(WSLAFDTty).get(), "Type: devpts\r\n");
@@ -2827,7 +2770,7 @@ class WSLATests
         // Validate that the 'follow' flag works as expected.
         {
             WSLAContainerLauncher launcher("debian:latest", "logs-test-6", "/bin/cat", {}, {}, {}, ProcessFlags::Stdin | ProcessFlags::Stdout);
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
 
             // Without 'follow', logs return immediately.

@@ -1536,7 +1536,7 @@ struct WSLA_ERROR
 {
     static inline auto Type = LxMessageWSLAError;
     MESSAGE_HEADER Header;
-    int Errno;
+    int Errno{};
     PRETTY_PRINT(FIELD(Header), FIELD(Errno));
 };
 
@@ -1547,7 +1547,7 @@ struct WSLA_GET_DISK_RESULT
     DECLARE_MESSAGE_CTOR(WSLA_GET_DISK_RESULT);
 
     MESSAGE_HEADER Header;
-    unsigned int Result;
+    unsigned int Result{};
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Buffer));
@@ -1561,7 +1561,7 @@ struct WSLA_GET_DISK
     DECLARE_MESSAGE_CTOR(WSLA_GET_DISK);
 
     MESSAGE_HEADER Header;
-    unsigned int ScsiLun;
+    unsigned int ScsiLun{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(ScsiLun));
 };
@@ -1569,8 +1569,8 @@ struct WSLA_GET_DISK
 struct WSLA_MOUNT_RESULT
 {
     static inline auto Type = LxMessageWSLAMountResult;
-    MESSAGE_HEADER Header;
-    int Result;
+    MESSAGE_HEADER Header{};
+    int Result{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(Result));
 };
@@ -1582,12 +1582,12 @@ struct WSLA_MOUNT
 
     DECLARE_MESSAGE_CTOR(WSLA_MOUNT);
 
-    MESSAGE_HEADER Header;
-    unsigned int SourceIndex;
-    unsigned int DestinationIndex;
-    unsigned int TypeIndex;
-    unsigned int OptionsIndex;
-    unsigned int Flags;
+    MESSAGE_HEADER Header{};
+    unsigned int SourceIndex{};
+    unsigned int DestinationIndex{};
+    unsigned int TypeIndex{};
+    unsigned int OptionsIndex{};
+    unsigned int Flags{};
 
     enum MountType : uint8_t
     {
@@ -1671,10 +1671,10 @@ struct WSLA_TTY_RELAY
     DECLARE_MESSAGE_CTOR(WSLA_TTY_RELAY);
 
     MESSAGE_HEADER Header;
-    int32_t TtyMaster;
-    int32_t TtyInput;
-    int32_t TtyOutput;
-    int32_t TtyControl;
+    int32_t TtyMaster{};
+    int32_t TtyInput{};
+    int32_t TtyOutput{};
+    int32_t TtyControl{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput), FIELD(TtyControl));
 };
@@ -1697,7 +1697,7 @@ struct WSLA_CONNECT
     DECLARE_MESSAGE_CTOR(WSLA_CONNECT);
 
     MESSAGE_HEADER Header;
-    uint32_t HostPort;
+    uint32_t HostPort{};
     PRETTY_PRINT(FIELD(Header), FIELD(HostPort));
 };
 
@@ -1717,8 +1717,8 @@ struct WSLA_OPEN
     DECLARE_MESSAGE_CTOR(WSLA_OPEN);
 
     MESSAGE_HEADER Header;
-    uint32_t Flags;
-    int32_t Fd;
+    uint32_t Flags{};
+    int32_t Fd{};
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), FIELD(Flags), FIELD(Fd), FIELD(Buffer));
@@ -1752,11 +1752,11 @@ struct WSLA_MAP_PORT
     using TResponse = RESULT_MESSAGE<uint32_t>;
 
     DECLARE_MESSAGE_CTOR(WSLA_MAP_PORT);
-    MESSAGE_HEADER Header;
-    uint16_t WindowsPort;
-    uint16_t LinuxPort;
-    uint32_t AddressFamily;
-    bool Stop;
+    MESSAGE_HEADER Header{};
+    uint16_t WindowsPort{};
+    uint16_t LinuxPort{};
+    uint32_t AddressFamily{};
+    bool Stop{};
 
     PRETTY_PRINT(FIELD(Header));
 };
@@ -1768,8 +1768,8 @@ struct WSLA_CONNECT_RELAY
 
     DECLARE_MESSAGE_CTOR(WSLA_CONNECT_RELAY);
     MESSAGE_HEADER Header;
-    uint16_t Port;
-    uint16_t Family;
+    uint16_t Port{};
+    uint16_t Family{};
     PRETTY_PRINT(FIELD(Header), FIELD(Port), FIELD(Family));
 };
 
@@ -1804,7 +1804,7 @@ struct WSLA_DETACH
 
     DECLARE_MESSAGE_CTOR(WSLA_DETACH);
     MESSAGE_HEADER Header;
-    unsigned int Lun;
+    unsigned int Lun{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(Lun));
 };
@@ -1816,8 +1816,8 @@ struct WSLA_TERMINAL_CHANGED
     static inline auto Type = LxMessageWSLATerminalChanged;
 
     MESSAGE_HEADER Header;
-    unsigned short Rows;
-    unsigned short Columns;
+    unsigned short Rows{};
+    unsigned short Columns{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(Rows), FIELD(Columns));
 };
@@ -1839,9 +1839,9 @@ struct WSLA_PROCESS_EXITED
 
     MESSAGE_HEADER Header;
     static inline auto Type = LxMessageWSLAProcessExited;
-    uint32_t Pid;
-    uint32_t Code;
-    bool Signaled;
+    uint32_t Pid{};
+    uint32_t Code{};
+    bool Signaled{};
 
     PRETTY_PRINT(FIELD(Header), FIELD(Pid), FIELD(Code), FIELD(Signaled));
 };
@@ -1854,7 +1854,7 @@ struct WSLA_UNIX_CONNECT
     DECLARE_MESSAGE_CTOR(WSLA_UNIX_CONNECT);
 
     MESSAGE_HEADER Header;
-    unsigned int PathOffset;
+    unsigned int PathOffset{};
     char Buffer[];
 
     PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathOffset));

@@ -553,7 +553,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     if (m_settings.NetworkingMode == WSLANetworkingModeNAT)
     {
         // TODO: refactor this to avoid using wsl config
-        static wsl::core::Config config(nullptr);
+        wsl::core::Config config(nullptr);
 
         // Disable HyperV Firewall if not supported
         if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(config))
