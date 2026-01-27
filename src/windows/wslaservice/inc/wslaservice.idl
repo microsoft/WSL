@@ -152,11 +152,6 @@ struct WSLA_CONTAINER_NETWORK
     LPCSTR ContainerNetworkName;
 };
 
-enum WSLA_CONTAINER_FLAGS
-{
-    WSLA_CONTAINER_FLAG_ENABLE_GPU = 1
-};
-
 typedef enum _WSLAContainerFlags
 {
     WSLAContainerFlagsNone = 0,
