@@ -285,15 +285,14 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
 
     std::vector<std::unique_ptr<OverlappedIOHandle>> handles;
 
-        // This is required for docker to know when stdin is closed.
-    auto onInputComplete = [&]() {
-        LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR);
-    };
+    // This is required for docker to know when stdin is closed.
+    auto onInputComplete = [&]() { LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR); };
 
     handles.emplace_back(std::make_unique<DockerIORelayHandle>(
         ioHandle.get(), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
-    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, std::move(ioHandle)));
+    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
+        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, std::move(ioHandle)));
 
     m_logsRelay.AddHandles(std::move(handles));
 
