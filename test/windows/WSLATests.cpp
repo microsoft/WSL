@@ -355,7 +355,7 @@ class WSLATests
         ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
 
         auto cleanup = wil::scope_exit([&]() {
-            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Force = false, .NoPrune = false};
+            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Flags = WSLADeleteImageFlagsNone};
 
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
             VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
@@ -445,7 +445,7 @@ class WSLATests
         // Test delete failed if image in use.
         WSLA_DELETE_IMAGE_OPTIONS options{};
         options.Image = "alpine:latest";
-        options.Force = FALSE;
+        options.Flags = WSLADeleteImageFlagsNone;
         wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
 
         VERIFY_ARE_EQUAL(
@@ -453,7 +453,7 @@ class WSLATests
             m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
 
         // Force should succeed.
-        options.Force = TRUE;
+        options.Flags = WSLADeleteImageFlagsForce;
         VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
         VERIFY_IS_TRUE(deletedImages.size() > 0);
         VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);

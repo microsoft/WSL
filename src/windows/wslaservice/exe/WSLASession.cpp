@@ -554,6 +554,8 @@ try
 }
 CATCH_RETURN();
 
+DEFINE_ENUM_FLAG_OPERATORS(WSLADeleteImageFlags);
+
 HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count, WSLA_ERROR_INFO* Error)
 try
 {
@@ -572,7 +574,7 @@ try
     std::vector<docker_schema::DeletedImage> deletedImages;
     try
     {
-        deletedImages = m_dockerClient->DeleteImage(Options->Image, !!Options->Force, !!Options->NoPrune);
+        deletedImages = m_dockerClient->DeleteImage(Options->Image, WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsForce), WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsNoPrune));
     }
     catch (const DockerHTTPException& e)
     {

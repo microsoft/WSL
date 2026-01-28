@@ -323,11 +323,17 @@ struct WSLA_DELETED_IMAGE_INFORMATION
     WSLADeletedImageType Type;
 };
 
+typedef enum _WSLADeleteImageFlags
+{
+    WSLADeleteImageFlagsNone = 0,
+    WSLADeleteImageFlagsForce = 1,
+    WSLADeleteImageFlagsNoPrune = 2,
+} WSLADeleteImageFlags;
+
 struct WSLA_DELETE_IMAGE_OPTIONS
 {
     LPCSTR Image; // Image can be ID or Repo:Tag.
-    BOOL Force;
-    BOOL NoPrune;
+    DWORD Flags; // WSLADeleteImageFlags
     // TODO: Platforms: a json array of OCI platform strings.
 };
 
