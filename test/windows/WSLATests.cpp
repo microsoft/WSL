@@ -595,11 +595,10 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        WSLAProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty);
+        WSLAProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin);
         auto process = launcher.Launch(*m_defaultSession);
 
-        wil::unique_handle ttyInput = process.GetStdHandle(0);
-        wil::unique_handle ttyOutput = process.GetStdHandle(1);
+        wil::unique_handle tty = process.GetStdHandle(WSLAFDTty);
 
         auto validateTtyOutput = [&](const std::string& expected) {
             std::string buffer(expected.size(), '\0');
@@ -609,7 +608,7 @@ class WSLATests
             while (offset < buffer.size())
             {
                 DWORD bytesRead{};
-                VERIFY_IS_TRUE(ReadFile(ttyOutput.get(), buffer.data() + offset, static_cast<DWORD>(buffer.size() - offset), &bytesRead, nullptr));
+                VERIFY_IS_TRUE(ReadFile(tty.get(), buffer.data() + offset, static_cast<DWORD>(buffer.size() - offset), &bytesRead, nullptr));
 
                 offset += bytesRead;
             }
@@ -619,7 +618,7 @@ class WSLATests
         };
 
         auto writeTty = [&](const std::string& content) {
-            VERIFY_IS_TRUE(WriteFile(ttyInput.get(), content.data(), static_cast<DWORD>(content.size()), nullptr, nullptr));
+            VERIFY_IS_TRUE(WriteFile(tty.get(), content.data(), static_cast<DWORD>(content.size()), nullptr, nullptr));
         };
 
         // Expect the shell prompt to be displayed
@@ -1294,6 +1293,14 @@ class WSLATests
             VERIFY_ARE_EQUAL(hresult, WSLA_E_IMAGE_NOT_FOUND);
         }
 
+        {
+            WSLAContainerLauncher launcher("debian:latest", "dummy", {"/does-not-exist"});
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
+
+            // TODO: Validate error message.
+        }
+
         // Test null image name
         {
             WSLA_CONTAINER_OPTIONS options{};
@@ -1504,7 +1511,8 @@ class WSLATests
 
         // Validate that container names are unique.
         {
-            WSLAContainerLauncher launcher("debian:latest", "test-unique-name", {"99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-unique-name", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
@@ -2595,7 +2603,7 @@ class WSLATests
         // Validate that logs work for TTY processes
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "logs-test-5", {"/bin/bash", "-c", "stat -f /dev/stdin | grep -io 'Type:.*$'"}, {}, {}, WSLAProcessFlagsTty);
+                "debian:latest", "logs-test-5", {"/bin/bash", "-c", "stat -f /dev/stdin | grep -io 'Type:.*$'"}, {}, {}, WSLAProcessFlagsStdin | WSLAProcessFlagsTty);
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
 
@@ -2737,7 +2745,7 @@ class WSLATests
 
         // Validate behavior for tty containers
         {
-            WSLAContainerLauncher launcher("debian:latest", "attach-test-3", {"/bin/bash"}, {}, {}, WSLAProcessFlagsTty);
+            WSLAContainerLauncher launcher("debian:latest", "attach-test-3", {"/bin/bash"}, {}, {}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin);
 
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();

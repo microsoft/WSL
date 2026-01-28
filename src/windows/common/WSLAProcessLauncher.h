@@ -22,7 +22,6 @@ Abstract:
 
 namespace wsl::windows::common {
 
-
 class RunningWSLAProcess
 {
 public:

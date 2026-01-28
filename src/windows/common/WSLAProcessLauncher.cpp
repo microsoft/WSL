@@ -153,7 +153,7 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
 
     wil::com_ptr<IWSLAProcess> process;
     int error = -1;
-    auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(),  &options, &process, &error);
+    auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, &process, &error);
     if (FAILED(result))
     {
         return std::make_tuple(result, error, std::optional<ClientRunningWSLAProcess>());

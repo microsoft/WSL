@@ -526,14 +526,13 @@ void WSLAVirtualMachine::ConfigureNetworking()
     int gnsChannelFd = -1;
     int dnsChannelFd = -1;
     auto prepareCommandLine = [&](const auto& sockets) {
-
         gnsChannelFd = sockets[0].Fd;
         socketFdArg = std::to_string(gnsChannelFd);
         cmd.emplace_back(socketFdArg.c_str());
 
         if (sockets.size() > 1)
         {
-            dnsChannelFd = sockets[0].Fd;
+            dnsChannelFd = sockets[1].Fd;
             dnsFdArg = std::to_string(dnsChannelFd);
             cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
             cmd.emplace_back(dnsFdArg.c_str());
@@ -833,7 +832,6 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
     std::vector<WSLAProcessFd> fds;
     if (WI_IsFlagSet(Options.Flags, WSLAProcessFlagsTty))
     {
-        THROW_HR_IF_MSG(E_INVALIDARG, WI_IsFlagSet(Options.Flags, WSLAProcessFlagsStdin), "Stdin & tty cannot both be set");
         fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDTty, .Type = WSLAFdType::WSLAFdTypeTty});
         fds.emplace_back(WSLAProcessFd{.Fd = 0, .Type = WSLAFdType::WSLAFdTypeTtyControl});
     }

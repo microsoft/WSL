@@ -157,9 +157,8 @@ struct WSLA_CONTAINER_NETWORK
 typedef enum _WSLAContainerFlags
 {
     WSLAContainerFlagsNone = 0,
-    WSLAContainerFlagsRm = 1,
-    WSLAContainerFlagsGpu = 2,
-    WSLAContainerFlagsAttach = 4,
+    WSLAContainerFlagsRm = 1, // Delete the container when it exists. TODO: Implement.
+    WSLAContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
 } WSLAContainerFlags;
 
 struct WSLA_CONTAINER_OPTIONS

@@ -135,7 +135,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 
     std::vector<const char*> entrypointStorage;
 
-    for (const auto &e: m_entrypoint)
+    for (const auto& e : m_entrypoint)
     {
         entrypointStorage.push_back(e.c_str());
     }

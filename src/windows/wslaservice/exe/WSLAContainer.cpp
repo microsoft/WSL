@@ -34,15 +34,7 @@ namespace {
 
 std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
 {
-    std::vector<std::string> result;
-    result.reserve(array.Count);
-
-    for (ULONG i = 0; i < array.Count; i++)
-    {
-        result.push_back(array.Values[i]);
-    }
-
-    return result;
+    return {&array.Values[0], &array.Values[array.Count]};
 }
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
@@ -349,7 +341,22 @@ void WSLAContainerImpl::Start()
         m_initProcessControl = nullptr;
     });
 
-    m_dockerClient.StartContainer(m_id);
+    try
+    {
+
+        m_dockerClient.StartContainer(m_id);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // TODO: wire error back to caller.
+        std::string errorMessage;
+        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        {
+            errorMessage = e.DockerMessage<ErrorResponse>().message;
+        }
+
+        THROW_HR_MSG(E_FAIL, "Failed to start container '%hs': %hs", m_id.c_str(), errorMessage.c_str());
+    }
 
     m_state = WslaContainerStateRunning;
     cleanup.release();

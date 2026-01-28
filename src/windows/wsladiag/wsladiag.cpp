@@ -484,7 +484,7 @@ static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, b
     wsl::windows::common::relay::InterruptableRelay(Tty, GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
 }
 
-static void RelayNonTtyProcess(HANDLE Stdin, HANDLE Stdout, HANDLE Stderr)
+static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
 {
     wsl::windows::common::relay::MultiHandleWait io;
 
@@ -506,17 +506,23 @@ static void RelayNonTtyProcess(HANDLE Stdin, HANDLE Stdout, HANDLE Stderr)
     {
         // TODO: Will output CR instead of LF's which can confuse the linux app.
         // Consider a custom relay logic to fix this.
-        inputThread = std::thread{
-            [&]() { wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin, exitEvent.get()); }};
+        inputThread = std::thread{[&]() {
+            try
+            {
+                wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
+            }
+            CATCH_LOG();
+
+            Stdin.reset();
+        }};
     }
     else
     {
-        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), Stdin));
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), std::move(Stdin)));
     }
 
-    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Stdout, GetStdHandle(STD_OUTPUT_HANDLE)));
-    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Stderr, GetStdHandle(STD_ERROR_HANDLE)));
-    io.AddHandle(std::make_unique<EventHandle>(exitEvent.get()), MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stderr), GetStdHandle(STD_ERROR_HANDLE)));
 
     io.Run({});
 }
@@ -529,8 +535,7 @@ static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
     }
     else
     {
-        RelayNonTtyProcess(
-            Process.GetStdHandle(WSLAFDStdin).get(), Process.GetStdHandle(WSLAFDStdout).get(), Process.GetStdHandle(WSLAFDStderr).get());
+        RelayNonTtyProcess(Process.GetStdHandle(WSLAFDStdin), Process.GetStdHandle(WSLAFDStdout), Process.GetStdHandle(WSLAFDStderr));
     }
 
     return Process.Wait();
@@ -566,13 +571,13 @@ static int Run(std::wstring_view commandLine)
         Info.cbSize = sizeof(Info);
         THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
 
-        options.InitProcessOptions.Flags = WSLAProcessFlagsTty;
+        options.InitProcessOptions.Flags = WSLAProcessFlagsTty | WSLAProcessFlagsStdin;
         options.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
         options.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
     }
     else
     {
-        WI_SetFlagIf(options.InitProcessOptions.Flags, WSLAProcessFlagsTty, interactive);
+        WI_SetFlagIf(options.InitProcessOptions.Flags, WSLAProcessFlagsStdin, interactive);
     }
 
     std::vector<std::string> argsStorage;
@@ -646,7 +651,7 @@ static int Attach(std::wstring_view commandLine)
     {
         WI_ASSERT(!!stderrLogs);
 
-        RelayNonTtyProcess(stdinLogs.get(), stdoutLogs.get(), stderrLogs.get());
+        RelayNonTtyProcess(std::move(stdinLogs), std::move(stdoutLogs), std::move(stderrLogs));
     }
     else
     {
