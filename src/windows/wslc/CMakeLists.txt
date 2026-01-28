@@ -1,8 +1,15 @@
 set(SOURCES
     main.cpp
+	RunCommand.cpp
+	Utils.cpp
 )
 
-add_executable(wslc ${SOURCES})
+set(HEADERS
+    RunCommand.h
+	Utils.h
+)
+
+add_executable(wslc ${SOURCES} ${HEADERS})
 
 target_link_libraries(wslc
     ${COMMON_LINK_LIBRARIES}
