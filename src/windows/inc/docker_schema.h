@@ -89,9 +89,10 @@ struct CreateContainer
     std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, std::string> Labels;
     HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, Labels, HostConfig);
 };
 
 struct InspectContainer
