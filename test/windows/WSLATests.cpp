@@ -143,6 +143,14 @@ class WSLATests
         return session;
     }
 
+    RunningWSLAContainer OpenContainer(IWSLASession* session, const std::string& name)
+    {
+        wil::com_ptr<IWSLAContainer> rawContainer;
+        VERIFY_SUCCEEDED(session->OpenContainer(name.c_str(), &rawContainer));
+
+        return RunningWSLAContainer(std::move(rawContainer), {});
+    }
+
     TEST_METHOD(GetVersion)
     {
         wil::com_ptr<IWSLASessionManager> sessionManager;
@@ -2516,17 +2524,9 @@ class WSLATests
         {
             auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test", true));
 
-            // Try to open the container from the previous session
-            wil::com_ptr<IWSLAContainer> recoveredContainer;
-            VERIFY_SUCCEEDED(session->OpenContainer(containerName.c_str(), &recoveredContainer));
-
-            // Verify container state
-            WSLA_CONTAINER_STATE state{};
-            VERIFY_SUCCEEDED(recoveredContainer->GetState(&state));
-            VERIFY_ARE_EQUAL(state, WslaContainerStateExited);
-
-            // Delete the container
-            VERIFY_SUCCEEDED(recoveredContainer->Delete());
+            auto container = OpenContainer(session.get(), containerName);
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
+            VERIFY_SUCCEEDED(container.Get().Delete());
 
             // Verify container is no longer accessible
             wil::com_ptr<IWSLAContainer> notFound;
@@ -2540,6 +2540,66 @@ class WSLATests
             // Verify container is no longer accessible
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(session->OpenContainer(containerName.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+    }
+
+    TEST_METHOD(ContainerVolumeAndPortRecoveryFromStorage)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto restore = ResetTestSession();
+
+        std::string containerName = "test-recovery-volumes-ports";
+        auto hostFolder = std::filesystem::current_path() / "test-recovery-volume";
+        std::filesystem::create_directories(hostFolder);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(hostFolder, ec);
+        });
+
+        // Create a test file in the host folder
+        std::ofstream testFile(hostFolder / "test.txt");
+        testFile << "recovery-test-content";
+        testFile.close();
+
+        // Create session and container with volumes and ports (but don't start it)
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-vp", true, WSLANetworkingModeNAT));
+
+            WSLAContainerLauncher launcher(
+                "python:3.12-alpine",
+                containerName.c_str(),
+                {},
+                {"python3", "-m", "http.server", "--directory", "/volume"},
+                {"PYTHONUNBUFFERED=1"},
+                WSLA_CONTAINER_NETWORK_BRIDGE);
+
+            launcher.AddPort(1250, 8000, AF_INET);
+            launcher.AddVolume(hostFolder.string(), "/volume", false);
+
+            // Create container but don't start it
+            auto container = launcher.Create(*session);
+            container.SetDeleteOnClose(false);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
+        }
+
+        // Recover the container in a new session, start it and verify volume and port mapping works.
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-vp", true, WSLANetworkingModeNAT));
+            auto container = OpenContainer(session.get(), containerName);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
+            VERIFY_SUCCEEDED(container.Get().Start());
+
+            auto initProcess = container.GetInitProcess();
+            auto stdoutHandle = initProcess.GetStdHandle(1);
+            WaitForOutput(stdoutHandle.get(), "Serving HTTP on 0.0.0.0 port 8000");
+
+            // A 200 response also indicates the test file is available so volume was mounted correctly.
+            ExpectHttpResponse(L"http://127.0.0.1:1250/test.txt", 200);
         }
     }
 

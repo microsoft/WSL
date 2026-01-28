@@ -62,6 +62,7 @@ public:
     using WSLAProcessLauncher::AddFd;
 
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> CreateNoThrow(IWSLASession& Session);
+    RunningWSLAContainer Create(IWSLASession& Session);
 
     RunningWSLAContainer Launch(IWSLASession& Session);
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> LaunchNoThrow(IWSLASession& Session);
