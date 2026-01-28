@@ -67,9 +67,32 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
     Transaction<docker_schema::EmptyRequest>(verb::post, std::format("http://localhost/images/{}/tag?repo={}&tag={}", Id, Repo, Tag));
 }
 
-std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
+std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, const std::string& filters, bool digests)
 {
-    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, "http://localhost/images/json");
+    std::string url = "http://localhost/images/json?";
+
+    if (all)
+    {
+        url += "all=true&";
+    }
+
+    if (!filters.empty())
+    {
+        url += "filters=" + filters + "&";
+    }
+
+    if (digests)
+    {
+        url += "digests=true&";
+    }
+
+    // Remove trailing '&' or '?' if present
+    if (url.back() == '&' || url.back() == '?')
+    {
+        url.pop_back();
+    }
+
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, url);
 }
 
 std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTPClient::DeleteImage(const char* Image, bool Force, bool NoPrune)

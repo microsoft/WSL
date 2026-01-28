@@ -515,7 +515,9 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     }
 }
 
-HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+DEFINE_ENUM_FLAG_OPERATORS(WSLAListImagesFlags);
+
+HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
 try
 {
     *Count = 0;
@@ -525,24 +527,104 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto images = m_dockerClient->ListImages();
+    // Build filters JSON for Docker API
+    std::string filters;
+    bool all = false;
+    bool digests = false;
 
-    // Compute the number of entries.
+    if (Options != nullptr)
+    {
+        all = (Options->Flags & WSLAListImagesFlagsAll) != 0;
+        digests = (Options->Flags & WSLAListImagesFlagsDigests) != 0;
+
+        nlohmann::json filtersJson;
+
+        if (Options->Reference != nullptr)
+        {
+            filtersJson["reference"] = nlohmann::json::array({Options->Reference});
+        }
+
+        if (Options->Before != nullptr)
+        {
+            filtersJson["before"] = nlohmann::json::array({Options->Before});
+        }
+
+        if (Options->Since != nullptr)
+        {
+            filtersJson["since"] = nlohmann::json::array({Options->Since});
+        }
+
+        if (Options->DanglingSet)
+        {
+            filtersJson["dangling"] = nlohmann::json::array({Options->Dangling ? "true" : "false"});
+        }
+
+        if (!filtersJson.empty())
+        {
+            filters = filtersJson.dump();
+        }
+    }
+
+    auto images = m_dockerClient->ListImages(all, filters, digests);
+
+    // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate<decltype(images.begin()), size_t>(
-        images.begin(), images.end(), 0, [](auto sum, const auto& e) { return sum + e.RepoTags.size(); });
+        images.begin(), images.end(), 0, [](auto sum, const auto& e) {
+            return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
+        });
 
     auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(entries);
 
     size_t index = 0;
     for (const auto& e : images)
     {
-        // TODO: download_timestamp
-        for (const auto& tag : e.RepoTags)
+        if (e.RepoTags.empty())
         {
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+            // Image has no tags (dangling image)
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, "<none>:<none>") != 0);
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+
+            // Set digest if available
+            if (!e.RepoDigests.empty())
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, e.RepoDigests[0].c_str()) != 0);
+            }
+            else
+            {
+                output[index].Digest[0] = '\0';
+            }
+
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
             output[index].Size = e.Size;
+            output[index].VirtualSize = e.VirtualSize;
+            output[index].Created = e.Created;
             index++;
+        }
+        else
+        {
+            // Image has tags - create one entry per tag
+            for (size_t tagIdx = 0; tagIdx < e.RepoTags.size(); ++tagIdx)
+            {
+                const auto& tag = e.RepoTags[tagIdx];
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+
+                // Set digest if available and matches the tag
+                if (tagIdx < e.RepoDigests.size())
+                {
+                    THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, e.RepoDigests[tagIdx].c_str()) != 0);
+                }
+                else
+                {
+                    output[index].Digest[0] = '\0';
+                }
+
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
+                output[index].Size = e.Size;
+                output[index].VirtualSize = e.VirtualSize;
+                output[index].Created = e.Created;
+                index++;
+            }
         }
     }
 

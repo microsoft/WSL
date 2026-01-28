@@ -57,7 +57,7 @@ class WSLATests
         m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
 
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
+        VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
 
         auto hasImage = [&](const std::string& imageName) {
             return std::ranges::any_of(
@@ -298,7 +298,7 @@ class WSLATests
     void ExpectImagePresent(IWSLASession& Session, const char* Image, bool Present = true)
     {
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        THROW_IF_FAILED(Session.ListImages(images.addressof(), images.size_address<ULONG>()));
+        THROW_IF_FAILED(Session.ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
         std::vector<std::string> tags;
         for (const auto& e : images)
@@ -347,9 +347,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // TODO: Add more test coverage once ListImages() is fully implemented.
-
-        // Validate that images with multiple tags are correctly returned.
+        // Test 1: Basic listing - validate that images with multiple tags are correctly returned.
         ExpectImagePresent(*m_defaultSession, "debian:latest");
 
         ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
@@ -363,6 +361,80 @@ class WSLATests
 
         ExpectImagePresent(*m_defaultSession, "debian:test-list-images");
         ExpectImagePresent(*m_defaultSession, "debian:latest");
+
+        // Test 2: Verify new fields are populated
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+            bool foundDebian = false;
+            for (const auto& image : images)
+            {
+                if (std::string(image.Image) == "debian:latest")
+                {
+                    foundDebian = true;
+                    // Verify fields are populated
+                    VERIFY_IS_TRUE(strlen(image.Hash) > 0);
+                    VERIFY_IS_TRUE(image.Size > 0);
+                    VERIFY_IS_TRUE(image.Created != 0);
+                    break;
+                }
+            }
+            VERIFY_IS_TRUE(foundDebian);
+        }
+
+        // Test 3: Filter by reference
+        {
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = "debian:latest";
+            options.Before = nullptr;
+            options.Since = nullptr;
+            options.DanglingSet = FALSE;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Should only return debian:latest and its other tags
+            bool foundDebianLatest = false;
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName == "debian:latest")
+                {
+                    foundDebianLatest = true;
+                }
+                // All returned images should be debian
+                VERIFY_IS_TRUE(imageName.starts_with("debian:") || imageName.starts_with("<none>"));
+            }
+            VERIFY_IS_TRUE(foundDebianLatest);
+        }
+
+        // Test 4: Digests flag
+        {
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsDigests;
+            options.Reference = nullptr;
+            options.Before = nullptr;
+            options.Since = nullptr;
+            options.DanglingSet = FALSE;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Verify at least one image has digest populated (if available from registry)
+            bool hasDigest = false;
+            for (const auto& image : images)
+            {
+                if (strlen(image.Digest) > 0)
+                {
+                    hasDigest = true;
+                    break;
+                }
+            }
+            // Note: Digest may not always be available for locally built images
+            LogInfo("Digests found: %s", hasDigest ? "yes" : "no");
+        }
 
         cleanup.reset();
         ExpectImagePresent(*m_defaultSession, "debian:test-list-images", false);
