@@ -11,6 +11,8 @@ int InteractiveShell(
 
 void PullImpl(IWSLASession& Session, const std::string& Image);
 
+int ReportError(const std::wstring& context, HRESULT hr);
+
 class ChangeTerminalMode
 {
 public:

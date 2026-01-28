@@ -1,12 +1,26 @@
 set(SOURCES
     main.cpp
-	RunCommand.cpp
-	Utils.cpp
+    RunCommand.cpp
+    ShellCommand.cpp
+    ListCommand.cpp
+    PullCommand.cpp
+    CreateCommand.cpp
+    DeleteCommand.cpp
+    StartCommand.cpp
+    StopCommand.cpp
+    Utils.cpp
 )
 
 set(HEADERS
     RunCommand.h
-	Utils.h
+    ShellCommand.h
+    ListCommand.h
+    PullCommand.h
+    CreateCommand.h
+    DeleteCommand.h
+    StartCommand.h
+    StopCommand.h
+    Utils.h
 )
 
 add_executable(wslc ${SOURCES} ${HEADERS})

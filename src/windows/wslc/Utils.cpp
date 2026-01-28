@@ -260,3 +260,10 @@ void PullImpl(IWSLASession& Session, const std::string& Image)
     auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
     error.ThrowIfFailed(result);
 }
+
+int ReportError(const std::wstring& context, HRESULT hr)
+{
+    auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
+    wslutil::PrintMessage(Localization::MessageErrorCode(context, errorString), stderr);
+    return 1;
+}

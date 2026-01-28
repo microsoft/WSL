@@ -20,6 +20,13 @@ Abstract:
 #include "WSLAProcessLauncher.h"
 #include "ExecutionContext.h"
 #include "RunCommand.h"
+#include "ListCommand.h"
+#include "ShellCommand.h"
+#include "PullCommand.h"
+#include "CreateCommand.h"
+#include "DeleteCommand.h"
+#include "StartCommand.h"
+#include "StopCommand.h"
 #include "Utils.h"
 #include <thread>
 #include <format>
@@ -35,389 +42,9 @@ using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-static int ReportError(const std::wstring& context, HRESULT hr)
-{
-    auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
-    wslutil::PrintMessage(Localization::MessageErrorCode(context, errorString), stderr);
-    return 1;
-}
-
-// Handler for `wslc shell <SessionName>` command.
-static int RunShellCommand(std::wstring_view commandLine)
-{
-    std::wstring sessionName;
-    bool verbose = false;
-
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, false);
-    parser.AddPositionalArgument(sessionName, 0);
-    parser.AddArgument(verbose, L"--verbose", L'v');
-
-    parser.Parse();
-
-    if (sessionName.empty())
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wslc shell"));
-    }
-
-    wil::com_ptr<IWSLASessionManager> sessionManager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
-
-    wil::com_ptr<IWSLASession> session;
-    HRESULT hr = sessionManager->OpenSessionByName(sessionName.c_str(), &session);
-    if (FAILED(hr))
-    {
-        if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
-        {
-            wslutil::PrintMessage(Localization::MessageWslaSessionNotFound(sessionName.c_str()), stderr);
-            return 1;
-        }
-
-        return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
-    }
-
-    if (verbose)
-    {
-        wslutil::PrintMessage(std::format(L"[wslc] Session opened: '{}'", sessionName), stdout);
-    }
-
-    // Console size for TTY.
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_LAST_ERROR_IF(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-    const ULONG rows = static_cast<ULONG>(info.srWindow.Bottom - info.srWindow.Top + 1);
-    const ULONG cols = static_cast<ULONG>(info.srWindow.Right - info.srWindow.Left + 1);
-
-    const std::string shell = "/bin/sh";
-
-    // Launch with terminal fds (PTY).
-    wsl::windows::common::WSLAProcessLauncher launcher{
-        shell, {shell, "--login"}, {"TERM=xterm-256color"}, wsl::windows::common::ProcessFlags::None};
-
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput, .Path = nullptr});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput, .Path = nullptr});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl, .Path = nullptr});
-
-    launcher.SetTtySize(rows, cols);
-
-    auto process = launcher.Launch(*session);
-
-    if (verbose)
-    {
-        wslutil::PrintMessage(L"[wslc] Shell process launched", stdout);
-    }
-
-    auto ttyIn = process.GetStdHandle(0);
-    auto ttyOut = process.GetStdHandle(1);
-
-    // Console handles.
-    wil::unique_hfile conin{
-        CreateFileW(L"CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-    wil::unique_hfile conout{
-        CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)};
-    THROW_LAST_ERROR_IF(!conin);
-    THROW_LAST_ERROR_IF(!conout);
-
-    const HANDLE consoleIn = conin.get();
-    const HANDLE consoleOut = conout.get();
-
-    // Save/restore console state.
-    DWORD originalInMode{};
-    DWORD originalOutMode{};
-    const UINT originalOutCP = GetConsoleOutputCP();
-    const UINT originalInCP = GetConsoleCP();
-
-    THROW_LAST_ERROR_IF(!GetConsoleMode(consoleIn, &originalInMode));
-    THROW_LAST_ERROR_IF(!GetConsoleMode(consoleOut, &originalOutMode));
-
-    auto restoreConsole = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleIn, originalInMode));
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleOut, originalOutMode));
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleOutputCP(originalOutCP));
-        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(originalInCP));
-    });
-
-    // Console mode for interactive terminal.
-    DWORD inMode = originalInMode;
-    WI_SetAllFlags(inMode, ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
-    WI_ClearAllFlags(inMode, ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_INSERT_MODE | ENABLE_PROCESSED_INPUT);
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleIn, inMode));
-
-    DWORD outMode = originalOutMode;
-    WI_SetAllFlags(outMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleMode(consoleOut, outMode));
-
-    THROW_LAST_ERROR_IF(!SetConsoleOutputCP(CP_UTF8));
-    THROW_LAST_ERROR_IF(!SetConsoleCP(CP_UTF8));
-
-    auto exitEvent = wil::unique_event(wil::EventOptions::ManualReset);
-
-    auto updateTerminalSize = [&]() {
-        CONSOLE_SCREEN_BUFFER_INFOEX infoEx{};
-        infoEx.cbSize = sizeof(infoEx);
-        THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(consoleOut, &infoEx));
-
-        LOG_IF_FAILED(process.Get().ResizeTty(
-            infoEx.srWindow.Bottom - infoEx.srWindow.Top + 1, infoEx.srWindow.Right - infoEx.srWindow.Left + 1));
-    };
-
-    // Start input relay thread to forward console input to TTY
-    // Runs in parallel with output relay (main thread)
-    std::thread inputThread([&] {
-        try
-        {
-            wsl::windows::common::relay::StandardInputRelay(consoleIn, ttyIn.get(), updateTerminalSize, exitEvent.get());
-        }
-        catch (...)
-        {
-            exitEvent.SetEvent();
-        }
-    });
-
-    auto joinInput = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        exitEvent.SetEvent();
-        if (inputThread.joinable())
-        {
-            inputThread.join();
-        }
-    });
-
-    // Relay tty output -> console (blocks until output ends).
-    wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), consoleOut, exitEvent.get());
-
-    process.GetExitEvent().wait();
-
-    auto exitCode = process.GetExitCode();
-
-    std::wstring shellWide(shell.begin(), shell.end());
-    wslutil::PrintMessage(wsl::shared::Localization::MessageWslaShellExited(shellWide.c_str(), static_cast<int>(exitCode)), stdout);
-
-    return static_cast<int>(exitCode);
-}
-
-// Handler for `wslc list` command.
-static int RunListCommand(std::wstring_view commandLine)
-{
-    bool verbose = false;
-
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, false);
-    parser.AddArgument(verbose, L"--verbose", L'v');
-
-    try
-    {
-        parser.Parse();
-    }
-    catch (...)
-    {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcUsage());
-    }
-
-    wil::com_ptr<IWSLASessionManager> sessionManager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
-
-    wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-    THROW_IF_FAILED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
-
-    if (verbose)
-    {
-        const wchar_t* plural = sessions.size() == 1 ? L"" : L"s";
-        wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
-    }
-
-    if (sessions.size() == 0)
-    {
-        wslutil::PrintMessage(Localization::MessageWslaNoSessionsFound(), stdout);
-        return 0;
-    }
-
-    wslutil::PrintMessage(Localization::MessageWslaSessionsFound(sessions.size(), sessions.size() == 1 ? L"" : L"s"), stdout);
-
-    // Use localized headers
-    const auto idHeader = Localization::MessageWslaHeaderId();
-    const auto pidHeader = Localization::MessageWslaHeaderCreatorPid();
-    const auto nameHeader = Localization::MessageWslaHeaderDisplayName();
-
-    size_t idWidth = idHeader.size();
-    size_t pidWidth = pidHeader.size();
-    size_t nameWidth = nameHeader.size();
-
-    for (const auto& s : sessions)
-    {
-        idWidth = std::max(idWidth, std::to_wstring(s.SessionId).size());
-        pidWidth = std::max(pidWidth, std::to_wstring(s.CreatorPid).size());
-        nameWidth = std::max(nameWidth, static_cast<size_t>(s.DisplayName ? wcslen(s.DisplayName) : 0));
-    }
-
-    // Header
-    wprintf(
-        L"%-*ls  %-*ls  %-*ls\n",
-        static_cast<int>(idWidth),
-        idHeader.c_str(),
-        static_cast<int>(pidWidth),
-        pidHeader.c_str(),
-        static_cast<int>(nameWidth),
-        nameHeader.c_str());
-
-    // Underline
-    std::wstring idDash(idWidth, L'-');
-    std::wstring pidDash(pidWidth, L'-');
-    std::wstring nameDash(nameWidth, L'-');
-
-    wprintf(
-        L"%-*ls  %-*ls  %-*ls\n",
-        static_cast<int>(idWidth),
-        idDash.c_str(),
-        static_cast<int>(pidWidth),
-        pidDash.c_str(),
-        static_cast<int>(nameWidth),
-        nameDash.c_str());
-
-    // Rows
-    for (const auto& s : sessions)
-    {
-        const wchar_t* displayName = s.DisplayName ? s.DisplayName : L"";
-        wprintf(
-            L"%-*lu  %-*lu  %-*ls\n",
-            static_cast<int>(idWidth),
-            static_cast<unsigned long>(s.SessionId),
-            static_cast<int>(pidWidth),
-            static_cast<unsigned long>(s.CreatorPid),
-            static_cast<int>(nameWidth),
-            displayName);
-    }
-
-    return 0;
-}
-
-static int Pull(std::wstring_view commandLine)
-{
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2);
-
-    std::string image;
-    parser.AddPositionalArgument(Utf8String{image}, 0);
-
-    parser.Parse();
-    THROW_HR_IF(E_INVALIDARG, image.empty());
-
-    PullImpl(*OpenCLISession(), image);
-
-    return 0;
-}
-
-static int Run(std::wstring_view commandLine)
-{
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, true);
-
-    bool interactive{};
-    bool tty{};
-    std::string image;
-    parser.AddPositionalArgument(Utf8String{image}, 0);
-    parser.AddArgument(interactive, L"--interactive", 'i');
-    parser.AddArgument(tty, L"--tty", 't');
-
-    parser.Parse();
-    THROW_HR_IF(E_INVALIDARG, image.empty());
-
-    auto session = OpenCLISession();
-
-    WSLA_CONTAINER_OPTIONS options{};
-    options.Image = image.c_str();
-
-    std::vector<WSLA_PROCESS_FD> fds;
-    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
-
-    if (tty)
-    {
-        CONSOLE_SCREEN_BUFFER_INFOEX Info{};
-        Info.cbSize = sizeof(Info);
-        THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
-
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
-
-        options.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
-        options.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
-    }
-    else
-    {
-        if (interactive)
-        {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
-        }
-
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
-    }
-
-    std::vector<std::string> argsStorage;
-    std::vector<const char*> args;
-    for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
-    {
-        argsStorage.emplace_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
-    }
-
-    for (const auto& e : argsStorage)
-    {
-        args.emplace_back(e.c_str());
-    }
-
-    options.InitProcessOptions.CommandLine = args.data();
-    options.InitProcessOptions.CommandLineCount = static_cast<ULONG>(args.size());
-    options.InitProcessOptions.Fds = fds.data();
-    options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
-
-    wil::com_ptr<IWSLAContainer> container;
-    WSLAErrorDetails error{};
-    auto result = session->CreateContainer(&options, &container, &error.Error);
-    if (result == WSLA_E_IMAGE_NOT_FOUND)
-    {
-        wslutil::PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
-
-        PullImpl(*session.get(), image);
-
-        error.Reset();
-        result = session->CreateContainer(&options, &container, &error.Error);
-    }
-
-    error.ThrowIfFailed(result);
-
-    THROW_IF_FAILED(container->Start()); // TODO: Error message
-
-    wil::com_ptr<IWSLAProcess> process;
-    THROW_IF_FAILED(container->GetInitProcess(&process));
-
-    return InteractiveShell(ClientRunningWSLAProcess(std::move(process), std::move(fds)), tty);
-}
-
 static void PrintUsage()
 {
     wslutil::PrintMessage(Localization::MessageWslcUsage(), stderr);
-}
-
-// Handler for `wslc create` command.
-static int RunCreateCommand(std::wstring_view commandLine)
-{
-    return 0;
-}
-
-// Handler for `wslc delete` command.
-static int RunDeleteCommand(std::wstring_view commandLine)
-{
-    return 0;
-}
-
-// Handler for `wslc start` command.
-static int RunStartCommand(std::wstring_view commandLine)
-{
-    return 0;
-}
-
-// Handler for `wslc stop` command.
-static int RunStopCommand(std::wstring_view commandLine)
-{
-    return 0;
 }
 
 int wslc_main(std::wstring_view commandLine)
@@ -464,11 +91,11 @@ int wslc_main(std::wstring_view commandLine)
     }
     else if (verb == L"pull")
     {
-        return Pull(commandLine);
+        return RunPullCommand(commandLine);
     }
     else if (verb == L"run")
     {
-        return Run(commandLine);
+        return RunRunCommand(commandLine);
     }
     else if (verb == L"create")
     {
@@ -476,7 +103,7 @@ int wslc_main(std::wstring_view commandLine)
     }
     else if (verb == L"delete")
     {
-        return RunCreateCommand(commandLine);
+        return RunDeleteCommand(commandLine);
     }
     else if (verb == L"start")
     {

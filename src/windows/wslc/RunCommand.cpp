@@ -15,7 +15,7 @@ using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-int RunCommand(std::wstring_view commandLine)
+int RunRunCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, true);
 
