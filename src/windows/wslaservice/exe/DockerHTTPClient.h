@@ -89,6 +89,7 @@ public:
     wil::unique_socket AttachContainer(const std::string& Id);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
+    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> ExportContainer(const std::string& ContainerID);
 
     // Image management.
     std::unique_ptr<HTTPRequestContext> PullImage(const char* Name, const char* Tag);
@@ -97,6 +98,7 @@ public:
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::vector<common::docker_schema::Image> ListImages();
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
+    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> SaveImage(const std::string& NameOrId);
 
     // Exec.
     common::docker_schema::CreateExecResponse CreateExec(const std::string& Container, const common::docker_schema::CreateExec& Request);
@@ -147,6 +149,14 @@ private:
         const std::string& Body,
         const OnResponseBytes& OnResponse,
         const std::map<boost::beast::http::field, std::string>& Headers = {});
+
+    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> SendRequestWithContext(
+        boost::beast::http::verb Method,
+        const std::string& Url,
+        const std::string& Body,
+        const OnResponseBytes& OnResponse,
+        const std::map<boost::beast::http::field, std::string>& Headers = {},
+        std::string* errorJson = nullptr); // Out parameter to receive error response body. If null, error body is left unread and caller is expected to handle reading the error message body
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
     auto Transaction(boost::beast::http::verb Method, const std::string& Url, const TRequest& RequestObject = {})
