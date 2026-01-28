@@ -31,7 +31,6 @@ class WSLAContainer;
 class WSLAContainerImpl
 {
 public:
-
     NON_COPYABLE(WSLAContainerImpl);
     NON_MOVABLE(WSLAContainerImpl);
 

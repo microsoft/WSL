@@ -20,10 +20,7 @@ Abstract:
 namespace wsl::windows::service::wsla {
 
 // Label key used to store WSLA container metadata in Docker container labels.
-constexpr auto WSLAContainerMetadataLabel = "WSLAContainerMetadata";
-
-// Current version of the metadata schema.
-constexpr uint32_t WSLAContainerMetadataVersion = 1;
+constexpr auto WSLAContainerMetadataLabel = "com.microsoft.wsl.container.metadata";
 
 struct WSLAPortMapping
 {
@@ -40,7 +37,7 @@ struct WSLAPortMapping
 
 struct WSLAVolumeMount
 {
-    std::string HostPath;
+    std::wstring HostPath;
     std::string ParentVMPath;
     std::string ContainerPath;
     bool ReadOnly{};
@@ -48,14 +45,25 @@ struct WSLAVolumeMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly);
 };
 
-struct ContainerMetadata
+struct WSLAContainerMetadataV1
 {
-    uint32_t Version{WSLAContainerMetadataVersion};
+    constexpr static int Version = 1;
+
     bool Tty{};
     std::vector<WSLAPortMapping> Ports;
     std::vector<WSLAVolumeMount> Volumes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerMetadata, Version, Tty, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadataV1, Tty, Ports, Volumes);
+};
+
+struct WSLAContainerMetadata
+{
+    constexpr static int CurrentVersion = WSLAContainerMetadataV1::Version;
+
+    int Version{CurrentVersion};
+    std::optional<WSLAContainerMetadataV1> V1;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadata, Version, V1);
 };
 
 } // namespace wsl::windows::service::wsla

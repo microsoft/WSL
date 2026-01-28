@@ -2224,8 +2224,8 @@ class WSLATests
             "fi ";
 
         WSLAContainerLauncher launcher("debian:latest", containerName, "/bin/sh", {"-c", script});
-        launcher.AddVolume(hostFolder.string(), containerPath, false);
-        launcher.AddVolume(hostFolderReadOnly.string(), containerReadOnlyPath, true);
+        launcher.AddVolume(hostFolder.wstring(), containerPath, false);
+        launcher.AddVolume(hostFolderReadOnly.wstring(), containerReadOnlyPath, true);
 
         {
             auto container = launcher.Launch(*session);
@@ -2274,10 +2274,10 @@ class WSLATests
 
         // Create a container with a simple command.
         WSLAContainerLauncher launcher("debian:latest", "test-container", "/bin/echo", {"OK"});
-        launcher.AddVolume(hostFolder.string(), "/volume", false);
+        launcher.AddVolume(hostFolder.wstring(), "/volume", false);
 
         // Add a volume with an invalid (non-existing) host path
-        launcher.AddVolume("does-not-exist", "/volume-invalid", false);
+        launcher.AddVolume(L"does-not-exist", "/volume-invalid", false);
 
         auto [result, container] = launcher.LaunchNoThrow(*session);
         VERIFY_FAILED(result);
@@ -2570,15 +2570,10 @@ class WSLATests
             auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-vp", true, WSLANetworkingModeNAT));
 
             WSLAContainerLauncher launcher(
-                "python:3.12-alpine",
-                containerName.c_str(),
-                {},
-                {"python3", "-m", "http.server", "--directory", "/volume"},
-                {"PYTHONUNBUFFERED=1"},
-                WSLA_CONTAINER_NETWORK_BRIDGE);
+                "python:3.12-alpine", containerName.c_str(), {}, {"python3", "-m", "http.server", "--directory", "/volume"}, {"PYTHONUNBUFFERED=1"}, WSLA_CONTAINER_NETWORK_BRIDGE);
 
             launcher.AddPort(1250, 8000, AF_INET);
-            launcher.AddVolume(hostFolder.string(), "/volume", false);
+            launcher.AddVolume(hostFolder.wstring(), "/volume", false);
 
             // Create container but don't start it
             auto container = launcher.Create(*session);
@@ -2612,7 +2607,11 @@ class WSLATests
 
         // Create a new session - this should succeed even though the volume folder is gone
         auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-vp", true, WSLANetworkingModeNAT));
-        VERIFY_FAILED(session->OpenContainer(containerName.c_str(), nullptr));
+
+        wil::com_ptr<IWSLAContainer> container;
+        auto hr = session->OpenContainer(containerName.c_str(), &container);
+
+        VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
     TEST_METHOD(SessionManagement)

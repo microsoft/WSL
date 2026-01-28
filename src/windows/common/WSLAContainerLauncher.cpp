@@ -97,7 +97,7 @@ void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort
     m_ports.emplace_back(WSLA_PORT_MAPPING{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
 }
 
-void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::string& HostPath, const std::string& ContainerPath, bool ReadOnly)
+void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
     const auto& hostPath = m_hostPaths.emplace_back(HostPath);

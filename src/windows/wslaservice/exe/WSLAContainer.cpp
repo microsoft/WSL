@@ -22,10 +22,11 @@ using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
+using wsl::windows::service::wsla::WSLAContainerMetadata;
+using wsl::windows::service::wsla::WSLAContainerMetadataV1;
 using wsl::windows::service::wsla::WSLAPortMapping;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 using wsl::windows::service::wsla::WSLAVolumeMount;
-
 
 using namespace wsl::windows::common::docker_schema;
 
@@ -75,13 +76,13 @@ auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
 
     // Check if we need to allocate VM ports for bridge mode (VmPort == 0).
     size_t portsToAllocate = std::count_if(ports.begin(), ports.end(), [](const auto& p) { return p.VmPort == 0; });
-    
+
     if (portsToAllocate > 0)
     {
         // Allocate VM ports in batch for bridge mode.
         auto allocatedPorts = vm.AllocatePorts(static_cast<uint16_t>(portsToAllocate));
         auto allocatedIt = allocatedPorts.begin();
-        
+
         for (auto& port : ports)
         {
             if (port.VmPort == 0)
@@ -99,8 +100,7 @@ auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
     {
         if (vmPorts->find(port.VmPort) == vmPorts->end())
         {
-            THROW_WIN32_IF_MSG(
-                ERROR_ALREADY_EXISTS, !vm.TryAllocatePort(port.VmPort), "Failed to allocate port: %u", port.VmPort);
+            THROW_WIN32_IF_MSG(ERROR_ALREADY_EXISTS, !vm.TryAllocatePort(port.VmPort), "Failed to allocate port: %u", port.VmPort);
             vmPorts->insert(port.VmPort);
         }
     }
@@ -120,7 +120,7 @@ auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
 std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options)
 {
     WSLA_CONTAINER_NETWORK_TYPE networkType = options.ContainerNetwork.ContainerNetworkType;
-    
+
     // Determine network mode string.
     std::string networkMode;
     if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
@@ -153,7 +153,7 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const W
     {
         const auto& port = options.Ports[i];
         THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
-        
+
         if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
         {
             // In bridged mode, VM port will be allocated by MapPorts() - set to 0 as placeholder.
@@ -204,6 +204,25 @@ std::string ExtractContainerName(const std::vector<std::string>& names, const st
     }
 
     return name;
+}
+
+WSLAContainerMetadataV1 ParseContainerMetadata(const std::string& json)
+{
+    auto wrapper = wsl::shared::FromJson<WSLAContainerMetadata>(json.c_str());
+
+    WI_ASSERT(wrapper.Version == WSLAContainerMetadataV1::Version);
+    WI_ASSERT(wrapper.V1.has_value());
+
+    return wrapper.V1.value();
+}
+
+std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
+{
+    WSLAContainerMetadata wrapper;
+    wrapper.Version = WSLAContainerMetadataV1::Version;
+    wrapper.V1 = metadata;
+
+    return wsl::shared::ToJson(wrapper);
 }
 
 } // namespace
@@ -575,10 +594,8 @@ void wsl::windows::service::wsla::WSLAContainerImpl::MountVolumes(std::vector<WS
     {
         try
         {
-            std::wstring hostPath = wsl::shared::string::MultiByteToWide(volume.HostPath);
-
-            auto result = parentVM.MountWindowsFolder(hostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
-            THROW_IF_FAILED_MSG(result, "Failed to mount %hs -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
+            auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
+            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
 
             mountedVolumes.push_back(volume);
         }
@@ -649,11 +666,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     {
         const WSLA_VOLUME& volume = containerOptions.Volumes[i];
         std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", containerOptions.Name, i);
-        volumes.push_back(WSLAVolumeMount{
-            volume.HostPath,
-            parentVMPath,
-            volume.ContainerPath,
-            static_cast<bool>(volume.ReadOnly)});
+        volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
     }
 
     // Mount volumes.
@@ -682,12 +695,12 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Build WSLA metadata to store in a label for recovery on Open().
-    ContainerMetadata metadata;
+    WSLAContainerMetadataV1 metadata;
     metadata.Tty = hasTty;
     metadata.Volumes = volumes;
     metadata.Ports = ports;
 
-    request.Labels[WSLAContainerMetadataLabel] = wsl::shared::ToJson(metadata);
+    request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
 
     // Send the request to docker.
     auto result =
@@ -728,7 +741,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         "Cannot open WSLA container %hs: missing WSLA metadata label",
         dockerContainer.Id.c_str());
 
-    auto metadata = wsl::shared::FromJson<ContainerMetadata>(metadataIt->second.c_str());
+    auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
 
     // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
     // to open containers that are not running.
