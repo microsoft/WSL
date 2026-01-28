@@ -292,10 +292,12 @@ ja asenna wsl.exe --install &lt;Distro&gt;.</value>
     <value>Vanha jakelu ei tue WSL 2 -koodausta.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2:a ei tueta nykyisessä konekokoonpanossasi. 
-Ota virtuaalikoneympäristön valinnainen osa käyttöön ja varmista, että virtualisointi on otettu käyttöön BIOSissa.
-Ota virtuaalikoneympäristö käyttöön suorittamalla: wsl.exe --install --no-distribution
-Lisätietoja on https://aka.ms/enablevirtualization</value>
+    <value>WSL2 ei käynnisty, koska virtualisointi ei ole käytössä tässä koneessa.
+Varmista, että valinnainen Virtuaalikonealusta on otettu käyttöön ja virtualisointi on aktivoitu tietokoneen laiteohjelmistoasetuksissa.
+
+Ota Virtuaalikonealusta käyttöön suorittamalla: wsl.exe --install --no-distribution
+
+Lisätietoja löytyy osoitteesta https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
