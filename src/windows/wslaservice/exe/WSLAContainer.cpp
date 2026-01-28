@@ -209,9 +209,7 @@ std::string ExtractContainerName(const std::vector<std::string>& names, const st
 WSLAContainerMetadataV1 ParseContainerMetadata(const std::string& json)
 {
     auto wrapper = wsl::shared::FromJson<WSLAContainerMetadata>(json.c_str());
-
-    WI_ASSERT(wrapper.Version == WSLAContainerMetadataV1::Version);
-    WI_ASSERT(wrapper.V1.has_value());
+    THROW_HR_IF(E_UNEXPECTED, !wrapper.V1.has_value());
 
     return wrapper.V1.value();
 }
@@ -219,7 +217,6 @@ WSLAContainerMetadataV1 ParseContainerMetadata(const std::string& json)
 std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
 {
     WSLAContainerMetadata wrapper;
-    wrapper.Version = WSLAContainerMetadataV1::Version;
     wrapper.V1 = metadata;
 
     return wsl::shared::ToJson(wrapper);

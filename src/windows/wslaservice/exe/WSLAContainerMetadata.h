@@ -47,8 +47,6 @@ struct WSLAVolumeMount
 
 struct WSLAContainerMetadataV1
 {
-    constexpr static int Version = 1;
-
     bool Tty{};
     std::vector<WSLAPortMapping> Ports;
     std::vector<WSLAVolumeMount> Volumes;
@@ -58,12 +56,8 @@ struct WSLAContainerMetadataV1
 
 struct WSLAContainerMetadata
 {
-    constexpr static int CurrentVersion = WSLAContainerMetadataV1::Version;
-
-    int Version{CurrentVersion};
     std::optional<WSLAContainerMetadataV1> V1;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadata, Version, V1);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadata, V1);
 };
 
 } // namespace wsl::windows::service::wsla
