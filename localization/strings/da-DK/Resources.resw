@@ -292,10 +292,12 @@ og "wsl.exe --install &lt;Distro&gt;" for at installere.</value>
     <value>Den ældre distribution understøtter ikke WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 understøttes ikke med den aktuelle maskinkonfiguration. 
-Aktivér den valgfri komponent "Platform til virtuel maskine", og sørg for, at virtualisering er aktiveret i BIOS.
-Aktivér "Platform til virtuel maskine" ved at køre: wsl.exe --install --no-distribution
-Du kan få flere oplysninger på https://aka.ms/enablevirtualization</value>
+    <value>WSL2 kan ikke starte, da virtualisering ikke er aktiveret på denne maskine.
+Kontrollér, at den valgfri komponent "Virtuel maskinplatform" er aktiveret, og at virtualisering er slået til i computerens firmwareindstillinger.
+
+Aktivér "Virtuel maskinplatform" ved at køre: wsl.exe --install --no-distribution
+
+Se https://aka.ms/enablevirtualization for at få mere at vide</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
