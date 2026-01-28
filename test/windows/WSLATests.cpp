@@ -2614,6 +2614,29 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
+    TEST_METHOD(ContainerPersistanceFromStorageInvalidMetadata)
+    {
+        auto restore = ResetTestSession();
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
+
+            // Create a docker container that has no metedata.
+            auto result = RunCommand(session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+            VERIFY_ARE_EQUAL(result.Code, 0L);
+        }
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
+
+            // Try to open the container - this should fail due to missing metadata.
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = session->OpenContainer("test-invalid-metadata", &container);
+            VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
+        }
+
+    }
+
     TEST_METHOD(SessionManagement)
     {
         WSL2_TEST_ONLY();
