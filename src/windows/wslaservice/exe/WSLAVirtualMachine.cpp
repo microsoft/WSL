@@ -526,15 +526,14 @@ void WSLAVirtualMachine::ConfigureNetworking()
     int gnsChannelFd = -1;
     int dnsChannelFd = -1;
     auto prepareCommandLine = [&](const auto& sockets) {
-        WI_ASSERT(sockets.size() >= 4);
 
-        gnsChannelFd = sockets[3].first.Fd;
+        gnsChannelFd = sockets[0].Fd;
         socketFdArg = std::to_string(gnsChannelFd);
         cmd.emplace_back(socketFdArg.c_str());
 
-        if (sockets.size() > 4)
+        if (sockets.size() > 1)
         {
-            dnsChannelFd = sockets[4].first.Fd;
+            dnsChannelFd = sockets[0].Fd;
             dnsFdArg = std::to_string(dnsChannelFd);
             cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
             cmd.emplace_back(dnsFdArg.c_str());
@@ -545,7 +544,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
         options.CommandLine = {.Values = cmd.data(), .Count = static_cast<ULONG>(cmd.size())};
     };
 
-    auto process = CreateLinuxProcess("/init", options, nullptr, fds, prepareCommandLine);
+    auto process = CreateLinuxProcessImpl("/init", options, fds, nullptr, prepareCommandLine);
     auto gnsChannel = wsl::core::GnsChannel(wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()});
 
     if (m_settings.NetworkingMode == WSLANetworkingModeNAT)
@@ -828,11 +827,32 @@ std::string WSLAVirtualMachine::GetVhdDevicePath(ULONG Lun)
 }
 
 Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
-    _In_ LPCSTR Executable,
-    _In_ const WSLA_PROCESS_OPTIONS& Options,
-    int* Errno,
-    const std::vector<WSLAProcessFd>& AdditionalFds,
-    const TPrepareCommandLine& PrepareCommandLine)
+    _In_ LPCSTR Executable, _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
+{
+    // Check if this is a tty or not
+    std::vector<WSLAProcessFd> fds;
+    if (WI_IsFlagSet(Options.Flags, WSLAProcessFlagsTty))
+    {
+        THROW_HR_IF_MSG(E_INVALIDARG, WI_IsFlagSet(Options.Flags, WSLAProcessFlagsStdin), "Stdin & tty cannot both be set");
+        fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDTty, .Type = WSLAFdType::WSLAFdTypeTty});
+        fds.emplace_back(WSLAProcessFd{.Fd = 0, .Type = WSLAFdType::WSLAFdTypeTtyControl});
+    }
+    else
+    {
+        if (WI_IsFlagSet(Options.Flags, WSLAProcessFlagsStdin))
+        {
+            fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDStdin, .Type = WSLAFdType::WSLAFdTypeDefault});
+        }
+
+        fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDStdout, .Type = WSLAFdType::WSLAFdTypeDefault});
+        fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDStderr, .Type = WSLAFdType::WSLAFdTypeDefault});
+    }
+
+    return CreateLinuxProcessImpl(Executable, Options, fds, Errno, PrepareCommandLine);
+}
+
+Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
+    LPCSTR Executable, const WSLA_PROCESS_OPTIONS& Options, const std::vector<WSLAProcessFd>& Fds, int* Errno, const TPrepareCommandLine& PrepareCommandLine)
 {
     // N.B This check is there to prevent processes from being started before the VM is done initializing.
     // to avoid potential deadlocks, since the processExitThread is required to signal the process exit events.
@@ -847,34 +867,25 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
     };
 
     // Check if this is a tty or not
-
-    // Check if this is a tty or not
-    std::vector<WSLAProcessFd> fds;
-    if (WI_IsFlagSet(Options.Flags, WSLAProcessFlagsTty))
-    {
-        THROW_HR_IF_MSG(E_INVALIDARG, WI_IsFlagSet(Options.Flags, WSLAProcessFlagsStdin), "Stdin & tty cannot both be set");
-        fds.emplace_back(WSLAProcessFd{.Fd = 0, .Type = WSLAFdType::WSLAFdTypeTty});
-        fds.emplace_back(WSLAProcessFd{.Fd = 1, .Type = WSLAFdType::WSLAFdTypeTtyControl});
-    }
-    else
-    {
-        if (WI_IsFlagSet(Options.Flags, WSLAProcessFlagsStdin))
-        {
-            fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDStdin, .Type = WSLAFdType::WSLAFdTypeDefault});
-        }
-
-        fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDStdout, .Type = WSLAFdType::WSLAFdTypeDefault});
-        fds.emplace_back(WSLAProcessFd{.Fd = WSLAFDStderr, .Type = WSLAFdType::WSLAFdTypeDefault});
-    }
-
-    fds.insert(fds.end(), AdditionalFds.begin(), AdditionalFds.end());
-
+    const WSLAProcessFd* tty = nullptr;
+    const WSLAProcessFd* ttyControl = nullptr;
     auto [pid, _, childChannel] = Fork(WSLA_FORK::Process);
 
-    std::vector<std::pair<WSLAVirtualMachine::ConnectedSocket, WSLAFdType>> sockets;
-    for (const auto& e : fds)
+    std::vector<WSLAVirtualMachine::ConnectedSocket> sockets;
+    for (const auto& e : Fds)
     {
-        sockets.emplace_back(ConnectSocket(childChannel, static_cast<int32_t>(e.Fd)), e.Type);
+        if (e.Type == WSLAFdTypeTty)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, tty != nullptr, "Multiple terminal fds specified");
+            tty = &e;
+        }
+        else if (e.Type == WSLAFdTypeTtyControl)
+        {
+            THROW_HR_IF_MSG(E_INVALIDARG, ttyControl != nullptr, "Multiple terminal control fds specified");
+            ttyControl = &e;
+        }
+
+        sockets.emplace_back(ConnectSocket(childChannel, static_cast<int32_t>(e.Fd)));
     }
 
     PrepareCommandLine(sockets);
@@ -884,16 +895,16 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
     Message.WriteString(Message->ExecutableIndex, Executable);
     Message.WriteString(Message->CurrentDirectoryIndex, Options.CurrentDirectory ? Options.CurrentDirectory : "/");
     Message.WriteStringArray(Message->CommandLineIndex, Options.CommandLine.Values, Options.CommandLine.Count);
-    Message.WriteStringArray(Message->EnvironmentIndex, Options.Environment.Values, Options.CommandLine.Count);
+    Message.WriteStringArray(Message->EnvironmentIndex, Options.Environment.Values, Options.Environment.Count);
 
     // If this is an interactive tty, we need a relay process
-    if (WI_IsFlagSet(Options.Flags, WSLAProcessFlagsTty))
+    if (tty != nullptr)
     {
         auto [grandChildPid, ptyMaster, grandChildChannel] = Fork(childChannel, WSLA_FORK::Pty, Options.TtyRows, Options.TtyColumns);
         WSLA_TTY_RELAY relayMessage{};
         relayMessage.TtyMaster = ptyMaster;
-        relayMessage.Socket = 0;
-        relayMessage.TtyControl = 1;
+        relayMessage.Socket = tty->Fd;
+        relayMessage.TtyControl = ttyControl == nullptr ? -1 : ttyControl->Fd;
         childChannel.SendMessage(relayMessage);
 
         auto result = ExpectClosedChannelOrError(childChannel);
@@ -927,15 +938,15 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcess(
     wil::unique_socket ttyControlHandle;
 
     std::map<ULONG, wil::unique_handle> stdHandles;
-    for (auto &e : sockets)
+    for (auto& [fd, handle] : sockets)
     {
-        if (e.second == WSLAFdTypeTtyControl)
+        if (ttyControl != nullptr && fd == ttyControl->Fd)
         {
-            ttyControlHandle = std::move(e.first.Socket);
+            ttyControlHandle = std::move(handle);
             continue;
         }
 
-        stdHandles.emplace(e.first.Fd, reinterpret_cast<HANDLE>(e.first.Socket.release()));
+        stdHandles.emplace(fd, reinterpret_cast<HANDLE>(handle.release()));
     }
 
     auto io = std::make_unique<VMProcessIO>(std::move(stdHandles));
