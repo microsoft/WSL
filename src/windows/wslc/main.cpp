@@ -22,11 +22,11 @@ Abstract:
 #include "RunCommand.h"
 #include "ListCommand.h"
 #include "ShellCommand.h"
-#include "PullCommand.h"
 #include "CreateCommand.h"
 #include "DeleteCommand.h"
 #include "StartCommand.h"
 #include "StopCommand.h"
+#include "ImageCommand.h"
 #include "Utils.h"
 #include <thread>
 #include <format>
@@ -81,46 +81,52 @@ int wslc_main(std::wstring_view commandLine)
         PrintUsage();
         return 0;
     }
-    else if (verb == L"list")
+    
+    if (verb == L"list")
     {
         return RunListCommand(commandLine);
     }
-    else if (verb == L"shell")
+    
+    if (verb == L"shell")
     {
         return RunShellCommand(commandLine);
     }
-    else if (verb == L"pull")
-    {
-        return RunPullCommand(commandLine);
-    }
-    else if (verb == L"run")
+    
+    if (verb == L"run")
     {
         return RunRunCommand(commandLine);
     }
-    else if (verb == L"create")
+    
+    if (verb == L"create")
     {
         return RunCreateCommand(commandLine);
     }
-    else if (verb == L"delete")
+    
+    if (verb == L"delete")
     {
         return RunDeleteCommand(commandLine);
     }
-    else if (verb == L"start")
+    
+    if (verb == L"start")
     {
         return RunStartCommand(commandLine);
     }
-    else if (verb == L"stop")
+    
+    if (verb == L"stop")
     {
         return RunStopCommand(commandLine);
     }
-    else
-    {
-        wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
-        PrintUsage();
 
-        // Unknown verb - show usage and fail.
-        return 1;
+    if (verb == L"image")
+    {
+        return RunImageCommand(commandLine);
     }
+
+    wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
+    PrintUsage();
+
+    // Unknown verb - show usage and fail.
+    return 1;
 }
 
 int wmain(int, wchar_t**)

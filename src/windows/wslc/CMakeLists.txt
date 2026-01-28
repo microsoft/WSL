@@ -3,11 +3,11 @@ set(SOURCES
     RunCommand.cpp
     ShellCommand.cpp
     ListCommand.cpp
-    PullCommand.cpp
     CreateCommand.cpp
     DeleteCommand.cpp
     StartCommand.cpp
     StopCommand.cpp
+    ImageCommand.cpp
     Utils.cpp
 )
 
@@ -15,11 +15,11 @@ set(HEADERS
     RunCommand.h
     ShellCommand.h
     ListCommand.h
-    PullCommand.h
     CreateCommand.h
     DeleteCommand.h
     StartCommand.h
     StopCommand.h
+    ImageCommand.h
     Utils.h
 )
 
