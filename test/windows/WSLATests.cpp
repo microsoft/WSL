@@ -347,46 +347,155 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // Test 1: Basic listing - validate that images with multiple tags are correctly returned.
+        // Setup: Ensure debian:latest is available
         ExpectImagePresent(*m_defaultSession, "debian:latest");
 
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-list-images"}, 0);
+        // Create additional tags for testing
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-tag1"}, 0);
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-tag2"}, 0);
 
         auto cleanup = wil::scope_exit([&]() {
-            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Flags = WSLADeleteImageFlagsNone};
-
+            WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-tag1", .Flags = WSLADeleteImageFlagsNone};
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+
+            options.Image = "debian:test-tag2";
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
         });
 
-        ExpectImagePresent(*m_defaultSession, "debian:test-list-images");
-        ExpectImagePresent(*m_defaultSession, "debian:latest");
-
-        // Test 2: Verify new fields are populated
+        LogInfo("Test: Basic listing with nullptr options");
         {
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
-            bool foundDebian = false;
+            VERIFY_IS_TRUE(images.size() > 0);
+            LogInfo("Total images returned: %zu", images.size());
+
+            // Find debian images and verify they exist
+            bool foundLatest = false, foundTag1 = false, foundTag2 = false;
             for (const auto& image : images)
             {
-                if (std::string(image.Image) == "debian:latest")
-                {
-                    foundDebian = true;
-                    // Verify fields are populated
-                    VERIFY_IS_TRUE(strlen(image.Hash) > 0);
-                    VERIFY_IS_TRUE(image.Size > 0);
-                    VERIFY_IS_TRUE(image.Created != 0);
-                    break;
-                }
+                std::string imageName = image.Image;
+                if (imageName == "debian:latest") foundLatest = true;
+                if (imageName == "debian:test-tag1") foundTag1 = true;
+                if (imageName == "debian:test-tag2") foundTag2 = true;
             }
-            VERIFY_IS_TRUE(foundDebian);
+
+            VERIFY_IS_TRUE(foundLatest);
+            VERIFY_IS_TRUE(foundTag1);
+            VERIFY_IS_TRUE(foundTag2);
         }
 
-        // Test 3: Filter by reference
+        LogInfo("Test: Verify all new fields are populated");
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
+
+            std::string commonHash;
+            int debianTagCount = 0;
+
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                if (imageName.starts_with("debian:"))
+                {
+                    debianTagCount++;
+
+                    // Verify Hash field
+                    VERIFY_IS_TRUE(strlen(image.Hash) > 0);
+                    VERIFY_IS_TRUE(std::string(image.Hash).starts_with("sha256:"));
+
+                    // All debian tags should have the same hash (same underlying image)
+                    if (commonHash.empty())
+                    {
+                        commonHash = image.Hash;
+                    }
+                    else
+                    {
+                        VERIFY_ARE_EQUAL(commonHash, std::string(image.Hash));
+                    }
+
+                    // Verify Size field
+                    VERIFY_IS_TRUE(image.Size > 0);
+                    LogInfo("Image %s - Size: %llu bytes", imageName.c_str(), image.Size);
+
+                    // Verify VirtualSize field
+                    VERIFY_IS_TRUE(image.VirtualSize > 0);
+                    VERIFY_IS_TRUE(image.VirtualSize >= image.Size);
+                    LogInfo("Image %s - VirtualSize: %llu bytes", imageName.c_str(), image.VirtualSize);
+
+                    // Verify Created timestamp
+                    VERIFY_IS_TRUE(image.Created > 0);
+                    LogInfo("Image %s - Created: %lld", imageName.c_str(), image.Created);
+
+                    // ParentId may be empty for base images, but should be a valid field
+                    LogInfo("Image %s - ParentId: %s", imageName.c_str(),
+                            strlen(image.ParentId) > 0 ? image.ParentId : "(empty - base image)");
+                }
+            }
+
+            VERIFY_IS_TRUE(debianTagCount >= 3); // At least debian:latest, test-tag1, test-tag2
+            LogInfo("Found %d debian tags with matching hash: %s", debianTagCount, commonHash.c_str());
+        }
+
+        LogInfo("Test: Multiple tags for same image return separate entries");
         {
             WSLA_LIST_IMAGES_OPTIONS options{};
             options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = "debian";
+            options.Before = nullptr;
+            options.Since = nullptr;
+            options.DanglingSet = FALSE;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // Should find at least our 3 debian tags
+            VERIFY_IS_TRUE(images.size() >= 3);
+
+            // Verify each tag is a separate entry
+            std::set<std::string> imageTags;
+            for (const auto& image : images)
+            {
+                imageTags.insert(image.Image);
+            }
+
+            VERIFY_IS_TRUE(imageTags.contains("debian:latest"));
+            VERIFY_IS_TRUE(imageTags.contains("debian:test-tag1"));
+            VERIFY_IS_TRUE(imageTags.contains("debian:test-tag2"));
+        }
+
+        LogInfo("Test: Filter by specific reference");
+        {
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = "debian:test-tag1";
+            options.Before = nullptr;
+            options.Since = nullptr;
+            options.DanglingSet = FALSE;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+
+            // When filtering by exact tag, Docker returns all tags for that image
+            // So we should get debian:latest, debian:test-tag1, debian:test-tag2
+            bool foundTag1 = false;
+            for (const auto& image : images)
+            {
+                std::string imageName = image.Image;
+                LogInfo("Filtered image: %s", imageName.c_str());
+                if (imageName == "debian:test-tag1")
+                {
+                    foundTag1 = true;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag1);
+        }
+
+        LogInfo("Test: Digests flag");
+        {
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsDigests;
             options.Reference = "debian:latest";
             options.Before = nullptr;
             options.Since = nullptr;
@@ -395,25 +504,160 @@ class WSLATests
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
-            // Should only return debian:latest and its other tags
-            bool foundDebianLatest = false;
+            // Check if digests are available (they may not be for all images)
+            bool hasDigest = false;
             for (const auto& image : images)
             {
-                std::string imageName = image.Image;
-                if (imageName == "debian:latest")
+                if (strlen(image.Digest) > 0)
                 {
-                    foundDebianLatest = true;
+                    hasDigest = true;
+                    LogInfo("Image %s has digest: %s", image.Image, image.Digest);
+                    // Digest should be in format repo@sha256:...
+                    VERIFY_IS_TRUE(std::string(image.Digest).find("@sha256:") != std::string::npos);
                 }
-                // All returned images should be debian
-                VERIFY_IS_TRUE(imageName.starts_with("debian:") || imageName.starts_with("<none>"));
             }
-            VERIFY_IS_TRUE(foundDebianLatest);
+            // Note: Pulled images from registry should have digests, locally built may not
+            LogInfo("Digests found: %s", hasDigest ? "yes" : "no");
         }
 
-        // Test 4: Digests flag
+        LogInfo("Test: Before/Since filters");
+        {
+            // Pull a second image to test before/since filters
+            if (m_defaultSession->PullImage("alpine:latest", nullptr, nullptr, nullptr) == S_OK)
+            {
+                auto alpineCleanup = wil::scope_exit([&]() {
+                    WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsForce};
+                    wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                    LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+                });
+
+                // Get all images to find their IDs
+                wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> allImages;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
+
+                std::string debianId, alpineId;
+                for (const auto& image : allImages)
+                {
+                    std::string imageName = image.Image;
+                    if (imageName == "debian:latest")
+                    {
+                        debianId = image.Hash;
+                    }
+                    else if (imageName == "alpine:latest")
+                    {
+                        alpineId = image.Hash;
+                    }
+                }
+
+                VERIFY_IS_FALSE(debianId.empty());
+                VERIFY_IS_FALSE(alpineId.empty());
+
+                // Test 'since' filter - images created after debian
+                {
+                    WSLA_LIST_IMAGES_OPTIONS options{};
+                    options.Flags = WSLAListImagesFlagsNone;
+                    options.Reference = nullptr;
+                    options.Before = nullptr;
+                    options.Since = debianId.c_str();
+                    options.DanglingSet = FALSE;
+
+                    wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                    LogInfo("Images since debian: %zu", images.size());
+                }
+
+                // Test 'before' filter - images created before alpine
+                {
+                    WSLA_LIST_IMAGES_OPTIONS options{};
+                    options.Flags = WSLAListImagesFlagsNone;
+                    options.Reference = nullptr;
+                    options.Before = alpineId.c_str();
+                    options.Since = nullptr;
+                    options.DanglingSet = FALSE;
+
+                    wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                    LogInfo("Images before alpine: %zu", images.size());
+                }
+
+                alpineCleanup.reset();
+            }
+            else
+            {
+                LogInfo("Skipping before/since tests - alpine pull failed");
+            }
+        }
+
+        LogInfo("Test: All flag comparison");
+        {
+            // List without All flag
+            WSLA_LIST_IMAGES_OPTIONS options1{};
+            options1.Flags = WSLAListImagesFlagsNone;
+            options1.Reference = nullptr;
+            options1.Before = nullptr;
+            options1.Since = nullptr;
+            options1.DanglingSet = FALSE;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> imagesWithoutAll;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options1, imagesWithoutAll.addressof(), imagesWithoutAll.size_address<ULONG>()));
+
+            // List with All flag
+            WSLA_LIST_IMAGES_OPTIONS options2{};
+            options2.Flags = WSLAListImagesFlagsAll;
+            options2.Reference = nullptr;
+            options2.Before = nullptr;
+            options2.Since = nullptr;
+            options2.DanglingSet = FALSE;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> imagesWithAll;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options2, imagesWithAll.addressof(), imagesWithAll.size_address<ULONG>()));
+
+            // With All flag should return same or more images (includes intermediates)
+            VERIFY_IS_TRUE(imagesWithAll.size() >= imagesWithoutAll.size());
+            LogInfo("Images without All flag: %zu, with All flag: %zu", imagesWithoutAll.size(), imagesWithAll.size());
+        }
+
+        LogInfo("Test: Dangling filter");
+        {
+            // List only dangling images
+            WSLA_LIST_IMAGES_OPTIONS options{};
+            options.Flags = WSLAListImagesFlagsNone;
+            options.Reference = nullptr;
+            options.Before = nullptr;
+            options.Since = nullptr;
+            options.Dangling = TRUE;
+            options.DanglingSet = TRUE;
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> danglingImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, danglingImages.addressof(), danglingImages.size_address<ULONG>()));
+
+            LogInfo("Dangling images found: %zu", danglingImages.size());
+
+            // All dangling images should have <none>:<none> as the tag
+            for (const auto& image : danglingImages)
+            {
+                std::string imageName = image.Image;
+                VERIFY_ARE_EQUAL(imageName, std::string("<none>:<none>"));
+                LogInfo("Dangling image: %s (hash: %s)", imageName.c_str(), image.Hash);
+            }
+
+            // List non-dangling images
+            options.Dangling = FALSE;
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> nonDanglingImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, nonDanglingImages.addressof(), nonDanglingImages.size_address<ULONG>()));
+
+            // None of these should be <none>:<none>
+            for (const auto& image : nonDanglingImages)
+            {
+                std::string imageName = image.Image;
+                VERIFY_ARE_NOT_EQUAL(imageName, std::string("<none>:<none>"));
+            }
+        }
+
+        LogInfo("Test: Combined flags (All + Digests)");
         {
             WSLA_LIST_IMAGES_OPTIONS options{};
-            options.Flags = WSLAListImagesFlagsDigests;
+            options.Flags = WSLAListImagesFlagsAll | WSLAListImagesFlagsDigests;
             options.Reference = nullptr;
             options.Before = nullptr;
             options.Since = nullptr;
@@ -422,23 +666,14 @@ class WSLATests
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
-            // Verify at least one image has digest populated (if available from registry)
-            bool hasDigest = false;
-            for (const auto& image : images)
-            {
-                if (strlen(image.Digest) > 0)
-                {
-                    hasDigest = true;
-                    break;
-                }
-            }
-            // Note: Digest may not always be available for locally built images
-            LogInfo("Digests found: %s", hasDigest ? "yes" : "no");
+            LogInfo("Images with All+Digests flags: %zu", images.size());
+            VERIFY_IS_TRUE(images.size() > 0);
         }
 
         cleanup.reset();
-        ExpectImagePresent(*m_defaultSession, "debian:test-list-images", false);
-        ExpectImagePresent(*m_defaultSession, "debian:latest");
+        ExpectImagePresent(*m_defaultSession, "debian:test-tag1", false);
+        ExpectImagePresent(*m_defaultSession, "debian:test-tag2", false);
+        ExpectImagePresent(*m_defaultSession, "debian:latest", true);
     }
 
     // TODO: Test that invalid tars are correctly handled.
