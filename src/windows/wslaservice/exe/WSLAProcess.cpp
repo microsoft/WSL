@@ -42,7 +42,7 @@ CATCH_RETURN();
 HRESULT WSLAProcess::GetStdHandle(ULONG Index, ULONG* Handle)
 try
 {
-    auto handle = m_io->OpenFd(Index, WSLAFDFlagsStream);
+    auto handle = m_io->OpenFd(Index);
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !handle.is_valid());
 
@@ -60,7 +60,7 @@ CATCH_RETURN();
 
 wil::unique_handle WSLAProcess::GetStdHandle(int Index)
 {
-    return m_io->OpenFd(Index, WSLAFDFlagsStream);
+    return m_io->OpenFd(Index);
 }
 
 HANDLE WSLAProcess::GetExitEvent()

@@ -17,8 +17,8 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::RunningWSLAContainer;
 using wsl::windows::common::WSLAContainerLauncher;
 
-RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& fds) :
-    m_container(std::move(Container)), m_fds(std::move(fds))
+RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, WSLAProcessFlags Flags) :
+    m_container(std::move(Container)), m_flags(Flags)
 {
 }
 
@@ -56,7 +56,7 @@ ClientRunningWSLAProcess RunningWSLAContainer::GetInitProcess()
     wil::com_ptr<IWSLAProcess> process;
     THROW_IF_FAILED(m_container->GetInitProcess(&process));
 
-    return ClientRunningWSLAProcess{std::move(process), std::move(m_fds)};
+    return ClientRunningWSLAProcess{std::move(process), m_flags};
 }
 
 void RunningWSLAContainer::SetDeleteOnClose(bool deleteOnClose)
@@ -83,12 +83,11 @@ std::string RunningWSLAContainer::Name()
 WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& Image,
     const std::string& Name,
-    const std::string& EntryPoint,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
     WSLA_CONTAINER_NETWORK_TYPE containerNetworkType,
-    ProcessFlags Flags) :
-    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
+    WSLAProcessFlags Flags) :
+    WSLAProcessLauncher({}, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
 {
 }
 
@@ -134,15 +133,22 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
         options.Name = m_name.c_str();
     }
 
+    std::vector<const char*> entrypointStorage;
+
+    for (const auto &e: m_entrypoint)
+    {
+        entrypointStorage.push_back(e.c_str());
+    }
+
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
 
-    if (m_executable.empty())
+    if (!entrypointStorage.empty())
     {
-        options.InitProcessOptions.Executable = nullptr;
+        options.Entrypoint = {entrypointStorage.data(), static_cast<ULONG>(entrypointStorage.size())};
     }
 
     options.VolumesCount = static_cast<ULONG>(m_volumes.size());
@@ -156,7 +162,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
         return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});
     }
 
-    return std::make_pair(S_OK, std::move(RunningWSLAContainer{std::move(container), std::move(m_fds)}));
+    return std::make_pair(S_OK, std::move(RunningWSLAContainer{std::move(container), m_flags}));
 }
 
 RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)

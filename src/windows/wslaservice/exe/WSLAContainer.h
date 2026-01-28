@@ -61,7 +61,8 @@ public:
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         WSLA_CONTAINER_STATE InitialState,
-        bool Tty);
+        WSLAProcessFlags InitProcessFlags,
+        WSLAContainerFlags ContainerFlags);
 
     ~WSLAContainerImpl();
 
@@ -108,7 +109,8 @@ private:
     std::string m_name;
     std::string m_image;
     std::string m_id;
-    bool m_tty{}; // TODO: have a flag for this at the API level.
+    WSLAProcessFlags m_initProcessFlags{};
+    WSLAContainerFlags m_containerFlags{};
     std::vector<DockerExecProcessControl*> m_processes;
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
@@ -121,9 +123,6 @@ private:
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     LogsRelay m_logsRelay;
-
-    static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);
-    static void AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options);
 
     static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
     static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);

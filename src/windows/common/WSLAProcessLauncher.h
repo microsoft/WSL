@@ -22,15 +22,6 @@ Abstract:
 
 namespace wsl::windows::common {
 
-enum class ProcessFlags
-{
-    None = 0,
-    Stdin = 1,
-    Stdout = 2,
-    Stderr = 4,
-};
-
-DEFINE_ENUM_FLAG_OPERATORS(ProcessFlags);
 
 class RunningWSLAProcess
 {
@@ -41,7 +32,7 @@ public:
         std::map<int, std::string> Output;
     };
 
-    RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds);
+    RunningWSLAProcess(WSLAProcessFlags Flags);
     NON_COPYABLE(RunningWSLAProcess);
     DEFAULT_MOVABLE(RunningWSLAProcess);
 
@@ -55,7 +46,7 @@ public:
 protected:
     virtual void GetState(WSLA_PROCESS_STATE* State, int* Code) = 0;
 
-    std::vector<WSLA_PROCESS_FD> m_fds;
+    WSLAProcessFlags m_flags{};
 };
 
 class ClientRunningWSLAProcess : public RunningWSLAProcess
@@ -64,7 +55,7 @@ public:
     NON_COPYABLE(ClientRunningWSLAProcess);
     DEFAULT_MOVABLE(ClientRunningWSLAProcess);
 
-    ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds);
+    ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, WSLAProcessFlags Flags);
     wil::unique_handle GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
     IWSLAProcess& Get();
@@ -85,9 +76,8 @@ public:
         const std::string& Executable,
         const std::vector<std::string>& Arguments,
         const std::vector<std::string>& Environment = {},
-        ProcessFlags Flags = ProcessFlags::Stdout | ProcessFlags::Stderr);
+        WSLAProcessFlags = WSLAProcessFlagsNone);
 
-    void AddFd(WSLA_PROCESS_FD Fd);
     void SetTtySize(ULONG Rows, ULONG Columns);
 
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
@@ -113,7 +103,7 @@ public:
 protected:
     std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> CreateProcessOptions();
 
-    std::vector<WSLA_PROCESS_FD> m_fds;
+    WSLAProcessFlags m_flags{};
     std::string m_executable;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;

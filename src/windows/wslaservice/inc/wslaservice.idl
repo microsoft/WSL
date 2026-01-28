@@ -107,6 +107,8 @@ typedef enum _WSLAProcessFlags
     WSLAProcessFlagsTty = 2
 } WSLAProcessFlags;
 
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAProcessFlags);")
+
 typedef struct _WSLAStringArray
 {
     [unique, size_is(Count)] LPCSTR* Values;
@@ -164,7 +166,7 @@ struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
     [unique] LPCSTR Name;
-    [unique] LPCSTR Entrypoint;
+    WSLAStringArray Entrypoint;
     struct WSLA_PROCESS_OPTIONS InitProcessOptions;
     [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
     ULONG VolumesCount;
@@ -337,7 +339,7 @@ interface IWSLASession : IUnknown
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in] LPCWSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT CreateRootNamespaceProcess([in] LPCSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 

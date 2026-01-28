@@ -115,13 +115,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     const std::string shell = "/bin/sh";
 
     // Launch with terminal fds (PTY).
-    wsl::windows::common::WSLAProcessLauncher launcher{
-        shell, {shell, "--login"}, {"TERM=xterm-256color"}, wsl::windows::common::ProcessFlags::None};
-
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput, .Path = nullptr});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput, .Path = nullptr});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl, .Path = nullptr});
-
+    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty};
     launcher.SetTtySize(rows, cols);
 
     auto process = launcher.Launch(*session);
@@ -563,7 +557,6 @@ static int Run(std::wstring_view commandLine)
     WSLA_CONTAINER_OPTIONS options{};
     options.Image = image.c_str();
 
-    std::vector<WSLA_PROCESS_FD> fds;
     HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -573,22 +566,13 @@ static int Run(std::wstring_view commandLine)
         Info.cbSize = sizeof(Info);
         THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
 
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
-
+        options.InitProcessOptions.Flags = WSLAProcessFlagsTty;
         options.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
         options.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
     }
     else
     {
-        if (interactive)
-        {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
-        }
-
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
+        WI_SetFlagIf(options.InitProcessOptions.Flags, WSLAProcessFlagsTty, interactive);
     }
 
     std::vector<std::string> argsStorage;
@@ -603,10 +587,7 @@ static int Run(std::wstring_view commandLine)
         args.emplace_back(e.c_str());
     }
 
-    options.InitProcessOptions.CommandLine = args.data();
-    options.InitProcessOptions.CommandLineCount = static_cast<ULONG>(args.size());
-    options.InitProcessOptions.Fds = fds.data();
-    options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
+    options.InitProcessOptions.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
 
     if (!name.empty())
     {
@@ -633,7 +614,7 @@ static int Run(std::wstring_view commandLine)
     wil::com_ptr<IWSLAProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
-    return InteractiveShell(ClientRunningWSLAProcess(std::move(process), std::move(fds)), tty);
+    return InteractiveShell(ClientRunningWSLAProcess(std::move(process), options.InitProcessOptions.Flags), tty);
 }
 
 static int Attach(std::wstring_view commandLine)

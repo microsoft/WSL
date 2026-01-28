@@ -77,11 +77,8 @@ try
 }
 CATCH_LOG();
 
-wil::unique_handle RelayedProcessIO::OpenFd(ULONG Fd, WSLAFDFlags Flags)
+wil::unique_handle RelayedProcessIO::OpenFd(ULONG Fd)
 {
-    // TODO: Implement logs and non-stream FD's.
-    THROW_HR_IF_MSG(E_INVALIDARG, Flags != WSLAFDFlagsStream, "Invalid flags for relayed process: %i", static_cast<int>(Flags));
-
     if (!m_relayedHandles.has_value())
     {
         StartIORelay();
@@ -99,10 +96,9 @@ TTYProcessIO::TTYProcessIO(wil::unique_handle&& IoStream) : m_ioStream(std::move
 {
 }
 
-wil::unique_handle TTYProcessIO::OpenFd(ULONG Fd, WSLAFDFlags Flags)
+wil::unique_handle TTYProcessIO::OpenFd(ULONG Fd)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Fd != WSLAFDTty, "Invalid fd type for TTY process: %i", static_cast<int>(Fd));
-    THROW_HR_IF_MSG(E_INVALIDARG, Flags != WSLAFDFlagsStream, "Invalid flags for TTY process: %i", static_cast<int>(Flags));
 
     return std::move(m_ioStream);
 }
@@ -111,7 +107,7 @@ VMProcessIO::VMProcessIO(std::map<ULONG, wil::unique_handle>&& handles) : m_hand
 {
 }
 
-wil::unique_handle VMProcessIO::OpenFd(ULONG Fd, WSLAFDFlags Flags)
+wil::unique_handle VMProcessIO::OpenFd(ULONG Fd)
 {
     auto it = m_handles.find(Fd);
     THROW_HR_IF_MSG(E_INVALIDARG, it == m_handles.end(), "Invalid fd type for VM process: %i", static_cast<int>(Fd));

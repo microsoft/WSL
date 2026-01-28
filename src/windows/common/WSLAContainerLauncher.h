@@ -23,7 +23,7 @@ class RunningWSLAContainer
 public:
     NON_COPYABLE(RunningWSLAContainer);
     DEFAULT_MOVABLE(RunningWSLAContainer);
-    RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& fds);
+    RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, WSLAProcessFlags Flags);
     ~RunningWSLAContainer();
     IWSLAContainer& Get();
 
@@ -37,7 +37,7 @@ public:
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;
-    std::vector<WSLA_PROCESS_FD> m_fds;
+    WSLAProcessFlags m_flags;
     bool m_deleteOnClose = true;
 };
 
@@ -50,21 +50,20 @@ public:
     WSLAContainerLauncher(
         const std::string& Image,
         const std::string& Name = "",
-        const std::string& EntryPoint = "",
         const std::vector<std::string>& Arguments = {},
         const std::vector<std::string>& Environment = {},
         WSLA_CONTAINER_NETWORK_TYPE containerNetworkType = WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST,
-        ProcessFlags Flags = ProcessFlags::Stdout | ProcessFlags::Stderr);
+        WSLAProcessFlags Flags = WSLAProcessFlagsNone);
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
-
-    using WSLAProcessLauncher::AddFd;
 
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> CreateNoThrow(IWSLASession& Session);
 
     RunningWSLAContainer Launch(IWSLASession& Session);
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> LaunchNoThrow(IWSLASession& Session);
+
+    void SetEntrypoint(std::vector<std::string>&& entrypoint);
 
 private:
     std::string m_image;
@@ -74,5 +73,6 @@ private:
     std::deque<std::wstring> m_hostPaths;
     std::deque<std::string> m_containerPaths;
     WSLA_CONTAINER_NETWORK_TYPE m_containerNetworkType;
+    std::vector<std::string> m_entrypoint;
 };
 } // namespace wsl::windows::common
