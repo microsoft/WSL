@@ -2622,7 +2622,8 @@ class WSLATests
             auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
 
             // Create a docker container that has no metedata.
-            auto result = RunCommand(session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
+            auto result = RunCommand(
+                session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
         }
 
@@ -2634,7 +2635,6 @@ class WSLATests
             auto hr = session->OpenContainer("test-invalid-metadata", &container);
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
         }
-
     }
 
     TEST_METHOD(SessionManagement)
