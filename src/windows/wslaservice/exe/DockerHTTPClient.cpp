@@ -80,6 +80,11 @@ std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTP
         std::format("http://localhost/images/{}?force={}&noprune={}", Image, Force ? "true" : "false", NoPrune ? "true" : "false"));
 }
 
+std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::SaveImage(const std::string& NameOrId)
+{
+    return SendRequestWithContext(verb::get, std::format("http://localhost/images/{}/get", NameOrId), {}, nullptr, {});
+}
+
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
 {
     auto url = std::format("http://localhost/containers/json?all={}", all ? "true" : "false");
@@ -150,6 +155,11 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     }
 
     return std::move(socket);
+}
+
+std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::ExportContainer(const std::string& ContainerNameOrID)
+{
+    return SendRequestWithContext(verb::get, std::format("http://localhost/containers/{}/export", ContainerNameOrID), {}, nullptr, {});
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -409,12 +419,13 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
     return std::move(context);
 }
 
-std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
+std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::SendRequestWithContext(
     verb Method,
     const std::string& Url,
     const std::string& Body,
     const OnResponseBytes& OnResponse,
-    const std::map<boost::beast::http::field, std::string>& Headers)
+    const std::map<boost::beast::http::field, std::string>& Headers,
+    std::string* errorJson)
 {
     // Write the request
     auto context = SendRequestImpl(Method, Url, Body, Headers);
@@ -501,5 +512,16 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
         }
     }
 
-    return {parser.get().result_int(), wil::unique_socket{context->stream.release()}};
+    return {parser.get().result_int(), std::move(context)};
+}
+
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
+    verb Method,
+    const std::string& Url,
+    const std::string& Body,
+    const OnResponseBytes& OnResponse,
+    const std::map<boost::beast::http::field, std::string>& Headers)
+{
+    auto result = SendRequestWithContext(Method, Url, Body, OnResponse, Headers);
+    return {result.first, wil::unique_socket{result.second->stream.release()}};
 }
