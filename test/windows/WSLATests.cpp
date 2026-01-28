@@ -2551,6 +2551,7 @@ class WSLATests
         auto restore = ResetTestSession();
 
         std::string containerName = "test-recovery-volumes-ports";
+
         auto hostFolder = std::filesystem::current_path() / "test-recovery-volume";
         std::filesystem::create_directories(hostFolder);
 
@@ -2590,6 +2591,7 @@ class WSLATests
         {
             auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-vp", true, WSLANetworkingModeNAT));
             auto container = OpenContainer(session.get(), containerName);
+            container.SetDeleteOnClose(false);
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
             VERIFY_SUCCEEDED(container.Get().Start());
@@ -2600,7 +2602,17 @@ class WSLATests
 
             // A 200 response also indicates the test file is available so volume was mounted correctly.
             ExpectHttpResponse(L"http://127.0.0.1:1250/test.txt", 200);
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete());
         }
+
+        // Delete the host folder to simulate volume folder being missing on recovery
+        cleanup.reset();
+
+        // Create a new session - this should succeed even though the volume folder is gone
+        auto session = CreateSession(GetDefaultSessionSettings(L"recovery-test-vp", true, WSLANetworkingModeNAT));
+        VERIFY_FAILED(session->OpenContainer(containerName.c_str(), nullptr));
     }
 
     TEST_METHOD(SessionManagement)

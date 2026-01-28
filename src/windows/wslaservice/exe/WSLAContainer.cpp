@@ -730,10 +730,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 
     auto metadata = wsl::shared::FromJson<ContainerMetadata>(metadataIt->second.c_str());
 
-    // Re-mount volumes from metadata.
+    // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
+    // to open containers that are not running.
     MountVolumes(metadata.Volumes, parentVM);
-
-    // Re-map ports from metadata.
     auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, parentVM);
 
     auto container = std::make_unique<WSLAContainerImpl>(
