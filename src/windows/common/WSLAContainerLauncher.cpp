@@ -135,7 +135,7 @@ void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& 
     m_volumes.push_back(vol);
 }
 
-std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
+std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session, WSLAContainerStartFlags Flags)
 {
     auto [result, container] = CreateNoThrow(Session);
     if (FAILED(result))
@@ -143,7 +143,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
         return std::make_pair(result, std::optional<RunningWSLAContainer>{});
     }
 
-    result = container.value().Get().Start();
+    result = container.value().Get().Start(Flags);
 
     return std::make_pair(result, std::move(container));
 }
@@ -207,9 +207,9 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
     return std::make_pair(S_OK, std::move(RunningWSLAContainer{std::move(container), m_flags}));
 }
 
-RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
+RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session, WSLAContainerStartFlags Flags)
 {
-    auto [result, container] = LaunchNoThrow(Session);
+    auto [result, container] = LaunchNoThrow(Session, Flags);
     THROW_IF_FAILED(result);
 
     return std::move(container.value());

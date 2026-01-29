@@ -658,7 +658,8 @@ try
             *m_virtualMachine,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
-            m_dockerClient.value()));
+            m_dockerClient.value(),
+            m_ioRelay));
 
         THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
 
@@ -930,7 +931,8 @@ void WSLASession::RecoverExistingContainers()
                 *m_virtualMachine,
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
-                m_dockerClient.value());
+                m_dockerClient.value(),
+                m_ioRelay);
 
             m_containers.emplace_back(std::move(container));
         }

@@ -195,6 +195,15 @@ typedef enum _WSLAContainerFlags
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerFlags);")
 
+
+typedef enum _WSLAContainerStartFlags
+{
+    WSLAContainerStartFlagsNone = 0,
+    WSLAContainerStartFlagsAttach = 1, // Attach stdio handles on start.
+} WSLAContainerStartFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerStartFlags);")
+
 struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
@@ -316,7 +325,7 @@ interface IWSLAContainer : IUnknown
 {
     HRESULT Attach([out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
     HRESULT Stop([in] WSLASignal Signal, [in] LONGLONG TimeoutSeconds);
-    HRESULT Start();
+    HRESULT Start([in] WSLAContainerStartFlags Flags);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);

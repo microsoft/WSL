@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LogsRelay.h
+    IORelay.h
 
 Abstract:
 
-    Contains the definition of the LogsRelay class.
+    Contains the definition of the IORelay class.
 
 --*/
 
@@ -16,14 +16,14 @@ Abstract:
 
 namespace wsl::windows::service::wsla {
 
-class LogsRelay
+class IORelay
 {
 
 public:
-    NON_COPYABLE(LogsRelay);
+    NON_COPYABLE(IORelay);
 
-    LogsRelay() = default;
-    ~LogsRelay();
+    IORelay() = default;
+    ~IORelay();
 
     void AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles);
     void AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle);

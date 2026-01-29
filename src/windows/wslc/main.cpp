@@ -552,7 +552,7 @@ static int Run(std::wstring_view commandLine)
 
     error.ThrowIfFailed(result);
 
-    THROW_IF_FAILED(container->Start()); // TODO: Error message
+    THROW_IF_FAILED(container->Start(WSLAContainerStartFlagsAttach)); // TODO: Error message
 
     wil::com_ptr<IWSLAProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));

@@ -3,7 +3,7 @@ set(SOURCES
     ContainerEventTracker.cpp
     DockerHTTPClient.cpp
     main.rc
-    LogsRelay.cpp
+    IORelay.cpp
     ServiceMain.cpp
     ServiceProcessLauncher.cpp
     WSLAContainer.cpp
@@ -20,7 +20,7 @@ set(HEADERS
     COMImplClass.h
     ContainerEventTracker.h
     DockerHTTPClient.h
-    LogsRelay.h
+    IORelay.h
     ServiceProcessLauncher.h
     WSLAContainer.h
     WSLAProcess.h

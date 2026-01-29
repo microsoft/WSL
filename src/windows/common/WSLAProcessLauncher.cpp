@@ -74,6 +74,11 @@ RunningWSLAProcess::RunningWSLAProcess(WSLAProcessFlags Flags) : m_flags(Flags)
 {
 }
 
+WSLAProcessFlags RunningWSLAProcess::Flags() const
+{
+    return m_flags;
+}
+
 int RunningWSLAProcess::GetExitCode()
 {
     WSLA_PROCESS_STATE state{};
@@ -122,6 +127,7 @@ int RunningWSLAProcess::Wait(DWORD TimeoutMs)
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_TIMEOUT), !GetExitEvent().wait(TimeoutMs));
     return GetExitCode();
 }
+
 
 RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
 {
@@ -205,6 +211,7 @@ IWSLAProcess& ClientRunningWSLAProcess::Get()
 {
     return *m_process.get();
 }
+
 
 ClientRunningWSLAProcess::ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, WSLAProcessFlags Flags) :
     RunningWSLAProcess(Flags), m_process(std::move(process))

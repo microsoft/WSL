@@ -20,7 +20,7 @@ Abstract:
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLAProcessControl.h"
-#include "LogsRelay.h"
+#include "IORelay.h"
 #include "COMImplClass.h"
 
 namespace wsl::windows::service::wsla {
@@ -60,13 +60,14 @@ public:
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
+        IORelay& Relay,
         WSLA_CONTAINER_STATE InitialState,
         WSLAProcessFlags InitProcessFlags,
         WSLAContainerFlags ContainerFlags);
 
     ~WSLAContainerImpl();
 
-    void Start();
+    void Start(WSLAContainerStartFlags Flags);
 
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
     void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
@@ -92,18 +93,21 @@ public:
         WSLAVirtualMachine& parentVM,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient);
+        DockerHTTPClient& DockerClient,
+        IORelay& Relay);
 
     static std::unique_ptr<WSLAContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLAVirtualMachine& parentVM,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient);
+        DockerHTTPClient& DockerClient,
+        IORelay& Relay);
 
 private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
+    std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
     std::recursive_mutex m_lock;
     std::string m_name;
@@ -122,7 +126,7 @@ private:
     DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
-    LogsRelay m_logsRelay;
+    IORelay& m_ioRelay;
 
     static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
     static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
@@ -142,7 +146,7 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
-    IFACEMETHOD(Start)() override;
+    IFACEMETHOD(Start)(WSLAContainerStartFlags Flags) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLAContainerId Id) override;

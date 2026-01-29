@@ -60,6 +60,8 @@ CATCH_RETURN();
 
 wil::unique_handle WSLAProcess::GetStdHandle(int Index)
 {
+    THROW_WIN32_IF(ERROR_INVALID_STATE, !m_io);
+
     return m_io->OpenFd(Index);
 }
 

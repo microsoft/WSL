@@ -19,6 +19,7 @@ Abstract:
 #include "WSLAContainer.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
+#include "IORelay.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -123,6 +124,7 @@ private:
     bool m_elevatedToken{};
     DWORD m_creatorPid{};
     std::recursive_mutex m_lock;
+    IORelay m_ioRelay;
 };
 
 } // namespace wsl::windows::service::wsla

@@ -4,27 +4,27 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    LogsRelay.cpp
+    IORelay.cpp
 
 Abstract:
 
-    Contains the implementation of the LogsRelay class.
+    Contains the implementation of the IORelay class.
 
 --*/
 
-#include "LogsRelay.h"
+#include "IORelay.h"
 
 using wsl::windows::common::relay::DockerIORelayHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::OverlappedIOHandle;
-using wsl::windows::service::wsla::LogsRelay;
+using wsl::windows::service::wsla::IORelay;
 
-LogsRelay::~LogsRelay()
+IORelay::~IORelay()
 {
     StopRelayThread();
 }
 
-void LogsRelay::AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle)
+void IORelay::AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle)
 {
     std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>> handles;
     handles.emplace_back(std::move(Handle));
@@ -32,7 +32,7 @@ void LogsRelay::AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& H
     AddHandles(std::move(handles));
 }
 
-void LogsRelay::AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles)
+void IORelay::AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles)
 {
     // Stop the relay thread.
     StopRelayThread();
@@ -42,6 +42,7 @@ void LogsRelay::AddHandles(std::vector<std::unique_ptr<common::relay::Overlapped
 
     for (auto& e : Handles)
     {
+        WI_ASSERT(!!e);
         m_io.AddHandle(std::move(e), MultiHandleWait::IgnoreErrors);
     }
 
@@ -49,7 +50,7 @@ void LogsRelay::AddHandles(std::vector<std::unique_ptr<common::relay::Overlapped
     StartRelayThread();
 }
 
-void LogsRelay::StartRelayThread()
+void IORelay::StartRelayThread()
 {
     WI_ASSERT(!m_thread.joinable());
     m_stopEvent.ResetEvent();
@@ -57,7 +58,7 @@ void LogsRelay::StartRelayThread()
     m_thread = std::thread([this]() { Run(); });
 }
 
-void LogsRelay::StopRelayThread()
+void IORelay::StopRelayThread()
 {
     if (m_thread.joinable())
     {
@@ -66,7 +67,7 @@ void LogsRelay::StopRelayThread()
     }
 }
 
-void LogsRelay::Run()
+void IORelay::Run()
 try
 {
     m_io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get()), MultiHandleWait::CancelOnCompleted);
