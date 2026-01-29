@@ -32,6 +32,16 @@ void WSLAProcessLauncher::SetTtySize(ULONG Rows, ULONG Columns)
     m_columns = Columns;
 }
 
+void WSLAProcessLauncher::SetWorkingDirectory(std::string&& WorkingDirectory)
+{
+    m_workingDirectory = std::move(WorkingDirectory);
+}
+
+void WSLAProcessLauncher::SetUser(std::string&& User)
+{
+    m_user = std::move(User);
+}
+
 std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> WSLAProcessLauncher::CreateProcessOptions()
 {
     std::vector<const char*> commandLine;
@@ -46,6 +56,16 @@ std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const cha
     options.TtyColumns = m_columns;
     options.TtyRows = m_rows;
     options.Flags = m_flags;
+
+    if (!m_workingDirectory.empty())
+    {
+        options.CurrentDirectory = m_workingDirectory.c_str();
+    }
+
+    if (!m_user.empty())
+    {
+        options.User = m_user.c_str();
+    }
 
     return std::make_tuple(options, std::move(commandLine), std::move(environment));
 }

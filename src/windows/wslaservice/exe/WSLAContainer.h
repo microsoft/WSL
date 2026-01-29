@@ -69,7 +69,7 @@ public:
     void Start();
 
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
-    void Stop(_In_ int Signal, _In_ ULONG TimeoutMs);
+    void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
     void Delete();
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process);
@@ -137,7 +137,7 @@ public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
-    IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
+    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;

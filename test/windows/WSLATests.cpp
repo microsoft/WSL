@@ -1274,6 +1274,81 @@ class WSLATests
             ValidateProcessOutput(process, {{1, ""}});
         }
 
+        // Validate that the default stop signal is respected.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-signal-1", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetDefaultStopSignal(WSLASignalSIGHUP);
+            launcher.SetContainerFlags(WSLAContainerFlagsInit);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalNone, 60));
+
+            // Validate that the init process exited with the expected signal.
+            VERIFY_ARE_EQUAL(process.Wait(), WSLASignalSIGHUP + 128);
+        }
+
+        // Validate that the default stop signal can be overriden.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-signal-2", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetDefaultStopSignal(WSLASignalSIGHUP);
+            launcher.SetContainerFlags(WSLAContainerFlagsInit);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 60));
+
+            // Validate that the init process exited with the expected signal.
+            VERIFY_ARE_EQUAL(process.Wait(), WSLASignalSIGKILL + 128);
+        }
+
+        // Validate that entrypoint is respected.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-entrypoint", {"OK"});
+            launcher.SetEntrypoint({"/bin/echo", "-n"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "OK"}});
+        }
+
+        // Validate that the working directory is correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-signal-1", {"pwd"});
+            launcher.SetWorkingDirectory("/tmp");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "/tmp\n"}});
+        }
+
+        // Validate that hostname and domainanme are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-stop-signal-2", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
+
+            launcher.SetHostname("my-host-name");
+            launcher.SetDomainname("my-domain-name");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "my-host-name.my-domain-name\n"}});
+        }
+
+        // Validate that the username is correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-stop-signal-1", {"whoami"});
+
+            launcher.SetUser("nobody");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "nobody\n"}});
+        }
+
         // Validate error paths
         {
             WSLAContainerLauncher launcher("debian:latest", std::string(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
@@ -1489,7 +1564,7 @@ class WSLATests
             // Verify that the container is in running state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
             // TODO: Once 'container run' is split into 'container create' + 'container start',
             // validate that Stop() on a container in 'Created' state returns ERROR_INVALID_STATE.
@@ -1540,14 +1615,14 @@ class WSLATests
             expectContainerList({{"test-unique-name", "debian:latest", WslaContainerStateExited}});
 
             // Verify that calling Stop() on exited containers is a no-op and state remains as WslaContainerStateExited.
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateExited);
 
             // Verify that stopped containers can be deleted.
             VERIFY_SUCCEEDED(container.Get().Delete());
 
             // Verify that stopping a deleted container returns ERROR_INVALID_STATE.
-            VERIFY_ARE_EQUAL(container.Get().Stop(15, 0), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
+            VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGTERM, 0), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
 
             // Verify that deleted containers can't be deleted again.
             VERIFY_ARE_EQUAL(container.Get().Delete(), HRESULT_FROM_WIN32(RPC_E_DISCONNECTED));
@@ -1642,7 +1717,7 @@ class WSLATests
             auto details = container.Inspect();
             VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
 
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
             expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
 
@@ -1664,7 +1739,7 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "none");
 
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
             expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
 
@@ -1698,7 +1773,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
 
-            VERIFY_SUCCEEDED(container.Get().Stop(15, 0));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
             expectContainerList({{"test-network", "debian:latest", WslaContainerStateExited}});
 
@@ -1725,9 +1800,27 @@ class WSLATests
 
         // Simple exec case.
         {
-            auto process = WSLAProcessLauncher("/bin/echo", {"echo", "OK"}).Launch(container.Get());
+            auto process = WSLAProcessLauncher({}, {"echo", "OK"}).Launch(container.Get());
 
             ValidateProcessOutput(process, {{1, "OK\n"}});
+        }
+
+        // Validate that the working directory is correctly wired.
+        {
+            WSLAProcessLauncher launcher({}, {"pwd"});
+            launcher.SetWorkingDirectory("/tmp");
+
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(process, {{1, "/tmp\n"}});
+        }
+
+        // Validate that the username is correctly wired.
+        {
+            WSLAProcessLauncher launcher({}, {"whoami"});
+            launcher.SetUser("nobody");
+
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(process, {{1, "nobody\n"}});
         }
 
         // Validate that stdin is correctly wired.

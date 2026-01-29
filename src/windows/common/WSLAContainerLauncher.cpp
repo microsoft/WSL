@@ -37,7 +37,7 @@ void RunningWSLAContainer::Reset()
     if (m_container && m_deleteOnClose)
     {
         // Attempt to stop and delete the container.
-        LOG_IF_FAILED(m_container->Stop(9, 0));
+        LOG_IF_FAILED(m_container->Stop(WSLASignalSIGILL, 0));
         LOG_IF_FAILED(m_container->Delete());
     }
 
@@ -96,6 +96,31 @@ void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort
     m_ports.emplace_back(WSLA_PORT_MAPPING{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
 }
 
+void WSLAContainerLauncher::SetDefaultStopSignal(WSLASignal Signal)
+{
+    m_stopSignal = Signal;
+}
+
+void WSLAContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
+{
+    m_entrypoint = std::move(entrypoint);
+}
+
+void WSLAContainerLauncher::SetContainerFlags(WSLAContainerFlags Flags)
+{
+    m_containerFlags = Flags;
+}
+
+void WSLAContainerLauncher::SetHostname(std::string&& Hostname)
+{
+    m_hostname = std::move(Hostname);
+}
+
+void WSLAContainerLauncher::SetDomainname(std::string&& Domainame)
+{
+    m_domainname = std::move(Domainame);
+}
+
 void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
@@ -145,10 +170,27 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
+    options.StopSignal = m_stopSignal;
+    options.Flags = m_containerFlags;
 
     if (!entrypointStorage.empty())
     {
         options.Entrypoint = {entrypointStorage.data(), static_cast<ULONG>(entrypointStorage.size())};
+    }
+
+    if (!m_hostname.empty())
+    {
+        options.HostName = m_hostname.c_str();
+    }
+
+    if (!m_domainname.empty())
+    {
+        options.DomainName = m_domainname.c_str();
+    }
+
+    if (!m_workingDirectory.empty())
+    {
+        options.InitProcessOptions.CurrentDirectory = m_workingDirectory.c_str();
     }
 
     options.VolumesCount = static_cast<ULONG>(m_volumes.size());

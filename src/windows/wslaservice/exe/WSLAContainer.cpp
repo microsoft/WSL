@@ -388,7 +388,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
-void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
+void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
 {
     std::lock_guard lock(m_lock);
 
@@ -399,7 +399,19 @@ void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
 
     try
     {
-        m_dockerClient.StopContainer(m_id, Signal, static_cast<ULONG>(std::round<ULONG>(TimeoutMs / 1000)));
+        std::optional<WSLASignal> SignalArg;
+        if (Signal != WSLASignalNone)
+        {
+            SignalArg = Signal;
+        }
+
+        std::optional<ULONG> TimeoutArg;
+        if (TimeoutSeconds >= 0)
+        {
+            TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
+        }
+
+        m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
     }
     catch (const DockerHTTPException& e)
     {
@@ -486,6 +498,11 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     if (Options->CurrentDirectory != nullptr)
     {
         request.WorkingDir = Options->CurrentDirectory;
+    }
+
+    if (Options->User != nullptr)
+    {
+        request.User = Options->User;
     }
 
     if (WI_IsFlagSet(Options->Flags, WSLAProcessFlagsTty))
@@ -594,6 +611,33 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
     request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
+
+    if (containerOptions.StopSignal != WSLASignalNone)
+    {
+        request.StopSignal = std::to_string(containerOptions.StopSignal);
+    }
+
+    if (containerOptions.InitProcessOptions.CurrentDirectory != nullptr)
+    {
+        request.WorkingDir = containerOptions.InitProcessOptions.CurrentDirectory;
+    }
+
+    if (containerOptions.HostName != nullptr)
+    {
+        request.Hostname = containerOptions.HostName;
+    }
+
+    if (containerOptions.DomainName != nullptr)
+    {
+        request.Domainname = containerOptions.DomainName;
+    }
+
+    if (containerOptions.InitProcessOptions.User != nullptr)
+    {
+        request.User = containerOptions.InitProcessOptions.User;
+    }
+
+    request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLAContainerFlagsInit);
 
     // Mount volumes.
     auto volumes = MountVolumes(containerOptions, parentVM);
@@ -800,9 +844,9 @@ HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** 
     return CallImpl(&WSLAContainerImpl::Exec, Options, Process, Errno);
 }
 
-HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
+HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds)
 {
-    return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutMs);
+    return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutSeconds);
 }
 
 HRESULT WSLAContainer::Start()

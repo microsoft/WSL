@@ -64,6 +64,13 @@ public:
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> LaunchNoThrow(IWSLASession& Session);
 
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
+    void SetDefaultStopSignal(WSLASignal Signal);
+    void SetContainerFlags(WSLAContainerFlags Flags);
+    void SetHostname(std::string&& Hostname);
+    void SetDomainname(std::string&& Domainame);
+
+    using WSLAProcessLauncher::SetUser;
+    using WSLAProcessLauncher::SetWorkingDirectory;
 
 private:
     std::string m_image;
@@ -74,5 +81,9 @@ private:
     std::deque<std::string> m_containerPaths;
     WSLA_CONTAINER_NETWORK_TYPE m_containerNetworkType;
     std::vector<std::string> m_entrypoint;
+    WSLASignal m_stopSignal = WSLASignalNone;
+    WSLAContainerFlags m_containerFlags = WSLAContainerFlagsNone;
+    std::string m_hostname;
+    std::string m_domainname;
 };
 } // namespace wsl::windows::common

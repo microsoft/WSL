@@ -78,6 +78,8 @@ public:
         WSLAProcessFlags = WSLAProcessFlagsNone);
 
     void SetTtySize(ULONG Rows, ULONG Columns);
+    void SetWorkingDirectory(std::string&& WorkingDirectory);
+    void SetUser(std::string&& User);
 
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
     std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
@@ -104,6 +106,8 @@ protected:
 
     WSLAProcessFlags m_flags{};
     std::string m_executable;
+    std::string m_workingDirectory;
+    std::string m_user;
     std::vector<std::string> m_arguments;
     std::vector<std::string> m_environment;
     DWORD m_rows = 0;

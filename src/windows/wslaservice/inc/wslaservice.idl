@@ -60,9 +60,40 @@ typedef enum _WSLAFD
 
 typedef enum _WSLASignal
 {
+    WSLASignalNone = 0,
+    WSLASignalSIGHUP = 1,
+    WSLASignalSIGINT = 2,
+    WSLASignalSIGQUIT = 3,
+    WSLASignalSIGILL = 4,
+    WSLASignalSIGTRAP = 5,
+    WSLASignalSIGABRT = 6,
+    WSLASignalSIGIOT = 6, // SIGABRT and SIGIOT are equivalent.
+    WSLASignalSIGBUS= 7,
+    WSLASignalSIGPE = 8,
     WSLASignalSIGKILL = 9,
+    WSLASignalSIGUSR1 = 10,
     WSLASignalSIGSEGV = 11,
-    WSLASignalSIGTERM = 15
+    WSLASignalSIGUSR2 = 12,
+    WSLASignalSIGPIPE = 13,
+    WSLASignalSIGALRM = 14,
+    WSLASignalSIGTERM = 15,
+    WSLASignalSIGTKFLT = 16,
+    WSLASignalSIGCHLD = 17,
+    WSLASignalSIGCONT = 18,
+    WSLASignalSIGSTOP = 19,
+    WSLASignalSIGSTP = 20,
+    WSLASignalSIGTTIN = 21,
+    WSLASignalSIGTTOU = 22,
+    WSLASignalSIGURG = 23,
+    WSLASignalSIGXCPU = 24,
+    WSLASignalSIGXFSZ = 25,
+    WSLASignalSIGVTALRM = 26,
+    WSLASignalSIGPROF = 27,
+    WSLASignalSIGINCH = 28,
+    WSLASignalSIGIO = 29,
+    WSLASignalSIGPOLL = 29, // SIGIO and SIGPOLL are equivalent.
+    WSLASignalSIGPWR = 30,
+    WSLASignalSIGSYS = 31
 } WSLASignal;
 
 [
@@ -159,7 +190,10 @@ typedef enum _WSLAContainerFlags
     WSLAContainerFlagsNone = 0,
     WSLAContainerFlagsRm = 1, // Delete the container when it exists. TODO: Implement.
     WSLAContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
+    WSLAContainerFlagsInit = 4, // Run the container under an init process.
 } WSLAContainerFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerFlags);")
 
 struct WSLA_CONTAINER_OPTIONS
 {
@@ -172,6 +206,7 @@ struct WSLA_CONTAINER_OPTIONS
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
     ULONG PortsCount;
     WSLAContainerFlags Flags;
+    WSLASignal StopSignal;
     // TODO: List specific GPU devices.
     [unique] LPCSTR HostName;
     [unique] LPCSTR DomainName;
@@ -280,7 +315,7 @@ typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
 interface IWSLAContainer : IUnknown
 {
     HRESULT Attach([out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
-    HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
+    HRESULT Stop([in] WSLASignal Signal, [in] LONGLONG TimeoutSeconds);
     HRESULT Start();
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);

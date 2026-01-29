@@ -115,7 +115,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     const std::string shell = "/bin/sh";
 
     // Launch with terminal fds (PTY).
-    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty};
+    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin};
     launcher.SetTtySize(rows, cols);
 
     auto process = launcher.Launch(*session);
@@ -125,8 +125,7 @@ static int RunShellCommand(std::wstring_view commandLine)
         wslutil::PrintMessage(L"[diag] Shell process launched", stdout);
     }
 
-    auto ttyIn = process.GetStdHandle(0);
-    auto ttyOut = process.GetStdHandle(1);
+    auto tty = process.GetStdHandle(WSLAFDTty);
 
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
@@ -142,7 +141,7 @@ static int RunShellCommand(std::wstring_view commandLine)
         try
         {
             wsl::windows::common::relay::StandardInputRelay(
-                GetStdHandle(STD_INPUT_HANDLE), ttyIn.get(), updateTerminalSize, exitEvent.get());
+                GetStdHandle(STD_INPUT_HANDLE), tty.get(), updateTerminalSize, exitEvent.get());
         }
         catch (...)
         {
@@ -159,7 +158,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     });
 
     // Relay tty output -> console (blocks until output ends).
-    wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
+    wsl::windows::common::relay::InterruptableRelay(tty.get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
 
     process.GetExitEvent().wait();
 
