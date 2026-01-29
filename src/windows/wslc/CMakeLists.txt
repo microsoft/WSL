@@ -1,5 +1,7 @@
 set(SOURCES
     main.cpp
+
+    # Commands
     ShellCommand.cpp
     ListCommand.cpp
     CreateCommand.cpp
@@ -7,11 +9,18 @@ set(SOURCES
     StartCommand.cpp
     StopCommand.cpp
     ImageCommand.cpp
-	ContainerCommand.cpp
+    ContainerCommand.cpp
+
+    # Others
     Utils.cpp
+
+    # Services
+    services/ContainerService.cpp
+	services/ImageService.cpp
 )
 
 set(HEADERS
+    # Commands
     ShellCommand.h
     ListCommand.h
     CreateCommand.h
@@ -19,8 +28,15 @@ set(HEADERS
     StartCommand.h
     StopCommand.h
     ImageCommand.h
-	ContainerCommand.h
+    ContainerCommand.h
+
+    # Others
     Utils.h
+	TableOutput.h
+
+    # Services
+    services/ContainerService.h
+	services/ImageService.h
 )
 
 add_executable(wslc ${SOURCES} ${HEADERS})

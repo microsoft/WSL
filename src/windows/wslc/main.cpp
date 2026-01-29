@@ -119,7 +119,7 @@ int wslc_main(std::wstring_view commandLine)
 
     if (verb == L"image")
     {
-        return RunImageCommand(commandLine);
+        return wslc::commands::RunImageCommand(commandLine);
     }
 
     wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);

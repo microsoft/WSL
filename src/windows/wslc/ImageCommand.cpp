@@ -4,7 +4,11 @@
 #include "WSLAProcessLauncher.h"
 #include <CommandLine.h>
 #include <format>
+#include "services/ImageService.h"
+#include "TableOutput.h"
 
+namespace wslc::commands
+{
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::ClientRunningWSLAProcess;
@@ -41,23 +45,22 @@ int RunPullImageCommand(std::wstring_view commandLine)
 
 int RunListImageCommand()
 {
-    auto session = OpenCLISession();
-    wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-    ULONG count = 0;
-    THROW_IF_FAILED(session->ListImages(&images, &count));
-
+    wslc::services::ImageService imageServie;
+    auto list = imageServie.List();
+    auto count = list.size();
     const wchar_t* plural = count == 1 ? L"" : L"s";
-    wslutil::PrintMessage(std::format(L"[wslc] Found {} image", count, plural), stdout);
+    wslutil::PrintMessage(std::format(L"[wslc] Found {} image{}", count, plural), stdout);
 
-    // Loop over images using begin and end pointers.
-    for (auto ptr = images.get(); ptr < images.get() + count; ++ptr)
+    TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+    for (const auto& [imageName, size] : list)
     {
-        const WSLA_IMAGE_INFORMATION& image = *ptr;
-        const char* imageName = image.Image;
-        auto size = image.Size;
-
-        wprintf(L"%hs (%.2f MB)\n", imageName, static_cast<double>(size) / (1024 * 1024));
+        tablePrinter.AddRow({
+            std::wstring(imageName.begin(), imageName.end()), 
+            std::format(L"{:.2f} MB", static_cast<double>(size) / (1024 * 1024))
+        });
     }
+
+    tablePrinter.Print();
 
     return 0;
 }
@@ -89,4 +92,5 @@ int RunImageCommand(std::wstring_view commandLine)
     }
 
     return PrintHelp();
+}
 }
