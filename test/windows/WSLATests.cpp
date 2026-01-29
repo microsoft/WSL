@@ -1326,8 +1326,7 @@ class WSLATests
 
         // Validate that hostname and domainanme are correctly wired.
         {
-            WSLAContainerLauncher launcher(
-                "debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
+            WSLAContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
 
             launcher.SetHostname("my-host-name");
             launcher.SetDomainname("my-domain-name");
