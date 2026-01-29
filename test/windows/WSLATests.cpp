@@ -80,6 +80,8 @@ class WSLATests
 
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
+        m_defaultSession.reset();
+
         // Keep the VHD when running in -f mode, to speed up subsequent test runs.
         if (!g_fastTestRun && !m_storagePath.empty())
         {
@@ -140,6 +142,8 @@ class WSLATests
 
     TEST_METHOD(GetVersion)
     {
+        WSL2_TEST_ONLY();
+
         wil::com_ptr<IWSLASessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
 
@@ -637,10 +641,13 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
+        // Reuse the default session if settings match (same networking mode and DNS tunneling setting).
+        auto createNewSession = mode != m_defaultSessionSettings.NetworkingMode ||
+                                enableDnsTunneling != WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsDnsTunneling);
+
         auto settings = GetDefaultSessionSettings(L"networking-test", false, mode);
         WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsDnsTunneling, enableDnsTunneling);
-
-        auto session = CreateSession(settings);
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
         // Validate that eth0 has an ip address
         ExpectCommandResult(
@@ -1975,12 +1982,15 @@ class WSLATests
 
     void RunPortMappingsTest(WSLANetworkingMode networkingMode, WSLA_CONTAINER_NETWORK_TYPE containerNetworkType)
     {
-        auto restore = ResetTestSession(); // Required to access the python container image.
+        WSL2_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings(L"port-mapping-test", true);
         settings.NetworkingMode = networkingMode;
 
-        auto session = CreateSession(settings);
+        // Reuse the default session if the networking mode matches, otherwise reset and create a new one.
+        auto createNewSession = networkingMode != m_defaultSessionSettings.NetworkingMode;
+        auto restore = createNewSession ? std::optional{ResetTestSession()} : std::nullopt;
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
         auto expectBoundPorts = [&](RunningWSLAContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
             auto ports = Container.Inspect().HostConfig.PortBindings;
