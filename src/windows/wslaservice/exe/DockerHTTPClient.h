@@ -82,7 +82,7 @@ public:
     std::vector<common::docker_schema::ContainerInfo> ListContainers(bool all = false);
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id);
-    void StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds);
+    void StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
     std::string InspectContainer(const std::string& Id);

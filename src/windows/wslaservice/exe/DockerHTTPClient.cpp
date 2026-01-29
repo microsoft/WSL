@@ -108,9 +108,21 @@ void DockerHTTPClient::StartContainer(const std::string& Id)
     Transaction(verb::post, std::format("http://localhost/containers/{}/start", Id));
 }
 
-void DockerHTTPClient::StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds)
+void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds)
 {
-    Transaction(verb::post, std::format("http://localhost/containers/{}/stop?signal={}&t={}", Id, Signal, TimeoutSeconds));
+    // TODO: Cleanup once we have proper URL generation.
+    auto url = std::format("http://localhost/containers/{}/stop", Id);
+    if (Signal.has_value())
+    {
+        url += std::format("?signal={}", static_cast<int>(Signal.value()));
+    }
+
+    if (TimeoutSeconds.has_value())
+    {
+        url += std::format("{}t={}", Signal.has_value() ? "&" : "?", TimeoutSeconds.value());
+    }
+
+    Transaction(verb::post, url);
 }
 
 void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
