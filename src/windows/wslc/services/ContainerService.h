@@ -39,7 +39,7 @@ public:
     void Kill(IWSLASession& session, std::string id, int signal = WSLASignalSIGKILL);
     void Delete(IWSLASession& session, std::string id, bool force);
     std::vector<ContainerInformation> List(IWSLASession& session, std::vector<std::string> ids);
-    void Exec();
+    void Exec(IWSLASession& session, std::string id, std::vector<std::string> arguments);
     void Inspect();
 
 private:
@@ -52,5 +52,10 @@ private:
     void StartInternal(IWSLAContainer& container);
     void StopInternal(IWSLAContainer& container, const StopContainerOptions& options);
     std::vector<WSLA_PROCESS_FD> CreateFds(const CreateOptions& options);
+    void SetContainerOptions(WSLA_CONTAINER_OPTIONS& options,
+        bool tty,
+        bool interactive,
+        std::vector<WSLA_PROCESS_FD>& fds,
+        std::vector<std::string>& arguments);
 };
 }

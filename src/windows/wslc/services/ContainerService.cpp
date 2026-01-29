@@ -104,8 +104,19 @@ std::vector<ContainerInformation> ContainerService::List(IWSLASession& session, 
     return result;
 }
 
-void ContainerService::Exec()
+void ContainerService::Exec(IWSLASession& session, std::string id, std::vector<std::string> arguments)
 {
+    wil::com_ptr<IWSLAContainer> container;
+    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    int error = -1;
+    WSLA_CONTAINER_OPTIONS options;
+
+    // TODO tty, interactive
+    auto fds = CreateFds({});
+    SetContainerOptions(options, false, false, fds, arguments);
+
+    wil::com_ptr<IWSLAProcess> createdProcess;
+    THROW_IF_FAILED(container->Exec(&options.InitProcessOptions, &createdProcess, &error));
 }
 
 void ContainerService::Inspect()
@@ -121,28 +132,7 @@ void ContainerService::CreateInternal(
 {
     WSLA_CONTAINER_OPTIONS containerOptions{};
     containerOptions.Image = image.c_str();
-
-    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
-    if (options.TTY)
-    {
-        CONSOLE_SCREEN_BUFFER_INFOEX Info{};
-        Info.cbSize = sizeof(Info);
-        THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
-        containerOptions.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
-        containerOptions.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
-    }
-
-    std::vector<const char*> args;
-    for (const auto& arg : options.Arguments)
-    {
-        args.push_back(arg.c_str());
-    }
-
-    containerOptions.InitProcessOptions.CommandLine = args.data();
-    containerOptions.InitProcessOptions.CommandLineCount = static_cast<ULONG>(args.size());
-    containerOptions.InitProcessOptions.Fds = fds.data();
-    containerOptions.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
+    SetContainerOptions(containerOptions, options.TTY, options.Interactive, fds, options.Arguments);
 
     WSLAErrorDetails error{};
     auto result = session.CreateContainer(&containerOptions, container, &error.Error);
@@ -191,6 +181,36 @@ void ContainerService::StartInternal(IWSLAContainer& container)
 void ContainerService::StopInternal(IWSLAContainer& container, const StopContainerOptions& options)
 {
     THROW_IF_FAILED(container.Stop(options.Signal, options.Timeout)); // TODO: Error message
+}
+
+void ContainerService::SetContainerOptions(
+    WSLA_CONTAINER_OPTIONS& options,
+    bool tty,
+    bool interactive,
+    std::vector<WSLA_PROCESS_FD>& fds,
+    std::vector<std::string>& arguments)
+{
+    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
+    if (tty)
+    {
+        CONSOLE_SCREEN_BUFFER_INFOEX Info{};
+        Info.cbSize = sizeof(Info);
+        THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
+        options.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
+        options.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
+    }
+
+    std::vector<const char*> args;
+    for (const auto& arg : arguments)
+    {
+        args.push_back(arg.c_str());
+    }
+
+    options.InitProcessOptions.CommandLine = args.data();
+    options.InitProcessOptions.CommandLineCount = static_cast<ULONG>(args.size());
+    options.InitProcessOptions.Fds = fds.data();
+    options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
 }
 }
 
