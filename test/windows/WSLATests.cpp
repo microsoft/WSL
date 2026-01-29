@@ -32,8 +32,6 @@ using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
 
-static std::filesystem::path storagePath;
-
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
 
@@ -42,6 +40,8 @@ class WSLATests
     WSL_TEST_CLASS(WSLATests)
     wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
     WSADATA m_wsadata;
+    std::filesystem::path m_storagePath;
+    WSLA_SESSION_SETTINGS m_defaultSessionSettings{};
     wil::com_ptr<IWSLASession> m_defaultSession;
     static inline auto c_testSessionName = L"wsla-test";
 
@@ -49,12 +49,9 @@ class WSLATests
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
-        auto distroKey = OpenDistributionKey(LXSS_DISTRO_NAME_TEST_L);
-
-        auto vhdPath = wsl::windows::common::registry::ReadString(distroKey.get(), nullptr, L"BasePath");
-        storagePath = std::filesystem::current_path() / "test-storage";
-
-        m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
+        m_storagePath = std::filesystem::current_path() / "test-storage";
+        m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT);
+        m_defaultSession = CreateSession(m_defaultSessionSettings);
 
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
         VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
@@ -84,27 +81,27 @@ class WSLATests
     TEST_CLASS_CLEANUP(TestClassCleanup)
     {
         // Keep the VHD when running in -f mode, to speed up subsequent test runs.
-        if (!g_fastTestRun && !storagePath.empty())
+        if (!g_fastTestRun && !m_storagePath.empty())
         {
             std::error_code error;
-            std::filesystem::remove_all(storagePath, error);
+            std::filesystem::remove_all(m_storagePath, error);
             if (error)
             {
-                LogError("Failed to cleanup storage path %ws: %hs", storagePath.c_str(), error.message().c_str());
+                LogError("Failed to cleanup storage path %ws: %hs", m_storagePath.c_str(), error.message().c_str());
             }
         }
 
         return true;
     }
 
-    static WSLA_SESSION_SETTINGS GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
+    WSLA_SESSION_SETTINGS GetDefaultSessionSettings(LPCWSTR Name, bool enableStorage = false, WSLANetworkingMode networkingMode = WSLANetworkingModeNone)
     {
         WSLA_SESSION_SETTINGS settings{};
         settings.DisplayName = Name;
         settings.CpuCount = 4;
         settings.MemoryMb = 2024;
         settings.BootTimeoutMs = 30 * 1000;
-        settings.StoragePath = enableStorage ? storagePath.c_str() : nullptr;
+        settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
         settings.MaximumStorageSizeMb = 1000; // 1GB.
         settings.NetworkingMode = networkingMode;
 
@@ -115,9 +112,7 @@ class WSLATests
     {
         m_defaultSession.reset();
 
-        return wil::scope_exit([this]() {
-            m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT));
-        });
+        return wil::scope_exit([this]() { m_defaultSession = CreateSession(m_defaultSessionSettings); });
     }
 
     static wil::com_ptr<IWSLASessionManager> OpenSessionManager()
@@ -822,7 +817,7 @@ class WSLATests
         auto settings = GetDefaultSessionSettings(L"port-mapping-test");
         settings.NetworkingMode = networkingMode;
 
-        auto session = networkingMode != WSLANetworkingModeNAT ? CreateSession(settings) : m_defaultSession;
+        auto session = networkingMode != m_defaultSessionSettings.NetworkingMode ? CreateSession(settings) : m_defaultSession;
 
         // Install socat in the container.
         //
