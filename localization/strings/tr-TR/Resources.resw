@@ -292,10 +292,12 @@ ve 'wsl.exe --install &lt;Distro&gt;' kullanın.</value>
     <value>Eski dağıtım WSL 2'yi desteklemez.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 geçerli makine yapılandırmanız ile desteklenmiyor.
-Lütfen "Sanal Makine Platformu" isteğe bağlı bileşenini etkinleştirin ve sanallaştırmanın BIOS'ta etkinleştirildiğinden emin olun.
-Ş"Sanal Makine Platformu"nu etkinleştirmek için şu komutu çalıştırın: wsl.exe --install --no-distribution
-Daha fazla bilgi için lütfen https://aka.ms/enablevirtualization adresini ziyaret edin.</value>
+    <value>Sanallaştırma bu makinede etkinleştirilmediği için WSL2 başlatılamıyor.
+Lütfen "Sanal Makine Platformu" isteğe bağlı bileşeninin etkinleştirildiğinden ve sanallaştırmanın bilgisayarınızın üretici yazılımı ayarlarında açık olduğundan emin olun.
+
+"Sanal Makine Platformu" seçeneğini şu komutu çalıştırarak etkinleştirin: wsl.exe --install --no-distribution
+
+Bilgi için lütfen şu adresi ziyaret https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
