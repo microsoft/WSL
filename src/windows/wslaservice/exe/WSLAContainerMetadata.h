@@ -16,6 +16,7 @@ Abstract:
 #pragma once
 
 #include "JsonUtils.h"
+#include "wslaservice.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -47,11 +48,11 @@ struct WSLAVolumeMount
 
 struct WSLAContainerMetadataV1
 {
-    bool Tty{};
+    WSLAProcessFlags InitProcessFlags{WSLAProcessFlagsNone};
     std::vector<WSLAPortMapping> Ports;
     std::vector<WSLAVolumeMount> Volumes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadataV1, Tty, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLAContainerMetadataV1, InitProcessFlags, Ports, Volumes);
 };
 
 struct WSLAContainerMetadata

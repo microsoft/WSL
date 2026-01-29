@@ -115,13 +115,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     const std::string shell = "/bin/sh";
 
     // Launch with terminal fds (PTY).
-    wsl::windows::common::WSLAProcessLauncher launcher{
-        shell, {shell, "--login"}, {"TERM=xterm-256color"}, wsl::windows::common::ProcessFlags::None};
-
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput, .Path = nullptr});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput, .Path = nullptr});
-    launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl, .Path = nullptr});
-
+    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin};
     launcher.SetTtySize(rows, cols);
 
     auto process = launcher.Launch(*session);
@@ -131,8 +125,7 @@ static int RunShellCommand(std::wstring_view commandLine)
         wslutil::PrintMessage(L"[diag] Shell process launched", stdout);
     }
 
-    auto ttyIn = process.GetStdHandle(0);
-    auto ttyOut = process.GetStdHandle(1);
+    auto tty = process.GetStdHandle(WSLAFDTty);
 
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
@@ -148,7 +141,7 @@ static int RunShellCommand(std::wstring_view commandLine)
         try
         {
             wsl::windows::common::relay::StandardInputRelay(
-                GetStdHandle(STD_INPUT_HANDLE), ttyIn.get(), updateTerminalSize, exitEvent.get());
+                GetStdHandle(STD_INPUT_HANDLE), tty.get(), updateTerminalSize, exitEvent.get());
         }
         catch (...)
         {
@@ -165,7 +158,7 @@ static int RunShellCommand(std::wstring_view commandLine)
     });
 
     // Relay tty output -> console (blocks until output ends).
-    wsl::windows::common::relay::InterruptableRelay(ttyOut.get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
+    wsl::windows::common::relay::InterruptableRelay(tty.get(), GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
 
     process.GetExitEvent().wait();
 
@@ -453,79 +446,98 @@ static int Logs(std::wstring_view commandLine)
     return 0;
 }
 
-static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
+static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh = false)
 {
-    auto exitEvent = Process.GetExitEvent();
+    // Configure console for interactive usage.
+    wsl::windows::common::ConsoleState console;
 
-    if (Tty)
+    if (triggerRefresh)
     {
-        // Configure console for interactive usage.
-        wsl::windows::common::ConsoleState console;
-        auto processTty = Process.GetStdHandle(WSLAFDTty);
+        // In the case of an Attach, force a terminal resize to force the tty to refresh its display.
+        // The docker client uses the same trick.
 
-        // Create a thread to relay stdin to the pipe.
-        std::thread inputThread([&]() {
-            auto updateTerminal = [&console, &Process]() {
-                const auto windowSize = console.GetWindowSize();
-                LOG_IF_FAILED(Process.Get().ResizeTty(windowSize.Y, windowSize.X));
-            };
+        auto size = console.GetWindowSize();
 
-            wsl::windows::common::relay::StandardInputRelay(
-                GetStdHandle(STD_INPUT_HANDLE), processTty.get(), updateTerminal, exitEvent.get());
-        });
+        LOG_IF_FAILED(Process.Get().ResizeTty(size.Y + 1, size.X + 1));
+        LOG_IF_FAILED(Process.Get().ResizeTty(size.Y, size.X));
+    }
 
-        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+    wil::unique_event exitEvent(wil::EventOptions::ManualReset);
+
+    // Create a thread to relay stdin to the pipe.
+    std::thread inputThread([&]() {
+        auto updateTerminal = [&console, &Process]() {
+            const auto windowSize = console.GetWindowSize();
+            LOG_IF_FAILED(Process.Get().ResizeTty(windowSize.Y, windowSize.X));
+        };
+
+        wsl::windows::common::relay::StandardInputRelay(GetStdHandle(STD_INPUT_HANDLE), Tty, updateTerminal, exitEvent.get());
+    });
+
+    auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        exitEvent.SetEvent();
+        inputThread.join();
+    });
+
+    // Relay the contents of the pipe to stdout.
+    wsl::windows::common::relay::InterruptableRelay(Tty, GetStdHandle(STD_OUTPUT_HANDLE), exitEvent.get());
+}
+
+static void RelayNonTtyProcess(wil::unique_handle&& Stdin, wil::unique_handle&& Stdout, wil::unique_handle&& Stderr)
+{
+    wsl::windows::common::relay::MultiHandleWait io;
+
+    // Create a thread to relay stdin to the pipe.
+    wil::unique_event exitEvent(wil::EventOptions::ManualReset);
+
+    std::thread inputThread;
+
+    auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (inputThread.joinable())
+        {
             exitEvent.SetEvent();
             inputThread.join();
-        });
+        }
+    });
 
-        // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(processTty.get(), GetStdHandle(STD_OUTPUT_HANDLE));
+    // Required because ReadFile() blocks if stdin is a tty.
+    if (wsl::windows::common::wslutil::IsInteractiveConsole())
+    {
+        // TODO: Will output CR instead of LF's which can confuse the linux app.
+        // Consider a custom relay logic to fix this.
+        inputThread = std::thread{[&]() {
+            try
+            {
+                wsl::windows::common::relay::InterruptableRelay(GetStdHandle(STD_INPUT_HANDLE), Stdin.get(), exitEvent.get());
+            }
+            CATCH_LOG();
 
-        // Wait for the process to exit.
-        THROW_LAST_ERROR_IF(WaitForSingleObject(exitEvent.get(), INFINITE) != WAIT_OBJECT_0);
+            Stdin.reset();
+        }};
     }
     else
     {
-        wsl::windows::common::relay::MultiHandleWait io;
-
-        // Create a thread to relay stdin to the pipe.
-
-        std::thread inputThread;
-
-        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            if (inputThread.joinable())
-            {
-                exitEvent.SetEvent();
-                inputThread.join();
-            }
-        });
-
-        // Required because ReadFile() blocks if stdin is a tty.
-        if (wsl::windows::common::wslutil::IsInteractiveConsole())
-        {
-            // TODO: Will output CR instead of LF's which can confuse the linux app.
-            // Consider a custom relay logic to fix this.
-            inputThread = std::thread{[&]() {
-                wsl::windows::common::relay::InterruptableRelay(
-                    GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0).get(), exitEvent.get());
-            }};
-        }
-        else
-        {
-            io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
-        }
-
-        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
-        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
-        io.AddHandle(std::make_unique<EventHandle>(exitEvent.get()));
-
-        io.Run({});
+        io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(GetStdHandle(STD_INPUT_HANDLE), std::move(Stdin)));
     }
 
-    int exitCode = Process.GetExitCode();
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stdout), GetStdHandle(STD_OUTPUT_HANDLE)));
+    io.AddHandle(std::make_unique<RelayHandle<ReadHandle>>(std::move(Stderr), GetStdHandle(STD_ERROR_HANDLE)));
 
-    return exitCode;
+    io.Run({});
+}
+
+static int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
+{
+    if (Tty)
+    {
+        RelayInteractiveTty(Process, Process.GetStdHandle(WSLAFDTty).get());
+    }
+    else
+    {
+        RelayNonTtyProcess(Process.GetStdHandle(WSLAFDStdin), Process.GetStdHandle(WSLAFDStdout), Process.GetStdHandle(WSLAFDStderr));
+    }
+
+    return Process.Wait();
 }
 
 static int Run(std::wstring_view commandLine)
@@ -549,7 +561,6 @@ static int Run(std::wstring_view commandLine)
     WSLA_CONTAINER_OPTIONS options{};
     options.Image = image.c_str();
 
-    std::vector<WSLA_PROCESS_FD> fds;
     HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -559,22 +570,13 @@ static int Run(std::wstring_view commandLine)
         Info.cbSize = sizeof(Info);
         THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
 
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
-
+        options.InitProcessOptions.Flags = WSLAProcessFlagsTty | WSLAProcessFlagsStdin;
         options.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
         options.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
     }
     else
     {
-        if (interactive)
-        {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
-        }
-
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
+        WI_SetFlagIf(options.InitProcessOptions.Flags, WSLAProcessFlagsStdin, interactive);
     }
 
     std::vector<std::string> argsStorage;
@@ -589,10 +591,7 @@ static int Run(std::wstring_view commandLine)
         args.emplace_back(e.c_str());
     }
 
-    options.InitProcessOptions.CommandLine = args.data();
-    options.InitProcessOptions.CommandLineCount = static_cast<ULONG>(args.size());
-    options.InitProcessOptions.Fds = fds.data();
-    options.InitProcessOptions.FdsCount = static_cast<ULONG>(fds.size());
+    options.InitProcessOptions.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
 
     if (!name.empty())
     {
@@ -619,7 +618,48 @@ static int Run(std::wstring_view commandLine)
     wil::com_ptr<IWSLAProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
-    return InteractiveShell(ClientRunningWSLAProcess(std::move(process), std::move(fds)), tty);
+    return InteractiveShell(ClientRunningWSLAProcess(std::move(process), options.InitProcessOptions.Flags), tty);
+}
+
+static int Attach(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2, true);
+
+    std::string id;
+    parser.AddPositionalArgument(Utf8String{id}, 0);
+
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, id.empty());
+
+    auto session = OpenCLISession();
+
+    wil::com_ptr<IWSLAContainer> container;
+    THROW_IF_FAILED(session->OpenContainer(id.c_str(), &container));
+
+    wil::com_ptr<IWSLAProcess> process;
+    THROW_IF_FAILED(container->GetInitProcess(&process));
+
+    ClientRunningWSLAProcess runningProcess(std::move(process), {});
+
+    wil::unique_handle stdinLogs;
+    wil::unique_handle stdoutLogs;
+    wil::unique_handle stderrLogs;
+    THROW_IF_FAILED(container->Attach((ULONG*)&stdinLogs, (ULONG*)&stdoutLogs, (ULONG*)&stderrLogs));
+
+    if (stdoutLogs)
+    {
+        WI_ASSERT(!!stderrLogs);
+
+        RelayNonTtyProcess(std::move(stdinLogs), std::move(stdoutLogs), std::move(stderrLogs));
+    }
+    else
+    {
+        WI_ASSERT(!stderrLogs);
+
+        RelayInteractiveTty(runningProcess, stdinLogs.get(), true);
+    }
+
+    return runningProcess.Wait();
 }
 
 static void PrintUsage()
@@ -680,6 +720,10 @@ int wsladiag_main(std::wstring_view commandLine)
     else if (verb == L"logs")
     {
         return Logs(commandLine);
+    }
+    else if (verb == L"attach")
+    {
+        return Attach(commandLine);
     }
     else
     {

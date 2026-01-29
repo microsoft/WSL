@@ -315,6 +315,30 @@ private:
     LPCWSTR m_path{};
 };
 
+class PartialHandleRead
+{
+public:
+    NON_COPYABLE(PartialHandleRead);
+    NON_MOVABLE(PartialHandleRead);
+
+    PartialHandleRead(HANDLE Handle);
+    ~PartialHandleRead();
+
+    void Expect(const std::string& Expected);
+    void ExpectClosed(DWORD Timeout = 60 * 1000);
+
+    std::string ReadBytes(size_t Length);
+
+private:
+    void Run();
+
+    HANDLE m_handle{};
+    std::mutex m_mutex;
+    wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    std::thread m_thread;
+    std::string m_data;
+};
+
 //
 // Structs and enums.
 //

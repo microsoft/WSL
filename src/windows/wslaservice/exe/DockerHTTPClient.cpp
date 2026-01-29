@@ -108,9 +108,21 @@ void DockerHTTPClient::StartContainer(const std::string& Id)
     Transaction(verb::post, std::format("http://localhost/containers/{}/start", Id));
 }
 
-void DockerHTTPClient::StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds)
+void DockerHTTPClient::StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds)
 {
-    Transaction(verb::post, std::format("http://localhost/containers/{}/stop?signal={}&t={}", Id, Signal, TimeoutSeconds));
+    // TODO: Cleanup once we have proper URL generation.
+    auto url = std::format("http://localhost/containers/{}/stop", Id);
+    if (Signal.has_value())
+    {
+        url += std::format("?signal={}", static_cast<int>(Signal.value()));
+    }
+
+    if (TimeoutSeconds.has_value())
+    {
+        url += std::format("{}t={}", Signal.has_value() ? "&" : "?", TimeoutSeconds.value());
+    }
+
+    Transaction(verb::post, url);
 }
 
 void DockerHTTPClient::SignalContainer(const std::string& Id, int Signal)
@@ -141,7 +153,7 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     std::map<boost::beast::http::field, std::string> headers{
         {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
 
-    auto url = std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1&logs=true", Id);
+    auto url = std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1", Id);
     auto [status, socket] = SendRequest(verb::post, url, {}, {}, headers);
 
     if (status != 101)

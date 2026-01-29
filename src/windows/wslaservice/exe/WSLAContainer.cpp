@@ -18,7 +18,10 @@ Abstract:
 #include "WSLAProcessIO.h"
 
 using wsl::windows::common::relay::DockerIORelayHandle;
+using wsl::windows::common::relay::HandleWrapper;
 using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
+using wsl::windows::common::relay::OverlappedIOHandle;
+using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
@@ -31,6 +34,18 @@ using wsl::windows::service::wsla::WSLAVolumeMount;
 using namespace wsl::windows::common::docker_schema;
 
 namespace {
+
+std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
+{
+    if (array.Count == 0)
+    {
+        return {};
+    }
+    else
+    {
+        return {&array.Values[0], &array.Values[array.Count]};
+    }
+}
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
 
@@ -169,6 +184,36 @@ std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const W
     return {std::move(ports), std::move(networkMode)};
 }
 
+void UnmountVolumes(const std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
+{
+    for (const auto& volume : volumes)
+    {
+        LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()));
+    }
+}
+
+void MountVolumes(std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
+{
+    std::vector<WSLAVolumeMount> mountedVolumes;
+
+    for (auto& volume : volumes)
+    {
+        try
+        {
+            auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
+            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
+
+            mountedVolumes.push_back(volume);
+        }
+        catch (...)
+        {
+            // On failure, unmount all previously mounted volumes.
+            UnmountVolumes(mountedVolumes, parentVM);
+            throw;
+        }
+    }
+}
+
 WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
 {
     switch (state)
@@ -237,7 +282,8 @@ WSLAContainerImpl::WSLAContainerImpl(
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     WSLA_CONTAINER_STATE InitialState,
-    bool Tty) :
+    WSLAProcessFlags InitProcessFlags,
+    WSLAContainerFlags ContainerFlags) :
     m_parentVM(parentVM),
     m_name(std::move(Name)),
     m_image(std::move(Image)),
@@ -250,7 +296,8 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
         m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2))),
     m_state(InitialState),
-    m_tty(Tty)
+    m_initProcessFlags(InitProcessFlags),
+    m_containerFlags(ContainerFlags)
 {
 }
 
@@ -335,6 +382,50 @@ IWSLAContainer& WSLAContainerImpl::ComWrapper()
     return *m_comWrapper.Get();
 }
 
+void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        m_state != WslaContainerStateRunning,
+        "Cannot attach to container '%hs', state: %i",
+        m_id.c_str(),
+        m_state);
+
+    auto ioHandle = m_dockerClient.AttachContainer(m_id);
+
+    // If this is a TTY process, the PTY handle can be returned directly.
+    if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
+    {
+        *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(ioHandle.get())));
+        return;
+    }
+
+    // Otherwise the stream is multiplexed and needs to be relayed.
+    // TODO: Consider skipping stdin if the stdin flag isn't set.
+    auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+
+    std::vector<std::unique_ptr<OverlappedIOHandle>> handles;
+
+    // This is required for docker to know when stdin is closed.
+    auto onInputComplete = [handle = ioHandle.get()]() { LOG_LAST_ERROR_IF(shutdown(handle, SD_SEND) == SOCKET_ERROR); };
+
+    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
+        ioHandle.get(), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+
+    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
+        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, std::move(ioHandle)));
+
+    m_logsRelay.AddHandles(std::move(handles));
+
+    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE));
+    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ));
+    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ));
+}
+
 void WSLAContainerImpl::Start()
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
@@ -348,7 +439,7 @@ void WSLAContainerImpl::Start()
 
     // Attach to the container's init process so no IO is lost.
     std::unique_ptr<WSLAProcessIO> io;
-    if (m_tty)
+    if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
     {
         io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
     }
@@ -367,7 +458,16 @@ void WSLAContainerImpl::Start()
         m_initProcessControl = nullptr;
     });
 
-    m_dockerClient.StartContainer(m_id);
+    try
+    {
+
+        m_dockerClient.StartContainer(m_id);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        // TODO: wire error back to caller.
+        THROW_HR_MSG(E_FAIL, "Failed to start container '%hs': %hs", m_id.c_str(), e.what());
+    }
 
     m_state = WslaContainerStateRunning;
     cleanup.release();
@@ -399,7 +499,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
-void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
+void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
 {
     std::lock_guard lock(m_lock);
 
@@ -410,7 +510,19 @@ void WSLAContainerImpl::Stop(int Signal, ULONG TimeoutMs)
 
     try
     {
-        m_dockerClient.StopContainer(m_id, Signal, static_cast<ULONG>(std::round<ULONG>(TimeoutMs / 1000)));
+        std::optional<WSLASignal> SignalArg;
+        if (Signal != WSLASignalNone)
+        {
+            SignalArg = Signal;
+        }
+
+        std::optional<ULONG> TimeoutArg;
+        if (TimeoutSeconds >= 0)
+        {
+            TimeoutArg = static_cast<ULONG>(TimeoutSeconds);
+        }
+
+        m_dockerClient.StopContainer(m_id, SignalArg, TimeoutArg);
     }
     catch (const DockerHTTPException& e)
     {
@@ -477,7 +589,7 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
 
 void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 {
-    THROW_HR_IF_MSG(E_INVALIDARG, Options->Executable != nullptr, "Executable must be null");
+    THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
 
     std::lock_guard lock{m_lock};
 
@@ -489,32 +601,29 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
         m_name.c_str(),
         state);
 
-    auto [hasStdin, hasTty] = ParseFdStatus(*Options);
-
     common::docker_schema::CreateExec request{};
     request.AttachStdout = true;
     request.AttachStderr = true;
-    for (ULONG i = 0; i < Options->CommandLineCount; i++)
-    {
-        request.Cmd.push_back(Options->CommandLine[i]);
-    }
 
-    for (ULONG i = 0; i < Options->EnvironmentCount; i++)
-    {
-        request.Env.push_back(Options->Environment[i]);
-    }
+    request.Cmd = StringArrayToVector(Options->CommandLine);
+    request.Env = StringArrayToVector(Options->Environment);
 
     if (Options->CurrentDirectory != nullptr)
     {
         request.WorkingDir = Options->CurrentDirectory;
     }
 
-    if (hasTty)
+    if (Options->User != nullptr)
+    {
+        request.User = Options->User;
+    }
+
+    if (WI_IsFlagSet(Options->Flags, WSLAProcessFlagsTty))
     {
         request.Tty = true;
     }
 
-    if (hasStdin)
+    if (WI_IsFlagSet(Options->Flags, WSLAProcessFlagsStdin))
     {
         request.AttachStdin = true;
     }
@@ -525,11 +634,12 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
         // N.B. There's no way to delete a created exec instance, it is removed when the container is deleted.
 
-        wil::unique_handle stream{(HANDLE)m_dockerClient
-                                      .StartExec(result.Id, common::docker_schema::StartExec{.Tty = hasTty, .ConsoleSize = request.ConsoleSize})
-                                      .release()};
+        wil::unique_handle stream{
+            (HANDLE)m_dockerClient
+                .StartExec(result.Id, common::docker_schema::StartExec{.Tty = request.Tty, .ConsoleSize = request.ConsoleSize})
+                .release()};
         std::unique_ptr<WSLAProcessIO> io;
-        if (hasTty)
+        if (request.Tty)
         {
             io = std::make_unique<TTYProcessIO>(std::move(stream));
         }
@@ -553,66 +663,6 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     }
 }
 
-std::pair<bool, bool> WSLAContainerImpl::ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options)
-{
-    bool hasStdin = false;
-    bool hasTty = false;
-    for (size_t i = 0; i < Options.FdsCount; i++)
-    {
-        if (Options.Fds[i].Fd == 0)
-        {
-            hasStdin = true;
-        }
-
-        if (Options.Fds[i].Type == WSLAFdTypeTerminalInput || Options.Fds[i].Type == WSLAFdTypeTerminalOutput)
-        {
-            hasTty = true;
-        }
-    }
-
-    return {hasStdin, hasTty};
-}
-
-void WSLAContainerImpl::AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options)
-{
-    for (ULONG i = 0; i < options.EnvironmentCount; i++)
-    {
-        THROW_HR_IF_MSG(E_INVALIDARG, options.Environment[i][0] == '-', "Invalid environment string: %hs", options.Environment[i]);
-
-        args.insert(args.end(), {"-e", options.Environment[i]});
-    }
-}
-
-void wsl::windows::service::wsla::WSLAContainerImpl::MountVolumes(std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
-{
-    std::vector<WSLAVolumeMount> mountedVolumes;
-
-    for (auto& volume : volumes)
-    {
-        try
-        {
-            auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
-            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
-
-            mountedVolumes.push_back(volume);
-        }
-        catch (...)
-        {
-            // On failure, unmount all previously mounted volumes.
-            UnmountVolumes(mountedVolumes, parentVM);
-            throw;
-        }
-    }
-}
-
-void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
-{
-    for (const auto& volume : volumes)
-    {
-        LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()));
-    }
-}
-
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
@@ -621,39 +671,50 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     DockerHTTPClient& DockerClient)
 {
     // TODO: Think about when 'StdinOnce' should be set.
-    auto [hasStdin, hasTty] = ParseFdStatus(containerOptions.InitProcessOptions);
-
     common::docker_schema::CreateContainer request;
     request.Image = containerOptions.Image;
 
-    if (hasTty)
+    if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsTty))
     {
         request.Tty = true;
     }
 
-    if (hasStdin)
+    if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsStdin))
     {
         request.OpenStdin = true;
         request.StdinOnce = true;
     }
 
-    if (containerOptions.InitProcessOptions.CommandLineCount > 0)
+    request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
+    request.Entrypoint = StringArrayToVector(containerOptions.Entrypoint);
+    request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
+
+    if (containerOptions.StopSignal != WSLASignalNone)
     {
-        request.Cmd.insert(
-            request.Cmd.end(),
-            containerOptions.InitProcessOptions.CommandLine,
-            containerOptions.InitProcessOptions.CommandLine + containerOptions.InitProcessOptions.CommandLineCount);
+        request.StopSignal = std::to_string(containerOptions.StopSignal);
     }
 
-    if (containerOptions.InitProcessOptions.Executable != nullptr)
+    if (containerOptions.InitProcessOptions.CurrentDirectory != nullptr)
     {
-        request.Entrypoint = std::vector<std::string>{containerOptions.InitProcessOptions.Executable};
+        request.WorkingDir = containerOptions.InitProcessOptions.CurrentDirectory;
     }
 
-    for (DWORD i = 0; i < containerOptions.InitProcessOptions.EnvironmentCount; i++)
+    if (containerOptions.HostName != nullptr)
     {
-        request.Env.push_back(containerOptions.InitProcessOptions.Environment[i]);
+        request.Hostname = containerOptions.HostName;
     }
+
+    if (containerOptions.DomainName != nullptr)
+    {
+        request.Domainname = containerOptions.DomainName;
+    }
+
+    if (containerOptions.InitProcessOptions.User != nullptr)
+    {
+        request.User = containerOptions.InitProcessOptions.User;
+    }
+
+    request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLAContainerFlagsInit);
 
     // Build volume list from container options.
     std::vector<WSLAVolumeMount> volumes;
@@ -664,16 +725,13 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         const WSLA_VOLUME& volume = containerOptions.Volumes[i];
         std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", containerOptions.Name, i);
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
+
+        request.HostConfig.Mounts.emplace_back(common::docker_schema::Mount{
+            .Source = parentVMPath, .Target = volume.ContainerPath, .Type = "bind", .ReadOnly = static_cast<bool>(volume.ReadOnly)});
     }
 
     // Mount volumes.
     MountVolumes(volumes, parentVM);
-
-    for (const auto& e : volumes)
-    {
-        request.HostConfig.Mounts.emplace_back(
-            common::docker_schema::Mount{.Source = e.ParentVMPath, .Target = e.ContainerPath, .Type = "bind", .ReadOnly = e.ReadOnly});
-    }
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
@@ -693,7 +751,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // Build WSLA metadata to store in a label for recovery on Open().
     WSLAContainerMetadataV1 metadata;
-    metadata.Tty = hasTty;
+    metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
     metadata.Ports = ports;
 
@@ -714,7 +772,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         EventTracker,
         DockerClient,
         WslaContainerStateCreated,
-        hasTty);
+        containerOptions.InitProcessOptions.Flags,
+        containerOptions.Flags);
 
     errorCleanup.release();
 
@@ -756,7 +815,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         EventTracker,
         DockerClient,
         DockerStateToWSLAState(dockerContainer.State),
-        metadata.Tty);
+        metadata.InitProcessFlags,
+        WSLAContainerFlagsNone);
 
     errorCleanup.release();
 
@@ -796,7 +856,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         THROW_HR_MSG(E_FAIL, "Failed to get container logs: %hs ", e.what());
     }
 
-    if (m_tty)
+    if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
     {
         // For tty processes, simply relay the HTTP chunks.
         auto [ttyRead, ttyWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
@@ -827,6 +887,15 @@ WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const W
 {
 }
 
+HRESULT WSLAContainer::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
+{
+    *Stdin = 0;
+    *Stdout = 0;
+    *Stderr = 0;
+
+    return CallImpl(&WSLAContainerImpl::Attach, Stdin, Stdout, Stderr);
+}
+
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
 {
     *Result = WslaContainerStateInvalid;
@@ -845,9 +914,9 @@ HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** 
     return CallImpl(&WSLAContainerImpl::Exec, Options, Process, Errno);
 }
 
-HRESULT WSLAContainer::Stop(int Signal, ULONG TimeoutMs)
+HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds)
 {
-    return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutMs);
+    return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutSeconds);
 }
 
 HRESULT WSLAContainer::Start()
