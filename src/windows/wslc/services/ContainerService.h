@@ -1,5 +1,6 @@
 #pragma once
 #include <wslservice.h>
+#include <docker_schema.h>
 
 namespace wslc::services
 {
@@ -38,9 +39,9 @@ public:
     void Stop(IWSLASession& session, std::string id, StopContainerOptions options);
     void Kill(IWSLASession& session, std::string id, int signal = WSLASignalSIGKILL);
     void Delete(IWSLASession& session, std::string id, bool force);
-    std::vector<ContainerInformation> List(IWSLASession& session, std::vector<std::string> ids);
+    std::vector<ContainerInformation> List(IWSLASession& session);
     void Exec(IWSLASession& session, std::string id, std::vector<std::string> arguments);
-    void Inspect();
+    wsl::windows::common::docker_schema::InspectContainer Inspect(IWSLASession& session, std::string id);
 
 private:
     void CreateInternal(

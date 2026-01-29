@@ -76,7 +76,7 @@ void ContainerService::Delete(IWSLASession& session, std::string id, bool force)
     THROW_IF_FAILED(container->Delete());
 }
 
-std::vector<ContainerInformation> ContainerService::List(IWSLASession& session, std::vector<std::string> ids)
+std::vector<ContainerInformation> ContainerService::List(IWSLASession& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
@@ -119,8 +119,13 @@ void ContainerService::Exec(IWSLASession& session, std::string id, std::vector<s
     THROW_IF_FAILED(container->Exec(&options.InitProcessOptions, &createdProcess, &error));
 }
 
-void ContainerService::Inspect()
+InspectContainer ContainerService::Inspect(IWSLASession& session, std::string id)
 {
+    wil::com_ptr<IWSLAContainer> container;
+    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    wil::unique_cotaskmem_ansistring output;
+    THROW_IF_FAILED(container->Inspect(&output));
+    return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
 void ContainerService::CreateInternal(
