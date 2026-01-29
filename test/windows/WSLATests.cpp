@@ -2614,14 +2614,14 @@ class WSLATests
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
 
-    TEST_METHOD(ContainerPersistanceFromStorageInvalidMetadata)
+    TEST_METHOD(ContainerRecoveryFromStorageInvalidMetadata)
     {
         auto restore = ResetTestSession();
 
         {
             auto session = CreateSession(GetDefaultSessionSettings(L"persistence-invalid-metadata", true));
 
-            // Create a docker container that has no metedata.
+            // Create a docker container that has no metadata.
             auto result = RunCommand(
                 session.get(), {"/usr/bin/docker", "container", "create", "--name", "test-invalid-metadata", "debian:latest"});
             VERIFY_ARE_EQUAL(result.Code, 0L);
