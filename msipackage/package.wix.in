@@ -542,14 +542,14 @@
 
             <!-- Generate initrd.img from the init binary during installation.
                  Only run when the tools component is being installed ($tools=3), not during same-version reinstalls -->
-            <Custom Action="CreateInitrd" Before="StartServices" Condition='$tools=3' />
+            <Custom Action="CreateInitrd" After="RegisterLspCategories" Condition='$tools=3' />
 
             <!-- This needs to run before the registry is cleared because this action needs to read the install path.
                  This actions runs on uninstallation and upgrade. -->
             <Custom Action="UnregisterLspCategories" Before="RemoveRegistryValues" Condition='(REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE) and (not SKIPLSP = 1)' />
 
             <!-- Remove initrd.img during uninstallation. Must run after StopServices so the file isn't locked -->
-            <Custom Action="RemoveInitrd" After="StopServices" Condition='(REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
+            <Custom Action="RemoveInitrd" Before="UnregisterLspCategories" Condition='(REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
 
             <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                 <!-- This needs to run before the registry is written because this action calculates registry key names and values -->
