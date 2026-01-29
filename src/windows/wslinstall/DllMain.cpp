@@ -42,6 +42,12 @@ static constexpr auto c_wslSettingsProgIDPropertyName = L"WSLSETTINGSPROGID";
         return NOERROR; \
     }
 
+#define WSL_INSTALL_LOG(Name, ...) \
+    { \
+        WSL_LOG(Name, __VA_ARGS__); \
+        WriteInstallLog(std::format("MSI install: {}", Name)); \
+    }
+
 #ifndef WSL_OFFICIAL_BUILD
 void TrustPackageCertificate(LPCWSTR Path)
 {
@@ -519,8 +525,7 @@ extern "C" UINT __stdcall CleanMsixState(MSIHANDLE install)
 extern "C" UINT __stdcall DeprovisionMsix(MSIHANDLE install)
 try
 {
-    WSL_LOG("DeprovisionMsix");
-    WriteInstallLog("MSI install: DeprovisionMsix");
+    WSL_INSTALL_LOG("DeprovisionMsix");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
     const auto result = packageManager.DeprovisionPackageForAllUsersAsync(wsl::windows::common::wslutil::c_msixPackageFamilyName).get();
@@ -543,8 +548,7 @@ catch (...)
 extern "C" UINT __stdcall RemoveMsixAsSystem(MSIHANDLE install)
 try
 {
-    WSL_LOG("RemoveMsixAsSystem");
-    WriteInstallLog("MSI install: RemoveMsixAsSystem");
+    WSL_INSTALL_LOG("RemoveMsixAsSystem");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -573,8 +577,7 @@ catch (...)
 extern "C" UINT __stdcall RemoveMsixAsUser(MSIHANDLE install)
 try
 {
-    WSL_LOG("RemoveMsixAsUser");
-    WriteInstallLog("MSI install: RemoveMsixAsUser");
+    WSL_INSTALL_LOG("RemoveMsixAsUser");
 
     const winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -643,8 +646,7 @@ wsl::windows::common::filesystem::TempFile ExtractMsix(MSIHANDLE install)
 extern "C" UINT __stdcall InstallMsixAsUser(MSIHANDLE install)
 try
 {
-    WSL_LOG("InstallMsixAsUser");
-    WriteInstallLog("MSI install: InstallMsixAsUser");
+    WSL_INSTALL_LOG("InstallMsixAsUser");
 
     // RegisterPackageByFamilyNameAsync() cannot be run as SYSTEM.
     //  If this thread runs as SYSTEM, simply skip this step.
@@ -687,8 +689,7 @@ try
     // Release a file handle to the MSIX file so that it can be installed.
     msixFile.Handle.reset();
 
-    WSL_LOG("InstallMsix", TraceLoggingValue(msixFile.Path.c_str(), "Path"));
-    WriteInstallLog("MSI install: InstallMsix");
+    WSL_INSTALL_LOG("InstallMsix", TraceLoggingValue(msixFile.Path.c_str(), "Path"));
 
     winrt::Windows::Management::Deployment::PackageManager packageManager;
 
@@ -790,8 +791,7 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
 {
     try
     {
-        WSL_LOG("WslFinalizeInstallation");
-        WriteInstallLog(std::format("MSI install: WslFinalizeInstallation"));
+        WSL_INSTALL_LOG("WslFinalizeInstallation");
     }
     CATCH_LOG();
 
@@ -801,9 +801,7 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
 extern "C" UINT __stdcall WslValidateInstallation(MSIHANDLE install)
 try
 {
-    WSL_LOG("WslValidateInstallation");
-
-    WriteInstallLog(std::format("MSI install: WslValidateInstallation"));
+    WSL_INSTALL_LOG("WslValidateInstallation");
 
     // TODO: Use a more precise version check so we don't install if the Windows build doesn't support lifted.
 
@@ -869,6 +867,157 @@ extern "C" UINT __stdcall UnregisterLspCategories(MSIHANDLE install)
         RegisterLspCategoriesImpl(0); // '0' means removing the entry.
     }
     CATCH_LOG();
+
+    // Failures in this method aren't fatal.
+    return NOERROR;
+}
+
+void CreateCpioInitrd(_In_ const std::filesystem::path& SourcePath, _In_ const std::filesystem::path& DestPath)
+{
+    // Open the source init binary
+    wil::unique_hfile sourceFile{
+        CreateFileW(SourcePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!sourceFile);
+
+    // Get file size
+    LARGE_INTEGER fileSize{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(sourceFile.get(), &fileSize));
+    THROW_HR_IF(E_INVALIDARG, fileSize.HighPart != 0); // File too large
+
+    const DWORD initSize = fileSize.LowPart;
+    const auto initDataPadding = (4 - (initSize % 4)) % 4;
+    wil::unique_hfile destFile{CreateFileW(DestPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    THROW_LAST_ERROR_IF(!destFile);
+
+    // Clean up the destination file on failure.
+    auto deleteFile = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        destFile.reset();
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(DestPath.c_str()));
+    });
+
+    auto writeCpioHeader = [&destFile](DWORD fileSize, PCSTR name) {
+        // CPIO newc header: magic(6) + 13 fields of 8 hex chars each = 110 bytes
+        constexpr size_t headerSize = 110;
+        const auto nameLen = strlen(name) + 1;
+        const auto headerPadding = (4 - ((headerSize + nameLen) % 4)) % 4;
+
+        // Get current time for mtime
+        const auto mtime = static_cast<DWORD>(time(nullptr));
+
+        char header[headerSize + 1];
+        sprintf_s(
+            header,
+            "070701" // magic
+            "%08X"   // inode
+            "%08X"   // mode
+            "%08X"   // uid
+            "%08X"   // gid
+            "%08X"   // nlink
+            "%08X"   // mtime
+            "%08X"   // filesize
+            "%08X"   // devmajor
+            "%08X"   // devminor
+            "%08X"   // rdevmajor
+            "%08X"   // rdevminor
+            "%08X"   // namesize
+            "%08X",  // check
+            0,
+            (fileSize > 0) ? 0100755 : 0,
+            0,
+            0,
+            (fileSize > 0) ? 1 : 0,
+            mtime,
+            fileSize,
+            0,
+            0,
+            0,
+            0,
+            static_cast<DWORD>(nameLen),
+            0);
+
+        DWORD bytesWritten;
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(destFile.get(), header, headerSize, &bytesWritten, nullptr));
+
+        // Write name with null terminator
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(destFile.get(), name, static_cast<DWORD>(nameLen), &bytesWritten, nullptr));
+
+        // Write padding to align to 4 bytes
+        if (headerPadding > 0)
+        {
+            char padding[4] = {0};
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(destFile.get(), padding, static_cast<DWORD>(headerPadding), &bytesWritten, nullptr));
+        }
+    };
+
+    // Write init file header
+    writeCpioHeader(initSize, SourcePath.filename().string().c_str());
+
+    // Copy file contents
+    wsl::windows::common::relay::InterruptableRelay(sourceFile.get(), destFile.get(), nullptr, 64 * 1024);
+
+    // Write data padding
+    if (initDataPadding > 0)
+    {
+        char padding[4] = {0};
+        DWORD bytesWritten;
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(destFile.get(), padding, static_cast<DWORD>(initDataPadding), &bytesWritten, nullptr));
+    }
+
+    // Write trailer entry (empty file with name "TRAILER!!!")
+    writeCpioHeader(0, "TRAILER!!!");
+
+    // Pad the archive to 512-byte boundary
+    constexpr DWORD archiveBlockSize = 512;
+    LARGE_INTEGER currentPos{};
+    THROW_IF_WIN32_BOOL_FALSE(SetFilePointerEx(destFile.get(), {}, &currentPos, FILE_CURRENT));
+
+    const auto archivePadding = (archiveBlockSize - (currentPos.LowPart % archiveBlockSize)) % archiveBlockSize;
+    if (archivePadding > 0)
+    {
+        auto paddingBuffer = std::make_unique<char[]>(archivePadding);
+        memset(paddingBuffer.get(), 0, archivePadding);
+        DWORD bytesWritten;
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(destFile.get(), paddingBuffer.get(), archivePadding, &bytesWritten, nullptr));
+    }
+
+    deleteFile.release();
+}
+
+extern "C" UINT __stdcall CreateInitrd(MSIHANDLE install)
+try
+{
+    WSL_INSTALL_LOG("CreateInitrd");
+
+    const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
+    THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
+
+    const auto toolsPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY;
+    const auto initPath = toolsPath / L"init";
+    const auto initrdPath = toolsPath / LXSS_VM_MODE_INITRD_NAME;
+    CreateCpioInitrd(initPath, initrdPath);
+
+    return NOERROR;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+
+    return ERROR_INSTALL_FAILURE;
+}
+
+extern "C" UINT __stdcall RemoveInitrd(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("RemoveInitrd");
+
+        const auto installRoot = wsl::windows::common::wslutil::GetMsiPackagePath();
+        THROW_HR_IF(E_INVALIDARG, !installRoot.has_value());
+
+        const auto initrdPath = std::filesystem::path(installRoot.value()) / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
+        THROW_IF_WIN32_BOOL_FALSE(DeleteFileW(initrdPath.c_str()));
+    }
+    CATCH_LOG()
 
     // Failures in this method aren't fatal.
     return NOERROR;

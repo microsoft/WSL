@@ -22,7 +22,7 @@ foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
 endforeach()
 
-set(LINUX_BINARIES init;initrd.img)
+set(LINUX_BINARIES init)
 foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")
 endforeach()
@@ -52,7 +52,7 @@ add_custom_command(
 
 add_custom_target(msipackage DEPENDS ${OUTPUT_PACKAGE})
 set_target_properties(msipackage PROPERTIES EXCLUDE_FROM_ALL FALSE SOURCES ${PACKAGE_WIX_IN})
-add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init initramfs wslinstall msixgluepackage)
+add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init wslinstall msixgluepackage)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_dependencies(msipackage wslsettings libwsl)
