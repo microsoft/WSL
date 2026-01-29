@@ -37,20 +37,47 @@ static int RunRunContainerCommand(std::wstring_view commandLine)
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, image.empty());
 
+    auto session = OpenCLISession();
 
+    wslc::services::ContainerService containerService;
+    wslc::services::CreateOptions options;
+    options.TTY = tty;
+    options.Interactive = interactive;
+    for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
+    {
+        options.Arguments.push_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
+    }
+
+    return containerService.Run(*session, image, options);
+}
+
+static int RunCreateContainerCommand(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
+
+    bool interactive{};
+    bool tty{};
+    std::string image;
+    parser.AddPositionalArgument(Utf8String{image}, 0);
+    parser.AddArgument(interactive, L"--interactive", 'i');
+    parser.AddArgument(tty, L"--tty", 't');
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, image.empty());
 
     auto session = OpenCLISession();
 
     wslc::services::ContainerService containerService;
-    wslc::services::RunOptions runOptions;
-    runOptions.TTY = tty;
-    runOptions.Interactive = interactive;
+    wslc::services::CreateOptions options;
+    options.TTY = tty;
+    options.Interactive = interactive;
     for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
     {
-        runOptions.Arguments.push_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
+        options.Arguments.push_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
     }
 
-    return containerService.Run(*session, image, runOptions);
+    auto result = containerService.Create(*session, image, options);
+    wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(result.Id));
+    return 0;
 }
 
 int RunContainerCommand(std::wstring_view commandLine)
@@ -71,6 +98,11 @@ int RunContainerCommand(std::wstring_view commandLine)
     if (subverb == L"run")
     {
         return RunRunContainerCommand(commandLine);
+    }
+
+    if (subverb == L"create")
+    {
+        return RunCreateContainerCommand(commandLine);
     }
 
     return PrintHelp();
