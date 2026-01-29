@@ -1339,8 +1339,7 @@ class WSLATests
 
         // Validate that the username is correctly wired.
         {
-            WSLAContainerLauncher launcher(
-                "debian:latest", "test-stop-signal-1", {"whoami"});
+            WSLAContainerLauncher launcher("debian:latest", "test-stop-signal-1", {"whoami"});
 
             launcher.SetUser("nobody");
 
