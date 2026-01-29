@@ -1,4 +1,4 @@
-﻿<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
     <Package Name="Windows Subsystem for Linux" Language="1033" InstallerVersion="500" Version="${PACKAGE_VERSION}" Manufacturer="Microsoft Corporation" UpgradeCode="6D5B792B-1EDC-4DE9-8EAD-201B820F8E82" Scope="perMachine" Compressed="${COMPRESS_PACKAGE}">
         <MajorUpgrade AllowDowngrades="yes"  Disallow="no"  />
         <MediaTemplate EmbedCab="yes" />
