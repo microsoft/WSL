@@ -21,7 +21,7 @@ class WSLAProcessIO
 {
 public:
     virtual ~WSLAProcessIO() = default;
-    virtual wil::unique_handle OpenFd(ULONG Fd, WSLAFDFlags Flags) = 0;
+    virtual wil::unique_handle OpenFd(ULONG Fd) = 0;
 };
 
 class RelayedProcessIO : public WSLAProcessIO
@@ -30,7 +30,7 @@ public:
     RelayedProcessIO(wil::unique_handle&& IoStream);
     virtual ~RelayedProcessIO();
 
-    wil::unique_handle OpenFd(ULONG Fd, WSLAFDFlags Flags) override;
+    wil::unique_handle OpenFd(ULONG Fd) override;
 
 private:
     void RunIORelay(wil::unique_hfile&& stdinPipe, wil::unique_hfile&& stdoutPipe, wil::unique_hfile&& stderrPipe);
@@ -47,7 +47,7 @@ class TTYProcessIO : public WSLAProcessIO
 public:
     TTYProcessIO(wil::unique_handle&& IoStream);
 
-    wil::unique_handle OpenFd(ULONG Fd, WSLAFDFlags Flags) override;
+    wil::unique_handle OpenFd(ULONG Fd) override;
 
 private:
     wil::unique_handle m_ioStream;
@@ -57,7 +57,7 @@ class VMProcessIO : public WSLAProcessIO
 {
 public:
     VMProcessIO(std::map<ULONG, wil::unique_handle>&& handles);
-    wil::unique_handle OpenFd(ULONG Fd, WSLAFDFlags Flags) override;
+    wil::unique_handle OpenFd(ULONG Fd) override;
 
 private:
     std::map<ULONG, wil::unique_handle> m_handles;
