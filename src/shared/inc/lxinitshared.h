@@ -1672,11 +1672,10 @@ struct WSLA_TTY_RELAY
 
     MESSAGE_HEADER Header;
     int32_t TtyMaster{};
-    int32_t TtyInput{};
-    int32_t TtyOutput{};
+    int32_t Socket{};
     int32_t TtyControl{};
 
-    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput), FIELD(TtyControl));
+    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(Socket), FIELD(TtyControl));
 };
 
 struct WSLA_ACCEPT

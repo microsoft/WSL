@@ -26,7 +26,7 @@ public:
     NON_COPYABLE(ServiceRunningProcess);
     DEFAULT_MOVABLE(ServiceRunningProcess);
 
-    ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLAProcess>& process, std::vector<WSLA_PROCESS_FD>&& fds);
+    ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLAProcess>& process, WSLAProcessFlags Flags);
     wil::unique_handle GetStdHandle(int Index) override;
     wil::unique_event GetExitEvent() override;
     WSLAProcess& Get();

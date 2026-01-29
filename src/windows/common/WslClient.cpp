@@ -34,7 +34,6 @@ using wsl::windows::common::WSLAProcessLauncher;
 using namespace wsl::windows::common;
 using namespace wsl::shared;
 using namespace wsl::windows::common::distribution;
-using wsl::windows::common::ProcessFlags;
 
 static bool g_promptBeforeExit = false;
 
@@ -1534,10 +1533,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     std::string shell = "/bin/bash";
     std::string cmd;
 
-    std::string containerImage;
     bool help = false;
     bool noTty = false;
-    bool exec = false;
     std::wstring debugShell;
 
     std::wstring storagePath;
@@ -1557,11 +1554,8 @@ int WslaShell(_In_ std::wstring_view commandLine)
     parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");
     parser.AddArgument(storagePath, L"--storage");
     parser.AddArgument(Integer(reinterpret_cast<int&>(sessionSettings.NetworkingMode)), L"--networking-mode");
-    parser.AddArgument(Utf8String(containerImage), L"--image");
     parser.AddArgument(debugShell, L"--debug-shell");
     parser.AddArgument(noTty, L"--no-tty");
-    parser.AddArgument(Utf8String(cmd), L"--cmd");
-    parser.AddArgument(exec, L"--exec");
     parser.AddArgument(help, L"--help");
     parser.Parse();
 
@@ -1630,78 +1624,10 @@ int WslaShell(_In_ std::wstring_view commandLine)
     Info.cbSize = sizeof(Info);
     THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &Info));
 
-    if (containerImage.empty())
-    {
-        wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, ProcessFlags::None};
-        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-        launcher.AddFd(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
-        launcher.SetTtySize(Info.srWindow.Bottom - Info.srWindow.Top + 1, Info.srWindow.Right - Info.srWindow.Left + 1);
+    wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty};
+    launcher.SetTtySize(Info.srWindow.Bottom - Info.srWindow.Top + 1, Info.srWindow.Right - Info.srWindow.Left + 1);
 
-        process = launcher.Launch(*session);
-    }
-    else
-    {
-        THROW_IF_FAILED(session->PullImage(containerImage.c_str(), nullptr, nullptr, nullptr));
-
-        std::vector<WSLA_PROCESS_FD> fds;
-
-        if (noTty)
-        {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
-        }
-        else
-        {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-        }
-
-        WSLA_CONTAINER_OPTIONS containerOptions{};
-        containerOptions.Image = containerImage.c_str();
-        containerOptions.Name = "test-container";
-        containerOptions.InitProcessOptions.Fds = fds.data();
-        containerOptions.InitProcessOptions.FdsCount = static_cast<DWORD>(fds.size());
-        containerOptions.InitProcessOptions.TtyColumns = Info.srWindow.Right - Info.srWindow.Left + 1;
-        containerOptions.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
-
-        std::vector<std::string> cmdStorage;
-        for (const auto& e : cmd | std::views::split(' '))
-        {
-            cmdStorage.emplace_back(e.begin(), e.end());
-        }
-
-        std::vector<const char*> cmdPtr;
-        for (auto&& e : cmdStorage)
-        {
-            cmdPtr.push_back(e.c_str());
-        }
-
-        if (!cmdPtr.empty())
-        {
-            containerOptions.InitProcessOptions.CommandLine = cmdPtr.data();
-            containerOptions.InitProcessOptions.CommandLineCount = gsl::narrow_cast<DWORD>(cmdPtr.size());
-        }
-
-        container.emplace();
-        THROW_IF_FAILED(session->CreateContainer(&containerOptions, &container.value(), nullptr));
-        THROW_IF_FAILED((*container)->Start());
-
-        wil::com_ptr<IWSLAProcess> createdProcess;
-
-        if (exec)
-        {
-            int error = -1;
-            THROW_IF_FAILED((*container)->Exec(&containerOptions.InitProcessOptions, &createdProcess, &error));
-        }
-        else
-        {
-            THROW_IF_FAILED((*container)->GetInitProcess(&createdProcess));
-        }
-
-        process.emplace(std::move(createdProcess), std::move(fds));
-    }
+    process = launcher.Launch(*session);
 
     if (noTty)
     {
@@ -1747,17 +1673,9 @@ int WslaShell(_In_ std::wstring_view commandLine)
         std::vector<wil::unique_handle> handleStorage;
         HANDLE ttyInput = nullptr;
         HANDLE ttyOutput = nullptr;
-        if (!containerImage.empty())
-        {
-            auto& it = handleStorage.emplace_back(process->GetStdHandle(WSLAFDTty));
-            ttyInput = it.get();
-            ttyOutput = it.get();
-        }
-        else
-        {
-            ttyInput = handleStorage.emplace_back(process->GetStdHandle(WSLAFDStdin)).get();
-            ttyOutput = handleStorage.emplace_back(process->GetStdHandle(WSLAFDStdout)).get();
-        }
+        auto& it = handleStorage.emplace_back(process->GetStdHandle(WSLAFDTty));
+        ttyInput = it.get();
+        ttyOutput = it.get();
 
         {
             // Create a thread to relay stdin to the pipe.

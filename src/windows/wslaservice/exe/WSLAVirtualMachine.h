@@ -32,12 +32,25 @@ enum WSLAMountFlags
     WSLAMountFlagsWriteableOverlayFs = 4,
 };
 
+enum WSLAFdType
+{
+    WSLAFdTypeDefault = 0,
+    WSLAFdTypeTty = 1,
+    WSLAFdTypeTtyControl = 2,
+};
+
+struct WSLAProcessFd
+{
+    LONG Fd{};
+    WSLAFdType Type{};
+};
+
 class WSLAVirtualMachine
 {
 public:
     struct ConnectedSocket
     {
-        int Fd;
+        int Fd{};
         wil::unique_socket Socket;
     };
 
@@ -85,7 +98,10 @@ public:
     void ReleasePorts(const std::set<uint16_t>& Ports);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcess(
-        _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
+        _In_ LPCSTR Executable,
+        _In_ const WSLA_PROCESS_OPTIONS& Options,
+        int* Errno = nullptr,
+        const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     std::pair<ULONG, std::string> AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly);
     void DetachDisk(_In_ ULONG Lun);
@@ -110,8 +126,13 @@ private:
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
     static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
-    static bool ParseTtyInformation(
-        const WSLA_PROCESS_FD* Fds, ULONG FdCount, const WSLA_PROCESS_FD** TtyInput, const WSLA_PROCESS_FD** TtyOutput, const WSLA_PROCESS_FD** TtyControl);
+
+    Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
+        _In_ LPCSTR Executable,
+        _In_ const WSLA_PROCESS_OPTIONS& Options,
+        _In_ const std::vector<WSLAProcessFd>& Fds = {},
+        int* Errno = nullptr,
+        const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     void ConfigureNetworking();
     void OnExit(_In_ const HCS_EVENT* Event);
@@ -133,9 +154,6 @@ private:
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
     void CollectCrashDumps(wil::unique_socket&& listenSocket) const;
-
-    Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
-        _In_ const WSLA_PROCESS_OPTIONS& Options, int* Errno = nullptr, const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
     HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ WSLAMountFlags Flags = WSLAMountFlagsNone);
 
