@@ -5,6 +5,8 @@
 namespace wslc::services
 {
 
+using wsl::windows::common::wslutil::WSLAErrorDetails;
+
 std::vector<ImageInformation> ImageService::List()
 {
     auto session = OpenCLISession();
@@ -25,8 +27,12 @@ std::vector<ImageInformation> ImageService::List()
     return result;
 }
 
-void ImageService::Pull()
+void ImageService::Pull(const std::string& image, IProgressCallback* callback)
 {
+    auto session = OpenCLISession();
+    WSLAErrorDetails error{};
+    auto result = session->PullImage(image.c_str(), nullptr, callback, &error.Error);
+    error.ThrowIfFailed(result);
 }
 
 void ImageService::Push()

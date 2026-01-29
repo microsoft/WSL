@@ -16,7 +16,7 @@ namespace wslc::services
     {
     public:
         std::vector<ImageInformation> List();
-        void Pull();
+        void Pull(const std::string& image, IProgressCallback* callback);
         void Push();
         void Save();
         void Load();

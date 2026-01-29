@@ -6,6 +6,7 @@
 #include "ExecutionContext.h"
 #include <thread>
 #include <format>
+#include "services/ImageService.h"
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
@@ -255,10 +256,9 @@ void PullImpl(IWSLASession& Session, const std::string& Image)
 
     wil::com_ptr<IWSLASession> session = OpenCLISession();
 
+    wslc::services::ImageService imageService;
     Callback callback;
-    WSLAErrorDetails error{};
-    auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
-    error.ThrowIfFailed(result);
+    imageService.Pull(Image, &callback);
 }
 
 int ReportError(const std::wstring& context, HRESULT hr)
