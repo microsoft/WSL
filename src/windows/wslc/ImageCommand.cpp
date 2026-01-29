@@ -43,24 +43,44 @@ int RunPullImageCommand(std::wstring_view commandLine)
     return 0;
 }
 
-int RunListImageCommand()
+int RunListImageCommand(std::wstring_view commandLine)
 {
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
+    std::string format = "table";
+    bool quiet = false;
+    parser.AddArgument(Utf8String(format), L"--format", L'f');
+    parser.AddArgument(quiet, L"--quiet", L'q');
+    parser.Parse();
+
     wslc::services::ImageService imageServie;
-    auto list = imageServie.List();
-    auto count = list.size();
-    const wchar_t* plural = count == 1 ? L"" : L"s";
-    wslutil::PrintMessage(std::format(L"[wslc] Found {} image{}", count, plural), stdout);
-
-    TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
-    for (const auto& [imageName, size] : list)
+    auto images = imageServie.List();
+    if (format == "json")
     {
-        tablePrinter.AddRow({
-            std::wstring(imageName.begin(), imageName.end()), 
-            std::format(L"{:.2f} MB", static_cast<double>(size) / (1024 * 1024))
-        });
+        for (const services::ImageInformation& image : images)
+        {
+            wprintf(L"%hs", wsl::shared::ToJson(image).c_str());
+        }
     }
+    else if (quiet)
+    {
+        for (const auto& image : images)
+        {
+            wprintf(L"%hs\n", image.Name.c_str());
+        }
+    }
+    else
+    {
+        TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+        for (const auto& [imageName, size] : images)
+        {
+            tablePrinter.AddRow({
+                std::wstring(imageName.begin(), imageName.end()), 
+                std::format(L"{:.2f} MB", static_cast<double>(size) / (1024 * 1024))
+            });
+        }
 
-    tablePrinter.Print();
+        tablePrinter.Print();
+    }
 
     return 0;
 }
@@ -83,7 +103,7 @@ int RunImageCommand(std::wstring_view commandLine)
 
     if (subverb == L"list")
     {
-        return RunListImageCommand();
+        return RunListImageCommand(commandLine);
     }
 
     if (subverb == L"pull")
