@@ -126,7 +126,9 @@ class WSLATests
         return settings;
     }
 
-    // Returns true if the given settings are compatible with the default session.
+    // Returns true if the given settings match the default session's VM-affecting settings.
+    // Only checks settings that affect VM behavior (NetworkingMode, FeatureFlags, DmesgOutput, TerminationCallback).
+    // Other settings like StoragePath are handled separately in CreateTestSession.
     static bool CanReuseDefaultSession(const WSLA_SESSION_SETTINGS& settings)
     {
         auto defaultSettings = GetDefaultSessionSettings(c_testSessionName);
@@ -159,12 +161,16 @@ class WSLATests
     {
         if (CanReuseDefaultSession(settings))
         {
-            // Reuse or create the default session
-            return wil::com_ptr<IWSLASession>(&GetDefaultSession());
+            if (!m_defaultSession)
+            {
+                m_defaultSession = CreateSession(GetDefaultSessionSettings(c_testSessionName));
+            }
+
+            return m_defaultSession;
         }
 
         // If both use the same storage VHD, terminate default first (VHD can only attach to one VM).
-        if (settings.StoragePath != nullptr && settings.StoragePath == storagePath)
+        if (settings.StoragePath != nullptr && std::filesystem::path(settings.StoragePath) == storagePath)
         {
             ResetDefaultSession();
         }
@@ -1021,7 +1027,8 @@ class WSLATests
         // Stop the service
         StopWslaService();
 
-        ResetDefaultSession(); // Reopen the session since the service was stopped.
+        // Reset the default session since the service was stopped. It will be recreated on next use.
+        ResetDefaultSession();
     }
 
     void ValidateWindowsMounts(bool enableVirtioFs)
