@@ -84,10 +84,8 @@ static int RunStartContainerCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
 
-    bool interactive{};
     std::string id;
     parser.AddPositionalArgument(Utf8String{id}, 0);
-    parser.AddArgument(interactive, L"--interactive", 'i');
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, id.empty());
 
@@ -105,8 +103,8 @@ static int RunStopContainerCommand(std::wstring_view commandLine)
     std::string id;
     wslc::services::StopContainerOptions options;
     parser.AddPositionalArgument(Utf8String{id}, 0);
-    parser.AddArgument(options.Signal, L"--signal", 's');
-    parser.AddArgument(options.Timeout, L"--time", 't');
+    parser.AddArgument(Integer{options.Signal}, L"--signal", 's');
+    parser.AddArgument(Integer{options.Timeout}, L"--time", 't');
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, id.empty());
 
