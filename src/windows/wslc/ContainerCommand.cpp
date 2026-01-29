@@ -80,6 +80,43 @@ static int RunCreateContainerCommand(std::wstring_view commandLine)
     return 0;
 }
 
+static int RunStartContainerCommand(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
+
+    bool interactive{};
+    std::string id;
+    parser.AddPositionalArgument(Utf8String{id}, 0);
+    parser.AddArgument(interactive, L"--interactive", 'i');
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, id.empty());
+
+    auto session = OpenCLISession();
+
+    wslc::services::ContainerService containerService;
+    containerService.Start(*session, id);
+    return 0;
+}
+
+static int RunStopContainerCommand(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
+
+    std::string id;
+    wslc::services::StopContainerOptions options;
+    parser.AddPositionalArgument(Utf8String{id}, 0);
+    parser.AddArgument(options.Signal, L"--signal", 's');
+    parser.AddArgument(options.Timeout, L"--time", 't');
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, id.empty());
+
+    auto session = OpenCLISession();
+
+    wslc::services::ContainerService containerService;
+    containerService.Stop(*session, id, options);
+    return 0;
+}
+
 int RunContainerCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, true);
@@ -103,6 +140,16 @@ int RunContainerCommand(std::wstring_view commandLine)
     if (subverb == L"create")
     {
         return RunCreateContainerCommand(commandLine);
+    }
+
+    if (subverb == L"start")
+    {
+        return RunStartContainerCommand(commandLine);
+    }
+
+    if (subverb == L"stop")
+    {
+        return RunStopContainerCommand(commandLine);
     }
 
     return PrintHelp();
