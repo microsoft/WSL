@@ -1515,7 +1515,7 @@ class WSLATests
             }
 
             // Create a stuck container.
-            WSLAContainerLauncher launcher("debian:latest", "test-container-1", {}, {"sleep", "99999"});
+            WSLAContainerLauncher launcher("debian:latest", "test-container-1", {"sleep", "99999"});
 
             auto container = launcher.Launch(*m_defaultSession);
 
