@@ -1,6 +1,5 @@
 set(SOURCES
     main.cpp
-    RunCommand.cpp
     ShellCommand.cpp
     ListCommand.cpp
     CreateCommand.cpp
@@ -8,11 +7,11 @@ set(SOURCES
     StartCommand.cpp
     StopCommand.cpp
     ImageCommand.cpp
+	ContainerCommand.cpp
     Utils.cpp
 )
 
 set(HEADERS
-    RunCommand.h
     ShellCommand.h
     ListCommand.h
     CreateCommand.h
@@ -20,6 +19,7 @@ set(HEADERS
     StartCommand.h
     StopCommand.h
     ImageCommand.h
+	ContainerCommand.h
     Utils.h
 )
 

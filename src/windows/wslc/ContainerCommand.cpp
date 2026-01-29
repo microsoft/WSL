@@ -1,8 +1,9 @@
 #include "precomp.h"
-#include "RunCommand.h"
+#include "ContainerCommand.h"
 #include "Utils.h"
 #include "WSLAProcessLauncher.h"
 #include <CommandLine.h>
+#include <format>
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
@@ -15,7 +16,14 @@ using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-int RunRunCommand(std::wstring_view commandLine)
+static int PrintHelp()
+{
+    wprintf(L"Supported commands for 'wslc container':\n");
+    wprintf(L"  run [--interactive|-i] [--tty|-t] <image> [command...]\n");
+    return 0;
+}
+
+static int RunRunContainerCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, true);
 
@@ -100,4 +108,27 @@ int RunRunCommand(std::wstring_view commandLine)
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
     return InteractiveShell(ClientRunningWSLAProcess(std::move(process), std::move(fds)), tty);
+}
+
+int RunContainerCommand(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, true);
+
+    bool help = false;
+    std::wstring subverb;
+    parser.AddPositionalArgument(subverb, 0);
+    parser.AddArgument(help, L"--help", L'h');
+    parser.Parse();
+
+    if (help)
+    {
+        return PrintHelp();
+    }
+
+    if (subverb == L"run")
+    {
+        return RunRunContainerCommand(commandLine);
+    }
+
+    return PrintHelp();
 }

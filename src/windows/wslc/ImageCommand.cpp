@@ -44,7 +44,7 @@ int RunListImageCommand()
     auto session = OpenCLISession();
     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
     ULONG count = 0;
-    session->ListImages(&images, &count);
+    THROW_IF_FAILED(session->ListImages(&images, &count));
 
     const wchar_t* plural = count == 1 ? L"" : L"s";
     wslutil::PrintMessage(std::format(L"[wslc] Found {} image", count, plural), stdout);
@@ -87,6 +87,6 @@ int RunImageCommand(std::wstring_view commandLine)
     {
         return RunPullImageCommand(commandLine);
     }
-    
+
     return PrintHelp();
 }

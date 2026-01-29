@@ -19,7 +19,6 @@ Abstract:
 #include "WslSecurity.h"
 #include "WSLAProcessLauncher.h"
 #include "ExecutionContext.h"
-#include "RunCommand.h"
 #include "ListCommand.h"
 #include "ShellCommand.h"
 #include "CreateCommand.h"
@@ -27,6 +26,7 @@ Abstract:
 #include "StartCommand.h"
 #include "StopCommand.h"
 #include "ImageCommand.h"
+#include "ContainerCommand.h"
 #include "Utils.h"
 #include <thread>
 #include <format>
@@ -92,9 +92,9 @@ int wslc_main(std::wstring_view commandLine)
         return RunShellCommand(commandLine);
     }
     
-    if (verb == L"run")
+    if (verb == L"container")
     {
-        return RunRunCommand(commandLine);
+        return RunContainerCommand(commandLine);
     }
     
     if (verb == L"create")
