@@ -4,7 +4,7 @@
 #include "WSLAProcessLauncher.h"
 #include <CommandLine.h>
 #include <format>
-#include "services/ImageService.h"
+#include "ImageService.h"
 #include "TableOutput.h"
 
 namespace wslc::commands

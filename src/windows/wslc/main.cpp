@@ -21,10 +21,6 @@ Abstract:
 #include "ExecutionContext.h"
 #include "ListCommand.h"
 #include "ShellCommand.h"
-#include "CreateCommand.h"
-#include "DeleteCommand.h"
-#include "StartCommand.h"
-#include "StopCommand.h"
 #include "ImageCommand.h"
 #include "ContainerCommand.h"
 #include "Utils.h"
@@ -97,26 +93,6 @@ int wslc_main(std::wstring_view commandLine)
         return RunContainerCommand(commandLine);
     }
     
-    if (verb == L"create")
-    {
-        return RunCreateCommand(commandLine);
-    }
-    
-    if (verb == L"delete")
-    {
-        return RunDeleteCommand(commandLine);
-    }
-    
-    if (verb == L"start")
-    {
-        return RunStartCommand(commandLine);
-    }
-    
-    if (verb == L"stop")
-    {
-        return RunStopCommand(commandLine);
-    }
-
     if (verb == L"image")
     {
         return wslc::commands::RunImageCommand(commandLine);

@@ -1,6 +1,6 @@
 #include "precomp.h"
 #include "ContainerCommand.h"
-#include "services/ContainerService.h"
+#include "ContainerService.h"
 #include "Utils.h"
 #include "WSLAProcessLauncher.h"
 #include <CommandLine.h>
@@ -24,7 +24,7 @@ static int PrintHelp()
     return 0;
 }
 
-static int RunRunContainerCommand(std::wstring_view commandLine)
+static int ExecuteRunCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
 
@@ -51,7 +51,7 @@ static int RunRunContainerCommand(std::wstring_view commandLine)
     return containerService.Run(*session, image, options);
 }
 
-static int RunCreateContainerCommand(std::wstring_view commandLine)
+static int ExecuteCreateCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
 
@@ -80,7 +80,7 @@ static int RunCreateContainerCommand(std::wstring_view commandLine)
     return 0;
 }
 
-static int RunStartContainerCommand(std::wstring_view commandLine)
+static int ExecuteStartCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
 
@@ -96,7 +96,7 @@ static int RunStartContainerCommand(std::wstring_view commandLine)
     return 0;
 }
 
-static int RunStopContainerCommand(std::wstring_view commandLine)
+static int ExecuteStopCommand(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
 

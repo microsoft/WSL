@@ -1,5 +1,5 @@
 #include "ImageService.h"
-#include "../Utils.h"
+#include "Utils.h"
 #include <wslutil.h>
 
 namespace wslc::services
