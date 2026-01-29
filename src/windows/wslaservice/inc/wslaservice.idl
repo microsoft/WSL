@@ -68,8 +68,8 @@ typedef enum _WSLASignal
     WSLASignalSIGTRAP = 5,
     WSLASignalSIGABRT = 6,
     WSLASignalSIGIOT = 6, // SIGABRT and SIGIOT are equivalent.
-    WSLASignalSIGBUS= 7,
-    WSLASignalSIGPE = 8,
+    WSLASignalSIGBUS = 7,
+    WSLASignalSIGFPE = 8,
     WSLASignalSIGKILL = 9,
     WSLASignalSIGUSR1 = 10,
     WSLASignalSIGSEGV = 11,
@@ -81,7 +81,7 @@ typedef enum _WSLASignal
     WSLASignalSIGCHLD = 17,
     WSLASignalSIGCONT = 18,
     WSLASignalSIGSTOP = 19,
-    WSLASignalSIGSTP = 20,
+    WSLASignalSIGTSTP = 20,
     WSLASignalSIGTTIN = 21,
     WSLASignalSIGTTOU = 22,
     WSLASignalSIGURG = 23,
@@ -89,7 +89,7 @@ typedef enum _WSLASignal
     WSLASignalSIGXFSZ = 25,
     WSLASignalSIGVTALRM = 26,
     WSLASignalSIGPROF = 27,
-    WSLASignalSIGINCH = 28,
+    WSLASignalSIGWINCH = 28,
     WSLASignalSIGIO = 29,
     WSLASignalSIGPOLL = 29, // SIGIO and SIGPOLL are equivalent.
     WSLASignalSIGPWR = 30,

@@ -37,7 +37,7 @@ void RunningWSLAContainer::Reset()
     if (m_container && m_deleteOnClose)
     {
         // Attempt to stop and delete the container.
-        LOG_IF_FAILED(m_container->Stop(WSLASignalSIGILL, 0));
+        LOG_IF_FAILED(m_container->Stop(WSLASignalSIGKILL, 0));
         LOG_IF_FAILED(m_container->Delete());
     }
 

@@ -43,7 +43,6 @@ struct WSLAProcessFd
 {
     LONG Fd{};
     WSLAFdType Type{};
-    // LPCSTR Path;
 };
 
 class WSLAVirtualMachine

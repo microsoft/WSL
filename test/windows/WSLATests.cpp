@@ -1327,7 +1327,7 @@ class WSLATests
         // Validate that hostname and domainanme are correctly wired.
         {
             WSLAContainerLauncher launcher(
-                "debian:latest", "test-stop-signal-2", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
+                "debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
 
             launcher.SetHostname("my-host-name");
             launcher.SetDomainname("my-domain-name");
@@ -1339,7 +1339,7 @@ class WSLATests
 
         // Validate that the username is correctly wired.
         {
-            WSLAContainerLauncher launcher("debian:latest", "test-stop-signal-1", {"whoami"});
+            WSLAContainerLauncher launcher("debian:latest", "test-username", {"whoami"});
 
             launcher.SetUser("nobody");
 
@@ -1757,7 +1757,7 @@ class WSLATests
                 "test-network",
                 {"sleep", "99999"},
                 {},
-                (WSLA_CONTAINER_NETWORK_TYPE)6 // WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE,);
+                (WSLA_CONTAINER_NETWORK_TYPE)6 // WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE
             );
 
             auto retVal = launcher.LaunchNoThrow(*m_defaultSession);

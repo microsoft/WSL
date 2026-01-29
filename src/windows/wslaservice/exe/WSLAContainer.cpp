@@ -34,7 +34,14 @@ namespace {
 
 std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
 {
-    return {&array.Values[0], &array.Values[array.Count]};
+    if (array.Count == 0)
+    {
+        return {};
+    }
+    else
+    {
+        return {&array.Values[0], &array.Values[array.Count]};
+    }
 }
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
@@ -349,13 +356,7 @@ void WSLAContainerImpl::Start()
     catch (const DockerHTTPException& e)
     {
         // TODO: wire error back to caller.
-        std::string errorMessage;
-        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
-        {
-            errorMessage = e.DockerMessage<ErrorResponse>().message;
-        }
-
-        THROW_HR_MSG(E_FAIL, "Failed to start container '%hs': %hs", m_id.c_str(), errorMessage.c_str());
+        THROW_HR_MSG(E_FAIL, "Failed to start container '%hs': %hs", m_id.c_str(), e.what());
     }
 
     m_state = WslaContainerStateRunning;
@@ -478,6 +479,8 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
 
 void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 {
+    THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
+
     std::lock_guard lock{m_lock};
 
     auto state = State();
