@@ -1884,10 +1884,8 @@ Usage:
   <data name="MessageWslcUsage" xml:space="preserve">
     <value>wslc - WSL Container CLI
 Usage:
-  wslc list
-  wslc shell &lt;SessionName&gt; [--verbose]
   wslc --help</value>
-    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaSessionNotFound" xml:space="preserve">
     <value>Session not found: '{}'</value>
