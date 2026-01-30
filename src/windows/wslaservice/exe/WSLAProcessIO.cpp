@@ -25,7 +25,6 @@ RelayedProcessIO::RelayedProcessIO(std::map<ULONG, wil::unique_handle>&& fds) : 
 {
 }
 
-
 wil::unique_handle RelayedProcessIO::OpenFd(ULONG Fd)
 {
     auto it = m_relayedHandles.find(Fd);

@@ -1543,9 +1543,9 @@ int WslaShell(_In_ std::wstring_view commandLine)
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(rootVhdOverride, L"--vhd");
     parser.AddArgument(Utf8String(shell), L"--shell");
-    parser.AddArgument(SetFlag<WslaFeatureFlagsDnsTunneling, ULONG>(sessionSettings.FeatureFlags), L"--dns-tunneling");
-    parser.AddArgument(SetFlag<WslaFeatureFlagsPmemVhds, ULONG>(sessionSettings.FeatureFlags), L"--pmem-vhds");
-    parser.AddArgument(SetFlag<WslaFeatureFlagsVirtioFs, ULONG>(sessionSettings.FeatureFlags), L"--virtiofs");
+    parser.AddArgument(SetFlag<WslaFeatureFlagsDnsTunneling>(sessionSettings.FeatureFlags), L"--dns-tunneling");
+    parser.AddArgument(SetFlag<WslaFeatureFlagsPmemVhds>(sessionSettings.FeatureFlags), L"--pmem-vhds");
+    parser.AddArgument(SetFlag<WslaFeatureFlagsVirtioFs>(sessionSettings.FeatureFlags), L"--virtiofs");
     parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");

@@ -60,8 +60,11 @@ bool IsContainerNameValid(LPCSTR Name)
 } // namespace
 
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated) :
-
-    m_id(id), m_displayName(Settings.DisplayName), m_tokenInfo(std::move(TokenInfo)), m_elevatedToken(Elevated)
+    m_id(id),
+    m_displayName(Settings.DisplayName),
+    m_tokenInfo(std::move(TokenInfo)),
+    m_elevatedToken(Elevated),
+    m_featureFlags(Settings.FeatureFlags)
 {
     auto callingProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
     m_creatorPid = GetProcessId(callingProcess.get());
@@ -85,33 +88,21 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::u
     ConfigureStorage(Settings, m_tokenInfo->User.Sid);
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        m_sessionTerminatingEvent.SetEvent();
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
 
-        if (m_containerdThread.joinable())
-        {
-            m_containerdThread.join();
-        }
-    });
+    // Launch dockerd
+    StartDockerd();
 
-    // Launch containerd
-    // TODO: Rework the daemon logic so we can have only one thread watching all daemons.
-    ServiceProcessLauncher launcher{
-        "/usr/bin/dockerd",
-        {"/usr/bin/dockerd" /*, "--debug"*/}, // TODO: Flag for --debug.
-        {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
-    m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine));
-
-    // Wait for containerd to be ready before starting the event tracker.
-    // TODO: Configurable timeout.
-    THROW_WIN32_IF_MSG(ERROR_TIMEOUT, !m_containerdReadyEvent.wait(10 * 1000), "Timed out waiting for containerd to start");
+    // Wait for dockerd to be ready before starting the event tracker.
+    THROW_WIN32_IF_MSG(
+        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings.BootTimeoutMs), "Timed out waiting for dockerd to start");
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLA_FORK::Thread);
 
     m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
     //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value());
+    m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
     // Recover any existing containers from storage.
     RecoverExistingContainers();
@@ -277,7 +268,15 @@ void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, siz
     wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
-void WSLASession::OnContainerdLog(const gsl::span<char>& buffer)
+void WSLASession::OnDockerdExited()
+{
+    if (!m_sessionTerminatingEvent.is_signaled())
+    {
+        WSL_LOG("UnexpectedDockerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
+    }
+}
+
+void WSLASession::OnDockerdLog(const gsl::span<char>& buffer)
 try
 {
     if (buffer.empty())
@@ -300,40 +299,30 @@ try
 }
 CATCH_LOG();
 
-void WSLASession::MonitorContainerd(ServiceRunningProcess&& process)
-try
+void WSLASession::StartDockerd()
 {
-    windows::common::relay::MultiHandleWait io;
+    std::vector<std::string> args{{"/usr/bin/dockerd"}};
+
+    if (WI_IsFlagSet(m_featureFlags, WslaFeatureFlagsDebug))
+    {
+        args.emplace_back("--debug");
+    }
+
+    ServiceProcessLauncher launcher{"/usr/bin/dockerd", args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
+
+    m_dockerdProcess = launcher.Launch(*m_virtualMachine);
 
     // Read stdout & stderr.
-    io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        m_dockerdProcess->GetStdHandle(1), [&](const auto& data) { OnDockerdLog(data); }, false));
 
-    io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        m_dockerdProcess->GetStdHandle(2), [&](const auto& data) { OnDockerdLog(data); }, false));
 
-    // Exit if either the VM terminates or containerd exits.
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent()), MultiHandleWait::CancelOnCompleted);
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(m_sessionTerminatingEvent.get()), MultiHandleWait::CancelOnCompleted);
-
-    io.Run({});
-
-    if (!m_sessionTerminatingEvent.is_signaled())
-    {
-        // If containerd exited before the VM starts terminating, then it exited unexpectedly.
-        WSL_LOG("UnexpectedContainerdExit", TraceLoggingValue(m_displayName.c_str(), "SessionDisplayName"));
-    }
-    else
-    {
-        // Otherwise, the session is shutting down; terminate containerd before exiting.
-        LOG_IF_FAILED(process.Get().Signal(15)); // SIGTERM
-
-        auto code = process.Wait(30 * 1000); // TODO: Configurable timeout.
-
-        WSL_LOG("DockerdExit", TraceLoggingValue(code, "code"));
-    }
+    // Monitor dockerd's exist so we can detect abnormal exits.
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(
+        m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
-CATCH_LOG();
 
 HRESULT WSLASession::PullImage(
     LPCSTR ImageUri,
@@ -816,34 +805,44 @@ try
 
     std::lock_guard lock{m_lock};
 
+    // This will delete all containers. Needs to be done before the VM is terminated.
+    m_containers.clear();
+
     // Stop the IO relay.
     // This stops:
     // - container state monitoring.
     // - container init process relays
     // - execs relays
     // - container logs relays
-
     m_ioRelay.Stop();
 
-    if (m_eventTracker.has_value())
-    {
-        m_eventTracker->Stop();
-    }
-
-    // This will delete all containers. Needs to be done before the VM is terminated.
-    m_containers.clear();
-
+    m_eventTracker.reset();
     m_dockerClient.reset();
 
-    // N.B. The containerd thread can only run if the VM is running.
-    if (m_containerdThread.joinable())
+    // Stop dockerd.
+    // N.B. dockerd wait a couple seconds if there are any outstanding HTTP request sockets opened.
+    if (m_dockerdProcess.has_value())
     {
-        m_containerdThread.join();
+        LOG_IF_FAILED(m_dockerdProcess->Get().Signal(WSLASignalSIGTERM));
+
+        int exitCode = -1;
+        try
+        {
+            auto exitCode = m_dockerdProcess->Wait(30 * 1000);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
+            exitCode = m_dockerdProcess->Wait(10 * 1000);
+        }
+
+        WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));
     }
 
     if (m_virtualMachine)
     {
-        // N.B. containerd has exited by this point, so unmounting the VHD is safe since no container can be running.
+        // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
         try
         {
             m_virtualMachine->Unmount(c_containerdStorage);

@@ -128,7 +128,6 @@ int RunningWSLAProcess::Wait(DWORD TimeoutMs)
     return GetExitCode();
 }
 
-
 RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD TimeoutMs, std::vector<std::unique_ptr<relay::OverlappedIOHandle>>&& ExtraHandles)
 {
     RunningWSLAProcess::ProcessResult result;
@@ -211,7 +210,6 @@ IWSLAProcess& ClientRunningWSLAProcess::Get()
 {
     return *m_process.get();
 }
-
 
 ClientRunningWSLAProcess::ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, WSLAProcessFlags Flags) :
     RunningWSLAProcess(Flags), m_process(std::move(process))

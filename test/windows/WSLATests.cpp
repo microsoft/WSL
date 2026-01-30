@@ -29,8 +29,6 @@ using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
-
 static std::filesystem::path storagePath;
 
 extern std::wstring g_testDataPath;
@@ -2743,7 +2741,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Validate attach behavior in a non-tty process.
-       {
+        {
             WSLAContainerLauncher launcher("debian:latest", "attach-test-1", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
             auto [result, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_SUCCEEDED(result);
@@ -2809,7 +2807,7 @@ class WSLATests
 
             container->SetDeleteOnClose(false);
         }
-    
+
         // Validate that closing an attached stdin terminates the container.
         {
             WSLAContainerLauncher launcher("debian:latest", "attach-test-2", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
@@ -2879,13 +2877,10 @@ class WSLATests
             VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLAFDStderr, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
 
             // Verify that the container can be attached to.
-            system("pause");
-
             wil::unique_handle attachedStdin;
             wil::unique_handle attachedStdout;
             wil::unique_handle attachedStderr;
-            VERIFY_SUCCEEDED(
-                container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
 
             PartialHandleRead attachedReader(attachedStdout.get());
 
@@ -2895,7 +2890,6 @@ class WSLATests
 
             attachedReader.Expect("OK\n");
             attachedReader.ExpectClosed();
-
             VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
         }
     }

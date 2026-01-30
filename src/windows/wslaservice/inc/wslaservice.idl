@@ -288,7 +288,10 @@ typedef enum _WSLAFeatureFlags
     WslaFeatureFlagsGPU = 4,
     WslaFeatureFlagsVirtioFs = 8,
     WslaFeatureFlagsPmemVhds = 16,
+    WslaFeatureFlagsDebug = 32,
 } WSLAFeatureFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
 
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
@@ -299,7 +302,7 @@ struct WSLA_SESSION_SETTINGS {
     ULONG BootTimeoutMs;
     WSLANetworkingMode NetworkingMode;
     [unique] ITerminationCallback* TerminationCallback;
-    ULONG FeatureFlags;
+    WSLAFeatureFlags FeatureFlags;
     ULONG DmesgOutput;
 
     // Below options are used for debugging purposes only.

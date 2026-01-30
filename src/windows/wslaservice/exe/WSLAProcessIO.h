@@ -32,7 +32,6 @@ public:
     wil::unique_handle OpenFd(ULONG Fd) override;
 
 private:
-
     std::map<ULONG, wil::unique_handle> m_relayedHandles;
 };
 

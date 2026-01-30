@@ -114,7 +114,7 @@ public:
             HTTPRequestContext& context,
             std::function<void(const boost::beast::http::message<false, boost::beast::http::buffer_body>&)>&& OnResponseHeader,
             std::function<void(const gsl::span<char>&)>&& OnResponseBytes,
-            std::function<void()>&& OnCompleted = [](){});
+            std::function<void()>&& OnCompleted = []() {});
 
         ~DockerHttpResponseHandle();
 

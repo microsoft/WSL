@@ -11,9 +11,11 @@ Abstract:
     Contains the definition for ContainerEventTracker.
 
 --*/
+
 #pragma once
 
 #include "DockerHTTPClient.h"
+#include "IORelay.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -54,7 +56,7 @@ public:
 
     using ContainerStateChangeCallback = std::function<void(ContainerEvent, std::optional<int>)>;
 
-    ContainerEventTracker(DockerHTTPClient& dockerClient);
+    ContainerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay);
     ~ContainerEventTracker();
 
     void Stop();
@@ -77,8 +79,7 @@ private:
 
     std::vector<Callback> m_callbacks;
 
-    std::thread m_thread;
-    wil::unique_event m_stopEvent{wil::EventOptions::ManualReset};
+    ULONG m_sessionId{};
     std::recursive_mutex m_lock;
     std::atomic<size_t> m_callbackId{0};
 };
