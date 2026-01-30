@@ -284,7 +284,7 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
     settings.BootTimeoutMs = 30 * 1000;
     settings.StoragePath = dataFolder.c_str();
     settings.MaximumStorageSizeMb = 10000; // 10GB.
-    settings.NetworkingMode = WSLANetworkingModeNAT;
+    settings.NetworkingMode = WSLANetworkingModeVirtioProxy;
 
     wil::com_ptr<IWSLASession> session;
     THROW_IF_FAILED(manager->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
