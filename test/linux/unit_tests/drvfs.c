@@ -156,6 +156,8 @@ LXT_VARIATION_HANDLER DrvFsTestFatWslPath;
 
 LXT_VARIATION_HANDLER DrvFsTestFstat;
 
+LXT_VARIATION_HANDLER DrvFsTestStatx;
+
 LXT_VARIATION_HANDLER DrvFsTestGetDents64Alignment;
 
 LXT_VARIATION_HANDLER DrvFsTestGetDentsAlignment;
@@ -246,6 +248,7 @@ static const LXT_VARIATION g_LxtVariations[] = {
     {"DrvFs - hard links", DrvFsTestHardLinks},
     {"DrvFs - block count", DrvFsTestBlockCount},
     {"DrvFs - fstat", DrvFsTestFstat},
+    {"DrvFs - statx", DrvFsTestStatx},
     {"DrvFs - reopen unlinked file", DrvFsTestReopenUnlinked},
     {"DrvFs - delete loop", DrvFsTestDeleteLoop},
     {"DrvFs - seek", DrvFsTestSeek},
@@ -336,6 +339,7 @@ static const LXT_VARIATION g_LxtMetadataVariations[] = {
     {"DrvFs - hard links", DrvFsTestHardLinks},
     {"DrvFs - block count", DrvFsTestBlockCount},
     {"DrvFs - fstat", DrvFsTestFstat},
+    {"DrvFs - statx", DrvFsTestStatx},
     {"DrvFs - reopen unlinked file", DrvFsTestReopenUnlinked},
     {"DrvFs - delete loop", DrvFsTestDeleteLoop},
     {"DrvFs - seek", DrvFsTestSeek},
@@ -368,6 +372,7 @@ static const LXT_VARIATION g_LxtReFsVariations[] = {
     {"DrvFs - hard links", DrvFsTestHardLinks},
     {"DrvFs - block count", DrvFsTestBlockCount},
     {"DrvFs - fstat", DrvFsTestFstat},
+    {"DrvFs - statx", DrvFsTestStatx},
     {"DrvFs - reopen unlinked file", DrvFsTestReopenUnlinked},
     {"DrvFs - delete loop", DrvFsTestDeleteLoop},
     {"DrvFs - seek", DrvFsTestSeek},
@@ -1389,13 +1394,6 @@ Return Value:
 
     int Result;
 
-    if (g_LxtFsInfo.FsType == LxtFsTypeVirtioFs)
-    {
-        LxtLogInfo("TODO: debug this test on virtiofs.");
-        Result = 0;
-        goto ErrorExit;
-    }
-
     LxtCheckErrno(LxtFsDeleteCurrentWorkingDirectoryCommon(DRVFS_PREFIX, FS_DELETE_DRVFS));
 
 ErrorExit:
@@ -2022,6 +2020,180 @@ ErrorExit:
         close(OPathFd);
     }
 
+    unlink(DRVFS_BASIC_PREFIX "/testfile");
+    rmdir(DRVFS_BASIC_PREFIX);
+    return Result;
+}
+
+int DrvFsTestStatx(PLXT_ARGS Args)
+
+/*++
+
+Description:
+
+    This routine tests the statx system call on drvfs files.
+
+Arguments:
+
+    Args - Supplies the command line arguments.
+
+Return Value:
+
+    Returns 0 on success, -1 on failure.
+
+--*/
+
+{
+
+    int Fd;
+    int Result;
+    struct stat Stat1;
+    struct statx Statx1;
+    struct statx Statx2;
+
+    Fd = -1;
+
+    if (g_LxtFsInfo.FsType == LxtFsTypeDrvFs)
+    {
+        LxtLogInfo("statx is not supported on drvfs in WSL1.");
+        Result = 0;
+        goto ErrorExit;
+    }
+
+    //
+    // Create a test file and symlink.
+    //
+
+    LxtCheckErrnoZeroSuccess(mkdir(DRVFS_BASIC_PREFIX, 0777));
+    LxtCheckErrno(Fd = creat(DRVFS_BASIC_PREFIX "/testfile", 0666));
+    LxtCheckErrnoZeroSuccess(symlink(DRVFS_BASIC_PREFIX "/testfile", DRVFS_BASIC_PREFIX "/testlink"));
+
+    //
+    // Stat and statx should have consistent results.
+    //
+
+    LxtCheckErrnoZeroSuccess(stat(DRVFS_BASIC_PREFIX "/testfile", &Stat1));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_BASIC_STATS, &Statx1));
+    LxtCheckEqual(Stat1.st_ino, Statx1.stx_ino, "%llu");
+    LxtCheckEqual(Stat1.st_size, Statx1.stx_size, "%llu");
+    LxtCheckEqual(Stat1.st_mode, Statx1.stx_mode, "0%o");
+
+    //
+    // Statx with AT_EMPTY_PATH on an fd.
+    //
+
+    LxtCheckErrnoZeroSuccess(statx(Fd, "", AT_EMPTY_PATH, STATX_BASIC_STATS, &Statx2));
+    LxtCheckEqual(Statx1.stx_ino, Statx2.stx_ino, "%llu");
+
+    //
+    // Test AT_SYMLINK_NOFOLLOW flag.
+    //
+
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testlink", AT_SYMLINK_NOFOLLOW, STATX_BASIC_STATS, &Statx2));
+    LxtCheckTrue(S_ISLNK(Statx2.stx_mode));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testlink", 0, STATX_BASIC_STATS, &Statx2));
+    LxtCheckTrue(S_ISREG(Statx2.stx_mode));
+
+    //
+    // Test STATX_BTIME (birth/creation time).
+    //
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_BASIC_STATS | STATX_BTIME, &Statx2));
+    if (Statx2.stx_mask & STATX_BTIME)
+    {
+        LxtLogInfo("Birth time supported: tv_sec=%lld", (long long)Statx2.stx_btime.tv_sec);
+    }
+
+    //
+    // Test sync flags.
+    //
+
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", AT_STATX_FORCE_SYNC, STATX_BASIC_STATS, &Statx2));
+    LxtCheckEqual(Statx1.stx_ino, Statx2.stx_ino, "%llu");
+
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", AT_STATX_DONT_SYNC, STATX_BASIC_STATS, &Statx2));
+    LxtCheckEqual(Statx1.stx_ino, Statx2.stx_ino, "%llu");
+
+    //
+    // Test individual field masks.
+    //
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_TYPE, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_TYPE) != 0);
+    LxtCheckTrue(S_ISREG(Statx2.stx_mode));
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_MODE, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_MODE) != 0);
+    LxtCheckEqual((Statx1.stx_mode & 0777), (Statx2.stx_mode & 0777), "0%o");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_NLINK, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_NLINK) != 0);
+    LxtCheckEqual(Statx1.stx_nlink, Statx2.stx_nlink, "%u");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_UID, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_UID) != 0);
+    LxtCheckEqual(Statx1.stx_uid, Statx2.stx_uid, "%u");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_GID, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_GID) != 0);
+    LxtCheckEqual(Statx1.stx_gid, Statx2.stx_gid, "%u");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_ATIME, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_ATIME) != 0);
+    LxtCheckEqual(Statx1.stx_atime.tv_sec, Statx2.stx_atime.tv_sec, "%lld");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_MTIME, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_MTIME) != 0);
+    LxtCheckEqual(Statx1.stx_mtime.tv_sec, Statx2.stx_mtime.tv_sec, "%lld");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_CTIME, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_CTIME) != 0);
+    LxtCheckEqual(Statx1.stx_ctime.tv_sec, Statx2.stx_ctime.tv_sec, "%lld");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_INO, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_INO) != 0);
+    LxtCheckEqual(Statx1.stx_ino, Statx2.stx_ino, "%llu");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_SIZE, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_SIZE) != 0);
+    LxtCheckEqual(Statx1.stx_size, Statx2.stx_size, "%llu");
+
+    memset(&Statx2, 0, sizeof(Statx2));
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/testfile", 0, STATX_BLOCKS, &Statx2));
+    LxtCheckTrue((Statx2.stx_mask & STATX_BLOCKS) != 0);
+    LxtCheckEqual(Statx1.stx_blocks, Statx2.stx_blocks, "%llu");
+
+    //
+    // Test on a directory.
+    //
+
+    LxtCheckErrnoZeroSuccess(statx(AT_FDCWD, DRVFS_BASIC_PREFIX, 0, STATX_BASIC_STATS, &Statx2));
+    LxtCheckTrue(S_ISDIR(Statx2.stx_mode));
+
+    //
+    // Test error case.
+    //
+
+    LxtCheckErrnoFailure(statx(AT_FDCWD, DRVFS_BASIC_PREFIX "/nonexistent", 0, STATX_BASIC_STATS, &Statx2), ENOENT);
+
+ErrorExit:
+    if (Fd >= 0)
+    {
+        close(Fd);
+    }
+
+    unlink(DRVFS_BASIC_PREFIX "/testlink");
     unlink(DRVFS_BASIC_PREFIX "/testfile");
     rmdir(DRVFS_BASIC_PREFIX);
     return Result;

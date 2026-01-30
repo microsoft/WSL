@@ -99,8 +99,7 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::u
     ServiceProcessLauncher launcher{
         "/usr/bin/dockerd",
         {"/usr/bin/dockerd" /*, "--debug"*/}, // TODO: Flag for --debug.
-        {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}},
-        common::ProcessFlags::Stdout | common::ProcessFlags::Stderr};
+        {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
     m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine));
 
     // Wait for containerd to be ready before starting the event tracker.
@@ -872,7 +871,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::CreateRootNamespaceProcess(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
+HRESULT WSLASession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
     if (Errno != nullptr)
@@ -883,7 +882,7 @@ try
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    auto process = m_virtualMachine->CreateLinuxProcess(*Options, Errno);
+    auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, Errno);
     THROW_IF_FAILED(process.CopyTo(Process));
 
     return S_OK;

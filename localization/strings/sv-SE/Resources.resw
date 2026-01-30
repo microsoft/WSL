@@ -292,9 +292,11 @@ och wsl.exe --install &lt;Distro&gt; att installera.</value>
     <value>Den äldre distributionen stöder inte WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 stöds inte med den aktuella datorkonfigurationen.
-Aktivera den valfria komponenten Virtual Machine Platform och se till att virtualisering har aktiverats i BIOS.
+    <value>Det går inte att starta WSL2 eftersom virtualisering inte är aktiverat på den här datorn.
+Kontrollera att den valfria komponenten Virtual Machine Platform är aktiverad och att virtualisering är aktiverat i datorns inställningar för inbyggd programvara.
+
 Aktivera Virtual Machine Platform genom att köra: wsl.exe --install --no-distribution
+
 Mer information finns på https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>

@@ -61,14 +61,15 @@ public:
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         WSLA_CONTAINER_STATE InitialState,
-        bool Tty);
+        WSLAProcessFlags InitProcessFlags,
+        WSLAContainerFlags ContainerFlags);
 
     ~WSLAContainerImpl();
 
     void Start();
 
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
-    void Stop(_In_ int Signal, _In_ ULONG TimeoutMs);
+    void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
     void Delete();
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process);
@@ -109,7 +110,8 @@ private:
     std::string m_name;
     std::string m_image;
     std::string m_id;
-    bool m_tty{}; // TODO: have a flag for this at the API level.
+    WSLAProcessFlags m_initProcessFlags{};
+    WSLAContainerFlags m_containerFlags{};
     std::vector<DockerExecProcessControl*> m_processes;
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
@@ -122,9 +124,6 @@ private:
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     LogsRelay m_logsRelay;
-
-    static std::pair<bool, bool> ParseFdStatus(const WSLA_PROCESS_OPTIONS& Options);
-    static void AddEnvironmentVariables(std::vector<std::string>& args, const WSLA_PROCESS_OPTIONS& options);
 
     static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
     static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
@@ -139,7 +138,7 @@ public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
-    IFACEMETHOD(Stop)(_In_ int Signal, _In_ ULONG TimeoutMs) override;
+    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
