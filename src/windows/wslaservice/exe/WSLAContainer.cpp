@@ -168,6 +168,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Image,
     std::vector<VolumeMountInfo>&& volumes,
     std::vector<PortMapping>&& ports,
+    std::map<std::string, std::string>&& labels,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -180,6 +181,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
+    m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
@@ -669,6 +671,15 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %i", containerOptions.ContainerNetwork.ContainerNetworkType);
     }
 
+    // Process labels.
+    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
+    {
+        const auto& label = containerOptions.Labels[i];
+        THROW_HR_IF_MSG(E_INVALIDARG, label.Key == nullptr || label.Value == nullptr, "Label key and value cannot be null");
+
+        request.Labels[label.Key] = label.Value;
+    }
+
     // Process port bindings.
     auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM);
 
@@ -694,6 +705,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::vector<PortMapping>(*mappedPorts),
+        std::move(request.Labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -740,6 +752,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::string(dockerContainer.Image),
         std::vector<VolumeMountInfo>{},
         std::move(ports),
+        std::map<std::string, std::string>(dockerContainer.Labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -907,5 +920,37 @@ try
     *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
 
     return S_OK;
+}
+CATCH_RETURN();
+
+void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+{
+    std::lock_guard lock(m_lock);
+
+    *Count = static_cast<ULONG>(m_labels.size());
+
+    if (m_labels.empty())
+    {
+        *Labels = nullptr;
+        return;
+    }
+
+    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(m_labels.size());
+    ULONG i = 0;
+    for (const auto& [key, value] : m_labels)
+    {
+        labelsArray[i].Key = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(key.c_str()).release();
+        labelsArray[i].Value = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()).release();
+        i++;
+    }
+
+    *Labels = labelsArray.release();
+}
+
+HRESULT WSLAContainer::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+try
+{
+    RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
+    return CallImpl(&WSLAContainerImpl::GetLabels, Labels, Count);
 }
 CATCH_RETURN();

@@ -2738,6 +2738,65 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ContainerLabels)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        // Test valid labels
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
+            launcher.AddLabel("key1", "value1");
+            launcher.AddLabel("key2", "value2");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            // Verify labels can be retrieved
+            auto labels = container.GetLabels();
+            VERIFY_ARE_EQUAL(labels.size(), 2u);
+            VERIFY_ARE_EQUAL(labels["key1"], "value1");
+            VERIFY_ARE_EQUAL(labels["key2"], "value2");
+        }
+
+        // Test nullptr key
+        {
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-nullptr-key";
+
+            WSLA_LABEL label{};
+            label.Key = nullptr;
+            label.Value = "value";
+
+            options.Labels = &label;
+            options.LabelsCount = 1;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test nullptr value
+        {
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-nullptr-value";
+
+            WSLA_LABEL label{};
+            label.Key = "key";
+            label.Value = nullptr;
+
+            options.Labels = &label;
+            options.LabelsCount = 1;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+    }
+
     TEST_METHOD(ContainerAttach)
     {
         WSL2_TEST_ONLY();
