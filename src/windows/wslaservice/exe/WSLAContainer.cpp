@@ -192,26 +192,17 @@ void UnmountVolumes(const std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMach
     }
 }
 
-void MountVolumes(std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
+auto MountVolumes(std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
 {
-    std::vector<WSLAVolumeMount> mountedVolumes;
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&volumes, &parentVM]() { UnmountVolumes(volumes, parentVM); });
 
     for (auto& volume : volumes)
     {
-        try
-        {
-            auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
-            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
-
-            mountedVolumes.push_back(volume);
-        }
-        catch (...)
-        {
-            // On failure, unmount all previously mounted volumes.
-            UnmountVolumes(mountedVolumes, parentVM);
-            throw;
-        }
+        auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
+        THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
     }
+
+    return std::move(errorCleanup);
 }
 
 WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
@@ -722,8 +713,12 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     for (ULONG i = 0; i < containerOptions.VolumesCount; i++)
     {
-        const WSLA_VOLUME& volume = containerOptions.Volumes[i];
-        std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", containerOptions.Name, i);
+        GUID volumeId;
+        THROW_IF_FAILED(CoCreateGuid(&volumeId));
+
+        auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
+        auto volume = containerOptions.Volumes[i];
+
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 
         request.HostConfig.Mounts.emplace_back(common::docker_schema::Mount{
@@ -731,7 +726,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Mount volumes.
-    MountVolumes(volumes, parentVM);
+    auto volumeErrorCleanup = MountVolumes(volumes, parentVM);
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
@@ -776,6 +771,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         containerOptions.Flags);
 
     errorCleanup.release();
+    volumeErrorCleanup.release();
 
     return container;
 }
@@ -801,7 +797,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 
     // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
     // to open containers that are not running.
-    MountVolumes(metadata.Volumes, parentVM);
+    auto volumeErrorCleanup = MountVolumes(metadata.Volumes, parentVM);
     auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, parentVM);
 
     auto container = std::make_unique<WSLAContainerImpl>(
@@ -819,6 +815,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         WSLAContainerFlagsNone);
 
     errorCleanup.release();
+    volumeErrorCleanup.release();
 
     return container;
 }
