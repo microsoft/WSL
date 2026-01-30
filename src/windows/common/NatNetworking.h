@@ -18,7 +18,7 @@ namespace wsl::core {
 class NatNetworking final : public INetworkingEngine
 {
 public:
-    NatNetworking(HCS_SYSTEM system, wsl::windows::common::hcs::unique_hcn_network&& network, GnsChannel&& gnsChannel, Config& config, wil::unique_socket&& dnsHvsocket);
+    NatNetworking(HCS_SYSTEM system, wsl::windows::common::hcs::unique_hcn_network&& network, GnsChannel&& gnsChannel, Config& config, wil::unique_socket&& dnsHvsocket, LPCWSTR dnsOptions = LX_INIT_RESOLVCONF_FULL_HEADER);
     ~NatNetworking() override;
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -72,6 +72,9 @@ private:
     // If true, DNS settings are retrieved from host adapters (mirrored mode)
     // rather than using the shared access DNS proxy
     bool m_useMirrorDnsSettings = false;
+
+    // Options/header for /etc/resolv.conf
+    LPCWSTR m_dnsOptions = nullptr;
 
     GnsChannel m_gnsChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
