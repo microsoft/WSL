@@ -26,7 +26,12 @@ static wil::srwlock g_endpointsInUseLock;
 static std::vector<GUID> g_endpointsInUse;
 
 NatNetworking::NatNetworking(
-    HCS_SYSTEM system, wsl::windows::common::hcs::unique_hcn_network&& network, GnsChannel&& gnsChannel, Config& config, wil::unique_socket&& dnsHvsocket, LPCWSTR dnsOptions) :
+    HCS_SYSTEM system,
+    wsl::windows::common::hcs::unique_hcn_network&& network,
+    GnsChannel&& gnsChannel,
+    Config& config,
+    wil::unique_socket&& dnsHvsocket,
+    LPCWSTR dnsOptions) :
     m_system(system), m_config(config), m_network(std::move(network)), m_dnsOptions(dnsOptions), m_gnsChannel(std::move(gnsChannel))
 {
     m_connectivityTelemetryEnabled = config.EnableTelemetry && !WslTraceLoggingShouldDisableTelemetry();

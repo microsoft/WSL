@@ -18,7 +18,13 @@ namespace wsl::core {
 class NatNetworking final : public INetworkingEngine
 {
 public:
-    NatNetworking(HCS_SYSTEM system, wsl::windows::common::hcs::unique_hcn_network&& network, GnsChannel&& gnsChannel, Config& config, wil::unique_socket&& dnsHvsocket, LPCWSTR dnsOptions = LX_INIT_RESOLVCONF_FULL_HEADER);
+    NatNetworking(
+        HCS_SYSTEM system,
+        wsl::windows::common::hcs::unique_hcn_network&& network,
+        GnsChannel&& gnsChannel,
+        Config& config,
+        wil::unique_socket&& dnsHvsocket,
+        LPCWSTR dnsOptions = LX_INIT_RESOLVCONF_FULL_HEADER);
     ~NatNetworking() override;
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
