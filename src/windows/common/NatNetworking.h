@@ -69,12 +69,15 @@ private:
     // The latest DNS settings configured in Linux
     _Guarded_by_(m_lock) networking::DnsInfo m_trackedDnsSettings {};
 
+    // If true, DNS settings are retrieved from host adapters (mirrored mode)
+    // rather than using the shared access DNS proxy
+    bool m_useMirrorDnsSettings = false;
+
     GnsChannel m_gnsChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     networking::EphemeralHcnEndpoint m_endpoint;
     ULONG m_networkMtu = 0;
 
-    std::optional<networking::HostDnsInfo> m_mirrorDnsInfo;
     networking::unique_notify_handle m_networkNotifyHandle{};
 };
 
