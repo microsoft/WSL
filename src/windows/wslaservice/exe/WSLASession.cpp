@@ -57,22 +57,33 @@ bool IsContainerNameValid(LPCSTR Name)
     return length > 0 && length <= WSLA_MAX_CONTAINER_NAME_LENGTH;
 }
 
+/// <summary>
+/// Handles image-like operations (save image, export container) by managing the HTTP response
+/// and relaying data to an output handle.
+/// </summary>
+/// <param name="RequestCodePair">The HTTP response code and request context from the Docker client</param>
+/// <param name="OutputHandle">Handle to the output file where data will be written</param>
+/// <param name="SessionTerminatingEvent">Event handle to monitor for session termination</param>
+/// <param name="ErrorInfo">Optional pointer to receive error information</param>
+/// <param name="FailureMessageFormat">Format string for error messages (must contain %hs for error text)</param>
+/// <param name="OnCompletedCallback">Optional callback invoked when the operation completes successfully</param>
+/// <exception cref="HRESULT">Throws E_FAIL if the HTTP response code is not 200, or E_ABORT if session terminates</exception>
 void HandleImageLikeOperation(
-    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& requestCodePair,
-    ULONG outputHandle,
-    HANDLE sessionTerminatingEvent,
-    WSLA_ERROR_INFO* errorInfo,
-    const char* failureMessageFormat,
-    std::function<void()> onCompletedCallback = nullptr)
+    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair,
+    ULONG OutputHandle,
+    HANDLE SessionTerminatingEvent,
+    WSLA_ERROR_INFO* ErrorInfo,
+    const char* FailureMessageFormat,
+    const std::function<void()>& OnCompletedCallback = nullptr)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(outputHandle))};
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
     relay::MultiHandleWait io;
-    auto onCompleted = [&, onCompletedCallback]() {
+    auto onCompleted = [&]() {
         io.Cancel();
-        if (onCompletedCallback)
+        if (OnCompletedCallback)
         {
-            onCompletedCallback();
+            OnCompletedCallback();
         }
     };
     std::string errorJson;
@@ -81,30 +92,30 @@ void HandleImageLikeOperation(
         errorJson.append(buffer.data(), buffer.size());
     };
 
-    if (requestCodePair.first != 200)
+    if (RequestCodePair.first != 200)
     {
         io.AddHandle(std::make_unique<relay::ReadHandle>(
-            common::relay::HandleWrapper{requestCodePair.second->stream.native_handle()}, std::move(accumulateError)));
+            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()}, std::move(accumulateError)));
     }
     else
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-            common::relay::HandleWrapper{requestCodePair.second->stream.native_handle()},
+            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()},
             common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
-        io.AddHandle(std::make_unique<relay::EventHandle>(sessionTerminatingEvent, [&]() { THROW_HR(E_ABORT); }));
+        io.AddHandle(std::make_unique<relay::EventHandle>(SessionTerminatingEvent, [&]() { THROW_HR(E_ABORT); }));
     }
 
     io.Run({});
 
-    if (requestCodePair.first != 200)
+    if (RequestCodePair.first != 200)
     {
         // Operation failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-        if (errorInfo != nullptr)
+        if (ErrorInfo != nullptr)
         {
-            errorInfo->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
+            ErrorInfo->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
         }
-        THROW_HR_MSG(E_FAIL, failureMessageFormat, error.message.c_str());
+        THROW_HR_MSG(E_FAIL, FailureMessageFormat, error.message.c_str());
     }
 }
 
