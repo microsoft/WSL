@@ -29,8 +29,6 @@ using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-static std::filesystem::path storagePath;
-
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
 
@@ -2907,7 +2905,7 @@ class WSLATests
             PartialHandleRead attachedReader(attachedStdout.get());
 
             // Write content on the attached stdin.
-            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.get(), "OK\n", 6, nullptr, nullptr));
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.get(), "OK\n", 3, nullptr, nullptr));
             attachedStdin.reset();
 
             attachedReader.Expect("OK\n");

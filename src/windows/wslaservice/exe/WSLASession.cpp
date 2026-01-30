@@ -828,7 +828,7 @@ try
         int exitCode = -1;
         try
         {
-            auto exitCode = m_dockerdProcess->Wait(30 * 1000);
+            exitCode = m_dockerdProcess->Wait(30 * 1000);
         }
         catch (...)
         {

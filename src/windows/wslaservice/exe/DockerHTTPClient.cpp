@@ -292,14 +292,11 @@ std::pair<uint32_t, std::string> DockerHTTPClient::SendRequestAndReadResponse(ve
     std::string responseBody;
     auto OnResponse = [&responseBody](const gsl::span<char>& span) { responseBody.append(span.data(), span.size()); };
 
-    auto onHttpResponse = [&](const auto& response) { status = response; };
+    auto onHttpResponse = [&](const auto& response) { status = response.result(); };
     MultiHandleWait io;
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_exitingEvent, [&]() { THROW_HR(E_ABORT); }));
-    io.AddHandle(
-        std::make_unique<DockerHttpResponseHandle>(
-            *context, [&status](const auto& response) { status = response.result(); }, std::move(OnResponse)),
-        MultiHandleWait::CancelOnCompleted);
+    io.AddHandle(std::make_unique<DockerHttpResponseHandle>(*context, std::move(onHttpResponse), std::move(OnResponse)), MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
 

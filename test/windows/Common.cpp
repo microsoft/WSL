@@ -2711,7 +2711,7 @@ void PartialHandleRead::Expect(const std::string& Expected)
 
 void PartialHandleRead::ExpectClosed(DWORD Timeout)
 {
-    VERIFY_ARE_EQUAL(WaitForSingleObject(m_thread.native_handle(), INFINITE), WAIT_OBJECT_0);
+    VERIFY_ARE_EQUAL(WaitForSingleObject(m_thread.native_handle(), Timeout), WAIT_OBJECT_0);
 }
 
 void PartialHandleRead::Run()
