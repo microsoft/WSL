@@ -66,7 +66,7 @@ bool IsContainerNameValid(LPCSTR Name)
 /// <param name="SessionTerminatingEvent">Event handle to monitor for session termination</param>
 /// <param name="ErrorInfo">Optional pointer to receive error information</param>
 /// <param name="FailureMessageFormat">Format string for error messages (must contain %hs for error text)</param>
-/// <param name="OnCompletedCallback">Optional callback invoked when the operation completes successfully</param>
+/// <param name="OnCompletedCallback">Optional callback invoked when data relay completes (not when entire operation succeeds)</param>
 /// <exception cref="HRESULT">Throws E_FAIL if the HTTP response code is not 200, or E_ABORT if session terminates</exception>
 void HandleImageLikeOperation(
     std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair,
@@ -74,12 +74,12 @@ void HandleImageLikeOperation(
     HANDLE SessionTerminatingEvent,
     WSLA_ERROR_INFO* ErrorInfo,
     const char* FailureMessageFormat,
-    const std::function<void()>& OnCompletedCallback = nullptr)
+    std::function<void()> OnCompletedCallback = nullptr)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
     relay::MultiHandleWait io;
-    auto onCompleted = [&]() {
+    auto onCompleted = [&, OnCompletedCallback]() {
         io.Cancel();
         if (OnCompletedCallback)
         {
@@ -95,7 +95,7 @@ void HandleImageLikeOperation(
     if (RequestCodePair.first != 200)
     {
         io.AddHandle(std::make_unique<relay::ReadHandle>(
-            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()}, std::move(accumulateError)));
+            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()}, accumulateError));
     }
     else
     {
@@ -593,8 +593,6 @@ CATCH_RETURN();
 void WSLASession::ExportContainerImpl(
     std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
 {
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
     auto onCompletedCallback = []() {
         WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
     };
@@ -617,8 +615,6 @@ CATCH_RETURN();
 
 void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
 {
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
     HandleImageLikeOperation(RequestCodePair, OutputHandle, m_sessionTerminatingEvent.get(), Error, "Image save failed: %hs");
 }
 
