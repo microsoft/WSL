@@ -14,20 +14,49 @@ using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::docker_schema::InspectContainer;
 
-int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
+#define IF_HELP_PRINT_HELP() if (m_help) { PrintHelp(); return 0; }
+#define ARG_REQUIRED(arg, msg) if (arg.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
+
+static std::string GetContainerName(const std::string& name)
 {
-    if (m_image.empty())
+    if (!name.empty())
     {
-        wslutil::PrintMessage(L"Image name is required.", stderr);
-        PrintHelp();
-        return E_INVALIDARG;
+        return name;
     }
 
+    GUID guid;
+    THROW_IF_FAILED(CoCreateGuid(&guid));
+    return wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
+}
+
+static std::wstring ContainerStateToString(WSLA_CONTAINER_STATE state)
+{
+    switch (state)
+    {
+    case WSLA_CONTAINER_STATE::WslaContainerStateCreated:
+        return L"created";
+    case WSLA_CONTAINER_STATE::WslaContainerStateRunning:
+        return L"running";
+    case WSLA_CONTAINER_STATE::WslaContainerStateDeleted:
+        return L"stopped";
+    case WSLA_CONTAINER_STATE::WslaContainerStateExited:
+        return L"exited";
+    case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
+    default:
+        return L"invalid";
+    }
+}
+
+int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
+{
+    IF_HELP_PRINT_HELP();
+    ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = OpenCLISession();
     CreateOptions options;
     options.TTY = m_tty;
     options.Interactive = m_interactive;
     options.Arguments = Arguments();
+    options.Name = GetContainerName(m_name);
     ContainerService containerService;
     return containerService.Run(*session, m_image, options);
 }
@@ -40,6 +69,7 @@ int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int p
     options.TTY = m_tty;
     options.Interactive = m_interactive;
     options.Arguments = Arguments();
+    options.Name = GetContainerName(m_name);
     ContainerService containerService;
     auto result = containerService.Create(*session, m_image, options);
     wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(result.Id));
@@ -107,11 +137,11 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
     }
 
-    // Filter by IDs if provided
+    // Filter by name if provided
     if (!argIds.empty())
     {
         auto shouldRemove = [&argIds](const wslc::services::ContainerInformation& container) {
-            return std::find(argIds.begin(), argIds.end(), container.Id) == argIds.end();
+            return std::find(argIds.begin(), argIds.end(), container.Name) == argIds.end();
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
     }
@@ -138,7 +168,7 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
                 std::wstring(container.Id.begin(), container.Id.end()),
                 std::wstring(container.Name.begin(), container.Name.end()),
                 std::wstring(container.Image.begin(), container.Image.end()),
-                std::to_wstring(static_cast<int>(container.State)),
+                ContainerStateToString(container.State),
             });
         }
 
@@ -221,7 +251,8 @@ int ContainerCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         return m_inspect.Execute(commandLine, parserOffset + 1);
     }
 
-    wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(GetFullDescription()));
+    IF_HELP_PRINT_HELP();
+    ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
     return 0;
 }
 

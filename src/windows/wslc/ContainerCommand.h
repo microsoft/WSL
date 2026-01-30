@@ -20,12 +20,6 @@ public:
         parser.AddArgument(m_help, L"--help", 'h');
         LoadArguments(parser);
         parser.Parse();
-        if (m_help)
-        {
-            PrintHelp();
-            return 0;
-        }
-
         for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
         {
             m_arguments.push_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
@@ -35,10 +29,10 @@ public:
 
 protected:
     virtual int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) = 0;
+    bool m_help;
 
 private:
     std::vector<std::string> m_arguments;
-    bool m_help;
 };
 
 class ContainerRunCommand : public ICommand
@@ -53,6 +47,7 @@ public:
             "arguments (pos. 1..): Arguments to pass to container's init process",
             "-t, --tty: Open a TTY with the container process",
             "-i, --interactive: Keep stdin open",
+            "--name <name>: Assign a name to the container that will be used as its container id",
         };
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
@@ -60,6 +55,7 @@ public:
         parser.AddPositionalArgument(wsl::shared::Utf8String{m_image}, 0);
         parser.AddArgument(m_interactive, L"--interactive", 'i');
         parser.AddArgument(m_tty, L"--tty", 't');
+        parser.AddArgument(wsl::shared::Utf8String{m_name}, L"--name");
     }
 
 protected:
@@ -69,6 +65,7 @@ private:
     bool m_tty;
     bool m_interactive;
     std::string m_image;
+    std::string m_name;
 };
 
 class ContainerCreateCommand : public ICommand
@@ -83,6 +80,7 @@ public:
             "arguments (pos. 1..): Arguments to pass to container's init process",
             "-t, --tty: Open a TTY with the container process",
             "-i, --interactive: Keep stdin open",
+            "--name <name>: Assign a name to the container that will be used as its container id",
         };
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
@@ -90,6 +88,7 @@ public:
         parser.AddPositionalArgument(wsl::shared::Utf8String{m_image}, 0);
         parser.AddArgument(m_interactive, L"--interactive", 'i');
         parser.AddArgument(m_tty, L"--tty", 't');
+        parser.AddArgument(wsl::shared::Utf8String{m_name}, L"--name");
     }
 
 protected:
@@ -99,6 +98,7 @@ private:
     bool m_tty;
     bool m_interactive;
     std::string m_image;
+    std::string m_name;
 };
 
 class ContainerStartCommand : public ICommand

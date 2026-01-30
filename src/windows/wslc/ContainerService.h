@@ -9,6 +9,7 @@ struct CreateOptions
     bool TTY = false;
     bool Interactive = false;
     std::vector<std::string> Arguments;
+    std::string Name;
 };
 
 struct CreateContainerResult
@@ -57,6 +58,7 @@ private:
     std::vector<WSLA_PROCESS_FD> CreateFds(const CreateOptions& options);
     void SetContainerOptions(
         WSLA_CONTAINER_OPTIONS& options,
+        const std::string& name,
         bool tty,
         bool interactive,
         std::vector<WSLA_PROCESS_FD>& fds,
