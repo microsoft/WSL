@@ -824,7 +824,9 @@ class WSLATests
         auto settings = GetDefaultSessionSettings(L"port-mapping-test");
         settings.NetworkingMode = networkingMode;
 
-        auto session = networkingMode != m_defaultSessionSettings.NetworkingMode ? CreateSession(settings) : m_defaultSession;
+        // Reuse the default session if the networking mode matches.
+        auto createNewSession = networkingMode != m_defaultSessionSettings.NetworkingMode;
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
         // Install socat in the container.
         //
@@ -954,7 +956,8 @@ class WSLATests
         WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
         // Reuse the default session if possible.
-        auto session = enableVirtioFs ? CreateSession(settings) : m_defaultSession;
+        auto createNewSession = enableVirtioFs != WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsVirtioFs);
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
         auto expectedMountOptions = [&](bool readOnly) -> std::string {
             if (enableVirtioFs)
@@ -1050,16 +1053,24 @@ class WSLATests
 
         // Validate that trying to mount the shares without GPU support enabled fails.
         {
+            auto settings = GetDefaultSessionSettings(L"gpu-test-disabled");
+            WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
+
+            auto createNewSession = WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsGPU);
+            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
             // Validate that the GPU device is not available.
-            ExpectMount(m_defaultSession.get(), "/usr/lib/wsl/drivers", {});
-            ExpectMount(m_defaultSession.get(), "/usr/lib/wsl/lib", {});
+            ExpectMount(session.get(), "/usr/lib/wsl/drivers", {});
+            ExpectMount(session.get(), "/usr/lib/wsl/lib", {});
         }
 
-        auto settings = GetDefaultSessionSettings(L"gpu-test");
-        WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
-
+        // Validate that the GPU device is available when enabled.
         {
-            auto session = CreateSession(settings);
+            auto settings = GetDefaultSessionSettings(L"gpu-test");
+            WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsGPU);
+
+            auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsGPU);
+            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
             // Validate that the GPU device is available.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -c /dev/dxg"}, 0);
@@ -1103,7 +1114,8 @@ class WSLATests
             auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
             WI_ClearFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
 
-            auto session = CreateSession(settings);
+            auto createNewSession = WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsPmemVhds);
+            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
             // Validate that SCSI devices are present and PMEM devices are not.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/sda"}, 0);
@@ -1120,7 +1132,8 @@ class WSLATests
             auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
             WI_SetFlag(settings.FeatureFlags, WslaFeatureFlagsPmemVhds);
 
-            auto session = CreateSession(settings);
+            auto createNewSession = !WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsPmemVhds);
+            auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
             // Validate that PMEM devices are present.
             ExpectCommandResult(session.get(), {"/bin/sh", "-c", "test -b /dev/pmem0"}, 0);
@@ -2267,7 +2280,9 @@ class WSLATests
         auto settings = GetDefaultSessionSettings(L"unmount-test");
         WI_UpdateFlag(settings.FeatureFlags, WslaFeatureFlagsVirtioFs, enableVirtioFs);
 
-        auto session = enableVirtioFs ? CreateSession(settings) : m_defaultSession;
+        // Reuse the default session if possible.
+        auto createNewSession = enableVirtioFs != WI_IsFlagSet(m_defaultSessionSettings.FeatureFlags, WslaFeatureFlagsVirtioFs);
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
         // Create a container with a simple command.
         WSLAContainerLauncher launcher("debian:latest", "test-container", "/bin/echo", {"OK"});
