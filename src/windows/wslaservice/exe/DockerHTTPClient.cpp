@@ -157,9 +157,9 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     return std::move(socket);
 }
 
-std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::ExportContainer(const std::string& ContainerNameOrID)
+std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::ExportContainer(const std::string& ContainerNameOrId)
 {
-    return SendRequestWithContext(verb::get, std::format("http://localhost/containers/{}/export", ContainerNameOrID), {}, nullptr, {});
+    return SendRequestWithContext(verb::get, std::format("http://localhost/containers/{}/export", ContainerNameOrId), {}, nullptr, {});
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)

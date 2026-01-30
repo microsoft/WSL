@@ -534,7 +534,7 @@ void WSLASession::ExportContainerImpl(
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
     relay::MultiHandleWait io;
-    std::optional<boost::beast::http::status> importResult;
+
     auto onCompleted = [&]() {
         io.Cancel();
         WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
@@ -547,7 +547,7 @@ void WSLASession::ExportContainerImpl(
     if (RequestCodePair.first != 200)
     {
         io.AddHandle(std::make_unique<relay::ReadHandle>(
-            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()}, accumulateError));
+            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()}, std::move(accumulateError)));
     }
     else
     {
@@ -587,7 +587,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPCl
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
     relay::MultiHandleWait io;
-    std::optional<boost::beast::http::status> importResult;
+
     auto onCompleted = [&]() { io.Cancel(); };
     std::string errorJson;
     auto accumulateError = [&](const gsl::span<char>& buffer) {
