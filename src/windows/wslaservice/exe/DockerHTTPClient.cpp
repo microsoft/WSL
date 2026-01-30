@@ -424,8 +424,7 @@ std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> Docke
     const std::string& Url,
     const std::string& Body,
     const OnResponseBytes& OnResponse,
-    const std::map<boost::beast::http::field, std::string>& Headers,
-    std::string* errorJson)
+    const std::map<boost::beast::http::field, std::string>& Headers)
 {
     // Write the request
     auto context = SendRequestImpl(Method, Url, Body, Headers);

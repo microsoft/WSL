@@ -487,12 +487,12 @@ class WSLATests
             VERIFY_ARE_EQUAL(0, result.Code);
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
         }
-        // Save the image to a tar file.
 
+        // Save the image to a tar file.
         {
             std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
             wil::unique_handle imageTarFileHandle{CreateFileW(
-                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
@@ -503,8 +503,27 @@ class WSLATests
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
-        // Try to save an invalid image.
 
+        // Load the saved image to verify it's valid.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            // Load the image from a saved tar
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Try to save an invalid image.
         {
             std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldError.tar";
             wil::unique_handle imageTarFileHandle{CreateFileW(
@@ -515,6 +534,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             WSLA_ERROR_INFO errorInfo{};
             VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, &errorInfo));
+            VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
             std::string errMsg = errorInfo.UserErrorMessage;
             VERIFY_IS_TRUE(errMsg.find("reference does not exist") != std::string::npos);
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
@@ -544,7 +564,7 @@ class WSLATests
             // Export the container to a tar file.
             std::filesystem::path containerTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
             wil::unique_handle containerTarFileHandle{CreateFileW(
-                containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
@@ -555,6 +575,25 @@ class WSLATests
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
+
+        // Load the exported container to verify it's valid.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
         // Try to export a non-existing container.
         {
             std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExportError.tar";
@@ -566,6 +605,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             WSLA_ERROR_INFO errorInfo{};
             VERIFY_FAILED(m_defaultSession->ExportContainer(HandleToULong(contTarFileHandle.get()), "dummy", nullptr, &errorInfo));
+            VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
             std::string errMsg = errorInfo.UserErrorMessage;
             LogInfo("Error message: %hs", errMsg.c_str());
             VERIFY_IS_TRUE(errMsg.find("No such container") != std::string::npos);

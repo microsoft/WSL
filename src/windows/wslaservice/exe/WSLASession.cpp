@@ -521,7 +521,9 @@ try
     UNREFERENCED_PARAMETER(ProgressCallback);
     RETURN_HR_IF_NULL(E_POINTER, ContainerID);
     std::lock_guard lock{m_lock};
+
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
     auto retVal = m_dockerClient->ExportContainer(ContainerID);
     ExportContainerImpl(retVal, OutHandle, Error);
     return S_OK;
@@ -531,19 +533,20 @@ CATCH_RETURN();
 void WSLASession::ExportContainerImpl(
     std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
+    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
+
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
     relay::MultiHandleWait io;
     std::optional<boost::beast::http::status> importResult;
-    auto onCompleted = [&]() {
-        io.Cancel();
-        WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
-    };
+    auto onCompleted = [&]() { io.Cancel(); };
+
     std::string errorJson;
     auto accumulateError = [&](const gsl::span<char>& buffer) {
         // If the export failed, accumulate the error message.
         errorJson.append(buffer.data(), buffer.size());
     };
+
     if (RequestCodePair.first != 200)
     {
         io.AddHandle(std::make_unique<relay::ReadHandle>(
@@ -553,10 +556,12 @@ void WSLASession::ExportContainerImpl(
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
             common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()},
-            common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
+            common::relay::HandleWrapper{std::move(containerFileHandle), std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }
+
     io.Run({});
+
     if (RequestCodePair.first != 200)
     {
         // Export failed, parse the error message.
@@ -565,6 +570,7 @@ void WSLASession::ExportContainerImpl(
         {
             Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
         }
+
         THROW_HR_MSG(E_FAIL, "Container export failed: %hs", error.message.c_str());
     }
 }
@@ -575,7 +581,9 @@ try
     UNREFERENCED_PARAMETER(ProgressCallback);
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
     std::lock_guard lock{m_lock};
+
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
     auto retVal = m_dockerClient->SaveImage(ImageNameOrID);
     SaveImageImpl(retVal, OutHandle, Error);
     return S_OK;
@@ -585,7 +593,9 @@ CATCH_RETURN();
 void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
+
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
     relay::MultiHandleWait io;
     std::optional<boost::beast::http::status> importResult;
     auto onCompleted = [&]() { io.Cancel(); };
@@ -594,6 +604,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPCl
         // If the save failed, accumulate the error message.
         errorJson.append(buffer.data(), buffer.size());
     };
+
     if (RequestCodePair.first != 200)
     {
         io.AddHandle(std::make_unique<relay::ReadHandle>(
@@ -606,7 +617,9 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPCl
             common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }
+
     io.Run({});
+
     if (RequestCodePair.first != 200)
     {
         // Save failed, parse the error message.
@@ -615,6 +628,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPCl
         {
             Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
         }
+
         THROW_HR_MSG(E_FAIL, "Image save failed: %hs", error.message.c_str());
     }
 }
