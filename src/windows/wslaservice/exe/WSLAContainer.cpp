@@ -29,6 +29,7 @@ using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
 using namespace wsl::windows::common::docker_schema;
+namespace wsla_schema = wsl::windows::common::wsla_schema;
 
 namespace {
 
@@ -553,6 +554,106 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     }
 }
 
+wsl::windows::service::wsla::WSLAContainerImpl::WslaInspectContainer wsl::windows::service::wsla::WSLAContainerImpl::BuildInspectContainer(
+    const wsl::windows::service::wsla::WSLAContainerImpl::DockerInspectContainer& dockerInspect)
+{
+    WslaInspectContainer wslaInspect{};
+
+    wslaInspect.Id = dockerInspect.Id;
+    wslaInspect.Name = dockerInspect.Name;
+
+    // Remove leading '/' from Docker container names.
+    if (!wslaInspect.Name.empty() && wslaInspect.Name[0] == '/')
+    {
+        wslaInspect.Name = wslaInspect.Name.substr(1);
+    }
+
+    wslaInspect.Created = dockerInspect.Created;
+    wslaInspect.Image = !dockerInspect.Config.Image.empty() ? dockerInspect.Config.Image : dockerInspect.Image;
+
+    // Map container state.
+    wslaInspect.State.Status = dockerInspect.State.Status;
+    wslaInspect.State.Running = dockerInspect.State.Running;
+    wslaInspect.State.ExitCode = dockerInspect.State.ExitCode;
+    wslaInspect.State.StartedAt = dockerInspect.State.StartedAt;
+    wslaInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
+
+    wslaInspect.NetworkMode = dockerInspect.HostConfig.NetworkMode;
+
+    // Map port bindings using WSLA's host-side data.
+    {
+        auto hasBinding = [](const auto& vec, const std::string& ip, const std::string& port) {
+            return std::any_of(vec.begin(), vec.end(), [&](const auto& b) { return b.HostIp == ip && b.HostPort == port; });
+        };
+
+        auto defaultHostIp = [](int family) { return family == AF_INET6 ? std::string("::1") : std::string("127.0.0.1"); };
+
+        // Map WSLA port mappings.
+        for (const auto& e : m_mappedPorts)
+        {
+            auto portKey = std::format("{}/tcp", e.ContainerPort);
+            auto& portBindings = wslaInspect.Ports[portKey];
+
+            wsla_schema::InspectPortBinding portBinding{};
+            portBinding.HostIp = defaultHostIp(e.Family);
+            portBinding.HostPort = std::to_string(e.HostPort);
+
+            if (!hasBinding(portBindings, portBinding.HostIp, portBinding.HostPort))
+            {
+                portBindings.push_back(std::move(portBinding));
+            }
+        }
+
+        // Include Docker configured port bindings.
+        for (const auto& [containerPort, bindings] : dockerInspect.HostConfig.PortBindings)
+        {
+            auto& portBindings = wslaInspect.Ports[containerPort];
+
+            for (const auto& binding : bindings)
+            {
+                if (!hasBinding(portBindings, binding.HostIp, binding.HostPort))
+                {
+                    wsla_schema::InspectPortBinding portBinding{};
+                    portBinding.HostIp = binding.HostIp;
+                    portBinding.HostPort = binding.HostPort;
+                    portBindings.push_back(std::move(portBinding));
+                }
+            }
+        }
+
+        // Include Docker runtime port bindings.
+        for (const auto& [containerPort, bindings] : dockerInspect.NetworkSettings.Ports)
+        {
+            auto& portBindings = wslaInspect.Ports[containerPort];
+
+            for (const auto& binding : bindings)
+            {
+                if (!hasBinding(portBindings, binding.HostIp, binding.HostPort))
+                {
+                    wsla_schema::InspectPortBinding portBinding{};
+                    portBinding.HostIp = binding.HostIp;
+                    portBinding.HostPort = binding.HostPort;
+                    portBindings.push_back(std::move(portBinding));
+                }
+            }
+        }
+    }
+
+    // Map volume mounts using WSLA's host-side data.
+    wslaInspect.Mounts.reserve(m_mountedVolumes.size());
+    for (const auto& volume : m_mountedVolumes)
+    {
+        wsla_schema::InspectMount mountInfo{};
+        mountInfo.Type = "bind";
+        mountInfo.Source = wsl::shared::string::WideToMultiByte(volume.HostPath);
+        mountInfo.Destination = volume.ContainerPath;
+        mountInfo.ReadWrite = !volume.ReadOnly;
+        wslaInspect.Mounts.push_back(std::move(mountInfo));
+    }
+
+    return wslaInspect;
+}
+
 std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainerImpl::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
 {
     std::vector<VolumeMountInfo> mountedVolumes;
@@ -767,7 +868,16 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
 
     try
     {
-        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_dockerClient.InspectContainer(m_id).data()).release();
+        // Get Docker inspect data
+        auto dockerJson = m_dockerClient.InspectContainer(m_id);
+        auto dockerInspect = wsl::shared::FromJson<DockerInspectContainer>(dockerJson.c_str());
+
+        // Convert to WSLA schema
+        auto wslaInspect = BuildInspectContainer(dockerInspect);
+
+        // Serialize WSLA schema to JSON
+        std::string wslaJson = wsl::shared::ToJson(wslaInspect);
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslaJson.c_str()).release();
     }
     catch (const DockerHTTPException& e)
     {

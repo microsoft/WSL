@@ -22,6 +22,7 @@ Abstract:
 #include "WSLAProcessControl.h"
 #include "LogsRelay.h"
 #include "COMImplClass.h"
+#include "wsla_schema.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -102,9 +103,12 @@ public:
         DockerHTTPClient& DockerClient);
 
 private:
+    using DockerInspectContainer = wsl::windows::common::docker_schema::InspectContainer;
+    using WslaInspectContainer = wsl::windows::common::wsla_schema::InspectContainer;
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
 
+    WslaInspectContainer BuildInspectContainer(const DockerInspectContainer& dockerInspect);
     std::recursive_mutex m_lock;
     std::string m_name;
     std::string m_image;

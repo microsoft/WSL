@@ -1713,7 +1713,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             auto details = container.Inspect();
-            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
+            VERIFY_ARE_EQUAL(details.NetworkMode, "host");
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
@@ -1735,7 +1735,7 @@ class WSLATests
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
-            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "none");
+            VERIFY_ARE_EQUAL(container.Inspect().NetworkMode, "none");
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
@@ -1769,7 +1769,7 @@ class WSLATests
 
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
+            VERIFY_ARE_EQUAL(container.Inspect().NetworkMode, "bridge");
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
@@ -1930,7 +1930,7 @@ class WSLATests
         auto session = CreateSession(settings);
 
         auto expectBoundPorts = [&](RunningWSLAContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
-            auto ports = Container.Inspect().HostConfig.PortBindings;
+            auto ports = Container.Inspect().Ports;
 
             std::vector<std::string> boundPorts;
 

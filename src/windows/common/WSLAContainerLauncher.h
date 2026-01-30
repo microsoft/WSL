@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 #include "WSLAProcessLauncher.h"
 #include "docker_schema.h"
+#include "wsla_schema.h"
 
 namespace wsl::windows::common {
 
@@ -31,7 +32,7 @@ public:
     ClientRunningWSLAProcess GetInitProcess();
     void SetDeleteOnClose(bool deleteOnClose);
     void Reset();
-    docker_schema::InspectContainer Inspect();
+    wsla_schema::InspectContainer Inspect();
     std::string Id();
     std::string Name();
 

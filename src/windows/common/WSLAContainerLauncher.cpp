@@ -215,10 +215,10 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
     return std::move(container.value());
 }
 
-wsl::windows::common::docker_schema::InspectContainer RunningWSLAContainer::Inspect()
+wsl::windows::common::wsla_schema::InspectContainer RunningWSLAContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(m_container->Inspect(&output));
 
-    return wsl::shared::FromJson<docker_schema::InspectContainer>(output.get());
+    return wsl::shared::FromJson<wsla_schema::InspectContainer>(output.get());
 }
