@@ -22,20 +22,24 @@ class IORelay
 public:
     NON_COPYABLE(IORelay);
 
-    IORelay() = default;
+    IORelay();
     ~IORelay();
 
     void AddHandles(std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>>&& Handles);
     void AddHandle(std::unique_ptr<common::relay::OverlappedIOHandle>&& Handle);
 
+    void Stop();
+
 private:
-    void StartRelayThread();
-    void StopRelayThread();
+    void Start();
     void Run();
 
+    std::mutex m_pendingHandlesLock;
+    wil::unique_event m_refreshEvent{wil::EventOptions::None};
+    std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>> m_pendingHandles;
+
     std::thread m_thread;
-    windows::common::relay::MultiHandleWait m_io;
-    wil::unique_event m_stopEvent{wil::EventOptions::ManualReset};
+    bool m_exit = false;
 };
 
 } // namespace wsl::windows::service::wsla

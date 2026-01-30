@@ -306,17 +306,18 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
     // This is required for docker to know when stdin is closed.
     auto onInputComplete = [handle = ioHandle.get()]() { LOG_LAST_ERROR_IF(shutdown(handle, SD_SEND) == SOCKET_ERROR); };
 
-    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        ioHandle.get(), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+    // N.B. Ownership of the io handle is given to the DockerIORelayHandle relay, so it can be closed when docker closes the connection.
+    handles.emplace_back(
+        std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
 
-    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, std::move(ioHandle)));
+    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
+        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(handles));
 
-    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE));
-    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ));
-    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ));
+    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get())));
+    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get())));
+    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get())));
 }
 
 void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
@@ -605,9 +606,11 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     DockerHTTPClient& DockerClient,
     IORelay& IoRelay)
 {
-    // TODO: Think about when 'StdinOnce' should be set.
     common::docker_schema::CreateContainer request;
     request.Image = containerOptions.Image;
+
+    // TODO: Think about when 'StdinOnce' should be set.
+    request.StdinOnce = true;
 
     if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsTty))
     {
@@ -617,7 +620,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsStdin))
     {
         request.OpenStdin = true;
-        request.StdinOnce = true;
     }
 
     request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
@@ -834,13 +836,12 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     std::map<ULONG, wil::unique_handle> fds;
 
     // This is required for docker to know when stdin is closed.
-    auto closeStdin = [socket = stream.get()]() {
+    auto closeStdin = [socket = stream.get(), this]() {
         LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(socket), SD_SEND) == SOCKET_ERROR);
     };
 
     if (WI_IsFlagSet(flags, WSLAProcessFlagsStdin))
     {
-
         auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
         ioHandles.emplace_back(
             std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, stream.get()));

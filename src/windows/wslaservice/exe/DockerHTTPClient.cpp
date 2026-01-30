@@ -27,8 +27,6 @@ Abstract:
 
 #include "DockerHTTPClient.h"
 
-#define WSLA_HTTP_DEBUG
-
 namespace http = boost::beast::http;
 using boost::beast::http::verb;
 using wsl::windows::common::relay::HandleWrapper;

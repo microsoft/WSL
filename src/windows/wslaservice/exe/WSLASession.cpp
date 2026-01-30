@@ -164,7 +164,7 @@ WSLASession::~WSLASession()
 {
     WSL_LOG("SessionTerminated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
-    Terminate();
+    LOG_IF_FAILED(Terminate());
 }
 
 void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid)
@@ -816,7 +816,15 @@ try
 
     std::lock_guard lock{m_lock};
 
-    // Stop the event tracker
+    // Stop the IO relay.
+    // This stops:
+    // - container state monitoring.
+    // - container init process relays
+    // - execs relays
+    // - container logs relays
+
+    m_ioRelay.Stop();
+
     if (m_eventTracker.has_value())
     {
         m_eventTracker->Stop();
