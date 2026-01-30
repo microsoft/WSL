@@ -497,7 +497,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             WSLA_ERROR_INFO errorInfo{};
             VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, &errorInfo));
-            VERIFY_ARE_EQUAL(0 == errorInfo.UserErrorMessage, true);
+            VERIFY_ARE_EQUAL(errorInfo.UserErrorMessage, nullptr);
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
@@ -535,6 +535,8 @@ class WSLATests
             VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
             std::string errMsg = errorInfo.UserErrorMessage;
             VERIFY_IS_TRUE(errMsg.find("reference does not exist") != std::string::npos);
+            CoTaskMemFree(errorInfo.UserErrorMessage);
+            errorInfo.UserErrorMessage = nullptr;
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
         }
@@ -570,6 +572,7 @@ class WSLATests
             VERIFY_SUCCEEDED(container.Get().GetID(&containerId));
             WSLA_ERROR_INFO errorInfo{};
             VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(HandleToULong(containerTarFileHandle.get()), containerId, nullptr, &errorInfo));
+            CoTaskMemFree(containerId);
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
@@ -607,6 +610,7 @@ class WSLATests
             std::string errMsg = errorInfo.UserErrorMessage;
             LogInfo("Error message: %hs", errMsg.c_str());
             VERIFY_IS_TRUE(errMsg.find("No such container") != std::string::npos);
+            CoTaskMemFree(errorInfo.UserErrorMessage);
             VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
         }
