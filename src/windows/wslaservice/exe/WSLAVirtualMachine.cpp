@@ -509,9 +509,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
     {
         THROW_HR_IF_MSG(
-            E_NOTIMPL,
-            m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy,
-            "DNS tunneling not currently supported for VirtioProxy");
+            E_NOTIMPL, m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
 
         fds.emplace_back(WSLAProcessFd{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
         THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
