@@ -4610,6 +4610,9 @@ class VirtioProxyTests
         const std::wregex pattern(L"(.|\\n)*nameserver [0-9. ]+(.|\\n)*");
 
         VERIFY_IS_TRUE(std::regex_match(out, pattern));
+
+        // Verify that /etc/resolv.conf contains a 'search' line with DNS suffixes
+        VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
     }
 
     TEST_METHOD(GuestPortIsReleased)
