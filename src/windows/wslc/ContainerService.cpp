@@ -113,7 +113,8 @@ void ContainerService::Exec(IWSLASession& session, std::string id, std::vector<s
 
     // TODO tty, interactive
     auto fds = CreateFds({});
-    SetContainerOptions(options, false, false, fds, arguments);
+    std::vector<const char*> args;
+    SetContainerOptions(options, false, false, fds, arguments, args);
 
     wil::com_ptr<IWSLAProcess> createdProcess;
     THROW_IF_FAILED(container->Exec(&options.InitProcessOptions, &createdProcess, &error));
@@ -133,11 +134,12 @@ void ContainerService::CreateInternal(
     IWSLAContainer** container,
     std::vector<WSLA_PROCESS_FD>& fds,
     std::string image,
-    CreateOptions options)
+    const CreateOptions& options)
 {
     WSLA_CONTAINER_OPTIONS containerOptions{};
     containerOptions.Image = image.c_str();
-    SetContainerOptions(containerOptions, options.TTY, options.Interactive, fds, options.Arguments);
+    std::vector<const char*> args;
+    SetContainerOptions(containerOptions, options.TTY, options.Interactive, fds, options.Arguments, args);
 
     WSLAErrorDetails error{};
     auto result = session.CreateContainer(&containerOptions, container, &error.Error);
@@ -193,7 +195,8 @@ void ContainerService::SetContainerOptions(
     bool tty,
     bool interactive,
     std::vector<WSLA_PROCESS_FD>& fds,
-    std::vector<std::string>& arguments)
+    const std::vector<std::string>& arguments,
+    std::vector<const char*>& args)
 {
     HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
@@ -206,7 +209,8 @@ void ContainerService::SetContainerOptions(
         options.InitProcessOptions.TtyRows = Info.srWindow.Bottom - Info.srWindow.Top + 1;
     }
 
-    std::vector<const char*> args;
+    args.clear();
+    args.reserve(arguments.size());
     for (const auto& arg : arguments)
     {
         args.push_back(arg.c_str());

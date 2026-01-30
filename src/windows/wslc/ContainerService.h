@@ -28,6 +28,8 @@ struct ContainerInformation
     std::string Name;
     std::string Image;
     WSLA_CONTAINER_STATE State;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
 };
 
 class ContainerService
@@ -49,14 +51,16 @@ private:
         IWSLAContainer** container,
         std::vector<WSLA_PROCESS_FD>& fds,
         std::string image,
-        CreateOptions options);
+        const CreateOptions& options);
     void StartInternal(IWSLAContainer& container);
     void StopInternal(IWSLAContainer& container, const StopContainerOptions& options);
     std::vector<WSLA_PROCESS_FD> CreateFds(const CreateOptions& options);
-    void SetContainerOptions(WSLA_CONTAINER_OPTIONS& options,
+    void SetContainerOptions(
+        WSLA_CONTAINER_OPTIONS& options,
         bool tty,
         bool interactive,
         std::vector<WSLA_PROCESS_FD>& fds,
-        std::vector<std::string>& arguments);
+        const std::vector<std::string>& arguments,
+        std::vector<const char*>& args);
 };
 }

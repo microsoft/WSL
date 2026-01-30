@@ -72,12 +72,6 @@ int wslc_main(std::wstring_view commandLine)
 
     parser.Parse();
 
-    if (help || verb.empty())
-    {
-        PrintUsage();
-        return 0;
-    }
-    
     if (verb == L"list")
     {
         return RunListCommand(commandLine);
@@ -90,7 +84,9 @@ int wslc_main(std::wstring_view commandLine)
     
     if (verb == L"container")
     {
-        return RunContainerCommand(commandLine);
+        wslc::commands::ContainerCommand command;
+        command.Execute(commandLine, 2);
+        return 0;
     }
     
     if (verb == L"image")
