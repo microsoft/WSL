@@ -1729,10 +1729,6 @@ Return Value:
         if (strcmp(MountEnum.Current().FileSystemType, PLAN9_FS_TYPE) == 0)
         {
             MountSource = UtilParsePlan9MountSource(MountEnum.Current().SuperOptions);
-            if (MountSource.empty())
-            {
-                continue;
-            }
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {
@@ -1741,9 +1737,14 @@ Return Value:
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = UtilParseVirtiofsMountSource(MountEnum.Current().Source);
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
         }
         else
+        {
+            continue;
+        }
+
+        if (MountSource.empty())
         {
             continue;
         }
@@ -2445,17 +2446,10 @@ try
                 NewMountOptions += ',';
             }
 
-            MountPlan9Filesystem(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin, Config);
+            MountPlan9Share(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin, Config);
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            std::string_view Source = MountEntry.Source;
-            std::string_view OldTag = Message->Admin ? LX_INIT_DRVFS_VIRTIO_TAG : LX_INIT_DRVFS_ADMIN_VIRTIO_TAG;
-            if (!wsl::shared::string::StartsWith(Source, OldTag))
-            {
-                continue;
-            }
-
             RemountVirtioFs(MountEntry.Source, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
         }
         else

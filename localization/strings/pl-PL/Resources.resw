@@ -292,10 +292,12 @@ i "wsl.exe --install &lt;Distro&gt;" do zainstalowania.</value>
     <value>Starsza dystrybucja nie obsługuje protokołu WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>Bieżąca konfiguracja komputera nie obsługuje protokołu WSL2.
-Włącz opcjonalny składnik "Platforma maszyny wirtualnej" i upewnij się, że wirtualizacja jest włączona w systemie BIOS.
-Włącz platformę maszyny wirtualnej, uruchamiając: wsl.exe --install --no-distribution
-Aby uzyskać informacje, odwiedź stronę https://aka.ms/enablevirtualization</value>
+    <value>Nie można uruchomić protokołu WSL2, ponieważ wirtualizacja nie jest włączona na tej maszynie.
+Upewnij się, że składnik opcjonalny "Platforma maszyny wirtualnej" jest włączony i że wirtualizacja jest włączona w ustawieniach oprogramowania układowego komputera.
+
+Włącz platformę maszyny wirtualnej, uruchamiając polecenie: wsl.exe --install --no-distribution
+
+Aby uzyskać informacje, odwiedź https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

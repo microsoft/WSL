@@ -298,9 +298,11 @@
     <value>旧分发不支持 WSL 2。</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>当前计算机配置不支持 WSL2。
-请启用“虚拟机平台”可选组件，并确保在 BIOS 中启用虚拟化。
-通过运行以下命令启用“虚拟机平台”: wsl.exe --install --no-distribution
+    <value>WSL2 无法启动，因为此计算机上未启用虚拟化。
+请确保计算机固件设置中“虚拟机平台”可选组件已启用，且虚拟化已开启。
+
+启用“虚拟机平台”通过运行: wsl.exe --install --no-distribution
+
 有关信息，请访问 https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>

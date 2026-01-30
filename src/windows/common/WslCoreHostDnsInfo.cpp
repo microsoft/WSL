@@ -496,3 +496,29 @@ wsl::core::networking::DnsSuffixRegistryWatcher::DnsSuffixRegistryWatcher(Regist
 
     m_registryWatchers.swap(localRegistryWatchers);
 }
+
+wsl::shared::hns::DNS wsl::core::networking::BuildDnsNotification(const DnsInfo& settings, bool useLinuxDomainEntry)
+{
+    wsl::shared::hns::DNS dnsNotification{};
+    dnsNotification.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
+    dnsNotification.ServerList = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(settings.Servers, ','));
+
+    if (useLinuxDomainEntry && !settings.Domains.empty())
+    {
+        // Use 'domain' entry for single DNS suffix (typically used when mirroring host DNS without tunneling)
+        dnsNotification.Domain = wsl::shared::string::MultiByteToWide(settings.Domains.front());
+    }
+    else
+    {
+        // Use 'search' entry for DNS suffix list
+        dnsNotification.Search = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(settings.Domains, ','));
+    }
+
+    return dnsNotification;
+}
+
+wsl::core::networking::DnsInfo wsl::core::networking::DnsUpdateHelper::GetCurrentDnsSettings(DnsSettingsFlags flags)
+{
+    m_hostDnsInfo.UpdateNetworkInformation();
+    return m_hostDnsInfo.GetDnsSettings(flags);
+}

@@ -18,6 +18,7 @@ Abstract:
 #include "Stringify.h"
 #include "WslCoreNetworkingSupport.h"
 #include "WslCoreNetworkEndpointSettings.h"
+#include "WslCoreHostDnsInfo.h"
 #include "hcs.hpp"
 #include "hns_schema.h"
 
@@ -895,17 +896,6 @@ try
 }
 CATCH_RETURN()
 
-static hns::DNS ConvertDnsInfoToHnsSettingsMsg(const wsl::core::networking::DnsInfo& dnsInfo)
-{
-    hns::DNS dnsSettings{};
-    dnsSettings.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
-
-    dnsSettings.ServerList = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(dnsInfo.Servers, ','));
-    dnsSettings.Search = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(dnsInfo.Domains, ','));
-
-    return dnsSettings;
-}
-
 _Requires_lock_held_(m_networkLock)
 _Check_return_ HRESULT wsl::core::networking::WslMirroredNetworkManager::SendDnsRequestToGns(
     const NetworkEndpoint& endpoint, const DnsInfo& dnsInfo, hns::ModifyRequestType requestType) noexcept
@@ -915,7 +905,7 @@ try
     modifyRequest.ResourceType = hns::GuestEndpointResourceType::DNS;
     modifyRequest.RequestType = requestType;
     modifyRequest.targetDeviceName = wsl::shared::string::GuidToString<wchar_t>(endpoint.InterfaceGuid);
-    modifyRequest.Settings = ConvertDnsInfoToHnsSettingsMsg(dnsInfo);
+    modifyRequest.Settings = BuildDnsNotification(dnsInfo);
 
     WSL_LOG(
         "WslMirroredNetworkManager::SendDnsRequestToGns",
@@ -1982,7 +1972,6 @@ void wsl::core::networking::WslMirroredNetworkManager::AddEndpointImpl(EndpointT
         THROW_IF_FAILED(hr);
 
         endpointTrackingObject.m_networkEndpoint.Network->MacAddress = endpointTrackingObject.m_hnsEndpoint.MacAddress;
-        endpointTrackingObject.m_networkEndpoint.Network->DeviceName = endpointTrackingObject.m_hnsEndpoint.PortFriendlyName;
 
         if (IsInterfaceIndexOfGelnic(endpointTrackingObject.m_networkEndpoint.Network->InterfaceIndex))
         {

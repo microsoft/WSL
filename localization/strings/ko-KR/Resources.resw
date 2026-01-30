@@ -298,10 +298,12 @@ WSL2가 강제로 디스크를 중지하고 분리하려면 'wsl.exe {}'을(를)
     <value>레거시 배포에서 WSL 2를 지원하지 않습니다.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2는 현재 컴퓨터 구성에서 지원되지 않습니다.
-"가상 머신 플랫폼" 선택적 구성 요소를 사용하도록 설정하고 BIOS에서 가상화가 사용하도록 설정되어 있는지 확인하세요.
-실행하여 "가상 머신 플랫폼"을 사용하도록 설정: wsl.exe --install --no-distribution
-자세한 내용은 https://aka.ms/enablevirtualization 참조하세요.</value>
+    <value>가상화가 활성화되지 않은 이 컴퓨터에서는 WSL2를 시작할 수 없습니다.
+컴퓨터의 펌웨어 설정에서 ‘가상 머신 플랫폼’ 선택적 구성 요소가 활성화되고, 가상화가 켜져 있는지 확인하세요.
+
+‘가상 머신 플랫폼’을 활성화기 위해 다음 명령 실행: wsl.exe --install --no-distribution
+
+자세한 내용을 알아보려면 https://aka.ms/enablevirtualization을 방문하세요.</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

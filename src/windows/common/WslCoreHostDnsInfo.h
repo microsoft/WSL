@@ -38,6 +38,14 @@ inline bool operator!=(const DnsInfo& lhs, const DnsInfo& rhs) noexcept
 
 std::string GenerateResolvConf(_In_ const DnsInfo& Info);
 
+/// <summary>
+/// Builds an hns::DNS notification from DnsInfo settings.
+/// </summary>
+/// <param name="settings">The DNS settings to convert</param>
+/// <param name="useLinuxDomainEntry">If true, uses 'domain' entry for single suffix; otherwise uses 'search' for all
+/// suffixes</param> <returns>The hns::DNS notification ready to send via GNS channel</returns>
+wsl::shared::hns::DNS BuildDnsNotification(const DnsInfo& settings, bool useLinuxDomainEntry = false);
+
 std::vector<std::string> GetAllDnsSuffixes(const std::vector<IpAdapterAddress>& AdapterAddresses);
 
 DWORD GetBestInterface();
@@ -82,6 +90,24 @@ private:
     /// </summary>
     std::mutex m_lock;
     _Guarded_by_(m_lock) std::vector<IpAdapterAddress> m_addresses;
+};
+
+/// <summary>
+/// Helper class that fetches current DNS settings from the host.
+/// Callers are responsible for tracking changes if needed.
+/// </summary>
+class DnsUpdateHelper
+{
+public:
+    /// <summary>
+    /// Fetches current DNS settings from the host.
+    /// </summary>
+    /// <param name="flags">Flags controlling which DNS settings to include</param>
+    /// <returns>Current DNS settings</returns>
+    DnsInfo GetCurrentDnsSettings(DnsSettingsFlags flags);
+
+private:
+    HostDnsInfo m_hostDnsInfo;
 };
 
 using RegistryChangeCallback = std::function<void()>;

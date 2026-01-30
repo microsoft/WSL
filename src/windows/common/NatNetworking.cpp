@@ -438,9 +438,6 @@ try
         return;
     }
 
-    hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
-    notification.Settings.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
-
     networking::DnsInfo latestDnsSettings{};
 
     // true if the "domain" entry of /etc/resolv.conf should be configured
@@ -475,28 +472,19 @@ try
 
     if (latestDnsSettings != m_trackedDnsSettings)
     {
-        notification.Settings.ServerList = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(latestDnsSettings.Servers, ','));
-
-        if (configureLinuxDomain)
-        {
-            WI_ASSERT(!latestDnsSettings.Domains.empty());
-            notification.Settings.Domain = wsl::shared::string::MultiByteToWide(latestDnsSettings.Domains.front());
-        }
-        else
-        {
-            notification.Settings.Search = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(latestDnsSettings.Domains, ','));
-        }
+        auto dnsNotification = BuildDnsNotification(latestDnsSettings, configureLinuxDomain);
 
         WSL_LOG(
             "NatNetworking::UpdateDns",
-            TraceLoggingValue(notification.Settings.Domain.c_str(), "domain"),
-            TraceLoggingValue(notification.Settings.Options.c_str(), "options"),
-            TraceLoggingValue(notification.Settings.Search.c_str(), "search"),
-            TraceLoggingValue(notification.Settings.ServerList.c_str(), "serverList"));
+            TraceLoggingValue(dnsNotification.Domain.c_str(), "domain"),
+            TraceLoggingValue(dnsNotification.Options.c_str(), "options"),
+            TraceLoggingValue(dnsNotification.Search.c_str(), "search"),
+            TraceLoggingValue(dnsNotification.ServerList.c_str(), "serverList"));
 
+        hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
         notification.RequestType = hns::ModifyRequestType::Update;
         notification.ResourceType = hns::GuestEndpointResourceType::DNS;
-        notification.Settings = notification.Settings;
+        notification.Settings = std::move(dnsNotification);
         m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_endpoint.Id);
 
         m_trackedDnsSettings = std::move(latestDnsSettings);

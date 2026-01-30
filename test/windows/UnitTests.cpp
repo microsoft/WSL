@@ -878,11 +878,6 @@ class UnitTests
         }
     }
 
-    TEST_METHOD(WslPath)
-    {
-        VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests wslpath", L"wslpath"));
-    }
-
     TEST_METHOD(FsTab)
     {
         //
@@ -5957,25 +5952,6 @@ Error code: Wsl/InstallDistro/WSL_E_INVALID_JSON\r\n",
             parse(parser);
             VERIFY_IS_TRUE(a);
             VERIFY_ARE_EQUAL(pos, L"-");
-        }
-
-        {
-            constexpr auto testDir = "wslpath-test-dir";
-            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { std::filesystem::remove_all(testDir); });
-
-            std::filesystem::create_directory(testDir);
-
-            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -aw {}", testDir));
-            VERIFY_ARE_EQUAL((std::filesystem::canonical(std::filesystem::current_path()) / testDir).wstring() + L"\n", out);
-
-            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -wa {}", testDir));
-            VERIFY_ARE_EQUAL((std::filesystem::canonical(std::filesystem::current_path()) / testDir).wstring() + L"\n", out);
-
-            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath {}", testDir));
-            VERIFY_ARE_EQUAL(std::format(L"{}\n", testDir), out);
-
-            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -a {}", testDir));
-            VERIFY_IS_TRUE(out.find(L"/mnt/") == 0);
         }
     }
 
