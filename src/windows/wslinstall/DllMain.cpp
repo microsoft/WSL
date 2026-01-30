@@ -974,10 +974,9 @@ void CreateCpioInitrd(_In_ const std::filesystem::path& SourcePath, _In_ const s
     const auto archivePadding = (archiveBlockSize - (currentPos.LowPart % archiveBlockSize)) % archiveBlockSize;
     if (archivePadding > 0)
     {
-        auto paddingBuffer = std::make_unique<char[]>(archivePadding);
-        memset(paddingBuffer.get(), 0, archivePadding);
+        char paddingBuffer[archiveBlockSize] = {0};
         DWORD bytesWritten;
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(destFile.get(), paddingBuffer.get(), archivePadding, &bytesWritten, nullptr));
+        THROW_IF_WIN32_BOOL_FALSE(WriteFile(destFile.get(), paddingBuffer, archivePadding, &bytesWritten, nullptr));
     }
 
     deleteFile.release();
