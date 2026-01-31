@@ -205,6 +205,11 @@ public:
     IFACEMETHOD(SetSparse)(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe, _Out_ LXSS_ERROR_INFO* Error) override;
 
     /// <summary>
+    /// Sets the filesystem mount options for a distribution.
+    /// </summary>
+    IFACEMETHOD(SetFsMountOptions)(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
     /// Sets the version for a distribution.
     /// </summary>
     IFACEMETHOD(SetVersion)(_In_ LPCGUID DistroGuid, _In_ ULONG Version, _In_ HANDLE StdErrHandle, _Out_ LXSS_ERROR_INFO* Error) override;
@@ -484,6 +489,12 @@ public:
     /// </summary>
     HRESULT
     SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOLEAN Sparse, _In_ BOOLEAN AllowUnsafe);
+
+    /// <summary>
+    /// Sets the filesystem mount options for a distribution.
+    /// </summary>
+    HRESULT
+    SetFsMountOptions(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions);
 
     /// <summary>
     /// Sets the version for a distribution.
