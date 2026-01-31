@@ -988,6 +988,13 @@ wsl::windows::common::SvcComm::SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOL Spar
     RETURN_HR(m_userSession->SetSparse(DistroGuid, Sparse, AllowUnsafe, context.OutError()));
 }
 
+void wsl::windows::common::SvcComm::SetFsMountOptions(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions) const
+{
+    ClientExecutionContext context;
+
+    THROW_IF_FAILED(m_userSession->SetFsMountOptions(DistroGuid, FsMountOptions, context.OutError()));
+}
+
 HRESULT
 wsl::windows::common::SvcComm::ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ ULONG64 NewSize) const
 {

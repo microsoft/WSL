@@ -266,6 +266,11 @@ interface ILxssUserSession : IUnknown
         [in] BOOLEAN AllowUnsafe,
         [in, out] LXSS_ERROR_INFO* Error);
 
+    HRESULT SetFsMountOptions(
+        [in] LPCGUID DistroGuid,
+        [in] LPCWSTR FsMountOptions,
+        [in, out] LXSS_ERROR_INFO* Error);
+
     HRESULT EnumerateDistributions(
         [out] ULONG *DistributionCount,
         [out, size_is(, *DistributionCount)] LXSS_ENUMERATE_INFO **Distributions,

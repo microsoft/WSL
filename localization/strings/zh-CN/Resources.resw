@@ -489,6 +489,9 @@
             --resize &lt;MemoryString&gt;
                 将发行版的磁盘大小调整为指定大小。
 
+            --set-fs-mount-options &lt;Options&gt;
+                设置发行版根目录的文件系统挂载选项。
+
     --mount &lt;Disk&gt;
         在所有 WSL 2 发行版中附加和装载物理磁盘或虚拟磁盘。
 
@@ -614,7 +617,7 @@
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

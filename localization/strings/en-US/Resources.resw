@@ -483,6 +483,9 @@ Arguments for managing Windows Subsystem for Linux:
             --resize &lt;MemoryString&gt;
                 Resize the disk of the distribution to the specified size.
 
+            --set-fs-mount-options &lt;Options&gt;
+                Set the filesystem mount options for the distribution root.
+
     --mount &lt;Disk&gt;
         Attaches and mounts a physical or virtual disk in all WSL 2 distributions.
 
@@ -608,7 +611,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 "}{Locked="--from-file "}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

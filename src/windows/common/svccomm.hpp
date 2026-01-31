@@ -98,6 +98,8 @@ public:
     HRESULT
     SetSparse(_In_ LPCGUID DistroGuid, _In_ BOOL Sparse, _In_ BOOL AllowUnsafe) const;
 
+    void SetFsMountOptions(_In_ LPCGUID DistroGuid, _In_ LPCWSTR FsMountOptions) const;
+
     HRESULT
     SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Version) const;
 
