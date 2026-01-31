@@ -1,5 +1,6 @@
 #pragma once
 #include <CommandLine.h>
+#include "ContainerService.h"
 
 namespace wslc::commands
 {
@@ -53,19 +54,17 @@ public:
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
         parser.AddPositionalArgument(wsl::shared::Utf8String{m_image}, 0);
-        parser.AddArgument(m_interactive, L"--interactive", 'i');
-        parser.AddArgument(m_tty, L"--tty", 't');
-        parser.AddArgument(wsl::shared::Utf8String{m_name}, L"--name");
+        parser.AddArgument(m_options.Interactive, L"--interactive", 'i');
+        parser.AddArgument(m_options.TTY, L"--tty", 't');
+        parser.AddArgument(wsl::shared::Utf8String{m_options.Name}, L"--name");
     }
 
 protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    bool m_tty;
-    bool m_interactive;
+    wslc::services::CreateOptions m_options;
     std::string m_image;
-    std::string m_name;
 };
 
 class ContainerCreateCommand : public ICommand
@@ -86,19 +85,17 @@ public:
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
         parser.AddPositionalArgument(wsl::shared::Utf8String{m_image}, 0);
-        parser.AddArgument(m_interactive, L"--interactive", 'i');
-        parser.AddArgument(m_tty, L"--tty", 't');
-        parser.AddArgument(wsl::shared::Utf8String{m_name}, L"--name");
+        parser.AddArgument(m_options.Interactive, L"--interactive", 'i');
+        parser.AddArgument(m_options.TTY, L"--tty", 't');
+        parser.AddArgument(wsl::shared::Utf8String{m_options.Name}, L"--name");
     }
 
 protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    bool m_tty;
-    bool m_interactive;
+    wslc::services::CreateOptions m_options;
     std::string m_image;
-    std::string m_name;
 };
 
 class ContainerStartCommand : public ICommand
@@ -139,16 +136,15 @@ public:
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
-        parser.AddArgument(wsl::shared::Integer{m_signal}, L"--signal", 's');
-        parser.AddArgument(wsl::shared::Integer{m_timeout}, L"--time", 't');
+        parser.AddArgument(wsl::shared::Integer{m_options.Signal}, L"--signal", 's');
+        parser.AddArgument(wsl::shared::Integer{m_options.Timeout}, L"--time", 't');
     }
 
 protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    int m_signal;
-    ULONG m_timeout;
+    wslc::services::StopContainerOptions m_options;
 };
 
 class ContainerKillCommand : public ICommand
@@ -165,14 +161,14 @@ public:
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
-        parser.AddArgument(wsl::shared::Integer{m_signal}, L"--signal", 's');
+        parser.AddArgument(wsl::shared::Integer{m_options.Signal}, L"--signal", 's');
     }
 
 protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    int m_signal;
+    wslc::services::KillContainerOptions m_options;
 };
 
 class ContainerDeleteCommand : public ICommand

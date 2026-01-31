@@ -53,13 +53,9 @@ int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int pars
     IF_HELP_PRINT_HELP();
     ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = OpenCLISession();
-    CreateOptions options;
-    options.TTY = m_tty;
-    options.Interactive = m_interactive;
-    options.Arguments = Arguments();
-    options.Name = GetContainerName(m_name);
+    m_options.Arguments = Arguments();
     ContainerService containerService;
-    return containerService.Run(*session, m_image, options);
+    return containerService.Run(*session, m_image, m_options);
 }
 
 int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
@@ -67,13 +63,10 @@ int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int p
     IF_HELP_PRINT_HELP();
     ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = OpenCLISession();
-    CreateOptions options;
-    options.TTY = m_tty;
-    options.Interactive = m_interactive;
-    options.Arguments = Arguments();
-    options.Name = GetContainerName(m_name);
+    m_options.Arguments = Arguments();
+    m_options.Name = GetContainerName(m_options.Name);
     ContainerService containerService;
-    auto result = containerService.Create(*session, m_image, options);
+    auto result = containerService.Create(*session, m_image, m_options);
     wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(result.Id));
     return 0;
 }
@@ -96,12 +89,9 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
-    wslc::services::StopContainerOptions options;
-    options.Signal = m_signal;
-    options.Timeout = m_timeout;
     for (const auto& id : arguments)
     {
-        containerService.Stop(*session, id, options);
+        containerService.Stop(*session, id, m_options);
     }
     return 0;
 }
@@ -116,7 +106,7 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
     wslc::services::ContainerService containerService;
     for (const auto& id : arguments)
     {
-        containerService.Kill(*session, id, m_signal);
+        containerService.Kill(*session, id, m_options.Signal);
     }
     return 0;
 }

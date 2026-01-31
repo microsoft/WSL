@@ -23,6 +23,11 @@ struct StopContainerOptions
     ULONG Timeout = 5;
 };
 
+struct KillContainerOptions
+{
+    int Signal = WSLASignalSIGKILL;
+};
+
 struct ContainerInformation
 {
     std::string Id;
