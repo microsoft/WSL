@@ -31,7 +31,7 @@ Abstract:
 
 #define STRING_FIELD(Name) #Name, (Name <= 0 ? "<empty>" : ((char*)(this)) + Name)
 
-#define STRING_ARRAY_FIELD(Name) #Name, (StringArray((char*)(this), Name))
+#define STRING_ARRAY_FIELD(Name) #Name, (StringArray((char*)(this), Name, Header.MessageSize))
 
 #define PRETTY_PRINT(...) \
     void PrettyPrintImpl(std::stringstream& Out) const \
@@ -50,6 +50,7 @@ struct StringArray
 {
     const char* MessageHead = nullptr;
     unsigned int Index = 0;
+    unsigned int MessageSize = 0;
 };
 
 template <typename T>
@@ -87,17 +88,8 @@ inline void PrettyPrint(std::stringstream& Out, const T& Value)
             return;
         }
 
-        const auto* it = Value.MessageHead + Value.Index;
-        while (*it != '\0')
-        {
-            if (it != Value.MessageHead + Value.Index)
-            {
-                Out << ",";
-            }
-
-            Out << it;
-            it += strlen(it) + 1;
-        }
+        gsl::span<const char> span(Value.MessageHead + Value.Index, Value.MessageHead + Value.MessageSize);
+        Out << wsl::shared::string::Join(wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span)), ',');
     }
     else
     {
