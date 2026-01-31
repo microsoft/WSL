@@ -115,10 +115,14 @@ void ContainerService::Exec(IWSLASession& session, std::string id, std::vector<s
     auto fds = CreateFds({});
     std::vector<const char*> args;
     SetContainerOptions(options, id, false, false, fds, arguments, args);
-    options.InitProcessOptions.Executable = nullptr; // Must be null
+    options.InitProcessOptions.Executable = nullptr;
+    options.InitProcessOptions.CurrentDirectory = nullptr;
+    options.InitProcessOptions.Environment = nullptr;
+    options.InitProcessOptions.EnvironmentCount = 0;
 
     wil::com_ptr<IWSLAProcess> createdProcess;
     THROW_IF_FAILED(container->Exec(&options.InitProcessOptions, &createdProcess, &error));
+    InteractiveShell(ClientRunningWSLAProcess(std::move(createdProcess), std::move(fds)), false);
 }
 
 InspectContainer ContainerService::Inspect(IWSLASession& session, std::string id)
