@@ -114,7 +114,8 @@ void ContainerService::Exec(IWSLASession& session, std::string id, std::vector<s
     // TODO tty, interactive
     auto fds = CreateFds({});
     std::vector<const char*> args;
-    SetContainerOptions(options, "", false, false, fds, arguments, args);
+    SetContainerOptions(options, id, false, false, fds, arguments, args);
+    options.InitProcessOptions.Executable = nullptr; // Must be null
 
     wil::com_ptr<IWSLAProcess> createdProcess;
     THROW_IF_FAILED(container->Exec(&options.InitProcessOptions, &createdProcess, &error));

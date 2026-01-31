@@ -138,6 +138,7 @@ int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int p
 
 int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    IF_HELP_PRINT_HELP();
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     auto containers = containerService.List(*session);
@@ -197,19 +198,24 @@ int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int par
 {
     IF_HELP_PRINT_HELP();
     ARG_REQUIRED(m_id, L"Error: container value is required.");
+    auto arguments = Arguments();
+    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
-    containerService.Exec(*session, m_id, Arguments());
+    containerService.Exec(*session, m_id, arguments);
     return 0;
 }
 
 int ContainerInspectCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    IF_HELP_PRINT_HELP();
+    auto arguments = Arguments();
+    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     std::vector<InspectContainer> result;
 
-    for (const auto& id : Arguments())
+    for (const auto& id : arguments)
     {
         auto inspectData = containerService.Inspect(*session, id);
         result.push_back(inspectData);
