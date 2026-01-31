@@ -466,6 +466,28 @@ private:
     size_t RemainingBytes = 0;
 };
 
+class SingleAcceptHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(SingleAcceptHandle);
+    NON_MOVABLE(SingleAcceptHandle);
+
+    SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
+    ~SingleAcceptHandle();
+
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    HandleWrapper ListenSocket;
+    HandleWrapper AcceptedSocket;
+    std::function<void(wil::unique_socket AcceptedSocket)> OnAccept;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    std::function<void()> OnAccepted;
+};
+
 class MultiHandleWait
 {
 public:
