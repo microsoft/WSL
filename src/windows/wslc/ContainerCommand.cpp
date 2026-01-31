@@ -16,6 +16,7 @@ using wsl::windows::common::docker_schema::InspectContainer;
 
 #define IF_HELP_PRINT_HELP() if (m_help) { PrintHelp(); return 0; }
 #define ARG_REQUIRED(arg, msg) if (arg.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
+#define ARG_ARRAY_REQUIRED(argArray, msg) if (argArray.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
 
 static std::string GetContainerName(const std::string& name)
 {
@@ -63,7 +64,8 @@ int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int pars
 
 int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    THROW_HR_IF(E_INVALIDARG, m_image.empty());
+    IF_HELP_PRINT_HELP();
+    ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = OpenCLISession();
     CreateOptions options;
     options.TTY = m_tty;
@@ -78,7 +80,8 @@ int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int p
 
 int ContainerStartCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    THROW_HR_IF(E_INVALIDARG, m_id.empty());
+    IF_HELP_PRINT_HELP();
+    ARG_REQUIRED(m_id, L"Error: container value is required.");
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     containerService.Start(*session, m_id);
@@ -87,12 +90,16 @@ int ContainerStartCommand::ExecuteInternal(std::wstring_view commandLine, int pa
 
 int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    IF_HELP_PRINT_HELP();
+    auto arguments = Arguments();
+    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
+
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     wslc::services::StopContainerOptions options;
     options.Signal = m_signal;
     options.Timeout = m_timeout;
-    for (const auto& id : Arguments())
+    for (const auto& id : arguments)
     {
         containerService.Stop(*session, id, options);
     }
@@ -101,9 +108,13 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
 int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    IF_HELP_PRINT_HELP();
+    auto arguments = Arguments();
+    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
+
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
-    for (const auto& id : Arguments())
+    for (const auto& id : arguments)
     {
         containerService.Kill(*session, id, m_signal);
     }
@@ -112,7 +123,11 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
 int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    IF_HELP_PRINT_HELP();
+    auto arguments = Arguments();
+    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
     auto session = OpenCLISession();
+
     wslc::services::ContainerService containerService;
     for (const auto& id : Arguments())
     {
@@ -180,7 +195,8 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
 int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    THROW_HR_IF(E_INVALIDARG, m_id.empty());
+    IF_HELP_PRINT_HELP();
+    ARG_REQUIRED(m_id, L"Error: container value is required.");
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     containerService.Exec(*session, m_id, Arguments());
