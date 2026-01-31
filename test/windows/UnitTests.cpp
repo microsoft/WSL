@@ -1084,6 +1084,145 @@ class UnitTests
         VERIFY_ARE_EQUAL(err, L"bsdtar: Error opening archive: Unrecognized archive format\n");
     }
 
+    TEST_METHOD(ImportDistroWithFsType)
+    {
+        WSL2_TEST_ONLY();
+
+        //
+        // Test importing a distribution with custom filesystem type.
+        // Validates ext4, btrfs, and xfs filesystem types.
+        //
+
+        auto validateOutput = [](LPCWSTR commandLine, LPCWSTR expectedOutput, DWORD expectedExitCode = 0) {
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(commandLine, expectedExitCode);
+            VERIFY_ARE_EQUAL(expectedOutput, out);
+        };
+
+        auto testFsType = [&](LPCWSTR fsType, LPCWSTR expectedFsType) {
+            const auto distroName = std::format(L"fstype-test-{}", fsType);
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+                std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+            });
+
+            // Import with custom fs type
+            validateOutput(
+                std::format(L"--import {} {} \"{}\" --version 2 --fs-type {}", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath, fsType).c_str(),
+                L"The operation completed successfully. \r\n",
+                0);
+
+            // Verify the filesystem type is correct by checking /etc/fstab or mount output
+            auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+            VERIFY_IS_TRUE(mountOut.find(expectedFsType) != std::wstring::npos);
+
+            // Cleanup
+            WslShutdown();
+        };
+
+        // Test ext4 (default)
+        testFsType(L"ext4", L"ext4");
+
+        // Test btrfs
+        testFsType(L"btrfs", L"btrfs");
+
+        // Test xfs
+        testFsType(L"xfs", L"xfs");
+    }
+
+    TEST_METHOD(ImportDistroWithFsMountOptions)
+    {
+        WSL2_TEST_ONLY();
+
+        //
+        // Test importing a distribution with custom filesystem mount options.
+        //
+
+        constexpr auto distroName = L"fsmount-test";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+            std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+        });
+
+        // Import with custom mount options
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--import {} {} \"{}\" --version 2 --fs-mount-options discard,noatime", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath),
+            0);
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+
+        // Verify the mount options are applied
+        auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+        VERIFY_IS_TRUE(mountOut.find(L"noatime") != std::wstring::npos);
+
+        WslShutdown();
+    }
+
+    TEST_METHOD(ImportDistroWithBtrfsSubvol)
+    {
+        WSL2_TEST_ONLY();
+
+        //
+        // Test importing a distribution with btrfs and subvol mount option.
+        //
+
+        constexpr auto distroName = L"btrfs-subvol-test";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+            std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+        });
+
+        // Import with btrfs and subvol mount option
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--import {} {} \"{}\" --version 2 --fs-type btrfs --fs-mount-options subvol=@", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath),
+            0);
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+
+        // Verify the subvolume is used
+        auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+        VERIFY_IS_TRUE(mountOut.find(L"btrfs") != std::wstring::npos);
+        VERIFY_IS_TRUE(mountOut.find(L"subvol=/@") != std::wstring::npos);
+
+        WslShutdown();
+    }
+
+    TEST_METHOD(ManageSetFsMountOptions)
+    {
+        WSL2_TEST_ONLY();
+
+        //
+        // Test the --manage --set-fs-mount-options command.
+        //
+
+        constexpr auto distroName = L"manage-fsmount-test";
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"--unregister {}", distroName));
+            std::filesystem::remove_all(LXSST_IMPORT_DISTRO_TEST_DIR);
+        });
+
+        // Import a distribution first
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--import {} {} \"{}\" --version 2", distroName, LXSST_IMPORT_DISTRO_TEST_DIR, g_testDistroPath),
+            0);
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+
+        // Set the mount options using --manage
+        WslShutdown();
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
+            std::format(L"--manage {} --set-fs-mount-options discard,noatime", distroName),
+            0);
+        VERIFY_ARE_EQUAL(out, L"The operation completed successfully. \r\n");
+
+        // Verify the mount options are applied after restart
+        auto [mountOut, _] = LxsstuLaunchWslAndCaptureOutput(std::format(L"-d {} -- mount | grep ' / '", distroName));
+        VERIFY_IS_TRUE(mountOut.find(L"noatime") != std::wstring::npos);
+
+        WslShutdown();
+    }
+
+
     TEST_METHOD(AppxDistroDeletion)
     {
         // Create a dummy distro registration
@@ -1352,6 +1491,11 @@ class UnitTests
             L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
         ValidateErrorMessage(L"--manage test_distro --resize foo", L"Invalid size: foo", L"Wsl/E_INVALIDARG");
+
+        ValidateErrorMessage(
+            L"--manage DoesNotExist --set-fs-mount-options discard",
+            L"There is no distribution with the supplied name.",
+            L"Wsl/Service/WSL_E_DISTRO_NOT_FOUND");
 
         ValidateErrorMessage(
             L"--install --distribution debian --no-distribution",
