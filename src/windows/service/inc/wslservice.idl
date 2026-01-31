@@ -144,7 +144,7 @@ cpp_quote("#define LXSS_PLAN9_UNIX_SOCKET L\"fsserver\"")
 
 cpp_quote("#define LXSS_VM_MODE_INITRD_NAME L\"initrd.img\"")
 cpp_quote("#define LXSS_VM_MODE_KERNEL_NAME L\"kernel\"")
-cpp_quote("#define LXSS_VM_MODE_VHD_NAME L\"ext4.vhdx\"")
+cpp_quote("#define LXSS_VM_MODE_VHD_NAME L\"distro.vhdx\"")
 
 cpp_quote("#define LXSS_TOOLS_DIRECTORY L\"tools\"")
 
