@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -434,7 +434,14 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
                 Rögzített méretű lemez létrehozása a disztribúció tárolásához.
 
             --from-file &lt;ElérésiÚt&gt;
-                Disztribúció telepítése helyi fájlból.
+              Disztribúció telepítése helyi fájlból.
+
+            --fs-type
+              Megadja, hogy milyen fájlrendszert használjon a disztribúció gyökeréhez.
+              Alapértelmezés: ext4.
+
+            --fs-mount-options
+              További csatolási beállításokat ad meg a fájlrendszerhez.
 
             --legacy
                 Az örökölt disztribúciós jegyzékfájl használata.
@@ -475,6 +482,9 @@ A Linuxos Windows-alrendszer kezelésére szolgáló argumentumok:
 
             --resize &lt;MemoriaSztring&gt;
                 A disztribúció lemezének átméretezése a megadott méretre.
+
+            --set-fs-mount-options &lt;Kapcsolók&gt;
+              Beállítja a disztribúció gyökerének fájlrendszer-csatolási beállításait.
 
     --mount &lt;Lemez&gt;
         Fizikai vagy virtuális lemez hozzárendelése és csatlakoztatása az összes WSL 2-disztribúcióban.
@@ -551,6 +561,13 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
                 Azt adja meg, hogy a megadott fájl .vhd vagy .vhdx fájl, nem .tar fájl.
                 Ez a művelet másolatot készít a VHD-fájlról a megadott telepítési helyen.
 
+            --fs-type
+              Megadja, hogy milyen fájlrendszert használjon a disztribúció gyökeréhez.
+              Alapértelmezés: ext4.
+
+            --fs-mount-options
+              További csatolási beállításokat ad meg a fájlrendszerhez.
+
     --import-in-place &lt;Disztribúció&gt; &lt;Fájlnév&gt;
         A megadott VHD-fájl importálása új disztribúcióként.
         Ezt a virtuális merevlemezt az ext4 fájlrendszertípussal kell formázni.
@@ -591,10 +608,12 @@ A disztribúciók Linuxos Windows-alrendszerben való kezelésére szolgáló ar
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--fs-type
+"}{Locked="--fs-mount-options
+"}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

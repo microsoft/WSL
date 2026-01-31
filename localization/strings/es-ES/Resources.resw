@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -442,6 +442,13 @@ Argumentos para administrar Subsistema de Windows para Linux:
             --from-file &lt;Path&gt;
                 Instala una distribución desde un archivo local.
 
+            --fs-type
+              Especifica el tipo de sistema de archivos que se usará para la raíz de la distribución.
+              El valor predeterminado es ext4.
+
+            --fs-mount-options
+              Especifica opciones de montaje adicionales para el sistema de archivos.
+
             --legacy
                 Usa el manifiesto de distribución heredado.
 
@@ -481,6 +488,9 @@ Argumentos para administrar Subsistema de Windows para Linux:
 
             --resize &lt;MemoryString&gt;
                 Cambia el tamaño del disco de la distribución al tamaño especificado.
+
+            --set-fs-mount-options &lt;Options&gt;
+              Establece las opciones de montaje del sistema de archivos para la raíz de la distribución.
 
     --mount &lt;Disk&gt;
         Conecta y monta un disco físico o virtual en todas las distribuciones de WSL 2.
@@ -557,6 +567,13 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
                 Especifica que el archivo proporcionado es un archivo .vhd o .vhdx, no un archivo tar.
                 Esta operación realiza una copia del archivo VHD en la ubicación de instalación especificada.
 
+            --fs-type
+              Especifica el tipo de sistema de archivos que se usará para la raíz de la distribución.
+              El valor predeterminado es ext4.
+
+            --fs-mount-options
+              Especifica opciones de montaje adicionales para el sistema de archivos.
+
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Importa el archivo VHD especificado como una nueva distribución.
         Este disco duro virtual debe tener el formato del tipo de sistema de archivos ext4.
@@ -597,10 +614,12 @@ Argumentos para administrar distribuciones en el Subsistema de Windows para Linu
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--fs-type
+"}{Locked="--fs-mount-options
+"}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

@@ -442,6 +442,13 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
             --from-file &lt;Path&gt;
                 로컬 파일에서 배포를 설치합니다.
 
+            --fs-type
+              배포판 루트에 사용할 파일 시스템 유형을 지정합니다.
+              기본값은 ext4입니다.
+
+            --fs-mount-options
+              파일 시스템에 대한 추가 마운트 옵션을 지정합니다.
+
             --legacy
                 레거시 배포 매니페스트를 사용합니다.
 
@@ -481,6 +488,9 @@ Linux용 Windows 하위 시스템을 관리하기 위한 인수:
 
             --resize &lt;MemoryString&gt;
                 배포 디스크의 크기를 지정된 크기로 조정합니다.
+
+            --set-fs-mount-options &lt;Options&gt;
+              배포판 루트의 파일 시스템 마운트 옵션을 설정합니다.
 
     --mount &lt;Disk&gt;
         모든 WSL 2 배포에서 실제 또는 가상 디스크를 연결하고 탑재합니다.
@@ -557,6 +567,13 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
                 제공된 파일이 tar 파일이 아닌 .vhd 또는 .vhdx 파일임을 지정합니다.
                 이 작업은 지정된 설치 위치에 VHD 파일의 복사본을 만듭니다.
 
+            --fs-type
+              배포판 루트에 사용할 파일 시스템 유형을 지정합니다.
+              기본값은 ext4입니다.
+
+            --fs-mount-options
+              파일 시스템에 대한 추가 마운트 옵션을 지정합니다.
+
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         지정된 VHD 파일을 새 배포판으로 가져옵니다.
         이 가상 하드 디스크는 ext4 파일 시스템 형식으로 포맷해야 합니다.
@@ -566,7 +583,8 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 
         옵션:
             --all
-                배포를 포함하여 모든 배포를 나열합니다.
+                
+배포를 포함하여 모든 배포를 나열합니다.
                 현재 설치 중이거나 제거되고 있습니다.
 
             --running
@@ -597,10 +615,12 @@ Linux용 Windows 하위 시스템 배포를 관리하기 위한 인수:
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--fs-type
+"}{Locked="--fs-mount-options
+"}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

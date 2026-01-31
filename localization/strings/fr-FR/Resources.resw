@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -443,6 +443,13 @@ Arguments pour la gestion du sous-système Windows pour Linux :
             --from-file &lt;Path&gt;
                 Installe une distribution à partir d’un fichier local.
 
+            --fs-type
+              Spécifie le type de système de fichiers à utiliser pour la racine de la distribution.
+              Par défaut : ext4.
+
+            --fs-mount-options
+              Spécifie des options de montage supplémentaires pour le système de fichiers.
+
             --legacy
                 Utilise le manifeste de distribution hérité.
 
@@ -482,6 +489,9 @@ Arguments pour la gestion du sous-système Windows pour Linux :
 
             --resize &lt;MemoryString&gt;
                 Redimensionne le disque de la distribution à la taille spécifiée.
+
+            --set-fs-mount-options &lt;Options&gt;
+              Définit les options de montage du système de fichiers pour la racine de la distribution.
 
     --mount &lt;Disk&gt;
         Attache et monte un disque physique ou virtuel dans toutes les distributions WSL 2.
@@ -558,6 +568,13 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
                 Spécifie que le fichier fourni est un fichier .vhd ou .vhdx, et non un fichier tar.
                 Cette opération effectue une copie du fichier VHD à l’emplacement d’installation spécifié.
 
+            --fs-type
+              Spécifie le type de système de fichiers à utiliser pour la racine de la distribution.
+              Par défaut : ext4.
+
+            --fs-mount-options
+              Spécifie des options de montage supplémentaires pour le système de fichiers.
+
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Importe le fichier VHD spécifié en tant que nouvelle distribution.
         Ce disque dur virtuel doit être formaté avec le type de système de fichiers ext4.
@@ -598,10 +615,12 @@ Arguments pour la gestion des distributions dans Sous-système Windows pour Linu
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--fs-type
+"}{Locked="--fs-mount-options
+"}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force

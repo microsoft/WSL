@@ -362,7 +362,8 @@ Beispiel: wslpath 'c:\\users'</value>
 "}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="MessageWslconfigUsage" xml:space="preserve">
-    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linuxaus
+    <value>Führt Verwaltungsvorgänge für Windows-Subsystem für Linux
+aus
 
 Verbrauch:
     /l, /list [Option]
@@ -442,6 +443,13 @@ Argumente für die Verwaltung des Windows-Subsystems für Linux:
             --from-file &lt;Path&gt;
                 Eine Verteilung aus einer lokalen Datei installieren.
 
+            --fs-type
+              Gibt den Dateisystemtyp an, der für das Stammverzeichnis der Distribution verwendet werden soll.
+              Standardmäßig ext4.
+
+            --fs-mount-options
+              Gibt zusätzliche Einbindungsoptionen für das Dateisystem an.
+
             --legacy
                 Das Legacy-Verteilungsmanifest verwenden.
 
@@ -481,6 +489,9 @@ Argumente für die Verwaltung des Windows-Subsystems für Linux:
 
             --resize &lt;MemoryString&gt;
                 Passen Sie die Größe des Datenträgers der Distribution auf die angegebene Größe an.
+
+            --set-fs-mount-options &lt;Options&gt;
+              Legt die Einbindungsoptionen des Dateisystems für das Stammverzeichnis der Distribution fest.
 
     --mount &lt;Disk&gt;
         Fügt einen physischen oder virtuellen Datenträger an alle WSL2-Distributionen an und bindet ihn ein.
@@ -557,6 +568,13 @@ Argumente für die Verwaltung von Distributionen in Windows-Subsystem für Linux
                 Gibt an, dass es sich bei der bereitgestellten Datei um eine VHDX-Datei handelt, nicht um eine TAR-Datei.
                 Dieser Vorgang erstellt eine Kopie der VHDX-Datei am angegebenen Installationsspeicherort.
 
+            --fs-type
+              Gibt den Dateisystemtyp an, der für das Stammverzeichnis der Distribution verwendet werden soll.
+              Standardmäßig ext4.
+
+            --fs-mount-options
+              Gibt zusätzliche Einbindungsoptionen für das Dateisystem an.
+
     --import-in-place &lt;Distro&gt; &lt;FileName&gt;
         Importiert die angegebene VHDX-Datei als neue Distribution.
         Diese virtuelle Festplatte muss mit dem Dateisystemtyp EXT4 formatiert sein.
@@ -597,10 +615,12 @@ Argumente für die Verwaltung von Distributionen in Windows-Subsystem für Linux
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
 "}{Locked="--fixed-vhd
-"}{Locked="--from-file "}{Locked="--legacy
+"}{Locked="--from-file "}{Locked="--fs-type
+"}{Locked="--fs-mount-options
+"}{Locked="--legacy
 "}{Locked="--location "}{Locked="--name "}{Locked="--no-distribution
 "}{Locked="--no-launch,"}{Locked="--version "}{Locked="--vhd-size "}{Locked="--web-download
-"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--mount "}{Locked="--vhd
+"}{Locked="--manage "}{Locked="--move "}{Locked="--set-sparse,"}{Locked="--set-default-user "}{Locked="--resize "}{Locked="--set-fs-mount-options "}{Locked="--mount "}{Locked="--vhd
 "}{Locked="--bare
 "}{Locked="--name "}{Locked="--type "}{Locked="--options "}{Locked="--partition "}{Locked="--set-default-version "}{Locked="--shutdown
 "}{Locked="--force
@@ -1492,7 +1512,8 @@ Anweisungen zur Wiederherstellung finden Sie unter: https://aka.ms/wsldiskmountr
     <value>Windows-Dateien und -Programme über WSL starten</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
-    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, auszuführen.
+    <value>Selbst bei Verwendung von WSL können Sie Ihre ausführbaren Windows-Dateien direkt von der Bash ausführen. Versuchen Sie, 
+auszuführen.
 „powershell.exe /c start .“, um den Datei-Explorer in Ihrem aktuellen Ordner zu öffnen.</value>
     <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
   </data>
