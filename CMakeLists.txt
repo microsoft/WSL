@@ -438,6 +438,7 @@ add_subdirectory(src/windows/wslinstall)
 add_subdirectory(src/windows/wslaclient)
 add_subdirectory(src/windows/wsladiag)
 add_subdirectory(src/windows/wslc)
+add_subdirectory(src/windows/wslc2)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)
