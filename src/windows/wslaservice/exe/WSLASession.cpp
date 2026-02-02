@@ -411,7 +411,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLASession::LoadImage(HANDLE ImageHandle, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -427,7 +427,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
+HRESULT WSLASession::ImportImage(HANDLE ImageHandle, LPCSTR ImageName, IProgressCallback* ProgressCallback, ULONGLONG ContentSize)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -446,10 +446,8 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle)
+void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, HANDLE InputHandle)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(InputHandle))};
-
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     relay::MultiHandleWait io;
@@ -482,7 +480,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     auto onCompleted = [&]() { io.Cancel(); };
 
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
+        common::relay::HandleWrapper{InputHandle}, common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
 
@@ -569,7 +567,7 @@ void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& S
     }
 }
 
-HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::SaveImage(HANDLE OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, WSLA_ERROR_INFO* Error)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
@@ -584,9 +582,8 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
+void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, HANDLE OutputHandle, WSLA_ERROR_INFO* Error)
 {
-    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -607,7 +604,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
             common::relay::HandleWrapper{std::move(SocketCodePair.second)},
-            common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
+            common::relay::HandleWrapper{OutputHandle, std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }
 
@@ -670,8 +667,6 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
-    RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
-    RETURN_HR_IF_NULL(E_POINTER, Count);
 
     *DeletedImages = nullptr;
     *Count = 0;
