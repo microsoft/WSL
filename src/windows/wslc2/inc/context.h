@@ -11,7 +11,7 @@
 
 #define WSLC_CATCH_RESULT_EXCEPTION_STORE(exceptionHR)   catch (const wil::ResultException& re) { exceptionHR = re.GetErrorCode(); }
 #define WSLC_CATCH_HRESULT_EXCEPTION_STORE(exceptionHR)   catch (const winrt::hresult_error& hre) { exceptionHR = hre.code(); }
-#define WSLC_CATCH_COMMAND_EXCEPTION_STORE(exceptionHR)   catch (const ::AppInstaller::CLI::CommandException&) { exceptionHR = WSLC_CLI_ERROR_INVALID_CL_ARGUMENTS; }
+#define WSLC_CATCH_COMMAND_EXCEPTION_STORE(exceptionHR)   catch (const wsl::windows::wslc::CommandException&) { exceptionHR = WSLC_CLI_ERROR_INVALID_CL_ARGUMENTS; }
 #define WSLC_CATCH_STD_EXCEPTION_STORE(exceptionHR, genericHR)   catch (const std::exception&) { exceptionHR = genericHR; }
 #define WSLC_CATCH_ALL_EXCEPTION_STORE(exceptionHR, genericHR)   catch (...) { exceptionHR = genericHR; }
 #define WSLC_CATCH_STORE(exceptionHR, genericHR) \
