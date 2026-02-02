@@ -85,9 +85,9 @@ ContainerEventTracker::~ContainerEventTracker()
     WI_ASSERT(m_callbacks.empty());
 }
 
-void ContainerEventTracker::OnEvent(const std::string& event)
+void ContainerEventTracker::OnEvent(const std::string_view& event)
 {
-    WSL_LOG("DockerEvent", TraceLoggingValue(event.c_str(), "Data"), TraceLoggingValue(m_sessionId, "SessionId"));
+    WSL_LOG("DockerEvent", TraceLoggingCountedString(event.data(), static_cast<UINT16>(event.size()), "Data"), TraceLoggingValue(m_sessionId, "SessionId"));
 
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}, {"exec_die", ContainerEvent::ExecDied}};
@@ -97,7 +97,7 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     auto action = parsed.find("Action");
     auto actor = parsed.find("Actor");
 
-    THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end() || actor == parsed.end(), "Failed to parse json: %hs", event.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end() || actor == parsed.end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
     auto it = events.find(action->get<std::string>());
     if (it == events.end())
@@ -106,7 +106,7 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     }
 
     auto id = actor->find("ID");
-    THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Failed to parse json: %hs", event.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
     auto containerId = id->get<std::string>();
 

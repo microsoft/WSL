@@ -66,7 +66,7 @@ public:
     void UnregisterContainerStateUpdates(size_t Id);
 
 private:
-    void OnEvent(const std::string& event);
+    void OnEvent(const std::string_view& event);
     void Run(wil::unique_socket&& Socket);
 
     struct Callback
