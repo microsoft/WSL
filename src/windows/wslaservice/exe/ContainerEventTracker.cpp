@@ -61,7 +61,7 @@ ContainerEventTracker::ContainerEventTracker(DockerHTTPClient& dockerClient, ULO
         {
             try
             {
-                OnEvent(std::string{buffer.begin(), buffer.end()});
+                OnEvent(std::string_view(buffer.data(), buffer.size()));
             }
             catch (...)
             {
