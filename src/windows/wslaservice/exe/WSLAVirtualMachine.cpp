@@ -209,7 +209,8 @@ void WSLAVirtualMachine::Start()
     wil::unique_handle dmesgOutput;
     dmesgOutput = std::move(m_settings.DmesgHandle);
 
-    m_dmesgCollector = DmesgCollector::Create(m_vmId, m_vmExitEvent, true, false, L"", true, std::move(dmesgOutput));
+    m_dmesgCollector = DmesgCollector::Create(
+        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslaFeatureFlagsEarlyBootDmesg), std::move(dmesgOutput));
 
     if (FeatureEnabled(WslaFeatureFlagsEarlyBootDmesg))
     {
