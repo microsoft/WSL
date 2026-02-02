@@ -30,7 +30,7 @@ public:
     WSLAProcess& operator=(const WSLAProcess&) = delete;
 
     IFACEMETHOD(Signal)(_In_ int Signal) override;
-    IFACEMETHOD(GetExitEvent)(_Out_ ULONG* Event) override;
+    IFACEMETHOD(GetExitEvent)(_Out_ HANDLE* Event) override;
     IFACEMETHOD(GetStdHandle)(_In_ ULONG Index, _Out_ ULONG* Handle) override;
     IFACEMETHOD(GetPid)(_Out_ int* Pid) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_PROCESS_STATE* State, _Out_ int* Code) override;

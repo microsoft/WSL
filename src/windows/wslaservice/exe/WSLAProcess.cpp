@@ -31,10 +31,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAProcess::GetExitEvent(ULONG* Event)
+HRESULT WSLAProcess::GetExitEvent(HANDLE* Event)
 try
 {
-    *Event = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(m_control->GetExitEvent(), SYNCHRONIZE));
+    *Event = common::helpers::DuplicateHandle(m_control->GetExitEvent());
     return S_OK;
 }
 CATCH_RETURN();

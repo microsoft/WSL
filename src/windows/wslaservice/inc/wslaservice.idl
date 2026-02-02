@@ -278,7 +278,7 @@ typedef struct _WSLA_ERROR_INFO{
 interface IWSLAProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
-    HRESULT GetExitEvent([out] ULONG* EventHandle);
+    HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
     HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
@@ -390,7 +390,7 @@ interface IWSLAContainer : IUnknown
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
+    HRESULT Logs([in] WSLALogsFlags Flags, [out, system_handle(sh_pipe)] HANDLE* Stdout, [out, system_handle(sh_pipe)] HANDLE* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
     HRESULT GetLabels([out, size_is(, *Count)] struct WSLA_LABEL_INFORMATION** Labels, [out] ULONG* Count);
@@ -438,8 +438,8 @@ interface IWSLASession : IUnknown
 
     // Image management.
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
-    HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT LoadImage([in, system_handle(sh_file)] HANDLE ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
+    HRESULT ImportImage([in, system_handle(sh_file)] HANDLE ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, out, unique] WSLA_ERROR_INFO * ErrorInfo);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
