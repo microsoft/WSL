@@ -150,13 +150,6 @@ private:
         const OnResponseBytes& OnResponse,
         const std::map<boost::beast::http::field, std::string>& Headers = {});
 
-    std::pair<boost::beast::http::status, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> SendRequestWithContext(
-        boost::beast::http::verb Method,
-        const std::string& Url,
-        const std::string& Body,
-        const OnResponseBytes& OnResponse,
-        const std::map<boost::beast::http::field, std::string>& Headers = {}); // Out parameter to receive error response body. If null, error body is left unread and caller is expected to handle reading the error message body
-
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
     auto Transaction(boost::beast::http::verb Method, const std::string& Url, const TRequest& RequestObject = {})
     {
