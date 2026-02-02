@@ -112,8 +112,8 @@ private:
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
     void RecoverExistingContainers();
 
-    void SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error);
-    void ExportContainerImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error);
+    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error);
+    void ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLAVirtualMachine> m_virtualMachine;
