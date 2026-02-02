@@ -527,45 +527,38 @@ try
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    // Build filters JSON for Docker API
-    std::string filters;
+    // Extract options for Docker API
     bool all = false;
     bool digests = false;
+    DockerHTTPClient::ListImagesFilters filters;
 
     if (Options != nullptr)
     {
         all = (Options->Flags & WSLAListImagesFlagsAll) != 0;
         digests = (Options->Flags & WSLAListImagesFlagsDigests) != 0;
 
-        nlohmann::json filtersJson;
-
         if (Options->Reference != nullptr)
         {
-            filtersJson["reference"] = nlohmann::json::array({Options->Reference});
+            filters.reference = Options->Reference;
         }
 
         if (Options->Before != nullptr)
         {
-            filtersJson["before"] = nlohmann::json::array({Options->Before});
+            filters.before = Options->Before;
         }
 
         if (Options->Since != nullptr)
         {
-            filtersJson["since"] = nlohmann::json::array({Options->Since});
+            filters.since = Options->Since;
         }
 
         if (Options->DanglingSet)
         {
-            filtersJson["dangling"] = nlohmann::json::array({Options->Dangling ? "true" : "false"});
-        }
-
-        if (!filtersJson.empty())
-        {
-            filters = filtersJson.dump();
+            filters.dangling = Options->Dangling != FALSE;
         }
     }
 
-    auto images = m_dockerClient->ListImages(all, filters, digests);
+    auto images = m_dockerClient->ListImages(all, digests, filters);
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate<decltype(images.begin()), size_t>(

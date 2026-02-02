@@ -67,7 +67,7 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
     Transaction<docker_schema::EmptyRequest>(verb::post, std::format("http://localhost/images/{}/tag?repo={}&tag={}", Id, Repo, Tag));
 }
 
-std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, const std::string& filters, bool digests)
+std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const ListImagesFilters& filters)
 {
     std::string url = "http://localhost/images/json?";
 
@@ -76,9 +76,32 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, const s
         url += "all=true&";
     }
 
-    if (!filters.empty())
+    // Build filters JSON if any filters are set
+    nlohmann::json filtersJson;
+
+    if (filters.reference.has_value())
     {
-        url += "filters=" + filters + "&";
+        filtersJson["reference"] = nlohmann::json::array({filters.reference.value()});
+    }
+
+    if (filters.before.has_value())
+    {
+        filtersJson["before"] = nlohmann::json::array({filters.before.value()});
+    }
+
+    if (filters.since.has_value())
+    {
+        filtersJson["since"] = nlohmann::json::array({filters.since.value()});
+    }
+
+    if (filters.dangling.has_value())
+    {
+        filtersJson["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
+    }
+
+    if (!filtersJson.empty())
+    {
+        url += "filters=" + filtersJson.dump() + "&";
     }
 
     if (digests)
