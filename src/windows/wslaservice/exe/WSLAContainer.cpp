@@ -213,9 +213,7 @@ WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
     case ContainerState::Created:
         return WSLA_CONTAINER_STATE::WslaContainerStateCreated;
     case ContainerState::Running:
-    case ContainerState::Restarting:
         return WSLA_CONTAINER_STATE::WslaContainerStateRunning;
-    case ContainerState::Paused:
     case ContainerState::Exited:
     case ContainerState::Dead:
         return WSLA_CONTAINER_STATE::WslaContainerStateExited;
