@@ -87,7 +87,10 @@ ContainerEventTracker::~ContainerEventTracker()
 
 void ContainerEventTracker::OnEvent(const std::string_view& event)
 {
-    WSL_LOG("DockerEvent", TraceLoggingCountedString(event.data(), static_cast<UINT16>(event.size()), "Data"), TraceLoggingValue(m_sessionId, "SessionId"));
+    WSL_LOG(
+        "DockerEvent",
+        TraceLoggingCountedString(event.data(), static_cast<UINT16>(event.size()), "Data"),
+        TraceLoggingValue(m_sessionId, "SessionId"));
 
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}, {"exec_die", ContainerEvent::ExecDied}};
@@ -97,7 +100,12 @@ void ContainerEventTracker::OnEvent(const std::string_view& event)
     auto action = parsed.find("Action");
     auto actor = parsed.find("Actor");
 
-    THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end() || actor == parsed.end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        action == parsed.end() || actor == parsed.end(),
+        "Failed to parse json: %.*hs",
+        static_cast<int>(event.size()),
+        event.data());
 
     auto it = events.find(action->get<std::string>());
     if (it == events.end())
