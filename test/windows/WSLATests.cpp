@@ -574,11 +574,9 @@ class WSLATests
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            LPSTR containerId = nullptr;
-            VERIFY_SUCCEEDED(container.Get().GetID(&containerId));
             WSLA_ERROR_INFO errorInfo{};
-            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(HandleToULong(containerTarFileHandle.get()), containerId, nullptr, &errorInfo));
-            CoTaskMemFree(containerId);
+            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(
+                HandleToULong(containerTarFileHandle.get()), container.Id().c_str(), nullptr, &errorInfo));
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
