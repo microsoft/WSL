@@ -529,8 +529,7 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::ExportContainerImpl(
-    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
+void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
 {
     wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
@@ -552,12 +551,12 @@ void WSLASession::ExportContainerImpl(
     if (RequestCodePair.first != 200)
     {
         io.AddHandle(std::make_unique<relay::ReadHandle>(
-            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()}, std::move(accumulateError)));
+            common::relay::HandleWrapper{std::move(RequestCodePair.second)}, std::move(accumulateError)));
     }
     else
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()},
+            common::relay::HandleWrapper{std::move(RequestCodePair.second)},
             common::relay::HandleWrapper{std::move(containerFileHandle), std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }
@@ -571,6 +570,11 @@ void WSLASession::ExportContainerImpl(
         if (Error != nullptr)
         {
             Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
+        }
+
+        if (RequestCodePair.first == 404)
+        {
+            THROW_HR_MSG(WSLA_E_CONTAINER_NOT_FOUND, "%hs", error.message.c_str());
         }
 
         THROW_HR_MSG(E_FAIL, "Container export failed: %hs", error.message.c_str());
@@ -592,7 +596,7 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
+void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
@@ -610,12 +614,12 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, std::unique_ptr<DockerHTTPCl
     if (RequestCodePair.first != 200)
     {
         io.AddHandle(std::make_unique<relay::ReadHandle>(
-            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()}, std::move(accumulateError)));
+            common::relay::HandleWrapper{std::move(RequestCodePair.second)}, std::move(accumulateError)));
     }
     else
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-            common::relay::HandleWrapper{RequestCodePair.second->stream.native_handle()},
+            common::relay::HandleWrapper{std::move(RequestCodePair.second)},
             common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }

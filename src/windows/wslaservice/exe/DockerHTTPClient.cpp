@@ -80,9 +80,9 @@ std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTP
         std::format("http://localhost/images/{}?force={}&noprune={}", Image, Force ? "true" : "false", NoPrune ? "true" : "false"));
 }
 
-std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::SaveImage(const std::string& NameOrId)
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::string& NameOrId)
 {
-    return SendRequestWithContext(verb::get, std::format("http://localhost/images/{}/get", NameOrId), {}, nullptr, {});
+    return SendRequest(verb::get, std::format("http://localhost/images/{}/get", NameOrId), {}, nullptr, {});
 }
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
@@ -169,9 +169,9 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     return std::move(socket);
 }
 
-std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::ExportContainer(const std::string& ContainerNameOrId)
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const std::string& ContainerNameOrId)
 {
-    return SendRequestWithContext(verb::get, std::format("http://localhost/containers/{}/export", ContainerNameOrId), {}, nullptr, {});
+    return SendRequest(verb::get, std::format("http://localhost/containers/{}/export", ContainerNameOrId), {}, nullptr, {});
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -431,7 +431,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
     return std::move(context);
 }
 
-std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::SendRequestWithContext(
+std::pair<boost::beast::http::status, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> DockerHTTPClient::SendRequestWithContext(
     verb Method,
     const std::string& Url,
     const std::string& Body,
@@ -523,7 +523,7 @@ std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> Docke
         }
     }
 
-    return {parser.get().result_int(), std::move(context)};
+    return {parser.get().result(), std::move(context)};
 }
 
 std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
@@ -534,5 +534,5 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
     const std::map<boost::beast::http::field, std::string>& Headers)
 {
     auto result = SendRequestWithContext(Method, Url, Body, OnResponse, Headers);
-    return {result.first, wil::unique_socket{result.second->stream.release()}};
+    return {static_cast<unsigned>(result.first), wil::unique_socket{result.second->stream.release()}};
 }
