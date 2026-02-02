@@ -1785,6 +1785,67 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ContainerInspect)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        // Running container with port mappings.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
+
+            launcher.AddPort(1234, 8000, AF_INET);
+            launcher.AddPort(1235, 8001, AF_INET);
+
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto details = container.Inspect();
+
+            VERIFY_IS_FALSE(details.Id.empty());
+            VERIFY_IS_FALSE(details.Name.empty());
+            VERIFY_IS_FALSE(details.Image.empty());
+
+            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
+            VERIFY_IS_TRUE(details.State.Running);
+            VERIFY_IS_FALSE(details.State.Status.empty());
+
+            // Verify port mappings are populated.
+            VERIFY_IS_FALSE(details.Ports.empty());
+
+            auto& p8000 = details.Ports.at("8000/tcp");
+            VERIFY_IS_TRUE(p8000.size() >= 1);
+            VERIFY_ARE_EQUAL(p8000[0].HostPort, "1234");
+
+            auto& p8001 = details.Ports.at("8001/tcp");
+            VERIFY_IS_TRUE(p8001.size() >= 1);
+            VERIFY_ARE_EQUAL(p8001[0].HostPort, "1235");
+
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+            VERIFY_SUCCEEDED(container.Get().Delete());
+        }
+
+        // Exited container retains schema shape.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-container-inspect-exited", {"echo", "OK"});
+            auto container = launcher.Launch(*m_defaultSession);
+
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            auto details = container.Inspect();
+
+            VERIFY_IS_FALSE(details.Id.empty());
+            VERIFY_IS_FALSE(details.Name.empty());
+            VERIFY_IS_FALSE(details.Image.empty());
+
+            VERIFY_IS_FALSE(details.State.Running);
+            VERIFY_ARE_EQUAL(details.State.ExitCode, 0);
+
+            VERIFY_SUCCEEDED(container.Get().Delete());
+        }
+    }
+
     TEST_METHOD(Exec)
     {
         WSL2_TEST_ONLY();
