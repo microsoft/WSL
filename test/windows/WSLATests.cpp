@@ -47,7 +47,7 @@ class WSLATests
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
         m_storagePath = std::filesystem::current_path() / "test-storage";
-        m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeNAT);
+        m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeVirtioProxy);
         m_defaultSession = CreateSession(m_defaultSessionSettings);
 
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
@@ -1933,23 +1933,14 @@ class WSLATests
         }
     }
 
-    void RunPortMappingsTest(WSLANetworkingMode networkingMode, WSLA_CONTAINER_NETWORK_TYPE containerNetworkType)
+    void RunPortMappingsTest(IWSLASession& session, WSLA_CONTAINER_NETWORK_TYPE containerNetworkType)
     {
-        WSL2_TEST_ONLY();
-
-        auto settings = GetDefaultSessionSettings(L"port-mapping-test", true);
-        settings.NetworkingMode = networkingMode;
-
-        // Reuse the default session if the networking mode matches, otherwise reset and create a new one.
-        auto createNewSession = networkingMode != m_defaultSessionSettings.NetworkingMode;
-        auto restore = createNewSession ? std::optional{ResetTestSession()} : std::nullopt;
-        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+        LogInfo("Container network type: %d", static_cast<int>(containerNetworkType));
 
         auto expectBoundPorts = [&](RunningWSLAContainer& Container, const std::vector<std::string>& expectedBoundPorts) {
             auto ports = Container.Inspect().HostConfig.PortBindings;
 
             std::vector<std::string> boundPorts;
-
             for (const auto& e : ports)
             {
                 boundPorts.emplace_back(e.first);
@@ -1974,7 +1965,7 @@ class WSLATests
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET6);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(session);
             auto initProcess = container.GetInitProcess();
             auto stdoutHandle = initProcess.GetStdHandle(1);
 
@@ -1991,7 +1982,7 @@ class WSLATests
                 "python:3.12-alpine", "test-ports-2", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             subLauncher.AddPort(1234, 8000, AF_INET);
-            auto [hresult, newContainer] = subLauncher.LaunchNoThrow(*session);
+            auto [hresult, newContainer] = subLauncher.LaunchNoThrow(session);
             VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
@@ -2006,7 +1997,7 @@ class WSLATests
 
                 launcher.AddPort(1234, 8000, AF_INET);
 
-                auto container = launcher.Launch(*session);
+                auto container = launcher.Launch(session);
                 auto initProcess = container.GetInitProcess();
                 auto stdoutHandle = initProcess.GetStdHandle(1);
 
@@ -2030,7 +2021,7 @@ class WSLATests
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET);
 
-            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
         }
 
         auto bindSocket = [](auto port) {
@@ -2050,7 +2041,7 @@ class WSLATests
                 "python:3.12-alpine", "test-ports-fail", {"python3", "-m", "http.server"}, {"PYTHONUNBUFFERED=1"}, containerNetworkType);
 
             launcher.AddPort(1235, 8000, AF_INET);
-            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(WSAEACCES));
+            VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEACCES));
 
             // Validate that Create() correctly cleans up bound ports after a port fails to map
             {
@@ -2059,7 +2050,7 @@ class WSLATests
                 launcher.AddPort(1236, 8000, AF_INET); // Should succeed
                 launcher.AddPort(1235, 8000, AF_INET); // Should fail.
 
-                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(*session).first, HRESULT_FROM_WIN32(WSAEACCES));
+                VERIFY_ARE_EQUAL(launcher.LaunchNoThrow(session).first, HRESULT_FROM_WIN32(WSAEACCES));
 
                 // Validate that port 1234 is still available.
                 VERIFY_IS_TRUE(!!bindSocket(1236));
@@ -2081,7 +2072,7 @@ class WSLATests
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1234, 8000, AF_INET6);
 
-            auto container = launcher.Launch(*session);
+            auto container = launcher.Launch(session);
             auto initProcess = container.GetInitProcess();
             auto stdoutHandle = initProcess.GetStdHandle(1);
 
@@ -2094,24 +2085,35 @@ class WSLATests
         }*/
     }
 
-    TEST_METHOD(PortMappingsNatBridged)
+    auto SetupPortMappingsTest(WSLANetworkingMode networkingMode)
     {
-        RunPortMappingsTest(WSLANetworkingModeNAT, WSLA_CONTAINER_NETWORK_BRIDGE);
+        auto settings = GetDefaultSessionSettings(L"networking-session", true, networkingMode);
+
+        auto createNewSession = settings.NetworkingMode != m_defaultSessionSettings.NetworkingMode;
+        auto restore = createNewSession ? std::optional{ResetTestSession()} : std::nullopt;
+        auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
+
+        return std::make_pair(std::move(restore), session);
     }
 
-    TEST_METHOD(PortMappingsNatHost)
+    TEST_METHOD(PortMappingsNat)
     {
-        RunPortMappingsTest(WSLANetworkingModeNAT, WSLA_CONTAINER_NETWORK_HOST);
+        WSL2_TEST_ONLY();
+
+        auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeNAT);
+
+        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_BRIDGE);
+        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_HOST);
     }
 
-    TEST_METHOD(PortMappingsVirtioProxyBridged)
+    TEST_METHOD(PortMappingsVirtioProxy)
     {
-        RunPortMappingsTest(WSLANetworkingModeVirtioProxy, WSLA_CONTAINER_NETWORK_BRIDGE);
-    }
+        WSL2_TEST_ONLY();
 
-    TEST_METHOD(PortMappingsVirtioProxyHost)
-    {
-        RunPortMappingsTest(WSLANetworkingModeVirtioProxy, WSLA_CONTAINER_NETWORK_HOST);
+        auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeVirtioProxy);
+
+        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_BRIDGE);
+        RunPortMappingsTest(*session, WSLA_CONTAINER_NETWORK_HOST);
     }
 
     TEST_METHOD(PortMappingsNone)
@@ -2541,11 +2543,7 @@ class WSLATests
         };
 
         auto create = [this](LPCWSTR Name, WSLASessionFlags Flags) {
-            auto settings = GetDefaultSessionSettings(Name);
-            settings.NetworkingMode = WSLANetworkingModeNone;
-            settings.StoragePath = nullptr;
-
-            return CreateSession(settings, Flags);
+            return CreateSession(GetDefaultSessionSettings(Name), Flags);
         };
 
         // Validate that non-persistent sessions are dropped when released

@@ -1526,7 +1526,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     sessionSettings.DisplayName = L"WSLAShell";
     sessionSettings.CpuCount = 4;
     sessionSettings.MemoryMb = 4096;
-    sessionSettings.NetworkingMode = WSLANetworkingModeNAT;
+    sessionSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
     sessionSettings.BootTimeoutMs = 30 * 1000;
     sessionSettings.MaximumStorageSizeMb = 4096;
 
