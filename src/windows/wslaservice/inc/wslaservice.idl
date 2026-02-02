@@ -334,7 +334,6 @@ interface IWSLAContainer : IUnknown
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT GetID([out] LPSTR * Id);
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
