@@ -554,8 +554,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     }
 }
 
-wsl::windows::service::wsla::WSLAContainerImpl::WslaInspectContainer wsl::windows::service::wsla::WSLAContainerImpl::BuildInspectContainer(
-    const wsl::windows::service::wsla::WSLAContainerImpl::DockerInspectContainer& dockerInspect)
+WSLAContainerImpl::WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect)
 {
     WslaInspectContainer wslaInspect{};
 
@@ -579,64 +578,17 @@ wsl::windows::service::wsla::WSLAContainerImpl::WslaInspectContainer wsl::window
     wslaInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
 
     wslaInspect.NetworkMode = dockerInspect.HostConfig.NetworkMode;
+    wslaInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
 
-    // Map port bindings using WSLA's host-side data.
+    // Map WSLA port mappings (Windows host ports only). HostIp is not surfaced.
+    for (const auto& e : m_mappedPorts)
     {
-        auto hasBinding = [](const auto& vec, const std::string& ip, const std::string& port) {
-            return std::any_of(vec.begin(), vec.end(), [&](const auto& b) { return b.HostIp == ip && b.HostPort == port; });
-        };
+        auto portKey = std::format("{}/tcp", e.ContainerPort);
 
-        auto defaultHostIp = [](int family) { return family == AF_INET6 ? std::string("::1") : std::string("127.0.0.1"); };
+        wsla_schema::InspectPortBinding portBinding{};
+        portBinding.HostPort = std::to_string(e.HostPort);
 
-        // Map WSLA port mappings.
-        for (const auto& e : m_mappedPorts)
-        {
-            auto portKey = std::format("{}/tcp", e.ContainerPort);
-            auto& portBindings = wslaInspect.Ports[portKey];
-
-            wsla_schema::InspectPortBinding portBinding{};
-            portBinding.HostIp = defaultHostIp(e.Family);
-            portBinding.HostPort = std::to_string(e.HostPort);
-
-            if (!hasBinding(portBindings, portBinding.HostIp, portBinding.HostPort))
-            {
-                portBindings.push_back(std::move(portBinding));
-            }
-        }
-
-        // Include Docker configured port bindings.
-        for (const auto& [containerPort, bindings] : dockerInspect.HostConfig.PortBindings)
-        {
-            auto& portBindings = wslaInspect.Ports[containerPort];
-
-            for (const auto& binding : bindings)
-            {
-                if (!hasBinding(portBindings, binding.HostIp, binding.HostPort))
-                {
-                    wsla_schema::InspectPortBinding portBinding{};
-                    portBinding.HostIp = binding.HostIp;
-                    portBinding.HostPort = binding.HostPort;
-                    portBindings.push_back(std::move(portBinding));
-                }
-            }
-        }
-
-        // Include Docker runtime port bindings.
-        for (const auto& [containerPort, bindings] : dockerInspect.NetworkSettings.Ports)
-        {
-            auto& portBindings = wslaInspect.Ports[containerPort];
-
-            for (const auto& binding : bindings)
-            {
-                if (!hasBinding(portBindings, binding.HostIp, binding.HostPort))
-                {
-                    wsla_schema::InspectPortBinding portBinding{};
-                    portBinding.HostIp = binding.HostIp;
-                    portBinding.HostPort = binding.HostPort;
-                    portBindings.push_back(std::move(portBinding));
-                }
-            }
-        }
+        wslaInspect.Ports[portKey].push_back(std::move(portBinding));
     }
 
     // Map volume mounts using WSLA's host-side data.

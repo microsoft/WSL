@@ -1713,7 +1713,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
             auto details = container.Inspect();
-            VERIFY_ARE_EQUAL(details.NetworkMode, "host");
+            VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
