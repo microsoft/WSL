@@ -208,6 +208,7 @@ auto MountVolumes(std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& par
 
 WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
 {
+    // TODO: Handle other states like Paused, Restarting, etc.
     switch (state)
     {
     case ContainerState::Created:
