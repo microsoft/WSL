@@ -1,13 +1,11 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 #include "pch.h"
+#include "util.h"
 #include "RootCommand.h"
-#include <winrt/Windows.System.Profile.h>
 
-//// Include all commands here so they output in help appropriately.
+// Include all commands that parent to the root. 
 #include "TestCommand.h"
-
-////#include "TableOutput.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
@@ -15,28 +13,6 @@ using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc
 {
-    namespace 
-    {
-        std::wstring GetOSVersion()
-        {
-            using namespace winrt::Windows::System::Profile;
-            auto versionInfo = AnalyticsInfo::VersionInfo();
-
-            uint64_t version = std::stoull(versionInfo.DeviceFamilyVersion().c_str());
-            uint16_t parts[4];
-
-            for (size_t i = 0; i < ARRAYSIZE(parts); ++i)
-            {
-                parts[i] = version & 0xFFFF;
-                version = version >> 16;
-            }
-
-            std::wostringstream strstr;
-            strstr << versionInfo.DeviceFamily().c_str() << L" v" << parts[3] << L'.' << parts[2] << L'.' << parts[1] << L'.' << parts[0];
-            return strstr.str();
-        }
-    }
-
     std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     {
         return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
@@ -48,7 +24,7 @@ namespace wsl::windows::wslc
     {
         return
         {
-            Argument{ Args::Type::Info, L"List information for the tool", ArgumentType::Flag, Argument::Visibility::Help },
+            Argument::ForType(Args::Type::Info),
         };
     }
 
@@ -64,9 +40,16 @@ namespace wsl::windows::wslc
 
     void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
-        std::wostringstream info;
-        info << L"Windows: " << GetOSVersion();
-        PrintMessage(info.str(), stdout);
+        if (context.Args.Contains(Args::Type::Info))
+        {
+            std::wostringstream info;
+            info << L"Windows: " << wsl::windows::wslc::util::GetOSVersion();
+            PrintMessage(info.str(), stdout);
+        }
+        else
+        {
+            OutputHelp();
+        }
     }
 }
 

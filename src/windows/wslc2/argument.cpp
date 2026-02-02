@@ -3,6 +3,7 @@
 #include "pch.h"
 #include "argument.h"
 #include "command.h"
+#include "context.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
@@ -27,11 +28,11 @@ namespace wsl::windows::wslc
         case Args::Type::Help:
             return { type, L"help", WSLC_CLI_HELP_ARGUMENT_TEXT_CHAR };
         case Args::Type::Info:
-            return { type, L"info" };
+            return {type, L"info", L'i' };
 
         // Used for demonstration purposes
         case Args::Type::TestArg:
-            return { type, L"arg" };
+            return {type, L"arg", L'a' };
 
         default:
             THROW_HR(E_UNEXPECTED);
@@ -52,8 +53,10 @@ namespace wsl::windows::wslc
         {
         case Args::Type::Help:
             return Argument{ type, Localization::WSLCCLI_HelpArgumentDescription(), ArgumentType::Flag };
+        case Args::Type::Info:
+            return Argument{ type, Localization::WSLCCLI_InfoArgumentDescription(), ArgumentType::Flag };
         case Args::Type::TestArg:
-            return Argument{type, L"Test argument description", ArgumentType::Flag };
+            return Argument{type, L"Display ninjacat", ArgumentType::Flag, true };
         default:
             THROW_HR(E_UNEXPECTED);
         }

@@ -21,6 +21,30 @@
         WSLC_CATCH_STD_EXCEPTION_STORE(exceptionHR, genericHR) \
         WSLC_CATCH_ALL_EXCEPTION_STORE(exceptionHR, genericHR)
 
+// Terminates the Context with some logging to indicate the location.
+// Also returns from the current function.
+#define WSLC_TERMINATE_CONTEXT_ARGS(_context_, _hr_, _ret_) \
+    do \
+    { \
+        _context_.Terminate(_hr_, __FILE__, __LINE__); \
+        return _ret_; \
+    } while (0, 0)
+
+// Terminates the Context named 'context' with some logging to indicate the location.
+// Also returns from the current function.
+#define WSLC_TERMINATE_CONTEXT(_hr_) WSLC_TERMINATE_CONTEXT_ARGS(context, _hr_, )
+
+// Terminates the Context named 'context' with some logging to indicate the location.
+// Also returns the specified value from the current function.
+#define WSLC_TERMINATE_CONTEXT_RETURN(_hr_, _ret_) WSLC_TERMINATE_CONTEXT_ARGS(context, _hr_, _ret_)
+
+// Returns if the context is terminated.
+#define WSLC_RETURN_IF_TERMINATED(_context_) \
+    if ((_context_).IsTerminated()) \
+    { \
+        return; \
+    }
+
 namespace wsl::windows::wslc
 {
     struct Command;
@@ -29,11 +53,20 @@ namespace wsl::windows::wslc
 namespace wsl::windows::wslc::workflow
 {
     struct WorkflowTask;
-    enum class ExecutionStage : uint32_t;
 }
 
 namespace wsl::windows::wslc::execution
 {
+    enum class ExecutionStage : uint32_t
+    {
+        Initial = 0,
+        ParseArgs = 1000,
+        Discovery = 2000,
+        PreExecution = 3500,
+        Execution = 4000,
+        PostExecution = 5000,
+    };
+
     // bit masks used as Context flags
     enum class ContextFlag : int
     {
@@ -43,7 +76,7 @@ namespace wsl::windows::wslc::execution
     DEFINE_ENUM_FLAG_OPERATORS(ContextFlag);
 
     // The context within which all commands execute.
-    // Contains arguments via Execution::Args.
+    // Contains arguments via Args.
     struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     {
         CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC) {}
@@ -59,7 +92,7 @@ namespace wsl::windows::wslc::execution
         Args Args;
 
         // Applies changes based on the parsed args.
-        void UpdateForArgs() {};
+        void UpdateForArgs();
 
         // Gets context flags
         ContextFlag GetFlags() const
@@ -79,7 +112,32 @@ namespace wsl::windows::wslc::execution
             WI_ClearAllFlags(m_flags, flags);
         }
 
-        ////virtual void SetExecutionStage(Workflow::ExecutionStage stage);
+        // Returns a value indicating whether the context is terminated.
+        bool IsTerminated() const
+        {
+            return m_isTerminated;
+        }
+
+        // Resets the context to a nonterminated state.
+        void ResetTermination()
+        {
+            m_terminationHR = S_OK;
+            m_isTerminated = false;
+        }
+
+        // Gets the HRESULT reason for the termination.
+        HRESULT GetTerminationHR() const
+        {
+            return m_terminationHR;
+        }
+
+        // Set the context to the terminated state.
+        void Terminate(HRESULT hr, std::string_view file = {}, size_t line = {});
+
+        // Set the termination hr of the context.
+        void SetTerminationHR(HRESULT hr);
+
+        virtual void SetExecutionStage(ExecutionStage stage);
 
         // Gets the executing command
         wsl::windows::wslc::Command* GetExecutingCommand() { return m_executingCommand; }
@@ -89,8 +147,9 @@ namespace wsl::windows::wslc::execution
 
     private:
         bool m_isTerminated = false;
+        HRESULT m_terminationHR = S_OK;
         ContextFlag m_flags = ContextFlag::None;
-        ////Workflow::ExecutionStage m_executionStage = Workflow::ExecutionStage::Initial;
+        ExecutionStage m_executionStage = ExecutionStage::Initial;
         wsl::windows::wslc::Command* m_executingCommand = nullptr;
     };
 }

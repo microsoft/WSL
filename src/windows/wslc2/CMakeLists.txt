@@ -2,10 +2,12 @@
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
+    ${CMAKE_CURRENT_SOURCE_DIR}/workflows
 )
 
 set(HEADERS
     inc/pch.h
+    inc/util.h
     inc/argument.h
     inc/command.h
     inc/context.h
@@ -15,15 +17,20 @@ set(HEADERS
     inc/invocation.h
     commands/RootCommand.h
     commands/TestCommand.h
+    workflows/WorkflowBase.h
+    workflows/TestFlow.h
 )
 
 set(SOURCES
     argument.cpp
     command.cpp
+    context.cpp
     core.cpp
     main.cpp
     commands/RootCommand.cpp
     commands/TestCommand.cpp
+    workflows/WorkflowBase.cpp
+    workflows/TestFlow.cpp
 )
 
 add_executable(wslc2 ${HEADERS} ${SOURCES})

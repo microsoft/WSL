@@ -1936,6 +1936,9 @@ Usage:
   <data name="WSLCCLI_HelpArgumentDescription" xml:space="preserve">
     <value>Shows help about the selected command</value>
   </data>
+  <data name="WSLCCLI_InfoArgumentDescription" xml:space="preserve">
+    <value>Shows information about the tool and its environment</value>
+  </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
     <value>Multiple mutually exclusive arguments provided: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1943,5 +1946,33 @@ Usage:
   <data name="WSLCCLI_DependencyArgumentMissing" xml:space="preserve">
     <value>Argument {} can only be used with {}</value>
     <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_Usage" xml:space="preserve">
+    <value>Usage: {} {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_Command" xml:space="preserve">
+    <value>Command</value>
+  </data>
+  <data name="WSLCCLI_Options" xml:space="preserve">
+    <value>options</value>
+  </data>
+  <data name="WSLCCLI_AvailableCommandAliases" xml:space="preserve">
+    <value>The following command aliases are available:</value>
+  </data>
+  <data name="WSLCCLI_AvailableCommands" xml:space="preserve">
+    <value>The following commands are available:</value>
+  </data>
+  <data name="WSLCCLI_AvailableSubcommands" xml:space="preserve">
+    <value>The following sub-commands are available:</value>
+  </data>
+  <data name="WSLCCLI_AvailableOptions" xml:space="preserve">
+    <value>The following options are available:</value>
+  </data>
+  <data name="WSLCCLI_AvailableArguments" xml:space="preserve">
+    <value>The following arguments are available:</value>
+  </data>
+  <data name="WSLCCLI_HelpForDetails" xml:space="preserve">
+    <value>For more details on a specific command, pass it the help argument.</value>
   </data>
 </root>

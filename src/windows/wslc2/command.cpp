@@ -4,11 +4,12 @@
 #include "argument.h"
 #include "command.h"
 #include "invocation.h"
+#include "WorkFlowBase.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
-using wsl::shared::string::CaseInsensitiveCompare;
+using namespace wsl::windows::wslc::workflow;
 
 namespace wsl::windows::wslc
 {
@@ -47,16 +48,14 @@ namespace wsl::windows::wslc
         // Header
         OutputIntroHeader();
 
-        /*
-        std::wcout << std::endl;
         // Error if given
         if (exception)
         {
-            reporter.Error() << exception->Message() << std::endl << std::endl;
+            PrintMessage(exception->Message(), stderr);
         }
 
         // Description
-        auto infoOut = reporter.Info();
+        std::wostringstream infoOut;
         infoOut <<
             LongDescription() << std::endl <<
             std::endl;
@@ -76,13 +75,13 @@ namespace wsl::windows::wslc
             {
                 if (c == ParentSplitChar)
                 {
-                    c = ' ';
+                    c = L' ';
                 }
             }
         }
 
         // Output the command preamble and command chain
-        infoOut << L"WSLCCLI_Usage("winget"_liv, Utility::LocIndView{ commandChain });
+        infoOut << Localization::WSLCCLI_Usage(L"wslc2", std::wstring_view{ commandChain });
 
         auto commandAliases = Aliases();
         auto commands = GetVisibleCommands();
@@ -98,14 +97,14 @@ namespace wsl::windows::wslc
 
             if (!arguments.empty())
             {
-                infoOut << '[';
+                infoOut << L'[';
             }
 
-            infoOut << '<' << L"WSLCCLI_Command << '>';
+            infoOut << L'<' << Localization::WSLCCLI_Command() << L'>';
 
             if (!arguments.empty())
             {
-                infoOut << ']';
+                infoOut << L']';
             }
         }
 
@@ -116,14 +115,14 @@ namespace wsl::windows::wslc
             {
                 hasArguments = true;
 
-                infoOut << ' ';
+                infoOut << L' ';
 
                 if (!arg.Required())
                 {
-                    infoOut << '[';
+                    infoOut << L'[';
                 }
 
-                infoOut << '[';
+                infoOut << L'[';
 
                 if (arg.Alias() == ArgumentCommon::NoAlias)
                 {
@@ -134,22 +133,22 @@ namespace wsl::windows::wslc
                     infoOut << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << arg.Alias();
                 }
 
-                infoOut << "] <"_liv << arg.Name() << '>';
+                infoOut << L"] <" << arg.Name() << L'>';
 
                 if (arg.Limit() > 1)
                 {
-                    infoOut << "..."_liv;
+                    infoOut << L"...";
                 }
 
                 if (!arg.Required())
                 {
-                    infoOut << ']';
+                    infoOut << L']';
                 }
             }
             else
             {
                 hasOptions = true;
-                infoOut << " [<"_liv << L"WSLCCLI_Options << ">]"_liv;
+                infoOut << L" [<" << Localization::WSLCCLI_Options()<< L">]";
                 break;
             }
         }
@@ -160,11 +159,11 @@ namespace wsl::windows::wslc
 
         if (!commandAliases.empty())
         {
-            infoOut << L"WSLCCLI_AvailableCommandAliases << std::endl;
+            infoOut << Localization::WSLCCLI_AvailableCommandAliases() << std::endl;
             
             for (const auto& commandAlias : commandAliases)
             {
-                infoOut << "  "_liv << Execution::HelpCommandEmphasis << commandAlias << std::endl;
+                infoOut << L"  " << commandAlias << std::endl;
             }
             infoOut << std::endl;
         }
@@ -173,11 +172,11 @@ namespace wsl::windows::wslc
         {
             if (Name() == FullName())
             {
-                infoOut << L"WSLCCLI_AvailableCommands << std::endl;
+                infoOut << Localization::WSLCCLI_AvailableCommands() << std::endl;
             }
             else
             {
-                infoOut << L"WSLCCLI_AvailableSubcommands << std::endl;
+                infoOut << Localization::WSLCCLI_AvailableSubcommands() << std::endl;
             }
 
             size_t maxCommandNameLength = 0;
@@ -189,13 +188,10 @@ namespace wsl::windows::wslc
             for (const auto& command : commands)
             {
                 size_t fillChars = (maxCommandNameLength - command->Name().length()) + 2;
-                infoOut << "  "_liv << Execution::HelpCommandEmphasis << command->Name() << Utility::LocIndString{ std::string(fillChars, ' ') } << command->ShortDescription() << std::endl;
+                infoOut << L"  " << command->Name() << std::wstring(fillChars, L' ') << command->ShortDescription() << std::endl;
             }
 
-            infoOut <<
-                std::endl <<
-                L"WSLCCLI_HelpForDetails
-                << " ["_liv << WSLC_CLI_HELP_ARGUMENT << ']' << std::endl;
+            infoOut << std::endl << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARGUMENT << L']' << std::endl;
         }
 
         if (!arguments.empty())
@@ -205,7 +201,7 @@ namespace wsl::windows::wslc
                 infoOut << std::endl;
             }
 
-            std::vector<std::string> argNames;
+            std::vector<std::wstring> argNames;
             size_t maxArgNameLength = 0;
             for (const auto& arg : arguments)
             {
@@ -215,16 +211,16 @@ namespace wsl::windows::wslc
 
             if (hasArguments)
             {
-                infoOut << L"WSLCCLI_AvailableArguments << std::endl;
+                infoOut << Localization::WSLCCLI_AvailableArguments() << std::endl;
 
                 size_t i = 0;
                 for (const auto& arg : arguments)
                 {
-                    const std::string& argName = argNames[i++];
+                    const std::wstring& argName = argNames[i++];
                     if (arg.Type() == ArgumentType::Positional)
                     {
                         size_t fillChars = (maxArgNameLength - argName.length()) + 2;
-                        infoOut << "  "_liv << Execution::HelpArgumentEmphasis << argName << Utility::LocIndString{ std::string(fillChars, ' ') } << arg.Description() << std::endl;
+                        infoOut << L"  " << argName << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
                     }
                 }
             }
@@ -236,28 +232,31 @@ namespace wsl::windows::wslc
                     infoOut << std::endl;
                 }
 
-                infoOut << L"WSLCCLI_AvailableOptions << std::endl;
+                infoOut << Localization::WSLCCLI_AvailableOptions() << std::endl;
 
                 size_t i = 0;
                 for (const auto& arg : arguments)
                 {
-                    const std::string& argName = argNames[i++];
+                    const std::wstring& argName = argNames[i++];
                     if (arg.Type() != ArgumentType::Positional)
                     {
                         size_t fillChars = (maxArgNameLength - argName.length()) + 2;
-                        infoOut << "  "_liv << Execution::HelpArgumentEmphasis << argName << Utility::LocIndString{ std::string(fillChars, ' ') } << arg.Description() << std::endl;
+                        infoOut << L"  " << argName << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
                     }
                 }
             }
         }
 
         // Finally, the link to the documentation pages
+        /* Omit for prototyping.
         auto helpLink = HelpLink();
         if (!helpLink.empty())
         {
-            infoOut << std::endl << L"WSLCCLI_HelpLinkPreamble(helpLink) << std::endl;
+            infoOut << std::endl << Localization::WSLCCLI_HelpLinkPreamble(helpLink) << std::endl;
         }
         */
+
+        PrintMessage(infoOut.str(), stdout);
     }
 
     std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
@@ -734,7 +733,6 @@ namespace wsl::windows::wslc
 
     void Command::Execute(CLIExecutionContext& context) const
     {
-        PrintMessage(L"Executing command: " + FullName() + L"\n", stdout);
         if (context.Args.Contains(Args::Type::Help))
         {
             OutputHelp();
@@ -758,6 +756,7 @@ namespace wsl::windows::wslc
 
     void Command::ExecuteInternal(CLIExecutionContext& context) const
     {
+        // This is a developer error if we get here, should never be user-facing.
         PrintMessage(L"ExecuteInternal for command '" + FullName() + L"' not implemented.\n", stdout);
         THROW_HR(E_NOTIMPL);
     }
@@ -794,6 +793,8 @@ namespace wsl::windows::wslc
         return arguments;
     }
 
+    // This is the main execution wrapper for a command. It will catch any exceptions and set the return code
+    // based on the exception and/or results of the command execution.
     void ExecuteWithoutLoggingSuccess(CLIExecutionContext& context, Command* command)
     {
         try
@@ -802,9 +803,7 @@ namespace wsl::windows::wslc
         }
         catch (...)
         {
-            ////context.SetTerminationHR(Workflow::HandleException(context, std::current_exception()));
-            // TODO: Implement later, rethrow for now.
-            throw;
+            context.SetTerminationHR(workflow::HandleException(context, std::current_exception()));
         }
     }
 
@@ -812,14 +811,11 @@ namespace wsl::windows::wslc
     {
         ExecuteWithoutLoggingSuccess(context, command.get());
 
-        /*
         if (SUCCEEDED(context.GetTerminationHR()))
         {
-            Logging::Telemetry().LogCommandSuccess(command->FullName());
+            ////Logging::Telemetry().LogCommandSuccess(command->FullName());
         }
-        */
 
-        //// return context.GetTerminationHR();
-        return S_OK;
+        return context.GetTerminationHR();
     }
 }

@@ -99,22 +99,22 @@ namespace wsl::windows::wslc
         // Defines an argument with no alternate name
         constexpr static std::wstring_view NoAlternateName = L"";
 
-        Argument(Args::Type execArgType, std::wstring_view desc) :
+        Argument(Args::Type execArgType, std::wstring desc) :
             m_argCommon(ArgumentCommon::ForType(execArgType)), m_desc(desc) {}
 
-        Argument(Args::Type execArgType, std::wstring_view desc, bool required) :
+        Argument(Args::Type execArgType, std::wstring desc, bool required) :
             m_argCommon(ArgumentCommon::ForType(execArgType)), m_desc(desc), m_required(required) {}
 
-        Argument(Args::Type execArgType, std::wstring_view desc, ArgumentType type) :
+        Argument(Args::Type execArgType, std::wstring desc, ArgumentType type) :
             m_argCommon(ArgumentCommon::ForType(execArgType)), m_desc(desc), m_type(type) {}
 
-        Argument(Args::Type execArgType, std::wstring_view desc, ArgumentType type, Argument::Visibility visibility) :
+        Argument(Args::Type execArgType, std::wstring desc, ArgumentType type, Argument::Visibility visibility) :
             m_argCommon(ArgumentCommon::ForType(execArgType)), m_desc(desc), m_type(type), m_visibility(visibility) {}
 
-        Argument(Args::Type execArgType, std::wstring_view desc, ArgumentType type, bool required) :
+        Argument(Args::Type execArgType, std::wstring desc, ArgumentType type, bool required) :
             m_argCommon(ArgumentCommon::ForType(execArgType)), m_desc(desc), m_type(type), m_required(required) {}
 
-        Argument(Args::Type execArgType, std::wstring_view desc, ArgumentType type, Argument::Visibility visibility, bool required) :
+        Argument(Args::Type execArgType, std::wstring desc, ArgumentType type, Argument::Visibility visibility, bool required) :
             m_argCommon(ArgumentCommon::ForType(execArgType)), m_desc(desc), m_type(type), m_visibility(visibility), m_required(required) {}
 
         ~Argument() = default;
@@ -153,7 +153,7 @@ namespace wsl::windows::wslc
         wchar_t Alias() const { return m_argCommon.Alias; }
         std::wstring_view AlternateName() const { return m_argCommon.AlternateName; }
         Args::Type ExecArgType() const { return m_argCommon.Type; }
-        const std::wstring_view& Description() const { return m_desc; }
+        const std::wstring Description() const { return m_desc; }
         bool Required() const { return m_required; }
         ArgumentType Type() const { return m_type; }
         size_t Limit() const { return m_countLimit; }
@@ -164,7 +164,7 @@ namespace wsl::windows::wslc
 
     private:
         ArgumentCommon m_argCommon;
-        std::wstring_view m_desc;
+        std::wstring m_desc;
         bool m_required = false;
         ArgumentType m_type = ArgumentType::Standard;
         Argument::Visibility m_visibility = Argument::Visibility::Example;

@@ -3,8 +3,6 @@
 #pragma once
 #include "command.h"
 
-using wsl::windows::wslc::execution::CLIExecutionContext;
-
 namespace wsl::windows::wslc
 {
     struct RootCommand final : public Command
