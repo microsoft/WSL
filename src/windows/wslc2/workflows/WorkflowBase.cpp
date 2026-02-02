@@ -90,6 +90,7 @@ namespace wsl::windows::wslc::workflow
     {
         if (!IsRunningAsAdmin())
         {
+            wslutil::PrintMessage(Localization::WSLCCLI_CommandRequiresAdmin(), stderr);
             WSLC_TERMINATE_CONTEXT(WSLC_CLI_ERROR_COMMAND_REQUIRES_ADMIN);
         }
     }

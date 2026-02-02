@@ -37,10 +37,12 @@ namespace wsl::windows::wslc
     void Command::OutputIntroHeader() const
     {
         // TODO: Product name, version, copyright info in resources.
+        /*
         std::wostringstream infoOut;
         infoOut << L"Windows Subsystem for Linux Container CLI (Preview) v1.0.0" << std::endl;
         infoOut << L"Copyright (c) Microsoft Corporation. All rights reserved." << std::endl;
         PrintMessage(infoOut.str(), stdout);
+        */
     }
 
     void Command::OutputHelp(const CommandException* exception) const
@@ -558,7 +560,7 @@ namespace wsl::windows::wslc
 
             if (!argFound)
             {
-                return CommandException(L"WSLCCLI_InvalidNameError" /* currArg */);
+                return CommandException(Localization::WSLCCLI_InvalidNameError(currArg));
             }
         }
 

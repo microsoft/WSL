@@ -31,6 +31,8 @@ namespace wsl::windows::wslc
 
     void TestCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
-        context << workflow::OutputNinjaCat;
+        context
+            << workflow::EnsureRunningAsAdmin
+            << workflow::OutputNinjaCat;
     }
 }

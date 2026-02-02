@@ -3,6 +3,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/workflows
+    ${CMAKE_CURRENT_SOURCE_DIR}/services
 )
 
 set(HEADERS
@@ -19,6 +20,7 @@ set(HEADERS
     commands/TestCommand.h
     workflows/WorkflowBase.h
     workflows/TestFlow.h
+    services/ContainerService.h
 )
 
 set(SOURCES
@@ -31,6 +33,7 @@ set(SOURCES
     commands/TestCommand.cpp
     workflows/WorkflowBase.cpp
     workflows/TestFlow.cpp
+    services/ContainerService.cpp
 )
 
 add_executable(wslc2 ${HEADERS} ${SOURCES})
