@@ -94,7 +94,6 @@ auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
 
     if (portsToAllocate > 0)
     {
-        // Allocate VM ports in batch for bridge mode.
         auto allocatedPorts = vm.AllocatePorts(static_cast<uint16_t>(portsToAllocate));
         auto allocatedIt = allocatedPorts.begin();
 
@@ -110,9 +109,11 @@ auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
         }
     }
 
-    // Allocate VM ports for host mode (VmPort != 0).
+    // In host mode, the VM ports are the same as the container ports. Ensure they are allocated.
     for (const auto& port : ports)
     {
+        // Only allocate a VM port if it hasn't already been allocated to that container.
+        // A user can allocate two different host ports to the same container port.
         if (vmPorts->find(port.VmPort) == vmPorts->end())
         {
             THROW_WIN32_IF_MSG(ERROR_ALREADY_EXISTS, !vm.TryAllocatePort(port.VmPort), "Failed to allocate port: %u", port.VmPort);
