@@ -23,7 +23,7 @@ int MountDrvfs(const char* Source, const char* Target, const char* Options, std:
 
 int MountDrvfsEntry(int Argc, char* Argv[]);
 
-int MountPlan9Share(const char* Source, const char* Target, const char* Options, bool Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode = nullptr);
+int MountPlan9Share(const char* Source, const char* Target, const char* Options, bool Admin, int* ExitCode = nullptr);
 
 int MountPlan9(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode);
 
