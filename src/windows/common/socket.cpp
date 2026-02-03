@@ -35,6 +35,7 @@ bool wsl::windows::common::socket::CancellableAccept(
 
     if (!accepted)
     {
+        WSL_LOG("CancelledAccept", TraceLoggingValue(Timeout, "Timeout"));
         return false; // Accept was cancelled by the exit event.
     }
 
