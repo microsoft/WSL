@@ -44,7 +44,7 @@ struct Argument
     bool Positional;
 };
 
-template <typename T, T Flag>
+template <auto Flag, typename T = std::remove_reference_t<decltype(Flag)>>
 struct SetFlag
 {
     T& value;
@@ -52,6 +52,17 @@ struct SetFlag
     void operator()() const
     {
         WI_SetFlag(value, Flag);
+    }
+};
+
+template <auto Flag, typename T = std::remove_reference_t<decltype(Flag)>>
+struct ClearFlag
+{
+    T& value;
+
+    void operator()() const
+    {
+        WI_ClearFlag(value, Flag);
     }
 };
 

@@ -298,9 +298,11 @@ WSL2 でディスクを強制的に停止してデタッチするには、'wsl.e
     <value>レガシ ディストリビューションは WSL 2 をサポートしていません。</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 は、現在のマシン構成ではサポートされていません。
-"仮想マシン プラットフォーム" オプション コンポーネントを有効にし、さらに、BIOS で仮想化を有効にしてください。
-"仮想マシン プラットフォーム" を有効にするには、次のコマンドを実行します: wsl.exe --install --no-distribution
+    <value>このコンピューターで仮想化が有効になっていないため、WSL2 を開始できません。
+[仮想マシン プラットフォーム] オプション　コンポーネントが有効になっており、コンピューターのファームウェア設定で仮想化がオンになっていることを確認してください。
+
+次のコマンドを実行して [仮想マシン プラットフォーム] を有効にします: wsl.exe --install --no-distribution
+
 詳細については、https://aka.ms/enablevirtualization をご覧ください</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>

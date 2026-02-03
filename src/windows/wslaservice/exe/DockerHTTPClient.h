@@ -82,14 +82,14 @@ public:
     std::vector<common::docker_schema::ContainerInfo> ListContainers(bool all = false);
     common::docker_schema::CreatedContainer CreateContainer(const common::docker_schema::CreateContainer& Request, const std::optional<std::string>& Name);
     void StartContainer(const std::string& Id);
-    void StopContainer(const std::string& Id, int Signal, ULONG TimeoutSeconds);
+    void StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
     std::string InspectContainer(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
-    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> ExportContainer(const std::string& ContainerID);
+    std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
 
     // Image management.
     std::unique_ptr<HTTPRequestContext> PullImage(const char* Name, const char* Tag);
@@ -98,7 +98,7 @@ public:
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::vector<common::docker_schema::Image> ListImages();
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
-    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> SaveImage(const std::string& NameOrId);
+    std::pair<uint32_t, wil::unique_socket> SaveImage(const std::string& NameOrId);
 
     // Exec.
     common::docker_schema::CreateExecResponse CreateExec(const std::string& Container, const common::docker_schema::CreateExec& Request);
@@ -116,7 +116,7 @@ public:
             HTTPRequestContext& context,
             std::function<void(const boost::beast::http::message<false, boost::beast::http::buffer_body>&)>&& OnResponseHeader,
             std::function<void(const gsl::span<char>&)>&& OnResponseBytes,
-            std::function<void()>&& OnCompleted);
+            std::function<void()>&& OnCompleted = []() {});
 
         ~DockerHttpResponseHandle();
 
@@ -140,23 +140,14 @@ private:
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
         boost::beast::http::verb Method, const std::string& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers);
 
-    std::pair<uint32_t, std::string> SendRequest(
+    std::pair<uint32_t, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const std::string& Url, const std::string& Body = "");
 
     std::pair<uint32_t, wil::unique_socket> SendRequest(
         boost::beast::http::verb Method,
         const std::string& Url,
         const std::string& Body,
-        const OnResponseBytes& OnResponse,
         const std::map<boost::beast::http::field, std::string>& Headers = {});
-
-    std::pair<uint32_t, std::unique_ptr<DockerHTTPClient::HTTPRequestContext>> SendRequestWithContext(
-        boost::beast::http::verb Method,
-        const std::string& Url,
-        const std::string& Body,
-        const OnResponseBytes& OnResponse,
-        const std::map<boost::beast::http::field, std::string>& Headers = {},
-        std::string* errorJson = nullptr); // Out parameter to receive error response body. If null, error body is left unread and caller is expected to handle reading the error message body
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
     auto Transaction(boost::beast::http::verb Method, const std::string& Url, const TRequest& RequestObject = {})
@@ -167,7 +158,7 @@ private:
             requestString = wsl::shared::ToJson(RequestObject);
         }
 
-        auto [statusCode, responseString] = SendRequest(Method, Url, requestString);
+        auto [statusCode, responseString] = SendRequestAndReadResponse(Method, Url, requestString);
 
         if (statusCode < 200 || statusCode >= 300)
         {

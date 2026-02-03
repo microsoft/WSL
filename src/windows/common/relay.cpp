@@ -974,6 +974,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
                     if (WI_IsFlagSet(m_handles[i].first, Flags::IgnoreErrors))
                     {
                         m_handles[i].second.reset(); // Reset the handle so it can be deleted.
+                        break;
                     }
                     else
                     {

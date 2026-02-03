@@ -293,7 +293,8 @@ en 'wsl.exe --install &lt;Distro&gt;' om te installeren.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 wordt niet ondersteund met de huidige computerconfiguratie. 
-Schakel het optionele onderdeel Virtual Machine Platform in en zorg ervoor dat virtualisatie is ingeschakeld in het BIOS.
+
+Schakel het optionele onderdeel Virtual Machine Platform in en zorg ervoor dat virtualisatie is ingeschakeld in het BIOS.
 Schakel Virtual Machine Platform in door uit te voeren: wsl.exe --install --no-distribution
 Ga naar https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution

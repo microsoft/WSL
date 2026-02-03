@@ -35,17 +35,6 @@ struct _WSLA_VERSION {
     ULONG Revision;
 } WSLA_VERSION;
 
-typedef enum _WSLAFdType
-{
-    WSLAFdTypeDefault = 0,
-    WSLAFdTypeTerminalInput = 1,
-    WSLAFdTypeTerminalOutput = 2,
-    WSLAFdTypeLinuxFileInput = 4,
-    WSLAFdTypeLinuxFileOutput = 8,
-    WSLAFdTypeLinuxFileAppend = 16,
-    WSLAFdTypeLinuxFileCreate = 32,
-    WSLAFdTypeTerminalControl = 64,
-} WSLAFdType;
 
 typedef enum _WSLAProcessState
 {
@@ -53,19 +42,6 @@ typedef enum _WSLAProcessState
     WSLAProcessStateRunning,
     WSLAProcessStateExited
 } WSLAProcessState;
-
-typedef struct _WSLA_PROCESS_FD
-{
-    LONG Fd;
-    WSLAFdType Type;
-    [string, unique] LPCSTR Path;
-} WSLA_PROCESS_FD;
-
-typedef
-struct _WSLA_CREATE_PROCESS_RESULT { // TODO: Delete once the new API is wired.
-   int Errno;
-   int Pid;
-} WSLA_CREATE_PROCESS_RESULT;
 
 typedef enum _WSLAVirtualMachineTerminationReason
 {
@@ -82,18 +58,42 @@ typedef enum _WSLAFD
     WSLAFDTty = 3,
 } WSLAFD;
 
-typedef enum _WSLAFDFlags
-{
-    WSLAFDFlagsNone = 0,
-    WSLAFDFlagsLogs = 1, // Replay previous logs
-    WSLAFDFlagsStream = 2, // Stream new logs.
-} WSLAFDFlags;
-
 typedef enum _WSLASignal
 {
+    WSLASignalNone = 0,
+    WSLASignalSIGHUP = 1,
+    WSLASignalSIGINT = 2,
+    WSLASignalSIGQUIT = 3,
+    WSLASignalSIGILL = 4,
+    WSLASignalSIGTRAP = 5,
+    WSLASignalSIGABRT = 6,
+    WSLASignalSIGIOT = 6, // SIGABRT and SIGIOT are equivalent.
+    WSLASignalSIGBUS = 7,
+    WSLASignalSIGFPE = 8,
     WSLASignalSIGKILL = 9,
+    WSLASignalSIGUSR1 = 10,
     WSLASignalSIGSEGV = 11,
-    WSLASignalSIGTERM = 15
+    WSLASignalSIGUSR2 = 12,
+    WSLASignalSIGPIPE = 13,
+    WSLASignalSIGALRM = 14,
+    WSLASignalSIGTERM = 15,
+    WSLASignalSIGTKFLT = 16,
+    WSLASignalSIGCHLD = 17,
+    WSLASignalSIGCONT = 18,
+    WSLASignalSIGSTOP = 19,
+    WSLASignalSIGTSTP = 20,
+    WSLASignalSIGTTIN = 21,
+    WSLASignalSIGTTOU = 22,
+    WSLASignalSIGURG = 23,
+    WSLASignalSIGXCPU = 24,
+    WSLASignalSIGXFSZ = 25,
+    WSLASignalSIGVTALRM = 26,
+    WSLASignalSIGPROF = 27,
+    WSLASignalSIGWINCH = 28,
+    WSLASignalSIGIO = 29,
+    WSLASignalSIGPOLL = 29, // SIGIO and SIGPOLL are equivalent.
+    WSLASignalSIGPWR = 30,
+    WSLASignalSIGSYS = 31
 } WSLASignal;
 
 [
@@ -131,16 +131,28 @@ struct WSLA_IMAGE_INFORMATION
     ULONGLONG DownloadTimestamp;
 };
 
+typedef enum _WSLAProcessFlags
+{
+    WSLAProcessFlagsNone = 0,
+    WSLAProcessFlagsStdin = 1,
+    WSLAProcessFlagsTty = 2
+} WSLAProcessFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAProcessFlags);")
+
+typedef struct _WSLAStringArray
+{
+    [unique, size_is(Count)] LPCSTR* Values;
+    ULONG Count;
+} WSLAStringArray;
+
 struct WSLA_PROCESS_OPTIONS
 {
-    [unique] LPCSTR Executable;
     [unique] LPCSTR CurrentDirectory;
-    [size_is(CommandLineCount)] LPCSTR* CommandLine;
-    ULONG CommandLineCount;
-    [unique, size_is(EnvironmentCount)] LPCSTR* Environment;
-    ULONG EnvironmentCount;
-    [unique, size_is(FdsCount)] WSLA_PROCESS_FD *Fds;
-    int FdsCount;
+    [unique] LPCSTR User;
+    WSLAStringArray CommandLine;
+    WSLAStringArray Environment;
+    WSLAProcessFlags Flags;
     ULONG TtyRows; // Only needed when tty fd's are passed.
     ULONG TtyColumns;
 };
@@ -173,24 +185,41 @@ struct WSLA_CONTAINER_NETWORK
     LPCSTR ContainerNetworkName;
 };
 
-enum WSLA_CONTAINER_FLAGS
+typedef enum _WSLAContainerFlags
 {
-    WSLA_CONTAINER_FLAG_ENABLE_GPU = 1
-} ;
+    WSLAContainerFlagsNone = 0,
+    WSLAContainerFlagsRm = 1, // Delete the container when it exists. TODO: Implement.
+    WSLAContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
+    WSLAContainerFlagsInit = 4, // Run the container under an init process.
+} WSLAContainerFlags;
 
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerFlags);")
+
+
+typedef enum _WSLAContainerStartFlags
+{
+    WSLAContainerStartFlagsNone = 0,
+    WSLAContainerStartFlagsAttach = 1, // Attach stdio handles on start.
+} WSLAContainerStartFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAContainerStartFlags);")
 
 struct WSLA_CONTAINER_OPTIONS
 {
     LPCSTR Image;
     [unique] LPCSTR Name;
+    WSLAStringArray Entrypoint;
     struct WSLA_PROCESS_OPTIONS InitProcessOptions;
     [unique, size_is(VolumesCount)] struct WSLA_VOLUME* Volumes;
     ULONG VolumesCount;
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
     ULONG PortsCount;
-    DWORD Flags; // GPU, Privileged, ...
+    WSLAContainerFlags Flags;
+    WSLASignal StopSignal;
     // TODO: List specific GPU devices.
-    // TODO: Flags on wether the caller wants to override entrypoint, args, or both.
+    [unique] LPCSTR HostName;
+    [unique] LPCSTR DomainName;
+
     ULONGLONG ShmSize;
     struct WSLA_CONTAINER_NETWORK ContainerNetwork;
 };
@@ -259,7 +288,10 @@ typedef enum _WSLAFeatureFlags
     WslaFeatureFlagsGPU = 4,
     WslaFeatureFlagsVirtioFs = 8,
     WslaFeatureFlagsPmemVhds = 16,
+    WslaFeatureFlagsDebug = 32,
 } WSLAFeatureFlags;
+
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
 
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
@@ -270,7 +302,7 @@ struct WSLA_SESSION_SETTINGS {
     ULONG BootTimeoutMs;
     WSLANetworkingMode NetworkingMode;
     [unique] ITerminationCallback* TerminationCallback;
-    ULONG FeatureFlags;
+    WSLAFeatureFlags FeatureFlags;
     ULONG DmesgOutput;
 
     // Below options are used for debugging purposes only.
@@ -295,8 +327,8 @@ typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
 interface IWSLAContainer : IUnknown
 {
     HRESULT Attach([out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
-    HRESULT Stop([in] int Signal, [in] ULONG TimeoutMs);
-    HRESULT Start();
+    HRESULT Stop([in] WSLASignal Signal, [in] LONGLONG TimeoutSeconds);
+    HRESULT Start([in] WSLAContainerStartFlags Flags);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
@@ -345,7 +377,7 @@ interface IWSLASession : IUnknown
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO * ErrorInfo);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
 
@@ -356,7 +388,7 @@ interface IWSLASession : IUnknown
     HRESULT ExportContainer([in] ULONG OutputHandle, [in] LPCSTR ContainerID, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT CreateRootNamespaceProcess([in] LPCSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
@@ -407,3 +439,4 @@ interface IWSLASessionManager : IUnknown
 cpp_quote("#define WSLA_E_BASE (0x0600)")
 cpp_quote("#define WSLA_E_IMAGE_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 1) /* 0x80040601 */")
 cpp_quote("#define WSLA_E_CONTAINER_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 2) /* 0x80040602 */")
+cpp_quote("#define WSLA_E_CONTAINER_NOT_FOUND MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLA_E_BASE + 3) /* 0x80040603 */")

@@ -14,11 +14,12 @@ using wsl::core::VirtioNetworking;
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel, bool enableLocalhostRelay, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
-    m_enableLocalhostRelay(enableLocalhostRelay)
+    m_enableLocalhostRelay(enableLocalhostRelay),
+    m_dnsOptions(dnsOptions)
 {
 }
 
@@ -65,14 +66,15 @@ void VirtioNetworking::Initialize()
         device_options << L"gateway_ip=" << default_route;
     }
 
-    auto dns_servers = m_networkSettings->DnsServersString();
-    if (!dns_servers.empty())
+    // Get initial DNS settings for device options.
+    auto initialDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    if (!initialDns.Servers.empty())
     {
         if (device_options.tellp() > 0)
         {
             device_options << L";";
         }
-        device_options << L"nameservers=" << dns_servers;
+        device_options << L"nameservers=" << wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(initialDns.Servers, ','));
     }
 
     auto lock = m_lock.lock_exclusive();
@@ -104,15 +106,9 @@ void VirtioNetworking::Initialize()
         m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId);
     }
 
-    // Update DNS information.
-    if (!dns_servers.empty())
-    {
-        // TODO: DNS domain suffixes
-        hns::DNS dnsSettings{};
-        dnsSettings.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
-        dnsSettings.ServerList = dns_servers;
-        UpdateDns(std::move(dnsSettings));
-    }
+    // Send the initial DNS configuration to GNS and track it.
+    m_trackedDnsSettings = initialDns;
+    SendDnsUpdate(initialDns);
 
     if (m_enableLocalhostRelay)
     {
@@ -263,15 +259,23 @@ try
 {
     auto lock = m_lock.lock_exclusive();
     UpdateMtu();
+
+    // Check for DNS changes and send update if needed.
+    auto currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    if (currentDns != m_trackedDnsSettings)
+    {
+        m_trackedDnsSettings = currentDns;
+        SendDnsUpdate(currentDns);
+    }
 }
 CATCH_LOG();
 
-void VirtioNetworking::UpdateDns(hns::DNS&& dnsSettings)
+void VirtioNetworking::SendDnsUpdate(const networking::DnsInfo& dnsSettings)
 {
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
     notification.RequestType = hns::ModifyRequestType::Update;
     notification.ResourceType = hns::GuestEndpointResourceType::DNS;
-    notification.Settings = std::move(dnsSettings);
+    notification.Settings = networking::BuildDnsNotification(dnsSettings, m_dnsOptions);
     m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId);
 }
 
