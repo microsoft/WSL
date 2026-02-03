@@ -2118,6 +2118,8 @@ Return Value:
 --*/
 
 {
+    std::this_thread::sleep_for(std::chrono::seconds(300)); 
+
     LogInfo("Exiting UnitTests module");
 
     //
