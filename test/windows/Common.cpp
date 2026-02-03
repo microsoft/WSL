@@ -66,6 +66,9 @@ static bool g_enableWerReport = false;
 static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 
+static std::vector<RegistryKeyChange<std::wstring>> g_registryChangesSz;
+static std::vector<RegistryKeyChange<DWORD>> g_registryChangesDword;
+
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
     wil::unique_handle read;
@@ -1997,7 +2000,7 @@ Return Value:
         g_OriginalStderr = LxssRedirectOutput(STD_ERROR_HANDLE, redirectStderr.value());
     }
 
-    g_dumpFolder = getOptionalTestParam(L"DumpFolder").value_or(L".");
+    g_dumpFolder = std::filesystem::weakly_canonical(getOptionalTestParam(L"DumpFolder").value_or(L".")).wstring();
     g_dumpToolPath = getOptionalTestParam(L"DumpTool");
     g_pipelineBuildId = getOptionalTestParam(L"PipelineBuildId").value_or(L"");
 
@@ -2007,6 +2010,19 @@ Return Value:
     }
 
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"WerReport", g_enableWerReport);
+
+    bool enableCrashDumpCollection = false;
+    WEX::TestExecution::RuntimeParameters::TryGetValue(L"CollectCrashDumps", enableCrashDumpCollection);
+
+    if (enableCrashDumpCollection)
+    {
+        LogInfo("Enabling crash dump collection. Target: %ls", g_dumpFolder.c_str());
+        auto key = L"SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps";
+        g_registryChangesSz.emplace_back(RegistryKeyChange<std::wstring>(HKEY_LOCAL_MACHINE, key, L"DumpFolder", g_dumpFolder));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpType", 2));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpCount", 10));
+    }
+
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"LogDmesg", g_LogDmesgAfterEachTest);
 
     g_WatchdogTimer = CreateThreadpoolTimer(LxsstuWatchdogTimer, nullptr, nullptr);
