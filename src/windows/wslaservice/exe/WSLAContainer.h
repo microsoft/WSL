@@ -112,8 +112,6 @@ private:
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
 
-    static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
-    static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
