@@ -14,11 +14,12 @@ using wsl::core::VirtioNetworking;
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel, bool enableLocalhostRelay, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
-    m_enableLocalhostRelay(enableLocalhostRelay)
+    m_enableLocalhostRelay(enableLocalhostRelay),
+    m_dnsOptions(dnsOptions)
 {
 }
 
@@ -66,7 +67,7 @@ void VirtioNetworking::Initialize()
     }
 
     // Get initial DNS settings for device options.
-    auto initialDns = m_dnsUpdateHelper.GetCurrentDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    auto initialDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
     if (!initialDns.Servers.empty())
     {
         if (device_options.tellp() > 0)
@@ -260,7 +261,7 @@ try
     UpdateMtu();
 
     // Check for DNS changes and send update if needed.
-    auto currentDns = m_dnsUpdateHelper.GetCurrentDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    auto currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
     if (currentDns != m_trackedDnsSettings)
     {
         m_trackedDnsSettings = currentDns;
@@ -274,7 +275,7 @@ void VirtioNetworking::SendDnsUpdate(const networking::DnsInfo& dnsSettings)
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
     notification.RequestType = hns::ModifyRequestType::Update;
     notification.ResourceType = hns::GuestEndpointResourceType::DNS;
-    notification.Settings = networking::BuildDnsNotification(dnsSettings);
+    notification.Settings = networking::BuildDnsNotification(dnsSettings, m_dnsOptions);
     m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId);
 }
 

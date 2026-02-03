@@ -225,11 +225,6 @@ private:
     LxssIpTables m_ipTables;
 
     /// <summary>
-    /// Class for querying host dns information.
-    /// </summary>
-    wsl::core::networking::HostDnsInfo m_dnsInfo;
-
-    /// <summary>
     /// Settings for updating /etc/resolv.conf.
     /// </summary>
     bool m_enableVpnDetection;
