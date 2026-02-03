@@ -19,6 +19,7 @@ Abstract:
 #include "WSLAContainer.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
+#include "IORelay.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -105,8 +106,9 @@ private:
     void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
-    void OnContainerdLog(const gsl::span<char>& Data);
-    void MonitorContainerd(ServiceRunningProcess&& process);
+    void OnDockerdLog(const gsl::span<char>& Data);
+    void OnDockerdExited();
+    void StartDockerd();
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
     void RecoverExistingContainers();
 
@@ -114,7 +116,6 @@ private:
     std::optional<WSLAVirtualMachine> m_virtualMachine;
     std::optional<ContainerEventTracker> m_eventTracker;
     wil::unique_event m_containerdReadyEvent{wil::EventOptions::ManualReset};
-    std::thread m_containerdThread;
     std::wstring m_displayName;
     std::filesystem::path m_storageVhdPath;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
@@ -123,6 +124,9 @@ private:
     bool m_elevatedToken{};
     DWORD m_creatorPid{};
     std::recursive_mutex m_lock;
+    IORelay m_ioRelay;
+    std::optional<ServiceRunningProcess> m_dockerdProcess;
+    WSLAFeatureFlags m_featureFlags{};
 };
 
 } // namespace wsl::windows::service::wsla

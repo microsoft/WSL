@@ -23,10 +23,14 @@ using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
-using wsl::windows::service::wsla::VolumeMountInfo;
+using wsl::windows::service::wsla::RelayedProcessIO;
 using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
+using wsl::windows::service::wsla::WSLAContainerMetadata;
+using wsl::windows::service::wsla::WSLAContainerMetadataV1;
+using wsl::windows::service::wsla::WSLAPortMapping;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
+using wsl::windows::service::wsla::WSLAVolumeMount;
 
 using namespace wsl::windows::common::docker_schema;
 
@@ -46,7 +50,7 @@ std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
 
-auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachine& vm)
+auto ValidatePortMappings(const WSLA_CONTAINER_OPTIONS& options)
 {
     THROW_HR_IF_MSG(
         E_INVALIDARG,
@@ -60,19 +64,20 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
         const auto& port = options.Ports[i];
         THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
     }
+}
 
-    // Generate Windows <-> VM port mappings depending on the networking mode.
+auto MapPorts(std::vector<WSLAPortMapping>& ports, WSLAVirtualMachine& vm)
+{
     // N.B. pointers are used so the vectors are still available if the errorCleanup is executed.
     auto vmPorts = std::make_shared<std::set<uint16_t>>();
-    auto mappedPorts = std::make_shared<std::vector<WSLAContainerImpl::PortMapping>>();
 
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [mappedPorts = mappedPorts, vmPorts = vmPorts, &vm]() {
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&ports, vmPorts = vmPorts, &vm]() {
         if (!vmPorts->empty())
         {
             LOG_IF_FAILED(wil::ResultFromException([&]() { vm.ReleasePorts(*vmPorts); }));
         }
 
-        for (const auto& e : *mappedPorts)
+        for (const auto& e : ports)
         {
             if (e.MappedToHost)
             {
@@ -85,59 +90,140 @@ auto ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options, WSLAVirtualMachi
         }
     });
 
-    if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+    // Check if we need to allocate VM ports for bridge mode (VmPort == 0).
+    size_t portsToAllocate = std::count_if(ports.begin(), ports.end(), [](const auto& p) { return p.VmPort == 0; });
+
+    if (portsToAllocate > 0)
     {
-        // If the container is in bridged mode, allocate one port in the VM for each port mapping.
-        *vmPorts = vm.AllocatePorts(static_cast<uint16_t>(options.PortsCount));
+        auto allocatedPorts = vm.AllocatePorts(static_cast<uint16_t>(portsToAllocate));
+        auto allocatedIt = allocatedPorts.begin();
 
-        auto vmPortIt = vmPorts->begin();
-        for (ULONG i = 0; i < options.PortsCount; i++)
+        for (auto& port : ports)
         {
-            WI_ASSERT(vmPortIt != vmPorts->end());
-
-            const auto& port = options.Ports[i];
-
-            mappedPorts->push_back({port.HostPort, *vmPortIt, port.ContainerPort, port.Family});
-            vmPortIt++;
-        }
-    }
-    else if (options.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_HOST)
-    {
-        // In host mode, the container port is the same as the VM port.
-        for (ULONG i = 0; i < options.PortsCount; i++)
-        {
-            const auto& port = options.Ports[i];
-
-            // Only allocate a VM port if it hasn't already been allocated to that container.
-            // A user can allocate two different host ports to the same container port.
-            if (std::ranges::find(*vmPorts, port.ContainerPort) == vmPorts->end())
+            if (port.VmPort == 0)
             {
-                THROW_WIN32_IF_MSG(
-                    ERROR_ALREADY_EXISTS, !vm.TryAllocatePort(port.ContainerPort), "Failed to allocate port: %u", options.Ports[i].ContainerPort);
-
-                vmPorts->insert(port.ContainerPort);
+                WI_ASSERT(allocatedIt != allocatedPorts.end());
+                port.VmPort = *allocatedIt;
+                vmPorts->insert(*allocatedIt);
+                ++allocatedIt;
             }
-
-            mappedPorts->push_back({port.HostPort, port.ContainerPort, port.ContainerPort, port.Family});
         }
     }
-    else
+
+    // In host mode, the VM ports are the same as the container ports. Ensure they are allocated.
+    for (const auto& port : ports)
     {
-        THROW_HR_IF_MSG(
-            E_INVALIDARG,
-            options.PortsCount > 0,
-            "Port mappings are not supported in networking mode: %i",
-            options.ContainerNetwork.ContainerNetworkType);
+        // Only allocate a VM port if it hasn't already been allocated to that container.
+        // A user can allocate two different host ports to the same container port.
+        if (vmPorts->find(port.VmPort) == vmPorts->end())
+        {
+            THROW_WIN32_IF_MSG(ERROR_ALREADY_EXISTS, !vm.TryAllocatePort(port.VmPort), "Failed to allocate port: %u", port.VmPort);
+            vmPorts->insert(port.VmPort);
+        }
     }
 
     // Map Windows <-> VM ports.
-    for (auto& e : *mappedPorts)
+    for (auto& e : ports)
     {
         vm.MapPort(e.Family, e.HostPort, e.VmPort);
         e.MappedToHost = true;
     }
 
-    return std::make_pair(std::move(mappedPorts), std::move(errorCleanup));
+    return std::make_pair(std::move(vmPorts), std::move(errorCleanup));
+}
+
+// Builds port mapping list from container options and returns the network mode string.
+// Note: For bridge mode, VM ports are set to 0 and will be allocated later by MapPorts().
+std::pair<std::vector<WSLAPortMapping>, std::string> ProcessPortMappings(const WSLA_CONTAINER_OPTIONS& options)
+{
+    WSLA_CONTAINER_NETWORK_TYPE networkType = options.ContainerNetwork.ContainerNetworkType;
+
+    // Determine network mode string.
+    std::string networkMode;
+    if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+    {
+        networkMode = "bridge";
+    }
+    else if (networkType == WSLA_CONTAINER_NETWORK_HOST)
+    {
+        networkMode = "host";
+    }
+    else if (networkType == WSLA_CONTAINER_NETWORK_NONE)
+    {
+        networkMode = "none";
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %i", networkType);
+    }
+
+    // Validate port mappings.
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        options.PortsCount > 0 && networkType == WSLA_CONTAINER_NETWORK_NONE,
+        "Port mappings are not supported without networking");
+
+    std::vector<WSLAPortMapping> ports;
+    ports.reserve(options.PortsCount);
+
+    for (ULONG i = 0; i < options.PortsCount; i++)
+    {
+        const auto& port = options.Ports[i];
+        THROW_HR_IF_MSG(E_INVALIDARG, port.Family != AF_INET && port.Family != AF_INET6, "Invalid family for port mapping %i: %i", i, port.Family);
+
+        if (networkType == WSLA_CONTAINER_NETWORK_BRIDGE)
+        {
+            // In bridged mode, VM port will be allocated by MapPorts() - set to 0 as placeholder.
+            ports.push_back({port.HostPort, 0, port.ContainerPort, port.Family});
+        }
+        else if (networkType == WSLA_CONTAINER_NETWORK_HOST)
+        {
+            // In host mode, the container port is the same as the VM port.
+            ports.push_back({port.HostPort, port.ContainerPort, port.ContainerPort, port.Family});
+        }
+    }
+
+    return {std::move(ports), std::move(networkMode)};
+}
+
+void UnmountVolumes(const std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
+{
+    for (const auto& volume : volumes)
+    {
+        LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()));
+    }
+}
+
+auto MountVolumes(std::vector<WSLAVolumeMount>& volumes, WSLAVirtualMachine& parentVM)
+{
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&volumes, &parentVM]() { UnmountVolumes(volumes, parentVM); });
+
+    for (auto& volume : volumes)
+    {
+        auto result = parentVM.MountWindowsFolder(volume.HostPath.c_str(), volume.ParentVMPath.c_str(), volume.ReadOnly);
+        THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath.c_str(), volume.ParentVMPath.c_str());
+    }
+
+    return std::move(errorCleanup);
+}
+
+WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
+{
+    // TODO: Handle other states like Paused, Restarting, etc.
+    switch (state)
+    {
+    case ContainerState::Created:
+        return WSLA_CONTAINER_STATE::WslaContainerStateCreated;
+    case ContainerState::Running:
+        return WSLA_CONTAINER_STATE::WslaContainerStateRunning;
+    case ContainerState::Exited:
+    case ContainerState::Dead:
+        return WSLA_CONTAINER_STATE::WslaContainerStateExited;
+    case ContainerState::Removing:
+        return WSLA_CONTAINER_STATE::WslaContainerStateDeleted;
+    default:
+        return WSLA_CONTAINER_STATE::WslaContainerStateInvalid;
+    }
 }
 
 std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
@@ -157,6 +243,22 @@ std::string ExtractContainerName(const std::vector<std::string>& names, const st
     return name;
 }
 
+WSLAContainerMetadataV1 ParseContainerMetadata(const std::string& json)
+{
+    auto wrapper = wsl::shared::FromJson<WSLAContainerMetadata>(json.c_str());
+    THROW_HR_IF(E_UNEXPECTED, !wrapper.V1.has_value());
+
+    return wrapper.V1.value();
+}
+
+std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
+{
+    WSLAContainerMetadata wrapper;
+    wrapper.V1 = metadata;
+
+    return wsl::shared::ToJson(wrapper);
+}
+
 } // namespace
 
 static constexpr DWORD stopTimeout = 60000; // 60 seconds
@@ -166,12 +268,13 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Id,
     std::string&& Name,
     std::string&& Image,
-    std::vector<VolumeMountInfo>&& volumes,
-    std::vector<PortMapping>&& ports,
+    std::vector<WSLAVolumeMount>&& volumes,
+    std::vector<WSLAPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
+    IORelay& Relay,
     WSLA_CONTAINER_STATE InitialState,
     WSLAProcessFlags InitProcessFlags,
     WSLAContainerFlags ContainerFlags) :
@@ -185,6 +288,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
+    m_ioRelay(Relay),
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
         m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2))),
     m_state(InitialState),
@@ -305,20 +409,21 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
     // This is required for docker to know when stdin is closed.
     auto onInputComplete = [handle = ioHandle.get()]() { LOG_LAST_ERROR_IF(shutdown(handle, SD_SEND) == SOCKET_ERROR); };
 
+    // N.B. Ownership of the io handle is given to the DockerIORelayHandle relay, so it can be closed when docker closes the connection.
+    handles.emplace_back(
+        std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
+
     handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        ioHandle.get(), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
-    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, std::move(ioHandle)));
+    m_ioRelay.AddHandles(std::move(handles));
 
-    m_logsRelay.AddHandles(std::move(handles));
-
-    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE));
-    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ));
-    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ));
+    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get())));
+    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get())));
+    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get())));
 }
 
-void WSLAContainerImpl::Start()
+void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
@@ -331,13 +436,18 @@ void WSLAContainerImpl::Start()
 
     // Attach to the container's init process so no IO is lost.
     std::unique_ptr<WSLAProcessIO> io;
-    if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
+
+    if (WI_IsFlagSet(Flags, WSLAContainerStartFlagsAttach))
     {
-        io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
-    }
-    else
-    {
-        io = std::make_unique<RelayedProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+        if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
+        {
+            io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+        }
+        else
+        {
+            wil::unique_handle stream{reinterpret_cast<HANDLE>(m_dockerClient.AttachContainer(m_id).release())};
+            io = CreateRelayedProcessIO(std::move(stream), m_initProcessFlags);
+        }
     }
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient, m_eventTracker);
@@ -537,7 +647,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
         }
         else
         {
-            io = std::make_unique<RelayedProcessIO>(std::move(stream));
+            io = CreateRelayedProcessIO(std::move(stream), Options->Flags);
         }
 
         auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
@@ -555,52 +665,19 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     }
 }
 
-std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainerImpl::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
-{
-    std::vector<VolumeMountInfo> mountedVolumes;
-    mountedVolumes.reserve(Options.VolumesCount);
-
-    for (ULONG i = 0; i < Options.VolumesCount; i++)
-    {
-        try
-        {
-            const WSLA_VOLUME& volume = Options.Volumes[i];
-            std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", Options.Name, i);
-
-            auto result = parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly);
-            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath, parentVMPath.c_str());
-
-            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
-        }
-        catch (...)
-        {
-            // On failure, unmount all previously mounted volumes.
-            UnmountVolumes(mountedVolumes, parentVM);
-            throw;
-        }
-    }
-
-    return mountedVolumes;
-}
-
-void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM)
-{
-    for (const auto& volume : volumes)
-    {
-        LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()));
-    }
-}
-
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient)
+    DockerHTTPClient& DockerClient,
+    IORelay& IoRelay)
 {
-    // TODO: Think about when 'StdinOnce' should be set.
     common::docker_schema::CreateContainer request;
     request.Image = containerOptions.Image;
+
+    // TODO: Think about when 'StdinOnce' should be set.
+    request.StdinOnce = true;
 
     if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsTty))
     {
@@ -610,7 +687,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsStdin))
     {
         request.OpenStdin = true;
-        request.StdinOnce = true;
     }
 
     request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
@@ -644,32 +720,51 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     request.HostConfig.Init = WI_IsFlagSet(containerOptions.Flags, WSLAContainerFlagsInit);
 
+    // Build volume list from container options.
+    std::vector<WSLAVolumeMount> volumes;
+    volumes.reserve(containerOptions.VolumesCount);
+
+    for (ULONG i = 0; i < containerOptions.VolumesCount; i++)
+    {
+        GUID volumeId;
+        THROW_IF_FAILED(CoCreateGuid(&volumeId));
+
+        auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
+        auto volume = containerOptions.Volumes[i];
+
+        volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
+
+        request.HostConfig.Mounts.emplace_back(common::docker_schema::Mount{
+            .Source = parentVMPath, .Target = volume.ContainerPath, .Type = "bind", .ReadOnly = static_cast<bool>(volume.ReadOnly)});
+    }
+
     // Mount volumes.
-    auto volumes = MountVolumes(containerOptions, parentVM);
+    auto volumeErrorCleanup = MountVolumes(volumes, parentVM);
 
-    for (const auto& e : volumes)
+    // Process port mappings from container options.
+    auto [ports, networkMode] = ProcessPortMappings(containerOptions);
+    request.HostConfig.NetworkMode = networkMode;
+
+
+    auto [vmPorts, errorCleanup] = MapPorts(ports, parentVM);
+
+    for (const auto& e : ports)
     {
-        request.HostConfig.Mounts.emplace_back(
-            common::docker_schema::Mount{.Source = e.ParentVMPath, .Target = e.ContainerPath, .Type = "bind", .ReadOnly = e.ReadOnly});
+        // TODO: UDP support
+        // TODO: Investigate ipv6 support.
+        auto portKey = std::format("{}/tcp", e.ContainerPort);
+        request.ExposedPorts[portKey] = {};
+        auto& portEntry = request.HostConfig.PortBindings[portKey];
+        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
     }
 
-    // Set the networking mode.
-    if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_BRIDGE)
-    {
-        request.HostConfig.NetworkMode = "bridge";
-    }
-    else if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_HOST)
-    {
-        request.HostConfig.NetworkMode = "host";
-    }
-    else if (containerOptions.ContainerNetwork.ContainerNetworkType == WSLA_CONTAINER_NETWORK_NONE)
-    {
-        request.HostConfig.NetworkMode = "none";
-    }
-    else
-    {
-        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %i", containerOptions.ContainerNetwork.ContainerNetworkType);
-    }
+    // Build WSLA metadata to store in a label for recovery on Open().
+    WSLAContainerMetadataV1 metadata;
+    metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
+    metadata.Volumes = volumes;
+    metadata.Ports = ports;
+
+    request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
 
     // Process labels.
     for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
@@ -680,40 +775,28 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         request.Labels[label.Key] = label.Value;
     }
 
-    // Process port bindings.
-    auto [mappedPorts, errorCleanup] = ProcessPortMappings(containerOptions, parentVM);
-
-    for (const auto& e : *mappedPorts)
-    {
-        // TODO: UDP support
-        // TODO: Investigate ipv6 support.
-        auto portKey = std::format("{}/tcp", e.ContainerPort);
-        request.ExposedPorts[portKey] = {};
-        auto& portEntry = request.HostConfig.PortBindings[portKey];
-        portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
-    }
-
     // Send the request to docker.
     auto result =
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
-    // N.B. mappedPorts is explicitly copied because it's referenced in errorCleanup, so it can't be moved.
     auto container = std::make_unique<WSLAContainerImpl>(
         &parentVM,
         std::move(result.Id),
         std::move(std::string(containerOptions.Name == nullptr ? "" : containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
-        std::vector<PortMapping>(*mappedPorts),
+        std::move(ports),
         std::move(request.Labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
+        IoRelay,
         WslaContainerStateCreated,
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
 
     errorCleanup.release();
+    volumeErrorCleanup.release();
 
     return container;
 }
@@ -723,48 +806,45 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     WSLAVirtualMachine& parentVM,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient)
+    DockerHTTPClient& DockerClient,
+    IORelay& ioRelay)
 {
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    // Convert Docker ports to PortMapping.
-    // TODO: Recover host port mapping info from metadata.
-    std::vector<PortMapping> ports;
-    for (const auto& port : dockerContainer.Ports)
-    {
-        if (port.PublicPort != 0)
-        {
-            ports.push_back({port.PublicPort, port.PublicPort, port.PrivatePort, AF_INET, false});
-        }
-    }
+    auto metadataIt = dockerContainer.Labels.find(WSLAContainerMetadataLabel);
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        metadataIt == dockerContainer.Labels.end(),
+        "Cannot open WSLA container %hs: missing WSLA metadata label",
+        dockerContainer.Id.c_str());
 
-    // Create a WSLAContainerImpl directly without going through Create().
-    // TODO: Recover TTY from metadata.
-    // TODO: Recover volumes from metadata.
-    // TODO: Recover container state from Docker.
-    // For now, assume the container has exited since we can't run containers in the new session until
-    // we can recover all the necessary state.
+    auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
+
+    // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
+    // to open containers that are not running.
+    auto volumeErrorCleanup = MountVolumes(metadata.Volumes, parentVM);
+    auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, parentVM);
+
+
     auto container = std::make_unique<WSLAContainerImpl>(
         &parentVM,
         std::string(dockerContainer.Id),
         std::move(name),
         std::string(dockerContainer.Image),
-        std::vector<VolumeMountInfo>{},
-        std::move(ports),
-        std::map<std::string, std::string>(dockerContainer.Labels),
+        std::move(metadata.Volumes),
+        std::move(metadata.Ports),
+        std::move(std::map<std::string, std::string>(dockerContainer.Labels)),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
-        WslaContainerStateExited,
-        WSLAProcessFlagsNone, // TODO
+        ioRelay,
+        DockerStateToWSLAState(dockerContainer.State),
+        metadata.InitProcessFlags,
         WSLAContainerFlagsNone);
 
-    WSL_LOG(
-        "ContainerOpened",
-        TraceLoggingValue(container->m_name.c_str(), "Name"),
-        TraceLoggingValue(container->m_id.c_str(), "Id"),
-        TraceLoggingValue((int)container->m_state, "State"));
+    errorCleanup.release();
+    volumeErrorCleanup.release();
 
     return container;
 }
@@ -808,7 +888,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto [ttyRead, ttyWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
 
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
-        m_logsRelay.AddHandle(std::move(handle));
+        m_ioRelay.AddHandle(std::move(handle));
 
         *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get()));
     }
@@ -821,11 +901,50 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto handle = std::make_unique<DockerIORelayHandle>(
             std::move(socket), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::HttpChunked);
 
-        m_logsRelay.AddHandle(std::move(handle));
+        m_ioRelay.AddHandle(std::move(handle));
 
         *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get()));
         *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get()));
     }
+}
+
+std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags)
+{
+    // Create one pipe for each STD handle.
+    std::vector<std::unique_ptr<OverlappedIOHandle>> ioHandles;
+    std::map<ULONG, wil::unique_handle> fds;
+
+    // This is required for docker to know when stdin is closed.
+    auto closeStdin = [socket = stream.get(), this]() {
+        LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(socket), SD_SEND) == SOCKET_ERROR);
+    };
+
+    if (WI_IsFlagSet(flags, WSLAProcessFlagsStdin))
+    {
+        auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+        ioHandles.emplace_back(
+            std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, stream.get()));
+
+        fds.emplace(WSLAFDStdin, stdinWrite.release());
+    }
+    else
+    {
+        // If stdin is not attached, close it now to make sure no one tries to write to it.
+        closeStdin();
+    }
+
+    auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+
+    fds.emplace(WSLAFDStdout, stdoutRead.release());
+    fds.emplace(WSLAFDStderr, stderrRead.release());
+
+    ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
+        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
+
+    m_ioRelay.AddHandles(std::move(ioHandles));
+
+    return std::make_unique<RelayedProcessIO>(std::move(fds));
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
@@ -865,9 +984,9 @@ HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds
     return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutSeconds);
 }
 
-HRESULT WSLAContainer::Start()
+HRESULT WSLAContainer::Start(WSLAContainerStartFlags Flags)
 {
-    return CallImpl(&WSLAContainerImpl::Start);
+    return CallImpl(&WSLAContainerImpl::Start, Flags);
 }
 
 HRESULT WSLAContainer::Inspect(LPSTR* Output)

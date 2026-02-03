@@ -30,8 +30,29 @@ Abstract:
 namespace http = boost::beast::http;
 using boost::beast::http::verb;
 using wsl::windows::common::relay::HandleWrapper;
+using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::service::wsla::DockerHTTPClient;
 using namespace wsl::windows::common;
+
+namespace {
+
+bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_type& response)
+{
+    auto transferEncoding = response.find(http::field::transfer_encoding);
+    if (transferEncoding == response.end())
+    {
+        return false;
+    }
+
+    if (transferEncoding->value() != "chunked")
+    {
+        THROW_HR_MSG(E_UNEXPECTED, "Unknown transfer encoding: %hs", std::string(transferEncoding->value()).c_str());
+    }
+
+    return true;
+}
+
+} // namespace
 
 DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
     m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
@@ -138,7 +159,7 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id)
 std::string DockerHTTPClient::InspectContainer(const std::string& Id)
 {
     auto url = std::format("http://localhost/containers/{}/json", Id);
-    auto [code, response] = SendRequest(verb::get, url);
+    auto [code, response] = SendRequestAndReadResponse(verb::get, url);
 
     if (code < 200 || code >= 300)
     {
@@ -154,7 +175,7 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
         {boost::beast::http::field::upgrade, "tcp"}, {boost::beast::http::field::connection, "upgrade"}};
 
     auto url = std::format("http://localhost/containers/{}/attach?stream=1&stdin=1&stdout=1&stderr=1", Id);
-    auto [status, socket] = SendRequest(verb::post, url, {}, {}, headers);
+    auto [status, socket] = SendRequest(verb::post, url, {}, headers);
 
     if (status != 101)
     {
@@ -209,7 +230,7 @@ wil::unique_socket DockerHTTPClient::StartExec(const std::string& Id, const comm
     auto url = std::format("http://localhost/exec/{}/start", Id);
 
     auto body = wsl::shared::ToJson(Request);
-    auto [status, socket] = SendRequest(verb::post, url, body, {}, headers);
+    auto [status, socket] = SendRequest(verb::post, url, body, headers);
     if (status != 101)
     {
         throw DockerHTTPException(status, verb::post, url, body, "");
@@ -261,14 +282,25 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     return newChannel.Release();
 }
 
-std::pair<uint32_t, std::string> DockerHTTPClient::SendRequest(verb Method, const std::string& Url, const std::string& Body)
+std::pair<uint32_t, std::string> DockerHTTPClient::SendRequestAndReadResponse(verb Method, const std::string& Url, const std::string& Body)
 {
+    // Send the request.
+    auto context = SendRequestImpl(Method, Url, Body, {});
+
+    // Read the response header and body.
+    std::optional<boost::beast::http::status> status;
     std::string responseBody;
     auto OnResponse = [&responseBody](const gsl::span<char>& span) { responseBody.append(span.data(), span.size()); };
 
-    auto [status, _] = SendRequest(Method, Url, Body, OnResponse);
+    auto onHttpResponse = [&](const auto& response) { status = response.result(); };
+    MultiHandleWait io;
 
-    return {status, std::move(responseBody)};
+    io.AddHandle(std::make_unique<relay::EventHandle>(m_exitingEvent, [&]() { THROW_HR(E_ABORT); }));
+    io.AddHandle(std::make_unique<DockerHttpResponseHandle>(*context, std::move(onHttpResponse), std::move(OnResponse)), MultiHandleWait::CancelOnCompleted);
+
+    io.Run({});
+
+    return {static_cast<uint32_t>(status.value()), responseBody};
 }
 
 DockerHTTPClient::DockerHttpResponseHandle::DockerHttpResponseHandle(
@@ -329,9 +361,7 @@ void DockerHTTPClient::DockerHttpResponseHandle::OnRead(const gsl::span<char>& C
             OnResponseHeader(response);
 
             // If the response is chunked, then create a chunked reader.
-            // TODO: Proper header parsing.
-            auto transferEncoding = response.find(http::field::transfer_encoding);
-            if (transferEncoding != response.end() && transferEncoding->value() == "chunked")
+            if (IsResponseChunked(response))
             {
                 ResponseParser.emplace(HandleWrapper{Context.stream.native_handle()}, std::move(OnResponse));
             }
@@ -422,11 +452,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
 }
 
 std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
-    verb Method,
-    const std::string& Url,
-    const std::string& Body,
-    const OnResponseBytes& OnResponse,
-    const std::map<boost::beast::http::field, std::string>& Headers)
+    verb Method, const std::string& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers)
 {
     // Write the request
     auto context = SendRequestImpl(Method, Url, Body, Headers);
@@ -491,25 +517,6 @@ std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
                 error && error != boost::beast::http::error::need_more,
                 "Error parsing HTTP response: %hs",
                 error.what().c_str());
-        }
-    }
-
-    WSL_LOG("HTTPResult", TraceLoggingValue(Url.c_str(), "Url"), TraceLoggingValue(parser.get().result_int(), "Status"));
-
-    if (OnResponse)
-    {
-        buffer.resize(bufferSize);
-        while (!parser.is_done())
-        {
-            boost::beast::flat_buffer adapter;
-
-            parser.get().body().data = buffer.data();
-            parser.get().body().size = buffer.size();
-            http::read(context->stream, adapter, parser);
-
-            auto bytesRead = buffer.size() - parser.get().body().size;
-
-            OnResponse(gsl::span<char>{buffer.data(), bytesRead});
         }
     }
 
