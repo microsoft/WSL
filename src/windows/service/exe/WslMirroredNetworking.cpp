@@ -434,8 +434,7 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessDNSChange()
     }
     else
     {
-        m_hostDnsInfo.UpdateNetworkInformation();
-        m_dnsInfo = m_hostDnsInfo.GetDnsSettings(
+        m_dnsInfo = wsl::core::networking::HostDnsInfo::GetDnsSettings(
             wsl::core::networking::DnsSettingsFlags::IncludeVpn | wsl::core::networking::DnsSettingsFlags::IncludeIpv6Servers |
             wsl::core::networking::DnsSettingsFlags::IncludeAllSuffixes);
     }

@@ -259,8 +259,6 @@ int UtilParseCgroupsLine(char* Line, char** SubsystemName, bool* Enabled);
 
 std::string UtilParsePlan9MountSource(std::string_view MountOptions);
 
-std::string UtilParseVirtiofsMountSource(std::string_view MountOptions);
-
 std::vector<char> UtilParseWslEnv(char* NtEnvironment);
 
 int UtilProcessChildExitCode(int Status, const char* Name, int ExpectedStatus = 0, bool PrintError = true);
