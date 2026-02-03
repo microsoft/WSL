@@ -18,12 +18,15 @@ set(HEADERS
     inc/invocation.h
     commands/RootCommand.h
     commands/TestCommand.h
+    commands/ContainerCommand.h
     workflows/WorkflowBase.h
+    workflows/CommonFlow.h
     workflows/TestFlow.h
     services/ContainerService.h
 )
 
 set(SOURCES
+    util.cpp
     argument.cpp
     command.cpp
     context.cpp
@@ -31,7 +34,9 @@ set(SOURCES
     main.cpp
     commands/RootCommand.cpp
     commands/TestCommand.cpp
+    commands/ContainerCommand.cpp
     workflows/WorkflowBase.cpp
+    workflows/CommonFlow.cpp
     workflows/TestFlow.cpp
     services/ContainerService.cpp
 )

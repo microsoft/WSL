@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "TestCommand.h"
 #include "WorkflowBase.h"
+#include "CommonFlow.h"
 #include "TestFlow.h"
 
 using namespace wsl::windows::common::wslutil;

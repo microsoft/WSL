@@ -37,12 +37,10 @@ namespace wsl::windows::wslc
     void Command::OutputIntroHeader() const
     {
         // TODO: Product name, version, copyright info in resources.
-        /*
         std::wostringstream infoOut;
         infoOut << L"Windows Subsystem for Linux Container CLI (Preview) v1.0.0" << std::endl;
         infoOut << L"Copyright (c) Microsoft Corporation. All rights reserved." << std::endl;
         PrintMessage(infoOut.str(), stdout);
-        */
     }
 
     void Command::OutputHelp(const CommandException* exception) const
@@ -248,15 +246,6 @@ namespace wsl::windows::wslc
                 }
             }
         }
-
-        // Finally, the link to the documentation pages
-        /* Omit for prototyping.
-        auto helpLink = HelpLink();
-        if (!helpLink.empty())
-        {
-            infoOut << std::endl << Localization::WSLCCLI_HelpLinkPreamble(helpLink) << std::endl;
-        }
-        */
 
         PrintMessage(infoOut.str(), stdout);
     }
@@ -620,117 +609,6 @@ namespace wsl::windows::wslc
         Argument::ValidateExclusiveArguments(execArgs);
 
         ValidateArgumentsInternal(execArgs);
-    }
-
-    // Completion can produce one of several things if the completion context is appropriate:
-    //  1. Sub commands, if the context is immediately after this command.
-    //  2. Argument names, if a value is not expected.
-    //  3. Argument values, if one is expected.
-    void Command::Complete(CLIExecutionContext& context) const
-    {
-        /*
-        CompletionData& data = context.Get<Execution::Data::CompletionData>();
-        const std::string& word = data.Word();
-
-        // The word we are to complete is directly after the command, thus it's sub-commands are potentials.
-        if (data.BeforeWord().begin() == data.BeforeWord().end())
-        {
-            for (const auto& command : GetCommands())
-            {
-                if (word.empty() || Utility::CaseInsensitiveStartsWith(command->Name(), word))
-                {
-                    context.Reporter.Completion() << command->Name() << std::endl;
-                }
-                // Allow for command aliases to be auto-completed
-                if (!(command->Aliases()).empty() && !word.empty())
-                {
-                    for (const auto& commandAlias : command->Aliases())
-                    {
-                        if (Utility::CaseInsensitiveStartsWith(commandAlias, word))
-                        {
-                            context.Reporter.Completion() << commandAlias << std::endl;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Consume what remains, if any, of the preceding values to determine what type the word is.
-        auto definedArgs = GetArguments();
-        Argument::GetCommon(definedArgs);
-
-        ParseArgumentsStateMachine stateMachine{ data.BeforeWord(), context.Args, std::move(definedArgs) };
-
-        // We don't care if there are errors along the way, just do the best that can be done and try to
-        // complete whatever would be next if the bad strings were simply ignored. To do that we just spin
-        // through the state until we reach our word.
-        while (stateMachine.Step());
-
-        const auto& state = stateMachine.GetState();
-
-        // This means that anything is possible, so argument names are on the table.
-        if (!state.Type() && !stateMachine.OnlyPositionalRemain())
-        {
-            // Use argument names if:
-            //  1. word is empty
-            //  2. word is just "-"
-            //  3. word starts with "--"
-            if (word.empty() ||
-                word == WSLC_CLI_ARGUMENT_IDENTIFIER_STRING ||
-                Utility::CaseInsensitiveStartsWith(word, WSLC_CLI_ARGUMENT_IDENTIFIER_STRING WSLC_CLI_ARGUMENT_IDENTIFIER_STRING))
-            {
-                for (const auto& arg : stateMachine.Arguments())
-                {
-                    if (word.length() <= 2 || Utility::CaseInsensitiveStartsWith(arg.Name(), word.substr(2)))
-                    {
-                        context.Reporter.Completion() << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << arg.Name() << std::endl;
-                    }
-                }
-            }
-            // Use argument aliases if the word is already one; allow cycling through them.
-            else if (Utility::CaseInsensitiveStartsWith(word, WSLC_CLI_ARGUMENT_IDENTIFIER_STRING) && word.length() == 2)
-            {
-                for (const auto& arg : stateMachine.Arguments())
-                {
-                    if (arg.Alias() != ArgumentCommon::NoAlias)
-                    {
-                        context.Reporter.Completion() << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << arg.Alias() << std::endl;
-                    }
-                }
-            }
-        }
-
-        std::optional<Execution::Args::Type> typeToComplete = state.Type();
-
-        // We are not waiting on an argument value, so the next could be a positional if the incoming word is not an argument name.
-        // If there is one, offer to complete it.
-        if (!typeToComplete && (word.empty() || word[0] != WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR))
-        {
-            const auto* nextPositional = stateMachine.NextPositional();
-            if (nextPositional)
-            {
-                typeToComplete = nextPositional->ExecArgType();
-            }
-        }
-
-        // To enable more complete scenarios, also attempt to parse any arguments after the word to complete.
-        // This will allow these later values to affect the result of the completion (for instance, if a specific source is listed).
-        {
-            ParseArgumentsStateMachine afterWordStateMachine{ data.AfterWord(), context.Args, stateMachine.Arguments() };
-            while (afterWordStateMachine.Step());
-        }
-
-        // Let the derived command take over supplying context sensitive argument value.
-        if (typeToComplete)
-        {
-            Complete(context, typeToComplete.value());
-        }
-        */
-    }
-
-    void Command::Complete(CLIExecutionContext& context, Args::Type type) const
-    {
-        // Derived commands must supply context sensitive argument values.
     }
 
     void Command::Execute(CLIExecutionContext& context) const

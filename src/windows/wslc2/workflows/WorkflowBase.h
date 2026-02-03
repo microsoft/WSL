@@ -12,11 +12,6 @@ using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc::workflow
 {
-    enum class OperationType
-    {
-        Completion,
-    };
-
     // A task in the workflow.
     struct WorkflowTask
     {
@@ -56,38 +51,6 @@ namespace wsl::windows::wslc::workflow
 
     // Helper to report exceptions and return the HRESULT.
     HRESULT HandleException(CLIExecutionContext& context, std::exception_ptr exception);
-
-    // Ensures that the process is running as admin.
-    // Required Args: None
-    // Inputs: None
-    // Outputs: None
-    void EnsureRunningAsAdmin(CLIExecutionContext& context);
-
-    // Ensures that the process is running as admin.
-    // Required Args: None
-    // Inputs: None
-    // Outputs: None
-    void OutputNinjaCat(CLIExecutionContext& context);
-
-    // Outputs text to the context's output.
-    // Required Args: None
-    // Inputs: Text
-    // Outputs: None
-    void OutputText(CLIExecutionContext& context, std::wstring_view text);
-
-    // Reports execution stage in a workflow
-    // Required Args: ExecutionStage
-    // Inputs: ExecutionStage?
-    // Outputs: ExecutionStage
-    struct ReportExecutionStage : public WorkflowTask
-    {
-        ReportExecutionStage(ExecutionStage stage) : WorkflowTask(L"ReportExecutionStage"), m_stage(stage) {}
-
-        void operator()(CLIExecutionContext& context) const;
-
-    private:
-        ExecutionStage m_stage;
-    };
 }
 
 // Passes the context to the function if it has not been terminated; returns the context.

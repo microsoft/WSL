@@ -1,27 +1,15 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+#pragma once
 #include "pch.h"
 #include "WorkflowBase.h"
-#include <wil/token_helpers.h>
 #include <wil/result_macros.h>
 
-using namespace wsl::shared;
 using namespace wsl::windows::common;
-using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::execution;
-using namespace std::string_literals;
-using namespace winrt::Windows::Foundation;
 
 namespace wsl::windows::wslc::workflow
 {
-    namespace
-    {
-        bool IsRunningAsAdmin()
-        {
-            return wil::test_token_membership(nullptr, SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
-        }
-    }
-
     bool WorkflowTask::operator==(const WorkflowTask& other) const
     {
         if (m_isFunc && other.m_isFunc)
@@ -84,20 +72,6 @@ namespace wsl::windows::wslc::workflow
     HRESULT HandleException(CLIExecutionContext& context, std::exception_ptr exception)
     {
         return HandleException(&context, exception);
-    }
-
-    void EnsureRunningAsAdmin(CLIExecutionContext& context)
-    {
-        if (!IsRunningAsAdmin())
-        {
-            wslutil::PrintMessage(Localization::WSLCCLI_CommandRequiresAdmin(), stderr);
-            WSLC_TERMINATE_CONTEXT(WSLC_CLI_ERROR_COMMAND_REQUIRES_ADMIN);
-        }
-    }
-
-    void ReportExecutionStage::operator()(CLIExecutionContext& context) const
-    {
-        context.SetExecutionStage(m_stage);
     }
 }
 

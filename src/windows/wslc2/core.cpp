@@ -65,7 +65,6 @@ namespace wsl::windows::wslc
             }
 
             command->ParseArguments(invocation, context.Args);
-            context.UpdateForArgs();
             context.SetExecutingCommand(command.get());
             command->ValidateArguments(context.Args);
         }

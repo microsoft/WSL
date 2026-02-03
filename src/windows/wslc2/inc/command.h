@@ -100,9 +100,6 @@ namespace wsl::windows::wslc
         virtual void ParseArguments(Invocation& inv, Args& execArgs) const;
         virtual void ValidateArguments(Args& execArgs) const;
 
-        virtual void Complete(CLIExecutionContext& context) const;
-        virtual void Complete(CLIExecutionContext& context, Args::Type valueType) const;
-
         virtual void Execute(CLIExecutionContext& context) const;
 
     protected:

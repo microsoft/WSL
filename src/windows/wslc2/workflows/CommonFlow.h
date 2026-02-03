@@ -7,9 +7,9 @@ using wsl::windows::wslc::execution::CLIExecutionContext;
 
 namespace wsl::windows::wslc::workflow
 {
-    // Prints the NinjaCat
-    // Required Args: TestArg
+    // Ensures that the process is running as admin.
+    // Required Args: None
     // Inputs: None
     // Outputs: None
-    void OutputNinjaCat(CLIExecutionContext& context);
+    void EnsureRunningAsAdmin(CLIExecutionContext& context);
 }

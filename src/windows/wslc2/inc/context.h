@@ -9,18 +9,6 @@
 
 #include <string_view>
 
-#define WSLC_CATCH_RESULT_EXCEPTION_STORE(exceptionHR)   catch (const wil::ResultException& re) { exceptionHR = re.GetErrorCode(); }
-#define WSLC_CATCH_HRESULT_EXCEPTION_STORE(exceptionHR)   catch (const winrt::hresult_error& hre) { exceptionHR = hre.code(); }
-#define WSLC_CATCH_COMMAND_EXCEPTION_STORE(exceptionHR)   catch (const wsl::windows::wslc::CommandException&) { exceptionHR = WSLC_CLI_ERROR_INVALID_CL_ARGUMENTS; }
-#define WSLC_CATCH_STD_EXCEPTION_STORE(exceptionHR, genericHR)   catch (const std::exception&) { exceptionHR = genericHR; }
-#define WSLC_CATCH_ALL_EXCEPTION_STORE(exceptionHR, genericHR)   catch (...) { exceptionHR = genericHR; }
-#define WSLC_CATCH_STORE(exceptionHR, genericHR) \
-        WSLC_CATCH_RESULT_EXCEPTION_STORE(exceptionHR) \
-        WSLC_CATCH_HRESULT_EXCEPTION_STORE(exceptionHR) \
-        WSLC_CATCH_COMMAND_EXCEPTION_STORE(exceptionHR) \
-        WSLC_CATCH_STD_EXCEPTION_STORE(exceptionHR, genericHR) \
-        WSLC_CATCH_ALL_EXCEPTION_STORE(exceptionHR, genericHR)
-
 // Terminates the Context with some logging to indicate the location.
 // Also returns from the current function.
 #define WSLC_TERMINATE_CONTEXT_ARGS(_context_, _hr_, _ret_) \
@@ -57,24 +45,6 @@ namespace wsl::windows::wslc::workflow
 
 namespace wsl::windows::wslc::execution
 {
-    enum class ExecutionStage : uint32_t
-    {
-        Initial = 0,
-        ParseArgs = 1000,
-        Discovery = 2000,
-        PreExecution = 3500,
-        Execution = 4000,
-        PostExecution = 5000,
-    };
-
-    // bit masks used as Context flags
-    enum class ContextFlag : int
-    {
-        None = 0x0,
-    };
-
-    DEFINE_ENUM_FLAG_OPERATORS(ContextFlag);
-
     // The context within which all commands execute.
     // Contains arguments via Args.
     struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
@@ -90,27 +60,6 @@ namespace wsl::windows::wslc::execution
 
         // The arguments given to execute.
         Args Args;
-
-        // Applies changes based on the parsed args.
-        void UpdateForArgs();
-
-        // Gets context flags
-        ContextFlag GetFlags() const
-        {
-            return m_flags;
-        }
-
-        // Set context flags
-        void SetFlags(ContextFlag flags)
-        {
-            WI_SetAllFlags(m_flags, flags);
-        }
-
-        // Clear context flags
-        void ClearFlags(ContextFlag flags)
-        {
-            WI_ClearAllFlags(m_flags, flags);
-        }
 
         // Returns a value indicating whether the context is terminated.
         bool IsTerminated() const
@@ -137,8 +86,6 @@ namespace wsl::windows::wslc::execution
         // Set the termination hr of the context.
         void SetTerminationHR(HRESULT hr);
 
-        virtual void SetExecutionStage(ExecutionStage stage);
-
         // Gets the executing command
         wsl::windows::wslc::Command* GetExecutingCommand() { return m_executingCommand; }
 
@@ -148,8 +95,6 @@ namespace wsl::windows::wslc::execution
     private:
         bool m_isTerminated = false;
         HRESULT m_terminationHR = S_OK;
-        ContextFlag m_flags = ContextFlag::None;
-        ExecutionStage m_executionStage = ExecutionStage::Initial;
         wsl::windows::wslc::Command* m_executingCommand = nullptr;
     };
 }

@@ -1,11 +1,14 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+#pragma once
 #include "pch.h"
 #include "util.h"
 #include "RootCommand.h"
+#include "WorkflowBase.h"
 
 // Include all commands that parent to the root. 
 #include "TestCommand.h"
+#include "ContainerCommand.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
@@ -17,6 +20,8 @@ namespace wsl::windows::wslc
     {
         return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
             std::make_unique<TestCommand>(FullName()),
+            std::make_unique<ContainerCommand>(FullName()),
+            std::make_unique<ContainerRunCommand>(FullName()),
         });
     }
 
