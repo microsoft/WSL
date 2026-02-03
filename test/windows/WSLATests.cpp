@@ -1735,7 +1735,7 @@ class WSLATests
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
 
-            VERIFY_ARE_EQUAL(container.Inspect().NetworkMode, "none");
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "none");
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
@@ -1769,7 +1769,7 @@ class WSLATests
 
             auto container = launcher.Launch(*m_defaultSession);
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
-            VERIFY_ARE_EQUAL(container.Inspect().NetworkMode, "bridge");
+            VERIFY_ARE_EQUAL(container.Inspect().HostConfig.NetworkMode, "bridge");
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGTERM, 0));
 
@@ -1790,13 +1790,27 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        // Running container with port mappings.
+        // Running container with port mappings and volumes.
         {
+            auto testFolder = std::filesystem::current_path() / "test-inspect-volume";
+            auto testFolderReadOnly = std::filesystem::current_path() / "test-inspect-volume-ro";
+
+            std::filesystem::create_directories(testFolder);
+            std::filesystem::create_directories(testFolderReadOnly);
+
+            auto cleanup = wil::scope_exit([&]() {
+                std::error_code ec;
+                std::filesystem::remove_all(testFolder, ec);
+                std::filesystem::remove_all(testFolderReadOnly, ec);
+            });
+
             WSLAContainerLauncher launcher(
                 "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
             launcher.AddPort(1234, 8000, AF_INET);
             launcher.AddPort(1235, 8001, AF_INET);
+            launcher.AddVolume(testFolder.wstring(), "/test-volume", false);           // read-write
+            launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true); // read-only
 
             auto container = launcher.Launch(*m_defaultSession);
 
@@ -1820,6 +1834,29 @@ class WSLATests
             auto& p8001 = details.Ports.at("8001/tcp");
             VERIFY_IS_TRUE(p8001.size() >= 1);
             VERIFY_ARE_EQUAL(p8001[0].HostPort, "1235");
+
+            // Verify volume mounts are populated.
+            VERIFY_ARE_EQUAL(details.Mounts.size(), 2u);
+
+            bool foundReadWrite = false, foundReadOnly = false;
+            for (const auto& mount : details.Mounts)
+            {
+                VERIFY_ARE_EQUAL(mount.Type, "bind");
+                VERIFY_IS_FALSE(mount.Source.empty());
+
+                if (mount.Destination == "/test-volume")
+                {
+                    VERIFY_IS_TRUE(mount.ReadWrite);
+                    foundReadWrite = true;
+                }
+                else if (mount.Destination == "/test-volume-ro")
+                {
+                    VERIFY_IS_FALSE(mount.ReadWrite);
+                    foundReadOnly = true;
+                }
+            }
+            VERIFY_IS_TRUE(foundReadWrite);
+            VERIFY_IS_TRUE(foundReadOnly);
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());

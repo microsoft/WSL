@@ -20,6 +20,7 @@ namespace wsl::windows::common::wsla_schema {
 
 struct InspectPortBinding
 {
+    // HostIp is not currently populated by WSLAContainer.cpp and will remain empty.
     std::string HostIp;
     std::string HostPort;
 
@@ -60,15 +61,12 @@ struct InspectContainer
     std::string Name;
     std::string Created;
     std::string Image;
-
     InspectState State;
-
-    std::string NetworkMode;
     InspectHostConfig HostConfig;
     std::map<std::string, std::vector<InspectPortBinding>> Ports;
     std::vector<InspectMount> Mounts;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, NetworkMode, HostConfig, Ports, Mounts);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, HostConfig, Ports, Mounts);
 };
 
 } // namespace wsl::windows::common::wsla_schema

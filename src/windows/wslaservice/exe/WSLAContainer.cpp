@@ -31,6 +31,9 @@ using wsl::windows::service::wsla::WSLAVirtualMachine;
 using namespace wsl::windows::common::docker_schema;
 namespace wsla_schema = wsl::windows::common::wsla_schema;
 
+using DockerInspectContainer = wsl::windows::common::docker_schema::InspectContainer;
+using WslaInspectContainer = wsl::windows::common::wsla_schema::InspectContainer;
+
 namespace {
 
 std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
@@ -554,7 +557,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     }
 }
 
-WSLAContainerImpl::WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect)
+WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect)
 {
     WslaInspectContainer wslaInspect{};
 
@@ -568,7 +571,7 @@ WSLAContainerImpl::WslaInspectContainer WSLAContainerImpl::BuildInspectContainer
     }
 
     wslaInspect.Created = dockerInspect.Created;
-    wslaInspect.Image = !dockerInspect.Config.Image.empty() ? dockerInspect.Config.Image : dockerInspect.Image;
+    wslaInspect.Image = dockerInspect.Image;
 
     // Map container state.
     wslaInspect.State.Status = dockerInspect.State.Status;
@@ -577,7 +580,6 @@ WSLAContainerImpl::WslaInspectContainer WSLAContainerImpl::BuildInspectContainer
     wslaInspect.State.StartedAt = dockerInspect.State.StartedAt;
     wslaInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
 
-    wslaInspect.NetworkMode = dockerInspect.HostConfig.NetworkMode;
     wslaInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
 
     // Map WSLA port mappings (Windows host ports only). HostIp is not surfaced.
