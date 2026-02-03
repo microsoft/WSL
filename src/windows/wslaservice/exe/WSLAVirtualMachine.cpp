@@ -561,11 +561,13 @@ void WSLAVirtualMachine::ConfigureNetworking()
             wsl::core::NatNetworking::CreateNetwork(config),
             std::move(gnsChannel),
             config,
-            dnsChannelFd != -1 ? wil::unique_socket{(SOCKET)process->GetStdHandle(dnsChannelFd).release()} : wil::unique_socket{});
+            dnsChannelFd != -1 ? wil::unique_socket{(SOCKET)process->GetStdHandle(dnsChannelFd).release()} : wil::unique_socket{},
+            nullptr);
     }
     else
     {
-        m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), false, m_guestDeviceManager, m_userToken);
+        m_networkEngine =
+            std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), false, nullptr, m_guestDeviceManager, m_userToken);
     }
 
     m_networkEngine->Initialize();

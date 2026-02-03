@@ -226,12 +226,6 @@ public:
     {
         SKIP_TEST_ARM64();
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("VirtioFS currently only supports mounting full drives");
-            return;
-        }
-
         constexpr auto MountPoint = "C:\\lxss_fat";
         constexpr auto VhdPath = "C:\\lxss_fat.vhdx";
         auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteVolume(MountPoint, VhdPath); });
@@ -352,12 +346,6 @@ public:
         SKIP_TEST_ARM64();
         WSL_TEST_VERSION_REQUIRED(wsl::windows::common::helpers::WindowsBuildNumbers::Germanium);
 
-        if (Mode == DrvFsMode::VirtioFs)
-        {
-            LogSkipped("VirtioFS currently only supports mounting full drives");
-            return;
-        }
-
         constexpr auto MountPoint = "C:\\lxss_refs";
         constexpr auto VhdPath = "C:\\lxss_refs.vhdx";
         auto Cleanup = wil::scope_exit([MountPoint, VhdPath] { DeleteVolume(MountPoint, VhdPath); });
@@ -365,6 +353,68 @@ public:
         VERIFY_NO_THROW(CreateVolume("refs", 50000, MountPoint, VhdPath));
         VERIFY_NO_THROW(
             LxsstuRunTest((L"bash -c '" + SkipUnstableTestEnvVar + L" /data/test/wsl_unit_tests drvfs -m 6'").c_str(), L"drvfs6"));
+    }
+
+    void WslPath(DrvFsMode Mode)
+    {
+        VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests wslpath", L"wslpath"));
+
+        auto testWslPath = [](const std::wstring& testDir) {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testDir); });
+
+            std::filesystem::create_directory(testDir);
+
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -aw '{}'", testDir));
+            VERIFY_ARE_EQUAL((std::filesystem::canonical(std::filesystem::current_path()) / testDir).wstring() + L"\n", out);
+
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -wa '{}'", testDir));
+            VERIFY_ARE_EQUAL((std::filesystem::canonical(std::filesystem::current_path()) / testDir).wstring() + L"\n", out);
+
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath '{}'", testDir));
+            VERIFY_ARE_EQUAL(std::format(L"{}\n", testDir), out);
+
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"wslpath -a '{}'", testDir));
+            VERIFY_IS_TRUE(out.find(L"/mnt/") == 0);
+        };
+
+        testWslPath(L"wslpath-test-dir");
+        testWslPath(L"wslpath-测试目录-テスト");
+    }
+
+    void DrvFsMountUnicodePath(DrvFsMode Mode)
+    {
+        WSL2_TEST_ONLY();
+
+        // Create a Windows directory with unicode characters
+        constexpr auto unicodeDir = L"C:\\drvfs-测试-テスト";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(unicodeDir); });
+
+        std::filesystem::create_directory(unicodeDir);
+
+        // Create a test file inside the directory
+        const auto testFilePath = std::filesystem::path(unicodeDir) / L"test-file.txt";
+        {
+            std::ofstream testFile(testFilePath);
+            testFile << "hello from unicode path";
+        }
+
+        // Mount the unicode directory using mount -t drvfs
+        constexpr auto mountPoint = L"/tmp/unicode-mount-test";
+        auto unmountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            LxsstuLaunchWsl(std::format(L"-u root umount '{}'", mountPoint).c_str());
+            LxsstuLaunchWsl(std::format(L"-u root rmdir '{}'", mountPoint).c_str());
+        });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root mkdir -p '{}'", mountPoint).c_str()), 0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"-u root mount -t drvfs '{}' '{}'", unicodeDir, mountPoint).c_str()), 0);
+
+        // Verify we can read the test file through the mount
+        auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"cat '{}/test-file.txt'", mountPoint));
+        VERIFY_ARE_EQUAL(L"hello from unicode path", out);
+
+        // Verify we can list the directory
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"ls '{}'", mountPoint));
+        VERIFY_IS_TRUE(out.find(L"test-file.txt") != std::wstring::npos);
     }
 
     // DrvFsTests Private Methods
@@ -935,7 +985,11 @@ private:
             const auto lines = LxssSplitString(output.Stdout, L"\n");
 
             VERIFY_ARE_EQUAL(lines.size(), 1);
-            VERIFY_IS_TRUE(output.Stdout.find(expectedType) == 0);
+
+            if (!expectedType.empty())
+            {
+                VERIFY_IS_TRUE(output.Stdout.find(expectedType) == 0);
+            }
         };
 
         std::wstring elevatedType;
@@ -951,8 +1005,7 @@ private:
             nonElevatedType = L"drvfs";
             break;
         case DrvFsMode::VirtioFs:
-            elevatedType = L"drvfsaC";
-            nonElevatedType = L"drvfsC";
+            // VirtioFs uses GUIDs as the tag so the value is not predictable.
             break;
 
         default:
@@ -1149,6 +1202,12 @@ class WSL1 : public DrvFsTests
         WSL1_TEST_ONLY();
         DrvFsTests::XattrDrvFs(DrvFsMode::WSL1);
     }
+
+    TEST_METHOD(WslPath)
+    {
+        WSL1_TEST_ONLY();
+        DrvFsTests::WslPath(DrvFsMode::WSL1);
+    }
 };
 
 #define WSL2_DRVFS_TEST_CLASS(_mode) \
@@ -1265,6 +1324,18 @@ class WSL1 : public DrvFsTests
         { \
             WSL2_TEST_ONLY(); \
             DrvFsTests::DrvFsReFs(DrvFsMode::##_mode##); \
+        } \
+\
+        TEST_METHOD(WslPath) \
+        { \
+            WSL2_TEST_ONLY(); \
+            DrvFsTests::WslPath(DrvFsMode::##_mode##); \
+        } \
+\
+        TEST_METHOD(DrvFsMountUnicodePath) \
+        { \
+            WSL2_TEST_ONLY(); \
+            DrvFsTests::DrvFsMountUnicodePath(DrvFsMode::##_mode##); \
         } \
     }
 
