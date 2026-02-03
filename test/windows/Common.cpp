@@ -2021,6 +2021,16 @@ Return Value:
         g_registryChangesSz.emplace_back(RegistryKeyChange<std::wstring>(HKEY_LOCAL_MACHINE, key, L"DumpFolder", g_dumpFolder));
         g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpType", 2));
         g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpCount", 10));
+
+        for (auto flags : {KEY_WOW64_32KEY, KEY_WOW64_64KEY})
+        {
+            auto currentVersion = wsl::windows::common::registry::OpenKey(
+                HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", KEY_ALL_ACCESS | flags);
+            
+            auto result = wsl::windows::common::registry::DeleteKey(currentVersion.get(), L"AeDebug");
+
+            LogInfo("AeDebug deletion result (flags %lu): %lu", flags, result);
+        }
     }
 
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"LogDmesg", g_LogDmesgAfterEachTest);
