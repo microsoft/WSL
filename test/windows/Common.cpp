@@ -1706,11 +1706,7 @@ Return Value:
 
         if (LxsstuVmMode())
         {
-            std::wstring Command = L"/bin/cp /data/test/log/";
-            Command += LogFileToken;
-            Command += L" $(wslpath '";
-            Command += LinuxLogPath;
-            Command += L"')";
+            std::wstring Command = std::format(L"/bin/cp /data/test/log/{} $(wslpath '{}')", LogFileToken, LinuxLogPath);
             VERIFY_NO_THROW(LxsstuRunTest(Command.c_str()));
         }
 

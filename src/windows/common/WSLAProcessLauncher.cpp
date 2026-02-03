@@ -21,37 +21,25 @@ using wsl::windows::common::RunningWSLAProcess;
 using wsl::windows::common::WSLAProcessLauncher;
 
 WSLAProcessLauncher::WSLAProcessLauncher(
-    const std::string& Executable, const std::vector<std::string>& Arguments, const std::vector<std::string>& Environment, ProcessFlags Flags) :
-    m_executable(Executable), m_arguments(Arguments), m_environment(Environment)
+    const std::string& Executable, const std::vector<std::string>& Arguments, const std::vector<std::string>& Environment, WSLAProcessFlags Flags) :
+    m_executable(Executable), m_arguments(Arguments), m_environment(Environment), m_flags(Flags)
 {
-    // Add standard Fds.
-    if (WI_IsFlagSet(Flags, ProcessFlags::Stdin))
-    {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault, .Path = nullptr});
-    }
-
-    if (WI_IsFlagSet(Flags, ProcessFlags::Stdout))
-    {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault, .Path = nullptr});
-    }
-
-    if (WI_IsFlagSet(Flags, ProcessFlags::Stderr))
-    {
-        m_fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault, .Path = nullptr});
-    }
-}
-
-void WSLAProcessLauncher::AddFd(WSLA_PROCESS_FD Fd)
-{
-    WI_ASSERT(std::ranges::find_if(m_fds, [&](const auto& e) { return e.Fd == Fd.Fd; }) == m_fds.end());
-
-    m_fds.push_back(Fd);
 }
 
 void WSLAProcessLauncher::SetTtySize(ULONG Rows, ULONG Columns)
 {
     m_rows = Rows;
     m_columns = Columns;
+}
+
+void WSLAProcessLauncher::SetWorkingDirectory(std::string&& WorkingDirectory)
+{
+    m_workingDirectory = std::move(WorkingDirectory);
+}
+
+void WSLAProcessLauncher::SetUser(std::string&& User)
+{
+    m_user = std::move(User);
 }
 
 std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const char*>> WSLAProcessLauncher::CreateProcessOptions()
@@ -63,21 +51,32 @@ std::tuple<WSLA_PROCESS_OPTIONS, std::vector<const char*>, std::vector<const cha
     std::ranges::transform(m_environment, std::back_inserter(environment), [](const std::string& e) { return e.c_str(); });
 
     WSLA_PROCESS_OPTIONS options{};
-    options.Executable = m_executable.c_str();
-    options.CommandLine = commandLine.data();
-    options.CommandLineCount = static_cast<DWORD>(commandLine.size());
-    options.Fds = m_fds.data();
-    options.FdsCount = static_cast<DWORD>(m_fds.size());
-    options.Environment = environment.data();
-    options.EnvironmentCount = static_cast<DWORD>(environment.size());
+    options.CommandLine = {.Values = commandLine.data(), .Count = static_cast<DWORD>(commandLine.size())};
+    options.Environment = {.Values = environment.data(), .Count = static_cast<DWORD>(environment.size())};
     options.TtyColumns = m_columns;
     options.TtyRows = m_rows;
+    options.Flags = m_flags;
+
+    if (!m_workingDirectory.empty())
+    {
+        options.CurrentDirectory = m_workingDirectory.c_str();
+    }
+
+    if (!m_user.empty())
+    {
+        options.User = m_user.c_str();
+    }
 
     return std::make_tuple(options, std::move(commandLine), std::move(environment));
 }
 
-RunningWSLAProcess::RunningWSLAProcess(std::vector<WSLA_PROCESS_FD>&& fds) : m_fds(std::move(fds))
+RunningWSLAProcess::RunningWSLAProcess(WSLAProcessFlags Flags) : m_flags(Flags)
 {
+}
+
+WSLAProcessFlags RunningWSLAProcess::Flags() const
+{
+    return m_flags;
 }
 
 int RunningWSLAProcess::GetExitCode()
@@ -136,22 +135,26 @@ RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD
     relay::MultiHandleWait io;
 
     // Add a callback on IO for each std handle.
-    for (size_t i = 0; i < m_fds.size(); i++)
-    {
-        if (m_fds[i].Fd == 0 || m_fds[i].Type != WSLAFdTypeDefault)
-        {
-            continue; // Don't try to read from stdin or non hvsocket fds.
-        }
 
-        result.Output.emplace(m_fds[i].Fd, std::string{});
+    auto addHandle = [&](int fd) {
+        result.Output.emplace(fd, std::string{});
 
-        auto stdHandle = GetStdHandle(m_fds[i].Fd);
-
-        auto ioCallback = [Index = m_fds[i].Fd, &result](const gsl::span<char>& Content) {
+        auto stdHandle = GetStdHandle(fd);
+        auto ioCallback = [Index = fd, &result](const gsl::span<char>& Content) {
             result.Output[Index].insert(result.Output[Index].end(), Content.begin(), Content.end());
         };
 
         io.AddHandle(std::make_unique<relay::ReadHandle>(std::move(stdHandle), std::move(ioCallback)));
+    };
+
+    if (WI_IsFlagSet(m_flags, WSLAProcessFlagsTty))
+    {
+        addHandle(WSLAFDTty);
+    }
+    else
+    {
+        addHandle(WSLAFDStdout);
+        addHandle(WSLAFDStderr);
     }
 
     for (auto& e : ExtraHandles)
@@ -175,7 +178,7 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
 
     wil::com_ptr<IWSLAProcess> process;
     int error = -1;
-    auto result = Session.CreateRootNamespaceProcess(&options, &process, &error);
+    auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, &process, &error);
     if (FAILED(result))
     {
         return std::make_tuple(result, error, std::optional<ClientRunningWSLAProcess>());
@@ -183,13 +186,12 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
 
-    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), std::move(m_fds)}};
+    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), m_flags}};
 }
 
 std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLAContainer& Container)
 {
     auto [options, commandLine, env] = CreateProcessOptions();
-    options.Executable = nullptr; // Must be null for exec.
 
     wil::com_ptr<IWSLAProcess> process;
     int error = -1;
@@ -201,7 +203,7 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
 
-    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), std::move(m_fds)}};
+    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), m_flags}};
 }
 
 IWSLAProcess& ClientRunningWSLAProcess::Get()
@@ -209,8 +211,8 @@ IWSLAProcess& ClientRunningWSLAProcess::Get()
     return *m_process.get();
 }
 
-ClientRunningWSLAProcess::ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, std::vector<WSLA_PROCESS_FD>&& fds) :
-    RunningWSLAProcess(std::move(fds)), m_process(std::move(process))
+ClientRunningWSLAProcess::ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& process, WSLAProcessFlags Flags) :
+    RunningWSLAProcess(Flags), m_process(std::move(process))
 {
 }
 

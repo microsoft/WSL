@@ -319,6 +319,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxInitMessageAddVirtioFsDevice,
     LxInitMessageAddVirtioFsDeviceResponse,
     LxInitMessageRemountVirtioFsDevice,
+    LxInitMessageQueryVirtioFsDevice,
     LxInitMessageStartDistroInit,
     LxInitMessageCreateLoginSession,
     LxInitMessageStopPlan9Server,
@@ -1169,6 +1170,17 @@ typedef struct _LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE
     PRETTY_PRINT(FIELD(Header), FIELD(Admin), STRING_FIELD(TagOffset));
 } LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE, *PLX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE;
 
+typedef struct _LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE
+{
+    static inline auto Type = LxInitMessageQueryVirtioFsDevice;
+    using TResponse = LX_INIT_ADD_VIRTIOFS_SHARE_RESPONSE_MESSAGE;
+
+    MESSAGE_HEADER Header;
+    unsigned int TagOffset;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(TagOffset));
+} LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE, *PLX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE;
 //
 // The messages that can be sent to mini_init.
 //
@@ -1672,11 +1684,10 @@ struct WSLA_TTY_RELAY
 
     MESSAGE_HEADER Header;
     int32_t TtyMaster{};
-    int32_t TtyInput{};
-    int32_t TtyOutput{};
+    int32_t Socket{};
     int32_t TtyControl{};
 
-    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(TtyInput), FIELD(TtyOutput), FIELD(TtyControl));
+    PRETTY_PRINT(FIELD(Header), FIELD(TtyMaster), FIELD(Socket), FIELD(TtyControl));
 };
 
 struct WSLA_ACCEPT
