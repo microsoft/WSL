@@ -2026,7 +2026,7 @@ Return Value:
         {
             auto currentVersion = wsl::windows::common::registry::OpenKey(
                 HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", KEY_ALL_ACCESS | flags);
-            
+
             auto result = wsl::windows::common::registry::DeleteKey(currentVersion.get(), L"AeDebug");
 
             LogInfo("AeDebug deletion result (flags %lu): %lu", flags, result);
