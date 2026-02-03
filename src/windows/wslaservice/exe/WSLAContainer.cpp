@@ -23,6 +23,7 @@ using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
+using wsl::windows::service::wsla::RelayedProcessIO;
 using wsl::windows::service::wsla::WSLAContainer;
 using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAContainerMetadata;
@@ -272,6 +273,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
+    IORelay& Relay,
     WSLA_CONTAINER_STATE InitialState,
     WSLAProcessFlags InitProcessFlags,
     WSLAContainerFlags ContainerFlags) :
@@ -284,6 +286,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
+    m_ioRelay(Relay),
     m_containerEvents(EventTracker.RegisterContainerStateUpdates(
         m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2))),
     m_state(InitialState),
@@ -404,20 +407,21 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
     // This is required for docker to know when stdin is closed.
     auto onInputComplete = [handle = ioHandle.get()]() { LOG_LAST_ERROR_IF(shutdown(handle, SD_SEND) == SOCKET_ERROR); };
 
+    // N.B. Ownership of the io handle is given to the DockerIORelayHandle relay, so it can be closed when docker closes the connection.
+    handles.emplace_back(
+        std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
+
     handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        ioHandle.get(), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
-    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, std::move(ioHandle)));
+    m_ioRelay.AddHandles(std::move(handles));
 
-    m_logsRelay.AddHandles(std::move(handles));
-
-    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE));
-    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ));
-    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get()), GENERIC_READ));
+    *Stdin = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdinWrite.get())));
+    *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stdoutRead.get())));
+    *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(reinterpret_cast<HANDLE>(stderrRead.get())));
 }
 
-void WSLAContainerImpl::Start()
+void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
@@ -430,13 +434,18 @@ void WSLAContainerImpl::Start()
 
     // Attach to the container's init process so no IO is lost.
     std::unique_ptr<WSLAProcessIO> io;
-    if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
+
+    if (WI_IsFlagSet(Flags, WSLAContainerStartFlagsAttach))
     {
-        io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
-    }
-    else
-    {
-        io = std::make_unique<RelayedProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+        if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
+        {
+            io = std::make_unique<TTYProcessIO>(wil::unique_handle{(HANDLE)m_dockerClient.AttachContainer(m_id).release()});
+        }
+        else
+        {
+            wil::unique_handle stream{reinterpret_cast<HANDLE>(m_dockerClient.AttachContainer(m_id).release())};
+            io = CreateRelayedProcessIO(std::move(stream), m_initProcessFlags);
+        }
     }
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient, m_eventTracker);
@@ -636,7 +645,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
         }
         else
         {
-            io = std::make_unique<RelayedProcessIO>(std::move(stream));
+            io = CreateRelayedProcessIO(std::move(stream), Options->Flags);
         }
 
         auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
@@ -659,11 +668,14 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     WSLAVirtualMachine& parentVM,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient)
+    DockerHTTPClient& DockerClient,
+    IORelay& IoRelay)
 {
-    // TODO: Think about when 'StdinOnce' should be set.
     common::docker_schema::CreateContainer request;
     request.Image = containerOptions.Image;
+
+    // TODO: Think about when 'StdinOnce' should be set.
+    request.StdinOnce = true;
 
     if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsTty))
     {
@@ -673,7 +685,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     if (WI_IsFlagSet(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsStdin))
     {
         request.OpenStdin = true;
-        request.StdinOnce = true;
     }
 
     request.Cmd = StringArrayToVector(containerOptions.InitProcessOptions.CommandLine);
@@ -766,6 +777,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
+        IoRelay,
         WslaContainerStateCreated,
         containerOptions.InitProcessOptions.Flags,
         containerOptions.Flags);
@@ -781,7 +793,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     WSLAVirtualMachine& parentVM,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
-    DockerHTTPClient& DockerClient)
+    DockerHTTPClient& DockerClient,
+    IORelay& ioRelay)
 {
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
@@ -810,6 +823,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
+        ioRelay,
         DockerStateToWSLAState(dockerContainer.State),
         metadata.InitProcessFlags,
         WSLAContainerFlagsNone);
@@ -859,7 +873,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto [ttyRead, ttyWrite] = common::wslutil::OpenAnonymousPipe(0, true, true);
 
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
-        m_logsRelay.AddHandle(std::move(handle));
+        m_ioRelay.AddHandle(std::move(handle));
 
         *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get()));
     }
@@ -872,11 +886,50 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto handle = std::make_unique<DockerIORelayHandle>(
             std::move(socket), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::HttpChunked);
 
-        m_logsRelay.AddHandle(std::move(handle));
+        m_ioRelay.AddHandle(std::move(handle));
 
         *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get()));
         *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get()));
     }
+}
+
+std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags)
+{
+    // Create one pipe for each STD handle.
+    std::vector<std::unique_ptr<OverlappedIOHandle>> ioHandles;
+    std::map<ULONG, wil::unique_handle> fds;
+
+    // This is required for docker to know when stdin is closed.
+    auto closeStdin = [socket = stream.get(), this]() {
+        LOG_LAST_ERROR_IF(shutdown(reinterpret_cast<SOCKET>(socket), SD_SEND) == SOCKET_ERROR);
+    };
+
+    if (WI_IsFlagSet(flags, WSLAProcessFlagsStdin))
+    {
+        auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+        ioHandles.emplace_back(
+            std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(closeStdin)}, stream.get()));
+
+        fds.emplace(WSLAFDStdin, stdinWrite.release());
+    }
+    else
+    {
+        // If stdin is not attached, close it now to make sure no one tries to write to it.
+        closeStdin();
+    }
+
+    auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+    auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+
+    fds.emplace(WSLAFDStdout, stdoutRead.release());
+    fds.emplace(WSLAFDStderr, stderrRead.release());
+
+    ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
+        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
+
+    m_ioRelay.AddHandles(std::move(ioHandles));
+
+    return std::make_unique<RelayedProcessIO>(std::move(fds));
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
@@ -916,9 +969,9 @@ HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds
     return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutSeconds);
 }
 
-HRESULT WSLAContainer::Start()
+HRESULT WSLAContainer::Start(WSLAContainerStartFlags Flags)
 {
-    return CallImpl(&WSLAContainerImpl::Start);
+    return CallImpl(&WSLAContainerImpl::Start, Flags);
 }
 
 HRESULT WSLAContainer::Inspect(LPSTR* Output)

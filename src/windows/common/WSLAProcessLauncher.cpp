@@ -74,6 +74,11 @@ RunningWSLAProcess::RunningWSLAProcess(WSLAProcessFlags Flags) : m_flags(Flags)
 {
 }
 
+WSLAProcessFlags RunningWSLAProcess::Flags() const
+{
+    return m_flags;
+}
+
 int RunningWSLAProcess::GetExitCode()
 {
     WSLA_PROCESS_STATE state{};

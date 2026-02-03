@@ -13,7 +13,7 @@ namespace wsl::core {
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
+    VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
     ~VirtioNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -49,12 +49,12 @@ private:
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     bool m_enableLocalhostRelay;
+    LPCWSTR m_dnsOptions = nullptr;
     GUID m_localhostAdapterId;
     GUID m_adapterId;
 
     std::optional<ULONGLONG> m_interfaceLuid;
     ULONG m_networkMtu = 0;
-    networking::DnsUpdateHelper m_dnsUpdateHelper;
     networking::DnsInfo m_trackedDnsSettings;
 
     // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.
