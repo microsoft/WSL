@@ -207,6 +207,14 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
     return std::make_pair(S_OK, std::move(RunningWSLAContainer{std::move(container), m_flags}));
 }
 
+RunningWSLAContainer WSLAContainerLauncher::Create(IWSLASession& Session)
+{
+    auto [result, container] = CreateNoThrow(Session);
+    THROW_IF_FAILED(result);
+
+    return std::move(container.value());
+}
+
 RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session, WSLAContainerStartFlags Flags)
 {
     auto [result, container] = LaunchNoThrow(Session, Flags);
