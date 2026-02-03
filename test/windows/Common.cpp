@@ -2021,6 +2021,9 @@ Return Value:
         g_registryChangesSz.emplace_back(RegistryKeyChange<std::wstring>(HKEY_LOCAL_MACHINE, key, L"DumpFolder", g_dumpFolder));
         g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpType", 2));
         g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpCount", 10));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"Disabled", 0));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"ForceQueue", 1));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DebugApplications", 0));
 
         for (auto flags : {KEY_WOW64_32KEY, KEY_WOW64_64KEY})
         {
