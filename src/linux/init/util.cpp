@@ -904,11 +904,12 @@ try
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = UtilParseVirtiofsMountSource(MountEnum.Current().Source);
+            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
             if (MountSource.empty())
             {
                 continue;
             }
+
             MountEnum.Current().Source = MountSource.data();
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
@@ -2045,41 +2046,6 @@ Return Value:
     }
 
     return {};
-}
-
-std::string UtilParseVirtiofsMountSource(std::string_view Source)
-
-/*++
-
-Routine Description:
-
-    This routine parses the mount source to determine the actual source of a
-    a VirtioFs mount.
-
-Arguments:
-
-    Source - Supplies the source string.
-
-Return Value:
-
-    The mount source, or NULL if the source is not valid.
-
---*/
-
-{
-    std::string MountSource{};
-    if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) && (Source.size() >= sizeof(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG)))
-    {
-        MountSource = Source[sizeof(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) - 1];
-        MountSource += ":";
-    }
-    else if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_VIRTIO_TAG) && (Source.size() >= sizeof(LX_INIT_DRVFS_VIRTIO_TAG)))
-    {
-        MountSource = Source[sizeof(LX_INIT_DRVFS_VIRTIO_TAG) - 1];
-        MountSource += ":";
-    }
-
-    return MountSource;
 }
 
 std::vector<char> UtilParseWslEnv(char* NtEnvironment)
