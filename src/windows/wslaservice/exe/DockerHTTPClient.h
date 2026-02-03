@@ -114,7 +114,7 @@ public:
             HTTPRequestContext& context,
             std::function<void(const boost::beast::http::message<false, boost::beast::http::buffer_body>&)>&& OnResponseHeader,
             std::function<void(const gsl::span<char>&)>&& OnResponseBytes,
-            std::function<void()>&& OnCompleted);
+            std::function<void()>&& OnCompleted = []() {});
 
         ~DockerHttpResponseHandle();
 
@@ -138,14 +138,13 @@ private:
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
         boost::beast::http::verb Method, const std::string& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers);
 
-    std::pair<uint32_t, std::string> SendRequest(
+    std::pair<uint32_t, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const std::string& Url, const std::string& Body = "");
 
     std::pair<uint32_t, wil::unique_socket> SendRequest(
         boost::beast::http::verb Method,
         const std::string& Url,
         const std::string& Body,
-        const OnResponseBytes& OnResponse,
         const std::map<boost::beast::http::field, std::string>& Headers = {});
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
@@ -157,7 +156,7 @@ private:
             requestString = wsl::shared::ToJson(RequestObject);
         }
 
-        auto [statusCode, responseString] = SendRequest(Method, Url, requestString);
+        auto [statusCode, responseString] = SendRequestAndReadResponse(Method, Url, requestString);
 
         if (statusCode < 200 || statusCode >= 300)
         {

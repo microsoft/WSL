@@ -29,8 +29,6 @@ using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);
-
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
 
@@ -1281,7 +1279,7 @@ class WSLATests
 
         // Validate that stdin behaves correctly if closed without any input.
         {
-            WSLAContainerLauncher launcher("debian:latest", "test-stdin", {"/bin/cat"});
+            WSLAContainerLauncher launcher("debian:latest", "test-stdin", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
             process.GetStdHandle(0); // Close stdin;
@@ -1660,10 +1658,10 @@ class WSLATests
             VERIFY_SUCCEEDED(result);
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateCreated);
-            VERIFY_SUCCEEDED(container->Get().Start());
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsNone));
 
             // Verify that Start() can't be called again on a running container.
-            VERIFY_ARE_EQUAL(container->Get().Start(), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(container->Get().Start(WSLAContainerStartFlagsNone), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             VERIFY_ARE_EQUAL(container->State(), WslaContainerStateRunning);
 
@@ -2775,7 +2773,7 @@ class WSLATests
                 HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Start the container.
-            VERIFY_SUCCEEDED(container->Get().Start());
+            VERIFY_SUCCEEDED(container->Get().Start(WSLAContainerStartFlagsAttach));
 
             // Get its original std handles.
             auto process = container->GetInitProcess();
@@ -2883,6 +2881,34 @@ class WSLATests
 
             originalReader.ExpectClosed();
             attachedReader.ExpectClosed();
+        }
+
+        // Validate that containers can be started in detached mode and attached to later.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "attach-test-4", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            auto container = launcher.Launch(*m_defaultSession, WSLAContainerStartFlagsNone);
+
+            auto initProcess = container.GetInitProcess();
+            ULONG dummy{};
+            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLAFDStdin, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLAFDStdout, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+            VERIFY_ARE_EQUAL(initProcess.Get().GetStdHandle(WSLAFDStderr, &dummy), HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+
+            // Verify that the container can be attached to.
+            wil::unique_handle attachedStdin;
+            wil::unique_handle attachedStdout;
+            wil::unique_handle attachedStderr;
+            VERIFY_SUCCEEDED(container.Get().Attach((ULONG*)&attachedStdin, (ULONG*)&attachedStdout, (ULONG*)&attachedStderr));
+
+            PartialHandleRead attachedReader(attachedStdout.get());
+
+            // Write content on the attached stdin.
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(attachedStdin.get(), "OK\n", 3, nullptr, nullptr));
+            attachedStdin.reset();
+
+            attachedReader.Expect("OK\n");
+            attachedReader.ExpectClosed();
+            VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
         }
     }
 };

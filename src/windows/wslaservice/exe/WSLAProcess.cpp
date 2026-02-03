@@ -42,6 +42,8 @@ CATCH_RETURN();
 HRESULT WSLAProcess::GetStdHandle(ULONG Index, ULONG* Handle)
 try
 {
+    RETURN_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_io, "Process IO not attached");
+
     auto handle = m_io->OpenFd(Index);
 
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !handle.is_valid());
@@ -60,6 +62,8 @@ CATCH_RETURN();
 
 wil::unique_handle WSLAProcess::GetStdHandle(int Index)
 {
+    THROW_WIN32_IF(ERROR_INVALID_STATE, !m_io);
+
     return m_io->OpenFd(Index);
 }
 

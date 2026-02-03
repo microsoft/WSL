@@ -255,7 +255,7 @@ int ExportDistribution(_In_ std::wstring_view commandLine)
 
     parser.AddPositionalArgument(name, 0);
     parser.AddPositionalArgument(filePath, 1);
-    parser.AddArgument(SetFlag<ULONG, LXSS_EXPORT_DISTRO_FLAGS_VHD>(flags), WSL_EXPORT_ARG_VHD_OPTION);
+    parser.AddArgument(SetFlag<LXSS_EXPORT_DISTRO_FLAGS_VHD, ULONG>(flags), WSL_EXPORT_ARG_VHD_OPTION);
     parser.AddArgument(parseFormat, WSL_EXPORT_ARG_FORMAT_OPTION);
     parser.Parse();
 
@@ -321,7 +321,7 @@ int ImportDistribution(_In_ std::wstring_view commandLine)
     parser.AddPositionalArgument(AbsolutePath(installPath), 1);
     parser.AddPositionalArgument(filePath, 2);
     parser.AddArgument(WslVersion(version), WSL_IMPORT_ARG_VERSION);
-    parser.AddArgument(SetFlag<ULONG, LXSS_IMPORT_DISTRO_FLAGS_VHD>{flags}, WSL_IMPORT_ARG_VHD);
+    parser.AddArgument(SetFlag<LXSS_IMPORT_DISTRO_FLAGS_VHD, ULONG>{flags}, WSL_IMPORT_ARG_VHD);
 
     parser.Parse();
 
@@ -1543,12 +1543,9 @@ int WslaShell(_In_ std::wstring_view commandLine)
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(rootVhdOverride, L"--vhd");
     parser.AddArgument(Utf8String(shell), L"--shell");
-    parser.AddArgument(
-        SetFlag<int, WslaFeatureFlagsDnsTunneling>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--dns-tunneling");
-    parser.AddArgument(
-        SetFlag<int, WslaFeatureFlagsPmemVhds>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--pmem-vhds");
-    parser.AddArgument(
-        SetFlag<int, WslaFeatureFlagsVirtioFs>(reinterpret_cast<int&>(sessionSettings.FeatureFlags)), L"--virtiofs");
+    parser.AddArgument(SetFlag<WslaFeatureFlagsDnsTunneling>(sessionSettings.FeatureFlags), L"--dns-tunneling");
+    parser.AddArgument(SetFlag<WslaFeatureFlagsPmemVhds>(sessionSettings.FeatureFlags), L"--pmem-vhds");
+    parser.AddArgument(SetFlag<WslaFeatureFlagsVirtioFs>(sessionSettings.FeatureFlags), L"--virtiofs");
     parser.AddArgument(Integer(sessionSettings.MemoryMb), L"--memory");
     parser.AddArgument(Integer(sessionSettings.CpuCount), L"--cpu");
     parser.AddArgument(Utf8String(rootVhdTypeOverride), L"--fstype");
