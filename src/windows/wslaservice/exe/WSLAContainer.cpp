@@ -826,7 +826,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     auto volumeErrorCleanup = MountVolumes(metadata.Volumes, parentVM);
     auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, parentVM);
 
-
     auto container = std::make_unique<WSLAContainerImpl>(
         &parentVM,
         std::string(dockerContainer.Id),
@@ -834,7 +833,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::string(dockerContainer.Image),
         std::move(metadata.Volumes),
         std::move(metadata.Ports),
-        std::move(std::map<std::string, std::string>(dockerContainer.Labels)),
+        std::move(dockerContainer.Labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
