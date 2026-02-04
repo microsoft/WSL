@@ -3,8 +3,8 @@
 
 #pragma once
 #include "pch.h"
-#include "errors.h"
-#include "executionargs.h"
+#include "Errors.h"
+#include "ExecutionArgs.h"
 #include "ExecutionContext.h"
 
 #include <string_view>

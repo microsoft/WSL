@@ -1,21 +1,21 @@
 
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
     ${CMAKE_CURRENT_SOURCE_DIR}/services
 )
 
 set(HEADERS
-    inc/pch.h
-    inc/util.h
-    inc/argument.h
-    inc/command.h
-    inc/context.h
-    inc/core.h
-    inc/errors.h
-    inc/executionargs.h
-    inc/invocation.h
+    core/pch.h
+    core/Util.h
+    core/Argument.h
+    core/Command.h
+    core/Core.h
+    core/Errors.h
+    core/ExecutionArgs.h
+    core/ExecutionContext.h
+    core/Invocation.h
     commands/RootCommand.h
     commands/TestCommand.h
     commands/ContainerCommand.h
@@ -26,12 +26,12 @@ set(HEADERS
 )
 
 set(SOURCES
-    util.cpp
-    argument.cpp
-    command.cpp
-    context.cpp
-    core.cpp
-    main.cpp
+    core/Util.cpp
+    core/Argument.cpp
+    core/Command.cpp
+    core/ExecutionContext.cpp
+    core/Core.cpp
+    core/Main.cpp
     commands/RootCommand.cpp
     commands/TestCommand.cpp
     commands/ContainerCommand.cpp

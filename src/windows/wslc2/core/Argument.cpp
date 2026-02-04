@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 #include "pch.h"
-#include "argument.h"
-#include "command.h"
-#include "context.h"
+#include "Argument.h"
+#include "Command.h"
+#include "ExecutionContext.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;

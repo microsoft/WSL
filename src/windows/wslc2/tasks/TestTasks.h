@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 #pragma once
-#include "context.h"
+#include "ExecutionContext.h"
 
 using wsl::windows::wslc::execution::CLIExecutionContext;
 

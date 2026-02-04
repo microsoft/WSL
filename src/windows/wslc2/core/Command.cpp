@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 #include "pch.h"
-#include "argument.h"
-#include "command.h"
-#include "invocation.h"
+#include "Argument.h"
+#include "Command.h"
+#include "Invocation.h"
 #include "TaskBase.h"
 
 using namespace wsl::shared;

@@ -3,7 +3,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include "core.h"
+#include "Core.h"
 
 int wmain(int argc, wchar_t const** argv)
 {

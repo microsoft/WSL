@@ -4,7 +4,6 @@
 #include "pch.h"
 #include "ContainerCommand.h"
 #include "TaskBase.h"
-#include "TestTasks.h"
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;

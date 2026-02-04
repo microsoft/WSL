@@ -2,11 +2,10 @@
 // Licensed under the MIT License.
 #pragma once
 #include "precomp.h"
-#include "argument.h"
-#include "context.h"
-#include "executionargs.h"
+#include "Argument.h"
+#include "ExecutionArgs.h"
 #include "ExecutionContext.h"
-#include "invocation.h"
+#include "Invocation.h"
 
 #include <initializer_list>
 #include <memory>

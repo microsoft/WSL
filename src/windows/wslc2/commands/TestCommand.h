@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 #pragma once
-#include "command.h"
+#include "Command.h"
 
 namespace wsl::windows::wslc
 {

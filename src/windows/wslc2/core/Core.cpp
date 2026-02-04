@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 #include "pch.h"
-#include "context.h"
-#include "errors.h"
-#include "invocation.h"
+#include "Errors.h"
+#include "ExecutionContext.h"
+#include "Invocation.h"
 #include "RootCommand.h"
 #include "TaskBase.h"
 
