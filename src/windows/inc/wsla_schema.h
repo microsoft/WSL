@@ -20,8 +20,8 @@ namespace wsl::windows::common::wsla_schema {
 
 struct InspectPortBinding
 {
-    // HostIp is not currently populated by WSLAContainer.cpp and will remain empty.
-    std::string HostIp;
+    // WSLA always binds to localhost. Included for Docker API compatibility.
+    std::string HostIp = "127.0.0.1";
     std::string HostPort;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(InspectPortBinding, HostIp, HostPort);
@@ -29,6 +29,7 @@ struct InspectPortBinding
 
 struct InspectMount
 {
+    // TODO: Support different mount types (plan9/VHD) when VHD volumes are implemented.
     std::string Type;
     std::string Source;
     std::string Destination;

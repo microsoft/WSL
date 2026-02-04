@@ -1790,7 +1790,86 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        // Running container with port mappings and volumes.
+        // Helper to verify port mappings.
+        auto expectPorts = [&](const auto& actualPorts, const std::map<std::string, std::set<std::string>>& expectedPorts) {
+            VERIFY_ARE_EQUAL(actualPorts.size(), expectedPorts.size());
+
+            for (const auto& [actualKey, _] : actualPorts)
+            {
+                if (!expectedPorts.contains(actualKey))
+                {
+                    LogError("Unexpected port key found: %hs", actualKey.c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            for (const auto& [expectedPort, expectedHostPorts] : expectedPorts)
+            {
+                auto it = actualPorts.find(expectedPort);
+                VERIFY_IS_TRUE(it != actualPorts.end());
+
+                std::set<std::string> actualHostPorts;
+                for (const auto& binding : it->second)
+                {
+                    VERIFY_IS_FALSE(binding.HostPort.empty());
+
+                    // WSLA always binds to localhost.
+                    VERIFY_ARE_EQUAL(binding.HostIp, "127.0.0.1");
+
+                    auto [_, inserted] = actualHostPorts.insert(binding.HostPort);
+                    if (!inserted)
+                    {
+                        LogError("Duplicate host port %hs found for port %hs", binding.HostPort.c_str(), expectedPort.c_str());
+                        VERIFY_FAIL();
+                    }
+                }
+
+                VERIFY_ARE_EQUAL(actualHostPorts, expectedHostPorts);
+            }
+        };
+
+        // Helper to verify mounts.
+        auto expectMounts = [&](const auto& actualMounts, const std::vector<std::tuple<std::string, std::string, bool>>& expectedMounts) {
+            VERIFY_ARE_EQUAL(actualMounts.size(), expectedMounts.size());
+
+            std::set<std::string> expectedDests;
+            for (const auto& [dest, _, __] : expectedMounts)
+            {
+                expectedDests.insert(dest);
+            }
+
+            std::set<std::string> seenDestinations;
+            for (const auto& mount : actualMounts)
+            {
+                VERIFY_IS_FALSE(mount.Destination.empty());
+                VERIFY_IS_FALSE(mount.Type.empty());
+
+                if (!expectedDests.contains(mount.Destination))
+                {
+                    LogError("Unexpected mount destination found: %hs", mount.Destination.c_str());
+                    VERIFY_FAIL();
+                }
+
+                auto [_, inserted] = seenDestinations.insert(mount.Destination);
+                if (!inserted)
+                {
+                    LogError("Duplicate mount destination found: %hs", mount.Destination.c_str());
+                    VERIFY_FAIL();
+                }
+            }
+
+            for (const auto& [expectedDest, expectedType, expectedReadWrite] : expectedMounts)
+            {
+                auto it = std::ranges::find_if(actualMounts, [&](const auto& m) { return m.Destination == expectedDest; });
+                VERIFY_IS_TRUE(it != actualMounts.end());
+
+                VERIFY_ARE_EQUAL(it->Type, expectedType);
+                VERIFY_ARE_EQUAL(it->ReadWrite, expectedReadWrite);
+                VERIFY_IS_FALSE(it->Source.empty());
+            }
+        };
+
+        // Test a running container with port mappings and volumes.
         {
             auto testFolder = std::filesystem::current_path() / "test-inspect-volume";
             auto testFolderReadOnly = std::filesystem::current_path() / "test-inspect-volume-ro";
@@ -1808,61 +1887,37 @@ class WSLATests
                 "debian:latest", "test-container-inspect", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
             launcher.AddPort(1234, 8000, AF_INET);
-            launcher.AddPort(1235, 8001, AF_INET);
-            launcher.AddVolume(testFolder.wstring(), "/test-volume", false);           // read-write
-            launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true); // read-only
+            launcher.AddPort(1235, 8000, AF_INET);
+            launcher.AddPort(1236, 8001, AF_INET);
+            launcher.AddVolume(testFolder.wstring(), "/test-volume", false);
+            launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true);
 
             auto container = launcher.Launch(*m_defaultSession);
-
             auto details = container.Inspect();
 
+            // Verify basic container metadata is present.
             VERIFY_IS_FALSE(details.Id.empty());
             VERIFY_IS_FALSE(details.Name.empty());
             VERIFY_IS_FALSE(details.Image.empty());
+            VERIFY_IS_FALSE(details.Created.empty());
 
+            // Verify container state is correct.
             VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
             VERIFY_IS_TRUE(details.State.Running);
             VERIFY_IS_FALSE(details.State.Status.empty());
+            VERIFY_IS_FALSE(details.State.StartedAt.empty());
 
-            // Verify port mappings are populated.
-            VERIFY_IS_FALSE(details.Ports.empty());
+            // Verify port mappings match what we configured.
+            expectPorts(details.Ports, {{"8000/tcp", {"1234", "1235"}}, {"8001/tcp", {"1236"}}});
 
-            auto& p8000 = details.Ports.at("8000/tcp");
-            VERIFY_IS_TRUE(p8000.size() >= 1);
-            VERIFY_ARE_EQUAL(p8000[0].HostPort, "1234");
-
-            auto& p8001 = details.Ports.at("8001/tcp");
-            VERIFY_IS_TRUE(p8001.size() >= 1);
-            VERIFY_ARE_EQUAL(p8001[0].HostPort, "1235");
-
-            // Verify volume mounts are populated.
-            VERIFY_ARE_EQUAL(details.Mounts.size(), 2u);
-
-            bool foundReadWrite = false, foundReadOnly = false;
-            for (const auto& mount : details.Mounts)
-            {
-                VERIFY_ARE_EQUAL(mount.Type, "bind");
-                VERIFY_IS_FALSE(mount.Source.empty());
-
-                if (mount.Destination == "/test-volume")
-                {
-                    VERIFY_IS_TRUE(mount.ReadWrite);
-                    foundReadWrite = true;
-                }
-                else if (mount.Destination == "/test-volume-ro")
-                {
-                    VERIFY_IS_FALSE(mount.ReadWrite);
-                    foundReadOnly = true;
-                }
-            }
-            VERIFY_IS_TRUE(foundReadWrite);
-            VERIFY_IS_TRUE(foundReadOnly);
+            // Verify volume mounts match what we configured.
+            expectMounts(details.Mounts, {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());
         }
 
-        // Exited container retains schema shape.
+        // Test an exited container still returns correct schema shape.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-container-inspect-exited", {"echo", "OK"});
             auto container = launcher.Launch(*m_defaultSession);
@@ -1872,12 +1927,21 @@ class WSLATests
 
             auto details = container.Inspect();
 
+            // Verify basic container metadata is present.
             VERIFY_IS_FALSE(details.Id.empty());
             VERIFY_IS_FALSE(details.Name.empty());
             VERIFY_IS_FALSE(details.Image.empty());
+            VERIFY_IS_FALSE(details.Created.empty());
 
+            // Verify exited state is correct.
             VERIFY_IS_FALSE(details.State.Running);
             VERIFY_ARE_EQUAL(details.State.ExitCode, 0);
+            VERIFY_IS_FALSE(details.State.StartedAt.empty());
+            VERIFY_IS_FALSE(details.State.FinishedAt.empty());
+
+            // Verify no ports or mounts for this simple container.
+            expectPorts(details.Ports, std::map<std::string, std::set<std::string>>{});
+            expectMounts(details.Mounts, std::vector<std::tuple<std::string, std::string, bool>>{});
 
             VERIFY_SUCCEEDED(container.Get().Delete());
         }

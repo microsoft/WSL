@@ -585,6 +585,8 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     // Map WSLA port mappings (Windows host ports only). HostIp is not surfaced.
     for (const auto& e : m_mappedPorts)
     {
+        // TODO: UDP support
+        // TODO: Investigate ipv6 support.
         auto portKey = std::format("{}/tcp", e.ContainerPort);
 
         wsla_schema::InspectPortBinding portBinding{};
@@ -598,6 +600,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     for (const auto& volume : m_mountedVolumes)
     {
         wsla_schema::InspectMount mountInfo{};
+        // TODO: Support different mount types (plan9/VHD) when VHD volumes are implemented.
         mountInfo.Type = "bind";
         mountInfo.Source = wsl::shared::string::WideToMultiByte(volume.HostPath);
         mountInfo.Destination = volume.ContainerPath;
@@ -730,7 +733,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     for (const auto& e : *mappedPorts)
     {
         // TODO: UDP support
-        // TODO: Investigate ipv6 support.
+        // TODO: ipv6 support.
         auto portKey = std::format("{}/tcp", e.ContainerPort);
         request.ExposedPorts[portKey] = {};
         auto& portEntry = request.HostConfig.PortBindings[portKey];

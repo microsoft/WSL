@@ -130,13 +130,6 @@ struct InspectMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, RW);
 };
 
-struct NetworkSettings
-{
-    std::map<std::string, std::vector<PortMapping>> Ports;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkSettings, Ports);
-};
-
 struct InspectContainer
 {
     std::string Id;
@@ -146,10 +139,9 @@ struct InspectContainer
     ContainerInspectState State;
     ContainerConfig Config;
     HostConfig HostConfig;
-    NetworkSettings NetworkSettings;
     std::vector<InspectMount> Mounts;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, NetworkSettings, Mounts);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts);
 };
 
 struct Image
