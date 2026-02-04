@@ -1,6 +1,7 @@
 ﻿// Copyright (C) Microsoft Corporation. All rights reserved.
 
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.AppLifecycle;
 using System.Runtime.CompilerServices;
 using WslSettings.Contracts.Services;
@@ -87,6 +88,9 @@ public class ProtocolActivationHandler : ActivationHandler<LaunchActivatedEventA
                         break;
                     case "vscodeint":
                         pageKey = typeof(VSCodeIntegrationViewModel).FullName!;
+                        break;
+                    case "vsint":
+                        pageKey = typeof(VSIntegrationViewModel).FullName!;
                         break;
                     case "gpuaccel":
                         pageKey = typeof(GPUAccelerationViewModel).FullName!;
