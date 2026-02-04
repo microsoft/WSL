@@ -642,12 +642,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_EXEC& Mes
 {
     auto Executable = wsl::shared::string::FromSpan(Buffer, Message.ExecutableIndex);
     auto ArgumentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.CommandLineIndex);
-    ArgumentArray.push_back(nullptr);
+    auto ArgumentPointers = wsl::shared::string::StringPointersFromArray(ArgumentArray, true);
 
     auto EnvironmentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.EnvironmentIndex);
-    EnvironmentArray.push_back(nullptr);
+    auto EnvironmentPointers = wsl::shared::string::StringPointersFromArray(EnvironmentArray, true);
 
-    execve(Executable, (char* const*)(ArgumentArray.data()), (char* const*)(EnvironmentArray.data()));
+    execve(Executable, (char* const*)(ArgumentPointers.data()), (char* const*)(EnvironmentPointers.data()));
 
     // Only reached if exec() fails
     Channel.SendResultMessage<int32_t>(errno);

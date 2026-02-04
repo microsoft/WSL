@@ -471,6 +471,157 @@ class WSLATests
             m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
     }
 
+    TEST_METHOD(SaveImage)
+    {
+        WSL2_TEST_ONLY();
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            // Load the image from a saved tar
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Save the image to a tar file.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle imageTarFileHandle{CreateFileW(
+                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+            WSLA_ERROR_INFO errorInfo{};
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, &errorInfo));
+            VERIFY_ARE_EQUAL(errorInfo.UserErrorMessage, nullptr);
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
+        }
+
+        // Load the saved image to verify it's valid.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            // Load the image from a saved tar
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Try to save an invalid image.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldError.tar";
+            wil::unique_handle imageTarFileHandle{CreateFileW(
+                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+            WSLA_ERROR_INFO errorInfo{};
+            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, &errorInfo));
+            VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
+            std::string errMsg = errorInfo.UserErrorMessage;
+            VERIFY_IS_TRUE(errMsg.find("reference does not exist") != std::string::npos);
+            CoTaskMemFree(errorInfo.UserErrorMessage);
+            errorInfo.UserErrorMessage = nullptr;
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+        }
+    }
+    TEST_METHOD(ExportContainer)
+    {
+        WSL2_TEST_ONLY();
+        // Load an image and launch a container to verify image is valid.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+
+            // Export the container to a tar file.
+            std::filesystem::path containerTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle containerTarFileHandle{CreateFileW(
+                containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
+            VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+            LPSTR containerId = nullptr;
+            VERIFY_SUCCEEDED(container.Get().GetID(&containerId));
+            WSLA_ERROR_INFO errorInfo{};
+            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(HandleToULong(containerTarFileHandle.get()), containerId, nullptr, &errorInfo));
+            CoTaskMemFree(containerId);
+            VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
+        }
+
+        // Load the exported container to verify it's valid.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+            wil::unique_handle imageTarFileHandle{
+                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            // Verify that the image is in the list of images.
+            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
+            auto container = launcher.Launch(*m_defaultSession);
+            auto result = container.GetInitProcess().WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
+            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+        }
+
+        // Try to export a non-existing container.
+        {
+            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExportError.tar";
+            wil::unique_handle contTarFileHandle{CreateFileW(
+                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == contTarFileHandle.get());
+            LARGE_INTEGER fileSize{};
+            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+            WSLA_ERROR_INFO errorInfo{};
+            VERIFY_ARE_EQUAL(m_defaultSession->ExportContainer(HandleToULong(contTarFileHandle.get()), "dummy", nullptr, &errorInfo), WSLA_E_CONTAINER_NOT_FOUND);
+            VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
+            std::string errMsg = errorInfo.UserErrorMessage;
+            LogInfo("Error message: %hs", errMsg.c_str());
+            VERIFY_IS_TRUE(errMsg.find("No such container") != std::string::npos);
+            CoTaskMemFree(errorInfo.UserErrorMessage);
+            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
+            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+        }
+    }
+
     TEST_METHOD(CustomDmesgOutput)
     {
         WSL2_TEST_ONLY();
@@ -1138,6 +1289,14 @@ class WSLATests
             ResetTestSession();
             VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
+
+        // Validate that empty arguments are correctly handled.
+        {
+            WSLAProcessLauncher launcher({"/usr/bin/echo"}, {"/usr/bin/echo", "foo", "", "bar"});
+
+            auto process = launcher.Launch(*m_defaultSession);
+            ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // expect two spaces for the empty argument.
+        }
     }
 
     TEST_METHOD(CrashDumpCollection)
@@ -1366,6 +1525,15 @@ class WSLATests
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
             ValidateProcessOutput(process, {{1, "nobody\n"}});
+        }
+
+        // Validate that empty arguments are correctly handled.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-empty-args", {"echo", "foo", "", "bar"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
         // Validate error paths
@@ -1880,6 +2048,14 @@ class WSLATests
             auto process = WSLAProcessLauncher({}, {"/bin/sh", "-c", "echo $testenv"}, {{"testenv=testvalue"}}).Launch(container.Get());
 
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
+        }
+
+        // Validate that empty arguments are correctly handled.
+        {
+            WSLAProcessLauncher launcher({}, {"echo", "foo", "", "bar"});
+
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
         // Validate that an exec'd command returns when the container is stopped.
@@ -2551,7 +2727,7 @@ class WSLATests
             container.SetDeleteOnClose(false);
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateCreated);
-            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsAttach));
 
             auto initProcess = container.GetInitProcess();
             auto stdoutHandle = initProcess.GetStdHandle(1);
