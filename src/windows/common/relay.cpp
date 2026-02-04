@@ -602,7 +602,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
     while (!m_handles.empty() && !m_cancel)
     {
         // Schedule IO on each handle until all are either pending, or completed.
-        for (auto i = 0; i < m_handles.size(); i++)
+        for (size_t i = 0; i < m_handles.size(); i++)
         {
             while (m_handles[i].second->GetState() == IOHandleStatus::Standby)
             {
@@ -737,15 +737,14 @@ SingleAcceptHandle::~SingleAcceptHandle()
 {
     if (State == IOHandleStatus::Pending)
     {
-        if (!CancelIoEx(ListenSocket.Get(), &Overlapped))
+        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
+
+        DWORD bytesProcessed{};
+        DWORD flagsReturned{};
+        if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
         {
-            DWORD bytesProcessed{};
-            DWORD flagsReturned{};
-            if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
-            {
-                auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-            }
+            auto error = GetLastError();
+            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
         }
     }
 }
