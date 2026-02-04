@@ -298,7 +298,7 @@ try
     {
         return MountFilesystem(DRVFS_FS_TYPE, Source, Target, Options, ExitCode);
     }
-    else if (WSL_USE_VIRTIO_FS(Config))
+    else if (WSL_USE_VIRTIO_FS())
     {
         return MountVirtioFs(Source, Target, Options, Admin, Config, ExitCode);
     }
@@ -349,7 +349,7 @@ Return Value:
     return ExitCode;
 }
 
-int MountPlan9Share(const char* Source, const char* Target, const char* Options, bool Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
+int MountPlan9Share(const char* Source, const char* Target, const char* Options, bool Admin, int* ExitCode)
 
 /*++
 
@@ -367,8 +367,6 @@ Arguments:
 
     Admin - Supplies a boolean specifying if the admin share should be used.
 
-    Config - Supplies the distribution configuration.
-
     ExitCode - Supplies an optional pointer that receives the exit code.
 
 Return Value:
@@ -379,7 +377,7 @@ Return Value:
 
 {
     std::string MountOptions;
-    if (WSL_USE_VIRTIO_9P(Config))
+    if (WSL_USE_VIRTIO_9P())
     {
         Source = Admin ? LX_INIT_DRVFS_ADMIN_VIRTIO_TAG : LX_INIT_DRVFS_VIRTIO_TAG;
         MountOptions = std::format("msize=262144,trans=virtio,{}", Options);
@@ -476,7 +474,7 @@ try
     //
 
     MountOptions += Plan9Options;
-    if (MountPlan9Share(Source, Target, MountOptions.c_str(), Elevated, Config, ExitCode) < 0)
+    if (MountPlan9Share(Source, Target, MountOptions.c_str(), Elevated, ExitCode) < 0)
     {
         return -1;
     }
@@ -515,6 +513,8 @@ Return Value:
 
 try
 {
+    assert(WSL_USE_VIRTIO_FS());
+
     //
     // Check whether to use the elevated or non-elevated virtiofs server.
     //
@@ -596,6 +596,8 @@ Return Value:
 
 try
 {
+    assert(WSL_USE_VIRTIO_FS());
+
     wsl::shared::MessageWriter<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE> RemountShare(LxInitMessageRemountVirtioFsDevice);
     RemountShare->Admin = Admin;
     RemountShare.WriteString(RemountShare->TagOffset, Tag);
@@ -643,6 +645,21 @@ Return Value:
 
 try
 {
+    if (!WSL_USE_VIRTIO_FS())
+    {
+        return {};
+    }
+
+    //
+    // Validate the tag is a GUID.
+    //
+
+    const auto Guid = wsl::shared::string::ToGuid(Tag);
+    if (!Guid)
+    {
+        return {};
+    }
+
     wsl::shared::MessageWriter<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE> QueryShare(LxInitMessageQueryVirtioFsDevice);
     QueryShare.WriteString(QueryShare->TagOffset, Tag);
 

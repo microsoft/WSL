@@ -223,7 +223,9 @@ std::optional<std::string> UtilGetEnv(const char* Name, char* Environment);
 
 std::string UtilGetEnvironmentVariable(const char* Name);
 
-int UtilGetFeatureFlags(const wsl::linux::WslDistributionConfig& Config);
+int UtilGetFeatureFlags();
+
+void UtilSetFeatureFlags(int FeatureFlags, bool UpdateEnv = true);
 
 std::optional<LX_MINI_INIT_NETWORKING_MODE> UtilGetNetworkingMode(void);
 
