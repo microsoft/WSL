@@ -66,6 +66,9 @@ static bool g_enableWerReport = false;
 static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 
+static std::vector<RegistryKeyChange<std::wstring>> g_registryChangesSz;
+static std::vector<RegistryKeyChange<DWORD>> g_registryChangesDword;
+
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
     wil::unique_handle read;
@@ -1997,7 +2000,7 @@ Return Value:
         g_OriginalStderr = LxssRedirectOutput(STD_ERROR_HANDLE, redirectStderr.value());
     }
 
-    g_dumpFolder = getOptionalTestParam(L"DumpFolder").value_or(L".");
+    g_dumpFolder = std::filesystem::weakly_canonical(getOptionalTestParam(L"DumpFolder").value_or(L".")).wstring();
     g_dumpToolPath = getOptionalTestParam(L"DumpTool");
     g_pipelineBuildId = getOptionalTestParam(L"PipelineBuildId").value_or(L"");
 
@@ -2007,6 +2010,38 @@ Return Value:
     }
 
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"WerReport", g_enableWerReport);
+
+    bool enableCrashDumpCollection = false;
+    WEX::TestExecution::RuntimeParameters::TryGetValue(L"CollectCrashDumps", enableCrashDumpCollection);
+
+    if (enableCrashDumpCollection)
+    {
+        LogInfo("Enabling crash dump collection. Target: %ls", g_dumpFolder.c_str());
+        auto key = L"SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps";
+        g_registryChangesSz.emplace_back(RegistryKeyChange<std::wstring>(HKEY_LOCAL_MACHINE, key, L"DumpFolder", g_dumpFolder));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpType", 2));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DumpCount", 10));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"Disabled", 0));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"ForceQueue", 1));
+        g_registryChangesDword.emplace_back(RegistryKeyChange<DWORD>(HKEY_LOCAL_MACHINE, key, L"DebugApplications", 0));
+
+        for (auto flags : {KEY_WOW64_32KEY, KEY_WOW64_64KEY})
+        {
+            auto currentVersion = wsl::windows::common::registry::OpenKey(
+                HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", KEY_ALL_ACCESS | flags);
+
+            auto result = wsl::windows::common::registry::DeleteKey(currentVersion.get(), L"AeDebug");
+
+            LogInfo("AeDebug deletion result (flags %lu): %lu", flags, result);
+        }
+
+        auto cmd = std::format(L"icacls \"{}\" /grant \"Everyone:(OI)(CI)F\"", g_dumpFolder);
+
+        LxsstuLaunchCommandAndCaptureOutput(cmd.data());
+    }
+
+    auto wait = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::this_thread::sleep_for(std::chrono::seconds(300)); });
+
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"LogDmesg", g_LogDmesgAfterEachTest);
 
     g_WatchdogTimer = CreateThreadpoolTimer(LxsstuWatchdogTimer, nullptr, nullptr);
