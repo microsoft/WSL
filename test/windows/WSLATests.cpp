@@ -1281,6 +1281,14 @@ class WSLATests
             ResetTestSession();
             VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
+
+        // Validate that empty arguments are correctly handled.
+        {
+            WSLAProcessLauncher launcher({"/usr/bin/echo"}, {"/usr/bin/echo", "foo", "", "bar"});
+
+            auto process = launcher.Launch(*m_defaultSession);
+            ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // expect two spaces for the empty argument.
+        }
     }
 
     TEST_METHOD(CrashDumpCollection)
@@ -1509,6 +1517,15 @@ class WSLATests
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
             ValidateProcessOutput(process, {{1, "nobody\n"}});
+        }
+
+        // Validate that empty arguments are correctly handled.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-empty-args", {"echo", "foo", "", "bar"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
         // Validate error paths
@@ -2023,6 +2040,14 @@ class WSLATests
             auto process = WSLAProcessLauncher({}, {"/bin/sh", "-c", "echo $testenv"}, {{"testenv=testvalue"}}).Launch(container.Get());
 
             ValidateProcessOutput(process, {{1, "testvalue\n"}});
+        }
+
+        // Validate that empty arguments are correctly handled.
+        {
+            WSLAProcessLauncher launcher({}, {"echo", "foo", "", "bar"});
+
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
         // Validate that an exec'd command returns when the container is stopped.
