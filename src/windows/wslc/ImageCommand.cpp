@@ -1,7 +1,6 @@
 #include "precomp.h"
 #include "ImageCommand.h"
 #include "Utils.h"
-#include "WSLAProcessLauncher.h"
 #include <CommandLine.h>
 #include <format>
 #include "ImageService.h"
@@ -11,57 +10,26 @@ namespace wslc::commands
 {
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
-using wsl::windows::common::ClientRunningWSLAProcess;
-using wsl::windows::common::Context;
-using wsl::windows::common::ExecutionContext;
-using wsl::windows::common::WSLAProcessLauncher;
-using wsl::windows::common::relay::EventHandle;
-using wsl::windows::common::relay::MultiHandleWait;
-using wsl::windows::common::relay::RelayHandle;
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-static int PrintHelp()
+int ImagePullCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    wprintf(L"Supported commands for 'wslc image':\n");
-    wprintf(L"  list   - List all available images\n");
-    wprintf(L"  pull   - Pull a new image\n");
+    CMD_ARG_REQUIRED(m_image, L"Image name is required.");
+    PullImpl(*OpenCLISession(), m_image);
     return 0;
 }
 
-int RunPullImageCommand(std::wstring_view commandLine)
+int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3);
-
-    std::string image;
-    parser.AddPositionalArgument(Utf8String{image}, 0);
-
-    parser.Parse();
-    THROW_HR_IF(E_INVALIDARG, image.empty());
-
-    PullImpl(*OpenCLISession(), image);
-
-    return 0;
-}
-
-int RunListImageCommand(std::wstring_view commandLine)
-{
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 3, true);
-    std::string format = "table";
-    bool quiet = false;
-    parser.AddArgument(Utf8String(format), L"--format", L'f');
-    parser.AddArgument(quiet, L"--quiet", L'q');
-    parser.Parse();
-
     wslc::services::ImageService imageServie;
     auto images = imageServie.List();
-    if (format == "json")
+    if (m_format == "json")
     {
         for (const services::ImageInformation& image : images)
         {
             wprintf(L"%hs", wsl::shared::ToJson(image).c_str());
         }
     }
-    else if (quiet)
+    else if (m_quiet)
     {
         for (const auto& image : images)
         {
@@ -85,32 +53,19 @@ int RunListImageCommand(std::wstring_view commandLine)
     return 0;
 }
 
-// Handler for `wslc image` command.
-int RunImageCommand(std::wstring_view commandLine)
+int ImageCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 2, true);
-
-    bool help = false;
-    std::wstring subverb;
-    parser.AddPositionalArgument(subverb, 0);
-    parser.AddArgument(help, L"--help", L'h');
-    parser.Parse();
-
-    if (help)
+    if (m_subverb == m_list.Name())
     {
-        return PrintHelp();
+        return m_list.Execute(commandLine, parserOffset + 1);
     }
 
-    if (subverb == L"list")
+    if (m_subverb == m_pull.Name())
     {
-        return RunListImageCommand(commandLine);
+        return m_pull.Execute(commandLine, parserOffset + 1);
     }
 
-    if (subverb == L"pull")
-    {
-        return RunPullImageCommand(commandLine);
-    }
-
-    return PrintHelp();
-}
-}
+    CMD_IF_HELP_PRINT_HELP();
+    CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
+    return 0;
+}}

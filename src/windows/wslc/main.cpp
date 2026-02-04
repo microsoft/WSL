@@ -17,7 +17,6 @@ Abstract:
 #include "wslutil.h"
 #include "wslaservice.h"
 #include "WslSecurity.h"
-#include "WSLAProcessLauncher.h"
 #include "ExecutionContext.h"
 #include "ListCommand.h"
 #include "ShellCommand.h"
@@ -29,18 +28,51 @@ Abstract:
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
-using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
-using wsl::windows::common::WSLAProcessLauncher;
-using wsl::windows::common::relay::EventHandle;
-using wsl::windows::common::relay::MultiHandleWait;
-using wsl::windows::common::relay::RelayHandle;
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-static void PrintUsage()
+namespace wslc::commands {
+// wslc image
+class RootCommand : public ICommand
 {
-    wslutil::PrintMessage(Localization::MessageWslcUsage(), stderr);
+public:
+    std::string Name() const override { return ""; }
+    std::string Description() const override { return "wslc root command"; }
+    std::vector<std::string> Options() const override
+    {
+        return {
+            m_image.GetShortDescription(),
+            m_container.GetShortDescription(),
+        };
+    }
+    void LoadArguments(wsl::shared::ArgumentParser& parser) override
+    {
+        parser.AddPositionalArgument(wsl::shared::Utf8String{m_subverb}, 0);
+    }
+
+protected:
+    int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override
+    {
+        if (m_subverb == m_image.Name())
+        {
+            return m_image.Execute(commandLine, parserOffset + 1);
+        }
+
+        if (m_subverb == m_container.Name())
+        {
+            return m_container.Execute(commandLine, parserOffset + 1);
+        }
+
+        CMD_IF_HELP_PRINT_HELP();
+        CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
+        return 0;
+    }
+
+private:
+    std::string m_subverb;
+    ImageCommand m_image;
+    ContainerCommand m_container;
+};
 }
 
 int wslc_main(std::wstring_view commandLine)
@@ -64,12 +96,9 @@ int wslc_main(std::wstring_view commandLine)
     // Parse the top-level verb (list, shell, --help).
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 1, true);
 
-    bool help = false;
     std::wstring verb;
 
     parser.AddPositionalArgument(verb, 0);
-    parser.AddArgument(help, L"--help", L'h');
-
     parser.Parse();
 
     if (verb == L"list")
@@ -82,23 +111,8 @@ int wslc_main(std::wstring_view commandLine)
         return RunShellCommand(commandLine);
     }
     
-    if (verb == L"container")
-    {
-        wslc::commands::ContainerCommand command;
-        command.Execute(commandLine, 2);
-        return 0;
-    }
-    
-    if (verb == L"image")
-    {
-        return wslc::commands::RunImageCommand(commandLine);
-    }
-
-    wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
-    PrintUsage();
-
-    // Unknown verb - show usage and fail.
-    return 1;
+    wslc::commands::RootCommand rootCommand;
+    return rootCommand.Execute(commandLine, 1);
 }
 
 int wmain(int, wchar_t**)

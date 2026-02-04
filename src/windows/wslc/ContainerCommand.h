@@ -1,41 +1,10 @@
 #pragma once
-#include <CommandLine.h>
+#include "ICommand.h"
 #include "ContainerService.h"
 
 namespace wslc::commands
 {
-class ICommand
-{
-public:
-    virtual std::string Name() const = 0;
-    virtual std::string Description() const = 0;
-    virtual std::vector<std::string> Options() const { return {}; };
-    virtual void LoadArguments(wsl::shared::ArgumentParser& parser) {};
-    std::vector<std::string> Arguments(int startIndex = 0) { return { m_arguments.begin() + startIndex, m_arguments.end() }; }
-    std::string GetFullDescription() const;
-    std::string GetShortDescription() const;
-    void PrintHelp() const;
-    int Execute(std::wstring_view commandLine, int parserOffset = 0)
-    {
-        wsl::shared::ArgumentParser parser(std::wstring{commandLine}, L"wslc", parserOffset, true);
-        parser.AddArgument(m_help, L"--help", 'h');
-        LoadArguments(parser);
-        parser.Parse();
-        for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
-        {
-            m_arguments.push_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
-        }
-        return ExecuteInternal(commandLine, parserOffset);
-    }
-
-protected:
-    virtual int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) = 0;
-    bool m_help;
-
-private:
-    std::vector<std::string> m_arguments;
-};
-
+// wslc container run
 class ContainerRunCommand : public ICommand
 {
 public:
@@ -67,6 +36,7 @@ private:
     std::string m_image;
 };
 
+// wslc container create
 class ContainerCreateCommand : public ICommand
 {
 public:
@@ -98,6 +68,7 @@ private:
     std::string m_image;
 };
 
+// wslc container start
 class ContainerStartCommand : public ICommand
 {
 public:
@@ -121,6 +92,7 @@ private:
     std::string m_id;
 };
 
+// wslc container stop
 class ContainerStopCommand : public ICommand
 {
 public:
@@ -147,6 +119,7 @@ private:
     wslc::services::StopContainerOptions m_options;
 };
 
+// wslc container kill
 class ContainerKillCommand : public ICommand
 {
 public:
@@ -171,6 +144,8 @@ private:
     wslc::services::KillContainerOptions m_options;
 };
 
+
+// wslc container delete
 class ContainerDeleteCommand : public ICommand
 {
 public:
@@ -195,6 +170,8 @@ private:
     bool m_force;
 };
 
+
+// wslc container list
 class ContainerListCommand : public ICommand
 {
 public:
@@ -225,6 +202,8 @@ private:
     bool m_quiet;
 };
 
+
+// wslc container exec
 class ContainerExecCommand : public ICommand
 {
 public:
@@ -249,6 +228,7 @@ private:
     std::string m_id;
 };
 
+// wslc container inspect
 class ContainerInspectCommand : public ICommand
 {
 public:
@@ -265,6 +245,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 };
 
+// wslc container
 class ContainerCommand : public ICommand
 {
 public:

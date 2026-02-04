@@ -14,10 +14,6 @@ using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::docker_schema::InspectContainer;
 
-#define IF_HELP_PRINT_HELP() if (m_help) { PrintHelp(); return 0; }
-#define ARG_REQUIRED(arg, msg) if (arg.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
-#define ARG_ARRAY_REQUIRED(argArray, msg) if (argArray.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
-
 static std::string GetContainerName(const std::string& name)
 {
     if (!name.empty())
@@ -50,8 +46,8 @@ static std::wstring ContainerStateToString(WSLA_CONTAINER_STATE state)
 
 int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
-    ARG_REQUIRED(m_image, L"Error: image name is required.");
+    CMD_IF_HELP_PRINT_HELP();
+    CMD_ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = OpenCLISession();
     m_options.Arguments = Arguments();
     ContainerService containerService;
@@ -60,8 +56,8 @@ int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int pars
 
 int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
-    ARG_REQUIRED(m_image, L"Error: image name is required.");
+    CMD_IF_HELP_PRINT_HELP();
+    CMD_ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = OpenCLISession();
     m_options.Arguments = Arguments();
     m_options.Name = GetContainerName(m_options.Name);
@@ -73,8 +69,8 @@ int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int p
 
 int ContainerStartCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
-    ARG_REQUIRED(m_id, L"Error: container value is required.");
+    CMD_IF_HELP_PRINT_HELP();
+    CMD_ARG_REQUIRED(m_id, L"Error: container value is required.");
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     containerService.Start(*session, m_id);
@@ -83,9 +79,9 @@ int ContainerStartCommand::ExecuteInternal(std::wstring_view commandLine, int pa
 
 int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
+    CMD_IF_HELP_PRINT_HELP();
     auto arguments = Arguments();
-    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
+    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
 
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
@@ -98,9 +94,9 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
 int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
+    CMD_IF_HELP_PRINT_HELP();
     auto arguments = Arguments();
-    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
+    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
 
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
@@ -113,9 +109,9 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
 int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
+    CMD_IF_HELP_PRINT_HELP();
     auto arguments = Arguments();
-    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
+    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
     auto session = OpenCLISession();
 
     wslc::services::ContainerService containerService;
@@ -128,7 +124,7 @@ int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int p
 
 int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
+    CMD_IF_HELP_PRINT_HELP();
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     auto containers = containerService.List(*session);
@@ -186,10 +182,10 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
 int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
-    ARG_REQUIRED(m_id, L"Error: container value is required.");
+    CMD_IF_HELP_PRINT_HELP();
+    CMD_ARG_REQUIRED(m_id, L"Error: container value is required.");
     auto arguments = Arguments();
-    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
+    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     containerService.Exec(*session, m_id, arguments);
@@ -198,9 +194,9 @@ int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int par
 
 int ContainerInspectCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
-    IF_HELP_PRINT_HELP();
+    CMD_IF_HELP_PRINT_HELP();
     auto arguments = Arguments();
-    ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
+    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
     auto session = OpenCLISession();
     wslc::services::ContainerService containerService;
     std::vector<InspectContainer> result;
@@ -263,30 +259,8 @@ int ContainerCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         return m_inspect.Execute(commandLine, parserOffset + 1);
     }
 
-    IF_HELP_PRINT_HELP();
-    ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
+    CMD_IF_HELP_PRINT_HELP();
+    CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
     return 0;
-}
-
-std::string ICommand::GetFullDescription() const
-{
-    std::stringstream ss;
-    ss << Description() << std::endl;
-    for (const auto& option : Options())
-    {
-        ss << "  " << option << std::endl;
-    }
-    ss << "  -h, --help: Print this help message" << std::endl;
-    return ss.str();
-}
-
-std::string ICommand::GetShortDescription() const
-{
-    return std::format("{}: {}", Name(), Description());
-}
-
-void ICommand::PrintHelp() const
-{
-    wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(GetFullDescription()));
 }
 }

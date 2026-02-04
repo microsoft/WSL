@@ -6,6 +6,7 @@ set(SOURCES
     ListCommand.cpp
     ImageCommand.cpp
     ContainerCommand.cpp
+	ICommand.cpp
 
     # Others
     Utils.cpp
@@ -21,6 +22,7 @@ set(HEADERS
     ListCommand.h
     ImageCommand.h
     ContainerCommand.h
+	ICommand.h
 
     # Others
     Utils.h
