@@ -22,6 +22,18 @@ Abstract:
 #define _wcsicmp wcscasecmp
 #endif
 
+#define NON_COPYABLE(Type) \
+    Type(const Type&) = delete; \
+    Type& operator=(const Type&) = delete;
+
+#define NON_MOVABLE(Type) \
+    Type(Type&&) = delete; \
+    Type& operator=(Type&&) = delete;
+
+#define DEFAULT_MOVABLE(Type) \
+    Type(Type&&) = default; \
+    Type& operator=(Type&&) = default;
+
 namespace wsl::shared {
 
 inline constexpr std::uint32_t VersionMajor = WSL_PACKAGE_VERSION_MAJOR;
