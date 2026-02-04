@@ -1612,10 +1612,8 @@ void SingleAcceptHandle::Schedule()
     WI_ASSERT(State == IOHandleStatus::Standby);
 
     // Schedule the accept.
-    CHAR acceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
     DWORD bytesReturned{};
-
-    if (AcceptEx((SOCKET)ListenSocket.Get(), (SOCKET)AcceptedSocket.Get(), acceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
+    if (AcceptEx((SOCKET)ListenSocket.Get(), (SOCKET)AcceptedSocket.Get(), &AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
     {
         // Accept completed immediately.
         State = IOHandleStatus::Completed;

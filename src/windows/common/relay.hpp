@@ -486,6 +486,7 @@ private:
     wil::unique_event Event{wil::EventOptions::ManualReset};
     OVERLAPPED Overlapped{};
     std::function<void()> OnAccepted;
+    char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
 };
 
 class MultiHandleWait
