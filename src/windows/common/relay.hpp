@@ -166,19 +166,19 @@ struct HandleWrapper
 
     HandleWrapper(
         wil::unique_handle&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle(std::move(handle)), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle(handle.get()), OwnedHandle(std::move(handle)), OnClose(std::move(OnClose))
     {
     }
 
     HandleWrapper(
         wil::unique_socket&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle((HANDLE)handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle((HANDLE)handle.get()), OwnedHandle(wil::unique_socket{handle.release()}), OnClose(std::move(OnClose))
     {
     }
 
     HandleWrapper(
         wil::unique_event&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle(handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle(handle.get()), OwnedHandle(wil::unique_handle{handle.release()}), OnClose(std::move(OnClose))
     {
     }
 
@@ -194,7 +194,7 @@ struct HandleWrapper
 
     HandleWrapper(
         wil::unique_hfile&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle(handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle(handle.get()), OwnedHandle(wil::unique_handle{handle.release()}), OnClose(std::move(OnClose))
     {
     }
 
@@ -216,13 +216,12 @@ struct HandleWrapper
             OnClose = nullptr;
         }
 
-        OwnedHandle.reset();
         Handle = nullptr;
     }
 
 private:
-    wil::unique_handle OwnedHandle;
     HANDLE Handle{};
+    std::variant<wil::unique_handle, wil::unique_socket> OwnedHandle;
     std::function<void()> OnClose;
 };
 
@@ -249,7 +248,7 @@ public:
     NON_COPYABLE(EventHandle)
     NON_MOVABLE(EventHandle)
 
-    EventHandle(HandleWrapper&& EventHandle, std::function<void()>&& OnSignalled = []() {});
+    EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -267,6 +266,7 @@ public:
 
     ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
     virtual ~ReadHandle();
+
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -278,6 +278,28 @@ private:
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
     LARGE_INTEGER Offset{};
+};
+
+class SingleAcceptHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(SingleAcceptHandle)
+    NON_MOVABLE(SingleAcceptHandle)
+
+    SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
+    ~SingleAcceptHandle();
+
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    HandleWrapper ListenSocket;
+    HandleWrapper AcceptedSocket;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    std::function<void()> OnAccepted;
+    char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
 };
 
 class LineBasedReadHandle : public ReadHandle
