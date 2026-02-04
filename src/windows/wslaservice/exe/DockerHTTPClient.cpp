@@ -101,6 +101,11 @@ std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTP
         std::format("http://localhost/images/{}?force={}&noprune={}", Image, Force ? "true" : "false", NoPrune ? "true" : "false"));
 }
 
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::string& NameOrId)
+{
+    return SendRequest(verb::get, std::format("http://localhost/images/{}/get", NameOrId), {}, {});
+}
+
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
 {
     auto url = std::format("http://localhost/containers/json?all={}", all ? "true" : "false");
@@ -183,6 +188,11 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     }
 
     return std::move(socket);
+}
+
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const std::string& ContainerNameOrId)
+{
+    return SendRequest(verb::get, std::format("http://localhost/containers/{}/export", ContainerNameOrId), {}, {});
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
