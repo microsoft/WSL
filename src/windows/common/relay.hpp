@@ -216,6 +216,7 @@ struct HandleWrapper
             OnClose = nullptr;
         }
 
+        OwnedHandle = {};
         Handle = nullptr;
     }
 
