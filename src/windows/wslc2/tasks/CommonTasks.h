@@ -5,7 +5,7 @@
 
 using wsl::windows::wslc::execution::CLIExecutionContext;
 
-namespace wsl::windows::wslc::workflow
+namespace wsl::windows::wslc::task
 {
     // Ensures that the process is running as admin.
     // Required Args: None

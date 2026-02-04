@@ -2,12 +2,12 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
-#include "TestFlow.h"
+#include "TestTasks.h"
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 
-namespace wsl::windows::wslc::workflow
+namespace wsl::windows::wslc::task
 {
     void OutputNinjaCat(CLIExecutionContext& context)
     {

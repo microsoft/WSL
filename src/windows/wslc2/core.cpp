@@ -5,7 +5,7 @@
 #include "errors.h"
 #include "invocation.h"
 #include "RootCommand.h"
-#include "WorkflowBase.h"
+#include "TaskBase.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -76,7 +76,7 @@ namespace wsl::windows::wslc
         }
         catch (...)
         {
-            return workflow::HandleException(context, std::current_exception());
+            return task::HandleException(context, std::current_exception());
         }
 
         return Execute(context, command);

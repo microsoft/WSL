@@ -38,9 +38,9 @@ namespace wsl::windows::wslc
     struct Command;
 }
 
-namespace wsl::windows::wslc::workflow
+namespace wsl::windows::wslc::task
 {
-    struct WorkflowTask;
+    struct Task;
 }
 
 namespace wsl::windows::wslc::execution

@@ -2,7 +2,7 @@
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
-    ${CMAKE_CURRENT_SOURCE_DIR}/workflows
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks
     ${CMAKE_CURRENT_SOURCE_DIR}/services
 )
 
@@ -19,9 +19,9 @@ set(HEADERS
     commands/RootCommand.h
     commands/TestCommand.h
     commands/ContainerCommand.h
-    workflows/WorkflowBase.h
-    workflows/CommonFlow.h
-    workflows/TestFlow.h
+    tasks/TaskBase.h
+    tasks/CommonTasks.h
+    tasks/TestTasks.h
     services/ContainerService.h
 )
 
@@ -35,9 +35,9 @@ set(SOURCES
     commands/RootCommand.cpp
     commands/TestCommand.cpp
     commands/ContainerCommand.cpp
-    workflows/WorkflowBase.cpp
-    workflows/CommonFlow.cpp
-    workflows/TestFlow.cpp
+    tasks/TaskBase.cpp
+    tasks/CommonTasks.cpp
+    tasks/TestTasks.cpp
     services/ContainerService.cpp
 )
 

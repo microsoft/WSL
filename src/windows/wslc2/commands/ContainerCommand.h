@@ -30,4 +30,18 @@ namespace wsl::windows::wslc
     protected:
         void ExecuteInternal(CLIExecutionContext& context) const override;
     };
-}
+
+    struct ContainerStartCommand final : public Command
+    {
+        constexpr static std::wstring_view CommandName = L"start";
+        ContainerStartCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show)
+        {
+        }
+        std::vector<Argument> GetArguments() const override;
+        std::wstring_view ShortDescription() const override;
+        std::wstring_view LongDescription() const override;
+
+    protected:
+        void ExecuteInternal(CLIExecutionContext& context) const override;
+    };
+    }

@@ -14,7 +14,13 @@ namespace wsl::windows::wslc
         {
             Info,           // About WSLC CLI
             Help,           // Display help information
+            SessionId,      // Session ID
             TestArg,        // Argument for testing purposes
+
+            // Container
+            Attach,         // Attach
+            Interactive,    // Interactive
+            ContainerId,    // Container ID
 
             // This should always be at the end
             Max

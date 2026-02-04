@@ -3,9 +3,9 @@
 #pragma once
 #include "pch.h"
 #include "TestCommand.h"
-#include "WorkflowBase.h"
-#include "CommonFlow.h"
-#include "TestFlow.h"
+#include "TaskBase.h"
+#include "CommonTasks.h"
+#include "TestTasks.h"
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
@@ -33,7 +33,7 @@ namespace wsl::windows::wslc
     void TestCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         context
-            << workflow::EnsureRunningAsAdmin
-            << workflow::OutputNinjaCat;
+            << task::EnsureRunningAsAdmin
+            << task::OutputNinjaCat;
     }
 }

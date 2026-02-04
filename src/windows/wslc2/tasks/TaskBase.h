@@ -10,39 +10,35 @@
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 
-namespace wsl::windows::wslc::workflow
+namespace wsl::windows::wslc::task
 {
-    // A task in the workflow.
-    struct WorkflowTask
+    struct Task
     {
         using Func = void (*)(CLIExecutionContext&);
 
-        WorkflowTask(Func f) : m_isFunc(true), m_func(f) {}
-        WorkflowTask(std::wstring_view name, bool executeAlways = false) : m_name(name), m_executeAlways(executeAlways) {}
+        Task(Func f) : m_isFunc(true), m_func(f) {}
+        Task(std::wstring_view name) : m_name(name) {}
 
-        virtual ~WorkflowTask() = default;
+        virtual ~Task() = default;
 
-        WorkflowTask(const WorkflowTask&) = default;
-        WorkflowTask& operator=(const WorkflowTask&) = default;
+        Task(const Task&) = default;
+        Task& operator=(const Task&) = default;
 
-        WorkflowTask(WorkflowTask&&) = default;
-        WorkflowTask& operator=(WorkflowTask&&) = default;
+        Task(Task&&) = default;
+        Task& operator=(Task&&) = default;
 
-        bool operator==(const WorkflowTask& other) const;
+        bool operator==(const Task& other) const;
 
         virtual void operator()(CLIExecutionContext& context) const;
 
         const std::wstring& GetName() const { return m_name; }
         bool IsFunction() const { return m_isFunc; }
         Func Function() const { return m_func; }
-        bool ExecuteAlways() const { return m_executeAlways; }
-        void Log() const;
 
     private:
         bool m_isFunc = false;
         Func m_func = nullptr;
         std::wstring m_name;
-        bool m_executeAlways = false;
     };
 
     // Helper to report exceptions and return the HRESULT.
@@ -54,7 +50,7 @@ namespace wsl::windows::wslc::workflow
 }
 
 // Passes the context to the function if it has not been terminated; returns the context.
-CLIExecutionContext& operator<<(CLIExecutionContext& context, wsl::windows::wslc::workflow::WorkflowTask::Func f);
+CLIExecutionContext& operator<<(CLIExecutionContext& context, wsl::windows::wslc::task::Task::Func f);
 
 // Passes the context to the task if it has not been terminated; returns the context.
-CLIExecutionContext& operator<<(CLIExecutionContext& context, const wsl::windows::wslc::workflow::WorkflowTask& task);
+CLIExecutionContext& operator<<(CLIExecutionContext& context, const wsl::windows::wslc::task::Task& task);

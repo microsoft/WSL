@@ -5,7 +5,7 @@
 
 using wsl::windows::wslc::execution::CLIExecutionContext;
 
-namespace wsl::windows::wslc::workflow
+namespace wsl::windows::wslc::task
 {
     // Prints the NinjaCat
     // Required Args: TestArg

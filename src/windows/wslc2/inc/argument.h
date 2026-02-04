@@ -34,6 +34,8 @@ namespace wsl::windows::wslc
     enum class ArgTypeCategory : uint32_t
     {
         None = 0x0,
+        ContainerSelection = 0x1,      // Args that select a container.
+        ImageSelection = 0x2,          // Args that select an image.
     };
 
     DEFINE_ENUM_FLAG_OPERATORS(ArgTypeCategory);
@@ -43,6 +45,9 @@ namespace wsl::windows::wslc
     enum class ArgTypeExclusiveSet : uint32_t
     {
         None = 0x0,
+        ProgressBarOption = 0x1,    // None or ANSI, may have other types
+        TargetSelection = 0x2,      // For selecting things to stop/kill/delete (all vs specific)
+        FormatOption = 0x4,         // Output Format options (JSON, table, etc)
 
         // This must always be at the end
         Max

@@ -4,7 +4,7 @@
 #include "pch.h"
 #include "util.h"
 #include "RootCommand.h"
-#include "WorkflowBase.h"
+#include "TaskBase.h"
 
 // Include all commands that parent to the root. 
 #include "TestCommand.h"
@@ -22,6 +22,7 @@ namespace wsl::windows::wslc
             std::make_unique<TestCommand>(FullName()),
             std::make_unique<ContainerCommand>(FullName()),
             std::make_unique<ContainerRunCommand>(FullName()),
+            std::make_unique<ContainerStartCommand>(FullName()),
         });
     }
 

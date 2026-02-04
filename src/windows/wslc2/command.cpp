@@ -4,12 +4,12 @@
 #include "argument.h"
 #include "command.h"
 #include "invocation.h"
-#include "WorkFlowBase.h"
+#include "TaskBase.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
-using namespace wsl::windows::wslc::workflow;
+using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc
 {
@@ -81,7 +81,7 @@ namespace wsl::windows::wslc
         }
 
         // Output the command preamble and command chain
-        infoOut << Localization::WSLCCLI_Usage(L"wslc2", std::wstring_view{ commandChain });
+        infoOut << Localization::WSLCCLI_Usage(L"wslc2", std::wstring_view{commandChain});
 
         auto commandAliases = Aliases();
         auto commands = GetVisibleCommands();
@@ -109,6 +109,8 @@ namespace wsl::windows::wslc
         }
 
         // Arguments are required by a test to have all positionals first.
+        // TODO: Need to adjust this for wslc format.
+        // for WSLC format of command <options> <positional> <args | positional2..>
         for (const auto& arg : arguments)
         {
             if (arg.Type() == ArgumentType::Positional)
@@ -683,7 +685,7 @@ namespace wsl::windows::wslc
         }
         catch (...)
         {
-            context.SetTerminationHR(workflow::HandleException(context, std::current_exception()));
+            context.SetTerminationHR(task::HandleException(context, std::current_exception()));
         }
     }
 

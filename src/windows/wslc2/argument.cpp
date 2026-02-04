@@ -27,12 +27,22 @@ namespace wsl::windows::wslc
         // Common arguments
         case Args::Type::Help:
             return { type, L"help", WSLC_CLI_HELP_ARGUMENT_TEXT_CHAR };
+        case Args::Type::SessionId:
+            return {type, L"session", L's'};
         case Args::Type::Info:
             return {type, L"info", L'i' };
 
         // Used for demonstration purposes
         case Args::Type::TestArg:
             return {type, L"arg", L'a' };
+
+        // Container
+        case Args::Type::Attach:
+            return {type, L"attach", L'a'};
+        case Args::Type::Interactive:
+            return {type, L"interactive", L'i'};
+        case Args::Type::ContainerId:
+            return {type, L"containerid", ArgTypeCategory::ContainerSelection};
 
         default:
             THROW_HR(E_UNEXPECTED);
@@ -55,6 +65,14 @@ namespace wsl::windows::wslc
             return Argument{ type, Localization::WSLCCLI_HelpArgumentDescription(), ArgumentType::Flag };
         case Args::Type::Info:
             return Argument{ type, Localization::WSLCCLI_InfoArgumentDescription(), ArgumentType::Flag };
+        case Args::Type::SessionId:
+            return Argument{type, L"Session Id", ArgumentType::Standard};
+        case Args::Type::Attach:
+            return Argument{type, L"Attach to stdout/stderr", ArgumentType::Flag };
+        case Args::Type::Interactive:
+            return Argument{type, L"Interactive terminal", ArgumentType::Flag };
+        case Args::Type::ContainerId:
+            return Argument{type, L"Container Id", ArgumentType::Positional, Visibility::Example, true};
         case Args::Type::TestArg:
             return Argument{type, L"Display ninjacat", ArgumentType::Flag, true };
         default:
@@ -65,6 +83,7 @@ namespace wsl::windows::wslc
     void Argument::GetCommon(std::vector<Argument>& args)
     {
         args.push_back(ForType(Args::Type::Help));
+        args.push_back(ForType(Args::Type::SessionId));
     }
 
     std::wstring Argument::GetUsageString() const

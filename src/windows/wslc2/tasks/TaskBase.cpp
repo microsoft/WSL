@@ -2,15 +2,15 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
-#include "WorkflowBase.h"
+#include "TaskBase.h"
 #include <wil/result_macros.h>
 
 using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
 
-namespace wsl::windows::wslc::workflow
+namespace wsl::windows::wslc::task
 {
-    bool WorkflowTask::operator==(const WorkflowTask& other) const
+    bool Task::operator==(const Task& other) const
     {
         if (m_isFunc && other.m_isFunc)
         {
@@ -26,15 +26,10 @@ namespace wsl::windows::wslc::workflow
         }
     }
 
-    void WorkflowTask::operator()(CLIExecutionContext& context) const
+    void Task::operator()(CLIExecutionContext& context) const
     {
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_isFunc);
         m_func(context);
-    }
-
-    void WorkflowTask::Log() const
-    {
-        // TODO: Log
     }
 
     HRESULT HandleException(CLIExecutionContext* context, std::exception_ptr exception)
@@ -75,16 +70,15 @@ namespace wsl::windows::wslc::workflow
     }
 }
 
-CLIExecutionContext& operator<<(CLIExecutionContext& context, wsl::windows::wslc::workflow::WorkflowTask::Func f)
+CLIExecutionContext& operator<<(CLIExecutionContext& context, wsl::windows::wslc::task::Task::Func f)
 {
-    return (context << wsl::windows::wslc::workflow::WorkflowTask(f));
+    return (context << wsl::windows::wslc::task::Task(f));
 }
 
-CLIExecutionContext& operator<<(CLIExecutionContext& context, const wsl::windows::wslc::workflow::WorkflowTask& task)
+CLIExecutionContext& operator<<(CLIExecutionContext& context, const wsl::windows::wslc::task::Task& task)
 {
-    if (!context.IsTerminated() || task.ExecuteAlways())
+    if (!context.IsTerminated())
     {
-        task.Log();
         task(context);
     }
 
