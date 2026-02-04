@@ -2040,9 +2040,7 @@ Return Value:
         LxsstuLaunchCommandAndCaptureOutput(cmd.data());
     }
 
-    auto wait = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        std::this_thread::sleep_for(std::chrono::seconds(300));
-    });
+    auto wait = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::this_thread::sleep_for(std::chrono::seconds(300)); });
 
     WEX::TestExecution::RuntimeParameters::TryGetValue(L"LogDmesg", g_LogDmesgAfterEachTest);
 
