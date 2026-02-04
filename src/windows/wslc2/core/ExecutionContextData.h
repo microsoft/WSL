@@ -2,13 +2,10 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
-#include "TaskBase.h"
 
-#include <map>
 #include <string>
-#include <vector>
 
-namespace AppInstaller::CLI::Execution
+namespace wsl::windows::wslc::execution
 {
     // Names a piece of data stored in the context by a task step.
     // Must start at 0 to enable direct access to variant in Context.
@@ -19,8 +16,6 @@ namespace AppInstaller::CLI::Execution
 
         Max
     };
-
-    struct Context;
 
     namespace details
     {

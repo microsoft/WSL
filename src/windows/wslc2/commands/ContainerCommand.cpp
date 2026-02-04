@@ -2,11 +2,15 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
+#include "ExecutionContext.h"
+#include "ExecutionContextData.h"
 #include "ContainerCommand.h"
+#include "CommonTasks.h"
 #include "TaskBase.h"
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc
 {
@@ -84,6 +88,8 @@ namespace wsl::windows::wslc
 
     void ContainerStartCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
+        context << StoreSessionId;
+
         PrintMessage(L"Container Start subcommand executing..", stdout);
         PrintMessage(L"  ContainerId: " + std::wstring{context.Args.GetArg(Args::Type::ContainerId)});
         if (context.Args.Contains(Args::Type::Interactive))
@@ -96,10 +102,9 @@ namespace wsl::windows::wslc
             PrintMessage(L"  Attach to stdout/stderr");
         }
 
-        if (context.Args.Contains(Args::Type::SessionId))
+        if (context.Contains(Data::SessionId))
         {
-            PrintMessage(L"  Using SessionId: " + std::wstring{context.Args.GetArg(Args::Type::SessionId)});
+            PrintMessage(L"  Stored SessionId: " + context.Get<Data::SessionId>());
         }
-
     }
     }

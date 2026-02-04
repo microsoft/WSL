@@ -15,6 +15,8 @@ set(HEADERS
     core/Errors.h
     core/ExecutionArgs.h
     core/ExecutionContext.h
+    core/ExecutionContextData.h
+    core/ExecutionHelpers.h
     core/Invocation.h
     commands/RootCommand.h
     commands/TestCommand.h

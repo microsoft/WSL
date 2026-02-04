@@ -12,4 +12,10 @@ namespace wsl::windows::wslc::task
     // Inputs: None
     // Outputs: None
     void EnsureRunningAsAdmin(CLIExecutionContext& context);
+
+    // Checks for SessionId and stores it in the context.
+    // Required Args: SessionId
+    // Inputs: None
+    // Outputs: None
+    void StoreSessionId(CLIExecutionContext& context);
 }

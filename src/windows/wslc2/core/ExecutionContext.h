@@ -5,7 +5,8 @@
 #include "pch.h"
 #include "Errors.h"
 #include "ExecutionArgs.h"
-#include "ExecutionContext.h"
+#include "ExecutionHelpers.h"
+#include "ExecutionContextData.h"
 
 #include <string_view>
 
@@ -47,7 +48,7 @@ namespace wsl::windows::wslc::execution
 {
     // The context within which all commands execute.
     // Contains arguments via Args.
-    struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
+    struct CLIExecutionContext : public wsl::windows::common::ExecutionContext, EnumBasedVariantMap<Data, details::DataMapping>
     {
         CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC) {}
         ~CLIExecutionContext() override = default;
