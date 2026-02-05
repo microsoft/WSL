@@ -603,8 +603,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     else
     {
         io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
-            common::relay::HandleWrapper{OutputHandle, std::move(onCompleted)}));
+            common::relay::HandleWrapper{std::move(SocketCodePair.second)}, common::relay::HandleWrapper{OutputHandle, std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }
 
