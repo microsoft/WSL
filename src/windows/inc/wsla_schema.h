@@ -24,7 +24,7 @@ struct InspectPortBinding
     std::string HostIp = "127.0.0.1";
     std::string HostPort;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(InspectPortBinding, HostIp, HostPort);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectPortBinding, HostIp, HostPort);
 };
 
 struct InspectMount
@@ -53,7 +53,7 @@ struct InspectHostConfig
 {
     std::string NetworkMode;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(InspectHostConfig, NetworkMode);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode);
 };
 
 struct InspectContainer

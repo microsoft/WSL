@@ -571,7 +571,16 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     }
 
     wslaInspect.Created = dockerInspect.Created;
-    wslaInspect.Image = dockerInspect.Image;
+
+    // Prefer the user-friendly image name/tag from Config.Image, falling back to the image ID.
+    if (!dockerInspect.Config.Image.empty())
+    {
+        wslaInspect.Image = dockerInspect.Config.Image;
+    }
+    else
+    {
+        wslaInspect.Image = dockerInspect.Image;
+    }
 
     // Map container state.
     wslaInspect.State.Status = dockerInspect.State.Status;
@@ -582,11 +591,12 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
 
     wslaInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
 
-    // Map WSLA port mappings (Windows host ports only). HostIp is not surfaced.
+    // Map WSLA port mappings (Windows host ports only). HostIp is not set here and will use
+    // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
     for (const auto& e : m_mappedPorts)
     {
         // TODO: UDP support
-        // TODO: Investigate ipv6 support.
+        // TODO: ipv6 support.
         auto portKey = std::format("{}/tcp", e.ContainerPort);
 
         wsla_schema::InspectPortBinding portBinding{};
