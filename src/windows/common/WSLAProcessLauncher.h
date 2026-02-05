@@ -42,6 +42,8 @@ public:
     int GetExitCode();
     WSLA_PROCESS_STATE State();
 
+    WSLAProcessFlags Flags() const;
+
 protected:
     virtual void GetState(WSLA_PROCESS_STATE* State, int* Code) = 0;
 

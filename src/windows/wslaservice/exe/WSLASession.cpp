@@ -60,8 +60,11 @@ bool IsContainerNameValid(LPCSTR Name)
 } // namespace
 
 WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated) :
-
-    m_id(id), m_displayName(Settings.DisplayName), m_tokenInfo(std::move(TokenInfo)), m_elevatedToken(Elevated)
+    m_id(id),
+    m_displayName(Settings.DisplayName),
+    m_tokenInfo(std::move(TokenInfo)),
+    m_elevatedToken(Elevated),
+    m_featureFlags(Settings.FeatureFlags)
 {
     auto callingProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
     m_creatorPid = GetProcessId(callingProcess.get());
@@ -85,33 +88,21 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::u
     ConfigureStorage(Settings, m_tokenInfo->User.Sid);
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
-    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        m_sessionTerminatingEvent.SetEvent();
+    auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
 
-        if (m_containerdThread.joinable())
-        {
-            m_containerdThread.join();
-        }
-    });
+    // Launch dockerd
+    StartDockerd();
 
-    // Launch containerd
-    // TODO: Rework the daemon logic so we can have only one thread watching all daemons.
-    ServiceProcessLauncher launcher{
-        "/usr/bin/dockerd",
-        {"/usr/bin/dockerd" /*, "--debug"*/}, // TODO: Flag for --debug.
-        {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
-    m_containerdThread = std::thread(&WSLASession::MonitorContainerd, this, launcher.Launch(*m_virtualMachine));
-
-    // Wait for containerd to be ready before starting the event tracker.
-    // TODO: Configurable timeout.
-    THROW_WIN32_IF_MSG(ERROR_TIMEOUT, !m_containerdReadyEvent.wait(10 * 1000), "Timed out waiting for containerd to start");
+    // Wait for dockerd to be ready before starting the event tracker.
+    THROW_WIN32_IF_MSG(
+        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings.BootTimeoutMs), "Timed out waiting for dockerd to start");
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLA_FORK::Thread);
 
     m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
     //  Start the event tracker.
-    m_eventTracker.emplace(m_dockerClient.value());
+    m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
 
     // Recover any existing containers from storage.
     RecoverExistingContainers();
@@ -164,7 +155,7 @@ WSLASession::~WSLASession()
 {
     WSL_LOG("SessionTerminated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
-    Terminate();
+    LOG_IF_FAILED(Terminate());
 }
 
 void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid)
@@ -277,7 +268,15 @@ void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, siz
     wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
-void WSLASession::OnContainerdLog(const gsl::span<char>& buffer)
+void WSLASession::OnDockerdExited()
+{
+    if (!m_sessionTerminatingEvent.is_signaled())
+    {
+        WSL_LOG("UnexpectedDockerdExit", TraceLoggingValue(m_displayName.c_str(), "Name"));
+    }
+}
+
+void WSLASession::OnDockerdLog(const gsl::span<char>& buffer)
 try
 {
     if (buffer.empty())
@@ -300,40 +299,30 @@ try
 }
 CATCH_LOG();
 
-void WSLASession::MonitorContainerd(ServiceRunningProcess&& process)
-try
+void WSLASession::StartDockerd()
 {
-    windows::common::relay::MultiHandleWait io;
+    std::vector<std::string> args{{"/usr/bin/dockerd"}};
+
+    if (WI_IsFlagSet(m_featureFlags, WslaFeatureFlagsDebug))
+    {
+        args.emplace_back("--debug");
+    }
+
+    ServiceProcessLauncher launcher{"/usr/bin/dockerd", args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
+
+    m_dockerdProcess = launcher.Launch(*m_virtualMachine);
 
     // Read stdout & stderr.
-    io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(1), [&](const auto& data) { OnContainerdLog(data); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        m_dockerdProcess->GetStdHandle(1), [&](const auto& data) { OnDockerdLog(data); }, false));
 
-    io.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
-        process.GetStdHandle(2), [&](const auto& data) { OnContainerdLog(data); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        m_dockerdProcess->GetStdHandle(2), [&](const auto& data) { OnDockerdLog(data); }, false));
 
-    // Exit if either the VM terminates or containerd exits.
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(process.GetExitEvent()), MultiHandleWait::CancelOnCompleted);
-    io.AddHandle(std::make_unique<windows::common::relay::EventHandle>(m_sessionTerminatingEvent.get()), MultiHandleWait::CancelOnCompleted);
-
-    io.Run({});
-
-    if (!m_sessionTerminatingEvent.is_signaled())
-    {
-        // If containerd exited before the VM starts terminating, then it exited unexpectedly.
-        WSL_LOG("UnexpectedContainerdExit", TraceLoggingValue(m_displayName.c_str(), "SessionDisplayName"));
-    }
-    else
-    {
-        // Otherwise, the session is shutting down; terminate containerd before exiting.
-        LOG_IF_FAILED(process.Get().Signal(15)); // SIGTERM
-
-        auto code = process.Wait(30 * 1000); // TODO: Configurable timeout.
-
-        WSL_LOG("DockerdExit", TraceLoggingValue(code, "code"));
-    }
+    // Monitor dockerd's exist so we can detect abnormal exits.
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(
+        m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
-CATCH_LOG();
 
 HRESULT WSLASession::PullImage(
     LPCSTR ImageUri,
@@ -514,6 +503,129 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     }
 }
 
+HRESULT WSLASession::ExportContainer(ULONG OutHandle, LPCSTR ContainerID, IProgressCallback* ProgressCallback, WSLA_ERROR_INFO* Error)
+try
+{
+    UNREFERENCED_PARAMETER(ProgressCallback);
+    RETURN_HR_IF_NULL(E_POINTER, ContainerID);
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto retVal = m_dockerClient->ExportContainer(ContainerID);
+    ExportContainerImpl(retVal, OutHandle, Error);
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
+{
+    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    relay::MultiHandleWait io;
+
+    auto onCompleted = [&]() {
+        io.Cancel();
+        WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
+    };
+
+    std::string errorJson;
+    auto accumulateError = [&](const gsl::span<char>& buffer) {
+        // If the export failed, accumulate the error message.
+        errorJson.append(buffer.data(), buffer.size());
+    };
+
+    if (SocketCodePair.first != 200)
+    {
+        io.AddHandle(std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+    }
+    else
+    {
+        io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
+            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
+            common::relay::HandleWrapper{std::move(containerFileHandle), std::move(onCompleted)}));
+        io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+    }
+
+    io.Run({});
+
+    if (SocketCodePair.first != 200)
+    {
+        // Export failed, parse the error message.
+        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+        if (Error != nullptr)
+        {
+            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
+        }
+
+        if (SocketCodePair.first == 404)
+        {
+            THROW_HR_MSG(WSLA_E_CONTAINER_NOT_FOUND, "%hs", error.message.c_str());
+        }
+
+        THROW_HR_MSG(E_FAIL, "Container export failed: %hs", error.message.c_str());
+    }
+}
+
+HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, WSLA_ERROR_INFO* Error)
+try
+{
+    UNREFERENCED_PARAMETER(ProgressCallback);
+    RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    auto retVal = m_dockerClient->SaveImage(ImageNameOrID);
+    SaveImageImpl(retVal, OutHandle, Error);
+    return S_OK;
+}
+CATCH_RETURN();
+
+void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
+{
+    wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    relay::MultiHandleWait io;
+
+    auto onCompleted = [&]() { io.Cancel(); };
+    std::string errorJson;
+    auto accumulateError = [&](const gsl::span<char>& buffer) {
+        // If the save failed, accumulate the error message.
+        errorJson.append(buffer.data(), buffer.size());
+    };
+
+    if (SocketCodePair.first != 200)
+    {
+        io.AddHandle(std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+    }
+    else
+    {
+        io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
+            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
+            common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
+        io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+    }
+
+    io.Run({});
+
+    if (SocketCodePair.first != 200)
+    {
+        // Save failed, parse the error message.
+        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
+        if (Error != nullptr)
+        {
+            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
+        }
+
+        THROW_HR_MSG(E_FAIL, "Image save failed: %hs", error.message.c_str());
+    }
+}
+
 HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
 try
 {
@@ -658,7 +770,8 @@ try
             *m_virtualMachine,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
-            m_dockerClient.value()));
+            m_dockerClient.value(),
+            m_ioRelay));
 
         THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
 
@@ -815,26 +928,44 @@ try
 
     std::lock_guard lock{m_lock};
 
-    // Stop the event tracker
-    if (m_eventTracker.has_value())
-    {
-        m_eventTracker->Stop();
-    }
-
     // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
 
+    // Stop the IO relay.
+    // This stops:
+    // - container state monitoring.
+    // - container init process relays
+    // - execs relays
+    // - container logs relays
+    m_ioRelay.Stop();
+
+    m_eventTracker.reset();
     m_dockerClient.reset();
 
-    // N.B. The containerd thread can only run if the VM is running.
-    if (m_containerdThread.joinable())
+    // Stop dockerd.
+    // N.B. dockerd wait a couple seconds if there are any outstanding HTTP request sockets opened.
+    if (m_dockerdProcess.has_value())
     {
-        m_containerdThread.join();
+        LOG_IF_FAILED(m_dockerdProcess->Get().Signal(WSLASignalSIGTERM));
+
+        int exitCode = -1;
+        try
+        {
+            exitCode = m_dockerdProcess->Wait(30 * 1000);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
+            exitCode = m_dockerdProcess->Wait(10 * 1000);
+        }
+
+        WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));
     }
 
     if (m_virtualMachine)
     {
-        // N.B. containerd has exited by this point, so unmounting the VHD is safe since no container can be running.
+        // N.B. dockerd has exited by this point, so unmounting the VHD is safe since no container can be running.
         try
         {
             m_virtualMachine->Unmount(c_containerdStorage);
@@ -930,7 +1061,8 @@ void WSLASession::RecoverExistingContainers()
                 *m_virtualMachine,
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
-                m_dockerClient.value());
+                m_dockerClient.value(),
+                m_ioRelay);
 
             m_containers.emplace_back(std::move(container));
         }

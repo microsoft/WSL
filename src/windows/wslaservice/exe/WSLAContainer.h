@@ -20,34 +20,18 @@ Abstract:
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLAProcessControl.h"
-#include "LogsRelay.h"
+#include "IORelay.h"
 #include "COMImplClass.h"
 #include "wsla_schema.h"
+#include "WSLAContainerMetadata.h"
 
 namespace wsl::windows::service::wsla {
-
-struct VolumeMountInfo
-{
-    std::wstring HostPath;
-    std::string ParentVMPath;
-    std::string ContainerPath;
-    bool ReadOnly;
-};
 
 class WSLAContainer;
 
 class WSLAContainerImpl
 {
 public:
-    struct PortMapping
-    {
-        uint16_t HostPort;
-        uint16_t VmPort;
-        uint16_t ContainerPort;
-        int Family;
-        bool MappedToHost = false;
-    };
-
     NON_COPYABLE(WSLAContainerImpl);
     NON_MOVABLE(WSLAContainerImpl);
 
@@ -56,18 +40,19 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
-        std::vector<VolumeMountInfo>&& volumes,
-        std::vector<PortMapping>&& ports,
+        std::vector<WSLAVolumeMount>&& volumes,
+        std::vector<WSLAPortMapping>&& ports,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
+        IORelay& Relay,
         WSLA_CONTAINER_STATE InitialState,
         WSLAProcessFlags InitProcessFlags,
         WSLAContainerFlags ContainerFlags);
 
     ~WSLAContainerImpl();
 
-    void Start();
+    void Start(WSLAContainerStartFlags Flags);
 
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
     void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
@@ -76,6 +61,7 @@ public:
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
     void Inspect(LPSTR* Output);
+    void GetID(LPSTR* Id);
     void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
 
     IWSLAContainer& ComWrapper();
@@ -93,18 +79,21 @@ public:
         WSLAVirtualMachine& parentVM,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient);
+        DockerHTTPClient& DockerClient,
+        IORelay& Relay);
 
     static std::unique_ptr<WSLAContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLAVirtualMachine& parentVM,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
-        DockerHTTPClient& DockerClient);
+        DockerHTTPClient& DockerClient,
+        IORelay& Relay);
 
 private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
+    std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect);
 
@@ -118,17 +107,14 @@ private:
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
-    std::vector<PortMapping> m_mappedPorts;
-    std::vector<VolumeMountInfo> m_mountedVolumes;
+    std::vector<WSLAPortMapping> m_mappedPorts;
+    std::vector<WSLAVolumeMount> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
     Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
     DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
-    LogsRelay m_logsRelay;
-
-    static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
-    static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
+    IORelay& m_ioRelay;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
@@ -145,8 +131,9 @@ public:
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
-    IFACEMETHOD(Start)() override;
+    IFACEMETHOD(Start)(WSLAContainerStartFlags Flags) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
+    IFACEMETHOD(GetID)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLAContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
