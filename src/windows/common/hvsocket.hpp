@@ -19,9 +19,9 @@ Abstract:
 
 namespace wsl::windows::common::hvsocket {
 
-wil::unique_socket Accept(
+std::optional<wil::unique_socket> CancellableAccept(
     _In_ SOCKET ListenSocket,
-    _In_ int Timeout,
+    _In_ DWORD Timeout,
     _In_opt_ HANDLE ExitHandle = nullptr,
     const std::source_location& Location = std::source_location::current());
 
