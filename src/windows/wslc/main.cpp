@@ -18,7 +18,6 @@ Abstract:
 #include "wslaservice.h"
 #include "WslSecurity.h"
 #include "ExecutionContext.h"
-#include "ListCommand.h"
 #include "ShellCommand.h"
 #include "ImageCommand.h"
 #include "ContainerCommand.h"
@@ -43,6 +42,7 @@ public:
         return {
             m_image.GetShortDescription(),
             m_container.GetShortDescription(),
+            m_shell.GetShortDescription(),
         };
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
@@ -63,8 +63,14 @@ protected:
             return m_container.Execute(commandLine, parserOffset + 1);
         }
 
+        if (m_subverb == m_shell.Name())
+        {
+            return m_shell.Execute(commandLine, parserOffset + 1);
+        }
+
         CMD_IF_HELP_PRINT_HELP();
         CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
+        PrintHelp();
         return 0;
     }
 
@@ -72,6 +78,7 @@ private:
     std::string m_subverb;
     ImageCommand m_image;
     ContainerCommand m_container;
+    ShellCommand m_shell;
 };
 }
 
@@ -101,16 +108,6 @@ int wslc_main(std::wstring_view commandLine)
     parser.AddPositionalArgument(verb, 0);
     parser.Parse();
 
-    if (verb == L"list")
-    {
-        return RunListCommand(commandLine);
-    }
-    
-    if (verb == L"shell")
-    {
-        return RunShellCommand(commandLine);
-    }
-    
     wslc::commands::RootCommand rootCommand;
     return rootCommand.Execute(commandLine, 1);
 }
