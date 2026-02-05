@@ -679,12 +679,7 @@ try
     //
 
     Config.FeatureFlags = Message->FeatureFlags;
-    char FeatureFlagsString[10];
-    snprintf(FeatureFlagsString, sizeof(FeatureFlagsString), "%x", Config.FeatureFlags.value());
-    if (setenv(WSL_FEATURE_FLAGS_ENV, FeatureFlagsString, 1) < 0)
-    {
-        LOG_ERROR("setenv failed {}", errno);
-    }
+    UtilSetFeatureFlags(Config.FeatureFlags.value());
 
     //
     // Determine the default UID which can be specified in /etc/wsl.conf.
@@ -2413,7 +2408,7 @@ try
 
             NewMountOptions = MountEntry.MountOptions;
             NewMountOptions += ',';
-            if (WSL_USE_VIRTIO_9P(Config))
+            if (WSL_USE_VIRTIO_9P())
             {
                 //
                 // Check if the existing mount is a drvfs mount that needs to be remounted.
@@ -2446,7 +2441,7 @@ try
                 NewMountOptions += ',';
             }
 
-            MountPlan9Share(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin, Config);
+            MountPlan9Share(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin);
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
