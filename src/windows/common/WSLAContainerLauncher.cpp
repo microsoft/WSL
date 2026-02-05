@@ -247,7 +247,7 @@ wsl::windows::common::docker_schema::InspectContainer RunningWSLAContainer::Insp
     return wsl::shared::FromJson<docker_schema::InspectContainer>(output.get());
 }
 
-std::map<std::string, std::string> RunningWSLAContainer::GetLabels()
+std::map<std::string, std::string> RunningWSLAContainer::Labels()
 {
     wil::unique_cotaskmem_array_ptr<WSLA_LABEL_INFORMATION> labels;
     THROW_IF_FAILED(m_container->GetLabels(&labels, labels.size_address<ULONG>()));

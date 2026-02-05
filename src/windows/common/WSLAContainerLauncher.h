@@ -34,7 +34,7 @@ public:
     docker_schema::InspectContainer Inspect();
     std::string Id();
     std::string Name();
-    std::map<std::string, std::string> GetLabels();
+    std::map<std::string, std::string> Labels();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;

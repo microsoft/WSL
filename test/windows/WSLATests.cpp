@@ -3029,25 +3029,41 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
+        auto restore = ResetTestSession();
+
+        const auto verifyLabels = [](RunningWSLAContainer& container) {
+            auto labels = container.Labels();
+
+            VERIFY_ARE_EQUAL(labels.size(), 2);
+            VERIFY_ARE_EQUAL(labels["key1"], "value1");
+            VERIFY_ARE_EQUAL(labels["key2"], "value2");
+        };
+
         // Test valid labels
         {
+            auto session = CreateSession(GetDefaultSessionSettings(L"labels-test", true));
+
             WSLAContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
             launcher.AddLabel("key1", "value1");
             launcher.AddLabel("key2", "value2");
 
-            auto container = launcher.Launch(*m_defaultSession);
-            auto process = container.GetInitProcess();
-            ValidateProcessOutput(process, {{1, "OK\n"}});
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
 
-            // Verify labels can be retrieved
-            auto labels = container.GetLabels();
-            VERIFY_ARE_EQUAL(labels.size(), 2u);
-            VERIFY_ARE_EQUAL(labels["key1"], "value1");
-            VERIFY_ARE_EQUAL(labels["key2"], "value2");
+            verifyLabels(container);
+        }
+
+        // Verify labels persist after container restart
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"labels-test", true));
+            auto container = OpenContainer(session.get(), "test-labels");
+            verifyLabels(container);
         }
 
         // Test nullptr key
         {
+            auto session = CreateSession(m_defaultSessionSettings);
+
             WSLA_CONTAINER_OPTIONS options{};
             options.Image = "debian:latest";
             options.Name = "test-labels-nullptr-key";
@@ -3060,12 +3076,14 @@ class WSLATests
             options.LabelsCount = 1;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            auto hr = session->CreateContainer(&options, &container, nullptr);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
         // Test nullptr value
         {
+            auto session = CreateSession(m_defaultSessionSettings);
+
             WSLA_CONTAINER_OPTIONS options{};
             options.Image = "debian:latest";
             options.Name = "test-labels-nullptr-value";
@@ -3078,7 +3096,7 @@ class WSLATests
             options.LabelsCount = 1;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            auto hr = session->CreateContainer(&options, &container, nullptr);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
     }

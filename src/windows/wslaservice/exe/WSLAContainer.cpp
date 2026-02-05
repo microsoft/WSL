@@ -745,7 +745,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
     request.HostConfig.NetworkMode = networkMode;
 
-
     auto [vmPorts, errorCleanup] = MapPorts(ports, parentVM);
 
     for (const auto& e : ports)
@@ -758,6 +757,15 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
     }
 
+    std::map<std::string, std::string> labels;
+    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
+    {
+        const auto& label = containerOptions.Labels[i];
+        THROW_HR_IF_MSG(E_INVALIDARG, label.Key == nullptr || label.Value == nullptr, "Label key and value cannot be null");
+
+        labels[label.Key] = label.Value;
+    }
+
     // Build WSLA metadata to store in a label for recovery on Open().
     WSLAContainerMetadataV1 metadata;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
@@ -765,15 +773,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.Ports = ports;
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
-
-    // Process labels.
-    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
-    {
-        const auto& label = containerOptions.Labels[i];
-        THROW_HR_IF_MSG(E_INVALIDARG, label.Key == nullptr || label.Value == nullptr, "Label key and value cannot be null");
-
-        request.Labels[label.Key] = label.Value;
-    }
+    request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
     auto result =
@@ -786,7 +786,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::move(ports),
-        std::move(request.Labels),
+        std::move(labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -812,14 +812,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    auto metadataIt = dockerContainer.Labels.find(WSLAContainerMetadataLabel);
+    auto labels(dockerContainer.Labels);
+    auto metadataIt = labels.find(WSLAContainerMetadataLabel);
+
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        metadataIt == dockerContainer.Labels.end(),
+        metadataIt == labels.end(),
         "Cannot open WSLA container %hs: missing WSLA metadata label",
         dockerContainer.Id.c_str());
 
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
+    labels.erase(metadataIt);
 
     // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
     // to open containers that are not running.
@@ -833,7 +836,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::string(dockerContainer.Image),
         std::move(metadata.Volumes),
         std::move(metadata.Ports),
-        std::move(dockerContainer.Labels),
+        std::move(labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
