@@ -141,6 +141,7 @@ private:
         std::string Get() const;
         void SetParameter(std::string&& Key, std::string&& Value);
         void SetParameter(std::string&& Key, const std::string& Value);
+        void SetParameter(std::string&& Key, const char* Value); // Overload so that pointers don't resolve to the bool method.
         void SetParameter(std::string&& Key, bool Value);
 
         template <typename... Args>

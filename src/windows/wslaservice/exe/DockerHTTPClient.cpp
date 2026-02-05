@@ -68,6 +68,11 @@ void DockerHTTPClient::URL::SetParameter(std::string&& Key, const std::string& V
     m_parameters.emplace(std::move(Key), Value);
 }
 
+void DockerHTTPClient::URL::SetParameter(std::string&& Key, const char* Value)
+{
+    SetParameter(std::move(Key), std::string(Value));
+}
+
 void DockerHTTPClient::URL::SetParameter(std::string&& Key, bool Value)
 {
     m_parameters.emplace(std::move(Key), Value ? "true" : "false");
@@ -277,21 +282,21 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALo
     url.SetParameter("follow", WI_IsFlagSet(Flags, WSLALogsFlagsFollow));
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
-    url.SetParameter("timestamps", WI_IsFlagSet(Flags, WSLALogsFlagsFollow));
+    url.SetParameter("timestamps", WI_IsFlagSet(Flags, WSLALogsFlagsTimestamps));
 
     if (Tail != 0)
     {
-        url.SetParameter("tail", Tail);
+        url.SetParameter("tail", std::to_string(Tail));
     }
 
     if (Until != 0)
     {
-        url.SetParameter("until", Until);
+        url.SetParameter("until", std::to_string(Until));
     }
 
     if (Since != 0)
     {
-        url.SetParameter("since", Since);
+        url.SetParameter("since", std::to_string(Since));
     }
 
     auto [status, socket] = SendRequest(verb::get, url, {}, {});
