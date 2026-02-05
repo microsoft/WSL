@@ -14,17 +14,19 @@ namespace wslutil = wsl::windows::common::wslutil;
 int ImagePullCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
     CMD_ARG_REQUIRED(m_image, L"Image name is required.");
-    PullImpl(*OpenCLISession(), m_image);
+    auto session = m_sessionService.CreateSession();
+    PullImpl(*session.Get(), m_image);
     return 0;
 }
 
 int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    auto session = m_sessionService.CreateSession();
     wslc::services::ImageService imageServie;
-    auto images = imageServie.List();
+    auto images = imageServie.List(session);
     if (m_format == "json")
     {
-        for (const services::ImageInformation& image : images)
+        for (const models::ImageInformation& image : images)
         {
             wprintf(L"%hs", wsl::shared::ToJson(image).c_str());
         }

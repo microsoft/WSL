@@ -1,18 +1,19 @@
 #include "ImageService.h"
 #include "Utils.h"
+#include "SessionService.h"
 #include <wslutil.h>
 
 namespace wslc::services
 {
 
 using wsl::windows::common::wslutil::WSLAErrorDetails;
+using namespace wslc::models;
 
-std::vector<ImageInformation> ImageService::List()
+std::vector<ImageInformation> ImageService::List(wslc::models::Session& session)
 {
-    auto session = OpenCLISession();
     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
     ULONG count = 0;
-    THROW_IF_FAILED(session->ListImages(&images, &count));
+    THROW_IF_FAILED(session.Get()->ListImages(&images, &count));
 
     std::vector<ImageInformation> result;
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
@@ -27,11 +28,10 @@ std::vector<ImageInformation> ImageService::List()
     return result;
 }
 
-void ImageService::Pull(const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    auto session = OpenCLISession();
     WSLAErrorDetails error{};
-    auto result = session->PullImage(image.c_str(), nullptr, callback, &error.Error);
+    auto result = session.Get()->PullImage(image.c_str(), nullptr, callback, &error.Error);
     error.ThrowIfFailed(result);
 }
 

@@ -10,8 +10,9 @@ using wsl::windows::common::wslutil::WSLAErrorDetails;
 using wsl::windows::common::wslutil::PrintMessage;
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
+using namespace wslc::models;
 
-int ContainerService::Run(IWSLASession& session, std::string image, CreateOptions runOptions)
+int ContainerService::Run(Session& session, std::string image, ContainerCreateOptions runOptions)
 {
     wil::com_ptr<IWSLAContainer> container;
     auto fds = CreateFds(runOptions);
@@ -24,7 +25,7 @@ int ContainerService::Run(IWSLASession& session, std::string image, CreateOption
     return InteractiveShell(ClientRunningWSLAProcess(std::move(process), std::move(fds)), runOptions.TTY);
 }
 
- CreateContainerResult ContainerService::Create(IWSLASession& session, std::string image, CreateOptions runOptions)
+ CreateContainerResult ContainerService::Create(Session& session, std::string image, ContainerCreateOptions runOptions)
 {
     wil::com_ptr<IWSLAContainer> container;
     auto fds = CreateFds(runOptions);
@@ -39,33 +40,33 @@ int ContainerService::Run(IWSLASession& session, std::string image, CreateOption
     return result;
 }
 
-void ContainerService::Start(IWSLASession& session, std::string id)
+void ContainerService::Start(Session& session, std::string id)
 {
     wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     StartInternal(*container);
 }
 
-void ContainerService::Stop(IWSLASession& session, std::string id, StopContainerOptions options)
+void ContainerService::Stop(Session& session, std::string id, StopContainerOptions options)
 {
     wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     StopInternal(*container, options);
 }
 
-void ContainerService::Kill(IWSLASession& session, std::string id, int signal)
+void ContainerService::Kill(Session& session, std::string id, int signal)
 {
     wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     StopContainerOptions options;
     options.Signal = signal;
     StopInternal(*container, options);
 }
 
-void ContainerService::Delete(IWSLASession& session, std::string id, bool force)
+void ContainerService::Delete(Session& session, std::string id, bool force)
 {
     wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     if (force)
     {
         StopContainerOptions options;
@@ -76,18 +77,18 @@ void ContainerService::Delete(IWSLASession& session, std::string id, bool force)
     THROW_IF_FAILED(container->Delete());
 }
 
-std::vector<ContainerInformation> ContainerService::List(IWSLASession& session)
+std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
     ULONG count = 0;
-    THROW_IF_FAILED(session.ListContainers(&containers, &count));
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, &count));
     for (auto ptr = containers.get(), end = containers.get() + count; ptr != end; ++ptr)
     {
         const WSLA_CONTAINER& current = *ptr;
 
         wil::com_ptr<IWSLAContainer> container;
-        THROW_IF_FAILED(session.OpenContainer(current.Name, &container));
+        THROW_IF_FAILED(session.Get()->OpenContainer(current.Name, &container));
 
         wil::unique_cotaskmem_ansistring output;
         THROW_IF_FAILED(container->Inspect(&output));
@@ -104,10 +105,10 @@ std::vector<ContainerInformation> ContainerService::List(IWSLASession& session)
     return result;
 }
 
-void ContainerService::Exec(IWSLASession& session, std::string id, std::vector<std::string> arguments)
+void ContainerService::Exec(Session& session, std::string id, std::vector<std::string> arguments)
 {
     wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     int error = -1;
     WSLA_CONTAINER_OPTIONS options;
 
@@ -125,21 +126,21 @@ void ContainerService::Exec(IWSLASession& session, std::string id, std::vector<s
     InteractiveShell(ClientRunningWSLAProcess(std::move(createdProcess), std::move(fds)), false);
 }
 
-InspectContainer ContainerService::Inspect(IWSLASession& session, std::string id)
+InspectContainer ContainerService::Inspect(Session& session, std::string id)
 {
     wil::com_ptr<IWSLAContainer> container;
-    THROW_IF_FAILED(session.OpenContainer(id.c_str(), &container));
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(container->Inspect(&output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
 
 void ContainerService::CreateInternal(
-    IWSLASession& session,
+    Session& session,
     IWSLAContainer** container,
     std::vector<WSLA_PROCESS_FD>& fds,
     std::string image,
-    const CreateOptions& options)
+    const ContainerCreateOptions& options)
 {
     WSLA_CONTAINER_OPTIONS containerOptions{};
     containerOptions.Image = image.c_str();
@@ -147,21 +148,21 @@ void ContainerService::CreateInternal(
     SetContainerOptions(containerOptions, options.Name, options.TTY, options.Interactive, fds, options.Arguments, args);
 
     WSLAErrorDetails error{};
-    auto result = session.CreateContainer(&containerOptions, container, &error.Error);
+    auto result = session.Get()->CreateContainer(&containerOptions, container, &error.Error);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
 
-        PullImpl(session, image);
+        PullImpl(*session.Get(), image);
 
         error.Reset();
-        result = session.CreateContainer(&containerOptions, container, &error.Error);
+        result = session.Get()->CreateContainer(&containerOptions, container, &error.Error);
     }
 
     error.ThrowIfFailed(result);
 }
 
-std::vector<WSLA_PROCESS_FD> ContainerService::CreateFds(const CreateOptions& options)
+std::vector<WSLA_PROCESS_FD> ContainerService::CreateFds(const ContainerCreateOptions& options)
 {
     std::vector<WSLA_PROCESS_FD> fds;
 

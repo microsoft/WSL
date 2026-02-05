@@ -1,66 +1,32 @@
 #pragma once
-#include <wslservice.h>
-#include <docker_schema.h>
+#include "SessionModel.h"
+#include "ContainerModel.h"
 
 namespace wslc::services
 {
-struct CreateOptions
-{
-    bool TTY = false;
-    bool Interactive = false;
-    std::vector<std::string> Arguments;
-    std::string Name;
-};
-
-struct CreateContainerResult
-{
-    std::string Id;
-};
-
-struct StopContainerOptions
-{
-    int Signal = WSLASignalSIGTERM;
-    ULONG Timeout = 5;
-};
-
-struct KillContainerOptions
-{
-    int Signal = WSLASignalSIGKILL;
-};
-
-struct ContainerInformation
-{
-    std::string Id;
-    std::string Name;
-    std::string Image;
-    WSLA_CONTAINER_STATE State;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
-};
-
 class ContainerService
 {
 public:
-    int Run(IWSLASession& session, std::string image, CreateOptions options);
-    CreateContainerResult Create(IWSLASession& session, std::string image, CreateOptions options);
-    void Start(IWSLASession& session, std::string id);
-    void Stop(IWSLASession& session, std::string id, StopContainerOptions options);
-    void Kill(IWSLASession& session, std::string id, int signal = WSLASignalSIGKILL);
-    void Delete(IWSLASession& session, std::string id, bool force);
-    std::vector<ContainerInformation> List(IWSLASession& session);
-    void Exec(IWSLASession& session, std::string id, std::vector<std::string> arguments);
-    wsl::windows::common::docker_schema::InspectContainer Inspect(IWSLASession& session, std::string id);
+    int Run(wslc::models::Session& session, std::string image, wslc::models::ContainerCreateOptions options);
+    wslc::models::CreateContainerResult Create(wslc::models::Session& session, std::string image, wslc::models::ContainerCreateOptions options);
+    void Start(wslc::models::Session& session, std::string id);
+    void Stop(wslc::models::Session& session, std::string id, wslc::models::StopContainerOptions options);
+    void Kill(wslc::models::Session& session, std::string id, int signal = WSLASignalSIGKILL);
+    void Delete(wslc::models::Session& session, std::string id, bool force);
+    std::vector<wslc::models::ContainerInformation> List(wslc::models::Session& session);
+    void Exec(wslc::models::Session& session, std::string id, std::vector<std::string> arguments);
+    wsl::windows::common::docker_schema::InspectContainer Inspect(wslc::models::Session& session, std::string id);
 
 private:
     void CreateInternal(
-        IWSLASession& session,
+        wslc::models::Session& session,
         IWSLAContainer** container,
         std::vector<WSLA_PROCESS_FD>& fds,
         std::string image,
-        const CreateOptions& options);
+        const wslc::models::ContainerCreateOptions& options);
     void StartInternal(IWSLAContainer& container);
-    void StopInternal(IWSLAContainer& container, const StopContainerOptions& options);
-    std::vector<WSLA_PROCESS_FD> CreateFds(const CreateOptions& options);
+    void StopInternal(IWSLAContainer& container, const wslc::models::StopContainerOptions& options);
+    std::vector<WSLA_PROCESS_FD> CreateFds(const wslc::models::ContainerCreateOptions& options);
     void SetContainerOptions(
         WSLA_CONTAINER_OPTIONS& options,
         const std::string& name,

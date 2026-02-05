@@ -1,22 +1,15 @@
 #pragma once
 
-#include <JsonUtils.h>
+#include "SessionModel.h"
+#include "ImageModel.h"
 
 namespace wslc::services
 {
-    struct ImageInformation
-    {
-        std::string Name;
-        ULONGLONG Size;
-
-        NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ImageInformation, Name, Size);
-    };
-
     class ImageService
     {
     public:
-        std::vector<ImageInformation> List();
-        void Pull(const std::string& image, IProgressCallback* callback);
+        std::vector<wslc::models::ImageInformation> List(wslc::models::Session& session);
+        void Pull(wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
         void Push();
         void Save();
         void Load();

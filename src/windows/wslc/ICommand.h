@@ -1,6 +1,7 @@
 #pragma once
 
 #include <CommandLine.h>
+#include "SessionService.h"
 
 #define CMD_IF_HELP_PRINT_HELP() if (m_help) { PrintHelp(); return 0; }
 #define CMD_ARG_REQUIRED(arg, msg) if (arg.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
@@ -41,6 +42,7 @@ public:
 protected:
     virtual int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) = 0;
     bool m_help;
+    wslc::services::SessionService m_sessionService;
 
 private:
     std::vector<std::string> m_arguments;

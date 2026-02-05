@@ -7,6 +7,7 @@
 #include <thread>
 #include <format>
 #include "ImageService.h"
+#include "SessionService.h"
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
@@ -19,33 +20,6 @@ using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
-
-wil::com_ptr<IWSLASession> OpenCLISession()
-{
-    wil::com_ptr<IWSLASessionManager> sessionManager;
-    THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
-
-    auto dataFolder = std::filesystem::path(wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr)) / "wsla";
-
-    // TODO: Have a configuration file for those.
-    WSLA_SESSION_SETTINGS settings{};
-    settings.DisplayName = L"wsla-cli";
-    settings.CpuCount = 4;
-    settings.MemoryMb = 2048;
-    settings.BootTimeoutMs = 30 * 1000;
-    settings.StoragePath = dataFolder.c_str();
-    settings.MaximumStorageSizeMb = 10000; // 10GB.
-    settings.NetworkingMode = WSLANetworkingModeNAT;
-
-    wil::com_ptr<IWSLASession> session;
-    auto x = sessionManager->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session);
-    THROW_IF_FAILED(x);
-    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-
-    return session;
-}
 
 int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
 {
@@ -254,11 +228,12 @@ void PullImpl(IWSLASession& Session, const std::string& Image)
         ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
     };
 
-    wil::com_ptr<IWSLASession> session = OpenCLISession();
+    wslc::services::SessionService sessionService;
+    auto session = sessionService.CreateSession();
 
     wslc::services::ImageService imageService;
     Callback callback;
-    imageService.Pull(Image, &callback);
+    imageService.Pull(session, Image, &callback);
 }
 
 int ReportError(const std::wstring& context, HRESULT hr)

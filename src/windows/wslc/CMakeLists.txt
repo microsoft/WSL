@@ -5,15 +5,19 @@ set(SOURCES
     ShellCommand.cpp
     ImageCommand.cpp
     ContainerCommand.cpp
-	ICommand.cpp
+    ICommand.cpp
 
     # Others
     Utils.cpp
 
     # Services
     ContainerService.cpp
-	ImageService.cpp
-	ShellService.cpp
+    ImageService.cpp
+    ShellService.cpp
+    SessionService.cpp
+
+    # Models
+    SessionModel.cpp
 )
 
 set(HEADERS
@@ -21,16 +25,51 @@ set(HEADERS
     ShellCommand.h
     ImageCommand.h
     ContainerCommand.h
-	ICommand.h
+    ICommand.h
 
     # Others
     Utils.h
-	TableOutput.h
+    TableOutput.h
 
     # Services
     ContainerService.h
-	ImageService.h
-	ShellService.h
+    ImageService.h
+    ShellService.h
+    SessionService.h
+
+    # Models
+    ImageModel.h
+    ContainerModel.h
+    SessionModel.h
+)
+
+source_group("Services" FILES
+    ContainerService.h
+    ContainerService.cpp
+    ImageService.h
+    ImageService.cpp
+    ShellService.h
+    ShellService.cpp
+    SessionService.h
+    SessionService.cpp
+)
+
+source_group("Commands" FILES
+    ShellCommand.h
+    ShellCommand.cpp
+    ImageCommand.h
+    ImageCommand.cpp
+    ContainerCommand.h
+    ContainerCommand.cpp
+    ICommand.h
+    ICommand.cpp
+)
+
+source_group("Models" FILES
+    ImageModel.h
+    ContainerModel.h
+    SessionModel.h
+    SessionModel.cpp
 )
 
 add_executable(wslc ${SOURCES} ${HEADERS})

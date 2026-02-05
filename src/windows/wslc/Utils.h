@@ -3,8 +3,6 @@
 #include "precomp.h"
 #include "WSLAProcessLauncher.h"
 
-wil::com_ptr<IWSLASession> OpenCLISession();
-
 int InteractiveShell(
     wsl::windows::common::ClientRunningWSLAProcess&& Process, 
     bool Tty);

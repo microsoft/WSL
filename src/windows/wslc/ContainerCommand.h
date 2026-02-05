@@ -32,7 +32,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::services::CreateOptions m_options;
+    wslc::models::ContainerCreateOptions m_options;
     std::string m_image;
 };
 
@@ -64,7 +64,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::services::CreateOptions m_options;
+    wslc::models::ContainerCreateOptions m_options;
     std::string m_image;
 };
 
@@ -116,7 +116,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::services::StopContainerOptions m_options;
+    wslc::models::StopContainerOptions m_options;
 };
 
 // wslc container kill
@@ -141,7 +141,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::services::KillContainerOptions m_options;
+    wslc::models::KillContainerOptions m_options;
 };
 
 
