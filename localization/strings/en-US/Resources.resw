@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <!--
-    Microsoft ResX Schema
-
+  <!-- 
+    Microsoft ResX Schema 
+    
     Version 2.0
-
-    The primary goals of this format is to allow a simple XML format
-    that is mostly human readable. The generation and parsing of the
-    various data types are done through the TypeConverter classes
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
     associated with the data types.
-
+    
     Example:
-
+    
     ... ado.net/XML headers & schema ...
     <resheader name="resmimetype">text/microsoft-resx</resheader>
     <resheader name="version">2.0</resheader>
@@ -26,36 +26,36 @@
         <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
         <comment>This is a comment</comment>
     </data>
-
-    There are any number of "resheader" rows that contain simple
+                
+    There are any number of "resheader" rows that contain simple 
     name/value pairs.
-
-    Each data row contains a name, and value. The row also contains a
-    type or mimetype. Type corresponds to a .NET class that support
-    text/value conversion through the TypeConverter architecture.
-    Classes that don't support this are serialized and stored with the
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
     mimetype set.
-
-    The mimetype is used for serialized objects, and tells the
-    ResXResourceReader how to depersist the object. This is currently not
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
     extensible. For a given mimetype the value must be set accordingly:
-
-    Note - application/x-microsoft.net.object.binary.base64 is the format
-    that the ResXResourceWriter will generate, however the reader can
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
     read any of the formats listed below.
-
+    
     mimetype: application/x-microsoft.net.object.binary.base64
-    value   : The object must be serialized with
+    value   : The object must be serialized with 
             : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
             : and then encoded with base64 encoding.
-
+    
     mimetype: application/x-microsoft.net.object.soap.base64
-    value   : The object must be serialized with
+    value   : The object must be serialized with 
             : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
             : and then encoded with base64 encoding.
 
     mimetype: application/x-microsoft.net.object.bytearray.base64
-    value   : The object must be serialized into a byte array
+    value   : The object must be serialized into a byte array 
             : using a System.ComponentModel.TypeConverter
             : and then encoded with base64 encoding.
     -->
@@ -586,7 +586,7 @@ Arguments for managing distributions in Windows Subsystem for Linux:
 
     --unregister &lt;Distro&gt;
         Unregisters the distribution and deletes the root filesystem.</value>
-  <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
+    <comment>{Locked="--exec,"}{Locked="--shell-type "}{Locked="--cd "}{Locked="--distribution,"}{Locked="--distribution-id "}{Locked="--user,"}{Locked="--system
 "}{Locked="--help
 "}{Locked="--debug-shell
 "}{Locked="--install "}{Locked="--list "}{Locked="--online'"}{Locked="--enable-wsl1
@@ -703,7 +703,7 @@ Arguments:
     <value>This application requires the Windows Subsystem for Linux Optional Component.
 Install it by running: wsl.exe --install --no-distribution
 The system may need to be restarted so the changes can take effect.</value>
-     <comment>{Locked="--install "}{Locked="--no-distribution
+    <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageRequiresFileExtension" xml:space="preserve">
@@ -764,7 +764,7 @@ For information please visit https://aka.ms/wslinstall</value>
     <value>Expected {} in {}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-    <data name="MessageConfigInvalidEscape" xml:space="preserve">
+  <data name="MessageConfigInvalidEscape" xml:space="preserve">
     <value>Invalid escaped character: '{}' in {}:{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1050,7 +1050,7 @@ Falling back to NAT networking.</value>
     <value>Invalid value '{}' for config key '{}' in {}:{} (Valid values: {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-    <data name="MessageWaitingForOobe" xml:space="preserve">
+  <data name="MessageWaitingForOobe" xml:space="preserve">
     <value>Waiting for OOBE command to complete for distribution "{}"...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1083,7 +1083,7 @@ This prompt will time out in 60 seconds.</value>
     <value>Failed to parse terminal profile while registering distribution: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-    <data name="MessageInvalidSize" xml:space="preserve">
+  <data name="MessageInvalidSize" xml:space="preserve">
     <value>Invalid size: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1092,7 +1092,7 @@ This prompt will time out in 60 seconds.</value>
 Error code: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-    <data name="MessageInvalidJson" xml:space="preserve">
+  <data name="MessageInvalidJson" xml:space="preserve">
     <value>Invalid JSON document. Parse error: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1126,7 +1126,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>An error occurred mounting the distribution disk, it was mounted read-only as a fallback.
 See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
   </data>
-    <data name="MessageFailedToTranslate" xml:space="preserve">
+  <data name="MessageFailedToTranslate" xml:space="preserve">
     <value>Failed to translate '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1518,7 +1518,7 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
     <value>Welcome to Windows Subsystem for Linux</value>
   </data>
   <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
-   <value>WSL is a great way to try out different Linux distributions.</value>
+    <value>WSL is a great way to try out different Linux distributions.</value>
   </data>
   <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
     <value>Distro Management</value>
@@ -1566,7 +1566,7 @@ Some of the benefits of using Docker Desktop with WSL are:
 • You can run Docker commands in WSL or in Windows, using the same Docker daemon and images.
 • You can share files and folders between Windows and Linux seamlessly, using the automatic mount of Windows drives in WSL.
 • You can use your preferred Windows tools and editors to work on Linux code and files, and vice versa, thanks to the interoperability of WSL.</value>
- </data>
+  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
     <value>Docker Desktop Integration</value>
   </data>
@@ -1665,7 +1665,7 @@ Linux binaries running in WSL can automatically use your GPU in Windows to speed
     <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
-   <value>You can use WSL as your full-time development environment directly from VS Code.</value>
+    <value>You can use WSL as your full-time development environment directly from VS Code.</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
     <value>VS Code Integration</value>
@@ -1872,5 +1872,34 @@ You can also access more VS Code Remote options through the command palette with
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>The number of milliseconds that a VM is idle, before it is shut down.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>Build, run, debug, and profile your apps running on WSL from Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Run and debug your apps on WSL from Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>Learn more about WSL in Visual Studio for .NET developers</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>Learn more about Visual Studio and WSL for C++ developers</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/build/walkthrough-build-debug-wsl</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>You can easily run and debug your .NET Core and cross platform C++ apps in Linux without leaving Visual Studio using Windows Subsystem for Linux (WSL). If you are a cross-platform developer, you can use this method as a simple way to test more of your target environments.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Visual Studio Integration</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Visual Studio Integration</value>
   </data>
 </root>
