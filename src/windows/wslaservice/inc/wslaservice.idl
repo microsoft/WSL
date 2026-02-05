@@ -171,6 +171,18 @@ struct WSLA_PORT_MAPPING
     int Family;
 };
 
+struct WSLA_LABEL
+{
+    [string] LPCSTR Key;
+    [string] LPCSTR Value;
+};
+
+struct WSLA_LABEL_INFORMATION
+{
+    [string] LPSTR Key;
+    [string] LPSTR Value;
+};
+
 enum WSLA_CONTAINER_NETWORK_TYPE
 {
     WSLA_CONTAINER_NETWORK_BRIDGE = 0,
@@ -214,6 +226,8 @@ struct WSLA_CONTAINER_OPTIONS
     ULONG VolumesCount;
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
     ULONG PortsCount;
+    [unique, size_is(LabelsCount)] const struct WSLA_LABEL* Labels;
+    ULONG LabelsCount;
     WSLAContainerFlags Flags;
     WSLASignal StopSignal;
     // TODO: List specific GPU devices.
@@ -338,6 +352,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
+    HRESULT GetLabels([out, size_is(, *Count)] struct WSLA_LABEL_INFORMATION** Labels, [out] ULONG* Count);
 
     // Anonymous host port allocation (P1).
     //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);

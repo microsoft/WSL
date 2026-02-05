@@ -3024,6 +3024,83 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ContainerLabels)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto restore = ResetTestSession();
+
+        const auto verifyLabels = [](RunningWSLAContainer& container) {
+            auto labels = container.Labels();
+
+            VERIFY_ARE_EQUAL(labels.size(), 2);
+            VERIFY_ARE_EQUAL(labels["key1"], "value1");
+            VERIFY_ARE_EQUAL(labels["key2"], "value2");
+        };
+
+        // Test valid labels
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"labels-test", true));
+
+            WSLAContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
+            launcher.AddLabel("key1", "value1");
+            launcher.AddLabel("key2", "value2");
+
+            auto container = launcher.Launch(*session);
+            container.SetDeleteOnClose(false);
+
+            verifyLabels(container);
+        }
+
+        // Verify labels persist after container restart
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(L"labels-test", true));
+            auto container = OpenContainer(session.get(), "test-labels");
+            verifyLabels(container);
+        }
+
+        // Test nullptr key
+        {
+            auto session = CreateSession(m_defaultSessionSettings);
+
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-nullptr-key";
+
+            WSLA_LABEL label{};
+            label.Key = nullptr;
+            label.Value = "value";
+
+            options.Labels = &label;
+            options.LabelsCount = 1;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = session->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test nullptr value
+        {
+            auto session = CreateSession(m_defaultSessionSettings);
+
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-nullptr-value";
+
+            WSLA_LABEL label{};
+            label.Key = "key";
+            label.Value = nullptr;
+
+            options.Labels = &label;
+            options.LabelsCount = 1;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = session->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+    }
+
     TEST_METHOD(ContainerAttach)
     {
         WSL2_TEST_ONLY();
