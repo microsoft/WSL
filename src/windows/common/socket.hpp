@@ -18,10 +18,10 @@ Abstract:
 
 namespace wsl::windows::common::socket {
 
-void Accept(
+bool CancellableAccept(
     _In_ SOCKET ListenSocket,
     _In_ SOCKET Socket,
-    _In_ int Timeout,
+    _In_ DWORD Timeout,
     _In_opt_ HANDLE ExitHandle,
     _In_ const std::source_location& Location = std::source_location::current());
 
