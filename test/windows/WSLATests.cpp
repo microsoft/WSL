@@ -3029,74 +3029,87 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        auto restore = ResetTestSession();
-
-        const auto verifyLabels = [](RunningWSLAContainer& container) {
-            auto labels = container.Labels();
-
-            VERIFY_ARE_EQUAL(labels.size(), 2);
-            VERIFY_ARE_EQUAL(labels["key1"], "value1");
-            VERIFY_ARE_EQUAL(labels["key2"], "value2");
-        };
+        // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
+        std::map<std::string, std::string> labels = {{"key1", "value1"}, {"key2", std::string(10000, 'a')}};
 
         // Test valid labels
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"labels-test", true));
-
             WSLAContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
-            launcher.AddLabel("key1", "value1");
-            launcher.AddLabel("key2", "value2");
 
-            auto container = launcher.Launch(*session);
+            for (const auto& [key, value] : labels)
+            {
+                launcher.AddLabel(key, value);
+            }
+
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(labels, container.Labels());
+
+            // Keep the container alive after the handle is dropped so we can validate labels are persisted across sessions.
             container.SetDeleteOnClose(false);
-
-            verifyLabels(container);
         }
 
-        // Verify labels persist after container restart
         {
-            auto session = CreateSession(GetDefaultSessionSettings(L"labels-test", true));
-            auto container = OpenContainer(session.get(), "test-labels");
-            verifyLabels(container);
+            // Restarting the test session will force the container to be reloaded from storage.
+            ResetTestSession();
+
+            // Validate that labels are correctly loaded.
+            auto container = OpenContainer(m_defaultSession.get(), "test-labels");
+            VERIFY_ARE_EQUAL(labels, container.Labels());
         }
 
         // Test nullptr key
         {
-            auto session = CreateSession(m_defaultSessionSettings);
+            WSLA_LABEL label{.Key = nullptr, .Value = "value"};
 
             WSLA_CONTAINER_OPTIONS options{};
             options.Image = "debian:latest";
             options.Name = "test-labels-nullptr-key";
-
-            WSLA_LABEL label{};
-            label.Key = nullptr;
-            label.Value = "value";
-
             options.Labels = &label;
             options.LabelsCount = 1;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container, nullptr);
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
         // Test nullptr value
         {
-            auto session = CreateSession(m_defaultSessionSettings);
+            WSLA_LABEL label{.Key = "key", .Value = nullptr};
 
             WSLA_CONTAINER_OPTIONS options{};
             options.Image = "debian:latest";
             options.Name = "test-labels-nullptr-value";
-
-            WSLA_LABEL label{};
-            label.Key = "key";
-            label.Value = nullptr;
-
             options.Labels = &label;
             options.LabelsCount = 1;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = session->CreateContainer(&options, &container, nullptr);
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test duplicate keys
+        {
+            std::vector<WSLA_LABEL> labels(2);
+            labels.push_back({.Key = "key", .Value = "value"});
+            labels.push_back({.Key = "key", .Value = "value2"});
+
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-duplicate-keys";
+            options.Labels = labels.data();
+            options.LabelsCount = static_cast<ULONG>(labels.size());
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test wsla metadata key conflict
+        {
+            WSLAContainerLauncher launcher("debian:latest");
+            launcher.AddLabel("com.microsoft.wsl.container.metadata", "value");
+
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
     }

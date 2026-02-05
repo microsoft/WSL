@@ -761,7 +761,12 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
     {
         const auto& label = containerOptions.Labels[i];
-        THROW_HR_IF_MSG(E_INVALIDARG, label.Key == nullptr || label.Value == nullptr, "Label key and value cannot be null");
+
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Key, "Label at index %lu has null key", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Value, "Label at index %lu has null value", i);
+
+        THROW_HR_IF_MSG(E_INVALIDARG, strcmp(label.Key, WSLAContainerMetadataLabel) == 0, "Label key '%hs' is reserved", WSLAContainerMetadataLabel);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), labels.contains(label.Key), "Duplicate label key: '%hs'", label.Key);
 
         labels[label.Key] = label.Value;
     }
@@ -1059,23 +1064,34 @@ void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
 {
     std::lock_guard lock(m_lock);
 
-    *Count = static_cast<ULONG>(m_labels.size());
-
     if (m_labels.empty())
     {
         *Labels = nullptr;
+        *Count = 0;
         return;
     }
 
-    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(m_labels.size());
-    ULONG i = 0;
-    for (const auto& [key, value] : m_labels)
+    auto count = m_labels.size();
+    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(count);
+
+    auto cleanup = wil::scope_exit([&]() {
+        for (size_t j = 0; j < count; ++j)
+        {
+            CoTaskMemFree(labelsArray[j].Key);
+            CoTaskMemFree(labelsArray[j].Value);
+        }
+    });
+
+    for (size_t i = 0; i < count; ++i)
     {
-        labelsArray[i].Key = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(key.c_str()).release();
-        labelsArray[i].Value = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()).release();
-        i++;
+        const auto& label = std::next(m_labels.begin(), i);
+        labelsArray[i].Key = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->first.c_str()).release();
+        labelsArray[i].Value = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->second.c_str()).release();
     }
 
+    cleanup.release();
+
+    *Count = static_cast<ULONG>(count);
     *Labels = labelsArray.release();
 }
 
@@ -1083,6 +1099,9 @@ HRESULT WSLAContainer::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
 try
 {
     RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
+
+    *Count = 0;
+    *Labels = nullptr;
     return CallImpl(&WSLAContainerImpl::GetLabels, Labels, Count);
 }
 CATCH_RETURN();
