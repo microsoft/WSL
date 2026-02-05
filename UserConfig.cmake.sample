@@ -34,7 +34,7 @@ if(WSL_DEV_BINARY_PATH)
 endif()
 
 # # Uncomment to skip building, packaging and installing wslsettings
-set(WSL_BUILD_WSL_SETTINGS true)
+# set(WSL_BUILD_WSL_SETTINGS false)
 
 # # Uncomment to generate a "thin" MSI package which builds and installs faster
 # set(WSL_BUILD_THIN_PACKAGE true)
