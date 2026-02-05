@@ -1890,7 +1890,7 @@ You can also access more VS Code Remote options through the command palette with
     <value>Learn more about Visual Studio and WSL for C++ developers</value>
   </data>
   <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
-    <value>https://learn.microsoft.com/cpp/build/walkthrough-build-debug-wsl</value>
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
     <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
   </data>
   <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
