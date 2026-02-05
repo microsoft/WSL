@@ -16,7 +16,7 @@ Session SessionService::CreateSession(std::optional<SessionOptions> options)
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
     auto dataFolder = std::filesystem::path(wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr)) / "wsla";
     wil::com_ptr<IWSLASession> session;
-   THROW_IF_FAILED(sessionManager->CreateSession(&options.value(), WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
+    THROW_IF_FAILED(sessionManager->CreateSession(&sessionOptions, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
