@@ -1194,7 +1194,7 @@ try
     auto shareNameUtf8 = shared::string::WideToMultiByte(shareName);
     if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
     {
-        auto [_, __, channel] = Fork(WSLA_FORK::Thread);
+        auto [_, __, channel] = Fork(WSLA_FORK::Process);
 
         WSLA_CONNECT message;
         message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
@@ -1261,8 +1261,6 @@ HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !FeatureEnabled(WslaFeatureFlagsGPU));
-
-    auto [channel, _, __] = Fork(WSLA_FORK::Thread);
 
     auto windowsPath = wil::GetWindowsDirectoryW<std::wstring>();
 
