@@ -59,6 +59,7 @@ public:
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
 
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> CreateNoThrow(IWSLASession& Session);
+    RunningWSLAContainer Create(IWSLASession& Session);
 
     RunningWSLAContainer Launch(IWSLASession& Session, WSLAContainerStartFlags Flags = WSLAContainerStartFlagsAttach);
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> LaunchNoThrow(IWSLASession& Session, WSLAContainerStartFlags Flags = WSLAContainerStartFlagsAttach);

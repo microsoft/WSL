@@ -376,8 +376,11 @@ void WSLAVirtualMachine::Start()
 
     // Create a socket listening for connections from mini_init.
     auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
-    auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
-    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
+    auto socket =
+        wsl::windows::common::hvsocket::CancellableAccept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
+    THROW_HR_IF(E_FAIL, !socket.has_value());
+
+    m_initChannel = wsl::shared::SocketChannel{std::move(socket.value()), "mini_init", m_vmTerminatingEvent.get()};
 
     // Create a thread to watch for exited processes.
     auto [__, ___, childChannel] = Fork(WSLA_FORK::Thread);
@@ -1191,7 +1194,7 @@ try
     auto shareNameUtf8 = shared::string::WideToMultiByte(shareName);
     if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
     {
-        auto [_, __, channel] = Fork(WSLA_FORK::Thread);
+        auto [_, __, channel] = Fork(WSLA_FORK::Process);
 
         WSLA_CONNECT message;
         message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
@@ -1258,8 +1261,6 @@ HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !FeatureEnabled(WslaFeatureFlagsGPU));
-
-    auto [channel, _, __] = Fork(WSLA_FORK::Thread);
 
     auto windowsPath = wil::GetWindowsDirectoryW<std::wstring>();
 
@@ -1381,12 +1382,17 @@ void WSLAVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket) co
     {
         try
         {
-            auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), INFINITE, m_vmExitEvent.get());
+            auto socket = wsl::windows::common::hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmExitEvent.get());
+            if (!socket)
+            {
+                // VM is exiting.
+                break;
+            }
 
             THROW_LAST_ERROR_IF(
                 setsockopt(listenSocket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&RECEIVE_TIMEOUT, sizeof(RECEIVE_TIMEOUT)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket), "crash_dump", m_vmExitEvent.get()};
+            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmExitEvent.get()};
 
             const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
             const char* process = reinterpret_cast<const char*>(&message.Buffer);

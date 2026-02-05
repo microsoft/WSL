@@ -297,7 +297,11 @@ try
         wil::unique_socket InetSocket(WSASocket(AddressFamily, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
         THROW_LAST_ERROR_IF(!InetSocket);
 
-        wsl::windows::common::socket::Accept(Arguments->ListenSocket.get(), InetSocket.get(), INFINITE, Arguments->ExitEvent.get());
+        if (!wsl::windows::common::socket::CancellableAccept(
+                Arguments->ListenSocket.get(), InetSocket.get(), INFINITE, Arguments->ExitEvent.get()))
+        {
+            break; // Exit event was signaled, exit.
+        }
 
         // Establish a relay thread.
 

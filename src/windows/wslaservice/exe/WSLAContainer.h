@@ -22,31 +22,15 @@ Abstract:
 #include "WSLAProcessControl.h"
 #include "IORelay.h"
 #include "COMImplClass.h"
+#include "WSLAContainerMetadata.h"
 
 namespace wsl::windows::service::wsla {
-
-struct VolumeMountInfo
-{
-    std::wstring HostPath;
-    std::string ParentVMPath;
-    std::string ContainerPath;
-    bool ReadOnly;
-};
 
 class WSLAContainer;
 
 class WSLAContainerImpl
 {
 public:
-    struct PortMapping
-    {
-        uint16_t HostPort;
-        uint16_t VmPort;
-        uint16_t ContainerPort;
-        int Family;
-        bool MappedToHost = false;
-    };
-
     NON_COPYABLE(WSLAContainerImpl);
     NON_MOVABLE(WSLAContainerImpl);
 
@@ -55,8 +39,8 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
-        std::vector<VolumeMountInfo>&& volumes,
-        std::vector<PortMapping>&& ports,
+        std::vector<WSLAVolumeMount>&& volumes,
+        std::vector<WSLAPortMapping>&& ports,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -120,17 +104,14 @@ private:
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
-    std::vector<PortMapping> m_mappedPorts;
-    std::vector<VolumeMountInfo> m_mountedVolumes;
+    std::vector<WSLAPortMapping> m_mappedPorts;
+    std::vector<WSLAVolumeMount> m_mountedVolumes;
     Microsoft::WRL::ComPtr<WSLAContainer> m_comWrapper;
     Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
     DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
     ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
-
-    static std::vector<VolumeMountInfo> MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM);
-    static void UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM);
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer

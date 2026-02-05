@@ -2565,7 +2565,6 @@ void __stdcall wsl::core::networking::WslMirroredNetworkManager::HcnServiceConne
     auto* const manager = static_cast<WslMirroredNetworkManager*>(Context);
 
     const auto lock = manager->m_networkLock.lock_exclusive();
-    WI_ASSERT(manager->m_state == State::Started);
     if (manager->m_state == State::Stopped)
     {
         return;
@@ -2591,7 +2590,6 @@ try
     auto* const manager = static_cast<WslMirroredNetworkManager*>(Context);
 
     const auto lock = manager->m_networkLock.lock_exclusive();
-    WI_ASSERT(manager->m_state == State::Started);
     if (manager->m_state == State::Stopped)
     {
         return;
