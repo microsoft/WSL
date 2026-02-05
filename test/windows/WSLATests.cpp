@@ -3181,4 +3181,20 @@ class WSLATests
             VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
         }
     }
+
+    TEST_METHOD(PageReporting)
+    {
+        WSL2_TEST_ONLY();
+
+        // Determine expected page reporting order based on Windows version.
+        // On Germanium or later: 5 (128k), otherwise: 9 (2MB).
+        const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+        int expectedOrder = (windowsVersion.BuildNumber >= wsl::windows::common::helpers::WindowsBuildNumbers::Germanium) ? 5 : 9;
+
+        // Read the actual value from sysfs and verify it matches.
+        auto result =
+            ExpectCommandResult(m_defaultSession.get(), {"/bin/cat", "/sys/module/page_reporting/parameters/page_reporting_order"}, 0);
+
+        VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
+    }
 };
