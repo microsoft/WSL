@@ -800,6 +800,24 @@ inline std::basic_string<TChar> FormatMacAddress(const MacAddress& input, TChar 
     return output;
 }
 
+// TODO: Replace with std::ranges::contains when C++ 20 support is available
+
+template <typename TChar>
+constexpr bool Contains(std::basic_string_view<TChar> ptr, TChar ch)
+{
+    while (*ptr != '\0')
+    {
+        if (*ptr == ch)
+        {
+            return true;
+        }
+
+        ptr++;
+    }
+
+    return false;
+}
+
 struct CaseInsensitiveCompare
 {
     bool operator()(const std::string& left, const std::string& right) const
