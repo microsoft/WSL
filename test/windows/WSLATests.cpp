@@ -742,6 +742,7 @@ class WSLATests
         session.reset();
         auto future = promise.get_future();
         auto result = future.wait_for(std::chrono::seconds(30));
+        VERIFY_ARE_EQUAL(result, std::future_status::ready);
         auto [reason, details] = future.get();
         VERIFY_ARE_EQUAL(reason, WSLAVirtualMachineTerminationReasonShutdown);
         VERIFY_ARE_NOT_EQUAL(details, L"");
