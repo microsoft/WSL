@@ -434,6 +434,17 @@ void WSLAVirtualMachine::Start()
         wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
         MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
     }
+
+    // Configure cold discard hint size for page reporting.
+    // This sets the minimum order of pages that will be reported as free to the hypervisor.
+    {
+        auto cmdStr = std::format("echo {} > /sys/module/page_reporting/parameters/page_reporting_order", m_coldDiscardShiftSize);
+        std::vector<const char*> args{"/bin/sh", "-c", cmdStr.c_str()};
+
+        WSLA_PROCESS_OPTIONS options{};
+        options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
+        CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
+    }
 }
 
 bool WSLAVirtualMachine::FeatureEnabled(WSLAFeatureFlags Value) const
