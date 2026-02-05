@@ -25,6 +25,7 @@ Abstract:
 
 #include "precomp.h"
 
+#include <winrt/Windows.Foundation.h>
 #include "DockerHTTPClient.h"
 
 namespace http = boost::beast::http;
@@ -35,6 +36,8 @@ using wsl::windows::service::wsla::DockerHTTPClient;
 using namespace wsl::windows::common;
 
 namespace {
+
+constexpr auto urlPrefix = "http://localhost/";
 
 bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_type& response)
 {
@@ -52,11 +55,70 @@ bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_typ
     return true;
 }
 
+class RequestUrl
+{
+public:
+    template <typename... Args>
+    RequestUrl(std::format_string<decltype(Escape(std::declval<Args>()))...> Url, Args&&... args)
+    {
+        m_path = std::format(Url, Escape(std::forward<Args>(args))...);
+    }
+
+    std::string Get()
+    {
+        std::stringstream url;
+        url << urlPrefix;
+        url << m_path;
+
+        if (!m_parameters.empty())
+        {
+            url << "?";
+            bool first = true;
+            for (const auto& [key, value] : m_parameters)
+            {
+                if (!first)
+                {
+                    url << "&";
+                }
+
+                url << key << "=" << value;
+                first = false;
+            }
+        }
+
+        return url.str();
+    }
+
+    void AddParameter(std::string&& Key, std::string&& Value)
+    {
+        m_parameters.emplace(std::move(Key), std::move(Value));
+    }
+
+private:
+    template <typename... Args>
+    std::string CreateUrl(std::format_string<Args...> Url, Args&&... args)
+    {
+        
+    }
+
+    static std::string Escape(const std::string& Value)
+    {
+        auto escaped = winrt::Windows::Foundation::Uri::EscapeComponent(winrt::to_hstring(Value));
+
+        return wsl::shared::string::WideToMultiByte(escaped.c_str());
+    }
+
+    std::string m_path;
+    std::map<std::string, std::string> m_parameters;
+};
+
 } // namespace
 
 DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
     m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
 {
+    RequestUrl url("{}/foo/{}", std::string("a"), std::string("1"));
+    url.Get();
 }
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const char* Name, const char* Tag)
