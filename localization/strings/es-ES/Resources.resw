@@ -1137,13 +1137,13 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_ErrorTryAgainLater.Text" xml:space="preserve">
-    <value>Hubo un problema. Prueba otra vez más tarde.</value>
+    <value>Se produjo un error. Inténtelo de nuevo más tarde.</value>
   </data>
   <data name="Settings_AboutPageTitle.Text" xml:space="preserve">
     <value>Acerca de</value>
   </data>
   <data name="Settings_About.Header" xml:space="preserve">
-    <value>Sobre la configuración del subsistema de Windows para Linux</value>
+    <value>Acerca de la configuración del Subsistema de Windows para Linux</value>
   </data>
   <data name="Settings_About.Description" xml:space="preserve">
     <value>© Microsoft. Todos los derechos reservados.</value>
@@ -1152,84 +1152,84 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Configuración del Subsistema de Windows para Linux</value>
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
-    <value>Subsistema de Windows para Linux Configuración permite a los desarrolladores administrar el archivo .wslconfig mediante una aplicación basada en GUI.</value>
+    <value>Configuración del Subsistema de Windows para Linux permite a los desarrolladores administrar el archivo .wslconfig mediante una aplicación con interfaz gráfica.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_AutoMemoryReclaim.Header" xml:space="preserve">
-    <value>Recuperación automática de memoria</value>
+    <value>Liberación automática de memoria</value>
   </data>
   <data name="Settings_AutoMemoryReclaim.Description" xml:space="preserve">
-    <value>Libera automáticamente la memoria en caché después de detectar el uso de CPU inactivo. Establézcalo en gradual para liberación lenta y dropcache para liberación instantánea de la memoria almacenada en caché.</value>
+    <value>Libera automáticamente la memoria caché después de detectar inactividad de la CPU. Establézcalo en "gradual" para una liberación lenta y en "dropcache" para liberar al instante la memoria caché.</value>
   </data>
   <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Recuperación automática de memoria.</value>
+    <value>Liberación automática de memoria.</value>
   </data>
   <data name="Settings_AutoMemoryReclaimComboBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Libera automáticamente la memoria en caché después de detectar el uso de CPU inactivo. Establézcalo en gradual para liberación lenta y dropcache para liberación instantánea de la memoria almacenada en caché.</value>
+    <value>Libera automáticamente la memoria caché después de detectar inactividad de la CPU. Establézcalo en "gradual" para una liberación lenta y en "dropcache" para liberar al instante la memoria caché.</value>
   </data>
   <data name="Settings_AutoProxy.Header" xml:space="preserve">
     <value>Proxy automático habilitado</value>
   </data>
   <data name="Settings_AutoProxy.Description" xml:space="preserve">
-    <value>Habilita a WSL para que use la información de proxy HTTP de Windows.</value>
+    <value>Permite que WSL use la información del proxy HTTP de Windows.</value>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Proxy automático habilitado.</value>
   </data>
   <data name="Settings_AutoProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Habilita a WSL para que use la información de proxy HTTP de Windows.</value>
+    <value>Permite que WSL use la información del proxy HTTP de Windows.</value>
   </data>
   <data name="Settings_BestEffortDNS.Header" xml:space="preserve">
-    <value>Usar el mejor esfuerzo de análisis de DNS</value>
+    <value>Intentar analizar el DNS</value>
   </data>
   <data name="Settings_BestEffortDNS.Description" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.dnsTunneling se establece en true. Cuando se establece en true, Windows extraerá la pregunta de la solicitud DNS e intentará resolverla, omitiendo los registros desconocidos.</value>
+    <value>Solo aplicable cuando 'Túnel de DNS habilitado' está establecido en 'On'. Cuando se establece en 'On', Windows extraerá la pregunta de la solicitud DNS e intentará resolverla, ignorando los registros desconocidos.</value>
     <comment>{Locked="wsl2.dnsTunneling"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Usar el mejor esfuerzo de análisis de DNS.</value>
+    <value>Intentar analizar el DNS.</value>
   </data>
   <data name="Settings_BestEffortDNSToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.dnsTunneling está establecido en true. Cuando se establece en true, Windows extraerá la pregunta de la solicitud DNS e intentará resolverla, omitiendo los registros desconocidos.</value>
+    <value>Solo aplicable cuando 'Túnel de DNS habilitado' está establecido en 'On'. Cuando se establece en 'On', Windows extraerá la pregunta de la solicitud DNS e intentará resolverla, ignorando los registros desconocidos.</value>
   </data>
   <data name="Settings_CustomKernelPath.Header" xml:space="preserve">
     <value>Kernel personalizado</value>
   </data>
   <data name="Settings_CustomKernelPath.Description" xml:space="preserve">
-    <value>Ruta de acceso absoluta de Windows a un kernel de Linux personalizado.</value>
+    <value>Ruta absoluta de Windows a un kernel de Linux personalizado.</value>
   </data>
   <data name="Settings_CustomKernelPathBrowseButton.Content" xml:space="preserve">
-    <value>Examinar kernels</value>
+    <value>Seleccionar kernel…</value>
   </data>
   <data name="Settings_CustomKernelPathTextBox.AutomationProperties.Name" xml:space="preserve">
     <value>Kernel personalizado</value>
   </data>
   <data name="Settings_CustomKernelPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Ruta de acceso absoluta de Windows a un kernel de Linux personalizado.</value>
+    <value>Ruta absoluta de Windows a un kernel de Linux personalizado.</value>
   </data>
   <data name="Settings_CustomKernelModulesPath.Header" xml:space="preserve">
-    <value>Módulos de kernel personalizados</value>
+    <value>Módulos del kernel personalizado</value>
   </data>
   <data name="Settings_CustomKernelModulesPath.Description" xml:space="preserve">
-    <value>Una ruta de acceso absoluta de Windows a un VHD de módulos de kernel de Linux personalizados.</value>
+    <value>Ruta absoluta de Windows a un VHD de módulos de kernel de Linux personalizado.</value>
   </data>
   <data name="Settings_CustomKernelModulesPathBrowseButton.Content" xml:space="preserve">
-    <value>Explorar módulos de kernel</value>
+    <value>Seleccionar VHD de módulos del kernel…</value>
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Módulos de kernel personalizados</value>
+    <value>Módulos del kernel personalizado</value>
   </data>
   <data name="Settings_CustomKernelModulesPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Una ruta de acceso absoluta de Windows a un VHD de módulos de kernel de Linux personalizados.</value>
+    <value>Ruta absoluta de Windows a un VHD de módulos de kernel de Linux personalizado.</value>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
-    <value>Pulsación del sistema personalizada</value>
+    <value>Distribución del sistema personalizada</value>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
-    <value>Examinar distribuciones</value>
+    <value>Seleccionar VHD de distribución del sistema…</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una pulsación del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
+    <value>Especifique una ruta a un VHD que se cargará como una distribución del sistema personalizada, usada principalmente para ejecutar aplicaciones con interfaz gráfica en WSL. [Más información sobre las distribuciones del sistema aquí].</value>
     <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
@@ -1237,40 +1237,40 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Pulsación del sistema personalizada</value>
+    <value>Distribución del sistema personalizada</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una pulsación del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
+    <value>Especifique una ruta a un VHD que se cargará como una distribución del sistema personalizada, usada principalmente para ejecutar aplicaciones con interfaz gráfica en WSL.</value>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Habilitar consola de depuración</value>
   </data>
   <data name="Settings_DebugConsole.Description" xml:space="preserve">
-    <value>Booleano para activar una ventana de consola de salida que muestra el contenido de dmesg al iniciar una instancia de distribución de WSL 2.</value>
+    <value>Activa una ventana de salida de consola que muestra el contenido de dmesg al iniciar una instancia de distribución de WSL2.</value>
   </data>
   <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Habilitar consola de depuración.</value>
   </data>
   <data name="Settings_DebugConsoleToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Booleano para activar una ventana de consola de salida que muestra el contenido de los mensajes de diagnóstico al iniciar una instancia de distribución de WSL 2.</value>
+    <value>Activa una ventana de salida de consola que muestra el contenido de los mensajes de diagnóstico al iniciar una instancia de distribución de WSL2.</value>
   </data>
   <data name="Settings_DefaultVHDSize.Header" xml:space="preserve">
-    <value>Tamaño de VHD predeterminado</value>
+    <value>Tamaño predeterminado del VHD</value>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
-    <value>Tamaño máximo predeterminado para el disco duro virtual (VHD) de WSL ampliable solo para distribuciones recién creadas.</value>
+    <value>El tamaño máximo predeterminado del disco duro virtual (VHD) de WSL, expandible, solo para distribuciones creadas desde ahora.</value>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>Restablecer tamaño</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Tamaño de VHD predeterminado</value>
+    <value>Tamaño predeterminado del VHD</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Tamaño máximo predeterminado, especificado en megabytes, para el disco duro virtual (VHD) WSL ampliable solo para distribuciones recién creadas.</value>
+    <value>El tamaño máximo predeterminado, especificado en megabytes, del disco duro virtual (VHD) de WSL, expandible, solo para distribuciones creadas desde ahora.</value>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
-    <value>Programador</value>
+    <value>Desarrollador</value>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Documentación</value>
@@ -1280,141 +1280,141 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked}Uri to Microsoft WSL documentation</comment>
   </data>
   <data name="Settings_DrvFSMode.Header" xml:space="preserve">
-    <value>Cambiar el modo DrvFS</value>
+    <value>Cambiar modo de DrvFS</value>
   </data>
   <data name="Settings_DrvFSMode.Description" xml:space="preserve">
     <value>Cambia la implementación de acceso a archivos entre sistemas operativos en WSL.</value>
   </data>
   <data name="Settings_DNSProxy.Header" xml:space="preserve">
-    <value>Proxy Servicio de nombres de dominio habilitado</value>
+    <value>Proxy DNS habilitado</value>
   </data>
   <data name="Settings_DNSProxy.Description" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode se establece en NAT. Booleano para informar a WSL de que debe configurar el servidor DNS en Linux a nat en el host. Si se establece en false, se reflejarán los servidores DNS de Windows a Linux.</value>
+    <value>Solo aplicable cuando 'Modo de red' está establecido en 'Nat'. Indica a WSL que configure el servidor DNS en Linux con el NAT del host. Establecerlo en 'Off' reflejará los servidores DNS de Windows en Linux.</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Proxy DNS habilitado.</value>
   </data>
   <data name="Settings_DNSProxyToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode está establecido en NAT. Booleano para informar a WSL para configurar el servidor DNS en Linux a la NAT en el host. Si se establece en false, se reflejarán los servidores DNS de Windows a Linux.</value>
+    <value>Solo aplicable cuando 'Modo de red' está establecido en 'Nat'. Indica a WSL que configure el servidor DNS en Linux con el NAT del host. Establecerlo en 'Off' reflejará los servidores DNS de Windows en Linux.</value>
   </data>
   <data name="Settings_DNSTunneling.Header" xml:space="preserve">
-    <value>Tunelización de DNS habilitada</value>
+    <value>Túnel de DNS habilitado</value>
   </data>
   <data name="Settings_DNSTunneling.Description" xml:space="preserve">
-    <value>Cambia la forma en que las solicitudes DNS se redirigen mediante proxy de WSL a Windows.</value>
+    <value>Cambia la forma en que las solicitudes DNS se envían mediante proxy desde WSL a Windows.</value>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Tunelización de DNS habilitada.</value>
+    <value>Túnel de DNS habilitado.</value>
   </data>
   <data name="Settings_DNSTunnelingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Cambia la forma en que las solicitudes DNS se redirigen mediante proxy de WSL a Windows.</value>
+    <value>Cambia la forma en que las solicitudes DNS se envían mediante proxy desde WSL a Windows.</value>
   </data>
   <data name="Settings_FileSystemPageTitle.Text" xml:space="preserve">
     <value>Sistema de archivos</value>
   </data>
   <data name="Settings_GUIApplications.Header" xml:space="preserve">
-    <value>Habilitar aplicaciones GUI</value>
+    <value>Habilitar aplicaciones con interfaz gráfica</value>
   </data>
   <data name="Settings_GUIApplicationsDescription.Text" xml:space="preserve">
-    <value>Booleano para activar o desactivar la compatibilidad con aplicaciones GUI ([WSLg]) en WSL.</value>
+    <value>Activa o desactiva la compatibilidad con aplicaciones con interfaz gráfica ([WSLg]) en WSL.</value>
   </data>
   <data name="Settings_GUIApplicationsDescription.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgproject</value>
     <comment>{Locked}Uri to the Microsoft GitHub WSLg project</comment>
   </data>
   <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Habilitar aplicaciones GUI.</value>
+    <value>Habilitar aplicaciones con interfaz gráfica.</value>
   </data>
   <data name="Settings_GUIApplicationsToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Booleano para activar o desactivar la compatibilidad con aplicaciones GUI (conocidas como WSL g) en WSL.</value>
+    <value>Activa o desactiva la compatibilidad con aplicaciones con interfaz gráfica (conocidas como WSLg) en WSL.</value>
   </data>
   <data name="Settings_HWPerfCounters.Header" xml:space="preserve">
-    <value>Habilitar contadores de rendimiento de hardware</value>
+    <value>Habilitar métricas de rendimiento de hardware</value>
   </data>
   <data name="Settings_HWPerfCounters.Description" xml:space="preserve">
-    <value>Habilita los contadores de rendimiento de hardware para Linux.</value>
+    <value>Habilita métricas de rendimiento de hardware para Linux.</value>
   </data>
   <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Habilitar contadores de rendimiento de hardware.</value>
+    <value>Habilitar métricas de rendimiento de hardware.</value>
   </data>
   <data name="Settings_HWPerfCountersToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Habilita los contadores de rendimiento de hardware para Linux.</value>
+    <value>Habilita métricas de rendimiento de hardware para Linux.</value>
   </data>
   <data name="Settings_HyperVFirewall.Header" xml:space="preserve">
     <value>Firewall de Hyper-V habilitado</value>
   </data>
   <data name="Settings_HyperVFirewall.Description" xml:space="preserve">
-    <value>Habilita el firewall de Hyper-V, que permite que las reglas de Firewall de Windows, así como las reglas específicas del tráfico de Hyper-V, filtre el tráfico de red de WSL.</value>
+    <value>Habilita el firewall de Hyper-V, lo que permite que las reglas del Firewall de Windows, así como las reglas específicas del tráfico de Hyper-V, filtren el tráfico de red de WSL.</value>
   </data>
   <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Firewall de Hyper-V habilitado.</value>
   </data>
   <data name="Settings_HyperVFirewallToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Habilita el firewall de Hyper-V, que permite que las reglas de Firewall de Windows, así como las reglas específicas del tráfico de Hyper-V, filtre el tráfico de red de WSL.</value>
+    <value>Habilita el firewall de Hyper-V, lo que permite que las reglas del Firewall de Windows, así como las reglas específicas del tráfico de Hyper-V, filtren el tráfico de red de WSL.</value>
   </data>
   <data name="Settings_HostAddressLoopback.Header" xml:space="preserve">
-    <value>Bucle invertido de dirección de host</value>
+    <value>Dirección del Host (Loopback)</value>
   </data>
   <data name="Settings_HostAddressLoopback.Description" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode se establece en reflejado. Cuando se establece en True, permitirá que el contenedor se conecte al host o que el host se conecte al contenedor mediante una dirección IP asignada al host. Tenga en cuenta que siempre se puede usar la dirección de bucle invertido 127.0.0.1. Esta opción también permite usar todas las direcciones IP locales asignadas adicionalmente.</value>
+    <value>Solo aplicable cuando 'Modo de red' está establecido en 'Mirrored'. Cuando se establece en 'On', permitirá que el contenedor se conecte al host, o que el host se conecte al contenedor, mediante una dirección IP asignada al host. Tenga en cuenta que siempre se puede usar la dirección de loopback 127.0.0.1; esta opción también permite usar todas las direcciones IP locales adicionales asignadas.</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Bucle invertido de dirección de host.</value>
+    <value>Dirección del Host (Loopback).</value>
   </data>
   <data name="Settings_HostAddressLoopbackToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode está establecido en reflejado. Cuando se establece en True, permitirá que el contenedor se conecte al host o que el host se conecte al contenedor mediante una dirección IP asignada al host. Tenga en cuenta que siempre se puede usar la dirección de bucle invertido 127.0.0.1. Esta opción también permite usar todas las direcciones IP locales asignadas adicionalmente.</value>
+    <value>Solo aplicable cuando 'Modo de red' está establecido en 'Mirrored'. Cuando se establece en 'On', permitirá que el contenedor se conecte al host, o que el host se conecte al contenedor, mediante una dirección IP asignada al host. Tenga en cuenta que siempre se puede usar la dirección de loopback 127.0.0.1; esta opción también permite usar todas las direcciones IP locales adicionales asignadas.</value>
   </data>
   <data name="Settings_IgnoredPorts.Header" xml:space="preserve">
-    <value>Puertos omitidos</value>
+    <value>Puertos ignorados</value>
   </data>
   <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode se establece en reflejado. Especifica a qué puertos se pueden enlazar las aplicaciones de Linux que no se reenviarán ni considerarán automáticamente en Windows. Debe formatearse en una lista separada por comas, por ejemplo: 3000.9000.9090.</value>
+    <value>Solo aplicable cuando 'Modo de red' está establecido en 'Mirrored'. Especifica a qué puertos pueden enlazarse las aplicaciones de Linux que no se reenviarán automáticamente ni se considerarán en Windows. Debe tener el formato de una lista separada por comas. Por ejemplo: 3000,9000,9090.</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
     <value>Restablecer puertos</value>
   </data>
   <data name="Settings_IgnoredPortsTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Puertos omitidos</value>
+    <value>Puertos ignorados</value>
   </data>
   <data name="Settings_IgnoredPortsTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.networkingMode está establecido en reflejado. Especifica a qué puertos se pueden enlazar las aplicaciones de Linux que no se reenviarán ni considerarán automáticamente en Windows. Debe formatearse en una lista separada por comas, por ejemplo, 3000, 9000, 9090.</value>
+    <value>Solo aplicable cuando 'Modo de red' está establecido en 'Mirrored'. Especifica a qué puertos pueden enlazarse las aplicaciones de Linux que no se reenviarán automáticamente ni se considerarán en Windows. Debe tener el formato de una lista separada por comas. Por ejemplo: 3000, 9000, 9090.</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Header" xml:space="preserve">
-    <value>Tiempo de espera inicial del proxy automático</value>
+    <value>Tiempo límite inicial del proxy automático</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeout.Description" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.autoProxy se establece en true. Configura el tiempo (en milisegundos) que WSL esperará para recuperar la información del proxy HTTP al iniciar un contenedor de WSL. Si la configuración de proxy se resuelve después de este tiempo, la instancia de WSL debe reiniciarse para usar la configuración de proxy recuperada.</value>
+    <value>Solo aplicable cuando 'Proxy automático habilitado' está establecido en 'On'. Configura con cuánto tiempo (en milisegundos) WSL contará para recuperar la información de proxy HTTP al iniciar un contenedor de WSL. Si la configuración de proxy se resuelve después de este tiempo, debe reiniciar la instancia de WSL para usar la configuración de proxy recuperada.</value>
     <comment>{Locked="wsl2.autoProxy"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutResetButton.Content" xml:space="preserve">
-    <value>Restablecer tiempo de espera</value>
+    <value>Restablecer tiempo límite</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Tiempo de espera inicial del proxy automático</value>
+    <value>Tiempo límite inicial del proxy automático</value>
   </data>
   <data name="Settings_InitialAutoProxyTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Solo es aplicable cuando wsl2.autoProxy está establecido en true. Configura el tiempo, en milisegundos, que WSL esperará para recuperar la información del proxy HTTP al iniciar un contenedor de WSL. Si la configuración de proxy se resuelve después de este tiempo, la instancia de WSL debe reiniciarse para usar la configuración de proxy recuperada.</value>
+    <value>Solo aplicable cuando 'Proxy automático habilitado' está establecido en 'On'. Configura con cuánto tiempo (en milisegundos) WSL contará para recuperar la información de proxy HTTP al iniciar un contenedor de WSL. Si la configuración de proxy se resuelve después de este tiempo, debe reiniciar la instancia de WSL para usar la configuración de proxy recuperada.</value>
   </data>
   <data name="Settings_KernelCommandLine.Header" xml:space="preserve">
-    <value>Línea de comandos completa</value>
+    <value>Línea de comando del kernel</value>
   </data>
   <data name="Settings_KernelCommandLine.Description" xml:space="preserve">
-    <value>Argumentos adicionales de la línea de comandos del kernel.</value>
+    <value>Argumentos adicionales de línea de comando del kernel.</value>
   </data>
   <data name="Settings_LocalhostForwarding.Header" xml:space="preserve">
     <value>Habilitar reenvío de localhost</value>
   </data>
   <data name="Settings_LocalhostForwarding.Description" xml:space="preserve">
-    <value>Valor booleano que especifica si los puertos enlazados a un carácter comodín o localhost en la VM WSL 2 deben poder conectarse desde el host a través de localhost:port.</value>
+    <value>Especifica si los puertos vinculados a * o a localhost en la VM de WSL2 deben poder conectarse desde el host mediante localhost:puerto.</value>
   </data>
   <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Habilitar reenvío de localhost.</value>
   </data>
   <data name="Settings_LocalhostForwardingToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Valor booleano que especifica si los puertos enlazados a un carácter comodín o localhost en la VM WSL 2 deben poder conectarse desde el host a través de localhos:port.</value>
+    <value>Especifica si los puertos vinculados a * o a localhost en la VM de WSL2 deben poder conectarse desde el host mediante localhost:puerto.</value>
   </data>
   <data name="Settings_MegabyteStringFormat" xml:space="preserve">
     <value>{0} MB</value>
@@ -1423,34 +1423,34 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Memoria y procesador</value>
   </data>
   <data name="Settings_MemorySize.Header" xml:space="preserve">
-    <value>Tamaño de memoria</value>
+    <value>Cantidad de memoria</value>
   </data>
   <data name="Settings_MemorySize.Description" xml:space="preserve">
-    <value>Cantidad de memoria que se asignará a la VM de WSL 2.</value>
+    <value>Cantidad de memoria que se asignará a la VM de WSL2.</value>
   </data>
   <data name="Settings_MemorySizeResetButton.Content" xml:space="preserve">
-    <value>Restablecer tamaño</value>
+    <value>Restablecer</value>
   </data>
   <data name="Settings_MemorySizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Tamaño de memoria</value>
+    <value>Cantidad de memoria</value>
   </data>
   <data name="Settings_MemorySizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Cantidad de memoria, especificada en megabytes, que se asignará a la VM WSL 2.</value>
+    <value>Cuánta memoria, especificada en megabytes, asignar a la VM de WSL2.</value>
   </data>
   <data name="Settings_MillisecondsStringFormat" xml:space="preserve">
     <value>{0} milisegundos</value>
   </data>
   <data name="Settings_NestedVirtualization.Header" xml:space="preserve">
-    <value>Habilitar la virtualización anidada</value>
+    <value>Habilitar virtualización anidada</value>
   </data>
   <data name="Settings_NestedVirtualization.Description" xml:space="preserve">
-    <value>Booleano para activar o desactivar la virtualización anidada, lo que permite que otras VM anidadas se ejecuten dentro de WSL 2.</value>
+    <value>Activa o desactiva la virtualización anidada, lo que permite que otras VMs se ejecuten dentro de WSL 2.</value>
   </data>
   <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.Name" xml:space="preserve">
-    <value>Habilitar la virtualización anidada.</value>
+    <value>Habilitar virtualización anidada.</value>
   </data>
   <data name="Settings_NestedVirtualizationToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Booleano para activar o desactivar la virtualización anidada, lo que permite que otras VM anidadas se ejecuten dentro de WSL 2.</value>
+    <value>Activa o desactiva la virtualización anidada, lo que permite que otras VMs se ejecuten dentro de WSL 2.</value>
   </data>
   <data name="Settings_NetworkingMode.Header" xml:space="preserve">
     <value>Modo de red</value>
@@ -1465,42 +1465,42 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Especifica el modo de red para WSL.</value>
   </data>
   <data name="Settings_NetworkingPageTitle.Text" xml:space="preserve">
-    <value>Funciones de red</value>
+    <value>Red</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess.Description" xml:space="preserve">
-    <value>Puede trabajar en todos los sistemas operativos con todos sus archivos.</value>
+    <value>Puede trabajar entre sistemas operativos con todos sus archivos.</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess.Title" xml:space="preserve">
     <value>Acceso a archivos entre sistemas operativos</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxTitle.Text" xml:space="preserve">
-    <value>Acceso a los archivos de Windows desde Linux</value>
+    <value>Acceda a sus archivos de Windows desde Linux</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_WindowsFromLinuxSample.Text" xml:space="preserve">
-    <value>Para acceder a los archivos de Windows desde Linux, ve a '/mnt' y, a continuación, a la letra de unidad de Windows, como en este ejemplo para la unidad C:
+    <value>Puede acceder a sus archivos de Windows desde Linux si navega a ‘/mnt’ y luego a la letra de unidad de Windows; por ejemplo, para la unidad C:
 
 'cd /mnt/c'</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerTitle.Text" xml:space="preserve">
-    <value>Acceda a los archivos de Linux con el Explorador de archivos</value>
+    <value>Acceda a sus archivos de Linux con el Explorador de archivos</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LinuxFromFileExplorerSample.Text" xml:space="preserve">
-    <value>Para ver los archivos de Linux desde Explorador de archivos, vaya a '\\wsl.localhost\'' o haga clic en el icono "Linux".</value>
+    <value>Puede ver sus archivos de Linux desde el Explorador de archivos si navega a '\\wsl.localhost\' o hace clic en el icono ‘Linux’.</value>
     <comment>{Locked="\\wsl.localhost\"}Url addresses should not be translated.</comment>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLTitle.Text" xml:space="preserve">
-    <value>Iniciar archivos y programas de Windows desde WSL</value>
+    <value>Inicie archivos y programas de Windows desde WSL</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_LaunchWindowsFromWSLSample.Text" xml:space="preserve">
-    <value>Incluso al usar WSL, puedes ejecutar los archivos ejecutables de Windows directamente desde Bash. Intenta ejecutar
-'powershell.exe /c start .' para abrir Explorador de archivos en la carpeta actual.</value>
+    <value>Incluso mientras usa WSL, puede ejecutar sus ejecutables de Windows directamente desde bash. Pruebe a ejecutar
+'powershell.exe /c start .' para abrir el Explorador de archivos en la carpeta actual.</value>
     <comment>{Locked="/c start ."}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsTitle.Text" xml:space="preserve">
-    <value>Acceso a aplicaciones de red de Linux desde Windows</value>
+    <value>Acceder a aplicaciones de red de Linux desde Windows</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.Text" xml:space="preserve">
-    <value>Si va a compilar una aplicación de red (por ejemplo, una aplicación que se ejecuta en un servidor SQL Server o NodeJS) en la distribución de Linux, puede acceder a ella desde una aplicación de Windows (como el explorador de Internet Edge o Chrome) mediante localhost (como lo haría normalmente). Esto significa que si inició un servidor Linux que escucha el puerto 3000, puede ir a [http://localhost:3000] en Edge en Windows para acceder a él.</value>
+    <value>Si está desarrollando una aplicación de red (por ejemplo, una aplicación que se ejecuta en un servidor NodeJS o SQL) en su distribución de Linux, puede acceder a ella desde una aplicación de Windows (como su navegador web Edge o Chrome) usando localhost (igual que normalmente). Esto significa que, si inició un servidor Linux que está escuchando en el puerto 3000, puede ir a [http://localhost:3000] en Edge en Windows para acceder a él.</value>
     <comment>{Locked="http://localhost:3000"}Url addresses should not be translated.</comment>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_NetworkingAppsFromWindowsSample.NavigateUri" xml:space="preserve">
@@ -1508,13 +1508,13 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked}Uri to the localhost on port 3000</comment>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingTitle.Text" xml:space="preserve">
-    <value>Redes en modo reflejado</value>
+    <value>Red en modo reflejado (mirror)</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccess_MirroredModeNetworkingSample.Text" xml:space="preserve">
-    <value>WSL también incluye un nuevo modo de red, denominado modo reflejado, que agrega funcionalidades avanzadas como compatibilidad con IPv6 y la capacidad de acceder a las aplicaciones de red en la red de área local.</value>
+    <value>WSL también incluye un nuevo modo de red, llamado modo reflejado (mirror), que agrega capacidades avanzadas como compatibilidad con IPv6 y la posibilidad de acceder a sus aplicaciones de red en su red de área local.</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccessLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre el acceso a archivos entre sistemas operativos</value>
+    <value>Más información sobre el acceso a archivos entre sistemas operativos</value>
   </data>
   <data name="Settings_OOBECrossOSFileAccessLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslfilesystems</value>
@@ -1524,211 +1524,211 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Le damos la bienvenida al Subsistema de Windows para Linux</value>
   </data>
   <data name="Settings_OOBEDistroManagement.Description" xml:space="preserve">
-   <value>WSL es una excelente manera de probar diferentes distribuciones de Linux.</value>
+    <value>WSL es una excelente forma de probar distintas distribuciones de Linux.</value>
   </data>
   <data name="Settings_OOBEDistroManagement.Title" xml:space="preserve">
     <value>Administración de distribuciones</value>
   </data>
   <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre los comandos básicos de WSL</value>
+    <value>Más información sobre comandos básicos de WSL</value>
   </data>
   <data name="Settings_OOBEDistroManagementBasicWSLCommandsLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslcommands</value>
     <comment>{Locked}Uri to the basic WSL commands documentation</comment>
   </data>
   <data name="Settings_OOBEDistroManagementImportCustomDistroLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre la importación de cualquier distribución de Linux</value>
+    <value>Más información sobre cómo importar cualquier distribución de Linux</value>
   </data>
   <data name="Settings_OOBEDistroManagementImportCustomDistroLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslcustomdistro</value>
     <comment>{Locked}Uri to the import any linux distribution to use with WSL documentation</comment>
   </data>
   <data name="Settings_OOBEDistroManagement_InstallableDistrosTitle.Text" xml:space="preserve">
-    <value>Comando Enumerar distribuciones de WSL instalables</value>
+    <value>Comando para listar las distribuciones de WSL que se pueden instalar</value>
   </data>
   <data name="Settings_OOBEDistroManagement_InstallableDistrosSample.Text" xml:space="preserve">
     <value>'wsl.exe -l -o'</value>
     <comment>{Locked="-l -o"}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="Settings_OOBEDistroManagement_InstallNamedDistrosTitle.Text" xml:space="preserve">
-    <value>Instalar un comando de distribución WSL con nombre</value>
+    <value>Comando para instalar una distribución de WSL por nombre</value>
   </data>
   <data name="Settings_OOBEDistroManagement_InstallNamedDistrosSample.Text" xml:space="preserve">
     <value>'wsl.exe --install &lt;DistroName&gt;'</value>
     <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="Settings_OOBEDistroManagement_AvailableDistrosTitle.Text" xml:space="preserve">
-    <value>Comando Enumerar distribuciones WSL disponibles</value>
+    <value>Comando para listar las distribuciones de WSL instaladas</value>
   </data>
   <data name="Settings_OOBEDistroManagement_AvailableDistrosSample.Text" xml:space="preserve">
     <value>'wsl.exe -l'</value>
     <comment>{Locked="-l"}Command line arguments and file names should not be translated</comment>
   </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Description" xml:space="preserve">
-    <value>Docker Desktop funciona perfectamente con WSL para ayudarle a desarrollar con contenedores de Linux.
+    <value>Docker Desktop funciona muy bien con WSL para ayudarle a desarrollar con contenedores Linux.
 
-Algunas de las ventajas de usar Docker Desktop con WSL son:
+Algunas ventajas de usar Docker Desktop con WSL son:
 
-• Puede ejecutar comandos de Docker en WSL o en Windows, con el mismo demonio de Docker e imágenes.
-• Puede compartir archivos y carpetas entre Windows y Linux sin problemas, mediante el montaje automático de unidades de Windows en WSL.
-• Puede usar sus herramientas y editores de Windows preferidos para trabajar en código y archivos de Linux, y viceversa, gracias a la interoperabilidad de WSL.</value>
- </data>
+• Puede ejecutar comandos de Docker en WSL o en Windows, usando el mismo demonio de Docker e imágenes.
+• Puede compartir archivos y carpetas entre Windows y Linux sin fricción, gracias al montaje automático de unidades de Windows en WSL.
+• Puede usar sus herramientas y editores de Windows preferidos para trabajar con código y archivos de Linux, y viceversa, gracias a la interoperabilidad de WSL.</value>
+  </data>
   <data name="Settings_OOBEDockerDesktopIntegration.Title" xml:space="preserve">
-    <value>Integración de Docker Desktop</value>
+    <value>Integración con Docker Desktop</value>
   </data>
   <data name="Settings_OOBEDockerDesktopIntegrationLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre el uso de WSL con Docker</value>
+    <value>Más información sobre el uso de WSL con Docker</value>
   </data>
   <data name="Settings_OOBEDockerDesktopIntegrationLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wsldocker</value>
     <comment>{Locked}Uri to the Docker remote containers on WSL 2 documentation</comment>
   </data>
   <data name="Settings_OOBEGeneral.Description" xml:space="preserve">
-    <value>El Subsistema de Windows para Linux (WSL) le permite ejecutar sus herramientas, utilidades, aplicaciones y flujos de trabajo favoritos de Linux directamente en Windows.
+    <value>El Subsistema de Windows para Linux (WSL) le permite ejecutar sus herramientas, utilidades, aplicaciones y flujos de trabajo de Linux favoritos directamente en Windows.
 
-Dedique un momento a obtener una vista previa de algunas de las características favoritas de la comunidad o vea nuestra documentación completa.</value>
+Tómese un momento para ver algunas de las características favoritas de la comunidad o consulte nuestra documentación completa.</value>
   </data>
   <data name="Settings_OOBEGeneral.Title" xml:space="preserve">
     <value>Te damos la bienvenida a WSL</value>
   </data>
   <data name="Settings_OOBEGeneral_BestPracticesSetupLink.Content" xml:space="preserve">
-    <value>Procedimientos recomendados para la configuración</value>
+    <value>Mejores prácticas de configuración</value>
   </data>
   <data name="Settings_OOBEGeneral_BestPracticesSetupLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslsetup</value>
     <comment>{Locked}Uri to the Best Practices for Setup Documentation</comment>
   </data>
   <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.Content" xml:space="preserve">
-    <value>Introducción a Linux</value>
+    <value>Primeros pasos con Linux</value>
   </data>
   <data name="Settings_OOBEGeneral_GettingStartedLinuxLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgettingstarted</value>
     <comment>{Locked}Uri to the Getting Started with Linux Documentation</comment>
   </data>
   <data name="Settings_OOBEGeneral_WSLDocumentationLink.Content" xml:space="preserve">
-    <value>Documentación de Subsistema de Windows para Linux (WSL)</value>
+    <value>Documentación del Subsistema de Windows para Linux (WSL)</value>
   </data>
   <data name="Settings_OOBEGeneral_WSLDocumentationLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wsldocs</value>
     <comment>{Locked}Uri to the Microsoft WSL Documentation</comment>
   </data>
   <data name="Settings_OOBEGUIApps.Description" xml:space="preserve">
-    <value>Puede usar aplicaciones Linux basadas en gráficos con interacciones nativas de Windows, como alt-tab, inicio del menú Inicio, anclaje de la barra de tareas y compatibilidad con cortar y pegar.</value>
+    <value>Puede usar aplicaciones de Linux con interfaz gráfica con interacciones nativas de Windows, como cambiar con Alt+Tab, iniciar desde el menú Inicio, anclar a la barra de tareas y compatibilidad con copiar y pegar.</value>
   </data>
   <data name="Settings_OOBEGUIApps.Title" xml:space="preserve">
-    <value>Aplicaciones de GUI</value>
+    <value>Aplicaciones con interfaz gráfica</value>
   </data>
   <data name="Settings_OOBEGPUAcceleration.Description" xml:space="preserve">
-    <value>WSL puede aprovechar la GPU de Windows para flujos de trabajo de Machine Learning
+    <value>WSL puede aprovechar la GPU de Windows para flujos de trabajo de aprendizaje automático
 
-Los archivos binarios de Linux que se ejecutan en WSL pueden usar automáticamente la GPU en Windows para acelerar su rendimiento. Solo tiene que instalar y ejecutar esos flujos de trabajo de la misma manera que lo haría en una máquina Linux normal. Hay muchas maneras diferentes de empezar a ejecutar CUDA en un contenedor de Docker si tiene una tarjeta gráfica NVIDIA, hasta ejecutar PyTorch o TensorFlow con DirectML en la tarjeta gráfica AMD, Intel o NVIDIA. Consulte la guía de introducción a continuación para obtener más información.</value>
+Los binarios de Linux que se ejecutan en WSL pueden usar automáticamente su GPU en Windows para acelerar el rendimiento. Solo necesita instalar y ejecutar esos flujos de trabajo de la misma forma que lo haría en una máquina Linux normal. Hay muchas maneras de empezar, desde ejecutar CUDA en un contenedor de Docker si tiene una tarjeta gráfica NVIDIA, hasta ejecutar PyTorch o TensorFlow con DirectML en su tarjeta gráfica AMD, Intel o NVIDIA. Consulte nuestra guía de primeros pasos a continuación para obtener más información.</value>
   </data>
   <data name="Settings_OOBEGPUAcceleration.Title" xml:space="preserve">
-    <value>Aceleración de la GPU</value>
+    <value>Aceleración por GPU</value>
   </data>
   <data name="Settings_OOBEGPUAccelerationLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre la aceleración de GPU</value>
+    <value>Más información sobre la aceleración de GPU</value>
   </data>
   <data name="Settings_OOBEGPUAccelerationLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslgpu</value>
     <comment>{Locked}Uri to the GPU acceleration for ML in WSL documentation</comment>
   </data>
   <data name="Settings_OOBEGUIAppsLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre las aplicaciones GUI de WSL</value>
+    <value>Más información sobre las aplicaciones con interfaz gráfica en WSL</value>
   </data>
   <data name="Settings_OOBEGUIAppsLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslguiapps</value>
     <comment>{Locked}Uri to the Run GUI apps on the WSL documentation</comment>
   </data>
   <data name="Settings_OOBEGUIApps_AppsListDescription.Text" xml:space="preserve">
-    <value>Esta es una lista de aplicaciones para probar (puede instalarlas todas en Ubuntu escribiendo 'sudo apt install &lt;Nombre de aplicación&gt;')
+    <value>Aquí tiene una lista de aplicaciones para probar (puede instalar todas en Ubuntu escribiendo 'sudo apt install &lt;Nombre de la aplicación&gt;')
 
-    • gedit: editor de texto básico
-    • audacity: grabar y editar archivos de audio
-    • blender: crear animaciones y visualizaciones 3D
-    • gimp: editar fotos
-    • nautilus: explorador de archivos de Linux
-    • vlc: reproductor de vídeo</value>
+    • gedit – Editor de texto básico
+    • audacity – Grabar y editar archivos de audio
+    • blender – Crear animaciones y visualizaciones 3D
+    • gimp – Editar fotos
+    • nautilus – Explorador de archivos de Linux
+    • vlc – Reproductor de vídeo</value>
   </data>
   <data name="Settings_OOBENetworkingIntegration.Description" xml:space="preserve">
-    <value>Puede acceder fácilmente a las aplicaciones de red en los sistemas operativos Windows y Linux.</value>
+    <value>Puede acceder fácilmente a aplicaciones de red entre los sistemas operativos Windows y Linux.</value>
   </data>
   <data name="Settings_OOBENetworkingIntegration.Title" xml:space="preserve">
-    <value>Integración de redes</value>
+    <value>Integración de red</value>
   </data>
   <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre las aplicaciones de red</value>
+    <value>Más información sobre aplicaciones de red</value>
   </data>
   <data name="Settings_OOBENetworkingIntegrationLinuxNetworkingAppsLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslnetworking</value>
     <comment>{Locked}Uri to the Accessing network applications with WSL documentation</comment>
   </data>
   <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.Content" xml:space="preserve">
-    <value>Obtenga más información sobre las redes en modo reflejado</value>
+    <value>Más información sobre la red en modo reflejado (mirror)</value>
   </data>
   <data name="Settings_OOBENetworkingIntegrationMirroredModeLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslmirroredmode</value>
     <comment>{Locked}Uri to the WSL Mirrored Mode networking documentation</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration.Description" xml:space="preserve">
-   <value>Puede usar WSL como entorno de desarrollo a tiempo completo directamente desde VS Code.</value>
+    <value>Puede usar WSL como su entorno de desarrollo a tiempo completo directamente desde VS Code.</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration.Title" xml:space="preserve">
-    <value>Integración de VS Code</value>
+    <value>Integración con VS Code</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegrationLink.Content" xml:space="preserve">
-    <value>Obtener más información sobre el uso de WSL con VS Code</value>
+    <value>Más información sobre el uso de WSL con VS Code</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegrationLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslvscode</value>
     <comment>{Locked}Uri to the using Visual Studio Code with WSL documentation</comment>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallTitle.Text" xml:space="preserve">
-    <value>Cómo instalarlo</value>
+    <value>Cómo instalar</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
-    <value>Después de instalar VS Code, puedes instalar la extensión WSL remota desde el Terminal Windows:
+    <value>Después de instalar VS Code, puede instalar la extensión Remote WSL desde Windows Terminal:
 
 'code –install-extension ms-vscode-remote.remote-wsl'</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
-    <value>Abrir un proyecto WSL en Visual Studio Code</value>
+    <value>Abrir un proyecto de WSL en Visual Studio Code</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectSample.Text" xml:space="preserve">
-    <value>Para abrir un proyecto en VS Code desde su distribución WSL, abra la línea de comando de la distribución y ejecute 'code .' para abrir un archivo de proyecto.
+    <value>Para abrir un proyecto en VS Code desde su distribución de WSL, abra la línea de comandos de la distribución y ejecute 'code .' para abrir un proyecto.
 
-También puedes acceder a más opciones remotas de VS Code mediante la paleta de comandos dentro de VS Code. Presiona "MAYÚS+CTRL+P" en el teclado para abrir la paleta de comandos y escribe "Remote-WSL" para ver una lista de las opciones remotas de VS Code disponibles, lo que te permite volver a abrir la carpeta en una sesión remota, especificar qué distribución deseas abrir y mucho más.</value>
+También puede acceder a más opciones de VS Code Remote a través de la paleta de comandos dentro de VS Code. Presione “SHIFT+CTRL+P” en su teclado para abrir la paleta de comandos y escriba ‘Remote-WSL’ para ver una lista de las opciones de VS Code Remote disponibles, lo que le permite volver a abrir la carpeta en una sesión remota, especificar qué distribución quiere abrir y más.</value>
   </data>
   <data name="Settings_OOBE_HowToUse.Text" xml:space="preserve">
-    <value>Cómo usarla</value>
+    <value>Cómo usar</value>
   </data>
   <data name="Settings_OptionalFeaturesPageTitle.Text" xml:space="preserve">
-    <value>Funciones opcionales</value>
+    <value>Características opcionales</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.Content" xml:space="preserve">
-    <value>Declaración privacidad</value>
+    <value>Declaración de privacidad</value>
   </data>
   <data name="Settings_PrivacyPolicyLink.NavigateUri" xml:space="preserve">
     <value>https://go.microsoft.com/fwlink/?linkid=2234882</value>
     <comment>{Locked}Uri to the Microsoft Privacy Policy</comment>
   </data>
   <data name="Settings_ProcCount.Header" xml:space="preserve">
-    <value>Recuento del procesador</value>
+    <value>Cantidad de procesadores lógicos</value>
   </data>
   <data name="Settings_ProcCount.Description" xml:space="preserve">
-    <value>Número de procesadores lógicos que se asignarán a la VM WSL 2.</value>
+    <value>Número de procesadores lógicos que se asignarán a la VM WSL2.</value>
   </data>
   <data name="Settings_ProcCountResetButton.Content" xml:space="preserve">
-    <value>Restablecer cuenta</value>
+    <value>Restablecer cantidad</value>
   </data>
   <data name="Settings_ProcCountTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Recuento del procesador</value>
+    <value>Cantidad de procesadores lógicos</value>
   </data>
   <data name="Settings_ProcCountTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Número de procesadores lógicos que se asignarán a la VM WSL 2.</value>
+    <value>Número de procesadores lógicos que se asignarán a la VM WSL2.</value>
   </data>
   <data name="Settings_RelatedLinks.Text" xml:space="preserve">
-    <value>Vínculos relacionados</value>
+    <value>Enlaces relacionados</value>
   </data>
   <data name="Settings_ReleaseNotesLink.Content" xml:space="preserve">
     <value>Notas de la versión</value>
@@ -1741,25 +1741,25 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Habilitar el modo seguro</value>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
-    <value>Ejecute WSL en "Modo seguro" que deshabilite muchas características y que esté pensado para su uso para recuperar distribuciones en mal estado.</value>
+    <value>Ejecuta WSL en "Modo seguro", que deshabilita muchas características y está pensado para recuperar distribuciones que están en mal estado.</value>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Habilitar el modo seguro.</value>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Ejecute WSL en "Modo seguro" que deshabilite muchas características y que esté pensado para su uso para recuperar distribuciones en mal estado.</value>
+    <value>Ejecuta WSL en "Modo seguro", que deshabilita muchas características y está pensado para recuperar distribuciones que están en mal estado.</value>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>Acerca de</value>
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
-    <value>Programador</value>
+    <value>Desarrollador</value>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Administración de distribuciones</value>
   </data>
   <data name="Settings_Shell_DockerDesktopIntegration.Content" xml:space="preserve">
-    <value>Integración de Docker Desktop</value>
+    <value>Integración con Docker Desktop</value>
   </data>
   <data name="Settings_Shell_FileSystem.Content" xml:space="preserve">
     <value>Sistema de archivos</value>
@@ -1768,10 +1768,10 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>General</value>
   </data>
   <data name="Settings_Shell_GPUAcceleration.Content" xml:space="preserve">
-    <value>Aceleración de la GPU</value>
+    <value>Aceleración por GPU</value>
   </data>
   <data name="Settings_Shell_GUIApps.Content" xml:space="preserve">
-    <value>Aplicaciones de GUI</value>
+    <value>Aplicaciones con interfaz gráfica</value>
   </data>
   <data name="Settings_Shell_LaunchWSL.Content" xml:space="preserve">
     <value>Iniciar wsl.exe</value>
@@ -1780,31 +1780,31 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Memoria y procesador</value>
   </data>
   <data name="Settings_Shell_Networking.Content" xml:space="preserve">
-    <value>Funciones de red</value>
+    <value>Red</value>
   </data>
   <data name="Settings_Shell_NetworkingIntegration.Content" xml:space="preserve">
-    <value>Integración de redes</value>
+    <value>Integración de red</value>
   </data>
   <data name="Settings_Shell_OOBE.Content" xml:space="preserve">
     <value>Te damos la bienvenida a WSL</value>
   </data>
   <data name="Settings_Shell_OptionalFeatures.Content" xml:space="preserve">
-    <value>Funciones opcionales</value>
+    <value>Características opcionales</value>
   </data>
   <data name="Settings_Shell_Settings.Content" xml:space="preserve">
     <value>Configuración</value>
   </data>
   <data name="Settings_Shell_VSCodeIntegration.Content" xml:space="preserve">
-    <value>Integración de VS Code</value>
+    <value>Integración con VS Code</value>
   </data>
   <data name="Settings_Shell_WhatsNew.Content" xml:space="preserve">
     <value>Novedades</value>
   </data>
   <data name="Settings_Shell_WorkingAcrossFileSystems.Content" xml:space="preserve">
-    <value>Trabajando en sistemas de archivos</value>
+    <value>Trabajar entre sistemas de archivos</value>
   </data>
   <data name="Settings_IssuesLink.Content" xml:space="preserve">
-    <value>Problemas</value>
+    <value>Incidencias</value>
   </data>
   <data name="Settings_IssuesLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/wslproject</value>
@@ -1814,69 +1814,69 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Habilitar VHD disperso de forma predeterminada</value>
   </data>
   <data name="Settings_SparseVHD.Description" xml:space="preserve">
-    <value>Cualquier VHD recién creado se establecerá en disperso automáticamente cuando se habilite.</value>
+    <value>Cuando está habilitado, cualquier VHD creado desde ahora se configurará como disperso automáticamente.</value>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>Habilitar VHD disperso de forma predeterminada.</value>
   </data>
   <data name="Settings_SparseVHDToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Cualquier VHD recién creado se establecerá en disperso automáticamente cuando se habilite.</value>
+    <value>Cuando está habilitado, cualquier VHD creado desde ahora se configurará como disperso automáticamente.</value>
   </data>
   <data name="Settings_SwapFilePath.Header" xml:space="preserve">
-    <value>Abrir ubicación del archivo</value>
+    <value>Ubicación del archivo de intercambio</value>
   </data>
   <data name="Settings_SwapFilePath.Description" xml:space="preserve">
-    <value>Ruta de acceso absoluta de Windows al disco duro virtual de intercambio.</value>
+    <value>Ruta absoluta de Windows al disco duro virtual de intercambio.</value>
   </data>
   <data name="Settings_SwapFilePathBrowseButton.Content" xml:space="preserve">
-    <value>Examinar archivos de intercambio</value>
+    <value>Seleccionar archivo VHD de intercambio…</value>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Abrir ubicación del archivo</value>
+    <value>Ubicación del archivo de intercambio</value>
   </data>
   <data name="Settings_SwapFilePathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Ruta de acceso absoluta de Windows al disco duro virtual de intercambio.</value>
+    <value>Ruta absoluta de Windows al disco duro virtual de intercambio.</value>
   </data>
   <data name="Settings_SwapSize.Header" xml:space="preserve">
-    <value>Tamaño de intercambio</value>
+    <value>Tamaño del archivo de intercambio</value>
   </data>
   <data name="Settings_SwapSize.Description" xml:space="preserve">
-    <value>Cantidad de espacio de intercambio que se agregará a la VM WSL 2, 0 para ningún archivo de intercambio. El almacenamiento de intercambio es una RAM basada en disco usada cuando la demanda de memoria supera el límite en el dispositivo de hardware.</value>
+    <value>Cuánto espacio de intercambio asignar a la VM de WSL2; 0 para no usar archivo de intercambio. El almacenamiento de intercambio es RAM basada en disco que se usa cuando la demanda de memoria supera el límite del hardware.</value>
   </data>
   <data name="Settings_SwapSizeResetButton.Content" xml:space="preserve">
     <value>Restablecer tamaño</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Tamaño de intercambio</value>
+    <value>Tamaño del archivo de intercambio</value>
   </data>
   <data name="Settings_SwapSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Cantidad de espacio de intercambio, especificado en megabytes, que se agregará a la VM WSL 2. 0 para ningún archivo de intercambio. El almacenamiento de intercambio es una RAM basada en disco usada cuando la demanda de memoria supera el límite en el dispositivo de hardware.</value>
+    <value>Cuánto espacio de intercambio, especificado en megabytes, asignar a la VM de WSL2; 0 para no usar archivo de intercambio. El almacenamiento de intercambio es RAM basada en disco que se usa cuando la demanda de memoria supera el límite del hardware.</value>
   </data>
   <data name="Settings_Virtio.Header" xml:space="preserve">
-    <value>Enable VirtIO</value>
+    <value>Habilitar VirtIO</value>
   </data>
   <data name="Settings_Virtio.Description" xml:space="preserve">
-    <value>Use virtiofs en lugar del plan 9 para acceder a los archivos host, lo que aumenta la velocidad.</value>
+    <value>Use virtiofs en lugar de 9p para acceder a los archivos del host, aumentando la velocidad.</value>
   </data>
   <data name="Settings_Virtio9p.Header" xml:space="preserve">
     <value>Habilitar Virtio 9p</value>
   </data>
   <data name="Settings_Virtio9p.Description" xml:space="preserve">
-    <value>Habilita el montaje del sistema de archivos 9P desde el host mediante el transporte virtual.</value>
+    <value>Habilita el montaje del sistema de archivos 9p del host usando el transporte virtio.</value>
   </data>
   <data name="Settings_VMIdleTimeout.Header" xml:space="preserve">
-    <value>Tiempo de espera de inactividad de SS</value>
+    <value>Tiempo de espera de inactividad de la VM</value>
   </data>
   <data name="Settings_VMIdleTimeout.Description" xml:space="preserve">
-    <value>Número de milisegundos que una VM está inactiva antes de apagarse.</value>
+    <value>La cantidad de milisegundos que una VM debe permanecer inactiva antes de apagarse.</value>
   </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Restablecer tiempo de espera</value>
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Tiempo de espera de inactividad de SS</value>
+    <value>Tiempo de espera de inactividad de la VM</value>
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Número de milisegundos que una VM está inactiva antes de apagarse.</value>
+    <value>La cantidad de milisegundos que una VM debe permanecer inactiva antes de apagarse.</value>
   </data>
 </root>
