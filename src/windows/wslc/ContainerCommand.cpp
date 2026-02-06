@@ -220,8 +220,7 @@ int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int par
     options.Arguments = arguments;
     options.Interactive = m_options.Interactive;
     options.TTY = m_options.TTY;
-    containerService.Exec(session, m_id, options);
-    return 0;
+    return containerService.Exec(session, m_id, options);
 }
 
 int ContainerInspectCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
