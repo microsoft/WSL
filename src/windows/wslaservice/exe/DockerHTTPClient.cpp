@@ -97,7 +97,7 @@ std::string DockerHTTPClient::URL::Get() const
                 url << "&";
             }
 
-            url << key << "=" << value;
+            url << key << "=" << Escape(value);
             first = false;
         }
     }
@@ -117,11 +117,15 @@ DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE 
 {
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const char* Name, const char* Tag)
+std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImage(const std::string& Repo, const std::optional<std::string>& Tag)
 {
     auto url = URL::Create("/images/create");
-    url.SetParameter("tag", Tag);
-    url.SetParameter("fromImage", std::format("library/{}", Name));
+    url.SetParameter("fromImage", std::format("library/{}", Repo));
+
+    if (Tag.has_value())
+    {
+        url.SetParameter("tag", Tag.value());
+    }
 
     return SendRequestImpl(verb::post, url, {}, {});
 }

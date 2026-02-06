@@ -425,6 +425,12 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+
+        // Validate that ImportImage fails if no tag is passed
+        {
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+        }
     }
 
     TEST_METHOD(DeleteImage)
@@ -3180,5 +3186,41 @@ class WSLATests
             attachedReader.ExpectClosed();
             VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
         }
+    }
+
+    TEST_METHOD(InvalidNames)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectInvalidArg = [&](const std::string& name) {
+            wil::com_ptr<IWSLAContainer> container;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &container), E_INVALIDARG);
+            VERIFY_IS_NULL(container.get());
+        };
+
+        expectInvalidArg("container with spaces");
+        expectInvalidArg("?foo");
+        expectInvalidArg("?foo&bar");
+        expectInvalidArg("/url/path");
+        expectInvalidArg("");
+        expectInvalidArg("\\escaped\n\\chars");
+
+        auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
+            WSLA_ERROR_INFO errorInfo{};
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr, &errorInfo), E_INVALIDARG);
+
+            wil::unique_cotaskmem_ansistring message{errorInfo.UserErrorMessage};
+
+            VerifyPatternMatch(message.get(), errorPattern);
+        };
+
+        expectInvalidPull("?foo&bar/url\n:name", "invalid reference format");
+        expectInvalidPull("?:&", "invalid reference format");
+        expectInvalidPull("/:/", "invalid reference format");
+        expectInvalidPull("\n: ", "invalid reference format");
+        expectInvalidPull("invalid\nrepo:valid-image", "invalid reference format");
+        expectInvalidPull("bad!repo:valid-image", "invalid reference format");
+        expectInvalidPull("repo:badimage!name", "invalid tag format");
+        expectInvalidPull("bad+image", "invalid reference format");
     }
 };

@@ -27,14 +27,15 @@ constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
 
-std::pair<std::string, std::string> ParseImage(const std::string& Input)
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
 {
-    size_t separator = Input.find(':');
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        separator == std::string::npos || separator >= Input.size() - 1 || separator == 0,
-        "Invalid image: %hs",
-        Input.c_str());
+    size_t separator = Input.find_last_of(':');
+    if (separator == std::string::npos)
+    {
+        return {Input, {}};
+    }
+
+    THROW_HR_IF_MSG(E_INVALIDARG, separator == separator >= Input.size() - 1 || separator == 0, "Invalid image: %hs", Input.c_str());
 
     return {Input.substr(0, separator), Input.substr(separator + 1)};
 }
@@ -339,7 +340,7 @@ try
 
     std::lock_guard lock{m_lock};
 
-    auto requestContext = m_dockerClient->PullImage(repo.c_str(), tag.c_str());
+    auto requestContext = m_dockerClient->PullImage(repo, tag);
 
     relay::MultiHandleWait io;
 
@@ -403,8 +404,10 @@ try
         {
             THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
         }
-
-        THROW_HR_MSG(E_FAIL, "Image import failed: %hs", errorMessage.c_str());
+        else if (pullResult.value() == boost::beast::http::status::bad_request)
+        {
+            THROW_HR_MSG(E_INVALIDARG, "Image import failed: %hs", errorMessage.c_str());
+        }
     }
 
     return S_OK;
@@ -435,11 +438,13 @@ try
 
     auto [repo, tag] = ParseImage(ImageName);
 
+    THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
+
     std::lock_guard lock{m_lock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
+    auto requestContext = m_dockerClient->ImportImage(repo, tag.value(), ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;
