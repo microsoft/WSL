@@ -2084,16 +2084,16 @@ class WSLATests
             auto container = launcher.Launch(*m_defaultSession);
             auto details = container.Inspect();
 
-            // Verify basic container metadata is present.
+            // Verify basic container metadata.
             VERIFY_IS_FALSE(details.Id.empty());
-            VERIFY_IS_FALSE(details.Name.empty());
-            VERIFY_IS_FALSE(details.Image.empty());
+            VERIFY_ARE_EQUAL(details.Name, "test-container-inspect");
+            VERIFY_IS_TRUE(details.Image.rfind("sha256:", 0) == 0);
             VERIFY_IS_FALSE(details.Created.empty());
 
-            // Verify container state is correct.
+            // Verify container state.
             VERIFY_ARE_EQUAL(details.HostConfig.NetworkMode, "host");
             VERIFY_IS_TRUE(details.State.Running);
-            VERIFY_IS_FALSE(details.State.Status.empty());
+            VERIFY_ARE_EQUAL(details.State.Status, "running");
             VERIFY_IS_FALSE(details.State.StartedAt.empty());
 
             // Verify port mappings match what we configured.
@@ -2118,12 +2118,13 @@ class WSLATests
 
             // Verify basic container metadata is present.
             VERIFY_IS_FALSE(details.Id.empty());
-            VERIFY_IS_FALSE(details.Name.empty());
-            VERIFY_IS_FALSE(details.Image.empty());
+            VERIFY_ARE_EQUAL(details.Name, "test-container-inspect-exited");
+            VERIFY_IS_TRUE(details.Image.rfind("sha256:", 0) == 0);
             VERIFY_IS_FALSE(details.Created.empty());
 
             // Verify exited state is correct.
             VERIFY_IS_FALSE(details.State.Running);
+            VERIFY_ARE_EQUAL(details.State.Status, "exited");
             VERIFY_ARE_EQUAL(details.State.ExitCode, 0);
             VERIFY_IS_FALSE(details.State.StartedAt.empty());
             VERIFY_IS_FALSE(details.State.FinishedAt.empty());
