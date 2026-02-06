@@ -13,6 +13,7 @@ namespace wslutil = wsl::windows::common::wslutil;
 
 int ImagePullCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    CMD_IF_HELP_PRINT_HELP();
     CMD_ARG_REQUIRED(m_image, L"Image name is required.");
     auto session = m_sessionService.CreateSession();
     PullImpl(*session.Get(), m_image);
@@ -21,6 +22,7 @@ int ImagePullCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
 
 int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
+    CMD_IF_HELP_PRINT_HELP();
     auto session = m_sessionService.CreateSession();
     wslc::services::ImageService imageServie;
     auto images = imageServie.List(session);
