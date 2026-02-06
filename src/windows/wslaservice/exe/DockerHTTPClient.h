@@ -92,7 +92,7 @@ public:
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);
 
     // Image management.
-    std::unique_ptr<HTTPRequestContext> PullImage(const char* Name, const char* Tag);
+    std::unique_ptr<HTTPRequestContext> PullImage(const std::string& Repo, const std::optional<std::string>& Tag);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
@@ -135,22 +135,45 @@ public:
     };
 
 private:
+    class URL
+    {
+    public:
+        std::string Get() const;
+        void SetParameter(std::string&& Key, std::string&& Value);
+        void SetParameter(std::string&& Key, const std::string& Value);
+        void SetParameter(std::string&& Key, const char* Value); // Overload so that pointers don't resolve to the bool method.
+        void SetParameter(std::string&& Key, bool Value);
+
+        template <typename... Args>
+        static auto Create(std::format_string<decltype(URL::Escape(std::declval<Args>()))...> Url, Args&&... args)
+        {
+            WI_ASSERT(Url.get().find_first_of("?!") == std::string::npos);
+
+            return URL(std::format(Url, Escape(std::forward<Args>(args))...));
+        }
+
+    private:
+        URL(std::string&& Path);
+
+        static std::string Escape(const std::string& Value);
+
+        std::string m_path;
+        std::map<std::string, std::string> m_parameters;
+    };
+
     wil::unique_socket ConnectSocket();
 
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
-        boost::beast::http::verb Method, const std::string& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers);
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers);
 
     std::pair<uint32_t, std::string> SendRequestAndReadResponse(
-        boost::beast::http::verb Method, const std::string& Url, const std::string& Body = "");
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");
 
     std::pair<uint32_t, wil::unique_socket> SendRequest(
-        boost::beast::http::verb Method,
-        const std::string& Url,
-        const std::string& Body,
-        const std::map<boost::beast::http::field, std::string>& Headers = {});
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers = {});
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
-    auto Transaction(boost::beast::http::verb Method, const std::string& Url, const TRequest& RequestObject = {})
+    auto Transaction(boost::beast::http::verb Method, const URL& Url, const TRequest& RequestObject = {})
     {
         std::string requestString;
         if constexpr (!std::is_same_v<TRequest, common::docker_schema::EmptyRequest>)
@@ -162,7 +185,7 @@ private:
 
         if (statusCode < 200 || statusCode >= 300)
         {
-            throw DockerHTTPException(statusCode, Method, Url, requestString, responseString);
+            throw DockerHTTPException(statusCode, Method, Url.Get(), requestString, responseString);
         }
 
         if constexpr (!std::is_same_v<TResponse, void>)
