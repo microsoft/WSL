@@ -169,7 +169,7 @@ Diski ayırmak için '{} {}' wsl.exe çalıştırın.</value>
     <value>Sağlanan yükleme konumu zaten kullanılıyor.</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir isim seçmek için --name seçeneğini kullanın.</value>
+    <value>Sağlanan ada sahip bir dağıtım zaten mevcut. Farklı bir ad seçmek için --name komutunu kullanın.</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
@@ -292,10 +292,12 @@ ve 'wsl.exe --install &lt;Distro&gt;' kullanın.</value>
     <value>Eski dağıtım WSL 2'yi desteklemez.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 geçerli makine yapılandırmanız ile desteklenmiyor.
-Lütfen "Sanal Makine Platformu" isteğe bağlı bileşenini etkinleştirin ve sanallaştırmanın BIOS'ta etkinleştirildiğinden emin olun.
-Ş"Sanal Makine Platformu"nu etkinleştirmek için şu komutu çalıştırın: wsl.exe --install --no-distribution
-Daha fazla bilgi için lütfen https://aka.ms/enablevirtualization adresini ziyaret edin.</value>
+    <value>Sanallaştırma bu makinede etkinleştirilmediği için WSL2 başlatılamıyor.
+Lütfen "Sanal Makine Platformu" isteğe bağlı bileşeninin etkinleştirildiğinden ve sanallaştırmanın bilgisayarınızın üretici yazılımı ayarlarında açık olduğundan emin olun.
+
+"Sanal Makine Platformu" seçeneğini şu komutu çalıştırarak etkinleştirin: wsl.exe --install --no-distribution
+
+Bilgi için lütfen şu adresi ziyaret https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1121,7 +1123,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>/etc/fstab with mount -a işlenemedi.</value>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
-    <value>ağıtım diski bağlanırken bir hata oluştu, yedek plan olarak salt okunur şekilde bağlandı.
+    <value>Dağıtım diski bağlanırken bir hata oluştu, yedek plan olarak salt okunur şekilde bağlandı.
 Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
@@ -1362,7 +1364,7 @@ Kurtarma yönergelerine bakın: https://aka.ms/wsldiskmountrecovery</value>
     <value>Yoksayılan bağlantı noktaları</value>
   </data>
   <data name="Settings_IgnoredPorts.Description" xml:space="preserve">
-    <value>Yalnızca wsl2.networkingMode olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'ta değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin: 3000.9000.9090.</value>
+    <value>Yalnızca wsl2.networkingMode olarak ayarlandığında uygulanabilir. Linux uygulamalarının otomatik olarak iletilen veya Windows'da değerlendirilen bağlantı noktalarına bağlanacak bağlantı noktalarını belirtir. Virgülle ayrılmış bir listede biçimlendirilmelidir, örneğin: 3000.9000.9090.</value>
     <comment>{Locked="wsl2.networkingMode"}.wslconfig property key names should not be translated</comment>
   </data>
   <data name="Settings_IgnoredPortsResetButton.Content" xml:space="preserve">
@@ -1870,5 +1872,53 @@ Ayrıca VS Code'un içindeki komut paleti aracılığıyla daha fazla VS Code Re
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Bir VM'nin kapatılmadan önce boşta olduğu milisaniye sayısı.</value>
+  </data>
+  <data name="MessageWsladiagUsage" xml:space="preserve">
+    <value>wsladiag - WSLA diagnostics tool
+Usage:
+  wsladiag list
+  wsladiag shell &lt;SessionName&gt; [--verbose]
+  wsladiag --help</value>
+    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUsage" xml:space="preserve">
+    <value>wslc - WSL Container CLI
+Usage:
+  wslc list
+  wslc shell &lt;SessionName&gt; [--verbose]
+  wslc --help</value>
+    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaSessionNotFound" xml:space="preserve">
+    <value>Session not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
+    <value>OpenSessionByName('{}') failed</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
+    <value>No WSLA sessions found.</value>
+  </data>
+  <data name="MessageWslaSessionsFound" xml:space="preserve">
+    <value>Found {} WSLA session{}:</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaShellExited" xml:space="preserve">
+    <value>{} exited with: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaHeaderId" xml:space="preserve">
+    <value>ID</value>
+  </data>
+  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
+    <value>Creator PID</value>
+  </data>
+  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="MessageWslaUnknownCommand" xml:space="preserve">
+    <value>Unknown command: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

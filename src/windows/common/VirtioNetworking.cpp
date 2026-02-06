@@ -14,12 +14,12 @@ using wsl::core::VirtioNetworking;
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel, bool enableLocalhostRelay, std::shared_ptr<GuestDeviceManager> guestDeviceManager, GUID classId, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel, bool enableLocalhostRelay, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
     m_enableLocalhostRelay(enableLocalhostRelay),
-    m_virtioNetworkClsid(classId)
+    m_dnsOptions(dnsOptions)
 {
 }
 
@@ -66,21 +66,22 @@ void VirtioNetworking::Initialize()
         device_options << L"gateway_ip=" << default_route;
     }
 
-    auto dns_servers = m_networkSettings->DnsServersString();
-    if (!dns_servers.empty())
+    // Get initial DNS settings for device options.
+    auto initialDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    if (!initialDns.Servers.empty())
     {
         if (device_options.tellp() > 0)
         {
             device_options << L";";
         }
-        device_options << L"nameservers=" << dns_servers;
+        device_options << L"nameservers=" << wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(initialDns.Servers, ','));
     }
 
     auto lock = m_lock.lock_exclusive();
 
     // Add virtio net adapter to guest
     m_adapterId = m_guestDeviceManager->AddGuestDevice(
-        VIRTIO_NET_DEVICE_ID, m_virtioNetworkClsid, L"eth0", nullptr, device_options.str().c_str(), 0, m_userToken.get());
+        VIRTIO_NET_DEVICE_ID, VIRTIO_NET_CLASS_ID, L"eth0", nullptr, device_options.str().c_str(), 0, m_userToken.get());
 
     hns::HNSEndpoint endpointProperties;
     endpointProperties.ID = m_adapterId;
@@ -105,15 +106,9 @@ void VirtioNetworking::Initialize()
         m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId);
     }
 
-    // Update DNS information.
-    if (!dns_servers.empty())
-    {
-        // TODO: DNS domain suffixes
-        hns::DNS dnsSettings{};
-        dnsSettings.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
-        dnsSettings.ServerList = dns_servers;
-        UpdateDns(std::move(dnsSettings));
-    }
+    // Send the initial DNS configuration to GNS and track it.
+    m_trackedDnsSettings = initialDns;
+    SendDnsUpdate(initialDns);
 
     if (m_enableLocalhostRelay)
     {
@@ -127,7 +122,7 @@ void VirtioNetworking::SetupLoopbackDevice()
 {
     m_localhostAdapterId = m_guestDeviceManager->AddGuestDevice(
         VIRTIO_NET_DEVICE_ID,
-        m_virtioNetworkClsid,
+        VIRTIO_NET_CLASS_ID,
         c_loopbackDeviceName,
         nullptr,
         L"client_ip=127.0.0.1;client_mac=00:11:22:33:44:55",
@@ -228,7 +223,7 @@ int VirtioNetworking::ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET&
     }
 
     auto lock = m_lock.lock_exclusive();
-    const auto server = m_guestDeviceManager->GetRemoteFileSystem(m_virtioNetworkClsid, c_defaultDeviceTag);
+    const auto server = m_guestDeviceManager->GetRemoteFileSystem(VIRTIO_NET_CLASS_ID, c_defaultDeviceTag);
     if (server)
     {
         std::wstring portString = std::format(L"tag={};port_number={}", tag, addr.Ipv4.sin_port);
@@ -264,15 +259,23 @@ try
 {
     auto lock = m_lock.lock_exclusive();
     UpdateMtu();
+
+    // Check for DNS changes and send update if needed.
+    auto currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    if (currentDns != m_trackedDnsSettings)
+    {
+        m_trackedDnsSettings = currentDns;
+        SendDnsUpdate(currentDns);
+    }
 }
 CATCH_LOG();
 
-void VirtioNetworking::UpdateDns(hns::DNS&& dnsSettings)
+void VirtioNetworking::SendDnsUpdate(const networking::DnsInfo& dnsSettings)
 {
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
     notification.RequestType = hns::ModifyRequestType::Update;
     notification.ResourceType = hns::GuestEndpointResourceType::DNS;
-    notification.Settings = std::move(dnsSettings);
+    notification.Settings = networking::BuildDnsNotification(dnsSettings, m_dnsOptions);
     m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId);
 }
 

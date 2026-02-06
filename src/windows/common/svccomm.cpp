@@ -293,8 +293,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
     // Create the process.
     //
 
-    SvcCommIo Io;
-    PLXSS_STD_HANDLES StdHandles = Io.GetStdHandles();
+    ConsoleState Io;
     COORD WindowSize = Io.GetWindowSize();
     ULONG Flags = LXSS_CREATE_INSTANCE_FLAGS_ALLOW_FS_UPGRADE;
     if (WI_IsFlagSet(LaunchFlags, LXSS_LAUNCH_FLAG_USE_SYSTEM_DISTRO))
@@ -310,6 +309,20 @@ wsl::windows::common::SvcComm::LaunchProcess(
     // This method is also used by Terminal.
     // See: https://github.com/microsoft/terminal/blob/ec434e3fba2a6ef254123e31f5257c25b04f2547/src/tools/ConsoleBench/conhost.cpp#L159-L164
     HANDLE console = NtCurrentTeb()->ProcessEnvironmentBlock->ProcessParameters->Reserved2[0];
+
+    LXSS_STD_HANDLES StdHandles{};
+    const HANDLE InputHandle = GetStdHandle(STD_INPUT_HANDLE);
+    const bool IsConsoleInput = wsl::windows::common::wslutil::IsConsoleHandle(InputHandle);
+    StdHandles.StdIn.HandleType = IsConsoleInput ? LxssHandleConsole : LxssHandleInput;
+    StdHandles.StdIn.Handle = IsConsoleInput ? LXSS_HANDLE_USE_CONSOLE : HandleToUlong(InputHandle);
+    const HANDLE OutputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    const bool IsConsoleOutput = wsl::windows::common::wslutil::IsConsoleHandle(OutputHandle);
+    StdHandles.StdOut.HandleType = IsConsoleOutput ? LxssHandleConsole : LxssHandleOutput;
+    StdHandles.StdOut.Handle = IsConsoleOutput ? LXSS_HANDLE_USE_CONSOLE : HandleToUlong(OutputHandle);
+    const HANDLE ErrorHandle = GetStdHandle(STD_ERROR_HANDLE);
+    const bool IsConsoleError = wsl::windows::common::wslutil::IsConsoleHandle(ErrorHandle);
+    StdHandles.StdErr.HandleType = IsConsoleError ? LxssHandleConsole : LxssHandleOutput;
+    StdHandles.StdErr.Handle = IsConsoleError ? LXSS_HANDLE_USE_CONSOLE : HandleToUlong(ErrorHandle);
 
     GUID DistributionId;
     GUID InstanceId;
@@ -339,7 +352,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
         WindowSize.X,
         WindowSize.Y,
         HandleToUlong(console),
-        StdHandles,
+        &StdHandles,
         Flags,
         &DistributionId,
         &InstanceId,

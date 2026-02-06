@@ -315,6 +315,30 @@ private:
     LPCWSTR m_path{};
 };
 
+class PartialHandleRead
+{
+public:
+    NON_COPYABLE(PartialHandleRead);
+    NON_MOVABLE(PartialHandleRead);
+
+    PartialHandleRead(HANDLE Handle);
+    ~PartialHandleRead();
+
+    void Expect(const std::string& Expected);
+    void ExpectClosed(DWORD Timeout = 60 * 1000);
+
+    std::string ReadBytes(size_t Length);
+
+private:
+    void Run();
+
+    HANDLE m_handle{};
+    std::mutex m_mutex;
+    wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
+    std::thread m_thread;
+    std::string m_data;
+};
+
 //
 // Structs and enums.
 //
@@ -532,8 +556,11 @@ wil::unique_hkey OpenDistributionKey(LPCWSTR Name);
 void ValidateOutput(LPCWSTR CommandLine, const std::wstring& ExpectedOutput, const std::wstring& ExpectedWarnings = L"", int ExitCode = -1);
 
 std::string ReadToString(SOCKET Handle);
+std::string ReadToString(HANDLE Handle);
 
 std::wstring ReadFileContent(const std::string& Path);
 std::wstring ReadFileContent(const std::wstring& Path);
 
 std::string EscapeString(const std::string& Input);
+
+void VerifyPatternMatch(const std::string& Content, const std::string& Pattern);

@@ -28,6 +28,7 @@ using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
+using wsl::windows::common::relay::SingleAcceptHandle;
 using wsl::windows::common::relay::WriteHandle;
 
 namespace {
@@ -936,18 +937,19 @@ try
 }
 CATCH_LOG()
 
-void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle)
+void MultiHandleWait::AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags)
 {
-    m_handles.emplace_back(std::move(handle));
+    m_handles.emplace_back(flags, std::move(handle));
 }
 
 void MultiHandleWait::Cancel()
 {
     m_cancel = true;
 }
-
 bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
 {
+    m_cancel = false; // Run may be called multiple times.
+
     std::optional<std::chrono::steady_clock::time_point> deadline;
 
     if (Timeout.has_value())
@@ -960,16 +962,50 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
     while (!m_handles.empty() && !m_cancel)
     {
         // Schedule IO on each handle until all are either pending, or completed.
-        for (auto i = 0; i < m_handles.size(); i++)
+        for (size_t i = 0; i < m_handles.size(); i++)
         {
-            while (m_handles[i]->GetState() == IOHandleStatus::Standby)
+            while (m_handles[i].second->GetState() == IOHandleStatus::Standby)
             {
-                m_handles[i]->Schedule();
+                try
+                {
+                    m_handles[i].second->Schedule();
+                }
+                catch (...)
+                {
+                    if (WI_IsFlagSet(m_handles[i].first, Flags::IgnoreErrors))
+                    {
+                        m_handles[i].second.reset(); // Reset the handle so it can be deleted.
+                        break;
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
         }
 
         // Remove completed handles from m_handles.
-        std::erase_if(m_handles, [&](const auto& e) { return e->GetState() == IOHandleStatus::Completed; });
+        for (auto it = m_handles.begin(); it != m_handles.end();)
+        {
+            if (!it->second)
+            {
+                it = m_handles.erase(it);
+            }
+            else if (it->second->GetState() == IOHandleStatus::Completed)
+            {
+                if (WI_IsFlagSet(it->first, Flags::CancelOnCompleted))
+                {
+                    m_cancel = true; // Cancel the IO if a handle with CancelOnCompleted is in the completed state.
+                }
+
+                it = m_handles.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
 
         if (m_handles.empty() || m_cancel)
         {
@@ -980,7 +1016,7 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         std::vector<HANDLE> waitHandles;
         for (const auto& e : m_handles)
         {
-            waitHandles.emplace_back(e->GetHandle());
+            waitHandles.emplace_back(e.second->GetHandle());
         }
 
         DWORD waitTimeout = INFINITE;
@@ -1000,7 +1036,22 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
         else if (result >= WAIT_OBJECT_0 && result < WAIT_OBJECT_0 + m_handles.size())
         {
             auto index = result - WAIT_OBJECT_0;
-            m_handles[index]->Collect();
+
+            try
+            {
+                m_handles[index].second->Collect();
+            }
+            catch (...)
+            {
+                if (WI_IsFlagSet(m_handles[index].first, Flags::IgnoreErrors))
+                {
+                    m_handles.erase(m_handles.begin() + index);
+                }
+                else
+                {
+                    throw;
+                }
+            }
         }
         else
         {
@@ -1140,6 +1191,67 @@ void ReadHandle::Collect()
 }
 
 HANDLE ReadHandle::GetHandle() const
+{
+    return Event.get();
+}
+
+SingleAcceptHandle::SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted) :
+    ListenSocket(std::move(ListenSocket)), AcceptedSocket(std::move(AcceptedSocket)), OnAccepted(std::move(OnAccepted))
+{
+    Overlapped.hEvent = Event.get();
+}
+
+SingleAcceptHandle::~SingleAcceptHandle()
+{
+    if (State == IOHandleStatus::Pending)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(CancelIoEx(ListenSocket.Get(), &Overlapped));
+
+        DWORD bytesProcessed{};
+        DWORD flagsReturned{};
+        if (!WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesProcessed, TRUE, &flagsReturned))
+        {
+            auto error = GetLastError();
+            LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
+        }
+    }
+}
+
+void SingleAcceptHandle::Schedule()
+{
+    WI_ASSERT(State == IOHandleStatus::Standby);
+
+    // Schedule the accept.
+    DWORD bytesReturned{};
+    if (AcceptEx((SOCKET)ListenSocket.Get(), (SOCKET)AcceptedSocket.Get(), &AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &bytesReturned, &Overlapped))
+    {
+        // Accept completed immediately.
+        State = IOHandleStatus::Completed;
+        OnAccepted();
+    }
+    else
+    {
+        auto error = WSAGetLastError();
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(error), error != ERROR_IO_PENDING, "Handle: 0x%p", (void*)ListenSocket.Get());
+
+        State = IOHandleStatus::Pending;
+    }
+}
+
+void SingleAcceptHandle::Collect()
+{
+    WI_ASSERT(State == IOHandleStatus::Pending);
+
+    DWORD bytesReceived{};
+    DWORD flagsReturned{};
+
+    THROW_IF_WIN32_BOOL_FALSE(WSAGetOverlappedResult((SOCKET)ListenSocket.Get(), &Overlapped, &bytesReceived, false, &flagsReturned));
+
+    State = IOHandleStatus::Completed;
+    OnAccepted();
+}
+
+HANDLE SingleAcceptHandle::GetHandle() const
 {
     return Event.get();
 }
@@ -1382,91 +1494,19 @@ HANDLE WriteHandle::GetHandle() const
     return Event.get();
 }
 
-RelayHandle::RelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& WriteHandle) :
-    Read(std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(WriteHandle))
+DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat) :
+    WriteStdout(std::move(Stdout)), WriteStderr(std::move(Stderr))
 {
-}
-
-void RelayHandle::Schedule()
-{
-    WI_ASSERT(State == IOHandleStatus::Standby);
-
-    // If the Buffer is empty, then we're reading.
-    if (PendingBuffer.empty())
+    if (ReadFormat == Format::HttpChunked)
     {
-        // If the output buffer is empty and the reading end is completed, then we're done.
-        if (Read.GetState() == IOHandleStatus::Completed)
-        {
-            State = IOHandleStatus::Completed;
-            return;
-        }
-
-        Read.Schedule();
-
-        // If the read is pending, update to 'Pending'
-        if (Read.GetState() == IOHandleStatus::Pending)
-        {
-            State = IOHandleStatus::Pending;
-        }
+        Read = std::make_unique<HTTPChunkBasedReadHandle>(
+            std::move(ReadHandle), [this](const gsl::span<char>& Line) { this->OnRead(Line); });
     }
     else
     {
-        Write.Push(PendingBuffer);
-        PendingBuffer.clear();
-
-        Write.Schedule();
-
-        if (Write.GetState() == IOHandleStatus::Pending)
-        {
-            // The write is pending, update to 'Pending'
-            State = IOHandleStatus::Pending;
-        }
+        Read = std::make_unique<relay::ReadHandle>(
+            std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { this->OnRead(Buffer); });
     }
-}
-
-void RelayHandle::OnRead(const gsl::span<char>& Content)
-{
-    WI_ASSERT(PendingBuffer.empty());
-
-    PendingBuffer.insert(PendingBuffer.end(), Content.begin(), Content.end());
-}
-
-void RelayHandle::Collect()
-{
-    WI_ASSERT(State == IOHandleStatus::Pending);
-
-    // Transition back to standby
-    State = IOHandleStatus::Standby;
-
-    if (Read.GetState() == IOHandleStatus::Pending)
-    {
-        Read.Collect();
-    }
-    else
-    {
-        WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
-        Write.Collect();
-    }
-}
-
-HANDLE RelayHandle::GetHandle() const
-{
-    if (Read.GetState() == IOHandleStatus::Pending)
-    {
-        return Read.GetHandle();
-    }
-    else
-    {
-        WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
-        return Write.GetHandle();
-    }
-}
-
-DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapper&& Stdout, HandleWrapper&& Stderr) :
-    Read(std::move(ReadHandle), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }),
-    WriteStdout(std::move(Stdout)),
-    WriteStderr(std::move(Stderr))
-{
 }
 
 void DockerIORelayHandle::Schedule()
@@ -1503,7 +1543,7 @@ void DockerIORelayHandle::Schedule()
     }
     else
     {
-        if (Read.GetState() == IOHandleStatus::Completed)
+        if (Read->GetState() == IOHandleStatus::Completed)
         {
             // No more data to read, we're done.
             State = IOHandleStatus::Completed;
@@ -1511,8 +1551,8 @@ void DockerIORelayHandle::Schedule()
         }
 
         // Schedule a read from the input.
-        Read.Schedule();
-        if (Read.GetState() == IOHandleStatus::Pending)
+        Read->Schedule();
+        if (Read->GetState() == IOHandleStatus::Pending)
         {
             State = IOHandleStatus::Pending;
         }
@@ -1536,7 +1576,7 @@ void DockerIORelayHandle::Collect()
 
         // Transition back to standby if there's still data to read.
         // Otherwise switch to Completed since everything is done.
-        if (Read.GetState() == IOHandleStatus::Completed)
+        if (Read->GetState() == IOHandleStatus::Completed)
         {
             State = IOHandleStatus::Completed;
         }
@@ -1548,7 +1588,7 @@ void DockerIORelayHandle::Collect()
     else
     {
         // Complete the read.
-        Read.Collect();
+        Read->Collect();
 
         // Transition back to standby.
         State = IOHandleStatus::Standby;
@@ -1563,7 +1603,7 @@ HANDLE DockerIORelayHandle::GetHandle() const
     }
     else
     {
-        return Read.GetHandle();
+        return Read->GetHandle();
     }
 }
 

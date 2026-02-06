@@ -16,6 +16,7 @@ Abstract:
 #include "WSLAVirtualMachine.h"
 #include <nlohmann/json.hpp>
 
+using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::service::wsla::ContainerEventTracker;
 using wsl::windows::service::wsla::DockerHTTPClient;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
@@ -52,36 +53,44 @@ ContainerEventTracker::ContainerTrackingReference::~ContainerTrackingReference()
     Reset();
 }
 
-ContainerEventTracker::ContainerEventTracker(DockerHTTPClient& dockerClient)
+ContainerEventTracker::ContainerEventTracker(DockerHTTPClient& dockerClient, ULONG sessionId, IORelay& relay) :
+    m_sessionId(sessionId)
 {
+    auto onChunk = [this](const gsl::span<char>& buffer) {
+        if (!buffer.empty()) // docker inserts empty lines between events, skip those.
+        {
+            try
+            {
+                OnEvent(std::string_view(buffer.data(), buffer.size()));
+            }
+            catch (...)
+            {
+                WSL_LOG(
+                    "DockerEventParseError",
+                    TraceLoggingValue(buffer.data(), "Data"),
+                    TraceLoggingValue(wil::ResultFromCaughtException(), "Error"),
+                    TraceLoggingValue(m_sessionId, "SessionId"));
+            }
+        }
+    };
+
     auto socket = dockerClient.MonitorEvents();
-    m_thread = std::thread([socket = std::move(socket), this]() mutable { Run(std::move(socket)); }
 
-    );
-}
-
-void ContainerEventTracker::Stop()
-{
-    // N.B. No callback should be left when the tracker is destroyed.
-    m_stopEvent.SetEvent();
-    if (m_thread.joinable())
-    {
-        m_thread.join();
-    }
+    relay.AddHandle(std::make_unique<common::relay::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
 }
 
 ContainerEventTracker::~ContainerEventTracker()
 {
     // N.B. No callback should be left when the tracker is destroyed.
     WI_ASSERT(m_callbacks.empty());
-
-    Stop();
 }
 
-void ContainerEventTracker::OnEvent(const std::string& event)
+void ContainerEventTracker::OnEvent(const std::string_view& event)
 {
-    // TODO: log session ID
-    WSL_LOG("DockerEvent", TraceLoggingValue(event.c_str(), "Data"));
+    WSL_LOG(
+        "DockerEvent",
+        TraceLoggingCountedString(event.data(), static_cast<UINT16>(event.size()), "Data"),
+        TraceLoggingValue(m_sessionId, "SessionId"));
 
     static std::map<std::string, ContainerEvent> events{
         {"start", ContainerEvent::Start}, {"die", ContainerEvent::Stop}, {"exec_die", ContainerEvent::ExecDied}};
@@ -91,7 +100,12 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     auto action = parsed.find("Action");
     auto actor = parsed.find("Actor");
 
-    THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end() || actor == parsed.end(), "Failed to parse json: %hs", event.c_str());
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        action == parsed.end() || actor == parsed.end(),
+        "Failed to parse json: %.*hs",
+        static_cast<int>(event.size()),
+        event.data());
 
     auto it = events.find(action->get<std::string>());
     if (it == events.end())
@@ -100,7 +114,7 @@ void ContainerEventTracker::OnEvent(const std::string& event)
     }
 
     auto id = actor->find("ID");
-    THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Failed to parse json: %hs", event.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, id == actor->end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
     auto containerId = id->get<std::string>();
 
@@ -132,43 +146,6 @@ void ContainerEventTracker::OnEvent(const std::string& event)
         }
     }
 }
-
-void ContainerEventTracker::Run(wil::unique_socket&& socket)
-try
-{
-    wsl::windows::common::relay::MultiHandleWait io;
-
-    auto oneLineWritten = [&](const gsl::span<char>& buffer) {
-        // docker events' output is line based. Call OnEvent() for each completed line.
-
-        if (!buffer.empty()) // docker inserts empty lines between events, skip those.
-        {
-            try
-            {
-                OnEvent(std::string{buffer.begin(), buffer.end()});
-            }
-            catch (...)
-            {
-                WSL_LOG(
-                    "DockerEventParseError",
-                    TraceLoggingValue(buffer.data(), "Data"),
-                    TraceLoggingValue(wil::ResultFromCaughtException(), "Error"));
-            }
-        }
-    };
-
-    auto onStop = [&]() { io.Cancel(); };
-
-    io.AddHandle(std::make_unique<common::relay::HTTPChunkBasedReadHandle>(wil::unique_handle{(HANDLE)socket.release()}, std::move(oneLineWritten)));
-    io.AddHandle(std::make_unique<common::relay::EventHandle>(m_stopEvent.get(), std::move(onStop)));
-
-    if (io.Run({}))
-    {
-        // TODO: Report error to session.
-        WSL_LOG("Unexpected docker exit");
-    }
-}
-CATCH_LOG();
 
 ContainerEventTracker::ContainerTrackingReference ContainerEventTracker::RegisterContainerStateUpdates(
     const std::string& ContainerId, ContainerStateChangeCallback&& Callback)

@@ -1,6 +1,7 @@
 set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
+    ConsoleState.cpp
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
@@ -33,7 +34,6 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
-    svccommio.cpp
     WSLAContainerLauncher.cpp
     VirtioNetworking.cpp
     WSLAProcessLauncher.cpp
@@ -78,6 +78,7 @@ set(HEADERS
     ../../shared/inc/stringshared.h
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
+    ConsoleState.h
     DeviceHostProxy.h
     disk.hpp
     Distribution.h
@@ -112,7 +113,6 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
-    svccommio.hpp
     WSLAContainerLauncher.h
     VirtioNetworking.h
     WSLAProcessLauncher.h
@@ -132,7 +132,7 @@ set(HEADERS
 
 include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
 add_library(common STATIC ${SOURCES} ${HEADERS})
-add_dependencies(common wslserviceidl localization wslservicemc wslinstalleridl wslaserviceproxystub)
+add_dependencies(common wslserviceidl wslaserviceidl localization wslservicemc wslinstalleridl wslaserviceproxystub)
 
 target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)

@@ -298,10 +298,12 @@
     <value>舊版發佈不支援 WSL 2。</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>您目前的電腦設定不支援 WSL2。
-請啟用「虛擬機器平台」選擇性元件，並確保 BIOS 中已啟用虛擬化。
-啟用以下項目，以執行 [虛擬機器平台]: wsl.exe --install --no-distribution
-如需詳細資訊，請瀏覽 https://aka.ms/enablevirtualization</value>
+    <value>WSL2 無法啟動，因為此機未啟用虛擬化。
+請確保您的電腦韌體設定中啟用了「虛擬機平台」這個選用元件，並且虛擬化功能已開啟。
+
+啟用「虛擬機器平台」時，執行： wsl.exe --install --no-distribution
+
+詳情請造訪 https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1876,5 +1878,53 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM 在關機前閒置的毫秒數。</value>
+  </data>
+  <data name="MessageWsladiagUsage" xml:space="preserve">
+    <value>wsladiag - WSLA diagnostics tool
+Usage:
+  wsladiag list
+  wsladiag shell &lt;SessionName&gt; [--verbose]
+  wsladiag --help</value>
+    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUsage" xml:space="preserve">
+    <value>wslc - WSL Container CLI
+Usage:
+  wslc list
+  wslc shell &lt;SessionName&gt; [--verbose]
+  wslc --help</value>
+    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaSessionNotFound" xml:space="preserve">
+    <value>Session not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
+    <value>OpenSessionByName('{}') failed</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
+    <value>No WSLA sessions found.</value>
+  </data>
+  <data name="MessageWslaSessionsFound" xml:space="preserve">
+    <value>Found {} WSLA session{}:</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaShellExited" xml:space="preserve">
+    <value>{} exited with: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaHeaderId" xml:space="preserve">
+    <value>ID</value>
+  </data>
+  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
+    <value>Creator PID</value>
+  </data>
+  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="MessageWslaUnknownCommand" xml:space="preserve">
+    <value>Unknown command: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

@@ -52,26 +52,6 @@ inline unsigned int CopyToSpan(const std::string_view String, const gsl::span<gs
     return PreviousOffset;
 }
 
-inline bool IsDriveRoot(const std::string_view Path)
-{
-    bool IsRoot = true;
-    if (Path.length() == 3)
-    {
-        IsRoot &= Path[2] == '\\';
-    }
-
-    if (Path.length() == 2 || Path.length() == 3)
-    {
-        IsRoot &= isalpha(Path[0]) && Path[1] == ':';
-    }
-    else
-    {
-        IsRoot = false;
-    }
-
-    return IsRoot;
-}
-
 template <class T>
 inline bool EndsWith(const std::basic_string<T>& String, const std::basic_string_view<T> Suffix)
 {
@@ -166,22 +146,53 @@ inline const char* FromMessageBuffer(const gsl::span<gsl::byte>& Span)
     return FromSpan(Span, offsetof(T, Buffer));
 }
 
-inline std::vector<const char*> ArrayFromSpan(gsl::span<gsl::byte> Span, size_t Offset = 0)
+inline std::vector<const char*> StringPointersFromArray(const std::vector<std::string>& Strings, bool insertNull)
+{
+    std::vector<const char*> result(Strings.size());
+    std::transform(Strings.begin(), Strings.end(), result.begin(), [](const std::string& str) { return str.c_str(); });
+
+    if (insertNull)
+    {
+        result.push_back(nullptr);
+    }
+
+    return result;
+}
+
+inline std::vector<std::string> ArrayFromSpan(gsl::span<const gsl::byte> Span, size_t Offset = 0)
 {
     THROW_INVALID_ARG_IF(Span.size() < Offset);
 
     Span = Span.subspan(Offset);
 
-    auto StringSpan = gsl::make_span<char>(reinterpret_cast<char*>(Span.data()), Span.size());
+    std::vector<std::string> Result;
 
-    std::vector<const char*> Result;
+    auto it = Span.begin();
 
-    auto it = StringSpan.begin();
+    auto readSize = [&]() {
+        THROW_INVALID_ARG_IF(Span.end() - it < sizeof(int32_t));
 
-    while (*it != '\0')
+        auto size = *reinterpret_cast<const int32_t*>(&*it);
+        it += sizeof(int32_t);
+
+        return size;
+    };
+
+    while (true)
     {
-        Result.push_back(&*it);
-        it += strlen(&*it) + 1;
+        auto size = readSize();
+        if (size == -1)
+        {
+            break;
+        }
+
+        THROW_INVALID_ARG_IF(size < 0);
+        THROW_INVALID_ARG_IF(size > Span.end() - it);
+
+        const char* begin = reinterpret_cast<const char*>(&*it);
+        Result.emplace_back(begin, size);
+
+        it += size;
     }
 
     return Result;

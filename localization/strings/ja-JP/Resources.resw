@@ -298,9 +298,11 @@ WSL2 でディスクを強制的に停止してデタッチするには、'wsl.e
     <value>レガシ ディストリビューションは WSL 2 をサポートしていません。</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 は、現在のマシン構成ではサポートされていません。
-"仮想マシン プラットフォーム" オプション コンポーネントを有効にし、さらに、BIOS で仮想化を有効にしてください。
-"仮想マシン プラットフォーム" を有効にするには、次のコマンドを実行します: wsl.exe --install --no-distribution
+    <value>このコンピューターで仮想化が有効になっていないため、WSL2 を開始できません。
+[仮想マシン プラットフォーム] オプション　コンポーネントが有効になっており、コンピューターのファームウェア設定で仮想化がオンになっていることを確認してください。
+
+次のコマンドを実行して [仮想マシン プラットフォーム] を有効にします: wsl.exe --install --no-distribution
+
 詳細については、https://aka.ms/enablevirtualization をご覧ください</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
@@ -1876,5 +1878,53 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>VM がシャットダウンされるまでのアイドル時間 (ミリ秒) です。</value>
+  </data>
+  <data name="MessageWsladiagUsage" xml:space="preserve">
+    <value>wsladiag - WSLA diagnostics tool
+Usage:
+  wsladiag list
+  wsladiag shell &lt;SessionName&gt; [--verbose]
+  wsladiag --help</value>
+    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcUsage" xml:space="preserve">
+    <value>wslc - WSL Container CLI
+Usage:
+  wslc list
+  wslc shell &lt;SessionName&gt; [--verbose]
+  wslc --help</value>
+    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaSessionNotFound" xml:space="preserve">
+    <value>Session not found: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
+    <value>OpenSessionByName('{}') failed</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
+    <value>No WSLA sessions found.</value>
+  </data>
+  <data name="MessageWslaSessionsFound" xml:space="preserve">
+    <value>Found {} WSLA session{}:</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaShellExited" xml:space="preserve">
+    <value>{} exited with: {}</value>
+    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaHeaderId" xml:space="preserve">
+    <value>ID</value>
+  </data>
+  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
+    <value>Creator PID</value>
+  </data>
+  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="MessageWslaUnknownCommand" xml:space="preserve">
+    <value>Unknown command: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

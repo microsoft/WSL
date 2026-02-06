@@ -155,6 +155,8 @@ std::vector<BYTE> HashFile(HANDLE File, DWORD Algorithm);
 
 void InitializeWil();
 
+bool IsConsoleHandle(HANDLE Handle);
+
 bool IsInteractiveConsole();
 
 bool IsRunningInMsix();

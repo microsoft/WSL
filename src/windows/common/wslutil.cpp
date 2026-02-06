@@ -87,6 +87,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
+    X(WSLA_E_CONTAINER_PREFIX_AMBIGUOUS),
     X(E_ACCESSDENIED),
     X_WIN32(ERROR_NOT_FOUND),
     X_WIN32(ERROR_VERSION_PARSE_ERROR),
@@ -148,6 +149,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_WIN32(ERROR_INVALID_SID),
     X_WIN32(ERROR_INVALID_STATE),
     X(WSLA_E_IMAGE_NOT_FOUND),
+    X(WSLA_E_CONTAINER_NOT_FOUND),
+    X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED)};
 
 #undef X
@@ -220,13 +223,6 @@ wil::unique_hlocal_string GetWinInetErrorString(HRESULT error)
             nullptr) == 0);
 
     return message;
-}
-
-bool IsInteractiveConsole()
-{
-    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode{};
-    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
 }
 
 bool IsWinInetError(HRESULT error)
@@ -1200,12 +1196,15 @@ void wsl::windows::common::wslutil::InitializeWil()
     }
 }
 
+bool wsl::windows::common::wslutil::IsConsoleHandle(HANDLE Handle)
+{
+    DWORD Mode;
+    return GetFileType(Handle) == FILE_TYPE_CHAR && GetConsoleMode(Handle, &Mode);
+}
+
 bool wsl::windows::common::wslutil::IsInteractiveConsole()
 {
-    const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode{};
-
-    return GetFileType(stdinHandle) == FILE_TYPE_CHAR && GetConsoleMode(stdinHandle, &mode);
+    return IsConsoleHandle(GetStdHandle(STD_INPUT_HANDLE));
 }
 
 bool wsl::windows::common::wslutil::IsRunningInMsix()

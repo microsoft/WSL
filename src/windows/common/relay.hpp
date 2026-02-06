@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 
 #include <winsock2.h>
-#include "svccommio.hpp"
+#include "ConsoleState.h"
 
 #define LX_RELAY_BUFFER_SIZE 0x1000
 
@@ -166,19 +166,19 @@ struct HandleWrapper
 
     HandleWrapper(
         wil::unique_handle&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle(std::move(handle)), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle(handle.get()), OwnedHandle(std::move(handle)), OnClose(std::move(OnClose))
     {
     }
 
     HandleWrapper(
         wil::unique_socket&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle((HANDLE)handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle((HANDLE)handle.get()), OwnedHandle(wil::unique_socket{handle.release()}), OnClose(std::move(OnClose))
     {
     }
 
     HandleWrapper(
         wil::unique_event&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle(handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle(handle.get()), OwnedHandle(wil::unique_handle{handle.release()}), OnClose(std::move(OnClose))
     {
     }
 
@@ -194,7 +194,7 @@ struct HandleWrapper
 
     HandleWrapper(
         wil::unique_hfile&& handle, std::function<void()>&& OnClose = []() {}) :
-        OwnedHandle(handle.release()), Handle(OwnedHandle.get()), OnClose(std::move(OnClose))
+        Handle(handle.get()), OwnedHandle(wil::unique_handle{handle.release()}), OnClose(std::move(OnClose))
     {
     }
 
@@ -216,13 +216,13 @@ struct HandleWrapper
             OnClose = nullptr;
         }
 
-        OwnedHandle.reset();
+        OwnedHandle = {};
         Handle = nullptr;
     }
 
 private:
-    wil::unique_handle OwnedHandle;
     HANDLE Handle{};
+    std::variant<wil::unique_handle, wil::unique_socket> OwnedHandle;
     std::function<void()> OnClose;
 };
 
@@ -249,7 +249,7 @@ public:
     NON_COPYABLE(EventHandle)
     NON_MOVABLE(EventHandle)
 
-    EventHandle(HandleWrapper&& EventHandle, std::function<void()>&& OnSignalled = []() {});
+    EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -267,6 +267,7 @@ public:
 
     ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
     virtual ~ReadHandle();
+
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -278,6 +279,28 @@ private:
     OVERLAPPED Overlapped{};
     std::vector<char> Buffer = std::vector<char>(LX_RELAY_BUFFER_SIZE);
     LARGE_INTEGER Offset{};
+};
+
+class SingleAcceptHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(SingleAcceptHandle)
+    NON_MOVABLE(SingleAcceptHandle)
+
+    SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
+    ~SingleAcceptHandle();
+
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    HandleWrapper ListenSocket;
+    HandleWrapper AcceptedSocket;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    std::function<void()> OnAccepted;
+    char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
 };
 
 class LineBasedReadHandle : public ReadHandle
@@ -335,22 +358,93 @@ private:
     std::vector<char> Buffer;
 };
 
+template <typename TRead = ReadHandle>
 class RelayHandle : public OverlappedIOHandle
 {
 public:
     NON_COPYABLE(RelayHandle);
     NON_MOVABLE(RelayHandle);
 
-    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output);
+    RelayHandle(HandleWrapper&& Input, HandleWrapper&& Output) :
+        Read(std::move(Input), [this](const gsl::span<char>& Buffer) { return OnRead(Buffer); }), Write(std::move(Output))
+    {
+    }
 
-    void Schedule() override;
-    void Collect() override;
-    HANDLE GetHandle() const override;
+    void Schedule() override
+    {
+        WI_ASSERT(State == IOHandleStatus::Standby);
+
+        // If the Buffer is empty, then we're reading.
+        if (PendingBuffer.empty())
+        {
+            // If the output buffer is empty and the reading end is completed, then we're done.
+            if (Read.GetState() == IOHandleStatus::Completed)
+            {
+                State = IOHandleStatus::Completed;
+                return;
+            }
+
+            Read.Schedule();
+
+            // If the read is pending, update to 'Pending'
+            if (Read.GetState() == IOHandleStatus::Pending)
+            {
+                State = IOHandleStatus::Pending;
+            }
+        }
+        else
+        {
+            Write.Push(PendingBuffer);
+            PendingBuffer.clear();
+
+            Write.Schedule();
+
+            if (Write.GetState() == IOHandleStatus::Pending)
+            {
+                // The write is pending, update to 'Pending'
+                State = IOHandleStatus::Pending;
+            }
+        }
+    }
+
+    void Collect() override
+    {
+        WI_ASSERT(State == IOHandleStatus::Pending);
+
+        // Transition back to standby
+        State = IOHandleStatus::Standby;
+
+        if (Read.GetState() == IOHandleStatus::Pending)
+        {
+            Read.Collect();
+        }
+        else
+        {
+            WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
+            Write.Collect();
+        }
+    }
+
+    HANDLE GetHandle() const override
+    {
+        if (Read.GetState() == IOHandleStatus::Pending)
+        {
+            return Read.GetHandle();
+        }
+        else
+        {
+            WI_ASSERT(Write.GetState() == IOHandleStatus::Pending);
+            return Write.GetHandle();
+        }
+    }
 
 private:
-    void OnRead(const gsl::span<char>& Buffer);
+    void OnRead(const gsl::span<char>& Content)
+    {
+        PendingBuffer.insert(PendingBuffer.end(), Content.begin(), Content.end());
+    }
 
-    ReadHandle Read;
+    TRead Read;
     WriteHandle Write;
     std::vector<char> PendingBuffer;
 };
@@ -361,7 +455,13 @@ public:
     NON_COPYABLE(DockerIORelayHandle);
     NON_MOVABLE(DockerIORelayHandle);
 
-    DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr);
+    enum class Format
+    {
+        Raw,
+        HttpChunked
+    };
+
+    DockerIORelayHandle(HandleWrapper&& Input, HandleWrapper&& Stdout, HandleWrapper&& Stderr, Format ReadFormat);
     void Schedule() override;
     void Collect() override;
     HANDLE GetHandle() const override;
@@ -381,7 +481,7 @@ private:
     void OnRead(const gsl::span<char>& Buffer);
     void ProcessNextHeader();
 
-    ReadHandle Read;
+    std::unique_ptr<OverlappedIOHandle> Read;
     WriteHandle WriteStdout;
     WriteHandle WriteStderr;
     std::vector<char> PendingBuffer;
@@ -392,15 +492,24 @@ private:
 class MultiHandleWait
 {
 public:
+    enum Flags
+    {
+        None = 0,
+        CancelOnCompleted = 1,
+        IgnoreErrors = 2
+    };
+
     MultiHandleWait() = default;
 
-    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle);
+    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
     bool Run(std::optional<std::chrono::milliseconds> Timeout);
     void Cancel();
 
 private:
-    std::vector<std::unique_ptr<OverlappedIOHandle>> m_handles;
+    std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
     bool m_cancel = false;
 };
+
+DEFINE_ENUM_FLAG_OPERATORS(MultiHandleWait::Flags);
 
 } // namespace wsl::windows::common::relay

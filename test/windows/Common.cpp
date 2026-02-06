@@ -67,6 +67,7 @@ static bool g_enableWerReport = false;
 static std::wstring g_pipelineBuildId;
 std::wstring g_testDistroPath;
 std::wstring g_testDataPath;
+bool g_fastTestRun = false; // True when test.bat was invoked with -f
 
 std::pair<wil::unique_handle, wil::unique_handle> CreateSubprocessPipe(bool inheritRead, bool inheritWrite, DWORD bufferSize, _In_opt_ SECURITY_ATTRIBUTES* sa)
 {
@@ -1705,11 +1706,7 @@ Return Value:
 
         if (LxsstuVmMode())
         {
-            std::wstring Command = L"/bin/cp /data/test/log/";
-            Command += LogFileToken;
-            Command += L" $(wslpath '";
-            Command += LinuxLogPath;
-            Command += L"')";
+            std::wstring Command = std::format(L"/bin/cp /data/test/log/{} $(wslpath '{}')", LogFileToken, LinuxLogPath);
             VERIFY_NO_THROW(LxsstuRunTest(Command.c_str()));
         }
 
@@ -2087,6 +2084,7 @@ Return Value:
     {
         // If no setup script is present, mark test_distro as the default distro here for convenience.
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--set-default " LXSS_DISTRO_NAME_TEST_L), 0L);
+        g_fastTestRun = true;
 
         return true;
     }
@@ -2604,6 +2602,41 @@ std::string ReadToString(SOCKET Handle)
     return output;
 }
 
+std::string ReadToString(HANDLE Handle)
+{
+    std::string output;
+    DWORD offset = 0;
+    constexpr DWORD bufferSize = 4096;
+
+    while (true)
+    {
+        output.resize(offset + bufferSize);
+        DWORD bytesRead = 0;
+        if (!ReadFile(Handle, output.data() + offset, bufferSize, &bytesRead, nullptr))
+        {
+            VERIFY_ARE_EQUAL(GetLastError(), ERROR_BROKEN_PIPE);
+        }
+
+        offset += bytesRead;
+        output.resize(offset);
+        if (bytesRead == 0)
+        {
+            break;
+        }
+    }
+
+    return output;
+}
+
+void VerifyPatternMatch(const std::string& Content, const std::string& Pattern)
+{
+    if (!PathMatchSpecA(Content.c_str(), Pattern.c_str()))
+    {
+        std::wstring message = std::format(L"Output: '{}' didn't match pattern: '{}'", Content, Pattern);
+        VERIFY_FAIL(message.c_str());
+    }
+}
+
 std::string EscapeString(const std::string& Input)
 {
     std::string Output;
@@ -2634,3 +2667,64 @@ std::string EscapeString(const std::string& Input)
 
     return Output;
 }
+
+PartialHandleRead::PartialHandleRead(HANDLE Handle) : m_handle(Handle)
+{
+    m_thread = std::thread(std::bind(&PartialHandleRead::Run, this));
+}
+
+PartialHandleRead::~PartialHandleRead()
+{
+    m_exitEvent.SetEvent();
+    if (m_thread.joinable())
+    {
+        m_thread.join();
+    }
+}
+
+std::string PartialHandleRead::ReadBytes(size_t Length)
+{
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&]() {
+            std::lock_guard lock{m_mutex};
+
+            THROW_HR_IF(E_ABORT, m_data.size() < Length);
+        },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(60));
+
+    std::lock_guard lock{m_mutex};
+
+    return m_data.substr(0, Length);
+}
+
+void PartialHandleRead::Expect(const std::string& Expected)
+{
+    auto content = ReadBytes(Expected.size());
+
+    VERIFY_ARE_EQUAL(content, Expected);
+}
+
+void PartialHandleRead::ExpectClosed(DWORD Timeout)
+{
+    VERIFY_ARE_EQUAL(WaitForSingleObject(m_thread.native_handle(), Timeout), WAIT_OBJECT_0);
+}
+
+void PartialHandleRead::Run()
+try
+{
+    std::vector<gsl::byte> buffer(4096);
+
+    while (!m_exitEvent.is_signaled())
+    {
+        auto bytesRead = wsl::windows::common::relay::InterruptableRead(m_handle, gsl::make_span(buffer), {m_exitEvent.get()});
+        if (bytesRead == 0)
+        {
+            break;
+        }
+
+        std::lock_guard lock{m_mutex};
+        m_data.append(reinterpret_cast<char*>(buffer.data()), bytesRead);
+    }
+}
+CATCH_LOG();

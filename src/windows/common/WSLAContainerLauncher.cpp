@@ -17,9 +17,14 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::RunningWSLAContainer;
 using wsl::windows::common::WSLAContainerLauncher;
 
-RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, std::vector<WSLA_PROCESS_FD>&& fds) :
-    m_container(std::move(Container)), m_fds(std::move(fds))
+RunningWSLAContainer::RunningWSLAContainer(wil::com_ptr<IWSLAContainer>&& Container, WSLAProcessFlags Flags) :
+    m_container(std::move(Container)), m_flags(Flags)
 {
+}
+
+RunningWSLAContainer::~RunningWSLAContainer()
+{
+    Reset();
 }
 
 IWSLAContainer& RunningWSLAContainer::Get()
@@ -29,6 +34,13 @@ IWSLAContainer& RunningWSLAContainer::Get()
 
 void RunningWSLAContainer::Reset()
 {
+    if (m_container && m_deleteOnClose)
+    {
+        // Attempt to stop and delete the container.
+        LOG_IF_FAILED(m_container->Stop(WSLASignalSIGKILL, 0));
+        LOG_IF_FAILED(m_container->Delete());
+    }
+
     m_container.reset();
 }
 
@@ -44,24 +56,69 @@ ClientRunningWSLAProcess RunningWSLAContainer::GetInitProcess()
     wil::com_ptr<IWSLAProcess> process;
     THROW_IF_FAILED(m_container->GetInitProcess(&process));
 
-    return ClientRunningWSLAProcess{std::move(process), std::move(m_fds)};
+    return ClientRunningWSLAProcess{std::move(process), m_flags};
+}
+
+void RunningWSLAContainer::SetDeleteOnClose(bool deleteOnClose)
+{
+    m_deleteOnClose = deleteOnClose;
+}
+
+std::string RunningWSLAContainer::Id()
+{
+    WSLAContainerId id{};
+    THROW_IF_FAILED(m_container->GetId(id));
+
+    return id;
+}
+
+std::string RunningWSLAContainer::Name()
+{
+    wil::unique_cotaskmem_ansistring name;
+    THROW_IF_FAILED(m_container->GetName(&name));
+
+    return name.get();
 }
 
 WSLAContainerLauncher::WSLAContainerLauncher(
     const std::string& Image,
     const std::string& Name,
-    const std::string& EntryPoint,
     const std::vector<std::string>& Arguments,
     const std::vector<std::string>& Environment,
     WSLA_CONTAINER_NETWORK_TYPE containerNetworkType,
-    ProcessFlags Flags) :
-    WSLAProcessLauncher(EntryPoint, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
+    WSLAProcessFlags Flags) :
+    WSLAProcessLauncher({}, Arguments, Environment, Flags), m_image(Image), m_name(Name), m_containerNetworkType(containerNetworkType)
 {
 }
 
 void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family)
 {
     m_ports.emplace_back(WSLA_PORT_MAPPING{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
+}
+
+void WSLAContainerLauncher::SetDefaultStopSignal(WSLASignal Signal)
+{
+    m_stopSignal = Signal;
+}
+
+void WSLAContainerLauncher::SetEntrypoint(std::vector<std::string>&& entrypoint)
+{
+    m_entrypoint = std::move(entrypoint);
+}
+
+void WSLAContainerLauncher::SetContainerFlags(WSLAContainerFlags Flags)
+{
+    m_containerFlags = Flags;
+}
+
+void WSLAContainerLauncher::SetHostname(std::string&& Hostname)
+{
+    m_hostname = std::move(Hostname);
+}
+
+void WSLAContainerLauncher::SetDomainname(std::string&& Domainame)
+{
+    m_domainname = std::move(Domainame);
 }
 
 void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
@@ -78,7 +135,7 @@ void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& 
     m_volumes.push_back(vol);
 }
 
-std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session)
+std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session, WSLAContainerStartFlags Flags)
 {
     auto [result, container] = CreateNoThrow(Session);
     if (FAILED(result))
@@ -86,7 +143,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::L
         return std::make_pair(result, std::optional<RunningWSLAContainer>{});
     }
 
-    result = container.value().Get().Start();
+    result = container.value().Get().Start(Flags);
 
     return std::make_pair(result, std::move(container));
 }
@@ -95,16 +152,45 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 {
     WSLA_CONTAINER_OPTIONS options{};
     options.Image = m_image.c_str();
-    options.Name = m_name.c_str();
+
+    if (!m_name.empty())
+    {
+        options.Name = m_name.c_str();
+    }
+
+    std::vector<const char*> entrypointStorage;
+
+    for (const auto& e : m_entrypoint)
+    {
+        entrypointStorage.push_back(e.c_str());
+    }
+
     auto [processOptions, commandLinePtrs, environmentPtrs] = CreateProcessOptions();
     options.InitProcessOptions = processOptions;
     options.ContainerNetwork.ContainerNetworkType = m_containerNetworkType;
     options.Ports = m_ports.data();
     options.PortsCount = static_cast<ULONG>(m_ports.size());
+    options.StopSignal = m_stopSignal;
+    options.Flags = m_containerFlags;
 
-    if (m_executable.empty())
+    if (!entrypointStorage.empty())
     {
-        options.InitProcessOptions.Executable = nullptr;
+        options.Entrypoint = {entrypointStorage.data(), static_cast<ULONG>(entrypointStorage.size())};
+    }
+
+    if (!m_hostname.empty())
+    {
+        options.HostName = m_hostname.c_str();
+    }
+
+    if (!m_domainname.empty())
+    {
+        options.DomainName = m_domainname.c_str();
+    }
+
+    if (!m_workingDirectory.empty())
+    {
+        options.InitProcessOptions.CurrentDirectory = m_workingDirectory.c_str();
     }
 
     options.VolumesCount = static_cast<ULONG>(m_volumes.size());
@@ -118,18 +204,26 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
         return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});
     }
 
-    return std::make_pair(S_OK, RunningWSLAContainer{std::move(container), std::move(m_fds)});
+    return std::make_pair(S_OK, std::move(RunningWSLAContainer{std::move(container), m_flags}));
 }
 
-RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session)
+RunningWSLAContainer WSLAContainerLauncher::Create(IWSLASession& Session)
 {
-    auto [result, container] = LaunchNoThrow(Session);
+    auto [result, container] = CreateNoThrow(Session);
     THROW_IF_FAILED(result);
 
     return std::move(container.value());
 }
 
-wsl::windows::common::docker_schema::InspectContainer wsl::windows::common::RunningWSLAContainer::Inspect()
+RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session, WSLAContainerStartFlags Flags)
+{
+    auto [result, container] = LaunchNoThrow(Session, Flags);
+    THROW_IF_FAILED(result);
+
+    return std::move(container.value());
+}
+
+wsl::windows::common::docker_schema::InspectContainer RunningWSLAContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(m_container->Inspect(&output));

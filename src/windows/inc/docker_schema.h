@@ -71,7 +71,9 @@ struct HostConfig
     std::vector<Mount> Mounts;
     std::map<std::string, std::vector<PortMapping>> PortBindings;
     std::string NetworkMode;
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode);
+    bool Init{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init);
 };
 
 struct CreateContainer
@@ -85,13 +87,20 @@ struct CreateContainer
     bool AttachStdin{};
     bool AttachStdout{};
     bool AttachStderr{};
+    std::optional<std::string> User;
+    std::string Hostname;
+    std::string Domainname;
+    std::optional<std::string> StopSignal;
+    std::optional<std::string> WorkingDir;
     std::vector<std::string> Cmd;
     std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, std::string> Labels;
     HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
+        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname, Labels);
 };
 
 struct InspectContainer
@@ -144,9 +153,10 @@ struct CreateExec
     std::vector<ULONG> ConsoleSize;
     std::vector<std::string> Cmd;
     std::vector<std::string> Env;
+    std::optional<std::string> User;
     std::string WorkingDir;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateExec, AttachStdin, AttachStdout, AttachStderr, Tty, ConsoleSize, Cmd, Env, WorkingDir, User);
 };
 
 struct StartExec
@@ -157,6 +167,50 @@ struct StartExec
     std::vector<ULONG> ConsoleSize;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(StartExec, Tty, Detach, ConsoleSize);
+};
+
+enum class ContainerState
+{
+    Created,
+    Running,
+    Paused,
+    Restarting,
+    Exited,
+    Removing,
+    Dead,
+    Unknown
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    ContainerState,
+    {
+        {ContainerState::Created, "created"},
+        {ContainerState::Running, "running"},
+        {ContainerState::Paused, "paused"},
+        {ContainerState::Restarting, "restarting"},
+        {ContainerState::Exited, "exited"},
+        {ContainerState::Removing, "removing"},
+        {ContainerState::Dead, "dead"},
+    });
+
+struct Port
+{
+    uint16_t PrivatePort{};
+    uint16_t PublicPort{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Port, PrivatePort, PublicPort);
+};
+
+struct ContainerInfo
+{
+    std::string Id;
+    std::vector<std::string> Names;
+    std::string Image;
+    std::map<std::string, std::string> Labels;
+    std::vector<Port> Ports;
+    ContainerState State{ContainerState::Unknown};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State);
 };
 
 struct CreateImageProgressDetails
