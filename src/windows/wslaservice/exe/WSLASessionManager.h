@@ -10,18 +10,46 @@ Abstract:
 
     Definition for WSLASessionManager.
 
+    Session Lifetime Management:
+    ----------------------------
+    Sessions are created in per-user COM server processes via IWSLASessionFactory.
+    The SYSTEM service holds IWSLASessionReference objects that contain weak
+    references to the actual sessions.
+
+    - Non-persistent sessions: Lifetime is tied to client COM references.
+      When all clients release their IWSLASession references, the session is
+      terminated and the weak reference in IWSLASessionReference returns NULL.
+
+    - Persistent sessions: The service holds an additional strong IWSLASession
+      reference to keep the session alive until explicitly terminated or service
+      shutdown.
+
+    The IWSLASessionReference allows the service to:
+    - Check if a session is still alive (OpenSession fails if session is gone)
+    - Get session metadata for enumeration without holding strong refs
+    - Terminate sessions when requested by elevated callers
+
 --*/
 
 #pragma once
-#include "WSLAVirtualMachine.h"
-#include "WSLASession.h"
+#include "wslaservice.h"
 #include "COMImplClass.h"
+#include "wslutil.h"
 #include <atomic>
+#include <algorithm>
 #include <vector>
 #include <mutex>
-#include <unordered_set>
+#include <string>
+
+namespace wslutil = wsl::windows::common::wslutil;
 
 namespace wsl::windows::service::wsla {
+
+struct CallingProcessTokenInfo
+{
+    wil::unique_tokeninfo_ptr<TOKEN_USER> Info;
+    bool Elevated;
+};
 
 class WSLASessionManagerImpl
 {
@@ -39,12 +67,8 @@ public:
     void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
 
 private:
-    struct CallingProcessTokenInfo
-    {
-        wil::unique_tokeninfo_ptr<TOKEN_USER> Info;
-        bool Elevated;
-    };
-
+    // Iterates over all sessions, cleaning up released sessions.
+    // The routine receives an IWSLASessionReference& and can return an optional<T> to stop iteration.
     template <typename T>
     inline auto ForEachSession(const auto& Routine)
     {
@@ -52,43 +76,40 @@ private:
 
         using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
         TResult result{};
-        auto each = [&](const Microsoft::WRL::ComPtr<IWeakReference>& Session) {
-            Microsoft::WRL::ComPtr<IWSLASessionImpl> lockedSession;
-            THROW_IF_FAILED(Session->Resolve(lockedSession.GetAddressOf()));
-            if (!lockedSession)
+
+        auto each = [&](const wil::com_ptr<IWSLASessionReference>& SessionRef) {
+            // Try to open the session via the service ref.
+            // Fails with ERROR_OBJECT_NO_LONGER_EXISTS if released,
+            // ERROR_INVALID_STATE if terminated, or RPC error if per-user process is dead.
+            wil::com_ptr<IWSLASession> lockedSession;
+            if (FAILED_LOG(SessionRef->OpenSession(&lockedSession)))
             {
-                return true; // Object is released, remove from the session list.
-            }
-
-            // N.B. lockedSession has a reference to the COM object.
-            WSLASession* SessionImpl{};
-            THROW_IF_FAILED(lockedSession->GetImplNoRef(&SessionImpl));
-
-            // If the session is terminated, drop its reference so it can be deleted (in case of persistent sessions)
-            if (SessionImpl->Terminated())
-            {
-                auto remove =
-                    std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return SessionImpl->GetId() == e->GetId(); });
-
-                WI_ASSERT(remove.end() - remove.begin() <= 1);
-
+                // Session is gone, drop the persistent reference if any.
+                auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) {
+                    ULONG refId = 0, sessionId = 0;
+                    if (FAILED_LOG(SessionRef->GetId(&refId)))
+                    {
+                        return true; // Per-user process is dead, remove persistent ref
+                    }
+                    return SUCCEEDED(e->GetId(&sessionId)) && refId == sessionId;
+                });
                 m_persistentSessions.erase(remove.begin(), remove.end());
-                return true;
+                return true; // Remove from tracking
             }
 
             if constexpr (std::is_same_v<T, void>)
             {
-                Routine(*SessionImpl);
+                Routine(*SessionRef, lockedSession);
             }
             else
             {
                 if (!result.has_value())
                 {
-                    result = Routine(*SessionImpl);
+                    result = Routine(*SessionRef, lockedSession);
                 }
             }
 
-            return false;
+            return false; // Keep in tracking
         };
 
         auto remove = std::ranges::remove_if(m_sessions, each);
@@ -104,15 +125,26 @@ private:
         }
     }
 
+    void AddSessionProcessToJobObject(_In_ IWSLASessionFactory* Factory);
+    WSLA_SESSION_INIT_SETTINGS CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLA_SESSION_SETTINGS* Settings);
+    void EnsureJobObjectCreated();
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
-    static HRESULT CheckTokenAccess(const WSLASession& Session, const CallingProcessTokenInfo& TokenInfo);
+    static HRESULT CheckTokenAccess(IWSLASessionReference* SessionRef, const CallingProcessTokenInfo& TokenInfo);
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslaSessionsLock;
 
-    // Persistent sessions that outlive their creating process.
-    std::vector<Microsoft::WRL::ComPtr<WSLASession>> m_persistentSessions;
-    std::vector<Microsoft::WRL::ComPtr<IWeakReference>> m_sessions;
+    // Job object that automatically terminates all child COM server processes
+    // when this service exits or crashes (JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE).
+    std::once_flag m_jobObjectInitFlag;
+    wil::unique_handle m_sessionJobObject;
+
+    // All sessions tracked via IWSLASessionReference (which holds weak refs).
+    // Sessions are automatically cleaned up when the underlying session is released.
+    std::vector<wil::com_ptr<IWSLASessionReference>> m_sessions;
+
+    // Strong references to persistent sessions to keep them alive.
+    std::vector<wil::com_ptr<IWSLASession>> m_persistentSessions;
 };
 } // namespace wsl::windows::service::wsla
 

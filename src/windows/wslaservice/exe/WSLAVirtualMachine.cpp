@@ -8,379 +8,45 @@ Module Name:
 
 Abstract:
 
-    Class for the WSLA virtual machine.
+    Client-side class for WSLA virtual machine operations.
+
+    The VM is created via IWSLAVirtualMachine (running in the SYSTEM service).
+    This class connects to the existing VM for unprivileged operations
+    and delegates privileged operations back to IWSLAVirtualMachine.
 
 --*/
 
 #include "WSLAVirtualMachine.h"
 #include <format>
 #include <filesystem>
-#include "hcs_schema.h"
-#include "VirtioNetworking.h"
-#include "NatNetworking.h"
 #include "ServiceProcessLauncher.h"
+#include "GuestDeviceManager.h"
+#include "wslutil.h"
+#include "lxinitshared.h"
 
 using namespace wsl::windows::common;
-using helpers::WindowsBuildNumbers;
-using helpers::WindowsVersion;
 using wsl::windows::service::wsla::WSLAProcess;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
+namespace wslutil = wsl::windows::common::wslutil;
 
-constexpr auto MAX_VM_CRASH_FILES = 3;
-constexpr auto MAX_CRASH_DUMPS = 10;
-constexpr auto SAVED_STATE_FILE_EXTENSION = L".vmrs";
-constexpr auto SAVED_STATE_FILE_PREFIX = L"saved-state-";
-constexpr auto RECEIVE_TIMEOUT = 30 * 1000;
 constexpr auto CONTAINER_PORT_RANGE = std::pair<uint16_t, uint16_t>(20002, 65535);
 
 static_assert(c_ephemeralPortRange.second < CONTAINER_PORT_RANGE.first);
 
-WSLAVirtualMachine::WSLAVirtualMachine(WSLAVirtualMachine::Settings&& Settings, PSID UserSid) :
-    m_settings(std::move(Settings)), m_userSid(UserSid)
+WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLA_SESSION_INIT_SETTINGS* Settings) :
+    m_vm(Vm),
+    m_featureFlags(static_cast<WSLAFeatureFlags>(Settings->FeatureFlags)),
+    m_networkingMode(Settings->NetworkingMode),
+    m_bootTimeoutMs(Settings->BootTimeoutMs),
+    m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4")
 {
-    THROW_IF_FAILED(CoCreateGuid(&m_vmId));
+    THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
-    m_vmIdString = wsl::shared::string::GuidToString<wchar_t>(m_vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
-    m_userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    m_virtioFsClassId = wsl::windows::common::security::IsTokenElevated(m_userToken.get()) ? VIRTIO_FS_ADMIN_CLASS_ID : VIRTIO_FS_CLASS_ID;
-    m_crashDumpFolder = GetCrashDumpFolder();
-}
+    // Establish a socket channel with mini_init in the VM.
+    wil::unique_socket socket;
+    THROW_IF_FAILED(m_vm->AcceptConnection(reinterpret_cast<HANDLE*>(&socket)));
 
-void WSLAVirtualMachine::OnSessionTerminated()
-{
-    // This method is called when the WSLA session is terminated.
-    // When that happens, signal the terminating event to cancel any pending operation
-
-    std::lock_guard mutex(m_lock);
-    if (m_vmTerminatingEvent.is_signaled())
-    {
-        return;
-    }
-
-    WSL_LOG("WSLASignalTerminating", TraceLoggingValue(m_running, "running"));
-
-    m_vmTerminatingEvent.SetEvent();
-}
-
-WSLAVirtualMachine::~WSLAVirtualMachine()
-{
-    WSL_LOG("WSLATerminateVmStart", TraceLoggingValue(m_running, "running"));
-    if (!m_computeSystem)
-    {
-        // If m_computeSystem is null, don't try to stop the VM since it never started.
-        return;
-    }
-
-    m_initChannel.Close();
-
-    bool forceTerminate = false;
-
-    // Wait up to 5 seconds for the VM to terminate.
-    if (!m_vmExitEvent.wait(5000))
-    {
-        forceTerminate = true;
-        try
-        {
-            wsl::windows::common::hcs::TerminateComputeSystem(m_computeSystem.get());
-        }
-        CATCH_LOG()
-    }
-
-    WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"), TraceLoggingValue(m_running, "running"));
-
-    // Shutdown DeviceHostProxy before resetting compute system
-    m_guestDeviceManager.reset();
-
-    m_computeSystem.reset();
-
-    for (const auto& e : m_attachedDisks)
-    {
-        try
-        {
-            if (e.second.AccessGranted)
-            {
-                wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str());
-            }
-        }
-        CATCH_LOG()
-    }
-
-    if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
-    {
-        // If the VM did not crash, the saved state file should be empty, so we can remove it.
-        try
-        {
-            WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
-            std::filesystem::remove(m_vmSavedStateFile);
-        }
-        CATCH_LOG()
-    }
-
-    if (m_processExitThread.joinable())
-    {
-        m_processExitThread.join();
-    }
-
-    if (m_crashDumpCollectionThread.joinable())
-    {
-        m_crashDumpCollectionThread.join();
-    }
-
-    // Clear the state of all remaining processes now that the VM has exited.
-    // The WSLAProcess object reference will be released when the last COM reference is closed.
-    for (auto& e : m_trackedProcesses)
-    {
-        e->OnVmTerminated();
-    }
-}
-
-void WSLAVirtualMachine::Start()
-{
-    hcs::ComputeSystem systemSettings{};
-    systemSettings.Owner = L"WSL";
-    systemSettings.ShouldTerminateOnLastHandleClosed = true;
-
-    // Determine which schema version to use based on the Windows version. Windows 10 does not support
-    // newer schema versions and some features may be disabled as a result.
-    if (wsl::windows::common::helpers::IsWindows11OrAbove())
-    {
-        systemSettings.SchemaVersion.Major = 2;
-        systemSettings.SchemaVersion.Minor = 7;
-    }
-    else
-    {
-        systemSettings.SchemaVersion.Major = 2;
-        systemSettings.SchemaVersion.Minor = 3;
-    }
-
-    hcs::VirtualMachine vmSettings{};
-    vmSettings.StopOnReset = true;
-    vmSettings.Chipset.UseUtc = true;
-
-    // Ensure the 2MB granularity enforced by HCS.
-    vmSettings.ComputeTopology.Memory.SizeInMB = m_settings.MemoryMb & ~0x1;
-    vmSettings.ComputeTopology.Memory.AllowOvercommit = true;
-    vmSettings.ComputeTopology.Memory.EnableDeferredCommit = true;
-    vmSettings.ComputeTopology.Memory.EnableColdDiscardHint = true;
-
-    // Configure backing page size, fault cluster shift size, and cold discard hint size to favor density (lower vmmem usage).
-    //
-    // N.B. Cold discard hint size should be a multiple of the fault cluster shift size.
-    const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
-    if (windowsVersion.BuildNumber >= WindowsBuildNumbers::Germanium)
-    {
-        vmSettings.ComputeTopology.Memory.BackingPageSize = hcs::MemoryBackingPageSize::Small;
-        vmSettings.ComputeTopology.Memory.FaultClusterSizeShift = 4;          // 64k
-        vmSettings.ComputeTopology.Memory.DirectMapFaultClusterSizeShift = 4; // 64k
-        m_coldDiscardShiftSize = 5;                                           // 128k
-    }
-    else
-    {
-        m_coldDiscardShiftSize = 9; // 2MB
-    }
-
-    // Configure the number of processors.
-    vmSettings.ComputeTopology.Processor.Count = m_settings.CpuCount;
-
-    // Set the vmmem suffix which will change the process name in task manager.
-    if (helpers::IsVmemmSuffixSupported())
-    {
-        vmSettings.ComputeTopology.Memory.HostingProcessNameSuffix = m_settings.DisplayName;
-    }
-
-#ifdef _AMD64_
-
-    HV_X64_HYPERVISOR_HARDWARE_FEATURES hardwareFeatures{};
-    __cpuid(reinterpret_cast<int*>(&hardwareFeatures), HvCpuIdFunctionMsHvHardwareFeatures);
-    vmSettings.ComputeTopology.Processor.EnablePerfmonPmu = hardwareFeatures.ChildPerfmonPmuSupported != 0;
-    vmSettings.ComputeTopology.Processor.EnablePerfmonLbr = hardwareFeatures.ChildPerfmonLbrSupported != 0;
-
-#endif
-
-    // Initialize kernel command line.
-    std::wstring kernelCmdLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLA_ROOT_INIT_ENV) L"=1 panic=-1";
-
-    // Set number of processors.
-    kernelCmdLine += std::format(L" nr_cpus={}", m_settings.CpuCount);
-
-    // Enable timesync workaround to sync on resume from sleep in modern standby.
-    kernelCmdLine += L" hv_utils.timesync_implicit=1";
-
-    wil::unique_handle dmesgOutput;
-    dmesgOutput = std::move(m_settings.DmesgHandle);
-
-    m_dmesgCollector = DmesgCollector::Create(
-        m_vmId, m_vmExitEvent, true, false, L"", FeatureEnabled(WslaFeatureFlagsEarlyBootDmesg), std::move(dmesgOutput));
-
-    if (FeatureEnabled(WslaFeatureFlagsEarlyBootDmesg))
-    {
-        kernelCmdLine += L" earlycon=uart8250,io,0x3f8,115200";
-        vmSettings.Devices.ComPorts["0"] = hcs::ComPort{m_dmesgCollector->EarlyConsoleName()};
-    }
-
-    // The primary "console" will be a virtio serial device.
-    if (helpers::IsVirtioSerialConsoleSupported())
-    {
-        kernelCmdLine += L" console=hvc0 debug";
-        vmSettings.Devices.VirtioSerial.emplace();
-        hcs::VirtioSerialPort virtioPort{};
-        virtioPort.Name = L"hvc0";
-        virtioPort.NamedPipe = m_dmesgCollector->VirtioConsoleName();
-        virtioPort.ConsoleSupport = true;
-        vmSettings.Devices.VirtioSerial->Ports["0"] = std::move(virtioPort);
-    }
-
-    // Set up boot params.
-    //
-    // N.B. Linux kernel direct boot is not yet supported on ARM64.
-
-    auto basePath = wslutil::GetBasePath();
-
-#ifdef WSL_KERNEL_PATH
-
-    auto kernelPath = std::filesystem::path(WSL_KERNEL_PATH);
-
-#else
-
-    auto kernelPath = std::filesystem::path(basePath) / L"tools" / LXSS_VM_MODE_KERNEL_NAME;
-
-#endif
-
-    if constexpr (!wsl::shared::Arm64)
-    {
-        vmSettings.Chipset.LinuxKernelDirect.emplace();
-        vmSettings.Chipset.LinuxKernelDirect->KernelFilePath = kernelPath.wstring();
-        vmSettings.Chipset.LinuxKernelDirect->InitRdPath = (basePath / L"tools" / LXSS_VM_MODE_INITRD_NAME).c_str();
-        vmSettings.Chipset.LinuxKernelDirect->KernelCmdLine = kernelCmdLine;
-    }
-    else
-    {
-        auto bootThis = hcs::UefiBootEntry{};
-        bootThis.DeviceType = hcs::UefiBootDevice::VmbFs;
-        bootThis.VmbFsRootPath = (basePath / L"tools").c_str();
-        bootThis.DevicePath = L"\\" LXSS_VM_MODE_KERNEL_NAME;
-        bootThis.OptionalData = kernelCmdLine;
-        hcs::Uefi uefiSettings{};
-        uefiSettings.BootThis = std::move(bootThis);
-        vmSettings.Chipset.Uefi = std::move(uefiSettings);
-    }
-
-#ifdef WSL_KERNEL_MODULES_PATH
-
-    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
-
-#else
-
-    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
-
-#endif
-
-    // Initialize the boot VHDs.
-    std::variant<ULONG, std::string> rootVhd;
-    std::variant<ULONG, std::string> modulesVhd;
-    hcs::Scsi scsiController{};
-    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
-    {
-        ULONG nextLun = 0;
-        auto attachScsiDisk = [&](PCWSTR path) {
-            auto lun = nextLun;
-            nextLun += 1;
-            hcs::Attachment disk{};
-            disk.Type = hcs::AttachmentType::VirtualDisk;
-            disk.Path = path;
-            disk.ReadOnly = true;
-            disk.SupportCompressedVolumes = true;
-            disk.AlwaysAllowSparseFiles = true;
-            disk.SupportEncryptedFiles = true;
-            scsiController.Attachments[std::to_string(lun)] = std::move(disk);
-            AttachedDisk attachedDisk{path};
-            m_attachedDisks.emplace(lun, std::move(attachedDisk));
-            return lun;
-        };
-
-        rootVhd = attachScsiDisk(m_settings.RootVhd.c_str());
-        modulesVhd = attachScsiDisk(kernelModulesPath.c_str());
-    }
-    else
-    {
-        hcs::VirtualPMemController pmemController{};
-        pmemController.Backing = hcs::VirtualPMemBackingType::Virtual;
-        ULONG nextDeviceId = 0;
-        auto attachPmemDisk = [&](PCWSTR path) {
-            auto deviceId = nextDeviceId;
-            nextDeviceId += 1;
-            hcs::VirtualPMemDevice vhd{};
-            vhd.HostPath = path;
-            vhd.ReadOnly = true;
-            vhd.ImageFormat = hcs::VirtualPMemImageFormat::Vhd1;
-            pmemController.Devices[std::to_string(deviceId)] = std::move(vhd);
-            return std::format("/dev/pmem{}", deviceId);
-        };
-
-        rootVhd = attachPmemDisk(m_settings.RootVhd.c_str());
-        modulesVhd = attachPmemDisk(kernelModulesPath.c_str());
-        vmSettings.Devices.VirtualPMem = std::move(pmemController);
-    }
-
-    // Initialize the SCSI controller.
-    vmSettings.Devices.Scsi["0"] = std::move(scsiController);
-
-    // Construct a security descriptor that allows system and the current user.
-    wil::unique_hlocal_string userSidString;
-    THROW_LAST_ERROR_IF(!ConvertSidToStringSidW(m_userSid, &userSidString));
-
-    std::wstring securityDescriptor = std::format(L"D:P(A;;FA;;;SY)(A;;FA;;;{})", userSidString.get());
-    hcs::HvSocket hvSocketConfig{};
-    hvSocketConfig.HvSocketConfig.DefaultBindSecurityDescriptor = securityDescriptor;
-    hvSocketConfig.HvSocketConfig.DefaultConnectSecurityDescriptor = securityDescriptor;
-    vmSettings.Devices.HvSocket = std::move(hvSocketConfig);
-
-    // Enable .vmrs dump collection if supported.
-    if (wsl::windows::common::helpers::IsWindows11OrAbove())
-    {
-        CreateVmSavedStateFile();
-        WI_ASSERT(!m_vmSavedStateFile.empty());
-
-        hcs::DebugOptions debugOptions{};
-        debugOptions.BugcheckSavedStateFileName = m_vmSavedStateFile;
-        vmSettings.DebugOptions = std::move(debugOptions);
-    }
-
-    systemSettings.VirtualMachine = std::move(vmSettings);
-    auto json = wsl::shared::ToJsonW(systemSettings);
-
-    WSL_LOG("CreateWSLAVirtualMachine", TraceLoggingValue(json.c_str(), "json"));
-
-    m_computeSystem = hcs::CreateComputeSystem(m_vmIdString.c_str(), json.c_str());
-
-    auto runtimeId = wsl::windows::common::hcs::GetRuntimeId(m_computeSystem.get());
-    WI_ASSERT(IsEqualGUID(m_vmId, runtimeId));
-
-    // Initialize DeviceHostProxy for virtio device support.
-    if (FeatureEnabled(WslaFeatureFlagsVirtioFs) || m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy)
-    {
-        m_guestDeviceManager = std::make_shared<GuestDeviceManager>(m_vmIdString, m_vmId);
-    }
-
-    wsl::windows::common::hcs::RegisterCallback(m_computeSystem.get(), &s_OnExit, this);
-
-    wsl::windows::common::hcs::StartComputeSystem(m_computeSystem.get(), json.c_str());
-    m_running = true;
-
-    // Create a socket listening for crash dumps.
-    auto crashDumpSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
-    THROW_LAST_ERROR_IF(!crashDumpSocket);
-
-    m_crashDumpCollectionThread =
-        std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
-
-    // Create a socket listening for connections from mini_init.
-    auto listenSocket = wsl::windows::common::hvsocket::Listen(runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
-    auto socket =
-        wsl::windows::common::hvsocket::CancellableAccept(listenSocket.get(), m_settings.BootTimeoutMs, m_vmTerminatingEvent.get());
-    THROW_HR_IF(E_FAIL, !socket.has_value());
-
-    m_initChannel = wsl::shared::SocketChannel{std::move(socket.value()), "mini_init", m_vmTerminatingEvent.get()};
+    m_initChannel = wsl::shared::SocketChannel{std::move(socket), "mini_init", m_vmTerminatingEvent.get()};
 
     // Create a thread to watch for exited processes.
     auto [__, ___, childChannel] = Fork(WSLA_FORK::Thread);
@@ -389,72 +55,168 @@ void WSLAVirtualMachine::Start()
     childChannel.SendMessage(watchMessage);
 
     THROW_HR_IF(E_FAIL, childChannel.ReceiveMessage<RESULT_MESSAGE<uint32_t>>().Result != 0);
+
     m_processExitThread = std::thread(std::bind(&WSLAVirtualMachine::WatchForExitedProcesses, this, std::move(childChannel)));
 
+    // Configure networking
     ConfigureNetworking();
 
-    // Configure mounts.
-    auto getDevicePath = [&](std::variant<ULONG, std::string>& vhd) -> const std::string& {
-        // If the variant holds the SCSI LUN, query the guest for the device path.
-        if (std::holds_alternative<ULONG>(vhd))
-        {
-            const auto lun = std::get<ULONG>(vhd);
-            auto it = m_attachedDisks.find(lun);
-            WI_ASSERT(it != m_attachedDisks.end() && it->second.Device.empty());
+    // Configure initial mounts
+    ConfigureInitialMounts();
 
-            it->second.Device = GetVhdDevicePath(lun);
-            vhd = it->second.Device;
-        }
-
-        return std::get<std::string>(vhd);
-    };
-
-    Mount(m_initChannel, getDevicePath(rootVhd).c_str(), "/mnt", m_settings.RootVhdType.c_str(), "ro", WSLAMountFlagsChroot | WSLAMountFlagsWriteableOverlayFs);
-    Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
-    Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
-    Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
-    Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
-    Mount(m_initChannel, getDevicePath(modulesVhd).c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
-    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
-
-    // Configure GPU if requested.
-    if (FeatureEnabled(WslaFeatureFlagsGPU))
-    {
-        hcs::ModifySettingRequest<hcs::GpuConfiguration> gpuRequest{};
-        gpuRequest.ResourcePath = L"VirtualMachine/ComputeTopology/Gpu";
-        gpuRequest.RequestType = hcs::ModifyRequestType::Update;
-        gpuRequest.Settings.AssignmentMode = hcs::GpuAssignmentMode::Mirror;
-        gpuRequest.Settings.AllowVendorExtension = true;
-        if (wsl::windows::common::helpers::IsDisableVgpuSettingsSupported())
-        {
-            gpuRequest.Settings.DisableGdiAcceleration = true;
-            gpuRequest.Settings.DisablePresentation = true;
-        }
-
-        wsl::windows::common::hcs::ModifyComputeSystem(m_computeSystem.get(), wsl::shared::ToJsonW(gpuRequest).c_str());
-        MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
-    }
+    // Configure GPU mounts if enabled
+    MountGpuLibraries("/usr/lib/wsl/lib", "/usr/lib/wsl/drivers");
 
     // Configure cold discard hint size for page reporting.
     // This sets the minimum order of pages that will be reported as free to the hypervisor.
     {
-        auto cmdStr = std::format("echo {} > /sys/module/page_reporting/parameters/page_reporting_order", m_coldDiscardShiftSize);
+        const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+        int pageReportingOrder = (windowsVersion.BuildNumber >= wsl::windows::common::helpers::WindowsBuildNumbers::Germanium) ? 5 : 9; // 128k or 2MB
+        auto cmdStr = std::format("echo {} > /sys/module/page_reporting/parameters/page_reporting_order", pageReportingOrder);
         std::vector<const char*> args{"/bin/sh", "-c", cmdStr.c_str()};
 
-        WSLA_PROCESS_OPTIONS options{};
-        options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
-        CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
+        auto [_, __, channel] = Fork(m_initChannel, WSLA_FORK::Process);
+
+        wsl::shared::MessageWriter<WSLA_EXEC> execMessage;
+        execMessage.WriteString(execMessage->ExecutableIndex, "/bin/sh");
+        execMessage.WriteString(execMessage->CurrentDirectoryIndex, "/");
+        execMessage.WriteStringArray(execMessage->CommandLineIndex, args.data(), static_cast<ULONG>(args.size()));
+        execMessage.WriteStringArray(execMessage->EnvironmentIndex, nullptr, 0);
+
+        channel.SendMessage<WSLA_EXEC>(execMessage.Span());
+        ExpectClosedChannelOrError(channel);
     }
+}
+
+WSLAVirtualMachine::~WSLAVirtualMachine()
+{
+    WSL_LOG("WSLATerminateVmStart");
+
+    m_vmTerminatingEvent.SetEvent();
+
+    m_initChannel.Close();
+
+    // Terminate the VM.
+    m_vm.reset();
+
+    if (m_processExitThread.joinable())
+    {
+        m_processExitThread.join();
+    }
+
+    // Clear the state of all remaining processes now that the VM has exited.
+    for (auto& e : m_trackedProcesses)
+    {
+        e->OnVmTerminated();
+    }
+}
+
+void WSLAVirtualMachine::ConfigureInitialMounts()
+{
+    // Get paths for root and modules VHDs
+    auto basePath = wslutil::GetBasePath();
+
+#ifdef WSL_KERNEL_MODULES_PATH
+    auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
+#else
+    auto kernelModulesPath = basePath / L"tools" / L"modules.vhd";
+#endif
+
+    // Determine device paths based on whether pmem VHDs are used
+    std::string rootDevice;
+    std::string modulesDevice;
+
+    if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
+    {
+        // SCSI attached disks - query device paths from guest
+        rootDevice = GetVhdDevicePath(0);
+        modulesDevice = GetVhdDevicePath(1);
+    }
+    else
+    {
+        // PMEM devices - use known device paths
+        rootDevice = "/dev/pmem0";
+        modulesDevice = "/dev/pmem1";
+    }
+
+    // Mount root filesystem with overlay
+    Mount(m_initChannel, rootDevice.c_str(), "/mnt", m_rootVhdType.c_str(), "ro", WSLA_MOUNT::Chroot | WSLA_MOUNT::OverlayFs);
+
+    // Mount standard filesystems
+    Mount(m_initChannel, nullptr, "/dev", "devtmpfs", "", 0);
+    Mount(m_initChannel, nullptr, "/sys", "sysfs", "", 0);
+    Mount(m_initChannel, nullptr, "/proc", "proc", "", 0);
+    Mount(m_initChannel, nullptr, "/dev/pts", "devpts", "noatime,nosuid,noexec,gid=5,mode=620", 0);
+
+    // Mount kernel modules
+    Mount(m_initChannel, modulesDevice.c_str(), "", "ext4", "ro", WSLA_MOUNT::KernelModules);
+
+    // Mount cgroup
+    Mount(m_initChannel, nullptr, "/sys/fs/cgroup", "cgroup2", "", 0);
+}
+
+void WSLAVirtualMachine::ConfigureNetworking()
+{
+    if (m_networkingMode == WSLANetworkingModeNone)
+    {
+        return;
+    }
+
+    // Fork to launch /gns
+    auto [pid, _, gnsChannel] = Fork(m_initChannel, WSLA_FORK::Process);
+
+    // Allocate sockets for GNS channel (and DNS channel if enabled)
+    auto gnsSocket = ConnectSocket(gnsChannel, -1);
+
+    ConnectedSocket dnsSocket;
+    bool enableDnsTunneling = FeatureEnabled(WslaFeatureFlagsDnsTunneling);
+    if (enableDnsTunneling)
+    {
+        dnsSocket = ConnectSocket(gnsChannel, -1);
+    }
+
+    // Build command line for /gns
+    std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
+    std::string gnsSocketFdArg = std::to_string(gnsSocket.Fd);
+    cmd.push_back(gnsSocketFdArg.c_str());
+
+    std::string dnsSocketFdArg;
+    if (enableDnsTunneling)
+    {
+        dnsSocketFdArg = std::to_string(dnsSocket.Fd);
+        cmd.push_back(LX_INIT_GNS_DNS_SOCKET_ARG);
+        cmd.push_back(dnsSocketFdArg.c_str());
+        cmd.push_back(LX_INIT_GNS_DNS_TUNNELING_IP);
+        cmd.push_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
+    }
+
+    // Send WSLA_EXEC to launch /gns via /init
+    wsl::shared::MessageWriter<WSLA_EXEC> execMessage;
+    execMessage.WriteString(execMessage->ExecutableIndex, "/init");
+    execMessage.WriteString(execMessage->CurrentDirectoryIndex, "/");
+    execMessage.WriteStringArray(execMessage->CommandLineIndex, cmd.data(), static_cast<ULONG>(cmd.size()));
+    execMessage.WriteStringArray(execMessage->EnvironmentIndex, nullptr, 0);
+
+    gnsChannel.SendMessage<WSLA_EXEC>(execMessage.Span());
+
+    // Wait for exec to complete - on success the channel closes, on failure we get an error
+    auto execResult = ExpectClosedChannelOrError(gnsChannel);
+    THROW_HR_IF_MSG(E_FAIL, execResult != 0, "exec /gns failed with errno: %d", execResult);
+
+    // Call back to the service to configure the networking engine
+    // The service takes ownership of the sockets via system_handle marshalling
+    HANDLE gnsSocketHandle = reinterpret_cast<HANDLE>(gnsSocket.Socket.release());
+    HANDLE dnsSocketHandle = enableDnsTunneling ? reinterpret_cast<HANDLE>(dnsSocket.Socket.release()) : nullptr;
+    HANDLE* dnsSocketPtr = enableDnsTunneling ? &dnsSocketHandle : nullptr;
+    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsSocketHandle, dnsSocketPtr));
+
+    // Launch port relay for port forwarding
+    LaunchPortRelay();
 }
 
 bool WSLAVirtualMachine::FeatureEnabled(WSLAFeatureFlags Value) const
 {
-    return static_cast<ULONG>(m_settings.FeatureFlags) & static_cast<ULONG>(Value);
-}
-
-const wil::unique_event& WSLAVirtualMachine::TerminatingEvent()
-{
-    return m_vmTerminatingEvent;
+    return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
 }
 
 void WSLAVirtualMachine::WatchForExitedProcesses(wsl::shared::SocketChannel& Channel)
@@ -500,240 +262,25 @@ try
 }
 CATCH_LOG();
 
-void WSLAVirtualMachine::ConfigureNetworking()
-{
-    switch (m_settings.NetworkingMode)
-    {
-    case WSLANetworkingModeNone:
-        return;
-    case WSLANetworkingModeNAT:
-    case WSLANetworkingModeVirtioProxy:
-        break;
-    default:
-        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %lu", m_settings.NetworkingMode);
-    }
-
-    // Launch GNS
-    std::vector<WSLAProcessFd> fds(1);
-    fds[0].Fd = -1;
-    fds[0].Type = WSLAFdType::WSLAFdTypeDefault;
-
-    std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
-
-    // If DNS tunnelling is enabled, use an additional for its channel.
-    if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
-    {
-        THROW_HR_IF_MSG(
-            E_NOTIMPL, m_settings.NetworkingMode == WSLANetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
-
-        fds.emplace_back(WSLAProcessFd{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
-        THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
-    }
-
-    WSLA_PROCESS_OPTIONS options{};
-
-    // Because the file descriptors numbers aren't known in advance, the command line needs to be generated after the file
-    // descriptors are allocated.
-    std::string socketFdArg;
-    std::string dnsFdArg;
-    int gnsChannelFd = -1;
-    int dnsChannelFd = -1;
-    auto prepareCommandLine = [&](const auto& sockets) {
-        gnsChannelFd = sockets[0].Fd;
-        socketFdArg = std::to_string(gnsChannelFd);
-        cmd.emplace_back(socketFdArg.c_str());
-
-        if (sockets.size() > 1)
-        {
-            dnsChannelFd = sockets[1].Fd;
-            dnsFdArg = std::to_string(dnsChannelFd);
-            cmd.emplace_back(LX_INIT_GNS_DNS_SOCKET_ARG);
-            cmd.emplace_back(dnsFdArg.c_str());
-            cmd.emplace_back(LX_INIT_GNS_DNS_TUNNELING_IP);
-            cmd.emplace_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
-        }
-
-        options.CommandLine = {.Values = cmd.data(), .Count = static_cast<ULONG>(cmd.size())};
-    };
-
-    auto process = CreateLinuxProcessImpl("/init", options, fds, nullptr, prepareCommandLine);
-    auto gnsChannel = wsl::core::GnsChannel(wil::unique_socket{(SOCKET)process->GetStdHandle(gnsChannelFd).release()});
-
-    if (m_settings.NetworkingMode == WSLANetworkingModeNAT)
-    {
-        // TODO: refactor this to avoid using wsl config
-        wsl::core::Config config(nullptr);
-
-        // Disable HyperV Firewall if not supported
-        if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(config))
-        {
-            config.FirewallConfig.reset();
-        }
-
-        m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
-            m_computeSystem.get(),
-            wsl::core::NatNetworking::CreateNetwork(config),
-            std::move(gnsChannel),
-            config,
-            dnsChannelFd != -1 ? wil::unique_socket{(SOCKET)process->GetStdHandle(dnsChannelFd).release()} : wil::unique_socket{},
-            nullptr);
-    }
-    else
-    {
-        m_networkEngine =
-            std::make_unique<wsl::core::VirtioNetworking>(std::move(gnsChannel), false, nullptr, m_guestDeviceManager, m_userToken);
-    }
-
-    m_networkEngine->Initialize();
-
-    LaunchPortRelay();
-}
-
-void CALLBACK WSLAVirtualMachine::s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context)
-try
-{
-    if (Event->Type == HcsEventSystemExited)
-    {
-        reinterpret_cast<WSLAVirtualMachine*>(Context)->OnExit(Event);
-    }
-    if (Event->Type == HcsEventSystemCrashInitiated || Event->Type == HcsEventSystemCrashReport)
-    {
-        reinterpret_cast<WSLAVirtualMachine*>(Context)->OnCrash(Event);
-    }
-}
-CATCH_LOG()
-
-void WSLAVirtualMachine::OnExit(_In_ const HCS_EVENT* Event)
-{
-    WSL_LOG(
-        "WSLAVmExited", TraceLoggingValue(Event->EventData, "details"), TraceLoggingValue(static_cast<int>(Event->Type), "type"));
-
-    m_vmExitEvent.SetEvent();
-
-    const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
-
-    auto reason = WSLAlVirtualMachineTerminationReasonUnknown;
-
-    if (exitStatus.ExitType.has_value())
-    {
-        switch (exitStatus.ExitType.value())
-        {
-        case hcs::NotificationType::ForcedExit:
-        case hcs::NotificationType::GracefulExit:
-            reason = WSLAVirtualMachineTerminationReasonShutdown;
-            break;
-        case hcs::NotificationType::UnexpectedExit:
-            reason = WSLAVirtualMachineTerminationReasonCrashed;
-            break;
-        default:
-            reason = WSLAlVirtualMachineTerminationReasonUnknown;
-            break;
-        }
-    }
-
-    if (m_terminationCallback)
-    {
-        LOG_IF_FAILED(m_terminationCallback->OnTermination(reason, Event->EventData));
-    }
-}
-
-void WSLAVirtualMachine::OnCrash(_In_ const HCS_EVENT* Event)
-{
-    WSL_LOG(
-        "WSLAGuestCrash",
-        TraceLoggingValue(Event->EventData, "details"),
-        TraceLoggingValue(static_cast<int>(Event->Type), "type"));
-
-    if (m_crashLogCaptured && m_vmSavedStateCaptured)
-    {
-        return;
-    }
-
-    const auto crashReport = wsl::shared::FromJson<wsl::windows::common::hcs::CrashReport>(Event->EventData);
-
-    if (crashReport.GuestCrashSaveInfo.has_value() && crashReport.GuestCrashSaveInfo->SaveStateFile.has_value())
-    {
-        m_vmSavedStateCaptured = true;
-        EnforceVmSavedStateFileLimit();
-    }
-
-    if (!m_crashLogCaptured && !crashReport.CrashLog.empty())
-    {
-        WriteCrashLog(crashReport.CrashLog);
-    }
-}
-
 std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly)
 {
     ULONG Lun{};
     std::string Device;
 
-    auto result = wil::ResultFromException([&]() {
-        std::lock_guard lock{m_lock};
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
+    // Delegate to IWSLAVirtualMachine for the privileged HCS operation
+    THROW_IF_FAILED(m_vm->AttachDisk(Path, ReadOnly, &Lun));
 
-        AttachedDisk disk{Path};
-
-        auto grantDiskAccess = [&]() {
-            auto runAsUser = wil::impersonate_token(m_userToken.get());
-            wsl::windows::common::hcs::GrantVmAccess(m_vmIdString.c_str(), Path);
-            disk.AccessGranted = true;
-        };
-
-        if (!ReadOnly)
-        {
-            grantDiskAccess();
-        }
-
-        while (m_attachedDisks.find(Lun) != m_attachedDisks.end())
-        {
-            Lun++;
-        }
-
-        bool vhdAdded = false;
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            if (vhdAdded)
-            {
-                wsl::windows::common::hcs::RemoveScsiDisk(m_computeSystem.get(), Lun);
-            }
-
-            if (disk.AccessGranted)
-            {
-                wsl::windows::common::hcs::RevokeVmAccess(m_vmIdString.c_str(), Path);
-            }
-        });
-
-        auto result =
-            wil::ResultFromException([&]() { wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, Lun, ReadOnly); });
-
-        if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && !disk.AccessGranted)
-        {
-            grantDiskAccess();
-            wsl::windows::common::hcs::AddVhd(m_computeSystem.get(), Path, Lun, ReadOnly);
-        }
-        else
-        {
-            THROW_IF_FAILED(result);
-        }
-
-        vhdAdded = true;
-
-        const auto devicePath = GetVhdDevicePath(Lun);
-        cleanup.release();
-
-        disk.Device = std::move(devicePath);
-        Device = disk.Device;
-        m_attachedDisks.emplace(Lun, std::move(disk));
-    });
+    // Query the guest for the device path
+    Device = GetVhdDevicePath(Lun);
 
     WSL_LOG(
         "WSLAAttachDisk",
         TraceLoggingValue(Path, "Path"),
         TraceLoggingValue(ReadOnly, "ReadOnly"),
         TraceLoggingValue(Device.c_str(), "Device"),
-        TraceLoggingValue(result, "Result"));
+        TraceLoggingValue(Lun, "Lun"));
 
-    THROW_IF_FAILED(result);
+    m_attachedDisks.emplace(Lun, AttachedDisk{Path, Device});
 
     return {Lun, Device};
 }
@@ -771,7 +318,7 @@ void WSLAVirtualMachine::DetachDisk(_In_ ULONG Lun)
     // Remove it from the VM
     m_attachedDisks.erase(it);
 
-    hcs::RemoveScsiDisk(m_computeSystem.get(), Lun);
+    THROW_IF_FAILED(m_vm->DetachDisk(Lun));
 }
 
 std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(enum WSLA_FORK::ForkType Type)
@@ -787,8 +334,6 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
     int32_t pid{};
     int32_t ptyMaster{};
     {
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
-
         WSLA_FORK message;
         message.ForkType = Type;
         message.TtyColumns = static_cast<uint16_t>(TtyColumns);
@@ -801,7 +346,7 @@ std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::For
 
     THROW_HR_IF_MSG(E_FAIL, pid <= 0, "fork() returned %i", pid);
 
-    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmExitEvent.get(), m_settings.BootTimeoutMs);
+    auto socket = wsl::windows::common::hvsocket::Connect(m_vmId, port, m_vmTerminatingEvent.get(), m_bootTimeoutMs);
 
     return std::make_tuple(pid, ptyMaster, wsl::shared::SocketChannel{std::move(socket), std::to_string(pid), m_vmTerminatingEvent.get()});
 }
@@ -1039,7 +584,6 @@ int32_t WSLAVirtualMachine::ExpectClosedChannelOrError(wsl::shared::SocketChanne
 void WSLAVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
 {
     std::lock_guard lock(m_lock);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_running);
 
     WSLA_SIGNAL message;
     message.Pid = Pid;
@@ -1047,16 +591,6 @@ void WSLAVirtualMachine::Signal(_In_ LONG Pid, _In_ int Signal)
     const auto& response = m_initChannel.Transaction(message);
 
     THROW_HR_IF(E_FAIL, response.Result != 0);
-}
-
-void WSLAVirtualMachine::RegisterCallback(ITerminationCallback* callback)
-{
-    std::lock_guard lock(m_lock);
-
-    THROW_HR_IF(E_INVALIDARG, m_terminationCallback);
-
-    // N.B. this calls AddRef() on the callback
-    m_terminationCallback = callback;
 }
 
 void WSLAVirtualMachine::LaunchPortRelay()
@@ -1073,12 +607,13 @@ void WSLAVirtualMachine::LaunchPortRelay()
     THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&readPipe, &m_portRelayChannelWrite, nullptr, 0));
     THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&m_portRelayChannelRead, &writePipe, nullptr, 0));
 
+    // TODO: move the port relay infra into this process. Create a thread, pass handle ownership to thread, refactor and remove
+    // wslrelaymode. wsl::windows::wslrelay::localhost::RunWSLAPortRelay(
+    //     readPipe.release(), writePipe.release(), m_vmId, relayPort.Result, m_vmTerminatingEvent.get());
+
     wsl::windows::common::helpers::SetHandleInheritable(readPipe.get());
     wsl::windows::common::helpers::SetHandleInheritable(writePipe.get());
-    wsl::windows::common::helpers::SetHandleInheritable(m_vmExitEvent.get());
-
-    // Create a restricted token.
-    auto restrictedToken = wsl::windows::common::security::CreateRestrictedToken(m_userToken.get());
+    wsl::windows::common::helpers::SetHandleInheritable(m_vmTerminatingEvent.get());
 
     auto path = wsl::windows::common::wslutil::GetBasePath() / L"wslrelay.exe";
 
@@ -1088,7 +623,7 @@ void WSLAVirtualMachine::LaunchPortRelay()
         wslrelay::mode_option,
         static_cast<int>(wslrelay::RelayMode::WSLAPortRelay),
         wslrelay::exit_event_option,
-        HandleToUlong(m_vmExitEvent.get()),
+        HandleToUlong(m_vmTerminatingEvent.get()),
         wslrelay::port_option,
         relayPort.Result,
         wslrelay::vm_id_option,
@@ -1098,7 +633,6 @@ void WSLAVirtualMachine::LaunchPortRelay()
 
     wsl::windows::common::SubProcess process{nullptr, cmd.c_str()};
     process.SetStdHandles(readPipe.get(), writePipe.get(), nullptr);
-    process.SetToken(restrictedToken.get());
     process.Start();
 
     readPipe.release();
@@ -1152,45 +686,17 @@ try
         HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND), !std::filesystem::is_directory(path), "Path is not a directory: '%ls'", WindowsPath);
 
     GUID shareGuid{};
-    THROW_IF_FAILED(CoCreateGuid(&shareGuid));
-
-    auto shareName = shared::string::GuidToString<wchar_t>(shareGuid, shared::string::None);
-
-    std::optional<GUID> instanceId;
     {
-        // Create the share on the host.
         std::lock_guard lock(m_lock);
 
         // Verify that this folder isn't already mounted.
         auto it = m_mountedWindowsFolders.find(LinuxPath);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
 
-        if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
-        {
-            auto flags = hcs::Plan9ShareFlags::AllowOptions;
-            WI_SetFlagIf(flags, hcs::Plan9ShareFlags::ReadOnly, WI_IsFlagSet(Flags, WSLAMountFlagsReadOnly));
-            hcs::AddPlan9Share(
-                m_computeSystem.get(),
-                shareName.c_str(),
-                shareName.c_str(),
-                WindowsPath,
-                LX_INIT_UTILITY_VM_PLAN9_PORT,
-                flags,
-                m_userToken.get());
-        }
-        else
-        {
-            instanceId = m_guestDeviceManager->AddGuestDevice(
-                VIRTIO_FS_DEVICE_ID,
-                m_virtioFsClassId,
-                shareName.c_str(),
-                L"",
-                WindowsPath,
-                VIRTIO_FS_FLAGS_TYPE_FILES,
-                m_userToken.get());
-        }
+        // Delegate to IWSLAVirtualMachine for the privileged share creation
+        THROW_IF_FAILED(m_vm->AddShare(WindowsPath, WI_IsFlagSet(Flags, WSLAMountFlagsReadOnly), &shareGuid));
 
-        m_mountedWindowsFolders.emplace(LinuxPath, MountedFolderInfo{shareName, instanceId});
+        m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
     }
 
     auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -1198,14 +704,13 @@ try
         auto mountIt = m_mountedWindowsFolders.find(LinuxPath);
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
-            auto mountInfo = mountIt->second;
             m_mountedWindowsFolders.erase(mountIt);
-            RemoveShare(mountInfo);
+            LOG_IF_FAILED(m_vm->RemoveShare(shareGuid));
         }
     });
 
     // Create the guest mount
-    auto shareNameUtf8 = shared::string::WideToMultiByte(shareName);
+    auto shareName = shared::string::GuidToString<char>(shareGuid, shared::string::None);
     if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
     {
         auto [_, __, channel] = Fork(WSLA_FORK::Process);
@@ -1222,14 +727,14 @@ try
             LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE,
             fd,
             fd,
-            shareNameUtf8);
+            shareName);
 
-        Mount(channel, shareNameUtf8.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags);
+        Mount(channel, shareName.c_str(), LinuxPath, "9p", mountOptions.c_str(), Flags);
     }
     else
     {
         std::string options = WI_IsFlagSet(Flags, WSLAMountFlagsReadOnly) ? "ro" : "rw";
-        Mount(m_initChannel, shareNameUtf8.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
+        Mount(m_initChannel, shareName.c_str(), LinuxPath, "virtiofs", options.c_str(), Flags);
     }
 
     deleteOnFailure.release();
@@ -1237,19 +742,6 @@ try
     return S_OK;
 }
 CATCH_RETURN();
-
-void WSLAVirtualMachine::RemoveShare(_In_ const MountedFolderInfo& MountInfo)
-{
-    if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
-    {
-        WI_ASSERT(!MountInfo.InstanceId.has_value());
-        hcs::RemovePlan9Share(m_computeSystem.get(), MountInfo.ShareName.c_str(), LX_INIT_UTILITY_VM_PLAN9_PORT);
-    }
-    else if (WI_VERIFY(MountInfo.InstanceId.has_value()))
-    {
-        m_guestDeviceManager->RemoveGuestDevice(VIRTIO_FS_DEVICE_ID, MountInfo.InstanceId.value());
-    }
-}
 
 HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 {
@@ -1259,22 +751,25 @@ HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
     auto it = m_mountedWindowsFolders.find(LinuxPath);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), it == m_mountedWindowsFolders.end());
 
-    // Unmount the folder from the guest. If the mount is not found, this most likely means that the guest unmounted it.
+    // Unmount the folder from the guest.
     auto result = wil::ResultFromException([&]() { Unmount(LinuxPath); });
     THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
-    auto mountInfo = it->second;
+    auto shareId = it->second;
     m_mountedWindowsFolders.erase(it);
 
-    // Remove the share from the host
-    RemoveShare(mountInfo);
+    // Delegate to IWSLAVirtualMachine for the privileged share removal
+    THROW_IF_FAILED(m_vm->RemoveShare(shareId));
 
     return S_OK;
 }
 
 void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_CONFIG_VALUE), !FeatureEnabled(WslaFeatureFlagsGPU));
+    if (!FeatureEnabled(WslaFeatureFlagsGPU))
+    {
+        return;
+    }
 
     auto windowsPath = wil::GetWindowsDirectoryW<std::wstring>();
 
@@ -1292,7 +787,6 @@ void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
     }
 
     // Mount the packaged libraries.
-
 #ifdef WSL_GPU_LIB_PATH
 
     auto packagedLibPath = std::filesystem::path(TEXT(WSL_GPU_LIB_PATH));
@@ -1316,142 +810,11 @@ void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_
     Mount(m_initChannel, "none", LibrariesMountPoint, "overlay", options.c_str(), 0);
 }
 
-std::filesystem::path WSLAVirtualMachine::GetCrashDumpFolder()
-{
-    auto tempPath = wsl::windows::common::filesystem::GetTempFolderPath(m_userToken.get());
-    return tempPath / L"wsla-crashes";
-}
-
-void WSLAVirtualMachine::CreateVmSavedStateFile()
-{
-    auto runAsUser = wil::impersonate_token(m_userToken.get());
-
-    const auto filename = std::format(L"{}{}-{}{}", SAVED_STATE_FILE_PREFIX, std::time(nullptr), m_vmIdString, SAVED_STATE_FILE_EXTENSION);
-
-    auto savedStateFile = m_crashDumpFolder / filename;
-
-    wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
-
-    wil::unique_handle file{CreateFileW(savedStateFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
-    THROW_LAST_ERROR_IF(!file);
-
-    hcs::GrantVmAccess(m_vmIdString.c_str(), savedStateFile.c_str());
-    m_vmSavedStateFile = savedStateFile;
-}
-
-void wsl::windows::service::wsla::WSLAVirtualMachine::EnforceVmSavedStateFileLimit()
-{
-    auto pred = [](const auto& e) {
-        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
-               e.path().extension() == SAVED_STATE_FILE_EXTENSION && e.path().has_filename() &&
-               e.path().filename().wstring().find(SAVED_STATE_FILE_PREFIX) == 0 && e.file_size() > 0;
-    };
-
-    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES + 1, pred);
-}
-
-void WSLAVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
-{
-    auto runAsUser = wil::impersonate_token(m_userToken.get());
-
-    constexpr auto c_extension = L".txt";
-    constexpr auto c_prefix = L"kernel-panic-";
-    const auto filename = std::format(L"{}{}-{}{}", c_prefix, std::time(nullptr), m_vmIdString, c_extension);
-    auto filePath = m_crashDumpFolder / filename;
-
-    WI_ASSERT(std::filesystem::exists(m_crashDumpFolder));
-    WI_ASSERT(std::filesystem::is_directory(m_crashDumpFolder));
-
-    auto pred = [&c_extension, &c_prefix](const auto& e) {
-        return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
-               e.path().extension() == c_extension && e.path().has_filename() && e.path().filename().wstring().find(c_prefix) == 0;
-    };
-
-    wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_VM_CRASH_FILES, pred);
-
-    {
-        std::wofstream outputFile(filePath.wstring());
-        THROW_HR_IF(E_UNEXPECTED, !outputFile.is_open());
-
-        outputFile << crashLog;
-        THROW_HR_IF(E_UNEXPECTED, outputFile.fail());
-    }
-
-    THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
-    m_crashLogCaptured = true;
-}
-
 void WSLAVirtualMachine::OnProcessReleased(int Pid)
 {
     std::lock_guard lock{m_trackedProcessesLock};
 
-    auto erased = std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
-}
-
-void WSLAVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket) const
-{
-    wsl::windows::common::wslutil::SetThreadDescription(L"CrashDumpCollection");
-
-    while (!m_vmExitEvent.is_signaled())
-    {
-        try
-        {
-            auto socket = wsl::windows::common::hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmExitEvent.get());
-            if (!socket)
-            {
-                // VM is exiting.
-                break;
-            }
-
-            THROW_LAST_ERROR_IF(
-                setsockopt(listenSocket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&RECEIVE_TIMEOUT, sizeof(RECEIVE_TIMEOUT)) == SOCKET_ERROR);
-
-            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmExitEvent.get()};
-
-            const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
-            const char* process = reinterpret_cast<const char*>(&message.Buffer);
-
-            constexpr auto dumpExtension = ".dmp";
-            constexpr auto dumpPrefix = "wsl-crash";
-
-            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
-
-            std::replace_if(filename.begin(), filename.end(), [](auto e) { return !std::isalnum(e) && e != '.' && e != '-'; }, '_');
-
-            auto fullPath = m_crashDumpFolder / filename;
-
-            WSL_LOG(
-                "WSLALinuxCrash",
-                TraceLoggingValue(fullPath.c_str(), "FullPath"),
-                TraceLoggingValue(message.Pid, "Pid"),
-                TraceLoggingValue(message.Signal, "Signal"),
-                TraceLoggingValue(process, "process"));
-
-            auto runAsUser = wil::impersonate_token(m_userToken.get());
-            wsl::windows::common::filesystem::EnsureDirectory(m_crashDumpFolder.c_str());
-
-            // Only delete files that:
-            // - have the temporary flag set
-            // - start with 'wsl-crash'
-            // - end in .dmp
-            //
-            // This logic is here to prevent accidental user file deletion
-            auto pred = [&dumpExtension, &dumpPrefix](const auto& e) {
-                return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
-                       e.path().extension() == dumpExtension && e.path().has_filename() &&
-                       e.path().filename().string().find(dumpPrefix) == 0;
-            };
-
-            wsl::windows::common::wslutil::EnforceFileLimit(m_crashDumpFolder.c_str(), MAX_CRASH_DUMPS, pred);
-
-            wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
-            THROW_LAST_ERROR_IF(!file);
-
-            channel.SendResultMessage<std::int32_t>(0);
-            wsl::windows::common::relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
-        }
-        CATCH_LOG();
-    }
+    std::erase_if(m_trackedProcesses, [Pid](const auto* e) { return e->GetPid() == Pid; });
 }
 
 // TODO: Handle reservations per family.

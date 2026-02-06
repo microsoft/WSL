@@ -263,10 +263,12 @@
                     <RegistryValue Value="WSLASessionManager" Type="string" />
                 </RegistryKey>
 
-                <!-- WSLASession -->
-                <RegistryKey Root="HKCR" Key="CLSID\{4877FEFC-4977-4929-A958-9F36AA1892A4}">
-                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
-                    <RegistryValue Value="WSLASession" Type="string" />
+                <!-- WSLASessionFactory - COM server in per-user process -->
+                <RegistryKey Root="HKCR" Key="CLSID\{C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91}">
+                    <RegistryValue Value="WSLASessionFactory" Type="string" />
+                    <RegistryKey Key="LocalServer32">
+                        <RegistryValue Value="&quot;[INSTALLDIR]wslasession.exe&quot;" Type="string" />
+                    </RegistryKey>
                 </RegistryKey>
 
                 <!-- IWSLASessionManager-->
@@ -317,7 +319,32 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLASessionReference-->
+                <RegistryKey Root="HKCR" Key="Interface\{B3A72F48-9D15-4E8A-A621-7C3E84F09B52}">
+                    <RegistryValue Value="IWSLASessionReference" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLASessionFactory-->
+                <RegistryKey Root="HKCR" Key="Interface\{C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91}">
+                    <RegistryValue Value="IWSLASessionFactory" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLAVirtualMachine-->
+                <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
+                    <RegistryValue Value="IWSLAVirtualMachine" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <File Id="wslaservice.exe" Source="${BIN}/wslaservice.exe"  KeyPath="yes" />
+                <File Id="wslasession.exe" Source="${BIN}/wslasession.exe" />
                 <File Id="wslaserviceproxystub.dll" Name="wslaserviceproxystub.dll" Source="${BIN}/wslaserviceproxystub.dll" />
 
                 <ServiceInstall Name="WSLAService" DisplayName="WSLA Service" Description="WSLA Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
