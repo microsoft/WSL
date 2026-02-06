@@ -81,12 +81,21 @@ int ContainerStartCommand::ExecuteInternal(std::wstring_view commandLine, int pa
 int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
     CMD_IF_HELP_PRINT_HELP();
-    auto arguments = Arguments();
-    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
-
+    auto containersToStop = Arguments();
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
-    for (const auto& id : arguments)
+
+    if(m_all)
+    {
+        containersToStop.clear();
+        auto allContainers = containerService.List(session);
+        for(const auto& container : allContainers)
+        {
+            containersToStop.push_back(container.Name);
+        }
+    }
+
+    for (const auto& id : containersToStop)
     {
         containerService.Stop(session, id, m_options);
     }
@@ -96,12 +105,21 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
 int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
     CMD_IF_HELP_PRINT_HELP();
-    auto arguments = Arguments();
-    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
-
+    auto containersToKill = Arguments();
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
-    for (const auto& id : arguments)
+
+    if(m_all)
+    {
+        containersToKill.clear();
+        auto allContainers = containerService.List(session);
+        for(const auto& container : allContainers)
+        {
+            containersToKill.push_back(container.Name);
+        }
+    }
+
+    for (const auto& id : containersToKill)
     {
         containerService.Kill(session, id, m_options.Signal);
     }
@@ -111,11 +129,21 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
 int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
     CMD_IF_HELP_PRINT_HELP();
-    auto arguments = Arguments();
-    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
+    auto containersToDelete = Arguments();
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
-    for (const auto& id : Arguments())
+
+    if(m_all)
+    {
+        containersToDelete.clear();
+        auto allContainers = containerService.List(session);
+        for(const auto& container : allContainers)
+        {
+            containersToDelete.push_back(container.Name);
+        }
+    }
+
+    for (const auto& id : containersToDelete)
     {
         containerService.Delete(session, id, m_force);
     }

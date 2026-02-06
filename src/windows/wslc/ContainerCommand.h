@@ -102,12 +102,14 @@ public:
     {
         return {
             "ids (pos. 0..): Container IDs",
+            "-a, --all: Stop all the running containers",
             "-s, --signal <signal>: Signal to send to the specified containers (default: SIGTERM)",
             "-t, --time <time>: Time in seconds to wait before killing the containers (default: 5)",
         };
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
+        parser.AddArgument(m_all, L"--all", 'a');
         parser.AddArgument(wsl::shared::Integer{m_options.Signal}, L"--signal", 's');
         parser.AddArgument(wsl::shared::Integer{m_options.Timeout}, L"--time", 't');
     }
@@ -117,6 +119,7 @@ protected:
 
 private:
     wslc::models::StopContainerOptions m_options;
+    bool m_all;
 };
 
 // wslc container kill
@@ -129,11 +132,13 @@ public:
     {
         return {
             "ids (pos. 0..): Container IDs",
+            "-a, --all: Stop all the running containers",
             "-s, --signal <signal>: Signal to send to the container(s) (default: SIGKILL)",
         };
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
+        parser.AddArgument(m_all, L"--all", 'a');
         parser.AddArgument(wsl::shared::Integer{m_options.Signal}, L"--signal", 's');
     }
 
@@ -142,6 +147,7 @@ protected:
 
 private:
     wslc::models::KillContainerOptions m_options;
+    bool m_all;
 };
 
 
@@ -155,11 +161,13 @@ public:
     {
         return {
             "ids (pos. 0..): Container IDs",
+            "-a, --all: Stop all the running containers",
             "-f, --force: Delete containers even if they are running ",
         };
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
+        parser.AddArgument(m_all, L"--all", 'a');
         parser.AddArgument(m_force, L"--force", 'f');
     }
 
@@ -168,6 +176,7 @@ protected:
 
 private:
     bool m_force;
+    bool m_all;
 };
 
 
