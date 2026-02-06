@@ -1883,11 +1883,6 @@ Usage:
     <value>wslc - WSL Container CLI
 Usage:
   wslc list
-  wslc create
-  wslc delete
-  wslc run
-  wslc stop
-  wslc start
   wslc shell &lt;SessionName&gt; [--verbose]
   wslc --help</value>
     <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
