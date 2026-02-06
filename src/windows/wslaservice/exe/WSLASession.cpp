@@ -364,15 +364,25 @@ try
         std::string contentString{Content.begin(), Content.end()};
         WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
 
-        if (ProgressCallback == nullptr)
+        if (ProgressCallback == nullptr || contentString.empty())
         {
             return;
         }
 
-        auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
+        std::optional<docker_schema::CreateImageProgress> parsed;
+        try
+        {
+            parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
+        }
+        catch (...)
+        {
+            // Ignore JSON parsing errors for pull output - Docker may emit non-JSON lines
+            LOG_CAUGHT_EXCEPTION();
+            return;
+        }
 
         THROW_IF_FAILED(ProgressCallback->OnProgress(
-            parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
+            parsed->status.c_str(), parsed->id.c_str(), parsed->progressDetail.current, parsed->progressDetail.total));
     };
 
     auto onCompleted = [&]() { io.Cancel(); };
@@ -412,6 +422,141 @@ try
         {
             THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
         }
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::BuildImage(
+    ULONG ContextHandle, ULONGLONG ContentLength, LPCSTR DockerfilePath, LPCSTR ImageTag, IProgressCallback* ProgressCallback, WSLA_ERROR_INFO* Error)
+try
+{
+    RETURN_HR_IF(E_INVALIDARG, ContextHandle == 0);
+
+    std::optional<std::string> dockerfilePath;
+    if (DockerfilePath != nullptr && *DockerfilePath != '\0')
+    {
+        dockerfilePath = std::string(DockerfilePath);
+    }
+
+    std::optional<std::string> tag;
+    if (ImageTag != nullptr && *ImageTag != '\0')
+    {
+        tag = std::string(ImageTag);
+    }
+
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    wil::unique_handle contextFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ContextHandle))};
+
+    auto requestContext = m_dockerClient->BuildImage(ContentLength, dockerfilePath, tag);
+
+    relay::MultiHandleWait io;
+
+    std::optional<boost::beast::http::status> buildResult;
+
+    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
+        WSL_LOG("BuildHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+
+        buildResult = response.result();
+    };
+
+    std::string errorJson;
+    std::string lastStreamMessage;
+
+    auto onChunk = [&](const gsl::span<char>& Content) {
+        if (buildResult.has_value() && buildResult.value() != boost::beast::http::status::ok)
+        {
+            // If the status code is an error, then this is an error message, not a progress update.
+            errorJson.append(Content.data(), Content.size());
+            return;
+        }
+
+        std::string contentString{Content.begin(), Content.end()};
+        WSL_LOG(
+            "ImageBuildProgress",
+            TraceLoggingValue(ImageTag != nullptr ? ImageTag : "(no tag)", "Image"),
+            TraceLoggingValue(contentString.c_str(), "Content"));
+
+        if (contentString.empty())
+        {
+            return;
+        }
+
+        std::optional<docker_schema::BuildProgress> parsed;
+        try
+        {
+            parsed = wsl::shared::FromJson<docker_schema::BuildProgress>(contentString.c_str());
+        }
+        catch (...)
+        {
+            // If JSON parsing fails, log but don't display
+            LOG_CAUGHT_EXCEPTION();
+            return;
+        }
+
+        if (!parsed->stream.empty())
+        {
+            lastStreamMessage = parsed->stream;
+            if (ProgressCallback != nullptr)
+            {
+                THROW_IF_FAILED(ProgressCallback->OnProgress(parsed->stream.c_str(), "", 0, 0));
+            }
+        }
+
+        if (!parsed->error.empty())
+        {
+            errorJson = parsed->error;
+        }
+    };
+
+    auto onCompleted = [&]() { io.Cancel(); };
+
+    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
+        common::relay::HandleWrapper{std::move(contextFileHandle)}, common::relay::HandleWrapper{requestContext->stream.native_handle()}));
+
+    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
+        *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+
+    io.Run({});
+
+    THROW_HR_IF(E_ABORT, m_sessionTerminatingEvent.is_signaled());
+    THROW_HR_IF(E_UNEXPECTED, !buildResult.has_value());
+
+    WSL_LOG(
+        "BuildCompleted",
+        TraceLoggingValue(static_cast<int>(buildResult.value()), "StatusCode"),
+        TraceLoggingValue(errorJson.c_str(), "ErrorJson"),
+        TraceLoggingValue(lastStreamMessage.c_str(), "LastStreamMessage"));
+
+    if (buildResult.value() != boost::beast::http::status::ok || !errorJson.empty())
+    {
+        std::string errorMessage = !errorJson.empty() ? std::move(errorJson) : std::move(lastStreamMessage);
+
+        // For HTTP-level errors, the error body is a JSON object - parse the message from it.
+        if (buildResult.value() != boost::beast::http::status::ok)
+        {
+            try
+            {
+                errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorMessage.c_str()).message;
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+            }
+        }
+
+        if (Error != nullptr && !errorMessage.empty())
+        {
+            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
+        }
+
+        THROW_HR_MSG(E_FAIL, "Image build failed: %hs", errorMessage.c_str());
     }
 
     return S_OK;

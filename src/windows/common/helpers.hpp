@@ -201,4 +201,6 @@ void SetHandleInheritable(_In_ HANDLE Handle, _In_ bool Inheritable = true);
 
 bool TryAttachConsole();
 
+void CreateDockerContextTarArchive(_In_ const std::filesystem::path& sourceDir, _In_ const std::filesystem::path& outputPath);
+
 } // namespace wsl::windows::common::helpers

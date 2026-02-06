@@ -63,6 +63,13 @@ public:
         _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
         _In_ IProgressCallback* ProgressCallback,
         _Inout_opt_ WSLA_ERROR_INFO* ErrorInfo) override;
+    IFACEMETHOD(BuildImage)(
+        _In_ ULONG ContextHandle,
+        _In_ ULONGLONG ContentLength,
+        _In_ LPCSTR DockerfilePath,
+        _In_ LPCSTR ImageTag,
+        _In_ IProgressCallback* ProgressCallback,
+        _Inout_opt_ WSLA_ERROR_INFO* ErrorInfo) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _Inout_opt_ WSLA_ERROR_INFO* Error) override;

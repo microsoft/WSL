@@ -708,3 +708,81 @@ bool wsl::windows::common::helpers::TryAttachConsole()
 
     return ReopenStdHandles();
 }
+
+void wsl::windows::common::helpers::CreateDockerContextTarArchive(_In_ const std::filesystem::path& sourceDir, _In_ const std::filesystem::path& outputPath)
+{
+    auto absoluteSourceDir = std::filesystem::absolute(sourceDir);
+    auto absoluteOutputPath = std::filesystem::absolute(outputPath);
+
+    std::wstring systemDirectory;
+    THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
+    auto tarExecutable = std::filesystem::path(std::move(systemDirectory)) / L"tar.exe";
+    std::wstring commandLine = std::format(L"\"{}\" -cf \"{}\"", tarExecutable.wstring(), absoluteOutputPath.wstring());
+
+    // Parse .dockerignore and add --exclude arguments.
+    {
+        std::ifstream ignoreFile(absoluteSourceDir / ".dockerignore");
+
+        for (std::string line; std::getline(ignoreFile, line);)
+        {
+            // Trim trailing whitespace.
+            while (!line.empty() && (line.back() == ' ' || line.back() == '\t' || line.back() == '\r'))
+            {
+                line.pop_back();
+            }
+
+            // Skip empty lines, comments, and negation patterns.
+            if (line.empty() || line[0] == '#' || line[0] == '!')
+            {
+                continue;
+            }
+
+            // Strip trailing directory slash.
+            if (line.back() == '/')
+            {
+                line.pop_back();
+            }
+
+            if (!line.empty())
+            {
+                commandLine += std::format(L" --exclude \"{}\"", std::wstring(line.begin(), line.end()));
+            }
+        }
+    }
+
+    commandLine += L" .";
+
+    SECURITY_ATTRIBUTES attributes{.nLength = sizeof(attributes), .bInheritHandle = TRUE};
+
+    wil::unique_hfile stderrRead, stderrWrite;
+    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&stderrRead, &stderrWrite, &attributes, 0));
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stderrRead.get(), HANDLE_FLAG_INHERIT, 0));
+
+    STARTUPINFOW startupInfo{
+        .cb = sizeof(startupInfo), .dwFlags = STARTF_USESTDHANDLES, .hStdOutput = stderrWrite.get(), .hStdError = stderrWrite.get()};
+
+    wil::unique_process_information processInfo;
+    THROW_IF_WIN32_BOOL_FALSE(CreateProcessW(
+        nullptr, commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, absoluteSourceDir.wstring().c_str(), &startupInfo, &processInfo));
+
+    stderrWrite.reset();
+
+    THROW_LAST_ERROR_IF(WaitForSingleObject(processInfo.hProcess, INFINITE) != WAIT_OBJECT_0);
+
+    DWORD exitCode = 0;
+    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(processInfo.hProcess, &exitCode));
+
+    if (exitCode != 0)
+    {
+        std::string errorOutput;
+        char buffer[512];
+        DWORD bytesRead;
+        while (ReadFile(stderrRead.get(), buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0)
+        {
+            buffer[bytesRead] = '\0';
+            errorOutput += buffer;
+        }
+
+        THROW_HR_MSG(E_FAIL, "tar.exe failed with exit code %u: %hs", exitCode, errorOutput.c_str());
+    }
+}
