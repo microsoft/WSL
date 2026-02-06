@@ -148,17 +148,31 @@ using unique_address_table = wil::unique_any<PMIB_UNICASTIPADDRESS_TABLE, declty
 using unique_forward_table = wil::unique_any<PMIB_IPFORWARD_TABLE2, decltype(FreeMibTable), &FreeMibTable>;
 using unique_ifstack_table = wil::unique_any<PMIB_IFSTACK_TABLE, decltype(FreeMibTable), &FreeMibTable>;
 
+// Ensures COM is initialized on the current thread. Tolerates the case where
+// COM is already initialized (even with a different apartment type or security) since this
+// can happen on RPC threads or callback threads.
 inline wil::unique_couninitialize_call InitializeCOMState()
 {
-    // Ensure COM is initialized
-    auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
-    HRESULT hr = CoInitializeSecurity(
-        nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, nullptr, EOAC_STATIC_CLOAKING, nullptr);
-    // Ignore error if CoInitializeSecurity has already been invoked
-    if (hr == RPC_E_TOO_LATE)
+    wil::unique_couninitialize_call coInit;
+    auto hr = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    if (SUCCEEDED(hr))
     {
+        // Ignore error if CoInitializeSecurity has already been invoked
+        hr = CoInitializeSecurity(
+            nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, nullptr, EOAC_STATIC_CLOAKING, nullptr);
+
+        if (hr == RPC_E_TOO_LATE)
+        {
+            hr = S_OK;
+        }
+    }
+    else if (hr == RPC_E_CHANGED_MODE)
+    {
+        // COM already initialized by someone else - disarm so we don't uninitialize their COM
+        coInit.release();
         hr = S_OK;
     }
+
     THROW_IF_FAILED(hr);
     return coInit;
 }

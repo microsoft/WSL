@@ -307,6 +307,48 @@ typedef enum _WSLAFeatureFlags
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
 
+//
+// IWSLAVirtualMachine - Interface representing a single VM instance.
+// Operations are scoped to this VM. The VM ID is stored internally,
+// so only the holder of this interface can operate on the VM.
+//
+[
+    uuid(B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A),
+    pointer_default(unique),
+    object
+]
+interface IWSLAVirtualMachine : IUnknown
+{
+    // Gets the VM ID.
+    HRESULT GetId([out, retval] GUID* VmId);
+
+    // Accepts a connect from mini_init in the VM.
+    HRESULT AcceptConnection([out, system_handle(sh_socket)] HANDLE* Socket);
+
+    // Configures networking engine with sockets from the user process.
+    // GnsSocket is required; DnsSocket is optional (NULL if DNS tunneling is disabled).
+    // The service duplicates the socket handles.
+    HRESULT ConfigureNetworking(
+        [in, system_handle(sh_socket)] HANDLE GnsSocket,
+        [in, system_handle(sh_socket), unique] HANDLE* DnsSocket);
+
+    // Attaches a VHD or VHDX disk to the VM.
+    // GrantVmAccess is called by the service before attaching.
+    // Returns the SCSI LUN assigned to the disk.
+    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out, retval] ULONG* Lun);
+
+    // Detaches a previously attached disk from the VM.
+    HRESULT DetachDisk([in] ULONG Lun);
+
+    // Adds a filesystem share (Plan9 or VirtioFS) accessible to the VM.
+    // Returns an instance GUID that can be used to remove the share.
+    HRESULT AddShare([in] LPCWSTR WindowsPath, [in] BOOL ReadOnly, [out, retval] GUID* ShareId);
+
+    // Removes a previously added filesystem share.
+    HRESULT RemoveShare([in] REFGUID ShareId);
+}
+
+// Settings for IWSLASessionManager::CreateSession - full session configuration
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
@@ -417,6 +459,15 @@ interface IWSLASession : IUnknown
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
     HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+
+    // Session initialization - called by SYSTEM service after launching per-user process.
+    // Returns a handle to this COM server process (used to add to job object).
+    HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
+
+    // Initializes the session with a pre-created VM.
+    HRESULT Initialize(
+        [in] const struct WSLA_SESSION_INIT_SETTINGS* Settings,
+        [in] IWSLAVirtualMachine* Vm);
 }
 
 struct WSLA_SESSION_INFORMATION
@@ -427,12 +478,29 @@ struct WSLA_SESSION_INFORMATION
     wchar_t Sid[256 + 1]; // MAX_SID_SIZE = 256
 };
 
+// Settings for IWSLASession::Initialize - passed from service to per-user process
+struct WSLA_SESSION_INIT_SETTINGS {
+    ULONG SessionId;
+    ULONG CreatorPid;
+    LPCWSTR DisplayName;
+    LPCWSTR StoragePath;
+    ULONGLONG MaximumStorageSizeMb;
+    ULONG BootTimeoutMs;
+    WSLANetworkingMode NetworkingMode;
+    WSLAFeatureFlags FeatureFlags;
+    [unique] LPCSTR RootVhdTypeOverride;
+};
+
 typedef enum _WSLASessionFlags
 {
     WSLASessionFlagsNone = 0,
     WSLASessionFlagsPersistent = 1, // Session remains active after its COM reference is released.
     WSLASessionFlagsOpenExisting = 2, // Open an existing session if the name is in use.
 } WSLASessionFlags;
+
+cpp_quote("#ifdef __cplusplus")
+cpp_quote("class DECLSPEC_UUID(\"4877FEFC-4977-4929-A958-9F36AA1892A4\") WSLASession;")
+cpp_quote("#endif")
 
 [
     uuid(82A7ABC8-6B50-43FC-AB96-15FBBE7E8760),

@@ -33,13 +33,26 @@ public:
     IFACEMETHOD(GetImplNoRef)(_Out_ WSLASession** Session) = 0;
 };
 
+//
+// WSLASession - Implements IWSLASession for container management.
+// Runs in a per-user COM server process for security isolation.
+// The SYSTEM service creates the VM and passes IWSLAVirtualMachine to Initialize().
+//
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown>
 {
 public:
-    WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated);
+    WSLASession() = default;
 
     ~WSLASession();
+
+    // Sets a callback invoked when this object is destroyed.
+    // Used by the COM server host to signal process exit.
+    void SetDestructionCallback(std::function<void()> callback);
+
+    // IWSLASession - initialization methods
+    IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
+    IFACEMETHOD(Initialize)(_In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm) override;
 
     ULONG GetId() const noexcept;
 
@@ -96,16 +109,12 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
 
-    void OnUserSessionTerminating();
-
     bool Terminated();
 
 private:
     ULONG m_id = 0;
 
-    static WSLAVirtualMachine::Settings CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings);
-
-    void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid);
+    void ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);
@@ -132,6 +141,7 @@ private:
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLAFeatureFlags m_featureFlags{};
+    std::function<void()> m_destructionCallback;
 };
 
 } // namespace wsl::windows::service::wsla

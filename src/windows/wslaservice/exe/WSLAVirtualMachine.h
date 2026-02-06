@@ -8,19 +8,18 @@ Module Name:
 
 Abstract:
 
-    TODO
+    WSLAVirtualMachine manages the client-side lifecycle of a WSLA virtual machine.
+
+    The VM is created via IWSLAVirtualMachine (running in the SYSTEM service), and this class
+    connects to the existing VM for unprivileged operations. Privileged operations
+    like AttachDisk and AddShare are delegated back to IWSLAVirtualMachine.
 
 --*/
 #pragma once
 #include "wslaservice.h"
-#include "INetworkingEngine.h"
 #include "hcs.hpp"
-#include "Dmesg.h"
-#include "DnsResolver.h"
-#include "GuestDeviceManager.h"
 #include "WSLAApi.h"
 #include "WSLAProcess.h"
-#include "ContainerEventTracker.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -54,33 +53,10 @@ public:
         wil::unique_socket Socket;
     };
 
-    struct MountedFolderInfo
-    {
-        std::wstring ShareName;
-        std::optional<GUID> InstanceId; // Only used for VirtioFS devices
-    };
-
-    struct Settings
-    {
-        std::wstring DisplayName;
-        ULONGLONG MemoryMb{};
-        ULONG CpuCount;
-        ULONG BootTimeoutMs{};
-        WSLANetworkingMode NetworkingMode{};
-        WSLAFeatureFlags FeatureFlags{};
-        wil::unique_handle DmesgHandle;
-        std::filesystem::path RootVhd;
-        std::string RootVhdType;
-    };
-
     using TPrepareCommandLine = std::function<void(const std::vector<ConnectedSocket>&)>;
 
-    WSLAVirtualMachine(Settings&& Settings, PSID Sid);
-
+    WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLA_SESSION_INIT_SETTINGS* Settings);
     ~WSLAVirtualMachine();
-
-    void Start();
-    void OnSessionTerminated();
 
     void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
     void UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
@@ -91,7 +67,6 @@ public:
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
     void OnProcessReleased(int Pid);
-    void RegisterCallback(_In_ ITerminationCallback* callback);
 
     bool TryAllocatePort(uint16_t Port);
     std::set<uint16_t> AllocatePorts(uint16_t Count);
@@ -107,10 +82,12 @@ public:
     void DetachDisk(_In_ ULONG Lun);
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
 
-    const wil::unique_event& TerminatingEvent();
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLA_FORK::ForkType Type);
-    HANDLE ExitingEvent() const
+
+    // Returns an event that is signaled when the VM is being terminated.
+    // Use this to cancel pending operations.
+    HANDLE TerminatingEvent() const
     {
         return m_vmTerminatingEvent.get();
     }
@@ -123,9 +100,12 @@ public:
 private:
     void MapPortImpl(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort, _In_ bool Remove);
 
+    // Initial setup during Connect()
+    void ConfigureInitialMounts();
+    void ConfigureNetworking();
+
     static void Mount(wsl::shared::SocketChannel& Channel, LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint);
-    static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
 
     Microsoft::WRL::ComPtr<WSLAProcess> CreateLinuxProcessImpl(
         _In_ LPCSTR Executable,
@@ -134,9 +114,6 @@ private:
         int* Errno = nullptr,
         const TPrepareCommandLine& PrepareCommandLine = [](const auto&) {});
 
-    void ConfigureNetworking();
-    void OnExit(_In_ const HCS_EVENT* Event);
-    void OnCrash(_In_ const HCS_EVENT* Event);
     bool FeatureEnabled(WSLAFeatureFlags Flag) const;
 
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(
@@ -147,13 +124,6 @@ private:
     std::string GetVhdDevicePath(ULONG Lun);
     static void OpenLinuxFile(wsl::shared::SocketChannel& Channel, const char* Path, uint32_t Flags, int32_t Fd);
     void LaunchPortRelay();
-    void RemoveShare(_In_ const MountedFolderInfo& MountInfo);
-
-    std::filesystem::path GetCrashDumpFolder();
-    void CreateVmSavedStateFile();
-    void EnforceVmSavedStateFileLimit();
-    void WriteCrashLog(const std::wstring& crashLog);
-    void CollectCrashDumps(wil::unique_socket&& listenSocket) const;
 
     HRESULT MountWindowsFolderImpl(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ WSLAMountFlags Flags = WSLAMountFlagsNone);
 
@@ -163,46 +133,34 @@ private:
     {
         std::filesystem::path Path;
         std::string Device;
-        bool AccessGranted = false;
     };
 
-    Settings m_settings;
+    // IWSLAVirtualMachine for privileged operations on this VM
+    wil::com_ptr<IWSLAVirtualMachine> m_vm;
+
+    WSLAFeatureFlags m_featureFlags{};
+    WSLANetworkingMode m_networkingMode{};
+    ULONG m_bootTimeoutMs{};
+
+    std::string m_rootVhdType;
+
     std::thread m_processExitThread;
-    std::thread m_crashDumpCollectionThread;
 
     std::set<uint16_t> m_allocatedPorts;
 
     GUID m_vmId{};
-    std::wstring m_vmIdString;
-    int m_coldDiscardShiftSize{};
-    bool m_running = false;
-    PSID m_userSid{};
-    wil::shared_handle m_userToken;
-    GUID m_virtioFsClassId;
 
     std::mutex m_trackedProcessesLock;
     std::vector<VMProcessControl*> m_trackedProcesses;
 
-    wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
-
-    std::filesystem::path m_vmSavedStateFile;
-    std::filesystem::path m_crashDumpFolder;
-    bool m_vmSavedStateCaptured = false;
-    bool m_crashLogCaptured = false;
-
-    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
-    std::shared_ptr<DmesgCollector> m_dmesgCollector;
-    wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
-    wil::com_ptr<ITerminationCallback> m_terminationCallback;
-    std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
 
     wsl::shared::SocketChannel m_initChannel;
     wil::unique_handle m_portRelayChannelRead;
     wil::unique_handle m_portRelayChannelWrite;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
-    std::map<std::string, MountedFolderInfo> m_mountedWindowsFolders;
+    std::map<std::string, GUID> m_mountedWindowsFolders;
     std::recursive_mutex m_lock;
     std::mutex m_portRelaylock;
 };

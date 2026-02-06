@@ -10,18 +10,36 @@ Abstract:
 
     Implementation for WSLASessionManager.
 
+    Sessions run in a per-user COM server process for security isolation.
+    CreateComServerAsUser handles process creation/reuse per user.
+
+    Session lifetime is managed through WSLASessionProxy objects:
+    - Non-persistent sessions: tracked via weak references, cleaned up when
+      all client references are released.
+    - Persistent sessions: held via strong references, kept alive until
+      explicitly terminated or service shutdown.
+
+    A job object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE ensures that all
+    wslasession processes are automatically terminated if wslaservice
+    crashes or exits unexpectedly.
+
 --*/
 
 #include "WSLASessionManager.h"
-#include "WSLASession.h"
+#include "HcsVirtualMachine.h"
+#include "wslutil.h"
 
+using wsl::windows::service::wsla::CallingProcessTokenInfo;
+using wsl::windows::service::wsla::HcsVirtualMachine;
 using wsl::windows::service::wsla::WSLASessionManagerImpl;
+using wsl::windows::service::wsla::WSLASessionProxy;
+namespace wslutil = wsl::windows::common::wslutil;
 
 WSLASessionManagerImpl::~WSLASessionManagerImpl()
 {
     // In case there are still COM references on sessions, signal that the user session is terminating
     // so the sessions are all in a 'terminated' state.
-    ForEachSession<void>([](WSLASession& e) { e.OnUserSessionTerminating(); });
+    ForEachSession<void>([](auto& e) { LOG_IF_FAILED(e.Terminate()); });
 }
 
 void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
@@ -49,20 +67,42 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
         return; // Existing session was opened.
     }
 
-    // No session was found, create a new one.
-    auto session = wil::MakeOrThrow<WSLASession>(m_nextSessionId++, *Settings, std::move(tokenInfo.Info), tokenInfo.Elevated);
+    // Get caller info.
+    const auto callerProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
+    const ULONG sessionId = m_nextSessionId++;
+    const DWORD creatorPid = GetProcessId(callerProcess.get());
+    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
-    if (WI_IsFlagSet(Flags, WSLASessionFlagsPersistent))
-    {
-        m_persistentSessions.push_back(session);
-    }
+    // Create the VM in the SYSTEM service (privileged).
+    auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
 
+    // Launch per-user COM server and add it to our job object for crash cleanup.
+    auto remoteSession = wslutil::CreateComServerAsUser<WSLASession, IWSLASession>(userToken.get());
+    AddSessionProcessToJobObject(remoteSession.get());
+
+    // Initialize the session.
+    const auto sessionSettings = CreateSessionSettings(sessionId, creatorPid, Settings);
+    THROW_IF_FAILED(remoteSession->Initialize(&sessionSettings, vm.Get()));
+
+    // Create the proxy that wraps the remote session.
+    const bool persistent = WI_IsFlagSet(Flags, WSLASessionFlagsPersistent);
+    auto proxy = Microsoft::WRL::Make<WSLASessionProxy>(
+        sessionId, creatorPid, Settings->DisplayName, std::move(tokenInfo), std::move(remoteSession));
+
+    // Get weak reference for tracking all sessions.
+    Microsoft::WRL::ComPtr<IWeakReferenceSource> weakRefSource;
+    THROW_IF_FAILED(proxy.As(&weakRefSource));
     Microsoft::WRL::ComPtr<IWeakReference> weakRef;
-    THROW_IF_FAILED(session->GetWeakReference(&weakRef));
-
+    THROW_IF_FAILED(weakRefSource->GetWeakReference(&weakRef));
     m_sessions.emplace_back(std::move(weakRef));
 
-    THROW_IF_FAILED(session.CopyTo(__uuidof(IWSLASession), (void**)WslaSession));
+    // For persistent sessions, also hold a strong reference to keep them alive.
+    if (persistent)
+    {
+        m_persistentSessions.emplace_back(proxy);
+    }
+
+    THROW_IF_FAILED(proxy.CopyTo(__uuidof(IWSLASession), reinterpret_cast<void**>(WslaSession)));
 }
 
 void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
@@ -92,7 +132,7 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
         if (e.DisplayName() == DisplayName)
         {
             THROW_IF_FAILED(CheckTokenAccess(e, tokenInfo));
-            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASession), (void**)Session));
+            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASession), reinterpret_cast<void**>(Session)));
             return std::make_optional(S_OK);
         }
         else
@@ -101,7 +141,7 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
         }
     });
 
-    THROW_IF_FAILED(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)));
+    THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%ls' not found", DisplayName);
 }
 
 void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
@@ -111,7 +151,8 @@ void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessi
     ForEachSession<void>([&](const auto& session) {
         auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = session.GetId(), .CreatorPid = session.GetCreatorPid()});
 
-        wcscpy_s(it.Sid, _countof(it.Sid), session.GetSidString().get());
+        auto sidString = wslutil::SidToString(session.GetSid());
+        wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
         session.CopyDisplayName(it.DisplayName, _countof(it.DisplayName));
     });
 
@@ -132,7 +173,49 @@ void WSLASessionManagerImpl::GetVersion(_Out_ WSLA_VERSION* Version)
     Version->Revision = WSL_PACKAGE_VERSION_REVISION;
 }
 
-WSLASessionManagerImpl::CallingProcessTokenInfo WSLASessionManagerImpl::GetCallingProcessTokenInfo()
+WSLA_SESSION_INIT_SETTINGS WSLASessionManagerImpl::CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLA_SESSION_SETTINGS* Settings)
+{
+    WSLA_SESSION_INIT_SETTINGS sessionSettings{};
+    sessionSettings.SessionId = SessionId;
+    sessionSettings.CreatorPid = CreatorPid;
+    sessionSettings.DisplayName = Settings->DisplayName;
+    sessionSettings.StoragePath = Settings->StoragePath;
+    sessionSettings.MaximumStorageSizeMb = Settings->MaximumStorageSizeMb;
+    sessionSettings.BootTimeoutMs = Settings->BootTimeoutMs;
+    sessionSettings.NetworkingMode = Settings->NetworkingMode;
+    sessionSettings.FeatureFlags = Settings->FeatureFlags;
+    sessionSettings.RootVhdTypeOverride = Settings->RootVhdTypeOverride;
+    return sessionSettings;
+}
+
+void WSLASessionManagerImpl::AddSessionProcessToJobObject(_In_ IWSLASession* Session)
+{
+    EnsureJobObjectCreated();
+
+    wil::unique_handle process;
+    THROW_IF_FAILED(Session->GetProcessHandle(process.put()));
+
+    THROW_IF_WIN32_BOOL_FALSE(AssignProcessToJobObject(m_sessionJobObject.get(), process.get()));
+}
+
+void WSLASessionManagerImpl::EnsureJobObjectCreated()
+{
+    // Create a job object that will automatically terminate all child processes
+    // when the job handle is closed (i.e., when wslaservice exits or crashes).
+    std::call_once(m_jobObjectInitFlag, [this] {
+        m_sessionJobObject.reset(CreateJobObjectW(nullptr, nullptr));
+        THROW_LAST_ERROR_IF(!m_sessionJobObject);
+
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo{};
+        jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        THROW_IF_WIN32_BOOL_FALSE(
+            SetInformationJobObject(m_sessionJobObject.get(), JobObjectExtendedLimitInformation, &jobInfo, sizeof(jobInfo)));
+
+        WSL_LOG("SessionManagerJobObjectCreated", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+    });
+}
+
+CallingProcessTokenInfo WSLASessionManagerImpl::GetCallingProcessTokenInfo()
 {
     const wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
@@ -143,7 +226,7 @@ WSLASessionManagerImpl::CallingProcessTokenInfo WSLASessionManagerImpl::GetCalli
     return {std::move(tokenInfo), elevated};
 }
 
-HRESULT WSLASessionManagerImpl::CheckTokenAccess(const WSLASession& Session, const CallingProcessTokenInfo& TokenInfo)
+HRESULT WSLASessionManagerImpl::CheckTokenAccess(const WSLASessionProxy& Session, const CallingProcessTokenInfo& TokenInfo)
 {
     // Allow elevated tokens to access all sessions.
     // Otherwise a token can only access sessions from the same SID and elevation status.

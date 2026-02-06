@@ -167,7 +167,7 @@ void DockerExecProcessControl::OnContainerReleased()
 }
 
 VMProcessControl::VMProcessControl(WSLAVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl) :
-    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", VirtualMachine.ExitingEvent()), m_vm(&VirtualMachine)
+    m_pid(Pid), m_ttyControlChannel(std::move(TtyControl), "TtyControl", VirtualMachine.TerminatingEvent()), m_vm(&VirtualMachine)
 {
 }
 

@@ -1292,7 +1292,7 @@ class WSLATests
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             ResetTestSession();
-            VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
         }
 
         // Validate that empty arguments are correctly handled.
@@ -1869,9 +1869,9 @@ class WSLATests
             // Terminate the session
             ResetTestSession();
 
-            // Validate that calling into the container returns RPC_E_DISCONNECTED.
+            // Validate that calling into the container returns RPC_S_SERVER_UNAVAILABLE .
             WSLA_CONTAINER_STATE state = WslaContainerStateRunning;
-            VERIFY_ARE_EQUAL(container.Get().GetState(&state), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
             VERIFY_ARE_EQUAL(state, WslaContainerStateInvalid);
         }
     }
