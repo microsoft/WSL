@@ -35,7 +35,7 @@ std::pair<std::string, std::optional<std::string>> ParseImage(const std::string&
         return {Input, {}};
     }
 
-    THROW_HR_IF_MSG(E_INVALIDARG, separator == separator >= Input.size() - 1 || separator == 0, "Invalid image: %hs", Input.c_str());
+    THROW_HR_IF_MSG(E_INVALIDARG, separator >= Input.size() - 1 || separator == 0, "Invalid image: %hs", Input.c_str());
 
     return {Input.substr(0, separator), Input.substr(separator + 1)};
 }
@@ -406,7 +406,11 @@ try
         }
         else if (pullResult.value() == boost::beast::http::status::bad_request)
         {
-            THROW_HR_MSG(E_INVALIDARG, "Image import failed: %hs", errorMessage.c_str());
+            THROW_HR_MSG(E_INVALIDARG, "%hs", errorMessage.c_str());
+        }
+        else
+        {
+            THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
         }
     }
 

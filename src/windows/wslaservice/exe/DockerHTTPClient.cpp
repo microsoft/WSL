@@ -141,7 +141,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImag
 
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength)
 {
-    auto url = URL::Create("/images/create", Repo);
+    auto url = URL::Create("/images/create");
     url.SetParameter("tag", Tag);
     url.SetParameter("repo", Repo);
     url.SetParameter("fromSrc", "-");
@@ -170,7 +170,6 @@ std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTP
     url.SetParameter("force", Force);
     url.SetParameter("noprune", NoPrune);
 
-    // TODO: Url escaping.
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::DeletedImage>>(verb::delete_, url);
 }
 
@@ -202,7 +201,7 @@ void DockerHTTPClient::ResizeContainerTty(const std::string& Id, ULONG Rows, ULO
 {
     auto url = URL::Create("/containers/{}/resize", Id);
     url.SetParameter("w", std::to_string(Columns));
-    url.SetParameter("h", std::to_string(Columns));
+    url.SetParameter("h", std::to_string(Rows));
 
     Transaction(verb::post, url);
 }
