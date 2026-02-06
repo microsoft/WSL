@@ -731,42 +731,6 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     return wslaInspect;
 }
 
-std::vector<VolumeMountInfo> wsl::windows::service::wsla::WSLAContainerImpl::MountVolumes(const WSLA_CONTAINER_OPTIONS& Options, WSLAVirtualMachine& parentVM)
-{
-    std::vector<VolumeMountInfo> mountedVolumes;
-    mountedVolumes.reserve(Options.VolumesCount);
-
-    for (ULONG i = 0; i < Options.VolumesCount; i++)
-    {
-        try
-        {
-            const WSLA_VOLUME& volume = Options.Volumes[i];
-            std::string parentVMPath = std::format("/mnt/wsla/{}/volumes/{}", Options.Name, i);
-
-            auto result = parentVM.MountWindowsFolder(volume.HostPath, parentVMPath.c_str(), volume.ReadOnly);
-            THROW_IF_FAILED_MSG(result, "Failed to mount %ls -> %hs", volume.HostPath, parentVMPath.c_str());
-
-            mountedVolumes.push_back(VolumeMountInfo{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
-        }
-        catch (...)
-        {
-            // On failure, unmount all previously mounted volumes.
-            UnmountVolumes(mountedVolumes, parentVM);
-            throw;
-        }
-    }
-
-    return mountedVolumes;
-}
-
-void wsl::windows::service::wsla::WSLAContainerImpl::UnmountVolumes(const std::vector<VolumeMountInfo>& volumes, WSLAVirtualMachine& parentVM)
-{
-    for (const auto& volume : volumes)
-    {
-        LOG_IF_FAILED(parentVM.UnmountWindowsFolder(volume.ParentVMPath.c_str()));
-    }
-}
-
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
