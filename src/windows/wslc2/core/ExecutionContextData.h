@@ -2,8 +2,16 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
+#include "EnumVariantMap.h"
 
 #include <string>
+
+#define DEFINE_DATA_MAPPING(_typeName_, _valueType_) \
+    template<> \
+    struct DataMapping<Data::_typeName_> \
+    { \
+        using value_t = _valueType_; \
+    };
 
 namespace wsl::windows::wslc::execution
 {
@@ -20,15 +28,12 @@ namespace wsl::windows::wslc::execution
     namespace details
     {
         template <Data D>
-        struct DataMapping
-        {
-            // value_t type specifies the type of this data
-        };
+        struct DataMapping {};
 
-        template<>
-        struct DataMapping<Data::SessionId>
-        {
-            using value_t = std::wstring;
-        };
+        DEFINE_DATA_MAPPING(SessionId, std::wstring);
     }
+
+    struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>
+    {
+    };
 }

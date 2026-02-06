@@ -4,8 +4,7 @@
 #pragma once
 #include "pch.h"
 #include "Errors.h"
-#include "ExecutionArgs.h"
-#include "ExecutionHelpers.h"
+#include "ArgumentTypes.h"
 #include "ExecutionContextData.h"
 
 #include <string_view>
@@ -34,6 +33,8 @@
         return; \
     }
 
+using namespace wsl::windows::wslc::argument;
+
 namespace wsl::windows::wslc
 {
     struct Command;
@@ -48,7 +49,7 @@ namespace wsl::windows::wslc::execution
 {
     // The context within which all commands execute.
     // Contains arguments via Args.
-    struct CLIExecutionContext : public wsl::windows::common::ExecutionContext, EnumBasedVariantMap<Data, details::DataMapping>
+    struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     {
         CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC) {}
         ~CLIExecutionContext() override = default;
@@ -59,8 +60,10 @@ namespace wsl::windows::wslc::execution
         CLIExecutionContext& operator=(const CLIExecutionContext&) = delete;
         CLIExecutionContext& operator=(CLIExecutionContext&&) = delete;
 
-        // The arguments given to execute.
         Args Args;
+
+        // Map of data stored in the context.
+        DataMap Data;
 
         // Returns a value indicating whether the context is terminated.
         bool IsTerminated() const

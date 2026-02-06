@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
-#include "ExecutionContext.h"
+#include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "ContainerCommand.h"
 #include "CommonTasks.h"
@@ -70,9 +70,9 @@ namespace wsl::windows::wslc
         return {
             // ContainerId should be first by position, but we need to adjust the parser
             // for WSLC format of command <options> <positional> <args | positional2..>
-            Argument::ForType(Args::Type::Attach),
-            Argument::ForType(Args::Type::Interactive),
-            Argument::ForType(Args::Type::ContainerId),
+            Argument::ForType(ArgType::Attach),
+            Argument::ForType(ArgType::Interactive),
+            Argument::ForType(ArgType::ContainerIds),
         };
     }
 
@@ -91,20 +91,36 @@ namespace wsl::windows::wslc
         context << StoreSessionId;
 
         PrintMessage(L"Container Start subcommand executing..", stdout);
-        PrintMessage(L"  ContainerId: " + std::wstring{context.Args.GetArg(Args::Type::ContainerId)});
-        if (context.Args.Contains(Args::Type::Interactive))
+        ////PrintMessage(L"  ContainerId: " + std::wstring{context.Args.Get<ArgType::ContainerId>()});
+        PrintMessage(L"  ContainerIds: ");
+        for (const auto& id : context.Args.Get<ArgType::ContainerIds>())
+        {
+            PrintMessage(L"    Container Id: " + id);
+        }
+
+
+        if (context.Args.Contains(ArgType::Interactive))
         {
             PrintMessage(L"  Interactive mode");
         }
 
-        if (context.Args.Contains(Args::Type::Attach))
+        if (context.Args.Contains(ArgType::Attach))
         {
             PrintMessage(L"  Attach to stdout/stderr");
         }
 
-        if (context.Contains(Data::SessionId))
+        if (context.Data.Contains(Data::SessionId))
         {
-            PrintMessage(L"  Stored SessionId: " + context.Get<Data::SessionId>());
+            PrintMessage(L"  Stored SessionId: " + context.Data.Get<Data::SessionId>());
+        }
+
+        auto keys = context.Data.GetKeys();
+        auto dataCount = keys.size();
+
+        PrintMessage(L"  Context contains " + std::to_wstring(dataCount) + L" data items:");
+        for (const auto& key : keys)
+        {
+            PrintMessage(L"    - Data key: " + std::to_wstring(static_cast<int>(key)));
         }
     }
-    }
+}

@@ -1,12 +1,19 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-#include "pch.h"
 #include "Argument.h"
 #include "Command.h"
-#include "ExecutionContext.h"
+#include "Exceptions.h"
+#include "LocalizeMacros.h"
+#include "ArgumentDefinitions.h"
+
+#include <algorithm>
+#include <iterator>
+#include <sstream>
+#include <string>
 
 using namespace wsl::shared;
-using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::argument;
+using namespace std::literals;
 
 namespace wsl::windows::wslc
 {
@@ -14,67 +21,23 @@ namespace wsl::windows::wslc
 
     namespace
     {
-        bool ContainsArgumentFromList(const Args& args, const std::vector<Args::Type>& argTypes)
+        bool ContainsArgumentFromList(const Args& args, const std::vector<ArgType>& argTypes)
         {
-            return std::any_of(argTypes.begin(), argTypes.end(), [&](Args::Type arg) { return args.Contains(arg); });
+            return std::any_of(argTypes.begin(), argTypes.end(), [&](ArgType arg) { return args.Contains(arg); });
         }
     }
 
-    ArgumentCommon ArgumentCommon::ForType(Args::Type type)
+    Argument Argument::ForType(ArgType type)
     {
         switch (type)
         {
-        // Common arguments
-        case Args::Type::Help:
-            return { type, L"help", WSLC_CLI_HELP_ARGUMENT_TEXT_CHAR };
-        case Args::Type::SessionId:
-            return {type, L"session", L's'};
-        case Args::Type::Info:
-            return {type, L"info", L'i' };
+#define WSLC_ARG_CASE(EnumName, Name, Alias, DescID, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
+        case ArgType::EnumName: \
+            return Argument{type, L##Name, Alias, L## #EnumName, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet};
 
-        // Used for demonstration purposes
-        case Args::Type::TestArg:
-            return {type, L"arg", L'a' };
+        WSLC_ARGUMENTS(WSLC_ARG_CASE)
+#undef WSLC_ARG_CASE
 
-        // Container
-        case Args::Type::Attach:
-            return {type, L"attach", L'a'};
-        case Args::Type::Interactive:
-            return {type, L"interactive", L'i'};
-        case Args::Type::ContainerId:
-            return {type, L"containerid", ArgTypeCategory::ContainerSelection};
-
-        default:
-            THROW_HR(E_UNEXPECTED);
-        }
-    }
-
-    std::vector<ArgumentCommon> ArgumentCommon::GetFromExecArgs(const Args& execArgs)
-    {
-        auto argTypes = execArgs.GetTypes();
-        std::vector<ArgumentCommon> result;
-        std::transform(argTypes.begin(), argTypes.end(), std::back_inserter(result), ArgumentCommon::ForType);
-        return result;
-    }
-
-    Argument Argument::ForType(Args::Type type)
-    {
-        switch (type)
-        {
-        case Args::Type::Help:
-            return Argument{ type, Localization::WSLCCLI_HelpArgumentDescription(), ArgumentType::Flag };
-        case Args::Type::Info:
-            return Argument{ type, Localization::WSLCCLI_InfoArgumentDescription(), ArgumentType::Flag };
-        case Args::Type::SessionId:
-            return Argument{type, L"Session Id", ArgumentType::Standard};
-        case Args::Type::Attach:
-            return Argument{type, L"Attach to stdout/stderr", ArgumentType::Flag };
-        case Args::Type::Interactive:
-            return Argument{type, L"Interactive terminal", ArgumentType::Flag };
-        case Args::Type::ContainerId:
-            return Argument{type, L"Container Id", ArgumentType::Positional, Visibility::Example, true};
-        case Args::Type::TestArg:
-            return Argument{type, L"Display ninjacat", ArgumentType::Flag, true };
         default:
             THROW_HR(E_UNEXPECTED);
         }
@@ -82,38 +45,41 @@ namespace wsl::windows::wslc
 
     void Argument::GetCommon(std::vector<Argument>& args)
     {
-        args.push_back(ForType(Args::Type::Help));
-        args.push_back(ForType(Args::Type::SessionId));
+        args.push_back(ForType(ArgType::Help));
+        args.push_back(ForType(ArgType::SessionId));
     }
 
     std::wstring Argument::GetUsageString() const
     {
         std::wostringstream strstr;
-        if (Alias() != ArgumentCommon::NoAlias)
+        if (m_alias != NoAlias)
         {
-            strstr << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << Alias() << ',';
+            strstr << WSLC_CLI_ARG_ID_CHAR << m_alias << L',';
         }
-        if (AlternateName() != Argument::NoAlternateName)
+        if (!m_alternateName.empty())
         {
-            strstr << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << AlternateName() << ',';
+            strstr << WSLC_CLI_ARG_ID_CHAR << WSLC_CLI_ARG_ID_CHAR << m_alternateName << L',';
         }
-        strstr << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << WSLC_CLI_ARGUMENT_IDENTIFIER_CHAR << Name();
+        strstr << WSLC_CLI_ARG_ID_CHAR << WSLC_CLI_ARG_ID_CHAR << m_name;
         return strstr.str();
     }
 
     void Argument::ValidateExclusiveArguments(const Args& args)
     {
-        auto argProperties = ArgumentCommon::GetFromExecArgs(args);
-
-        using ExclusiveSet_t = std::underlying_type_t<ArgTypeExclusiveSet>;
-        for (ExclusiveSet_t i = 1 + static_cast<ExclusiveSet_t>(ArgTypeExclusiveSet::None); i < static_cast<ExclusiveSet_t>(ArgTypeExclusiveSet::Max); i <<= 1)
+        auto keys = args.GetKeys();
+        
+        using ExclusiveSet_t = std::underlying_type_t<ExclusiveSet>;
+        for (ExclusiveSet_t i = 1 + static_cast<ExclusiveSet_t>(ExclusiveSet::None); i < static_cast<ExclusiveSet_t>(ExclusiveSet::Max); i <<= 1)
         {
-            std::vector<ArgumentCommon> argsFromSet;
+            std::vector<ArgType> argsFromSet;
             std::copy_if(
-                argProperties.begin(),
-                argProperties.end(),
+                keys.begin(),
+                keys.end(),
                 std::back_inserter(argsFromSet),
-                [=](const ArgumentCommon& arg) { return static_cast<ExclusiveSet_t>(arg.ExclusiveSet) & i; });
+                [=](ArgType arg) { 
+                    auto argument = Argument::ForType(arg);
+                    return static_cast<ExclusiveSet_t>(argument.m_exclusiveSet) & i; 
+                });
 
             if (argsFromSet.size() > 1)
             {
@@ -123,42 +89,40 @@ namespace wsl::windows::wslc
                 {
                     if (!argsString.empty())
                     {
-                        argsString += '|';
-
+                        argsString += L'|';
                     }
-
-                    argsString += arg.Name;
+                    argsString += Argument::ForType(arg).Name();
                 }
 
-                throw CommandException(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(std::wstring{ argsString }));
+                throw CommandException(Localization::WSLCCLI_MultipleExclusiveArgumentsProvided(argsString));
             }
         }
     }
 
-    void Argument::ValidateArgumentDependency(const Args& args, Args::Type type, Args::Type dependencyArgType)
+    void Argument::ValidateArgumentDependency(const Args& args, ArgType type, ArgType dependencyArgType)
     {
         if (args.Contains(type) && !args.Contains(dependencyArgType))
         {
             throw CommandException(Localization::WSLCCLI_DependencyArgumentMissing(
-                std::wstring{ ArgumentCommon::ForType(type).Name },
-                std::wstring{ ArgumentCommon::ForType(dependencyArgType).Name }));
+                Argument::ForType(type).Name(),
+                Argument::ForType(dependencyArgType).Name()));
         }
     }
 
-    ArgTypeCategory Argument::GetCategoriesPresent(const Args& args)
+    Category Argument::GetCategoriesPresent(const Args& args)
     {
-        auto argProperties = ArgumentCommon::GetFromExecArgs(args);
+        auto keys = args.GetKeys();
 
-        ArgTypeCategory result = ArgTypeCategory::None;
-        for (const auto& arg : argProperties)
+        Category result = Category::None;
+        for (const auto& argType : keys)
         {
-            result |= arg.TypeCategory;
+            result |= Argument::ForType(argType).m_category;
         }
 
         return result;
     }
 
-    ArgTypeCategory Argument::GetCategoriesAndValidateCommonArguments(const Args& args)
+    Category Argument::GetCategoriesAndValidateCommonArguments(const Args& args)
     {
         const auto categories = GetCategoriesPresent(args);
 
@@ -166,7 +130,7 @@ namespace wsl::windows::wslc
         return categories;
     }
 
-    Argument::Visibility Argument::GetVisibility() const
+    Visibility Argument::GetVisibility() const
     {
         // Visibility adjustments, such as experimental or disabled by policy.
         return m_visibility;

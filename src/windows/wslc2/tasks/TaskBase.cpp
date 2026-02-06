@@ -40,6 +40,8 @@ namespace wsl::windows::wslc::task
         }
         catch (...)
         {
+            LOG_CAUGHT_EXCEPTION();
+
             // Using WSL shared utility to get the HRESULT from the caught exception.
             // CLIExecutionContext is a derived class of wsl::windows::common::ExecutionContext.
             auto result = wil::ResultFromCaughtException();
@@ -50,11 +52,13 @@ namespace wsl::windows::wslc::task
                     auto strings = wslutil::ErrorToString(*reported);
                     auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
                     wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
+                    WSLC_LOG(Fail, Error, << wslutil::ErrorCodeToString(result) << L": " << errorMessage);
                 }
                 else
                 {
                     // Fallback for errors without context
                     wslutil::PrintMessage(Localization::MessageErrorCode("", wslutil::ErrorCodeToString(result)), stderr);
+                    WSLC_LOG(Fail, Error, << wslutil::ErrorCodeToString(result) << L": <Unknown>");
                 }
             }
 

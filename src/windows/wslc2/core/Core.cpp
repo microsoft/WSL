@@ -2,10 +2,12 @@
 // Licensed under the MIT License.
 #include "pch.h"
 #include "Errors.h"
-#include "ExecutionContext.h"
+#include "CLIExecutionContext.h"
 #include "Invocation.h"
 #include "RootCommand.h"
 #include "TaskBase.h"
+#include "DebugLogger.h"
+#include "FileLogger.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;
@@ -35,6 +37,27 @@ namespace wsl::windows::wslc
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
         auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
+        try
+        {
+            #ifdef _DEBUG
+            logging::OutputDebugLogger::Add();
+            #endif
+            logging::FileLogger::Add();
+            logging::Log().SetEnabledChannels(logging::Channel::All);
+
+            // TODO: Make log level a setting.
+            logging::Log().SetLevel(logging::Level::Verbose);
+
+            // Initiate the background cleanup of the log file location.
+            logging::FileLogger::BeginCleanup();
+        }
+        catch(std::exception& e)
+        {
+            // Failures to set up logging should not prevent the CLI from running.
+            // Log it in case the debug logger catches file logger failures.
+            WSLC_LOG(Fail, Error, << e.what());
+        }
+        
         std::unique_ptr<Command> command = std::make_unique<RootCommand>();
 
         try
@@ -53,8 +76,7 @@ namespace wsl::windows::wslc
                 wstrstr << L" '" << arg << L'\'';
             }
         
-            // Log the invocation
-            ////wslutil::PrintMessage(wstrstr.str(), stdout);
+            WSLC_LOG(Core, Info, << wstrstr.str());
 
             Invocation invocation{ std::move(args) };
             std::unique_ptr<Command> subCommand = command->FindSubCommand(invocation);

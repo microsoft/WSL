@@ -16,7 +16,7 @@ namespace wsl::windows::wslc
     {
         return
         {
-            Argument::ForType(Args::Type::TestArg),
+            Argument::ForType(ArgType::TestArg),
         };
     }
 

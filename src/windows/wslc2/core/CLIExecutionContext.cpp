@@ -4,7 +4,7 @@
 #include "pch.h"
 #include "Argument.h"
 #include "Command.h"
-#include "ExecutionContext.h"
+#include "CLIExecutionContext.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;

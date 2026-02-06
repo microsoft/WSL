@@ -1,6 +1,6 @@
-
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/foundation
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
     ${CMAKE_CURRENT_SOURCE_DIR}/services
@@ -8,15 +8,25 @@ include_directories(
 
 set(HEADERS
     core/pch.h
-    core/Util.h
+    core/foundation/DateTime.h
+    core/foundation/Errors.h
+    core/foundation/Exceptions.h
+    core/foundation/EnumVariantMap.h
+    core/foundation/SharedThreadGlobals.h
+    core/foundation/LocalizeMacros.h
+    core/foundation/Logging.h
+    core/foundation/SystemUtilities.h
+    core/foundation/StringUtilities.h
+    core/foundation/DebugLogger.h
+    core/foundation/FileLogger.h
+    core/ArgumentTypes.h
+    core/ArgumentDefinitions.h
     core/Argument.h
+    core/ArgumentParser.h
     core/Command.h
     core/Core.h
-    core/Errors.h
-    core/ExecutionArgs.h
-    core/ExecutionContext.h
+    core/CLIExecutionContext.h
     core/ExecutionContextData.h
-    core/ExecutionHelpers.h
     core/Invocation.h
     commands/RootCommand.h
     commands/TestCommand.h
@@ -28,10 +38,17 @@ set(HEADERS
 )
 
 set(SOURCES
-    core/Util.cpp
+    core/foundation/DateTime.cpp
+    core/foundation/SystemUtilities.cpp
+    core/foundation/StringUtilities.cpp
+    core/foundation/SharedThreadGlobals.cpp
+    core/foundation/Logging.cpp
+    core/foundation/DebugLogger.cpp
+    core/foundation/FileLogger.cpp
     core/Argument.cpp
+    core/ArgumentParser.cpp
     core/Command.cpp
-    core/ExecutionContext.cpp
+    core/CLIExecutionContext.cpp
     core/Core.cpp
     core/Main.cpp
     commands/RootCommand.cpp

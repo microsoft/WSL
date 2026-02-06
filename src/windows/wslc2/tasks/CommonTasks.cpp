@@ -2,13 +2,15 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
-#include "Util.h"
-#include "ExecutionContext.h"
+#include "SystemUtilities.h"
+#include "CLIExecutionContext.h"
 #include "TaskBase.h"
 #include "CommonTasks.h"
 
+
 using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::logging;
 
 namespace wsl::windows::wslc::task
 {
@@ -23,10 +25,11 @@ namespace wsl::windows::wslc::task
     }
 
     void StoreSessionId(CLIExecutionContext& context)
-    {
-        if (context.Args.Contains(Args::Type::SessionId))
+    {;
+        WSLC_LOG(Task, Verbose, << L"In StoreSessionId Testing...");
+        if (context.Args.Contains(ArgType::SessionId))
         {
-            context.Add<Data::SessionId>(std::wstring{context.Args.GetArg(Args::Type::SessionId)});
+            context.Data.Add<Data::SessionId>(std::wstring{context.Args.Get<ArgType::SessionId>()});
         }
     }
 }

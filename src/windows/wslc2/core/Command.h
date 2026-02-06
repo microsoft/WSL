@@ -3,9 +3,11 @@
 #pragma once
 #include "precomp.h"
 #include "Argument.h"
-#include "ExecutionArgs.h"
-#include "ExecutionContext.h"
+#include "Exceptions.h"
+#include "ArgumentTypes.h"
+#include "CLIExecutionContext.h"
 #include "Invocation.h"
+#include "ArgumentParser.h"
 
 #include <initializer_list>
 #include <memory>
@@ -17,18 +19,10 @@
 #include <vector>
 
 using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc
 {
-    struct CommandException
-    {
-        CommandException(std::wstring_view message) : m_message(message) {}
-        const std::wstring Message() const { return m_message; }
-
-    private:
-        std::wstring m_message;
-    };
-
     // Flags to control the behavior of the command output.
     enum class CommandOutputFlags : int
     {
@@ -120,12 +114,12 @@ namespace wsl::windows::wslc
     template <typename Container>
     Container InitializeFromMoveOnly(std::initializer_list<typename Container::value_type> il)
     {
-        using Value = typename Container::value_type;
+        using String = typename Container::value_type;
         Container result;
 
         for (const auto& v : il)
         {
-            result.emplace_back(std::move(*const_cast<Value*>(&v)));
+            result.emplace_back(std::move(*const_cast<String*>(&v)));
         }
 
         return result;

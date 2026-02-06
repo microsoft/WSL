@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
-#include "Util.h"
+#include "SystemUtilities.h"
 #include <wil/token_helpers.h>
 #include <winrt/Windows.System.Profile.h>
 

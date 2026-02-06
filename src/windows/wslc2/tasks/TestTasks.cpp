@@ -11,7 +11,7 @@ namespace wsl::windows::wslc::task
 {
     void OutputNinjaCat(CLIExecutionContext& context)
     {
-        if (context.Args.Contains(Args::Type::TestArg))
+        if (context.Args.Contains(ArgType::TestArg))
         {
             std::wostringstream testout;
             static constexpr std::wstring_view s_ninjaCat = LR"(
