@@ -23,7 +23,10 @@ int ShellService::Attach(std::wstring sessionName)
             return 1;
         }
 
-        return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
+        auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
+        auto context = Localization::MessageErrorCode(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), errorString);
+        wslutil::PrintMessage(context, stderr);
+        return 1;
     }
 
     // Console size for TTY.

@@ -14,7 +14,7 @@ public:
     void Kill(wslc::models::Session& session, std::string id, int signal = WSLASignalSIGKILL);
     void Delete(wslc::models::Session& session, std::string id, bool force);
     std::vector<wslc::models::ContainerInformation> List(wslc::models::Session& session);
-    void Exec(wslc::models::Session& session, std::string id, std::vector<std::string> arguments);
+    int Exec(wslc::models::Session& session, std::string id, wslc::models::ExecContainerOptions options);
     wsl::windows::common::docker_schema::InspectContainer Inspect(wslc::models::Session& session, std::string id);
 
 private:
@@ -26,7 +26,6 @@ private:
         const wslc::models::ContainerCreateOptions& options);
     void StartInternal(IWSLAContainer& container);
     void StopInternal(IWSLAContainer& container, const wslc::models::StopContainerOptions& options);
-    std::vector<WSLA_PROCESS_FD> CreateFds(const wslc::models::ContainerCreateOptions& options);
     void SetContainerOptions(
         WSLA_CONTAINER_OPTIONS& options,
         const std::string& name,

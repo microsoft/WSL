@@ -38,4 +38,11 @@ struct ContainerInformation
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
 };
+
+struct ExecContainerOptions
+{
+    bool TTY = false;
+    bool Interactive = false;
+    std::vector<std::string> Arguments;
+};
 }

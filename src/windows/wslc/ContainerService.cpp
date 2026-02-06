@@ -1,4 +1,5 @@
 #include "ContainerService.h"
+#include "ConsoleService.h"
 #include "Utils.h"
 #include <wslutil.h>
 #include <WSLAProcessLauncher.h>
@@ -14,21 +15,26 @@ using namespace wslc::models;
 
 int ContainerService::Run(Session& session, std::string image, ContainerCreateOptions runOptions)
 {
+    ConsoleService consoleService;
     wil::com_ptr<IWSLAContainer> container;
-    auto fds = CreateFds(runOptions);
+    auto fds = consoleService.BuildStdioDescriptors(runOptions.TTY, runOptions.Interactive);
     CreateInternal(session, &container, fds, image, runOptions);
     StartInternal(*container);
 
     wil::com_ptr<IWSLAProcess> process;
     THROW_IF_FAILED(container->GetInitProcess(&process));
 
-    return InteractiveShell(ClientRunningWSLAProcess(std::move(process), std::move(fds)), runOptions.TTY);
+    wslc::models::ConsoleAttachOptions options;
+    options.TTY = runOptions.TTY;
+    options.Interactive = runOptions.Interactive;
+    return consoleService.AttachToCurrentConsole(std::move(process), options);
 }
 
  CreateContainerResult ContainerService::Create(Session& session, std::string image, ContainerCreateOptions runOptions)
 {
+    ConsoleService consoleService;
     wil::com_ptr<IWSLAContainer> container;
-    auto fds = CreateFds(runOptions);
+    auto fds = consoleService.BuildStdioDescriptors(runOptions.TTY, runOptions.Interactive);
     CreateInternal(session, &container, fds, image, runOptions);
 
     wil::unique_cotaskmem_ansistring output;
@@ -105,25 +111,28 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
     return result;
 }
 
-void ContainerService::Exec(Session& session, std::string id, std::vector<std::string> arguments)
+int ContainerService::Exec(Session& session, std::string id, wslc::models::ExecContainerOptions options)
 {
+    ConsoleService consoleService;
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     int error = -1;
-    WSLA_CONTAINER_OPTIONS options;
+    WSLA_CONTAINER_OPTIONS containerOptions;
 
-    // TODO tty, interactive
-    auto fds = CreateFds({});
+    auto fds = consoleService.BuildStdioDescriptors(options.TTY, options.Interactive);
     std::vector<const char*> args;
-    SetContainerOptions(options, id, false, false, fds, arguments, args);
-    options.InitProcessOptions.Executable = nullptr;
-    options.InitProcessOptions.CurrentDirectory = nullptr;
-    options.InitProcessOptions.Environment = nullptr;
-    options.InitProcessOptions.EnvironmentCount = 0;
+    SetContainerOptions(containerOptions, id, false, false, fds, options.Arguments, args);
+    containerOptions.InitProcessOptions.Executable = nullptr;
+    containerOptions.InitProcessOptions.CurrentDirectory = nullptr;
+    containerOptions.InitProcessOptions.Environment = nullptr;
+    containerOptions.InitProcessOptions.EnvironmentCount = 0;
 
-    wil::com_ptr<IWSLAProcess> createdProcess;
-    THROW_IF_FAILED(container->Exec(&options.InitProcessOptions, &createdProcess, &error));
-    InteractiveShell(ClientRunningWSLAProcess(std::move(createdProcess), std::move(fds)), false);
+    wil::com_ptr<IWSLAProcess> process;
+    THROW_IF_FAILED(container->Exec(&containerOptions.InitProcessOptions, &process, &error));
+    wslc::models::ConsoleAttachOptions attachOptions;
+    attachOptions.TTY = options.TTY;
+    attachOptions.Interactive = options.Interactive;
+    return consoleService.AttachToCurrentConsole(std::move(process), attachOptions);
 }
 
 InspectContainer ContainerService::Inspect(Session& session, std::string id)
@@ -160,30 +169,6 @@ void ContainerService::CreateInternal(
     }
 
     error.ThrowIfFailed(result);
-}
-
-std::vector<WSLA_PROCESS_FD> ContainerService::CreateFds(const ContainerCreateOptions& options)
-{
-    std::vector<WSLA_PROCESS_FD> fds;
-
-    if (options.TTY)
-    {
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeTerminalInput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeTerminalOutput});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeTerminalControl});
-    }
-    else
-    {
-        if (options.Interactive)
-        {
-            fds.emplace_back(WSLA_PROCESS_FD{.Fd = 0, .Type = WSLAFdTypeDefault});
-        }
-
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 1, .Type = WSLAFdTypeDefault});
-        fds.emplace_back(WSLA_PROCESS_FD{.Fd = 2, .Type = WSLAFdTypeDefault});
-    }
-
-    return fds;
 }
 
 void ContainerService::StartInternal(IWSLAContainer& container)

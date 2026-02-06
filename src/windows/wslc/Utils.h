@@ -3,13 +3,7 @@
 #include "precomp.h"
 #include "WSLAProcessLauncher.h"
 
-int InteractiveShell(
-    wsl::windows::common::ClientRunningWSLAProcess&& Process, 
-    bool Tty);
-
 void PullImpl(IWSLASession& Session, const std::string& Image);
-
-int ReportError(const std::wstring& context, HRESULT hr);
 
 class ChangeTerminalMode
 {

@@ -1,6 +1,7 @@
 #include "precomp.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
+#include "ConsoleModel.h"
 #include "TableOutput.h"
 #include "Utils.h"
 #include <CommandLine.h>
@@ -187,7 +188,11 @@ int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int par
     CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
-    containerService.Exec(session, m_id, arguments);
+    wslc::models::ExecContainerOptions options;
+    options.Arguments = arguments;
+    options.Interactive = m_options.Interactive;
+    options.TTY = m_options.TTY;
+    containerService.Exec(session, m_id, options);
     return 0;
 }
 

@@ -214,11 +214,15 @@ public:
         return {
             "id (pos. 0): Container ID",
             "arguments (pos. 1..): Arguments to pass to the intended process/command to be run inside the container",
+            "-t, --tty: Open a TTY with the container process",
+            "-i, --interactive: Keep stdin open",
         };
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
         parser.AddPositionalArgument(wsl::shared::Utf8String{m_id}, 0);
+        parser.AddArgument(m_options.Interactive, L"--interactive", 'i');
+        parser.AddArgument(m_options.TTY, L"--tty", 't');
     }
 
 protected:
@@ -226,6 +230,7 @@ protected:
 
 private:
     std::string m_id;
+    wslc::models::ExecContainerOptions m_options;
 };
 
 // wslc container inspect

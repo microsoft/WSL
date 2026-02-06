@@ -2,7 +2,6 @@
 #include "wslutil.h"
 #include "wslaservice.h"
 #include "WslSecurity.h"
-#include "WSLAProcessLauncher.h"
 #include "ExecutionContext.h"
 #include <thread>
 #include <format>
@@ -11,119 +10,10 @@
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
-using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
-using wsl::windows::common::WSLAProcessLauncher;
-using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::MultiHandleWait;
-using wsl::windows::common::relay::RelayHandle;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
-
-
-int InteractiveShell(ClientRunningWSLAProcess&& Process, bool Tty)
-{
-    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
-    auto exitEvent = Process.GetExitEvent();
-
-    if (Tty)
-    {
-        // Save original console modes so they can be restored on exit.
-        DWORD OriginalInputMode{};
-        DWORD OriginalOutputMode{};
-        UINT OriginalOutputCP = GetConsoleOutputCP();
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdin, &OriginalInputMode));
-        THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
-
-        auto restoreConsoleMode = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            SetConsoleMode(Stdin, OriginalInputMode);
-            SetConsoleMode(Stdout, OriginalOutputMode);
-            SetConsoleOutputCP(OriginalOutputCP);
-        });
-
-        // Configure console for interactive usage.
-        DWORD InputMode = OriginalInputMode;
-        WI_SetAllFlags(InputMode, (ENABLE_WINDOW_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT));
-        WI_ClearAllFlags(InputMode, (ENABLE_ECHO_INPUT | ENABLE_INSERT_MODE | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdin, InputMode));
-
-        DWORD OutputMode = OriginalOutputMode;
-        WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-        THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
-
-        THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
-
-        auto processTty = Process.GetStdHandle(WSLAFDTty);
-
-        // TODO: Study a single thread for both handles.
-
-        // Create a thread to relay stdin to the pipe.
-        std::thread inputThread([&]() {
-            auto updateTerminal = [&Stdout, &Process, &processTty]() {
-                CONSOLE_SCREEN_BUFFER_INFOEX info{};
-                info.cbSize = sizeof(info);
-
-                THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfoEx(Stdout, &info));
-
-                LOG_IF_FAILED(Process.Get().ResizeTty(
-                    info.srWindow.Bottom - info.srWindow.Top + 1, info.srWindow.Right - info.srWindow.Left + 1));
-            };
-
-            wsl::windows::common::relay::StandardInputRelay(Stdin, processTty.get(), updateTerminal, exitEvent.get());
-        });
-
-        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            exitEvent.SetEvent();
-            inputThread.join();
-        });
-
-        // Relay the contents of the pipe to stdout.
-        wsl::windows::common::relay::InterruptableRelay(processTty.get(), Stdout);
-
-        // Wait for the process to exit.
-        THROW_LAST_ERROR_IF(WaitForSingleObject(exitEvent.get(), INFINITE) != WAIT_OBJECT_0);
-    }
-    else
-    {
-        wsl::windows::common::relay::MultiHandleWait io;
-
-        // Create a thread to relay stdin to the pipe.
-
-        std::thread inputThread;
-
-        auto joinThread = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            if (inputThread.joinable())
-            {
-                exitEvent.SetEvent();
-                inputThread.join();
-            }
-        });
-
-        // Required because ReadFile() blocks if stdin is a tty.
-        if (wsl::windows::common::wslutil::IsInteractiveConsole())
-        {
-            // TODO: Will output CR instead of LF's which can confuse the linux app.
-            // Consider a custom relay logic to fix this.
-            inputThread = std::thread{
-                [&]() { wsl::windows::common::relay::InterruptableRelay(Stdin, Process.GetStdHandle(0).get(), exitEvent.get()); }};
-        }
-        else
-        {
-            io.AddHandle(std::make_unique<RelayHandle>(GetStdHandle(STD_INPUT_HANDLE), Process.GetStdHandle(0)));
-        }
-
-        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(1), GetStdHandle(STD_OUTPUT_HANDLE)));
-        io.AddHandle(std::make_unique<RelayHandle>(Process.GetStdHandle(2), GetStdHandle(STD_ERROR_HANDLE)));
-        io.AddHandle(std::make_unique<EventHandle>(exitEvent.get()));
-
-        io.Run({});
-    }
-
-    int exitCode = Process.GetExitCode();
-
-    return exitCode;
-}
 
 void PullImpl(IWSLASession& Session, const std::string& Image)
 {
@@ -234,11 +124,4 @@ void PullImpl(IWSLASession& Session, const std::string& Image)
     wslc::services::ImageService imageService;
     Callback callback;
     imageService.Pull(session, Image, &callback);
-}
-
-int ReportError(const std::wstring& context, HRESULT hr)
-{
-    auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
-    wslutil::PrintMessage(Localization::MessageErrorCode(context, errorString), stderr);
-    return 1;
 }

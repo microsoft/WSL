@@ -15,6 +15,7 @@ set(SOURCES
     ImageService.cpp
     ShellService.cpp
     SessionService.cpp
+    ConsoleService.cpp
 
     # Models
     SessionModel.cpp
@@ -36,11 +37,13 @@ set(HEADERS
     ImageService.h
     ShellService.h
     SessionService.h
+    ConsoleService.h
 
     # Models
     ImageModel.h
     ContainerModel.h
     SessionModel.h
+    ConsoleModel.h
 )
 
 source_group("Services" FILES
@@ -52,6 +55,8 @@ source_group("Services" FILES
     ShellService.cpp
     SessionService.h
     SessionService.cpp
+    ConsoleService.h
+    ConsoleService.cpp
 )
 
 source_group("Commands" FILES
@@ -70,6 +75,7 @@ source_group("Models" FILES
     ContainerModel.h
     SessionModel.h
     SessionModel.cpp
+    ConsoleModel.h
 )
 
 add_executable(wslc ${SOURCES} ${HEADERS})
