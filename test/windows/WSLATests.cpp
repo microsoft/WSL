@@ -748,6 +748,7 @@ class WSLATests
         session.reset();
         auto future = promise.get_future();
         auto result = future.wait_for(std::chrono::seconds(30));
+        VERIFY_ARE_EQUAL(result, std::future_status::ready);
         auto [reason, details] = future.get();
         VERIFY_ARE_EQUAL(reason, WSLAVirtualMachineTerminationReasonShutdown);
         VERIFY_ARE_NOT_EQUAL(details, L"");
@@ -3222,5 +3223,21 @@ class WSLATests
         expectInvalidPull("bad!repo:valid-image", "invalid reference format");
         expectInvalidPull("repo:badimage!name", "invalid tag format");
         expectInvalidPull("bad+image", "invalid reference format");
+    }
+
+    TEST_METHOD(PageReporting)
+    {
+        WSL2_TEST_ONLY();
+
+        // Determine expected page reporting order based on Windows version.
+        // On Germanium or later: 5 (128k), otherwise: 9 (2MB).
+        const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
+        int expectedOrder = (windowsVersion.BuildNumber >= wsl::windows::common::helpers::WindowsBuildNumbers::Germanium) ? 5 : 9;
+
+        // Read the actual value from sysfs and verify it matches.
+        auto result =
+            ExpectCommandResult(m_defaultSession.get(), {"/bin/cat", "/sys/module/page_reporting/parameters/page_reporting_order"}, 0);
+
+        VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
     }
 };
