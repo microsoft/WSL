@@ -853,12 +853,7 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     }
 }
 
-void WSLAContainerImpl::GetID(LPSTR* Output)
-{
-    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_id.data()).release();
-}
-
-void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+void WSLAContainerImpl::Logs(WSLALogsFlags Flags, HANDLE* Stdout, HANDLE* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     std::lock_guard lock(m_lock);
 
@@ -880,7 +875,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
         auto handle = std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(std::move(socket), std::move(ttyWrite));
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(ttyRead.get()));
+        *Stdout = ttyRead.release();
     }
     else
     {
@@ -893,8 +888,8 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
 
         m_ioRelay.AddHandle(std::move(handle));
 
-        *Stdout = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stdoutRead.get()));
-        *Stderr = HandleToULong(common::wslutil::DuplicateHandleToCallingProcess(stderrRead.get()));
+        *Stdout = stdoutRead.release();
+        *Stderr = stderrRead.release();
     }
 }
 
@@ -986,12 +981,6 @@ HRESULT WSLAContainer::Inspect(LPSTR* Output)
     return CallImpl(&WSLAContainerImpl::Inspect, Output);
 }
 
-HRESULT WSLAContainer::GetID(LPSTR* Id)
-{
-    *Id = nullptr;
-    return CallImpl(&WSLAContainerImpl::GetID, Id);
-}
-
 HRESULT WSLAContainer::Delete()
 try
 {
@@ -1005,12 +994,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, HANDLE* Stdout, HANDLE* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
-    RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
-
-    *Stdout = 0;
-    *Stderr = 0;
+    *Stdout = nullptr;
+    *Stderr = nullptr;
 
     return CallImpl(&WSLAContainerImpl::Logs, Flags, Stdout, Stderr, Since, Until, Tail);
 }

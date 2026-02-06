@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 
+#include "precomp.h"
 #include "WSLASessionManager.h"
 #include "WSLASession.h"
 
