@@ -361,7 +361,6 @@
         <DirectoryRef Id="TOOLSFOLDER">
             <Component Id="tools" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134733" Bitness="always64" UninstallWhenSuperseded="yes">
                 <File Id="init" Source="${BIN}/init" Checksum="yes" />
-                <File Id="initrd.img" Source="${BIN}/initrd.img"/>
                 <File Id="bsdtar" Source="${BSDTARD_SOURCE_DIR}/${TARGET_PLATFORM}/bsdtar"/>
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
@@ -563,20 +562,36 @@
             Execute="deferred"
          />
 
+        <CustomAction Id="CreateInitrd"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="CreateInitrd"
+            Return="check"
+            Execute="deferred"
+         />
+
+        <CustomAction Id="RemoveInitrd"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="RemoveInitrd"
+            Return="check"
+            Execute="deferred"
+         />
+
         <CustomAction Id="RemoveRegistryKeyProtections"
-           Impersonate="no"
-           BinaryRef="wslinstall.dll"
-           DllEntry="RemoveRegistryKeyProtections"
-           Return="check"
-           Execute="deferred"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="RemoveRegistryKeyProtections"
+            Return="check"
+            Execute="deferred"
          />
 
         <CustomAction Id="UnregisterLspCategories"
-           Impersonate="no"
-           BinaryRef="wslinstall.dll"
-           DllEntry="UnregisterLspCategories"
-           Return="check"
-           Execute="deferred"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="UnregisterLspCategories"
+            Return="check"
+            Execute="deferred"
          />
 
         <CustomAction Id="InstallMsix.SetProperty" Return="check" Property="InstallMsix" Value='[DATABASE]' Execute='immediate' />
@@ -626,9 +641,16 @@
             <!-- This needs to run after the registry is written because this action needs to read the install path -->
             <Custom Action="RegisterLspCategories" After="WriteRegistryValues" Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED)  and (not UPGRADINGPRODUCTCODE) and (not SKIPLSP = 1)' />
 
+            <!-- Generate initrd.img from the init binary during installation.
+                 Only run when the tools component is being installed ($tools=3), not during same-version reinstalls -->
+            <Custom Action="CreateInitrd" After="RegisterLspCategories" Condition='$tools=3' />
+
             <!-- This needs to run before the registry is cleared because this action needs to read the install path.
                  This actions runs on uninstallation and upgrade. -->
             <Custom Action="UnregisterLspCategories" Before="RemoveRegistryValues" Condition='(REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE) and (not SKIPLSP = 1)' />
+
+            <!-- Remove initrd.img during uninstallation. Must run after StopServices so the file isn't locked -->
+            <Custom Action="RemoveInitrd" Before="UnregisterLspCategories" Condition='(REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
 
             <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                 <!-- This needs to run before the registry is written because this action calculates registry key names and values -->
