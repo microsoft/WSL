@@ -157,32 +157,32 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionListOnline" xml:space="preserve">
-    <value>以下是可安装的有效分发的列表。
+    <value>以下是可安装的有效发行版的列表。
 使用“wsl.exe {} &lt;Distro&gt;”安装。
 </value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroAlreadySet" xml:space="preserve">
-    <value>分发名称已设置。</value>
+    <value>发行版名称已设置。</value>
   </data>
   <data name="MessageDistroInstallPathAlreadyExists" xml:space="preserve">
     <value>提供的安装位置已在使用中。</value>
   </data>
   <data name="MessageDistroNameAlreadyExists" xml:space="preserve">
-    <value>已存在具有所提供名称的分发。使用 --name 选择其他名称。</value>
+    <value>已存在具有所提供名称的发行版。使用 --name 选择其他名称。</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistroNotFound" xml:space="preserve">
-    <value>不存在具有所提供名称的分发。</value>
+    <value>不存在具有所提供名称的发行版。</value>
   </data>
   <data name="MessageElevationNeededToMountDisk" xml:space="preserve">
     <value>需要管理员访问权限才能装载磁盘。</value>
   </data>
   <data name="MessageExportFailed" xml:space="preserve">
-    <value>导出分发失败。</value>
+    <value>导出发行版失败。</value>
   </data>
   <data name="MessageFsUpgradeNeeded" xml:space="preserve">
-    <value>为此分发实施适用于 Linux 的 Windows 子系统文件系统的一次性升级...
+    <value>为此发行版实施适用于 Linux 的 Windows 子系统文件系统的一次性升级...
 </value>
   </data>
   <data name="MessageHigherIntegrity" xml:space="preserve">
@@ -190,7 +190,7 @@
 </value>
   </data>
   <data name="MessageImportFailed" xml:space="preserve">
-    <value>导入分发失败。</value>
+    <value>导入发行版失败。</value>
   </data>
   <data name="MessageInstallingWindowsComponent" xml:space="preserve">
     <value>正在安装 Windows 可选组件: {}</value>
@@ -205,7 +205,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageImportingDistribution" xml:space="preserve">
-    <value>正在导入通讯组</value>
+    <value>正在导入发行版</value>
   </data>
   <data name="MessageDownloadComplete" xml:space="preserve">
     <value>{} 已下载。</value>
@@ -215,8 +215,8 @@
     <value>适用于 Linux 的 Windows 子系统正在恢复以前的安装...</value>
   </data>
   <data name="MessageInvalidDistributionName" xml:space="preserve">
-    <value>无效的分发名称：“{}”。
-若要获取有效分发列表，请使用“wsl.exe --list --online'”。</value>
+    <value>无效的发行版名称：“{}”。
+若要获取有效发行版列表，请使用“wsl.exe --list --online”。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInstanceTerminated" xml:space="preserve">
@@ -241,7 +241,7 @@
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidState" xml:space="preserve">
-    <value>正在进行此分发的安装、卸载或转换。
+    <value>正在进行此发行版的安装、卸载或转换。
 </value>
   </data>
   <data name="MessageLaunchingDistro" xml:space="preserve">
@@ -253,25 +253,25 @@
 </value>
   </data>
   <data name="MessageNoDefaultDistro" xml:space="preserve">
-    <value>适用于 Linux 的 Windows 子系统没有已安装的分发。
-可通过安装包含以下说明的分发来解决此问题：
+    <value>适用于 Linux 的 Windows 子系统没有已安装的发行版。
+可通过安装包含以下说明的发行版来解决此问题：
 
-使用“wsl.exe --list --online' ”列出可用的分发
+使用“wsl.exe --list --online”列出可用的发行版
 和 “wsl.exe --install &lt;Distro&gt;” 进行安装。</value>
     <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoRunningDistro" xml:space="preserve">
-    <value>没有正在运行的分发。</value>
+    <value>没有正在运行的发行版。</value>
   </data>
   <data name="MessagePrintDistroDefault" xml:space="preserve">
     <value>{} (默认值)</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageRegisteredDistrosHeader" xml:space="preserve">
-    <value>适用于 Linux 的 Windows 子系统分发:</value>
+    <value>适用于 Linux 的 Windows 子系统发行版:</value>
   </data>
   <data name="MessageStatusDefaultDistro" xml:space="preserve">
-    <value>默认分发: {}</value>
+    <value>默认发行版: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageStatusDefaultVersion" xml:space="preserve">
@@ -292,16 +292,16 @@
     <value>正在进行转换，这可能需要几分钟时间。</value>
   </data>
   <data name="MessageAlreadyRequestedVersion" xml:space="preserve">
-    <value>该分发已是请求的版本。</value>
+    <value>该发行版已是请求的版本。</value>
   </data>
   <data name="MessageVmModeNotSupported" xml:space="preserve">
-    <value>旧分发不支持 WSL 2。</value>
+    <value>旧发行版不支持 WSL 2。</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2 无法启动，因为此计算机上未启用虚拟化。
 请确保计算机固件设置中“虚拟机平台”可选组件已启用，且虚拟化已开启。
 
-启用“虚拟机平台”通过运行: wsl.exe --install --no-distribution
+通过运行以下命令启用“虚拟机平台”: wsl.exe --install --no-distribution
 
 有关信息，请访问 https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
@@ -322,7 +322,7 @@
     <value>仅 WSL2 支持此操作。</value>
   </data>
   <data name="MessageWslInfoUsage" xml:space="preserve">
-    <value>使用量:
+    <value>用法:
     --networking-mode
        显示当前网络模式。
 
@@ -366,20 +366,20 @@
 
 用法:
     /l, /list [选项]
-        列出已注册的分发版。
-        /all - (可选)列出所有分发版，包括
-               当前安装或未安装的分发版。
+        列出已注册的发行版。
+        /all - (可选)列出所有发行版，包括
+               当前安装或未安装的发行版。
 
-        /running - 仅列出当前正在运行的分发版。
+        /running - 仅列出当前正在运行的发行版。
 
     /s, /setdefault &lt;DistributionName&gt;
-        将分发版设置为默认值。
+        将发行版设置为默认值。
 
     /t, /terminate &lt;DistributionName&gt;
-        终止分发版。
+        终止发行版。
 
     /u, /unregister &lt;DistributionName&gt;
-        取消注册分发版并删除根文件系统。</value>
+        取消注册发行版并删除根文件系统。</value>
     <comment>{Locked="/l,"}{Locked="/list "}{Locked="/all "}{Locked="/running "}{Locked="/s,"}{Locked="/setdefault "}{Locked="/t,"}{Locked="/terminate "}{Locked="/u,"}{Locked="/unregister "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslUsage" xml:space="preserve">
@@ -458,7 +458,7 @@
                 安装后不要启动发行版。
 
             --version &lt;Version&gt;
-                指定要用于新分发的版本。
+                指定要用于新发行版的版本。
 
             --vhd-size &lt;MemoryString&gt;
                 指定用于存储发行版的磁盘的大小。
@@ -551,7 +551,7 @@
 
         选项:
             --version &lt;Version&gt;
-                指定要用于新分发的版本。
+                指定要用于新发行版的版本。
 
             --vhd
                 指定所提供的文件是 .vhd 还是 .vhdx 文件，而不是 tar 文件。
@@ -582,7 +582,7 @@
                 显示适合通过 'wsl --install' 安装的可用发行版列表。
 
     --set-default, -s &lt;Distro&gt;
-        将分布版设置为默认值。
+        将发行版设置为默认值。
 
     --set-version &lt;Distro&gt; &lt;Version&gt;
         更改指定发行版的版本。
@@ -620,7 +620,7 @@ WSLg 版本: {}
 MSRDC 版本: {}
 Direct3D 版本: {}
 DXCore 版本: {}
-Windows: {}</value>
+Windows 版本: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageBuildInfo" xml:space="preserve">
@@ -638,7 +638,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCustomSystemDistroError" xml:space="preserve">
-    <value>在 {} 中指定的自定义系统分发找不到或格式不正确。</value>
+    <value>在 {} 中指定的自定义系统发行版找不到或格式不正确。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslgUsage" xml:space="preserve">
@@ -651,11 +651,11 @@ Windows: {}</value>
    --cd &lt;Directory&gt;
        将指定目录设置为当前工作目录。
        如果使用 ~，则将使用 Linux 用户的主路径。如果路径开始于
-       对于 /字符，它将解释为绝对 Linux 路径。
+       如果路径以 / 字符开始，它将被解释为绝对 Linux 路径。
        否则，该值必须是绝对 Windows 路径。
 
    --distribution, -d &lt;Distro&gt;
-       运行指定的分发。
+       运行指定的发行版。
 
    --user, -u &lt;UserName&gt;
        以指定用户身份运行。
@@ -667,7 +667,7 @@ Windows: {}</value>
        显示使用情况信息。
 
    --
-       按时传递剩余的命令行。</value>
+       按原样传递剩余的命令行。</value>
     <comment>{Locked="--cd "}{Locked="--distribution,"}{Locked="--user,"}{Locked="--shell-type "}{Locked="--help
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -675,7 +675,7 @@ Windows: {}</value>
     <value>按任意键继续...</value>
   </data>
   <data name="MessageRequiredParameterMissing" xml:space="preserve">
-    <value>自变量 {} 缺少必需的参数。</value>
+    <value>参数 {} 缺少必需的参数。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageExportProgress" xml:space="preserve">
@@ -692,7 +692,7 @@ Windows: {}</value>
     <value>正在检查更新。</value>
   </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
-    <value>此分发版仅在Microsoft Store中可用。</value>
+    <value>此发行版仅在 Microsoft Store 中可用。</value>
   </data>
   <data name="MessageWslMountNotSupportedOnArm" xml:space="preserve">
     <value>在 ARM64 上 wsl.exe --mount 需要 Windows 版本 27653 或更高版本。</value>
@@ -708,7 +708,7 @@ Windows: {}</value>
   <data name="MessageWslOptionalComponentRequired" xml:space="preserve">
     <value>此应用程序需要适用于 Linux 的 Windows 子系统可选组件。
 通过运行 wsl.exe --install --no-distribution
-来安装它可能需要重新启动系统才能使更改生效。</value>
+来安装它。可能需要重新启动系统才能使更改生效。</value>
      <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -728,7 +728,7 @@ Windows: {}</value>
     <value>桥接网络需要设置 wsl2.vmSwitch。</value>
   </data>
   <data name="MessageCouldFetchDistributionList" xml:space="preserve">
-    <value>无法从“{}”提取列表分发。{}</value>
+    <value>无法从“{}”中获取发行版列表。{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToAttachDisk" xml:space="preserve">
@@ -751,7 +751,7 @@ Windows: {}</value>
     <value>运行调试 shell 需要以管理员身份运行 wsl.exe。</value>
   </data>
   <data name="MessageInstallProcessFailed" xml:space="preserve">
-    <value>分发“{}”的安装过程失败，退出代码: {}。</value>
+    <value>发行版“{}”的安装过程失败，退出代码: {}。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidGuid" xml:space="preserve">
@@ -802,14 +802,14 @@ Windows: {}</value>
     <value>WSL 启动期间出错</value>
   </data>
   <data name="MessageSystemdUserSessionFailed" xml:space="preserve">
-    <value>无法启动“{}”的系统用户会话。有关详细信息，请参阅 journalctl。</value>
+    <value>无法启动“{}”的 systemd 用户会话。有关详细信息，请参阅 journalctl。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageOpenEventViewer" xml:space="preserve">
     <value>打开 EventViewer</value>
   </data>
   <data name="MessageDistributionNameNeeded" xml:space="preserve">
-    <value>此分发不包含默认名称。使用 --name 选择分发名称。</value>
+    <value>此发行版不包含默认名称。使用 --name 选择发行版名称。</value>
     <comment>{Locked="--name "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageArgumentsNotValidTogether" xml:space="preserve">
@@ -821,22 +821,22 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
-    <value>无效分发名称:“{}”。</value>
+    <value>无效发行版名称:“{}”。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
-    <value>正在使用旧分发注册。请考虑改用基于 tar 的分发。</value>
+    <value>正在使用旧发行版注册。请考虑改用基于 tar 的发行版。</value>
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
-    <value>旧分发注册不支持 --version 参数。</value>
+    <value>旧发行版注册不支持 --version 参数。</value>
     <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionOverridden" xml:space="preserve">
-    <value>分发“{}”由替代清单提供。</value>
+    <value>发行版“{}”由替代清单提供。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageHashMismatch" xml:space="preserve">
-    <value>分发哈希不匹配。预期: {}，实际哈希: {}</value>
+    <value>发行版哈希不匹配。预期: {}，实际哈希: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidHexString" xml:space="preserve">
@@ -844,11 +844,11 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNotSupportedOnLegacyDistros" xml:space="preserve">
-    <value>安装旧版分发时不支持“{}”。</value>
+    <value>安装旧版发行版时不支持“{}”。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionInstalled" xml:space="preserve">
-    <value>已成功安装分发。可以通过 “wsl.exe -d {}” 启动它</value>
+    <value>已成功安装发行版。可以通过 “wsl.exe -d {}” 启动它</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidNumberString" xml:space="preserve">
@@ -930,11 +930,11 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFatalPluginError" xml:space="preserve">
-    <value>插件“{}”返回了一个错误</value>
+    <value>插件“{}”返回了一个致命错误</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFatalPluginErrorWithMessage" xml:space="preserve">
-    <value>插件“{}”返回了一个错误。错误消息:“{}”</value>
+    <value>插件“{}”返回了一个致命错误。错误消息:“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePluginRequiresUpdate" xml:space="preserve">
@@ -989,7 +989,7 @@ Windows: {}</value>
     <value>安装缺少的组件。</value>
   </data>
   <data name="MessageInvalidDistributionTar" xml:space="preserve">
-    <value>导入的文件不是有效的 Linux 分发。</value>
+    <value>导入的文件不是有效的 Linux 发行版。</value>
   </data>
   <data name="MessagePressAnyKeyToExit" xml:space="preserve">
     <value>按任意键即可退出...</value>
@@ -1042,11 +1042,11 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionFailedToStart" xml:space="preserve">
-    <value>无法启动分发。错误代码： {}，失败步骤： {}</value>
+    <value>无法启动发行版。错误代码： {}，失败步骤： {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDiskCorrupted" xml:space="preserve">
-    <value>无法启动分发，因为其虚拟磁盘已损坏。</value>
+    <value>无法启动发行版，因为其虚拟磁盘已损坏。</value>
   </data>
   <data name="MessageConfigKeyDuplicated" xml:space="preserve">
     <value>{}:{} 中的配置键“{}”重复({}:{}中的键“{}”冲突)</value>
@@ -1057,11 +1057,11 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWaitingForOobe" xml:space="preserve">
-    <value>正在等待 OOBE 命令完成分发“{}”...</value>
+    <value>正在等待 OOBE 命令完成发行版“{}”...</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageCorruptedDistroRegistration" xml:space="preserve">
-    <value>无法从分发 {} 读取属性“{}”</value>
+    <value>无法从发行版 {} 读取属性“{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePassVhdFlag" xml:space="preserve">
@@ -1074,7 +1074,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoInstallDefault" xml:space="preserve">
-    <value>尚未配置默认分发。请提供要安装的分发。</value>
+    <value>尚未配置默认发行版。请提供要安装的发行版。</value>
   </data>
   <data name="MessageConfigVirtio9pDisabled" xml:space="preserve">
     <value>已禁用 wsl2.virtio9p，使用 vsock 传输回退到 9p。</value>
@@ -1086,7 +1086,7 @@ Windows: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageFailedToParseTerminalProfile" xml:space="preserve">
-    <value>注册分发时无法分析终端配置文件： {}</value>
+    <value>注册发行版时无法分析终端配置文件： {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidSize" xml:space="preserve">
@@ -1129,7 +1129,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>使用 mount -a 处理 /etc/fstab 失败。</value>
   </data>
   <data name="MessageReadOnlyDistro" xml:space="preserve">
-    <value>装载分发磁盘时出错，该磁盘作为回退以只读方式装载。
+    <value>装载发行版磁盘时出错，该磁盘作为回退以只读方式装载。
 请参阅以下位置的恢复说明： https://aka.ms/wsldiskmountrecovery</value>
   </data>
   <data name="MessageFailedToTranslate" xml:space="preserve">
@@ -1149,7 +1149,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>© Microsoft。保留所有权利。</value>
   </data>
   <data name="Settings_AppDisplayName" xml:space="preserve">
-    <value>适用于 Linux 设置的 Windows 子系统</value>
+    <value>适用于 Linux 的 Windows 子系统设置</value>
   </data>
   <data name="Settings_AppDescription" xml:space="preserve">
     <value>适用于 Linux 的 Windows 子系统设置允许开发人员使用基于 GUI 的应用程序管理 .wslconfig 文件。</value>
@@ -1258,7 +1258,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>默认 VHD 大小</value>
   </data>
   <data name="Settings_DefaultVHDSize.Description" xml:space="preserve">
-    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的分发。</value>
+    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的发行版。</value>
   </data>
   <data name="Settings_DefaultVHDSizeResetButton.Content" xml:space="preserve">
     <value>重设大小</value>
@@ -1267,7 +1267,7 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>默认 VHD 大小</value>
   </data>
   <data name="Settings_DefaultVHDSizeTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的分发。</value>
+    <value>为可扩展的 WSL 虚拟硬盘指定的默认最大大小 (VHD)，仅用于新创建的发行版。</value>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
     <value>开发人员</value>
@@ -1741,13 +1741,13 @@ wsl.exe --manage &lt;DistributionName&gt; --set-sparse true --allow-unsafe</valu
     <value>启用安全模式</value>
   </data>
   <data name="Settings_SafeMode.Description" xml:space="preserve">
-    <value>在“安全模式”下运行 WSL，这将禁用许多功能，并用于恢复处于错误状态的分发。</value>
+    <value>在“安全模式”下运行 WSL，这将禁用许多功能，并用于恢复处于错误状态的发行版。</value>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.Name" xml:space="preserve">
     <value>启用安全模式。</value>
   </data>
   <data name="Settings_SafeModeToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
-    <value>在“安全模式”下运行 WSL，这将禁用许多功能，并用于恢复处于错误状态的分发。</value>
+    <value>在“安全模式”下运行 WSL，这将禁用许多功能，并用于恢复处于错误状态的发行版。</value>
   </data>
   <data name="Settings_Shell_About.Content" xml:space="preserve">
     <value>关于</value>
