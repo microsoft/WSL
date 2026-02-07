@@ -1545,7 +1545,7 @@ class WSLATests
 
         // Validate that the group is correctly wired.
         {
-            WSLAContainerLauncher launcher("debian:latest", "test-username", {"groups"});
+            WSLAContainerLauncher launcher("debian:latest", "test-group", {"groups"});
 
             launcher.SetUser("nobody:www-data");
 
