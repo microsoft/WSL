@@ -21,6 +21,7 @@ Abstract:
 #include "WSLAProcessControl.h"
 #include "IORelay.h"
 #include "COMImplClass.h"
+#include "wsla_schema.h"
 #include "WSLAContainerMetadata.h"
 
 namespace wsl::windows::service::wsla {
@@ -93,6 +94,8 @@ private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
+
+    wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect);
 
     std::recursive_mutex m_lock;
     std::string m_name;

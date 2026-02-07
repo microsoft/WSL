@@ -53,6 +53,7 @@ set(SOURCES
 set(HEADERS
     ../../../generated/Localization.h
     ../inc/docker_schema.h
+    ../inc/wsla_schema.h
     ../inc/lxssbusclient.h
     ../inc/lxssclient.h
     ../inc/LxssDynamicFunction.h
