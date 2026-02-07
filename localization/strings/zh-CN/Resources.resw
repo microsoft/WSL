@@ -139,7 +139,7 @@
     <value>该卷已装载到 WSL2 内。</value>
   </data>
   <data name="MessageDiskMountNameAlreadyExists" xml:space="preserve">
-    <value>该名称的磁盘已装载;请卸载磁盘或选择新名称，然后重试。</value>
+    <value>该名称的磁盘已装载；请卸载磁盘或选择新名称，然后重试。</value>
   </data>
   <data name="MessageDiskMountNameInvalid" xml:space="preserve">
     <value>指定的装载名称包含无效的 "/" 字符。请在没有无效字符的情况下重试。</value>
