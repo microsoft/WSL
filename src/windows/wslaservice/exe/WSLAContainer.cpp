@@ -875,11 +875,6 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     }
 }
 
-void WSLAContainerImpl::GetID(LPSTR* Output)
-{
-    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_id.data()).release();
-}
-
 void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
     std::lock_guard lock(m_lock);
@@ -1006,12 +1001,6 @@ HRESULT WSLAContainer::Inspect(LPSTR* Output)
     *Output = nullptr;
 
     return CallImpl(&WSLAContainerImpl::Inspect, Output);
-}
-
-HRESULT WSLAContainer::GetID(LPSTR* Id)
-{
-    *Id = nullptr;
-    return CallImpl(&WSLAContainerImpl::GetID, Id);
 }
 
 HRESULT WSLAContainer::Delete()
