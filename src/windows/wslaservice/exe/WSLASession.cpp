@@ -99,11 +99,11 @@ try
     // Create the VM.
     m_virtualMachine.emplace(Vm, Settings);
 
-    // Configure storage.
-    ConfigureStorage(*Settings, m_tokenInfo->User.Sid);
-
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
+
+    // Configure storage.
+    ConfigureStorage(*Settings, m_tokenInfo->User.Sid);
 
     // Launch dockerd
     StartDockerd();

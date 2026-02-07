@@ -42,7 +42,7 @@ WSLASessionManagerImpl::~WSLASessionManagerImpl()
     ForEachSession<void>([](auto& e) { LOG_IF_FAILED(e.Terminate()); });
 }
 
-void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
+void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASessionProxy** WslaSession)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
 
@@ -55,7 +55,7 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
             RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
 
             THROW_IF_FAILED(CheckTokenAccess(session, tokenInfo));
-            return session.QueryInterface(__uuidof(IWSLASession), (void**)WslaSession);
+            return session.QueryInterface(__uuidof(IWSLASessionProxy), (void**)WslaSession);
         }
 
         return std::optional<HRESULT>{};
@@ -102,17 +102,17 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
         m_persistentSessions.emplace_back(proxy);
     }
 
-    THROW_IF_FAILED(proxy.CopyTo(__uuidof(IWSLASession), reinterpret_cast<void**>(WslaSession)));
+    THROW_IF_FAILED(proxy.CopyTo(__uuidof(IWSLASessionProxy), reinterpret_cast<void**>(WslaSession)));
 }
 
-void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
+void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASessionProxy** Session)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
     auto result = ForEachSession<HRESULT>([&](auto& e) {
         if (e.GetId() == Id)
         {
             THROW_IF_FAILED(CheckTokenAccess(e, tokenInfo));
-            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASession), (void**)Session));
+            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASessionProxy), (void**)Session));
             return std::make_optional(S_OK);
         }
         else
@@ -124,7 +124,7 @@ void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
     THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%lu' not found", Id);
 }
 
-void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession** Session)
+void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASessionProxy** Session)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
 
@@ -132,7 +132,7 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
         if (e.DisplayName() == DisplayName)
         {
             THROW_IF_FAILED(CheckTokenAccess(e, tokenInfo));
-            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASession), reinterpret_cast<void**>(Session)));
+            THROW_IF_FAILED(e.QueryInterface(__uuidof(IWSLASessionProxy), reinterpret_cast<void**>(Session)));
             return std::make_optional(S_OK);
         }
         else
@@ -259,7 +259,7 @@ HRESULT WSLASessionManager::GetVersion(_Out_ WSLA_VERSION* Version)
     return CallImpl(&WSLASessionManagerImpl::GetVersion, Version);
 }
 
-HRESULT WSLASessionManager::CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession)
+HRESULT WSLASessionManager::CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASessionProxy** WslaSession)
 {
     return CallImpl(&WSLASessionManagerImpl::CreateSession, WslaSessionSettings, Flags, WslaSession);
 }
@@ -269,12 +269,12 @@ HRESULT WSLASessionManager::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessio
     return CallImpl(&WSLASessionManagerImpl::ListSessions, Sessions, SessionsCount);
 }
 
-HRESULT WSLASessionManager::OpenSession(_In_ ULONG Id, _Out_ IWSLASession** Session)
+HRESULT WSLASessionManager::OpenSession(_In_ ULONG Id, _Out_ IWSLASessionProxy** Session)
 {
     return CallImpl(&WSLASessionManagerImpl::OpenSession, Id, Session);
 }
 
-HRESULT WSLASessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session)
+HRESULT WSLASessionManager::OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASessionProxy** Session)
 {
     return CallImpl(&WSLASessionManagerImpl::OpenSessionByName, DisplayName, Session);
 }

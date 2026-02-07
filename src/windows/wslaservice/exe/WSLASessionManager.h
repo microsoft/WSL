@@ -52,10 +52,10 @@ public:
     ~WSLASessionManagerImpl();
 
     void GetVersion(_Out_ WSLA_VERSION* Version);
-    void CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession);
+    void CreateSession(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASessionProxy** WslaSession);
     void ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount);
-    void OpenSession(_In_ ULONG Id, _Out_ IWSLASession** Session);
-    void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session);
+    void OpenSession(_In_ ULONG Id, _Out_ IWSLASessionProxy** Session);
+    void OpenSessionByName(_In_ LPCWSTR DisplayName, _Out_ IWSLASessionProxy** Session);
 
 private:
     // Iterates over all sessions, cleaning up released non-persistent sessions.
@@ -70,8 +70,8 @@ private:
 
         auto each = [&](const Microsoft::WRL::ComPtr<IWeakReference>& WeakRef) {
             // Try to resolve the weak reference
-            Microsoft::WRL::ComPtr<IWSLASession> lockedSession;
-            THROW_IF_FAILED(WeakRef->Resolve(__uuidof(IWSLASession), reinterpret_cast<IInspectable**>(lockedSession.GetAddressOf())));
+            Microsoft::WRL::ComPtr<IWSLASessionProxy> lockedSession;
+            THROW_IF_FAILED(WeakRef->Resolve(__uuidof(IWSLASessionProxy), reinterpret_cast<IInspectable**>(lockedSession.GetAddressOf())));
 
             if (!lockedSession)
             {
@@ -151,8 +151,8 @@ public:
     WSLASessionManager(wsl::windows::service::wsla::WSLASessionManagerImpl* Impl);
 
     IFACEMETHOD(GetVersion)(_Out_ WSLA_VERSION* Version) override;
-    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASession** WslaSession) override;
+    IFACEMETHOD(CreateSession)(const WSLA_SESSION_SETTINGS* WslaSessionSettings, WSLASessionFlags Flags, IWSLASessionProxy** WslaSession) override;
     IFACEMETHOD(ListSessions)(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount) override;
-    IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASession** Session) override;
-    IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLASession** Session) override;
+    IFACEMETHOD(OpenSession)(_In_ ULONG Id, _Out_ IWSLASessionProxy** Session) override;
+    IFACEMETHOD(OpenSessionByName)(_In_ LPCWSTR DisplayName, _Out_ IWSLASessionProxy** Session) override;
 };

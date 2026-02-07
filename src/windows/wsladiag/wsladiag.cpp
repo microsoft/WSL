@@ -88,8 +88,8 @@ static int RunShellCommand(std::wstring_view commandLine)
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
 
-    wil::com_ptr<IWSLASession> session;
-    HRESULT hr = manager->OpenSessionByName(sessionName.c_str(), &session);
+    wil::com_ptr<IWSLASessionProxy> proxy;
+    HRESULT hr = manager->OpenSessionByName(sessionName.c_str(), &proxy);
     if (FAILED(hr))
     {
         if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND))
@@ -100,6 +100,10 @@ static int RunShellCommand(std::wstring_view commandLine)
 
         return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
     }
+
+    wil::com_ptr<IWSLASession> session;
+    THROW_IF_FAILED(proxy->GetSession(&session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     if (verbose)
     {
@@ -286,11 +290,15 @@ static wil::com_ptr<IWSLASession> OpenCLISession()
     settings.MaximumStorageSizeMb = 10000; // 10GB.
     settings.NetworkingMode = WSLANetworkingModeVirtioProxy;
 
-    wil::com_ptr<IWSLASession> session;
+    wil::com_ptr<IWSLASessionProxy> session;
     THROW_IF_FAILED(manager->CreateSession(&settings, WSLASessionFlagsPersistent | WSLASessionFlagsOpenExisting, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-    return session;
+    wil::com_ptr<IWSLASession> directSession;
+    THROW_IF_FAILED(session->GetSession(&directSession));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(directSession.get());
+
+    return directSession;
 }
 static void PullImpl(IWSLASession& Session, const std::string& Image)
 {

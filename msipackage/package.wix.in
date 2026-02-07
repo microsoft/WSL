@@ -319,6 +319,14 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLASessionProxy-->
+                <RegistryKey Root="HKCR" Key="Interface\{B3A72F48-9D15-4E8A-A621-7C3E84F09B52}">
+                    <RegistryValue Value="IWSLASessionProxy" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <!-- IWSLAVirtualMachine-->
                 <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
                     <RegistryValue Value="IWSLAVirtualMachine" Type="string" />

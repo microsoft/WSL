@@ -35,11 +35,42 @@ extern bool g_fastTestRun;
 class WSLATests
 {
     WSL_TEST_CLASS(WSLATests)
+
+    // Holds both the session proxy (for lifetime management) and the direct session
+    // (for operational calls). Convenience operators delegate to the direct session.
+    struct TestSession
+    {
+        wil::com_ptr<IWSLASessionProxy> proxy;
+        wil::com_ptr<IWSLASession> direct;
+
+        IWSLASession* get() const
+        {
+            return direct.get();
+        }
+        IWSLASession& operator*() const
+        {
+            return *direct;
+        }
+        IWSLASession* operator->() const
+        {
+            return direct.get();
+        }
+        void reset()
+        {
+            direct.reset();
+            proxy.reset();
+        }
+        explicit operator bool() const
+        {
+            return !!direct;
+        }
+    };
+
     wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
     WSLA_SESSION_SETTINGS m_defaultSessionSettings{};
-    wil::com_ptr<IWSLASession> m_defaultSession;
+    TestSession m_defaultSession;
     static inline auto c_testSessionName = L"wsla-test";
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -118,22 +149,29 @@ class WSLATests
     {
         wil::com_ptr<IWSLASessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
         return sessionManager;
     }
 
-    wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings, WSLASessionFlags Flags = WSLASessionFlagsNone)
+    TestSession CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings, WSLASessionFlags Flags = WSLASessionFlagsNone)
     {
-        wil::com_ptr<IWSLASessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        const auto sessionManager = OpenSessionManager();
 
+        wil::com_ptr<IWSLASessionProxy> proxy;
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &proxy));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(proxy.get());
+
+        auto direct = GetDirectSession(proxy.get());
+        return {std::move(proxy), std::move(direct)};
+    }
+
+    static wil::com_ptr<IWSLASession> GetDirectSession(IWSLASessionProxy* Proxy)
+    {
         wil::com_ptr<IWSLASession> session;
+        VERIFY_SUCCEEDED(Proxy->GetSession(&session));
 
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-
         return session;
     }
 
@@ -289,12 +327,12 @@ class WSLATests
         auto sessionManager = OpenSessionManager();
 
         // Act: open by the same display name
-        wil::com_ptr<IWSLASession> opened;
+        wil::com_ptr<IWSLASessionProxy> opened;
         VERIFY_SUCCEEDED(sessionManager->OpenSessionByName(c_testSessionName, &opened));
         VERIFY_IS_NOT_NULL(opened.get());
 
         // And verify we get ERROR_NOT_FOUND for a nonexistent name
-        wil::com_ptr<IWSLASession> notFound;
+        wil::com_ptr<IWSLASessionProxy> notFound;
         auto hr = sessionManager->OpenSessionByName(L"this-name-does-not-exist", &notFound);
         VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
     }
@@ -2282,7 +2320,7 @@ class WSLATests
         auto restore = createNewSession ? std::optional{ResetTestSession()} : std::nullopt;
         auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
-        return std::make_pair(std::move(restore), session);
+        return std::make_pair(std::move(restore), std::move(session));
     }
 
     TEST_METHOD(PortMappingsNat)
@@ -2839,7 +2877,7 @@ class WSLATests
             expectSessions({L"session-1", c_testSessionName});
             session1 = create(L"session-1", WSLASessionFlagsOpenExisting);
 
-            VERIFY_SUCCEEDED(session1->Terminate());
+            VERIFY_SUCCEEDED(session1.proxy->Terminate());
             session1.reset();
             expectSessions({c_testSessionName});
         }
@@ -2860,10 +2898,10 @@ class WSLATests
             // Verify that name conflicts are correctly handled.
             auto settings = GetDefaultSessionSettings(L"session-1");
 
-            wil::com_ptr<IWSLASession> session;
+            wil::com_ptr<IWSLASessionProxy> session;
             VERIFY_ARE_EQUAL(manager->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
-            VERIFY_SUCCEEDED(session1Copy->Terminate());
+            VERIFY_SUCCEEDED(session1Copy.proxy->Terminate());
             expectSessions({c_testSessionName});
 
             // Validate that a new session is created if WSLASessionFlagsOpenExisting is set and no match is found.
@@ -2879,7 +2917,7 @@ class WSLATests
             auto nonElevatedSession = create(L"non-elevated-session", WSLASessionFlagsNone);
 
             // Validate that non-elevated tokens can't open an elevated session.
-            wil::com_ptr<IWSLASession> openedSession;
+            wil::com_ptr<IWSLASessionProxy> openedSession;
             ULONG elevatedId{};
             VERIFY_SUCCEEDED(elevatedSession->GetId(&elevatedId));
             VERIFY_ARE_EQUAL(manager->OpenSession(elevatedId, &openedSession), HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED));

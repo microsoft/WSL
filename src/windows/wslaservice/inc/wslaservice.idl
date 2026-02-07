@@ -468,6 +468,24 @@ interface IWSLASession : IUnknown
     HRESULT Initialize(
         [in] const struct WSLA_SESSION_INIT_SETTINGS* Settings,
         [in] IWSLAVirtualMachine* Vm);
+
+}
+
+[
+    uuid(B3A72F48-9D15-4E8A-A621-7C3E84F09B52),
+    pointer_default(unique),
+    object
+]
+interface IWSLASessionProxy : IUnknown
+{
+    // Get a direct reference to the underlying session object in the per-user process.
+    HRESULT GetSession([out] IWSLASession** Session);
+
+    // Session ID.
+    HRESULT GetId([out] ULONG* Id);
+
+    // Terminate the session and its VM.
+    HRESULT Terminate();
 }
 
 struct WSLA_SESSION_INFORMATION
@@ -512,10 +530,10 @@ interface IWSLASessionManager : IUnknown
     HRESULT GetVersion([out] WSLA_VERSION* Version);
 
     // Session managment.
-    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out]IWSLASession** Session);
+    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out]IWSLASessionProxy** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
-    HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
-    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
+    HRESULT OpenSession([in] ULONG Id, [out]IWSLASessionProxy** Session);
+    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASessionProxy** Session);
 }
 
 cpp_quote("#define WSLA_E_BASE (0x0600)")
