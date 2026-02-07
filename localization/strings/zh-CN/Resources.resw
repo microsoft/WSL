@@ -215,7 +215,7 @@
   </data>
   <data name="MessageInvalidDistributionName" xml:space="preserve">
     <value>无效的发行版名称：“{}”。
-若要获取有效发行版列表，请使用“wsl.exe --list --online”。</value>
+若要获取有效的发行版列表，请使用 'wsl.exe --list --online'。</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInstanceTerminated" xml:space="preserve">
@@ -254,8 +254,8 @@
     <value>适用于 Linux 的 Windows 子系统没有已安装的发行版。
 可通过按照以下说明安装发行版来解决此问题：
 
-使用“wsl.exe --list --online”列出可用的发行版
-和 “wsl.exe --install &lt;Distro&gt;” 进行安装。</value>
+使用 'wsl.exe --list --online' 列出可用的发行版
+以及使用 'wsl.exe --install &lt;Distro&gt;' 进行安装。</value>
     <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoRunningDistro" xml:space="preserve">
@@ -576,7 +576,7 @@
                 显示有关所有发行版的详细信息。
 
             --online, -o
-                显示适合通过 “wsl.exe --install” 安装的可用发行版列表。
+                显示适合通过 'wsl.exe --install' 安装的可用发行版列表。
 
     --set-default, -s &lt;Distro&gt;
         将发行版设置为默认值。
