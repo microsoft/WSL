@@ -21,6 +21,13 @@ from urllib.parse import urlparse
 @click.option('--use-current-ref', is_flag=True, default=False)
 @click.option('--auto-release-notes', is_flag=True, default=False)
 def main(version: str, previous: str, max_message_lines: int, publish: bool, assets: list, no_fetch: bool, github_token: str, use_current_ref: bool, auto_release_notes: bool):
+    # Securely retrieve GitHub token from environment variable
+    # Fall back to command-line option for backwards compatibility (deprecated)
+    if github_token is not None:
+        print('WARNING: Passing --github-token via command line is deprecated and insecure. Use GITHUB_TOKEN environment variable instead.', file=sys.stderr)
+    else:
+        github_token = os.environ.get('GITHUB_TOKEN')
+    
     if publish:
         # Click provides an empty tuple when no assets are passed. Guard against both
         # an explicit None (older Click versions / direct invocation) and an empty
@@ -29,7 +36,7 @@ def main(version: str, previous: str, max_message_lines: int, publish: bool, ass
             raise RuntimeError('--publish requires at least one asset')
 
         if github_token is None:
-            raise RuntimeError('--publish requires --github_token')
+            raise RuntimeError('--publish requires GITHUB_TOKEN environment variable or --github-token option')
 
     for e in assets:
         if not os.path.exists(e):
