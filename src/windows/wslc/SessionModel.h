@@ -16,8 +16,16 @@ private:
     wil::com_ptr<IWSLASession> m_session;
 };
 
-struct SessionOptions : public WSLA_SESSION_SETTINGS
+struct SessionOptions
 {
     static SessionOptions Default();
+
+    void StoragePath(std::filesystem::path path);
+
+    operator const WSLA_SESSION_SETTINGS*() const;
+
+private:
+    WSLA_SESSION_SETTINGS m_sessionSettings;
+    std::filesystem::path m_storagePath;
 };
 }
