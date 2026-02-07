@@ -1580,6 +1580,7 @@ int WslaShell(_In_ std::wstring_view commandLine)
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
+    wil::com_ptr<IWSLASessionProxy> sessionProxy;
     wil::com_ptr<IWSLASession> session;
 
     if (!rootVhdOverride.empty())
@@ -1602,14 +1603,18 @@ int WslaShell(_In_ std::wstring_view commandLine)
 
     if (!debugShell.empty())
     {
-        THROW_IF_FAILED(sessionManager->OpenSessionByName(debugShell.c_str(), &session));
+        THROW_IF_FAILED(sessionManager->OpenSessionByName(debugShell.c_str(), &sessionProxy));
     }
     else
     {
-        THROW_IF_FAILED(sessionManager->CreateSession(&sessionSettings, WSLASessionFlagsNone, &session));
+        THROW_IF_FAILED(sessionManager->CreateSession(&sessionSettings, WSLASessionFlagsNone, &sessionProxy));
 
         wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
     }
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionProxy.get());
+    THROW_IF_FAILED(sessionProxy->GetSession(&session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     std::optional<wil::com_ptr<IWSLAContainer>> container;
     std::optional<wsl::windows::common::ClientRunningWSLAProcess> process;
