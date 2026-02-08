@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+#include "pch.h"
 #include "ArgumentParser.h"
 #include "Localization.h"
 
@@ -39,7 +40,7 @@ namespace wsl::windows::wslc
         // If the next argument was to be a value, but none was provided, convert it to an exception.
         else if (m_state.Type() && m_invocationItr == m_invocation.end())
         {
-            throw ArgumentException(L"WSLCCLI_MissingArgumentError" /* m_state.Arg() */);
+            throw ArgumentException(WSLC_LOC(MissingArgumentError, m_state.Arg()));
         }
     }
 
@@ -82,8 +83,7 @@ namespace wsl::windows::wslc
         // If the previous step indicated a value was needed, set it and forget it.
         if (m_state.Type())
         {
-            auto argType = m_state.Type().value();
-            m_executionArgs.Add(argType, std::wstring{currArg});
+            m_executionArgs.Add(m_state.Type().value(), std::wstring{currArg});
             return {};
         }
 
@@ -93,7 +93,7 @@ namespace wsl::windows::wslc
             const Argument* nextPositional = NextPositional();
             if (!nextPositional)
             {
-                return ArgumentException(L"WSLCCLI_ExtraPositionalError" /* currArg */);
+                return ArgumentException(WSLC_LOC(ExtraPositionalError, currArg));
             }
 
             std::vector<std::wstring> containerIds;
@@ -103,7 +103,7 @@ namespace wsl::windows::wslc
         // The currentArg must not be empty, and starts with a -
         else if (currArg.length() == 1)
         {
-            return ArgumentException(L"WSLCCLI_InvalidArgumentSpecifierError" /* currArg */);
+            return ArgumentException(WSLC_LOC(InvalidArgumentSpecifierError, currArg));
         }
         // Now it must be at least 2 chars
         else if (currArg[1] != WSLC_CLI_ARG_ID_CHAR)
@@ -114,7 +114,7 @@ namespace wsl::windows::wslc
             auto itr = std::find_if(m_arguments.begin(), m_arguments.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
             if (itr == m_arguments.end())
             {
-                return ArgumentException(L"WSLCCLI_InvalidAliasError" /* currArg */);
+                return ArgumentException(WSLC_LOC(InvalidAliasError, currArg));
             }
 
             if (argument::Args::GetValueType(itr->Type()) == ValueType::Bool)
@@ -128,11 +128,11 @@ namespace wsl::windows::wslc
                     auto itr2 = std::find_if(m_arguments.begin(), m_arguments.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
                     if (itr2 == m_arguments.end())
                     {
-                        return ArgumentException(L"WSLCCLI_AdjoinedNotFoundError" /* currArg */);
+                        return ArgumentException(WSLC_LOC(AdjoinedNotFoundError, currArg));
                     }
                     else if (argument::Args::GetValueType(itr2->Type()) != ValueType::Bool)
                     {
-                        return ArgumentException(L"WSLCCLI_AdjoinedNotFlagError" /* currArg */);
+                        return ArgumentException(WSLC_LOC(AdjoinedNotFlagError, currArg));
                     }
                     else
                     {
@@ -148,7 +148,7 @@ namespace wsl::windows::wslc
                 }
                 else
                 {
-                    return ArgumentException(L"WSLCCLI_SingleCharAfterDashError" /* currArg */);
+                    return ArgumentException(WSLC_LOC(SingleCharAfterDashError, currArg));
                 }
             }
             else
@@ -189,7 +189,7 @@ namespace wsl::windows::wslc
                     {
                         if (hasValue)
                         {
-                            return ArgumentException(L"WSLCCLI_FlagContainAdjoinedError" /* currArg */);
+                            return ArgumentException(WSLC_LOC(FlagContainAdjoinedError, currArg));
                         }
 
                         m_executionArgs.Add(arg.Type(), true);
@@ -209,7 +209,7 @@ namespace wsl::windows::wslc
 
             if (!argFound)
             {
-                return ArgumentException(Localization::WSLCCLI_InvalidNameError(currArg));
+                return ArgumentException(WSLC_LOC(InvalidNameError, currArg));
             }
         }
 

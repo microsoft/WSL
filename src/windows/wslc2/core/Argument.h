@@ -89,7 +89,7 @@ namespace wsl::windows::wslc
     private:
         ArgType m_argType;
         std::wstring m_name;
-        std::wstring m_desc;
+        mutable std::wstring m_desc;  // Mutable to allow lazy resolution
         wchar_t m_alias;
         std::wstring m_alternateName = std::wstring();
         bool m_required = false;

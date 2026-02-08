@@ -1933,11 +1933,11 @@ Usage:
     <value>Argument provided more times than allowed: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_HelpArgumentDescription" xml:space="preserve">
+  <data name="WSLCCLI_HelpArgDescription" xml:space="preserve">
     <value>Shows help about the selected command</value>
   </data>
-  <data name="WSLCCLI_InfoArgumentDescription" xml:space="preserve">
-    <value>Shows information about the tool and its environment</value>
+  <data name="WSLCCLI_InfoArgDescription" xml:space="preserve">
+    <value>Shows information about this tool and its environment</value>
   </data>
   <data name="WSLCCLI_MultipleExclusiveArgumentsProvided" xml:space="preserve">
     <value>Multiple mutually exclusive arguments provided: '{}'</value>
@@ -1981,5 +1981,24 @@ Usage:
   </data>
   <data name="WSLCCLI_CommandRequiresAdmin" xml:space="preserve">
     <value>This command requires administrator privileges to execute.</value>
+  </data>
+  <data name="WSLCCLI_SessionIdArgDescription" xml:space="preserve">
+    <value>Specify the session to use</value>
+  </data>
+  <data name="WSLCCLI_AttachArgDescription" xml:space="preserve">
+    <value>Attach to stdout/stderr of the container</value>
+  </data>
+  <data name="WSLCCLI_InteractiveArgDescription" xml:space="preserve">
+    <value>Attach to stdin and keep it open</value>
+  </data>
+  <data name="WSLCCLI_PortArgDescription" xml:space="preserve">
+    <value>Specify the port to use</value>
+  </data>
+  <data name="WSLCCLI_ContainerIdArgDescription" xml:space="preserve">
+    <value>Specify the container name to use</value>
+  </data>
+  <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
+    <value>Missing argument value: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

@@ -25,17 +25,34 @@ namespace wsl::windows::wslc
         {
             return std::any_of(argTypes.begin(), argTypes.end(), [&](ArgType arg) { return args.Contains(arg); });
         }
+
+        // Helper to get enum name as string for comparison
+        std::wstring GetArgTypeName(ArgType type)
+        {
+            switch (type)
+            {
+#define WSLC_ARG_NAME_CASE(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
+            case ArgType::EnumName: \
+                return L#EnumName;
+
+            WSLC_ARGUMENTS(WSLC_ARG_NAME_CASE)
+#undef WSLC_ARG_NAME_CASE
+
+            default:
+                return L"Unknown";
+            }
+        }
     }
 
     Argument Argument::ForType(ArgType type)
     {
         switch (type)
         {
-#define WSLC_ARG_CASE(EnumName, Name, Alias, DescID, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
+#define WSLC_ARG_CASE(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
         case ArgType::EnumName: \
-            return Argument{type, L##Name, Alias, L## #EnumName, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet};
+            return Argument{type, L##Name, Alias, Desc, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet};
 
-        WSLC_ARGUMENTS(WSLC_ARG_CASE)
+            WSLC_ARGUMENTS(WSLC_ARG_CASE)
 #undef WSLC_ARG_CASE
 
         default:
@@ -46,7 +63,6 @@ namespace wsl::windows::wslc
     void Argument::GetCommon(std::vector<Argument>& args)
     {
         args.push_back(ForType(ArgType::Help));
-        args.push_back(ForType(ArgType::SessionId));
     }
 
     std::wstring Argument::GetUsageString() const

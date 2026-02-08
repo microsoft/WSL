@@ -29,7 +29,7 @@ namespace wsl::windows::wslc::task
         WSLC_LOG(Task, Verbose, << L"In StoreSessionId Testing...");
         if (context.Args.Contains(ArgType::SessionId))
         {
-            context.Data.Add<Data::SessionId>(std::wstring{context.Args.Get<ArgType::SessionId>()});
+            context.Data.Add<Data::SessionId>(context.Args.Get<ArgType::SessionId>());
         }
     }
 }

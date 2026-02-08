@@ -70,9 +70,11 @@ namespace wsl::windows::wslc
         return {
             // ContainerId should be first by position, but we need to adjust the parser
             // for WSLC format of command <options> <positional> <args | positional2..>
+            Argument::ForType(ArgType::ContainerId),
+            Argument::ForType(ArgType::ForwardArgs),
             Argument::ForType(ArgType::Attach),
             Argument::ForType(ArgType::Interactive),
-            Argument::ForType(ArgType::ContainerIds),
+            Argument::ForType(ArgType::SessionId),
         };
     }
 
@@ -93,6 +95,7 @@ namespace wsl::windows::wslc
         PrintMessage(L"Container Start subcommand executing..", stdout);
         ////PrintMessage(L"  ContainerId: " + std::wstring{context.Args.Get<ArgType::ContainerId>()});
         PrintMessage(L"  ContainerIds: ");
+
         for (const auto& id : context.Args.Get<ArgType::ContainerIds>())
         {
             PrintMessage(L"    Container Id: " + id);
@@ -122,5 +125,15 @@ namespace wsl::windows::wslc
         {
             PrintMessage(L"    - Data key: " + std::to_wstring(static_cast<int>(key)));
         }
+
+        if (context.Args.Contains(ArgType::Port))
+        {
+            PrintMessage(L"  Ports: ");
+            for (const auto& port : context.Args.GetAll<ArgType::Port>())
+            {
+                PrintMessage(L"    Port: " + port);
+            }
+        }
+
     }
 }

@@ -370,7 +370,8 @@ namespace wsl::windows::wslc
         template <typename Func, size_t... I>
         void ExtractAtIndex(Func&& func, size_t index, std::index_sequence<I...>) const
         {
-            ((index == I + 1 ? (func.template operator()<I + 1>(), true) : false) || ...);
+            bool matched = false;
+            ((index == I + 1 ? (func.template operator()<I + 1>(), matched = true) : void()), ...);
         }
 
         // Helper to emplace at runtime-determined index
@@ -381,12 +382,14 @@ namespace wsl::windows::wslc
                 using Emplacer = wsl::windows::wslc::EnumBasedVariantMapEmplacer<Enum, Mapping, V>;
                 Emplacer::template Emplace<Index>(variant, std::forward<V>(v));
             };
-            
+
             size_t index = static_cast<size_t>(e) + 1;
             bool handled = false;
-            
-            ((index == I + 1 ? (emplaceAtIndex.template operator()<I + 1>(), handled = true) : false) || ...);
-            
+
+            (void)((((index == I + 1)
+                ? ([&] { emplaceAtIndex.template operator()<I + 1>(); handled = true; }(), true)
+                : false)) || ...);
+
             if (!handled)
             {
                 THROW_HR_MSG(E_INVALIDARG, "Invalid enum value: %d", static_cast<int>(e));
