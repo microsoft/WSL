@@ -88,7 +88,7 @@ namespace wsl::windows::wslc
             return {};
         }
 
-        // This is a positional argument
+        // If the anchor is found then all remaining args are considered positional or forwarded.
         if (m_anchorPositionalArgumentFound)
         {
             // This is either an additional positional argument for the anchor if
@@ -149,6 +149,7 @@ namespace wsl::windows::wslc
             // At this point we have an extra positional argument
             return ArgumentException(Localization::WSLCCLI_ExtraPositionalError(currArg));
         }
+        // This is the first positional argument we have encountered.
         else if (currArg.empty() || currArg[0] != WSLC_CLI_ARG_ID_CHAR)
         {
             const Argument* nextPositional = NextPositional();
