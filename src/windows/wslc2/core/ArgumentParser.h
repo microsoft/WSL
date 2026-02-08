@@ -72,6 +72,8 @@ namespace wsl::windows::wslc
 
         void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
 
+        void EscapeAndQuoteForwardedArgument(std::wstring& arg);
+
         Invocation& m_invocation;
         Args& m_executionArgs;
         std::vector<Argument> m_arguments;

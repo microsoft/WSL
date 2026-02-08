@@ -174,3 +174,69 @@ namespace wsl::windows::wslc::argument
     // Defines an argument with no alias.
     constexpr static wchar_t NoAlias = L'\0';
 }
+
+// Compile-time validation of argument definitions
+namespace wsl::windows::wslc::argument::validation {
+    // Helper to check if a type is a vector
+    template <typename T>
+    struct is_vector : std::false_type {};
+
+    template <typename T>
+    struct is_vector<std::vector<T>> : std::true_type {};
+
+    template <typename T>
+    inline constexpr bool is_vector_v = is_vector<T>::value;
+
+    // Forward declare a type name holder that will be specialized per enum
+    template <ArgType A>
+    struct ArgTypeName;
+
+    // Validation: Forward arguments must be vector types
+    template <typename T, Kind K, ArgType A>
+    constexpr bool ValidateForwardKind()
+    {
+        // Force instantiation of ArgTypeName<A> to show the enum value in error
+        using FailedArgument = ArgTypeName<A>;
+        static_assert(K != Kind::Forward || is_vector_v<T>,
+            "Arguments with Kind::Forward must have a vector data type (e.g., std::vector<std::wstring>). "
+            "Check the template instantiation for ArgTypeName<ArgType::YourEnumName> to see which argument failed.");
+        return true;
+    }
+
+    // Validation: Vector types should be Kind::Forward
+    template <typename T, Kind K, size_t Limit, ArgType A>
+    constexpr bool ValidateVectorUsage()
+    {
+        // Force instantiation of ArgTypeName<A> to show the enum value in error
+        using FailedArgument = ArgTypeName<A>;
+        static_assert(!is_vector_v<T> || K == Kind::Forward,
+            "Vector data types must be Kind::Forward. "
+            "Check the template instantiation for ArgTypeName<ArgType::YourEnumName> to see which argument failed.");
+        return true;
+    }
+
+    // Master validation function
+    template <typename T, Kind K, size_t Limit, ArgType A>
+    constexpr bool ValidateArgument()
+    {
+        return ValidateForwardKind<T, K, A>() && 
+               ValidateVectorUsage<T, K, Limit, A>();
+    }
+
+    // Helper macro to remove parentheses from a type
+    #define WSLC_REMOVE_PARENS(...) __VA_ARGS__
+
+    #include "ArgumentDefinitions.h" // Ensure this is included before using WSLC_ARGUMENTS
+
+    // Macro to generate validation instances for each argument
+    // Also creates a specialized ArgTypeName for better error messages
+    #define VALIDATE_ARGUMENT(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
+        template<> struct ArgTypeName<ArgType::EnumName> { static constexpr auto name = #EnumName; }; \
+        inline constexpr bool validate_##EnumName = ValidateArgument<WSLC_REMOVE_PARENS DataType, Kind, CountLimit, ArgType::EnumName>();
+
+    // Trigger validation for all arguments at compile time
+    WSLC_ARGUMENTS(VALIDATE_ARGUMENT)
+
+    #undef VALIDATE_ARGUMENT
+    #undef WSLC_REMOVE_PARENS
+} // namespace wsl::windows::wslc::argument::validation

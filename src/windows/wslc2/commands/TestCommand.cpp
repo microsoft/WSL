@@ -79,11 +79,21 @@ namespace wsl::windows::wslc
         if (context.Args.Contains(ArgType::ForwardArgs))
         {
             auto forwardedArgs = context.Args.Get<ArgType::ForwardArgs>();
-            PrintMessage(L"  Forwarded " + std::to_wstring(forwardedArgs.size()) + L" args:");
-            for (const auto& forwardArg : forwardedArgs)
+            PrintMessage(L"Forwarded " + std::to_wstring(forwardedArgs.size()) + L" Args:");
+            for (const auto& arg : forwardedArgs)
             {
-                PrintMessage(L"  Forward Arg: " + forwardArg);
+                PrintMessage(L"    " + arg);
             }
+
+            std::wstring concatenatedArgs = std::accumulate(
+                forwardedArgs.begin(),
+                forwardedArgs.end(),
+                std::wstring{},
+                [](const std::wstring& a, const std::wstring& b) {
+                    return a.empty() ? b : a + L" " + b;
+                });
+
+            PrintMessage(L"  Concatenated: " + concatenatedArgs);
         }
 
     }

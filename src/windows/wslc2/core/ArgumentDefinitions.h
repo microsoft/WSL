@@ -14,5 +14,5 @@
     _(ContainerId,  "containerid",  NoAlias,        Localization::WSLCCLI_ContainerIdArgDescription(),    (std::wstring),               Kind::Positional,  Visibility::Example, true,  1, Category::None, ExclusiveSet::None) \
     _(Port,         "port",         L'p',           Localization::WSLCCLI_PortArgDescription(),           (std::wstring),               Kind::Standard,    Visibility::Help,    false, 5, Category::None, ExclusiveSet::None) \
     _(ForwardArgs,  "",             NoAlias,        L"Test Arg for now",                                  (std::vector<std::wstring>),  Kind::Forward,     Visibility::Example, false, 1, Category::None, ExclusiveSet::None) \
-    _(ContainerIds, "containerids", NoAlias,        L"Test Arg for now",                                  (std::vector<std::wstring>),  Kind::Positional,  Visibility::Example, true,  1, Category::None, ExclusiveSet::None) \
+    _(ContainerIds, "containerids", NoAlias,        L"Test Arg for now",                                  (std::wstring),               Kind::Positional,  Visibility::Example, true,  1, Category::None, ExclusiveSet::None) \
     _(TestArg,      "arg",          L'a',           L"Shows Ninjacat",                                    (bool),                       Kind::Standard,    Visibility::Help,    false,  1, Category::None, ExclusiveSet::None)

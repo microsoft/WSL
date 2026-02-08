@@ -400,7 +400,7 @@ namespace wsl::windows::wslc
         void ExtractAtIndex(Func&& func, size_t index, std::index_sequence<I...>) const
         {
             bool matched = false;
-            ((index == I + 1 ? (func.template operator()<I + 1>(), matched = true) : void()), ...);
+            ((index == I + 1 ? (matched = true, func.template operator()<I + 1>(), 0) : 0), ...);
         }
 
         // Helper to emplace at runtime-determined index
