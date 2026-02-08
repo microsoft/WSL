@@ -89,9 +89,13 @@ namespace wsl::windows::wslc
             {
                 Callback(this, E, EnumBasedVariantMapAction::Add);
             }
+
+            // Compile-time type checking - this should always pass since mapping_t<E> is the correct type
+            using CleanV = std::remove_cvref_t<mapping_t<E>>;
+            static_assert(std::is_same_v<CleanV, mapping_t<E>>, "Type mismatch in Add: provided type does not match the expected type for this enum value");
             
             typename Variant::variant_t variant;
-            variant.template emplace<Variant::Index(E)>(std::move(std::forward<mapping_t<E>>(v)));
+            variant.template emplace<Variant::Index(E)>(std::move(v));
             m_data.emplace(E, std::move(variant));
         }
 
@@ -102,7 +106,11 @@ namespace wsl::windows::wslc
             {
                 Callback(this, E, EnumBasedVariantMapAction::Add);
             }
-            
+
+            // Compile-time type checking - this should always pass since mapping_t<E> is the correct type
+            using CleanV = std::remove_cvref_t<mapping_t<E>>;
+            static_assert(std::is_same_v<CleanV, mapping_t<E>>, "Type mismatch in Add: provided type does not match the expected type for this enum value");
+
             typename Variant::variant_t variant;
             variant.template emplace<Variant::Index(E)>(v);
             m_data.emplace(E, std::move(variant));
@@ -116,8 +124,20 @@ namespace wsl::windows::wslc
             {
                 Callback(this, e, EnumBasedVariantMapAction::Add);
             }
+
+            // Check if the type matches the SPECIFIC enum value at compile time if possible
+            using CleanV = std::remove_cvref_t<V>;
             
-            WSLC_LOG(Debug, Verbose, << L"Adding value to enum " << ToIntegral(e) << L" with type: " << typeid(V).name());
+            WSLC_LOG(Debug, Verbose, << L"Adding value to enum " << ToIntegral(e)
+                 << L" with type: " << typeid(V).name());
+
+            // Pre-check if this type matches the specific enum value being added to
+            if (!IsMatchingType<CleanV>(e))
+            {
+                WSLC_LOG(Fail, Error, << L"Type mismatch: Type " << typeid(CleanV).name()
+                     << L" does not match the expected type for enum value " << ToIntegral(e));
+                THROW_HR_MSG(E_INVALIDARG, "Type mismatch: provided type does not match the expected type for enum value %d", static_cast<int>(e));
+            }
 
             typename Variant::variant_t variant;
             EmplaceAtRuntimeIndex(variant, e, std::forward<V>(v), std::make_index_sequence<static_cast<size_t>(Enum::Max)>());
@@ -133,14 +153,9 @@ namespace wsl::windows::wslc
             {
                 Callback(this, E, EnumBasedVariantMapAction::Set);
             }
-            
-            // Remove all existing entries
+
             m_data.erase(E);
-            
-            // Add the new value
-            typename Variant::variant_t variant;
-            variant.template emplace<Variant::Index(E)>(std::move(std::forward<mapping_t<E>>(v)));
-            m_data.emplace(E, std::move(variant));
+            Add<E>(std::move(v));
         }
 
         template <Enum E>
@@ -150,14 +165,9 @@ namespace wsl::windows::wslc
             {
                 Callback(this, E, EnumBasedVariantMapAction::Set);
             }
-            
-            // Remove all existing entries
+
             m_data.erase(E);
-            
-            // Add the new value
-            typename Variant::variant_t variant;
-            variant.template emplace<Variant::Index(E)>(v);
-            m_data.emplace(E, std::move(variant));
+            Add<E>(v);
         }
 
         // Runtime version of Set
@@ -168,16 +178,9 @@ namespace wsl::windows::wslc
             {
                 Callback(this, e, EnumBasedVariantMapAction::Set);
             }
-            
-            WSLC_LOG(Debug, Verbose, << L"Setting value for enum " << ToIntegral(e) << L" with type: " << typeid(V).name());
-            
-            // Remove all existing entries
+
             m_data.erase(e);
-            
-            // Add the new value
-            typename Variant::variant_t variant;
-            EmplaceAtRuntimeIndex(variant, e, std::forward<V>(v), std::make_index_sequence<static_cast<size_t>(Enum::Max)>());
-            m_data.emplace(e, std::move(variant));
+            Add(e, std::forward<V>(v));
         }
 
         // Runtime method to check if value V matches the mapped type for an enum value.
@@ -208,6 +211,7 @@ namespace wsl::windows::wslc
         }
 
         // Gets the FIRST value for the enum key (for backward compatibility).
+        // Non-const version returns a reference that can be modified.
         template <Enum E>
         mapping_t<E>& Get()
         {
@@ -217,9 +221,22 @@ namespace wsl::windows::wslc
             }
             auto itr = m_data.find(E);
             THROW_HR_IF_MSG(E_NOT_SET, itr == m_data.end(), "Get(%d): key not found", static_cast<int>(E));
-            return std::get<Variant::Index(E)>(itr->second);
+
+            // Validate that the variant holds the expected type at the expected index
+            constexpr size_t expectedIndex = Variant::Index(E);
+            if (itr->second.index() != expectedIndex)
+            {
+                WSLC_LOG(Fail, Error, << L"Variant index mismatch for enum " << ToIntegral(E) 
+                     << L": expected index " << expectedIndex
+                     << L", actual index " << itr->second.index());
+                THROW_HR_MSG(E_UNEXPECTED, "Get(%d): variant type mismatch - expected index %zu, got %zu",
+                    static_cast<int>(E), expectedIndex, itr->second.index());
+            }
+
+            return std::get<expectedIndex>(itr->second);
         }
 
+        // Const overload of Get, cannot be modified.
         template <Enum E>
         const mapping_t<E>& Get() const
         {
@@ -229,7 +246,19 @@ namespace wsl::windows::wslc
             }
             auto itr = m_data.find(E);
             THROW_HR_IF_MSG(E_NOT_SET, itr == m_data.cend(), "Get(%d): key not found", static_cast<int>(E));
-            return std::get<Variant::Index(E)>(itr->second);
+
+            // Validate that the variant holds the expected type at the expected index
+            constexpr size_t expectedIndex = Variant::Index(E);
+            if (itr->second.index() != expectedIndex)
+            {
+                WSLC_LOG(Fail, Error, << L"Variant index mismatch for enum " << ToIntegral(E)
+                     << L": expected index " << expectedIndex
+                     << L", actual index " << itr->second.index());
+                THROW_HR_MSG(E_UNEXPECTED, "Get(%d): variant type mismatch - expected index %zu, got %zu",
+                    static_cast<int>(E), expectedIndex, itr->second.index());
+            }
+
+            return std::get<expectedIndex>(itr->second);
         }
 
         // Gets ALL values for a specific enum key as a vector.
@@ -240,15 +269,15 @@ namespace wsl::windows::wslc
             {
                 Callback(this, E, EnumBasedVariantMapAction::GetAll);
             }
-            
+
             std::vector<mapping_t<E>> results;
             auto range = m_data.equal_range(E);
-            
+
             for (auto it = range.first; it != range.second; ++it)
             {
                 results.push_back(std::get<Variant::Index(E)>(it->second));
             }
-            
+
             return results;
         }
 
@@ -260,10 +289,10 @@ namespace wsl::windows::wslc
             {
                 Callback(this, e, EnumBasedVariantMapAction::GetAll);
             }
-            
+
             std::vector<T> results;
             auto range = m_data.equal_range(e);
-            
+
             for (auto it = range.first; it != range.second; ++it)
             {
                 // Extract the value at the appropriate index based on enum value
@@ -276,12 +305,12 @@ namespace wsl::windows::wslc
                         }
                     }
                 };
-                
+
                 // Try to extract at the correct index for this enum value
                 size_t index = static_cast<size_t>(e) + 1;
                 ExtractAtIndex(extractValue, index, std::make_index_sequence<static_cast<size_t>(Enum::Max)>());
             }
-            
+
             return results;
         }
 
@@ -303,7 +332,7 @@ namespace wsl::windows::wslc
             {
                 Callback(this, E, EnumBasedVariantMapAction::RemoveOne);
             }
-            
+
             auto itr = m_data.find(E);
             if (itr != m_data.end())
             {
@@ -320,7 +349,7 @@ namespace wsl::windows::wslc
             {
                 Callback(this, e, EnumBasedVariantMapAction::RemoveOne);
             }
-            
+
             auto itr = m_data.find(e);
             if (itr != m_data.end())
             {
@@ -342,7 +371,7 @@ namespace wsl::windows::wslc
             std::vector<Enum> keys;
             Enum lastKey = static_cast<Enum>(-1);
             bool first = true;
-            
+
             for (const auto& pair : m_data)
             {
                 if (first || pair.first != lastKey)
@@ -352,7 +381,7 @@ namespace wsl::windows::wslc
                     first = false;
                 }
             }
-            
+
             return keys;
         }
 
@@ -378,20 +407,23 @@ namespace wsl::windows::wslc
         template <typename V, size_t... I>
         void EmplaceAtRuntimeIndex(typename Variant::variant_t& variant, Enum e, V&& v, std::index_sequence<I...>)
         {
-            auto emplaceAtIndex = [&]<size_t Index>() {
-                using Emplacer = wsl::windows::wslc::EnumBasedVariantMapEmplacer<Enum, Mapping, V>;
-                Emplacer::template Emplace<Index>(variant, std::forward<V>(v));
-            };
-
             size_t index = static_cast<size_t>(e) + 1;
             bool handled = false;
 
-            (void)((((index == I + 1)
-                ? ([&] { emplaceAtIndex.template operator()<I + 1>(); handled = true; }(), true)
-                : false)) || ...);
+            ([&] {
+                if (index == I + 1 && !handled)
+                {
+                    using Emplacer = wsl::windows::wslc::EnumBasedVariantMapEmplacer<Enum, Mapping, V>;
+                    Emplacer::template Emplace<I + 1>(variant, std::forward<V>(v));
+                    handled = true;
+                }
+            }(), ...);
 
             if (!handled)
             {
+                using CleanV = std::remove_cvref_t<V>;
+                WSLC_LOG(Fail, Error, << L"Invalid enum value " << ToIntegral(e)
+                     << L" or type mismatch. Provided type: " << typeid(CleanV).name());
                 THROW_HR_MSG(E_INVALIDARG, "Invalid enum value: %d", static_cast<int>(e));
             }
         }
@@ -428,8 +460,8 @@ namespace wsl::windows::wslc
             }
             else
             {
-                WSLC_LOG(Fail, Error, << L"Type mismatch at index " << Index 
-                     << L": CleanV=" << typeid(CleanV).name() 
+                WSLC_LOG(Fail, Error, << L"Type mismatch at index " << Index
+                     << L": CleanV=" << typeid(CleanV).name()
                      << L", TargetType=" << typeid(TargetType).name()
                      << L", same=" << is_same_type
                      << L", convertible=" << is_convertible

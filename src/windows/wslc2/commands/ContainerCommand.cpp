@@ -93,13 +93,7 @@ namespace wsl::windows::wslc
         context << StoreSessionId;
 
         PrintMessage(L"Container Start subcommand executing..", stdout);
-        ////PrintMessage(L"  ContainerId: " + std::wstring{context.Args.Get<ArgType::ContainerId>()});
-        PrintMessage(L"  ContainerIds: ");
-
-        for (const auto& id : context.Args.Get<ArgType::ContainerIds>())
-        {
-            PrintMessage(L"    Container Id: " + id);
-        }
+        PrintMessage(L"    Container Id: " + context.Args.Get<ArgType::ContainerId>());
 
 
         if (context.Args.Contains(ArgType::Interactive))

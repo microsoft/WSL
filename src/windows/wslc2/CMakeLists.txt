@@ -13,7 +13,6 @@ set(HEADERS
     core/foundation/Exceptions.h
     core/foundation/EnumVariantMap.h
     core/foundation/SharedThreadGlobals.h
-    core/foundation/LocalizeMacros.h
     core/foundation/Logging.h
     core/foundation/SystemUtilities.h
     core/foundation/StringUtilities.h

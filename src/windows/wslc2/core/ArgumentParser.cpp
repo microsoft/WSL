@@ -40,15 +40,16 @@ namespace wsl::windows::wslc
         // If the next argument was to be a value, but none was provided, convert it to an exception.
         else if (m_state.Type() && m_invocationItr == m_invocation.end())
         {
-            throw ArgumentException(WSLC_LOC(MissingArgumentError, m_state.Arg()));
+            throw ArgumentException(Localization::WSLCCLI_MissingArgumentError(m_state.Arg()));
         }
     }
 
     const Argument* ParseArgumentsStateMachine::NextPositional()
     {
         // Find the next appropriate positional arg if the current itr isn't one or has hit its limit.
-        while (m_positionalSearchItr != m_arguments.end() &&
-            (m_positionalSearchItr->Kind()) != Kind::Positional)
+        while (m_positionalSearchItr != m_arguments.end() && 
+               ((m_positionalSearchItr->Kind() != Kind::Positional) || 
+                (m_executionArgs.Count(m_positionalSearchItr->Type()) == m_positionalSearchItr->Limit())))
         {
             ++m_positionalSearchItr;
         }
@@ -88,22 +89,85 @@ namespace wsl::windows::wslc
         }
 
         // This is a positional argument
-        if (m_positionalArgumentFound || currArg.empty() || currArg[0] != WSLC_CLI_ARG_ID_CHAR)
+        if (m_anchorPositionalArgumentFound)
+        {
+            // This is either an additional positional argument for the anchor if
+            // it has not yet reached its limit, otherwise it is a forwarded argument.
+
+            // If we haven't reached the limit for the anchor positional, treat this as another anchor positional.
+            if (m_executionArgs.Count(m_anchorPositional) < Argument::ForType(m_anchorPositional).Limit())
+            {
+                // validate that we dont have any invalid argument specifiers.
+                if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
+                {
+                    return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
+                }
+
+                m_executionArgs.Add(m_anchorPositional, std::wstring{currArg});
+                return {};
+            }
+
+            // There are three possibilities for this argument:
+            // 1) It is another positional argument (likely an unexpected scenario)
+            // 2) It is a forwarded argument set that could be anything (most likely)
+            // 3) It is an input error and there should be no such argument.
+
+            // Check next positional.
+            const Argument* nextPositional = NextPositional();
+            if (nextPositional)
+            {
+                m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
+                return {};
+            }
+
+            // TODO: Also check that forwarded arg kind was not used earlier. Forwarded args
+            // should always be the last argument type encountered.
+            // Check for forwarded arg existence.
+            auto forwardedArgItr = std::find_if(m_arguments.begin(), m_arguments.end(),
+                [](const Argument& arg) { return arg.Kind() == Kind::Forward; });
+
+            if (forwardedArgItr != m_arguments.end())
+            {
+                // We have forwarded args type. Collect all remaining args as forwarded args.
+                std::vector<std::wstring> forwardedArgs;
+
+                // Add the current arg
+                forwardedArgs.push_back(std::wstring{currArg});
+
+                // Collect all remaining args from the invocation
+                while (m_invocationItr != m_invocation.end())
+                {
+                    forwardedArgs.push_back(std::wstring{*m_invocationItr});
+                    ++m_invocationItr;
+                }
+
+                // Add the vector to the forwarded ArgType.
+                m_executionArgs.Add(forwardedArgItr->Type(), std::move(forwardedArgs));
+                return {};
+            }
+
+            // At this point we have an extra positional argument
+            return ArgumentException(Localization::WSLCCLI_ExtraPositionalError(currArg));
+        }
+        else if (currArg.empty() || currArg[0] != WSLC_CLI_ARG_ID_CHAR)
         {
             const Argument* nextPositional = NextPositional();
             if (!nextPositional)
             {
-                return ArgumentException(WSLC_LOC(ExtraPositionalError, currArg));
+                return ArgumentException(Localization::WSLCCLI_ExtraPositionalError(currArg));
             }
 
-            std::vector<std::wstring> containerIds;
-            containerIds.push_back(std::wstring{currArg});
-            m_executionArgs.Add(nextPositional->Type(), std::move(containerIds));
+            // Anchor positional found. We treat all subsequent args as either additional
+            // positional args for the anchor or forwarded args.
+            m_anchorPositionalArgumentFound = true;
+            m_anchorPositional = nextPositional->Type();
+            m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
         }
+
         // The currentArg must not be empty, and starts with a -
         else if (currArg.length() == 1)
         {
-            return ArgumentException(WSLC_LOC(InvalidArgumentSpecifierError, currArg));
+            return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
         }
         // Now it must be at least 2 chars
         else if (currArg[1] != WSLC_CLI_ARG_ID_CHAR)
@@ -114,7 +178,7 @@ namespace wsl::windows::wslc
             auto itr = std::find_if(m_arguments.begin(), m_arguments.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
             if (itr == m_arguments.end())
             {
-                return ArgumentException(WSLC_LOC(InvalidAliasError, currArg));
+                return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
             }
 
             if (argument::Args::GetValueType(itr->Type()) == ValueType::Bool)
@@ -128,11 +192,11 @@ namespace wsl::windows::wslc
                     auto itr2 = std::find_if(m_arguments.begin(), m_arguments.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
                     if (itr2 == m_arguments.end())
                     {
-                        return ArgumentException(WSLC_LOC(AdjoinedNotFoundError, currArg));
+                        return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
                     }
                     else if (argument::Args::GetValueType(itr2->Type()) != ValueType::Bool)
                     {
-                        return ArgumentException(WSLC_LOC(AdjoinedNotFlagError, currArg));
+                        return ArgumentException(Localization::WSLCCLI_AdjoinedNotFlagError(currArg));
                     }
                     else
                     {
@@ -144,11 +208,12 @@ namespace wsl::windows::wslc
             {
                 if (currArg[2] == WSLC_CLI_ARG_SPLIT_CHAR)
                 {
+                    // Subtract the first 3 chars (-a=) to get the adjoined value.
                     ProcessAdjoinedValue(itr->Type(), currArg.substr(3));
                 }
                 else
                 {
-                    return ArgumentException(WSLC_LOC(SingleCharAfterDashError, currArg));
+                    return ArgumentException(Localization::WSLCCLI_SingleCharAfterDashError(currArg));
                 }
             }
             else
@@ -159,7 +224,8 @@ namespace wsl::windows::wslc
         // The currentArg is at least 2 chars, both of which are --
         else if (currArg.length() == 2)
         {
-            m_positionalArgumentFound = true;
+            // Missing argument name after double dash, this is an error.
+            return ArgumentException(Localization::WSLCCLI_MissingArgumentNameError(currArg));
         }
         // The currentArg is more than 2 chars, both of which are --
         else
@@ -187,9 +253,10 @@ namespace wsl::windows::wslc
                 {
                     if (argument::Args::GetValueType(arg.Type()) == ValueType::Bool)
                     {
+                        // TODO: Consider supporting --flag and --flag=true or --flag=false for boolean args.
                         if (hasValue)
                         {
-                            return ArgumentException(WSLC_LOC(FlagContainAdjoinedError, currArg));
+                            return ArgumentException(Localization::WSLCCLI_FlagContainAdjoinedError(currArg));
                         }
 
                         m_executionArgs.Add(arg.Type(), true);
@@ -209,7 +276,7 @@ namespace wsl::windows::wslc
 
             if (!argFound)
             {
-                return ArgumentException(WSLC_LOC(InvalidNameError, currArg));
+                return ArgumentException(Localization::WSLCCLI_InvalidNameError(currArg));
             }
         }
 

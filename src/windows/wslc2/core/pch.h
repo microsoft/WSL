@@ -18,4 +18,3 @@
 // wslc
 #include "Logging.h"
 #include "Errors.h"
-#include "LocalizeMacros.h"

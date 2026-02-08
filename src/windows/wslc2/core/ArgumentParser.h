@@ -60,7 +60,7 @@ namespace wsl::windows::wslc
 
         const State& GetState() const { return m_state; }
 
-        bool PositionalArgumentFound() const { return m_positionalArgumentFound; }
+        bool PositionalArgumentFound() const { return m_anchorPositionalArgumentFound; }
 
         // Gets the next positional argument, or nullptr if there is not one.
         const Argument* NextPositional();
@@ -78,7 +78,8 @@ namespace wsl::windows::wslc
 
         Invocation::iterator m_invocationItr;
         std::vector<Argument>::iterator m_positionalSearchItr;
-        bool m_positionalArgumentFound = false;
+        bool m_anchorPositionalArgumentFound = false;
+        ArgType m_anchorPositional = ArgType::Max; // Invalid default value indicating no anchor positional found yet.
 
         State m_state;
     };

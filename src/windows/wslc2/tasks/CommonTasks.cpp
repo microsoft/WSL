@@ -14,7 +14,6 @@ using namespace wsl::windows::wslc::logging;
 
 namespace wsl::windows::wslc::task
 {
-
     void EnsureRunningAsAdmin(CLIExecutionContext& context)
     {
         if (!util::IsRunningAsAdmin())
@@ -25,11 +24,14 @@ namespace wsl::windows::wslc::task
     }
 
     void StoreSessionId(CLIExecutionContext& context)
-    {;
+    {
         WSLC_LOG(Task, Verbose, << L"In StoreSessionId Testing...");
         if (context.Args.Contains(ArgType::SessionId))
         {
-            context.Data.Add<Data::SessionId>(context.Args.Get<ArgType::SessionId>());
+            auto sessionId = context.Args.Get<ArgType::SessionId>();
+
+            WSLC_LOG(Task, Verbose, << L"Storing SessionId: " << sessionId);
+            context.Data.Add<Data::SessionId>(sessionId);
         }
     }
 }

@@ -3,7 +3,6 @@
 #include "Argument.h"
 #include "Command.h"
 #include "Exceptions.h"
-#include "LocalizeMacros.h"
 #include "ArgumentDefinitions.h"
 
 #include <algorithm>

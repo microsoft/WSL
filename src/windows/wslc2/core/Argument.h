@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 #pragma once
 #include "ArgumentTypes.h"
-#include "LocalizeMacros.h"
 
 #include <string>
 #include <string_view>
@@ -54,8 +53,6 @@ namespace wsl::windows::wslc
 
         // Gets the common arguments for all commands.
         static void GetCommon(std::vector<Argument>& args);
-
-        // Static argument validation helpers; throw CommandException when validation fails.
 
         // Requires that at most one argument from the list is present.
         static void ValidateExclusiveArguments(const Args& args);
