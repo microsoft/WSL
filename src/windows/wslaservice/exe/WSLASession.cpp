@@ -517,7 +517,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLAListImagesFlags);
 
-HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count, WSLA_ERROR_INFO* Error)
 try
 {
     *Count = 0;
@@ -552,13 +552,58 @@ try
             filters.since = Options->Since;
         }
 
-        if (Options->DanglingSet)
+        // Check dangling flags (mutually exclusive in practice)
+        if ((Options->Flags & WSLAListImagesFlagsDanglingTrue) != 0)
         {
-            filters.dangling = Options->Dangling != FALSE;
+            filters.dangling = true;
+        }
+        else if ((Options->Flags & WSLAListImagesFlagsDanglingFalse) != 0)
+        {
+            filters.dangling = false;
+        }
+        // If neither flag is set, filters.dangling remains std::nullopt (show all)
+
+        // Parse NULL-terminated array of labels
+        if (Options->Labels != nullptr)
+        {
+            for (LPCSTR* labelPtr = Options->Labels; *labelPtr != nullptr; ++labelPtr)
+            {
+                filters.labels.push_back(*labelPtr);
+            }
         }
     }
 
-    auto images = m_dockerClient->ListImages(all, digests, filters);
+    std::vector<docker_schema::Image> images;
+    try
+    {
+        images = m_dockerClient->ListImages(all, digests, filters);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage;
+        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+        }
+
+        if (Error != nullptr)
+        {
+            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
+        }
+
+        if (e.StatusCode() == 400)
+        {
+            THROW_HR_MSG(E_INVALIDARG, "%hs", errorMessage.c_str());
+        }
+        else if (e.StatusCode() == 500)
+        {
+            THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
+        }
+        else
+        {
+            throw;
+        }
+    }
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate<decltype(images.begin()), size_t>(

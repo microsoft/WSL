@@ -137,18 +137,20 @@ struct WSLA_IMAGE_INFORMATION
 typedef enum _WSLAListImagesFlags
 {
     WSLAListImagesFlagsNone = 0,
-    WSLAListImagesFlagsAll = 1,      // Show all images (default hides intermediate images)
-    WSLAListImagesFlagsDigests = 2,  // Include digest information
+    WSLAListImagesFlagsAll = 1,           // Show all images (default hides intermediate images)
+    WSLAListImagesFlagsDigests = 2,       // Include digest information
+    WSLAListImagesFlagsDanglingTrue = 4,  // Show only dangling images (untagged)
+    WSLAListImagesFlagsDanglingFalse = 8, // Show only non-dangling images (tagged)
+    // Note: If neither dangling flag is set, show all images (both tagged and untagged)
 } WSLAListImagesFlags;
 
 struct WSLA_LIST_IMAGES_OPTIONS
 {
-    DWORD Flags; // WSLAListImagesFlags
+    DWORD Flags; // WSLAListImagesFlags (can combine with bitwise OR)
     [unique] LPCSTR Reference; // Filter by reference (name[:tag])
     [unique] LPCSTR Before; // Filter: show images created before this image
     [unique] LPCSTR Since; // Filter: show images created since this image
-    BOOL Dangling; // Filter: show only dangling images (true) or non-dangling (false), or all if not set
-    BOOL DanglingSet; // Whether the Dangling filter is set
+    [unique] LPCSTR* Labels; // NULL-terminated array of label filters (format: "key" or "key=value")
 };
 
 struct WSLA_PROCESS_OPTIONS
@@ -370,7 +372,7 @@ interface IWSLASession : IUnknown
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT ListImages([in, unique] const struct WSLA_LIST_IMAGES_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
+    HRESULT ListImages([in, unique] const struct WSLA_LIST_IMAGES_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
 
     // Container management.

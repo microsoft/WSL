@@ -99,6 +99,11 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool di
         filtersJson["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
     }
 
+    if (!filters.labels.empty())
+    {
+        filtersJson["label"] = filters.labels;
+    }
+
     if (!filtersJson.empty())
     {
         url += "filters=" + filtersJson.dump() + "&";

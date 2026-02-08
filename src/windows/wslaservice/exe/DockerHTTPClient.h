@@ -97,6 +97,7 @@ public:
         std::optional<std::string> before;
         std::optional<std::string> since;
         std::optional<bool> dangling;
+        std::vector<std::string> labels;
     };
 
     std::unique_ptr<HTTPRequestContext> PullImage(const char* Name, const char* Tag);
