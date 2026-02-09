@@ -97,18 +97,18 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings sessionSettings,
    
 //OPTIONAL SESSION SETTINGS
 
-STDAPI WslcSessionSettingsVHD(_In_ WslcSessionSettings sessionSettings,
+STDAPI WslcSessionSettingsVHD(_Inout_ WslcSessionSettings* sessionSettings,
                                  _In_ WSLC_VHD_REQUIREMENTS vhdRequirements);
 
-STDAPI WslcSessionSettingsTimeout(_In_ WslcSessionSettings sessionSettings,
+STDAPI WslcSessionSettingsTimeout(_Inout_ WslcSessionSettings* sessionSettings,
                                   uint32_t timeoutMS);
 
 
-STDAPI WslcSessionSettingsFlags(_In_ WslcSessionSettings sessionSettings,
+STDAPI WslcSessionSettingsFlags(_Inout_ WslcSessionSettings* sessionSettings,
                                    _In_ WSLC_SESSION_FLAGS flags);
 
 // Pass in Null for callback to clear the termination callback
-STDAPI WslcSessionSettingsTerminateCallback(_In_ WslcSessionSettings sessionSettings,
+STDAPI WslcSessionSettingsTerminateCallback(_Inout_ WslcSessionSettings* sessionSettings,
                                             _In_opt_ WslcSessionTerminationCallback terminationCallback,
                                             _In_opt_ PVOID terminationContext);
 
