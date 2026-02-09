@@ -293,7 +293,8 @@ ja asenna wsl.exe --install &lt;Distro&gt;.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
     <value>WSL2:a ei tueta nykyisessä konekokoonpanossasi. 
-Ota virtuaalikoneympäristön valinnainen osa käyttöön ja varmista, että virtualisointi on otettu käyttöön BIOSissa.
+
+Ota virtuaalikoneympäristön valinnainen osa käyttöön ja varmista, että virtualisointi on otettu käyttöön BIOSissa.
 Ota virtuaalikoneympäristö käyttöön suorittamalla: wsl.exe --install --no-distribution
 Lisätietoja on https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
