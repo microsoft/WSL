@@ -14,26 +14,24 @@ Abstract:
 #include "precomp.h"
 
 #include "wslcsdk.h"
-#include "WslcsdkPrivate.h"
+#include "wslcsdkprivate.h"
 
 
 // SESSION DEFINITIONS
 STDAPI_(void) WslcSessionInitSettings(_In_ PCWSTR storagePath,
-                               _In_ uint32_t cpuCount,
-                               _In_ uint64_t memoryMb,
-                               _In_ WslcSessionSettings* sessionSettings)
+                                        _In_ uint32_t cpuCount,
+                                        _In_ uint64_t memoryMb,
+                                        _Out_ WslcSessionSettings* sessionSettings)
 {
 
     
-    // Demo: how to cast the opaque struct to the internal struct and set some values.
-    // The real implementation would have actual logic here.
-    //WSLC_SESSION_OPTIONS_INTERNAL* sessionSettingsInternal =
-    //    reinterpret_cast<WSLC_SESSION_OPTIONS_INTERNAL*>(sessionSettings);
-
+    // demo test code to show how to cast the opaque struct to the internal struct and set some values. The real implementation would have actual logic here.
+    //WSLC_SESSION_OPTIONS_INTERNAL* sessionSettingsinternal = (WSLC_SESSION_OPTIONS_INTERNAL*)sessionSettings;
+    sessionSettings = NULL;
     UNREFERENCED_PARAMETER(storagePath);
     UNREFERENCED_PARAMETER(cpuCount);
     UNREFERENCED_PARAMETER(memoryMb);
-    UNREFERENCED_PARAMETER(sessionSettings);
+    //UNREFERENCED_PARAMETER(sessionSettings);
     return;
 }
 
@@ -51,7 +49,7 @@ STDAPI WslcSessionTerminate(_In_ WslcSession session)
     UNREFERENCED_PARAMETER(session);
     return E_NOTIMPL;
 }
-STDAPI WslcContainerSettingsNetworkingMode(_In_ WslcContainerSettings containerSettings,
+STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* containerSettings,
                                            _In_ WSLC_ContainerNetworkingMode networkingMode)
 {
     UNREFERENCED_PARAMETER(networkingMode);
@@ -59,32 +57,38 @@ STDAPI WslcContainerSettingsNetworkingMode(_In_ WslcContainerSettings containerS
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionSettingsDisplayName(_In_ WslcSessionSettings sessionSettings,
-                                      _In_ PCWSTR displayName)
+STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings,
+                                         _In_ PCWSTR displayName)
 {
     UNREFERENCED_PARAMETER(displayName);
     UNREFERENCED_PARAMETER(sessionSettings);
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionSettingsTimeout(_In_ WslcSessionSettings sessionSettings,
-                                  uint32_t timeoutMS)
+STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings,
+                                     uint32_t timeoutMS)
 {
     UNREFERENCED_PARAMETER(timeoutMS);
     UNREFERENCED_PARAMETER(sessionSettings);
     return E_NOTIMPL;
 }
-
-
-STDAPI WslcSessionSettingsVHD(_In_ WslcSessionSettings sessionSettings,
-                              _In_ WSLC_VHD_REQUIREMENTS WslcVHDRequirements)
+STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion,
+                            _In_ const WSLC_VHD_REQUIREMENTS* options)
 {
-    UNREFERENCED_PARAMETER(WslcVHDRequirements);
+    UNREFERENCED_PARAMETER(sesssion);
+    UNREFERENCED_PARAMETER(options);
+    return E_NOTIMPL;
+}
+
+STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings,
+                              _In_ WSLC_VHD_REQUIREMENTS* vhdRequirements)
+{
+    UNREFERENCED_PARAMETER(vhdRequirements);
     UNREFERENCED_PARAMETER(sessionSettings);
     return E_NOTIMPL;
 }
-STDAPI WslcContainerSettingsHostName(_In_ WslcContainerSettings containerSettings,
-                                     _In_ PCSTR hostName)
+STDAPI WslcContainerSettingsSetHostName(_In_ WslcContainerSettings* containerSettings,
+                                     _In_ const PCSTR hostName)
 {
     UNREFERENCED_PARAMETER(hostName);
     UNREFERENCED_PARAMETER(containerSettings);
@@ -92,8 +96,8 @@ STDAPI WslcContainerSettingsHostName(_In_ WslcContainerSettings containerSetting
 }
 
 
-STDAPI WslcContainerSettingsDomainName(_In_ WslcContainerSettings containerSettings,
-                                       _In_ PCSTR domainName)
+STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerSettings,
+                                       _In_ const PCSTR domainName)
 {
     UNREFERENCED_PARAMETER(domainName);
     UNREFERENCED_PARAMETER(containerSettings);
@@ -101,7 +105,7 @@ STDAPI WslcContainerSettingsDomainName(_In_ WslcContainerSettings containerSetti
 }
 
 
-STDAPI WslcSessionSettingsFlags(_In_ WslcSessionSettings sessionSettings,
+STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings,
                                 _In_ const WSLC_SESSION_FLAGS flags)
 {
     UNREFERENCED_PARAMETER(flags);
@@ -109,7 +113,7 @@ STDAPI WslcSessionSettingsFlags(_In_ WslcSessionSettings sessionSettings,
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionSettingsTerminateCallback(_In_ WslcSessionSettings sessionSettings,
+STDAPI WslcSessionSettingsSetTerminateCallback(_In_ WslcSessionSettings* sessionSettings,
                                             _In_ WslcSessionTerminationCallback terminationCallback,
                                             _In_ PVOID terminationContext)
 {
@@ -119,34 +123,17 @@ STDAPI WslcSessionSettingsTerminateCallback(_In_ WslcSessionSettings sessionSett
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionSettingsRelease(_In_ WslcSessionSettings sessionSettings)
-{
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
-}
 STDAPI WslcSessionRelease(_In_ WslcSession session)
 {
     UNREFERENCED_PARAMETER(session);
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsRelease(_In_ WslcContainerSettings containerSettings)
-{
-    UNREFERENCED_PARAMETER(containerSettings);
-    return E_NOTIMPL;
-}
 STDAPI WslcContainerRelease(_In_ WslcContainer container)
 {
     UNREFERENCED_PARAMETER(container);
     return E_NOTIMPL;
 }
-
-STDAPI WslcProcessSettingsRelease(_In_ WslcProcessSettings processSettings)
-{
-    UNREFERENCED_PARAMETER(processSettings);
-    return E_NOTIMPL;
-}
-
 STDAPI WslcProcessRelease(_In_ WslcProcess process)
 {
     UNREFERENCED_PARAMETER(process);
@@ -164,7 +151,7 @@ STDAPI WslcContainerInitSettings(_In_ PCSTR imageName,
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerCreate(_In_ WslcContainerSettings containerSettings,
+STDAPI WslcContainerCreate(_In_ WslcContainerSettings* containerSettings,
                            _Out_ WslcContainer* container, 
                            _Outptr_opt_result_z_ PWSTR* errorMessage)
 {
@@ -180,30 +167,30 @@ STDAPI WslcContainerStart(_In_ WslcContainer container)
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsFlags(_In_ WslcContainerSettings containerSettings,
+STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings,
                                   _In_ WSLC_CONTAINER_FLAGS flags)
 {
     UNREFERENCED_PARAMETER(flags);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
 }
-STDAPI WslcContainerSettingsName(_In_ WslcContainerSettings containerSettings,
-                                        _In_ PCSTR runtimeName)
+STDAPI WslcContainerSettingsSetName(_In_ WslcContainerSettings* containerSettings,
+                                        _In_ PCSTR name)
 {
-    UNREFERENCED_PARAMETER(runtimeName);
+    UNREFERENCED_PARAMETER(name);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsInitProcess(_In_ WslcContainerSettings containerSettings,
-                                        _In_ WslcProcessSettings initProcess)
+STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* containerSettings,
+                                           _In_ WslcProcessSettings* initProcess)
 {
     UNREFERENCED_PARAMETER(initProcess);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsPortMapping(_In_ WslcContainerSettings containerSettings,
+STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings,
                                         _In_ const WSLC_CONTAINER_PORT_MAPPING* portMappings)
 {
     UNREFERENCED_PARAMETER(portMappings);
@@ -211,8 +198,8 @@ STDAPI WslcContainerSettingsPortMapping(_In_ WslcContainerSettings containerSett
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsVolume(_In_ WslcContainerSettings containerSettings,
-                                   _In_ const WSLC_CONTAINER_VOLUME* volumes)
+STDAPI WslcContainerSettingsSetVolume(_In_ WslcContainerSettings* containerSettings,
+                                      _In_ const WSLC_CONTAINER_VOLUME* volumes)
 {
     UNREFERENCED_PARAMETER(volumes);
     UNREFERENCED_PARAMETER(containerSettings);
@@ -220,7 +207,7 @@ STDAPI WslcContainerSettingsVolume(_In_ WslcContainerSettings containerSettings,
 }
 
 STDAPI WslcContainerExec(_In_ WslcContainer container,
-                                _In_ WslcProcessSettings newProcessSettings,
+                                _In_ WslcProcessSettings *newProcessSettings,
                                 _Out_ WslcProcess* newProcess)
 {
     UNREFERENCED_PARAMETER(container);
@@ -263,11 +250,16 @@ STDAPI WslcContainerGetState(_In_ WslcContainer container,
     UNREFERENCED_PARAMETER(state);
     return E_NOTIMPL;
 }
+
+
+
 STDAPI WslcContainerStop(_In_ WslcContainer container,
                          _In_ WSLC_PROCESS_SIGNAL signal,
                          _In_ uint32_t timeoutMS)
 {
     UNREFERENCED_PARAMETER(container);
+    UNREFERENCED_PARAMETER(signal);
+    UNREFERENCED_PARAMETER(timeoutMS);
     return E_NOTIMPL;
 }
 
@@ -275,6 +267,7 @@ STDAPI WslcContainerDelete(_In_ WslcContainer container,
                            _In_ WslcDeleteContainerFlags flags)
 {
     UNREFERENCED_PARAMETER(container);
+    UNREFERENCED_PARAMETER(flags);
     return E_NOTIMPL;
 }
 
@@ -285,15 +278,15 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings)
     UNREFERENCED_PARAMETER(processSettings);
     return E_NOTIMPL;
 }
-STDAPI WslcProcessSettingsEntryPoint(_In_ WslcProcessSettings processSettings,
-    _In_ const PCSTR entryPoint)
+STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings,
+    _In_ const PCSTR executable)
 {
-    UNREFERENCED_PARAMETER(entryPoint);
+    UNREFERENCED_PARAMETER(executable);
     UNREFERENCED_PARAMETER(processSettings);
     return E_NOTIMPL;
 }
 
-STDAPI WslcProcessSettingsCurrentDirectory(_In_ WslcProcessSettings processSettings,
+STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings,
                                            _In_ const PCSTR currentDirectory)
 {
     UNREFERENCED_PARAMETER(currentDirectory);
@@ -303,9 +296,9 @@ STDAPI WslcProcessSettingsCurrentDirectory(_In_ WslcProcessSettings processSetti
 
 // OPTIONAL PROCESS SETTINGS
 
-STDAPI WslcProcessSettingsCmdLineArgs(WslcProcessSettings processSettings,
-                                      _In_reads_(argc) PCSTR const* argv,
-                                       size_t argc)
+STDAPI WslcProcessSettingsSetCmdLineArgs(WslcProcessSettings* processSettings,
+                                      _In_reads_(argc) PCSTR const* argv, 
+                                      size_t argc)
 {
     UNREFERENCED_PARAMETER(argv);
     UNREFERENCED_PARAMETER(argc);
@@ -313,7 +306,7 @@ STDAPI WslcProcessSettingsCmdLineArgs(WslcProcessSettings processSettings,
     return E_NOTIMPL;
 }
 
-STDAPI WslcProcessSettingsEnvVariables(_In_ WslcProcessSettings processSettings,
+STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSettings,
                                        _In_reads_(argc) PCSTR const* key_value,
                                        size_t argc)
 {
@@ -326,7 +319,7 @@ STDAPI WslcProcessSettingsEnvVariables(_In_ WslcProcessSettings processSettings,
 // PROCESS MANAGEMENT
 
 STDAPI WslcProcessGetPid(_In_ WslcProcess process,
-                         _Out_ const UINT32* pid)
+                         _Out_ UINT32* pid)
 {
     UNREFERENCED_PARAMETER(process);
     UNREFERENCED_PARAMETER(pid);
@@ -369,7 +362,7 @@ STDAPI WslcProcessSignal(_In_ WslcProcess process,
     return E_NOTIMPL;
 }
 
-STDAPI WslcProcessSettingsIoCallback(_In_ WslcProcessSettings processSettings,
+STDAPI WslcProcessSettingsSetIoCallback(_In_ WslcProcessSettings* processSettings,
                                      _In_ WSLC_PROCESS_IO_HANDLE ioHandle,
                                      _In_ WslcStdIOCallback stdIOCallback,
                                      _In_opt_ PVOID context)
@@ -393,7 +386,7 @@ STDAPI WslcProcessGetIOHandles(_In_ WslcProcess process,
 
 // IMAGE MANAGEMENT
 STDAPI WslcSessionImagePull(_In_ WslcSession session,
-                            _In_ const WLSC_PULL_IMAGE_OPTIONS* options,
+                            _In_ const WSLC_PULL_IMAGE_OPTIONS* options,
                             _Outptr_opt_result_z_ PWSTR* errorMessage)
 {
     UNREFERENCED_PARAMETER(options);
@@ -437,13 +430,7 @@ STDAPI WslcSessionImageList(_In_ WslcSession session,
 
 // STORAGE
 
-STDAPI WslcSessionCreateVhd(_In_ WslcSession session,
-                            _In_ const WSLC_VHD_REQUIREMENTS* options)
-{
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(options);
-    return E_NOTIMPL;
-}
+
 
 // INSTALL
 

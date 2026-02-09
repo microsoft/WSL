@@ -1,19 +1,25 @@
 LIBRARY wslcsdk
 
 EXPORTS
+
 WslcSessionInitSettings
+WslcContainerInitSettings
+WslcProcessInitSettings
+
 WslcSessionCreate
-WslcSessionTerminate
+WslcContainerCreate
 
-
-WslcSessionSettingsTimeout
-WslcSessionSettingsVHD
-WslcSessionSettingsFlags
-WslcSessionSettingsTerminateCallback
-WslcSessionSettingsDisplayName
-WslcSessionSettingsRelease
 WslcSessionRelease
+WslcContainerRelease
+WslcProcessRelease
 
+WslcSessionSettingsSetFlags
+WslcSessionSettingsSetTerminateCallback
+WslcSessionSettingsSetDisplayName
+WslcSessionSettingsSetTimeout
+WslcSessionSettingsSetVHD
+ 
+WslcSessionTerminate
 WslcSessionImagePull
 WslcSessionImageImport
 WslcSessionImageLoad
@@ -21,37 +27,29 @@ WslcSessionImageDelete
 WslcSessionImageList
 WslcSessionCreateVhd
 
-WslcContainerInitSettings
-WslcContainerCreate
-WslcContainerStart
-WslcContainerSettingsRuntimeName
-WslcContainerSettingsInitProcess
-WslcContainerSettingsFlags
-WslcContainerSettingsPortMapping
-WslcContainerSettingsNetworkingMode
-WslcContainerSettingsVolume
-WslcContainerSettingsHostName
-WslcContainerSettingsDomainName
-WslcContainerSettingsRelease
-WslcContainerRelease
+WslcContainerSettingsSetDomainName
+WslcContainerSettingsSetName
+WslcContainerSettingsSetNetworkingMode
+WslcContainerSettingsSetHostName
+WslcContainerSettingsSetVolume
+WslcContainerSettingsSetInitProcess
+WslcContainerSettingsSetFlags
+WslcContainerSettingsSetPortMapping
 
 WslcContainerExec
-WslcContainerGetID
-WslcContainerGetInitProcess
+WslcContainerStart
 WslcContainerInspect
 WslcContainerGetState
 WslcContainerStop
 WslcContainerDelete
+WslcContainerGetID
+WslcContainerGetInitProcess
 
-WslcProcessInitSettings
-WslcProcessSettingsEntryPoint
-WslcProcessSettingsIoCallback
-WslcProcessSettingsCurrentDirectory
-WslcProcessSettingsCmdLineArgs
-WslcProcessSettingsEnvVariables
-WslcProcessSettingsRelease
-WslcProcessRelease
-
+WslcProcessSettingsSetExecutable
+WslcProcessSettingsSetIoCallback
+WslcProcessSettingsSetCurrentDirectory
+WslcProcessSettingsSetCmdLineArgs
+WslcProcessSettingsSetEnvVariables
 WslcProcessGetPid
 WslcProcessGetExitEvent
 WslcProcessGetState
@@ -62,3 +60,9 @@ WslcProcessGetIOHandles
 WslcCanRun
 WslcGetVersion
 WslcInstallWithDependencies
+
+
+
+
+
+

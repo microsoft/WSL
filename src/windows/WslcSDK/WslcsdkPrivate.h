@@ -42,7 +42,7 @@ typedef char WSLC_SESSION_OPTIONS_INTERNAL_ALIGNMENT_ASSERT[__alignof(WSLC_SESSI
 // PROCESS DEFINITIONS
 typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
 {
-    PCSTR entryPoint; // path to executable inside container
+    PCSTR executable; // path to executable inside container
     PCSTR* commandLine;
     UINT32 commandLineCount;
     PCSTR* environment;
@@ -78,8 +78,6 @@ typedef char WSLC_CONTAINER_OPTIONS_INTERNAL_ALIGNMENT_ASSERT[__alignof(WSLC_CON
 struct WslcSessionImpl
 {
     wil::com_ptr<IWSLASessionManager> sessionManager;
-    //wil::com_ptr<IWSLAUserSession> userSession;
-    //wil::com_ptr<IWSLASession> session;
 };
 
 struct WslcContainerImpl
