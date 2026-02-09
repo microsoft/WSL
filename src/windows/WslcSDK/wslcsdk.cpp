@@ -18,7 +18,7 @@ Abstract:
 
 
 // SESSION DEFINITIONS
-STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath,
+STDAPI_(void) WslcSessionInitSettings(_In_ PCWSTR storagePath,
                                _In_ uint32_t cpuCount,
                                _In_ uint64_t memoryMb,
                                _In_ WslcSessionSettings* sessionSettings)
@@ -32,7 +32,7 @@ STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath,
     UNREFERENCED_PARAMETER(cpuCount);
     UNREFERENCED_PARAMETER(memoryMb);
     //UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    return;
 }
 
 STDAPI WslcSessionCreate(_In_ WslcSessionSettings sessionSettings,
