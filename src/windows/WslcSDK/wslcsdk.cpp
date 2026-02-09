@@ -217,7 +217,7 @@ STDAPI WslcContainerSettingsVolume(_In_ WslcContainerSettings containerSettings,
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerExecProcess(_In_ WslcContainer container,
+STDAPI WslcContainerExec(_In_ WslcContainer container,
                                 _In_ WslcProcessSettings newProcessSettings,
                                 _Out_ WslcProcess* newProcess)
 {
