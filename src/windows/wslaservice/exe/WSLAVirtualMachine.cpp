@@ -872,6 +872,9 @@ Microsoft::WRL::ComPtr<WSLAProcess> WSLAVirtualMachine::CreateLinuxProcessImpl(
     // std::thread::joinable() is const, so this can be called without acquiring the lock.
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_processExitThread.joinable());
 
+    THROW_WIN32_IF_MSG(
+        ERROR_NOT_SUPPORTED, Options.User != nullptr, "Custom users are not supported for root namespace processes");
+
     auto setErrno = [Errno](int Error) {
         if (Errno != nullptr)
         {
