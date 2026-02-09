@@ -313,7 +313,7 @@ typedef enum WSLC_PROCESS_IO_HANDLE
 // Pass in Null for stdIOCallback to clear the callback for the given handle
 STDAPI WslcProcessSettingsIoCallback(_In_ WslcProcessSettings processSettings,
                                      _In_ WSLC_PROCESS_IO_HANDLE ioHandle,
-                                     _In_ WslcStdIOCallback stdIOCallback);
+                                     _In_opt_ WslcStdIOCallback stdIOCallback);
 
 //PROCESS MANAGEMENT
 
