@@ -417,10 +417,10 @@ STDAPI WslcSessionImageLoad(_In_ WslcSession session,
 }
 
 STDAPI WslcSessionImageDelete(_In_ WslcSession session,
-                              _In_reads_(32) const UINT8* sha256)
+                              _In_z_ PCSTR NameOrId)
 {
     UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(sha256);
+    UNREFERENCED_PARAMETER(NameOrId);
     return E_NOTIMPL;
 }
 
