@@ -1,7 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -38,6 +37,14 @@ inline bool operator!=(const DnsInfo& lhs, const DnsInfo& rhs) noexcept
 
 std::string GenerateResolvConf(_In_ const DnsInfo& Info);
 
+/// <summary>
+/// Builds an hns::DNS notification from DnsInfo settings.
+/// </summary>
+/// <param name="settings">The DNS settings to convert</param>
+/// <param name="options">The resolv.conf header options (defaults to LX_INIT_RESOLVCONF_FULL_HEADER)</param>
+/// <returns>The hns::DNS notification ready to send via GNS channel</returns>
+wsl::shared::hns::DNS BuildDnsNotification(const DnsInfo& settings, PCWSTR options = LX_INIT_RESOLVCONF_FULL_HEADER);
+
 std::vector<std::string> GetAllDnsSuffixes(const std::vector<IpAdapterAddress>& AdapterAddresses);
 
 DWORD GetBestInterface();
@@ -45,27 +52,15 @@ DWORD GetBestInterface();
 class HostDnsInfo
 {
 public:
-    DnsInfo GetDnsSettings(_In_ DnsSettingsFlags Flags);
-
-    void UpdateNetworkInformation();
+    static DnsInfo GetDnsSettings(_In_ DnsSettingsFlags Flags);
 
     static DnsInfo GetDnsTunnelingSettings(const std::wstring& dnsTunnelingNameserver);
 
-    const std::vector<IpAdapterAddress>& CurrentAddresses() const
-    {
-        return m_addresses;
-    }
-
 private:
-    /// <summary>
-    /// Internal function to retrieve the latest copy of interface information.
-    /// </summary>
-    std::vector<IpAdapterAddress> GetAdapterAddresses();
-
     /// <summary>
     /// Internal function to retrieve interface DNS servers.
     /// </summary>
-    std::vector<std::string> GetInterfaceDnsServers(const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags);
+    static std::vector<std::string> GetInterfaceDnsServers(const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags);
 
     /// <summary>
     /// Internal function to retrieve all Windows DNS suffixes.
@@ -76,12 +71,6 @@ private:
     /// Internal function to convert DNS server addresses into strings.
     /// </summary>
     static std::vector<std::string> GetDnsServerStrings(_In_ const PIP_ADAPTER_DNS_SERVER_ADDRESS& DnsServer, _In_ USHORT IpFamilyFilter, _In_ USHORT MaxValues);
-
-    /// <summary>
-    /// Stores latest copy of interface information.
-    /// </summary>
-    std::mutex m_lock;
-    _Guarded_by_(m_lock) std::vector<IpAdapterAddress> m_addresses;
 };
 
 using RegistryChangeCallback = std::function<void()>;

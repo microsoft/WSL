@@ -19,8 +19,8 @@ using wsl::windows::service::wsla::ServiceProcessLauncher;
 using wsl::windows::service::wsla::ServiceRunningProcess;
 using wsl::windows::service::wsla::WSLAProcess;
 
-ServiceRunningProcess::ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLAProcess>& process, std::vector<WSLA_PROCESS_FD>&& fds) :
-    common::RunningWSLAProcess(std::move(fds))
+ServiceRunningProcess::ServiceRunningProcess(const Microsoft::WRL::ComPtr<WSLAProcess>& process, WSLAProcessFlags flags) :
+    common::RunningWSLAProcess(flags)
 {
     process.CopyTo(m_process.GetAddressOf());
 }
@@ -57,8 +57,8 @@ std::tuple<HRESULT, int, std::optional<ServiceRunningProcess>> ServiceProcessLau
     int error = -1;
 
     std::optional<ServiceRunningProcess> process;
-    auto result =
-        wil::ResultFromException([&]() { process.emplace(virtualMachine.CreateLinuxProcess(options, &error), std::move(m_fds)); });
+    auto result = wil::ResultFromException(
+        [&]() { process.emplace(virtualMachine.CreateLinuxProcess(m_executable.c_str(), options, &error), m_flags); });
 
     return {result, error, std::move(process)};
 }

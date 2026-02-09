@@ -300,7 +300,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY
 
     pollfd pollDescriptors[3];
 
-    pollDescriptors[0].fd = Message.TtyInput;
+    pollDescriptors[0].fd = Message.Socket;
     pollDescriptors[0].events = POLLIN;
     pollDescriptors[1].fd = Message.TtyMaster;
     pollDescriptors[1].events = POLLIN;
@@ -402,7 +402,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY
                 break;
             }
 
-            bytesWritten = UtilWriteBuffer(Message.TtyOutput, buffer.data(), bytesRead);
+            bytesWritten = UtilWriteBuffer(Message.Socket, buffer.data(), bytesRead);
             if (bytesWritten < 0)
             {
                 LOG_ERROR("write failed {}", errno);
@@ -437,8 +437,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_TTY_RELAY
     }
 
     // Shutdown sockets and tty
-    UtilSocketShutdown(Message.TtyInput, SHUT_WR);
-    UtilSocketShutdown(Message.TtyOutput, SHUT_WR);
+    UtilSocketShutdown(Message.Socket, SHUT_WR);
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Message, const gsl::span<gsl::byte>& Buffer)
@@ -643,12 +642,12 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_EXEC& Mes
 {
     auto Executable = wsl::shared::string::FromSpan(Buffer, Message.ExecutableIndex);
     auto ArgumentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.CommandLineIndex);
-    ArgumentArray.push_back(nullptr);
+    auto ArgumentPointers = wsl::shared::string::StringPointersFromArray(ArgumentArray, true);
 
     auto EnvironmentArray = wsl::shared::string::ArrayFromSpan(Buffer, Message.EnvironmentIndex);
-    EnvironmentArray.push_back(nullptr);
+    auto EnvironmentPointers = wsl::shared::string::StringPointersFromArray(EnvironmentArray, true);
 
-    execve(Executable, (char* const*)(ArgumentArray.data()), (char* const*)(EnvironmentArray.data()));
+    execve(Executable, (char* const*)(ArgumentPointers.data()), (char* const*)(EnvironmentPointers.data()));
 
     // Only reached if exec() fails
     Channel.SendResultMessage<int32_t>(errno);

@@ -26,8 +26,13 @@ static wil::srwlock g_endpointsInUseLock;
 static std::vector<GUID> g_endpointsInUse;
 
 NatNetworking::NatNetworking(
-    HCS_SYSTEM system, wsl::windows::common::hcs::unique_hcn_network&& network, GnsChannel&& gnsChannel, Config& config, wil::unique_socket&& dnsHvsocket) :
-    m_system(system), m_config(config), m_network(std::move(network)), m_gnsChannel(std::move(gnsChannel))
+    HCS_SYSTEM system,
+    wsl::windows::common::hcs::unique_hcn_network&& network,
+    GnsChannel&& gnsChannel,
+    Config& config,
+    wil::unique_socket&& dnsHvsocket,
+    LPCWSTR dnsOptions) :
+    m_system(system), m_config(config), m_network(std::move(network)), m_dnsOptions(dnsOptions), m_gnsChannel(std::move(gnsChannel))
 {
     m_connectivityTelemetryEnabled = config.EnableTelemetry && !WslTraceLoggingShouldDisableTelemetry();
 
@@ -48,7 +53,7 @@ NatNetworking::NatNetworking(
         // prioritized means:
         // - can only set 3 DNS servers (Linux limitation)
         // - when there are multiple host connected interfaces, we need to use the DNS servers from the most-likely-to-be-used interface on the host
-        m_mirrorDnsInfo.emplace();
+        m_useMirrorDnsSettings = true;
     }
 }
 
@@ -337,7 +342,7 @@ void NatNetworking::Initialize()
     UpdateDns(endpointProperties.GatewayAddress.c_str());
 
     // if using the shared access DNS proxy, ensure that the shared access service is allowed inbound UDP access.
-    if (!m_mirrorDnsInfo && !m_dnsTunnelingResolver)
+    if (!m_useMirrorDnsSettings && !m_dnsTunnelingResolver)
     {
         // N.B. This rule works around a host OS issue that prevents the DNS proxy from working on older versions of Windows.
         ConfigureSharedAccessFirewallRule();
@@ -433,19 +438,12 @@ _Requires_lock_held_(m_lock)
 void NatNetworking::UpdateDns(std::optional<PCWSTR> gatewayAddress) noexcept
 try
 {
-    if (!m_dnsTunnelingResolver && !m_mirrorDnsInfo && !gatewayAddress)
+    if (!m_dnsTunnelingResolver && !m_useMirrorDnsSettings && !gatewayAddress)
     {
         return;
     }
 
-    hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
-    notification.Settings.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
-
     networking::DnsInfo latestDnsSettings{};
-
-    // true if the "domain" entry of /etc/resolv.conf should be configured
-    // Note: the "domain" entry allows a single DNS suffix to be configured
-    bool configureLinuxDomain = false;
 
     // NAT mode with DNS tunneling
     if (m_dnsTunnelingResolver)
@@ -453,18 +451,9 @@ try
         latestDnsSettings = HostDnsInfo::GetDnsTunnelingSettings(m_dnsTunnelingIpAddress);
     }
     // NAT mode without Shared Access DNS proxy
-    else if (m_mirrorDnsInfo)
+    else if (m_useMirrorDnsSettings)
     {
-        m_mirrorDnsInfo->UpdateNetworkInformation();
-        const auto settings = m_mirrorDnsInfo->GetDnsSettings(DnsSettingsFlags::IncludeVpn);
-
-        latestDnsSettings.Servers = std::move(settings.Servers);
-
-        if (!settings.Domains.empty())
-        {
-            latestDnsSettings.Domains.emplace_back(std::move(settings.Domains.front()));
-            configureLinuxDomain = true;
-        }
+        latestDnsSettings = HostDnsInfo::GetDnsSettings(DnsSettingsFlags::IncludeVpn);
     }
     // NAT mode with Shared Access DNS proxy
     else if (gatewayAddress)
@@ -475,28 +464,18 @@ try
 
     if (latestDnsSettings != m_trackedDnsSettings)
     {
-        notification.Settings.ServerList = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(latestDnsSettings.Servers, ','));
-
-        if (configureLinuxDomain)
-        {
-            WI_ASSERT(!latestDnsSettings.Domains.empty());
-            notification.Settings.Domain = wsl::shared::string::MultiByteToWide(latestDnsSettings.Domains.front());
-        }
-        else
-        {
-            notification.Settings.Search = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(latestDnsSettings.Domains, ','));
-        }
+        auto dnsNotification = BuildDnsNotification(latestDnsSettings, m_dnsOptions);
 
         WSL_LOG(
             "NatNetworking::UpdateDns",
-            TraceLoggingValue(notification.Settings.Domain.c_str(), "domain"),
-            TraceLoggingValue(notification.Settings.Options.c_str(), "options"),
-            TraceLoggingValue(notification.Settings.Search.c_str(), "search"),
-            TraceLoggingValue(notification.Settings.ServerList.c_str(), "serverList"));
+            TraceLoggingValue(dnsNotification.Options.c_str(), "options"),
+            TraceLoggingValue(dnsNotification.Search.c_str(), "search"),
+            TraceLoggingValue(dnsNotification.ServerList.c_str(), "serverList"));
 
+        hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
         notification.RequestType = hns::ModifyRequestType::Update;
         notification.ResourceType = hns::GuestEndpointResourceType::DNS;
-        notification.Settings = notification.Settings;
+        notification.Settings = std::move(dnsNotification);
         m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_endpoint.Id);
 
         m_trackedDnsSettings = std::move(latestDnsSettings);
