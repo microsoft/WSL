@@ -55,14 +55,14 @@ DECLARE_HANDLE(WslcProcess);
 
 typedef enum WSLC_ContainerNetworkingMode
 {
-    WSLA_NetworkingModeNone = 0,   // No networking / isolated
-    WSLA_NetworkingModeBridged,    
+    WSLC_NetworkingModeNone = 0,   // No networking / isolated
+    WSLC_NetworkingModeBridged,    
 } WSLC_ContainerNetworkingMode;
 
 typedef enum WSLC_VhdType
 {
-    WSLA_VhdTypeDynamic = 0, // Expanding VHDX (default)
-    WSLA_VhdTypeFixed,       // Fully allocated VHDX
+    WSLC_VhdTypeDynamic = 0, // Expanding VHDX (default)
+    WSLC_VhdTypeFixed,       // Fully allocated VHDX
 } WSLC_VhdType;
 
 typedef struct WSLC_VHD_REQUIREMENTS
