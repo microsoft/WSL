@@ -643,6 +643,11 @@ try
     *Count = 0;
     *Images = nullptr;
 
+    if (Options != nullptr)
+    {
+        RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingFalse));
+    }
+
     std::lock_guard lock{m_lock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -654,8 +659,8 @@ try
 
     if (Options != nullptr)
     {
-        all = (Options->Flags & WSLAListImagesFlagsAll) != 0;
-        digests = (Options->Flags & WSLAListImagesFlagsDigests) != 0;
+        all = WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsAll);
+        digests = WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDigests);
 
         if (Options->Reference != nullptr)
         {
@@ -673,11 +678,11 @@ try
         }
 
         // Check dangling flags (mutually exclusive in practice)
-        if ((Options->Flags & WSLAListImagesFlagsDanglingTrue) != 0)
+        if (WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingTrue))
         {
             filters.dangling = true;
         }
-        else if ((Options->Flags & WSLAListImagesFlagsDanglingFalse) != 0)
+        else if (WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingFalse))
         {
             filters.dangling = false;
         }
