@@ -82,7 +82,7 @@ STDAPI WslcSessionSettingsVHD(_In_ WslcSessionSettings sessionSettings,
     return E_NOTIMPL;
 }
 STDAPI WslcContainerSettingsHostName(_In_ WslcContainerSettings containerSettings,
-                                     _In_ const PCSTR hostName)
+                                     _In_ PCSTR hostName)
 {
     UNREFERENCED_PARAMETER(hostName);
     UNREFERENCED_PARAMETER(containerSettings);
@@ -91,7 +91,7 @@ STDAPI WslcContainerSettingsHostName(_In_ WslcContainerSettings containerSetting
 
 
 STDAPI WslcContainerSettingsDomainName(_In_ WslcContainerSettings containerSettings,
-                                       _In_ const PCSTR domainName)
+                                       _In_ PCSTR domainName)
 {
     UNREFERENCED_PARAMETER(domainName);
     UNREFERENCED_PARAMETER(containerSettings);
