@@ -185,7 +185,7 @@ STDAPI WslcContainerSettingsFlags(_In_ WslcContainerSettings containerSettings,
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
 }
-STDAPI WslcContainerSettingsRuntimeName(_In_ WslcContainerSettings containerSettings,
+STDAPI WslcContainerSettingsName(_In_ WslcContainerSettings containerSettings,
                                         _In_ PCSTR runtimeName)
 {
     UNREFERENCED_PARAMETER(runtimeName);
