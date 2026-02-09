@@ -369,11 +369,13 @@ STDAPI WslcProcessSignal(_In_ WslcProcess process,
 
 STDAPI WslcProcessSettingsIoCallback(_In_ WslcProcessSettings processSettings,
                                      _In_ WSLC_PROCESS_IO_HANDLE ioHandle,
-                                     _In_ WslcStdIOCallback stdIOCallback)
+                                     _In_ WslcStdIOCallback stdIOCallback,
+                                     _In_opt_ PVOID context)
 {
     UNREFERENCED_PARAMETER(processSettings);
     UNREFERENCED_PARAMETER(ioHandle);
     UNREFERENCED_PARAMETER(stdIOCallback);
+    UNREFERENCED_PARAMETER(context);
     return E_NOTIMPL;
 }
 
