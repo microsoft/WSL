@@ -37,7 +37,7 @@ STDAPI_(void) WslcSessionInitSettings(_In_ PCWSTR storagePath,
     return;
 }
 
-STDAPI WslcSessionCreate(_In_ WslcSessionSettings sessionSettings,
+STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings,
                          _Out_ WslcSession* session)
 {
     UNREFERENCED_PARAMETER(session);
