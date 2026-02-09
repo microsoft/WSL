@@ -52,26 +52,6 @@ inline unsigned int CopyToSpan(const std::string_view String, const gsl::span<gs
     return PreviousOffset;
 }
 
-inline bool IsDriveRoot(const std::string_view Path)
-{
-    bool IsRoot = true;
-    if (Path.length() == 3)
-    {
-        IsRoot &= Path[2] == '\\';
-    }
-
-    if (Path.length() == 2 || Path.length() == 3)
-    {
-        IsRoot &= isalpha(Path[0]) && Path[1] == ':';
-    }
-    else
-    {
-        IsRoot = false;
-    }
-
-    return IsRoot;
-}
-
 template <class T>
 inline bool EndsWith(const std::basic_string<T>& String, const std::basic_string_view<T> Suffix)
 {

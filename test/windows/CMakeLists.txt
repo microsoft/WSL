@@ -9,9 +9,7 @@ set(SOURCES
     PluginTests.cpp
     PolicyTests.cpp
     InstallerTests.cpp
-    WSLATests.cpp
-    #WSLCTests.cpp
-)
+    WSLATests.cpp)
 
 set(HEADERS
     Common.h
