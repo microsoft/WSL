@@ -489,14 +489,14 @@ STDAPI WslcSessionImageDelete(_In_ WslcSession session,
 // Notes:
 //   - The caller must pass non-null pointers for both 'images' and 'count'.
 //
-STDAPI WslcSessionImageList(_In_ WslcSession sesssion,
+STDAPI WslcSessionImageList(_In_ WslcSession session,
                             _Outptr_result_buffer_(*count) WSLC_IMAGE_INFO** images,
                             _Out_ UINT32* count);
 
 
 // STORAGE
 
-STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion,
+STDAPI WslcSessionCreateVhd(_In_ WslcSession session,
                             _In_ const WSLC_VHD_REQUIREMENTS* options);
 
 // INSTALL
