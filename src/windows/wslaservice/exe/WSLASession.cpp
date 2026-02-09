@@ -683,12 +683,22 @@ try
         }
         // If neither flag is set, filters.dangling remains std::nullopt (show all)
 
-        // Parse NULL-terminated array of labels
-        if (Options->Labels != nullptr)
+        // Parse labels
+        if (Options->Labels != nullptr && Options->LabelsCount > 0)
         {
-            for (LPCSTR* labelPtr = Options->Labels; *labelPtr != nullptr; ++labelPtr)
+            for (ULONG i = 0; i < Options->LabelsCount; ++i)
             {
-                filters.labels.push_back(*labelPtr);
+                const auto& label = Options->Labels[i];
+                if (label.Key != nullptr)
+                {
+                    std::string labelFilter = label.Key;
+                    if (label.Value != nullptr)
+                    {
+                        labelFilter += "=";
+                        labelFilter += label.Value;
+                    }
+                    filters.labels.push_back(labelFilter);
+                }
             }
         }
     }

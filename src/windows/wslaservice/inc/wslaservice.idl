@@ -148,7 +148,8 @@ struct WSLA_LIST_IMAGES_OPTIONS
     [unique] LPCSTR Reference; // Filter by reference (name[:tag])
     [unique] LPCSTR Before; // Filter: show images created before this image
     [unique] LPCSTR Since; // Filter: show images created since this image
-    [unique] LPCSTR* Labels; // NULL-terminated array of label filters (format: "key" or "key=value")
+    [unique, size_is(LabelsCount)] const struct WSLA_LABEL* Labels;
+    ULONG LabelsCount;
 };
 
 typedef enum _WSLAProcessFlags

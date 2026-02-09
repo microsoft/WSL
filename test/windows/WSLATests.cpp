@@ -445,6 +445,7 @@ class WSLATests
             options.Before = nullptr;
             options.Since = nullptr;
             options.Labels = nullptr;
+            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
@@ -472,6 +473,7 @@ class WSLATests
             options.Before = nullptr;
             options.Since = nullptr;
             options.Labels = nullptr;
+            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
@@ -499,6 +501,7 @@ class WSLATests
             options.Before = nullptr;
             options.Since = nullptr;
             options.Labels = nullptr;
+            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
@@ -559,6 +562,7 @@ class WSLATests
                     options.Before = nullptr;
                     options.Since = debianId.c_str();
                     options.Labels = nullptr;
+            options.LabelsCount = 0;
 
                     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
                     VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
@@ -573,6 +577,7 @@ class WSLATests
                     options.Before = alpineId.c_str();
                     options.Since = nullptr;
                     options.Labels = nullptr;
+            options.LabelsCount = 0;
 
                     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
                     VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
@@ -625,6 +630,7 @@ class WSLATests
             options.Before = nullptr;
             options.Since = nullptr;
             options.Labels = nullptr;
+            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> danglingImages;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, danglingImages.addressof(), danglingImages.size_address<ULONG>(), nullptr));
@@ -660,6 +666,7 @@ class WSLATests
             options.Before = nullptr;
             options.Since = nullptr;
             options.Labels = nullptr;
+            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
@@ -678,6 +685,7 @@ class WSLATests
             options.Before = nullptr;
             options.Since = nullptr;
             options.Labels = nullptr;
+            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
@@ -687,8 +695,9 @@ class WSLATests
 
             // Test with single label filter
             {
-                LPCSTR labels[] = {"test.label", nullptr};
+                WSLA_LABEL labels[] = {{.Key = "test.label", .Value = nullptr}};
                 options.Labels = labels;
+                options.LabelsCount = 1;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
                 LogInfo("Images with single label filter: %zu", images.size());
@@ -696,8 +705,12 @@ class WSLATests
 
             // Test with multiple label filters (labels are AND'ed together)
             {
-                LPCSTR labels[] = {"test.label1", "test.label2=value", nullptr};
+                WSLA_LABEL labels[] = {
+                    {.Key = "test.label1", .Value = nullptr},
+                    {.Key = "test.label2", .Value = "value"}
+                };
                 options.Labels = labels;
+                options.LabelsCount = 2;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
                 LogInfo("Images with multiple label filters: %zu", images.size());
