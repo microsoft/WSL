@@ -12,9 +12,9 @@ Abstract:
 
 --*/
 #pragma once
+#include <winsock2.h>
 #include <windows.h>
 #include <stdint.h>
-#include <winsock2.h>
 
 
 EXTERN_C_START
