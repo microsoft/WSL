@@ -315,7 +315,7 @@ STDAPI WslcProcessSettingsIoCallback(_In_ WslcProcessSettings processSettings,
 //PROCESS MANAGEMENT
 
 STDAPI WslcProcessGetPid(_In_ WslcProcess process,
-                         _Out_ const UINT32* pid);
+                         _Out_ UINT32* pid);
 
 STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process,
                                _Out_ HANDLE* exitEvent);
