@@ -133,8 +133,11 @@ typedef struct WSLC_CONTAINER_PORT_MAPPING
     _In_ UINT16 containerPort;        // Port inside container
     _In_ WSLC_PORT_PROTOCOL protocol; // TCP or UDP
 
-    // if you want to override the default binding address
-    _In_opt_ struct sockaddr_storage windowsAddress; // accepts ipv4/6
+    // Optional override for the default binding address. If NULL, the default
+    // address will be used. The buffer must point to a valid sockaddr (IPv4 or
+    // IPv6) of length windowsAddressLength bytes.
+    _In_reads_bytes_opt_(windowsAddressLength) const struct sockaddr* windowsAddress;
+    _In_ INT windowsAddressLength;
 }WSLC_CONTAINER_PORT_MAPPING;
 
 typedef struct WSLC_CONTAINER_VOLUME
