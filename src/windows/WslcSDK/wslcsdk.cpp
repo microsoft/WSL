@@ -261,8 +261,9 @@ STDAPI WslcContainerGetState(_In_ WslcContainer container,
     UNREFERENCED_PARAMETER(state);
     return E_NOTIMPL;
 }
-
-STDAPI WslcContainerStop(_In_ WslcContainer container)
+STDAPI WslcContainerStop(_In_ WslcContainer container,
+                         _In_ WSLC_PROCESS_SIGNAL signal,
+                         _In_ uint32_t timeoutMS)
 {
     UNREFERENCED_PARAMETER(container);
     return E_NOTIMPL;
