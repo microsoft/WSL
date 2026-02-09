@@ -269,7 +269,8 @@ STDAPI WslcContainerStop(_In_ WslcContainer container,
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerDelete(_In_ WslcContainer container)
+STDAPI WslcContainerDelete(_In_ WslcContainer container,
+                           _In_ WslcDeleteContainerFlags flags)
 {
     UNREFERENCED_PARAMETER(container);
     return E_NOTIMPL;
