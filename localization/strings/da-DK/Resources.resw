@@ -292,10 +292,12 @@ og "wsl.exe --install &lt;Distro&gt;" for at installere.</value>
     <value>Den ældre distribution understøtter ikke WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 understøttes ikke med den aktuelle maskinkonfiguration. 
-Aktivér den valgfri komponent "Platform til virtuel maskine", og sørg for, at virtualisering er aktiveret i BIOS.
-Aktivér "Platform til virtuel maskine" ved at køre: wsl.exe --install --no-distribution
-Du kan få flere oplysninger på https://aka.ms/enablevirtualization</value>
+    <value>WSL2 kan ikke starte, da virtualisering ikke er aktiveret på denne maskine.
+Kontrollér, at den valgfri komponent "Virtuel maskinplatform" er aktiveret, og at virtualisering er slået til i computerens firmwareindstillinger.
+
+Aktivér "Virtuel maskinplatform" ved at køre: wsl.exe --install --no-distribution
+
+Se https://aka.ms/enablevirtualization for at få mere at vide</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1870,53 +1872,5 @@ Du kan også få adgang til flere Fjernindstillinger for VS-kode via kommandopal
   </data>
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>Det antal millisekunder, en VM er inaktiv, før den lukkes.</value>
-  </data>
-  <data name="MessageWsladiagUsage" xml:space="preserve">
-    <value>wsladiag - WSLA diagnostics tool
-Usage:
-  wsladiag list
-  wsladiag shell &lt;SessionName&gt; [--verbose]
-  wsladiag --help</value>
-    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslcUsage" xml:space="preserve">
-    <value>wslc - WSL Container CLI
-Usage:
-  wslc list
-  wslc shell &lt;SessionName&gt; [--verbose]
-  wslc --help</value>
-    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslaSessionNotFound" xml:space="preserve">
-    <value>Session not found: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslaOpenSessionFailed" xml:space="preserve">
-    <value>OpenSessionByName('{}') failed</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslaNoSessionsFound" xml:space="preserve">
-    <value>No WSLA sessions found.</value>
-  </data>
-  <data name="MessageWslaSessionsFound" xml:space="preserve">
-    <value>Found {} WSLA session{}:</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslaShellExited" xml:space="preserve">
-    <value>{} exited with: {}</value>
-    <comment>{FixedPlaceholder="{}"}{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="MessageWslaHeaderId" xml:space="preserve">
-    <value>ID</value>
-  </data>
-  <data name="MessageWslaHeaderCreatorPid" xml:space="preserve">
-    <value>Creator PID</value>
-  </data>
-  <data name="MessageWslaHeaderDisplayName" xml:space="preserve">
-    <value>Display Name</value>
-  </data>
-  <data name="MessageWslaUnknownCommand" xml:space="preserve">
-    <value>Unknown command: '{}'</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

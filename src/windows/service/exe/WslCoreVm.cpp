@@ -158,7 +158,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Set the install path of the package.
     m_installPath = wsl::windows::common::wslutil::GetBasePath();
 
-    // Initialize the path to the tools folder.
+    // Initialize the path to the tools folder which also serves as the default rootfs path.
     m_rootFsPath = m_installPath / LXSS_TOOLS_DIRECTORY;
 
     // Store the path of the user profile.
@@ -570,7 +570,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, m_guestDeviceManager, m_userToken);
+                    std::move(gnsChannel), m_vmConfig.EnableLocalhostRelay, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
@@ -813,14 +813,15 @@ WslCoreVm::~WslCoreVm() noexcept
 
 wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket =
-        wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
+    auto socket = hvsocket::CancellableAccept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
+    THROW_HR_IF(E_ABORT, !socket.has_value());
+
     if (ReceiveTimeout != 0)
     {
-        THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
+        THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
     }
 
-    return socket;
+    return std::move(socket.value());
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
@@ -845,9 +846,6 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
     {
         // Add virtiofs devices associating indices with paths from the fixed drive bitmap. These devices support
         // multiple mounts in the guest, so this only needs to be done once.
-        // EX: drvfsC1 => C:\
-        //     drvfsD2 => D:\
-        //     drvfsaC3 => C:\ (elevated)
         auto fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives(UserToken).first;
         while (fixedDrives != 0)
         {
@@ -1046,13 +1044,16 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
     {
         try
         {
-            auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+            if (!socket.has_value())
+            {
+                break; // VM is exiting.
+            }
 
             DWORD receiveTimeout = m_vmConfig.KernelBootTimeout;
-            THROW_LAST_ERROR_IF(
-                setsockopt(listenSocket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
+            THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket), "crash_dump", m_terminatingEvent.get()};
+            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_terminatingEvent.get()};
 
             const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
             const char* process = reinterpret_cast<const char*>(&message.Buffer);
@@ -2084,7 +2085,7 @@ void WslCoreVm::WaitForPmemDeviceInVm(_In_ ULONG PmemId)
 _Requires_lock_held_(m_guestDeviceLock)
 std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_ PCWSTR Options, _In_opt_ HANDLE UserToken)
 {
-    WI_ASSERT(m_vmConfig.EnableVirtioFs && wsl::shared::string::IsDriveRoot(wsl::shared::string::WideToMultiByte(Path)));
+    WI_ASSERT(m_vmConfig.EnableVirtioFs);
 
     if (!ARGUMENT_PRESENT(UserToken))
     {
@@ -2095,11 +2096,13 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
     WI_ASSERT(Admin == wsl::windows::common::security::IsTokenElevated(UserToken));
 
     // Ensure that the path has a trailing path separator.
-    std::wstring sharePath{Path};
-    if (sharePath.back() != L'\\')
+    std::wstring sharePath(Path);
+    if (!sharePath.ends_with(L'\\') && !sharePath.ends_with(L'/'))
     {
-        sharePath += L'\\';
+        sharePath.push_back(L'\\');
     }
+
+    sharePath = std::filesystem::weakly_canonical(sharePath).wstring();
 
     // Check if a matching share already exists.
     bool created = false;
@@ -2107,10 +2110,13 @@ std::wstring WslCoreVm::AddVirtioFsShare(_In_ bool Admin, _In_ PCWSTR Path, _In_
     VirtioFsShare key(sharePath.c_str(), Options, Admin);
     if (!m_virtioFsShares.contains(key))
     {
-        // Generate a new tag for the share.
-        tag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
-        tag += sharePath[0];
-        tag += std::to_wstring(m_virtioFsShares.size());
+        // Generate a new unique tag for the share.
+        //
+        // N.B. The tag can be maximum 36 characters long so a GUID without braces fits perfectly.
+        GUID tagGuid{};
+        THROW_IF_FAILED(CoCreateGuid(&tagGuid));
+
+        tag = wsl::shared::string::GuidToString<wchar_t>(tagGuid, wsl::shared::string::None);
         WI_ASSERT(!FindVirtioFsShare(tag.c_str(), Admin));
 
         (void)m_guestDeviceManager->AddGuestDevice(
@@ -2513,10 +2519,14 @@ try
     for (;;)
     {
         // Create a worker thread to handle each request.
-        wsl::shared::SocketChannel channel{
-            wsl::windows::common::hvsocket::Accept(listenSocket.get(), INFINITE, m_terminatingEvent.get()),
-            "VirtioFs",
-            m_terminatingEvent.get()};
+
+        auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+        if (!socket.has_value())
+        {
+            break;
+        }
+
+        wsl::shared::SocketChannel channel{std::move(socket.value()), "VirtioFs", m_terminatingEvent.get()};
         std::thread([this, channel = std::move(channel)]() mutable {
             try
             {
@@ -2546,8 +2556,6 @@ try
                         THROW_HR_IF(E_UNEXPECTED, !addShare);
 
                         const auto path = wsl::shared::string::FromSpan(span, addShare->PathOffset);
-                        THROW_HR_IF_MSG(E_INVALIDARG, !wsl::shared::string::IsDriveRoot(path), "%hs is not the root of a drive", path);
-
                         const auto pathWide = wsl::shared::string::MultiByteToWide(path);
                         const auto options = wsl::shared::string::FromSpan(span, addShare->OptionsOffset);
                         const auto optionsWide = wsl::shared::string::MultiByteToWide(options);
@@ -2567,25 +2575,30 @@ try
                         THROW_HR_IF(E_UNEXPECTED, !remountShare);
 
                         const std::string tag = wsl::shared::string::FromSpan(span, remountShare->TagOffset);
-                        if (tag.find(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG, 0) == 0)
-                        {
-                            THROW_HR_IF(E_UNEXPECTED, remountShare->Admin);
-                        }
-                        else if (tag.find(LX_INIT_DRVFS_VIRTIO_TAG, 0) == 0)
-                        {
-                            THROW_HR_IF(E_UNEXPECTED, !remountShare->Admin);
-                        }
-                        else
-                        {
-                            THROW_HR_MSG(E_UNEXPECTED, "Unexpected tag %hs", tag.data());
-                        }
-
                         const auto tagWide = wsl::shared::string::MultiByteToWide(tag);
                         auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
                         const auto foundShare = FindVirtioFsShare(tagWide.c_str(), !remountShare->Admin);
                         THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
 
                         newTag = AddVirtioFsShare(remountShare->Admin, foundShare->Path.c_str(), foundShare->OptionsString().c_str());
+                    });
+
+                    respondWithTag(newTag, result);
+                }
+                else if (message->MessageType == LxInitMessageQueryVirtioFsDevice)
+                {
+                    std::wstring newTag;
+                    const auto result = wil::ResultFromException([this, span, &newTag]() {
+                        const auto* query = gslhelpers::try_get_struct<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE>(span);
+                        THROW_HR_IF(E_UNEXPECTED, !query);
+
+                        const std::string tag = wsl::shared::string::FromSpan(span, query->TagOffset);
+                        const auto tagWide = wsl::shared::string::MultiByteToWide(tag);
+                        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+                        const auto foundShare = FindVirtioFsShare(tagWide.c_str());
+                        THROW_HR_IF_MSG(E_UNEXPECTED, !foundShare.has_value(), "Unknown tag %ls", tagWide.c_str());
+
+                        newTag = foundShare->Path;
                     });
 
                     respondWithTag(newTag, result);
