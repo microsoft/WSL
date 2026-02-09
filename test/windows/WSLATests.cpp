@@ -421,20 +421,20 @@ class WSLATests
 
                     // Verify Size field
                     VERIFY_IS_TRUE(image.Size > 0);
-                    LogInfo("Image %s - Size: %llu bytes", imageName.c_str(), image.Size);
+                    LogInfo("Image %hs - Size: %llu bytes", imageName.c_str(), image.Size);
 
                     // Verify Created timestamp
                     VERIFY_IS_TRUE(image.Created > 0);
-                    LogInfo("Image %s - Created: %lld", imageName.c_str(), image.Created);
+                    LogInfo("Image %hs - Created: %lld", imageName.c_str(), image.Created);
 
                     // ParentId may be empty for base images, but should be a valid field
-                    LogInfo("Image %s - ParentId: %s", imageName.c_str(),
+                    LogInfo("Image %hs - ParentId: %hs", imageName.c_str(),
                             strlen(image.ParentId) > 0 ? image.ParentId : "(empty - base image)");
                 }
             }
 
             VERIFY_IS_TRUE(debianTagCount >= 3); // At least debian:latest, test-tag1, test-tag2
-            LogInfo("Found %d debian tags with matching hash: %s", debianTagCount, commonHash.c_str());
+            LogInfo("Found %d debian tags with matching hash: %hs", debianTagCount, commonHash.c_str());
         }
 
         LogInfo("Test: Multiple tags for same image return separate entries");
@@ -482,7 +482,7 @@ class WSLATests
             for (const auto& image : images)
             {
                 std::string imageName = image.Image;
-                LogInfo("Filtered image: %s", imageName.c_str());
+                LogInfo("Filtered image: %hs", imageName.c_str());
                 if (imageName == "debian:test-tag1")
                 {
                     foundTag1 = true;
@@ -510,13 +510,13 @@ class WSLATests
                 if (strlen(image.Digest) > 0)
                 {
                     hasDigest = true;
-                    LogInfo("Image %s has digest: %s", image.Image, image.Digest);
+                    LogInfo("Image %hs has digest: %hs", image.Image, image.Digest);
                     // Digest should be in format repo@sha256:...
                     VERIFY_IS_TRUE(std::string(image.Digest).find("@sha256:") != std::string::npos);
                 }
             }
             // Note: Pulled images from registry should have digests, locally built may not
-            LogInfo("Digests found: %s", hasDigest ? "yes" : "no");
+            LogInfo("Digests found: %hs", hasDigest ? "yes" : "no");
         }
 
         LogInfo("Test: Before/Since filters");
@@ -636,7 +636,7 @@ class WSLATests
             {
                 std::string imageName = image.Image;
                 VERIFY_ARE_EQUAL(imageName, std::string("<none>:<none>"));
-                LogInfo("Dangling image: %s (hash: %s)", imageName.c_str(), image.Hash);
+                LogInfo("Dangling image: %hs (hash: %hs)", imageName.c_str(), image.Hash);
             }
 
             // List non-dangling images
@@ -669,7 +669,7 @@ class WSLATests
         }
 
         // Test 10: Label filter (NULL-terminated array)
-        LogInfo("Test 10: Label filter");
+        LogInfo("Test: Label filter");
         {
             // Test with nullptr (no label filter)
             WSLA_LIST_IMAGES_OPTIONS options{};
@@ -687,8 +687,8 @@ class WSLATests
 
             // Test with single label filter
             {
-                const char* labels[] = {"test.label", nullptr};
-                options.Labels = const_cast<LPCSTR*>(labels);
+                LPCSTR labels[] = {"test.label", nullptr};
+                options.Labels = labels;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
                 LogInfo("Images with single label filter: %zu", images.size());
@@ -696,8 +696,8 @@ class WSLATests
 
             // Test with multiple label filters (labels are AND'ed together)
             {
-                const char* labels[] = {"test.label1", "test.label2=value", nullptr};
-                options.Labels = const_cast<LPCSTR*>(labels);
+                LPCSTR labels[] = {"test.label1", "test.label2=value", nullptr};
+                options.Labels = labels;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
                 LogInfo("Images with multiple label filters: %zu", images.size());
