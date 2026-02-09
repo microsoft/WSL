@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 
 #include "wslcsdk.h"
-#include "wslcsdkprivate.h"
+#include "WslcsdkPrivate.h"
 
 
 // SESSION DEFINITIONS
