@@ -681,7 +681,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     }
 
     wslaInspect.Created = dockerInspect.Created;
-    wslaInspect.Image = dockerInspect.Image;
+    wslaInspect.Image = m_image;
 
     // Map container state.
     wslaInspect.State.Status = dockerInspect.State.Status;
