@@ -161,12 +161,10 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
 
 std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const ListImagesFilters& filters)
 {
-    std::string url = URL::Create("/images/json")
+    auto url = URL::Create("/images/json");
 
-    if (all)
-    {
-        url += "all=true&";
-    }
+    url.SetParameter("all", all);
+    url.SetParameter("digests", digests);
 
     // Build filters JSON if any filters are set
     nlohmann::json filtersJson;
@@ -198,18 +196,7 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool di
 
     if (!filtersJson.empty())
     {
-        url += "filters=" + filtersJson.dump() + "&";
-    }
-
-    if (digests)
-    {
-        url += "digests=true&";
-    }
-
-    // Remove trailing '&' or '?' if present
-    if (url.back() == '&' || url.back() == '?')
-    {
-        url.pop_back();
+        url.SetParameter("filters", filtersJson.dump());
     }
 
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, url);
