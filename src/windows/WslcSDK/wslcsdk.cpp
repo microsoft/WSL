@@ -26,7 +26,7 @@ STDAPI_(void) WslcSessionInitSettings(_In_ PCWSTR storagePath,
 
     
     // demo test code to show how to cast the opaque struct to the internal struct and set some values. The real implementation would have actual logic here.
-    WSLC_SESSION_OPTIONS_INTERNAL* sessionSettingsinternal = (WSLC_SESSION_OPTIONS_INTERNAL*)sessionSettings;
+    //WSLC_SESSION_OPTIONS_INTERNAL* sessionSettingsinternal = (WSLC_SESSION_OPTIONS_INTERNAL*)sessionSettings;
 
     UNREFERENCED_PARAMETER(storagePath);
     UNREFERENCED_PARAMETER(cpuCount);
