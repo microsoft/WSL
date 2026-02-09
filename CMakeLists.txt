@@ -80,6 +80,7 @@ find_nuget_package(Microsoft.WSL.LinuxSdk LINUXSDK /)
 find_nuget_package(Microsoft.WSL.TestDistro TEST_DISTRO /)
 find_nuget_package(Microsoft.WSL.TestData WSL_TEST_DATA /build/native/bin/${TARGET_PLATFORM})
 find_nuget_package(Microsoft.WSLg WSLG /build/native/bin)
+find_nuget_package(StrawberryPerl PERL /)
 find_nuget_package(vswhere VSWHERE /tools)
 find_nuget_package(Wix WIX /tools/net6.0/any)
 
@@ -105,6 +106,7 @@ find_nuget_package(Microsoft.Windows.SDK.NET.Ref WINDOWS_SDK_DOTNET /)
 find_nuget_package(Microsoft.Xaml.Behaviors.WinUI.Managed XAML_BEHAVIORS /)
 find_nuget_package(WinUIEx WINUIEX /)
 
+set(BIN2CPIO ${CMAKE_CURRENT_LIST_DIR}/tools/bin2cpio/bin2cpio.pl)
 set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 
 # Default to debug build if unspecified

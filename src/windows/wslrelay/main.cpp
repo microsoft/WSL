@@ -126,10 +126,7 @@ try
         const wil::unique_socket socket(WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
         THROW_LAST_ERROR_IF(!socket);
 
-        if (!wsl::windows::common::socket::CancellableAccept(listenSocket.get(), socket.get(), INFINITE, exitEvent.get()))
-        {
-            return 1;
-        }
+        wsl::windows::common::socket::Accept(listenSocket.get(), socket.get(), INFINITE, exitEvent.get());
 
         // Begin the relay.
         wsl::windows::common::relay::BidirectionalRelay(

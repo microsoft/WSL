@@ -292,12 +292,10 @@ A 'wsl.exe --list --online' parancs használatával listázhatja az elérhető d
     <value>Az örökölt disztribúció nem támogatja a WSL 2-t.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>A WSL2 nem indítható el, mert a virtualizáció nincs engedélyezve ezen a gépen.
-Győződjön meg arról, hogy a „Virtuálisgép-platform” választható összetevő engedélyezve van, és a virtualizáció be van kapcsolva a számítógép firmware-beállításaiban.
-
+    <value>A jelenlegi számítógép-konfiguráció nem támogatja a WSL2-t.
+Engedélyezze a „Virtuálisgép-platform” választható összetevőt, és győződjön meg arról, hogy a virtualizálás engedélyezve van a BIOS-ban.
 A „Virtuálisgép-platform” engedélyezéséhez futtassa a következőt: wsl.exe --install --no-distribution
-
-További információért látogasson el ide: https://aka.ms/enablevirtualization</value>
+További információért látogasson el a https://aka.ms/enablevirtualization oldalra</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

@@ -72,32 +72,3 @@ See [debugging](debugging.md) for general debugging instructions.
 
 To attach a debugger to the unit test process, use: `/waitfordebugger` when calling `test.bat`. 
 Use `/breakonfailure` to automatically break on the first test failure. 
-
-## Tips and tricks
-
-**Building and deploying faster** 
-
-To iterate faster, create a copy of [```UserConfig.cmake.sample```](https://github.com/microsoft/WSL/blob/master/UserConfig.cmake.sample):
-
-```
-copy UserConfig.cmake.sample UserConfig.cmake
-```
-
-And uncomment this line:
-
-```
-# set(WSL_DEV_BINARY_PATH "C:/wsldev")
-```
-
-This will change the build logic to build a smaller package that installs faster.
-Also see:
-
-- `WSL_BUILD_THIN_PACKAGE` to build an even smaller package
-- `WSL_POST_BUILD_COMMAND` to automatically deploy the package during build
-
-**Code formatting**
-
-Every pull request needs to be clang-formatted before it can be merged.
-
-The code can be manually formatted by running: `powershell .\FormatSource.ps1 -ModifiedOnly $false`.
-To automatically check formatting when creating a commit, run: `tools\SetupClangFormat.bat`

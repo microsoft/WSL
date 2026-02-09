@@ -223,9 +223,7 @@ std::optional<std::string> UtilGetEnv(const char* Name, char* Environment);
 
 std::string UtilGetEnvironmentVariable(const char* Name);
 
-int UtilGetFeatureFlags();
-
-void UtilSetFeatureFlags(int FeatureFlags, bool UpdateEnv = true);
+int UtilGetFeatureFlags(const wsl::linux::WslDistributionConfig& Config);
 
 std::optional<LX_MINI_INIT_NETWORKING_MODE> UtilGetNetworkingMode(void);
 
@@ -260,6 +258,8 @@ int UtilOpenMountNamespace(void);
 int UtilParseCgroupsLine(char* Line, char** SubsystemName, bool* Enabled);
 
 std::string UtilParsePlan9MountSource(std::string_view MountOptions);
+
+std::string UtilParseVirtiofsMountSource(std::string_view MountOptions);
 
 std::vector<char> UtilParseWslEnv(char* NtEnvironment);
 

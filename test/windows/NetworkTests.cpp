@@ -1037,6 +1037,7 @@ class NetworkTests
 
         wsl::shared::hns::DNS dns;
         dns.ServerList = L"1.1.1.1,1.1.1.2";
+        dns.Domain = L"microsoft.com";
         dns.Search = L"foo.microsoft.com,bar.microsoft.com";
         dns.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
         RunGns(dns, ModifyRequestType::Update, GuestEndpointResourceType::DNS);
@@ -1046,6 +1047,7 @@ class NetworkTests
         const std::wstring expected = std::wstring(LX_INIT_RESOLVCONF_FULL_HEADER) +
                                       L"nameserver 1.1.1.1\n"
                                       L"nameserver 1.1.1.2\n"
+                                      L"domain microsoft.com\n"
                                       L"search foo.microsoft.com bar.microsoft.com\n";
         VERIFY_ARE_EQUAL(expected, out.c_str());
     }
@@ -4610,9 +4612,6 @@ class VirtioProxyTests
         const std::wregex pattern(L"(.|\\n)*nameserver [0-9. ]+(.|\\n)*");
 
         VERIFY_IS_TRUE(std::regex_match(out, pattern));
-
-        // Verify that /etc/resolv.conf contains a 'search' line with DNS suffixes
-        VERIFY_IS_TRUE(out.find(L"search ") != std::wstring::npos);
     }
 
     TEST_METHOD(GuestPortIsReleased)

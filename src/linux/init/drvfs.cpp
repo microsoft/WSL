@@ -298,137 +298,18 @@ try
     {
         return MountFilesystem(DRVFS_FS_TYPE, Source, Target, Options, ExitCode);
     }
-    else if (WSL_USE_VIRTIO_FS())
+
+    // Use virtiofs if the source of the mount is the root of a drive; otherwise, use 9p.
+    if (WSL_USE_VIRTIO_FS(Config))
     {
-        return MountVirtioFs(Source, Target, Options, Admin, Config, ExitCode);
-    }
-
-    return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
-}
-CATCH_RETURN_ERRNO()
-
-int MountDrvfsEntry(int Argc, char* Argv[])
-
-/*++
-
-Routine Description:
-
-    This routine is the entrypoint for mount.drvfs.
-
-Arguments:
-
-    Argc - Supplies the argument count.
-
-    Argv - Supplies the command line arguments.
-
-Return Value:
-
-    0 on success, -1 on failure.
-
---*/
-
-{
-    if (Argc < 3)
-    {
-        LOG_STDERR(EINVAL);
-        return c_exitCodeInvalidUsage;
-    }
-
-    //
-    // Handle mount options if provided.
-    //
-
-    auto* Options = "";
-    if (Argc > 4)
-    {
-        Options = Argv[4];
-    }
-
-    int ExitCode = c_exitCodeMountFail;
-    MountDrvfs(Argv[1], Argv[2], Options, {}, wsl::linux::WslDistributionConfig{CONFIG_FILE}, &ExitCode);
-    return ExitCode;
-}
-
-int MountPlan9Share(const char* Source, const char* Target, const char* Options, bool Admin, int* ExitCode)
-
-/*++
-
-Routine Description:
-
-    This routine will perform a plan 9 mount using the /bin/mount binary.
-
-Arguments:
-
-    Source - Supplies the mount source.
-
-    Target - Supplies the mount target.
-
-    Options - Supplies the mount options.
-
-    Admin - Supplies a boolean specifying if the admin share should be used.
-
-    ExitCode - Supplies an optional pointer that receives the exit code.
-
-Return Value:
-
-    0 on success, -1 on failure.
-
---*/
-
-{
-    std::string MountOptions;
-    if (WSL_USE_VIRTIO_9P())
-    {
-        Source = Admin ? LX_INIT_DRVFS_ADMIN_VIRTIO_TAG : LX_INIT_DRVFS_VIRTIO_TAG;
-        MountOptions = std::format("msize=262144,trans=virtio,{}", Options);
-        return MountWithRetry(Source, Target, PLAN9_FS_TYPE, MountOptions.c_str(), ExitCode);
-    }
-    else
-    {
-        auto Port = Admin ? LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT : LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT;
-        wil::unique_fd Fd{UtilConnectVsock(Port, false, LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE)};
-        if (!Fd)
+        if (wsl::shared::string::IsDriveRoot(Source))
         {
-            return -1;
+            return MountVirtioFs(Source, Target, Options, Admin, Config, ExitCode);
         }
 
-        MountOptions =
-            std::format("msize={},trans=fd,rfdno={},wfdno={},{}", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, Fd.get(), Fd.get(), Options);
-
-        return MountFilesystem(PLAN9_FS_TYPE, Source, Target, MountOptions.c_str(), ExitCode);
+        LOG_WARNING("virtiofs is only supported for mounting full drives, using 9p to mount {}", Source);
     }
-}
 
-int MountPlan9(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
-
-/*++
-
-Routine Description:
-
-    This routine will perform a DrvFs mount using Plan9.
-
-Arguments:
-
-    Source - Supplies the mount source.
-
-    Target - Supplies the mount target.
-
-    Options - Supplies the mount options.
-
-    Admin - Supplies an optional boolean to specify if the admin or non-admin share should be used.
-
-    Config - Supplies the distribution configuration.
-
-    ExitCode - Supplies an optional pointer that receives the exit code.
-
-Return Value:
-
-    0 on success, -1 on failure.
-
---*/
-
-try
-{
     //
     // Check if the path is a UNC path.
     //
@@ -474,7 +355,8 @@ try
     //
 
     MountOptions += Plan9Options;
-    if (MountPlan9Share(Source, Target, MountOptions.c_str(), Elevated, ExitCode) < 0)
+
+    if (MountPlan9Filesystem(Source, Target, MountOptions.c_str(), Elevated, Config, ExitCode) < 0)
     {
         return -1;
     }
@@ -482,6 +364,97 @@ try
     return 0;
 }
 CATCH_RETURN_ERRNO()
+
+int MountDrvfsEntry(int Argc, char* Argv[])
+
+/*++
+
+Routine Description:
+
+    This routine is the entrypoint for mount.drvfs.
+
+Arguments:
+
+    Argc - Supplies the argument count.
+
+    Argv - Supplies the command line arguments.
+
+Return Value:
+
+    0 on success, -1 on failure.
+
+--*/
+
+{
+    if (Argc < 3)
+    {
+        LOG_STDERR(EINVAL);
+        return c_exitCodeInvalidUsage;
+    }
+
+    //
+    // Handle mount options if provided.
+    //
+
+    auto* Options = "";
+    if (Argc > 4)
+    {
+        Options = Argv[4];
+    }
+
+    int ExitCode = c_exitCodeMountFail;
+    MountDrvfs(Argv[1], Argv[2], Options, {}, wsl::linux::WslDistributionConfig{CONFIG_FILE}, &ExitCode);
+    return ExitCode;
+}
+
+int MountPlan9Filesystem(const char* Source, const char* Target, const char* Options, bool Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
+
+/*++
+
+Routine Description:
+
+    This routine will perform a plan 9 mount using the /bin/mount binary.
+
+Arguments:
+
+    Source - Supplies the mount source.
+
+    Target - Supplies the mount target.
+
+    Options - Supplies the mount options.
+
+    Admin - Supplies a boolean specifying if the admin share should be used.
+
+    ExitCode - Supplies an optional pointer that receives the exit code.
+
+Return Value:
+
+    0 on success, -1 on failure.
+
+--*/
+
+{
+    std::string MountOptions;
+    if (WSL_USE_VIRTIO_9P(Config))
+    {
+        Source = Admin ? LX_INIT_DRVFS_ADMIN_VIRTIO_TAG : LX_INIT_DRVFS_VIRTIO_TAG;
+        MountOptions = std::format("msize=262144,trans=virtio,{}", Options);
+        return MountWithRetry(Source, Target, PLAN9_FS_TYPE, MountOptions.c_str(), ExitCode);
+    }
+    else
+    {
+        auto Port = Admin ? LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT : LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT;
+        wil::unique_fd Fd{UtilConnectVsock(Port, false, LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE)};
+        if (!Fd)
+        {
+            return -1;
+        }
+
+        MountOptions =
+            std::format("msize={},trans=fd,rfdno={},wfdno={},{}", LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE, Fd.get(), Fd.get(), Options);
+        return MountFilesystem(PLAN9_FS_TYPE, Source, Target, MountOptions.c_str(), ExitCode);
+    }
+}
 
 int MountVirtioFs(const char* Source, const char* Target, const char* Options, std::optional<bool> Admin, const wsl::linux::WslDistributionConfig& Config, int* ExitCode)
 
@@ -513,7 +486,7 @@ Return Value:
 
 try
 {
-    assert(WSL_USE_VIRTIO_FS());
+    assert(wsl::shared::string::IsDriveRoot(Source));
 
     //
     // Check whether to use the elevated or non-elevated virtiofs server.
@@ -543,7 +516,7 @@ try
     AddShare.WriteString(AddShare->OptionsOffset, Plan9Options);
 
     //
-    // Connect to the wsl service to add the virtiofs share. If adding the share fails, fallback to mounting using Plan9.
+    // Connect to the wsl service to add the virtiofs share.
     //
 
     wsl::shared::SocketChannel Channel{UtilConnectVsock(LX_INIT_UTILITY_VM_VIRTIOFS_PORT, true), "VirtoFs"};
@@ -554,10 +527,11 @@ try
 
     gsl::span<gsl::byte> ResponseSpan;
     const auto& Response = Channel.Transaction<LX_INIT_ADD_VIRTIOFS_SHARE_MESSAGE>(AddShare.Span(), &ResponseSpan);
+
     if (Response.Result != 0)
     {
-        LOG_WARNING("Add virtiofs share for {} failed {}, falling back to Plan9", Source, Response.Result);
-        return MountPlan9(Source, Target, Options, Admin, Config, ExitCode);
+        LOG_ERROR("Add virtiofs share for {} failed {}", Source, Response.Result);
+        return -1;
     }
 
     //
@@ -596,8 +570,6 @@ Return Value:
 
 try
 {
-    assert(WSL_USE_VIRTIO_FS());
-
     wsl::shared::MessageWriter<LX_INIT_REMOUNT_VIRTIOFS_SHARE_MESSAGE> RemountShare(LxInitMessageRemountVirtioFsDevice);
     RemountShare->Admin = Admin;
     RemountShare.WriteString(RemountShare->TagOffset, Tag);
@@ -624,67 +596,3 @@ try
     return MountWithRetry(Tag, Target, VIRTIO_FS_TYPE, Options);
 }
 CATCH_RETURN_ERRNO()
-
-std::string QueryVirtiofsMountSource(const char* Tag)
-
-/*++
-
-Routine Description:
-
-    This routine takes a virtiofs tag and determines the Windows path it refers to.
-
-Arguments:
-
-    Tag - Supplies the virtiofs tag to query.
-
-Return Value:
-
-    The mount source, an empty string on failure.
-
---*/
-
-try
-{
-    if (!WSL_USE_VIRTIO_FS())
-    {
-        return {};
-    }
-
-    //
-    // Validate the tag is a GUID.
-    //
-
-    const auto Guid = wsl::shared::string::ToGuid(Tag);
-    if (!Guid)
-    {
-        return {};
-    }
-
-    wsl::shared::MessageWriter<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE> QueryShare(LxInitMessageQueryVirtioFsDevice);
-    QueryShare.WriteString(QueryShare->TagOffset, Tag);
-
-    //
-    // Connect to the host and send the query request.
-    //
-
-    wsl::shared::SocketChannel Channel{UtilConnectVsock(LX_INIT_UTILITY_VM_VIRTIOFS_PORT, true), "QueryVirtioFs"};
-    if (Channel.Socket() < 0)
-    {
-        return {};
-    }
-
-    gsl::span<gsl::byte> ResponseSpan;
-    const auto& Response = Channel.Transaction<LX_INIT_QUERY_VIRTIOFS_SHARE_MESSAGE>(QueryShare.Span(), &ResponseSpan);
-    if (Response.Result != 0)
-    {
-        LOG_ERROR("Query virtiofs share for {} failed {}", Tag, Response.Result);
-        return {};
-    }
-
-    return wsl::shared::string::FromSpan(ResponseSpan, Response.TagOffset);
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
-    return {};
-}

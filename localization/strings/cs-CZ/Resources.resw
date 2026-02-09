@@ -292,12 +292,10 @@ a wsl.exe --install &lt;Distro&gt;.</value>
     <value>Starší verze distribuce nepodporuje WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 nelze spustit, protože na tomto počítači není povolena virtualizace.
-Ujistěte se, že je povolena volitelná součást „Virtual Machine Platform“ a že je virtualizace zapnutá v nastavení firmwaru vašeho počítače.
-
-Povolte „Virtual Machine Platform“ spuštěním: wsl.exe --install --no-distribution
-
-Další informace najdete na https://aka.ms/enablevirtualization</value>
+    <value>WsL2 se v aktuální konfiguraci vašeho počítače nepodporuje.
+Povolte volitelnou součást „Platforma virtuálního počítače“ a ujistěte se, že je v systému BIOS povolená virtualizace.
+Povolte platformu virtuálních počítačů spuštěním příkazu: wsl.exe --install --no-distribution
+Informace najdete na https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>

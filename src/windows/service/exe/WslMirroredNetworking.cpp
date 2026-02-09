@@ -434,7 +434,8 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessDNSChange()
     }
     else
     {
-        m_dnsInfo = wsl::core::networking::HostDnsInfo::GetDnsSettings(
+        m_hostDnsInfo.UpdateNetworkInformation();
+        m_dnsInfo = m_hostDnsInfo.GetDnsSettings(
             wsl::core::networking::DnsSettingsFlags::IncludeVpn | wsl::core::networking::DnsSettingsFlags::IncludeIpv6Servers |
             wsl::core::networking::DnsSettingsFlags::IncludeAllSuffixes);
     }
@@ -2565,6 +2566,7 @@ void __stdcall wsl::core::networking::WslMirroredNetworkManager::HcnServiceConne
     auto* const manager = static_cast<WslMirroredNetworkManager*>(Context);
 
     const auto lock = manager->m_networkLock.lock_exclusive();
+    WI_ASSERT(manager->m_state == State::Started);
     if (manager->m_state == State::Stopped)
     {
         return;
@@ -2590,6 +2592,7 @@ try
     auto* const manager = static_cast<WslMirroredNetworkManager*>(Context);
 
     const auto lock = manager->m_networkLock.lock_exclusive();
+    WI_ASSERT(manager->m_state == State::Started);
     if (manager->m_state == State::Stopped)
     {
         return;

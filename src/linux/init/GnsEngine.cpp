@@ -315,17 +315,21 @@ void GnsEngine::ProcessDNSChange(Interface& interface, const wsl::shared::hns::D
         content << L"nameserver " << server << L"\n";
     }
 
-    // Use 'search' for DNS suffixes.
-    // Per resolv.conf(5): "The domain directive is an obsolete name for the search directive
-    // that handles one search list entry only."
-    // See: https://man7.org/linux/man-pages/man5/resolv.conf.5.html
+    if (!payload.Domain.empty())
+    {
+        content << L"domain " << payload.Domain << L"\n";
+    }
+
     if (!payload.Search.empty())
     {
         content << L"search " << wsl::shared::string::Join(wsl::shared::string::Split(payload.Search, L','), L' ') << L"\n";
     }
 
     GNS_LOG_INFO(
-        "Setting DNS search to {}: {} on interfaceName {} ", payload.Search.c_str(), content.str().c_str(), interface.Name().c_str());
+        "Setting DNS server domain to {}: {} on interfaceName {} ",
+        payload.Domain.c_str(),
+        content.str().c_str(),
+        interface.Name().c_str());
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc", 0755) < 0);
     std::wofstream resolvConf;

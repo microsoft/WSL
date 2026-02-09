@@ -294,7 +294,7 @@ Return Value:
             snprintf(
                 Plan9Options,
                 sizeof(Plan9Options),
-                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=5,access=client,msize=65536,trans=fd,rfd=*,wfd=*",
+                "aname=drvfs;path=%s%s;symlinkroot=/mnt/,cache=5,access=client,msize=65536,trans=fd,rfd=4,wfd=4",
                 Plan9Source,
                 Temp);
         }

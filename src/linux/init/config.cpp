@@ -679,7 +679,12 @@ try
     //
 
     Config.FeatureFlags = Message->FeatureFlags;
-    UtilSetFeatureFlags(Config.FeatureFlags.value());
+    char FeatureFlagsString[10];
+    snprintf(FeatureFlagsString, sizeof(FeatureFlagsString), "%x", Config.FeatureFlags.value());
+    if (setenv(WSL_FEATURE_FLAGS_ENV, FeatureFlagsString, 1) < 0)
+    {
+        LOG_ERROR("setenv failed {}", errno);
+    }
 
     //
     // Determine the default UID which can be specified in /etc/wsl.conf.
@@ -1724,6 +1729,10 @@ Return Value:
         if (strcmp(MountEnum.Current().FileSystemType, PLAN9_FS_TYPE) == 0)
         {
             MountSource = UtilParsePlan9MountSource(MountEnum.Current().SuperOptions);
+            if (MountSource.empty())
+            {
+                continue;
+            }
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
         {
@@ -1732,14 +1741,9 @@ Return Value:
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            MountSource = UtilParseVirtiofsMountSource(MountEnum.Current().Source);
         }
         else
-        {
-            continue;
-        }
-
-        if (MountSource.empty())
         {
             continue;
         }
@@ -2408,7 +2412,7 @@ try
 
             NewMountOptions = MountEntry.MountOptions;
             NewMountOptions += ',';
-            if (WSL_USE_VIRTIO_9P())
+            if (WSL_USE_VIRTIO_9P(Config))
             {
                 //
                 // Check if the existing mount is a drvfs mount that needs to be remounted.
@@ -2441,10 +2445,17 @@ try
                 NewMountOptions += ',';
             }
 
-            MountPlan9Share(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin);
+            MountPlan9Filesystem(NewSource, MountEntry.MountPoint, NewMountOptions.c_str(), Message->Admin, Config);
         }
         else if (strcmp(MountEntry.FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
+            std::string_view Source = MountEntry.Source;
+            std::string_view OldTag = Message->Admin ? LX_INIT_DRVFS_VIRTIO_TAG : LX_INIT_DRVFS_ADMIN_VIRTIO_TAG;
+            if (!wsl::shared::string::StartsWith(Source, OldTag))
+            {
+                continue;
+            }
+
             RemountVirtioFs(MountEntry.Source, MountEntry.MountPoint, MountEntry.MountOptions, Message->Admin);
         }
         else

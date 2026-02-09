@@ -3999,12 +3999,6 @@ int main(int Argc, char* Argv[])
     }
 
     //
-    // Log the WSL version to kmesg.
-    //
-
-    LOG_INFO("WSL version {}", WSL_PACKAGE_VERSION);
-
-    //
     // Ensure /dev/console is present and set as the controlling terminal.
     // If opening /dev/console times out, stdout and stderr to the logging file descriptor.
     //

@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -41,9 +42,9 @@ std::string GenerateResolvConf(_In_ const DnsInfo& Info);
 /// Builds an hns::DNS notification from DnsInfo settings.
 /// </summary>
 /// <param name="settings">The DNS settings to convert</param>
-/// <param name="options">The resolv.conf header options (defaults to LX_INIT_RESOLVCONF_FULL_HEADER)</param>
-/// <returns>The hns::DNS notification ready to send via GNS channel</returns>
-wsl::shared::hns::DNS BuildDnsNotification(const DnsInfo& settings, PCWSTR options = LX_INIT_RESOLVCONF_FULL_HEADER);
+/// <param name="useLinuxDomainEntry">If true, uses 'domain' entry for single suffix; otherwise uses 'search' for all
+/// suffixes</param> <returns>The hns::DNS notification ready to send via GNS channel</returns>
+wsl::shared::hns::DNS BuildDnsNotification(const DnsInfo& settings, bool useLinuxDomainEntry = false);
 
 std::vector<std::string> GetAllDnsSuffixes(const std::vector<IpAdapterAddress>& AdapterAddresses);
 
@@ -52,15 +53,27 @@ DWORD GetBestInterface();
 class HostDnsInfo
 {
 public:
-    static DnsInfo GetDnsSettings(_In_ DnsSettingsFlags Flags);
+    DnsInfo GetDnsSettings(_In_ DnsSettingsFlags Flags);
+
+    void UpdateNetworkInformation();
 
     static DnsInfo GetDnsTunnelingSettings(const std::wstring& dnsTunnelingNameserver);
 
+    const std::vector<IpAdapterAddress>& CurrentAddresses() const
+    {
+        return m_addresses;
+    }
+
 private:
+    /// <summary>
+    /// Internal function to retrieve the latest copy of interface information.
+    /// </summary>
+    std::vector<IpAdapterAddress> GetAdapterAddresses();
+
     /// <summary>
     /// Internal function to retrieve interface DNS servers.
     /// </summary>
-    static std::vector<std::string> GetInterfaceDnsServers(const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags);
+    std::vector<std::string> GetInterfaceDnsServers(const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags);
 
     /// <summary>
     /// Internal function to retrieve all Windows DNS suffixes.
@@ -71,6 +84,30 @@ private:
     /// Internal function to convert DNS server addresses into strings.
     /// </summary>
     static std::vector<std::string> GetDnsServerStrings(_In_ const PIP_ADAPTER_DNS_SERVER_ADDRESS& DnsServer, _In_ USHORT IpFamilyFilter, _In_ USHORT MaxValues);
+
+    /// <summary>
+    /// Stores latest copy of interface information.
+    /// </summary>
+    std::mutex m_lock;
+    _Guarded_by_(m_lock) std::vector<IpAdapterAddress> m_addresses;
+};
+
+/// <summary>
+/// Helper class that fetches current DNS settings from the host.
+/// Callers are responsible for tracking changes if needed.
+/// </summary>
+class DnsUpdateHelper
+{
+public:
+    /// <summary>
+    /// Fetches current DNS settings from the host.
+    /// </summary>
+    /// <param name="flags">Flags controlling which DNS settings to include</param>
+    /// <returns>Current DNS settings</returns>
+    DnsInfo GetCurrentDnsSettings(DnsSettingsFlags flags);
+
+private:
+    HostDnsInfo m_hostDnsInfo;
 };
 
 using RegistryChangeCallback = std::function<void()>;

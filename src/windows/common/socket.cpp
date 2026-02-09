@@ -17,25 +17,20 @@ Abstract:
 #include "socket.hpp"
 #pragma hdrstop
 
-bool wsl::windows::common::socket::CancellableAccept(
-    _In_ SOCKET ListenSocket, _In_ SOCKET Socket, _In_ DWORD Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
+void wsl::windows::common::socket::Accept(
+    _In_ SOCKET ListenSocket, _In_ SOCKET Socket, _In_ int Timeout, _In_opt_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
-    relay::MultiHandleWait io;
+    CHAR AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
+    DWORD BytesReturned;
+    OVERLAPPED Overlapped{};
+    const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
+    Overlapped.hEvent = OverlappedEvent.get();
+    const BOOL Success =
+        AcceptEx(ListenSocket, Socket, AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &BytesReturned, &Overlapped);
 
-    bool accepted = false;
-
-    io.AddHandle(std::make_unique<relay::SingleAcceptHandle>(ListenSocket, Socket, [&]() { accepted = true; }), relay::MultiHandleWait::CancelOnCompleted);
-
-    if (ExitHandle != nullptr)
+    if (!Success)
     {
-        io.AddHandle(std::make_unique<relay::EventHandle>(ExitHandle), relay::MultiHandleWait::CancelOnCompleted);
-    }
-
-    io.Run(std::chrono::milliseconds(Timeout));
-
-    if (!accepted)
-    {
-        return false; // Accept was cancelled by the exit event.
+        GetResult(ListenSocket, Overlapped, Timeout, ExitHandle, Location);
     }
 
     // Set the accept context to mark the socket as connected.
@@ -44,7 +39,7 @@ bool wsl::windows::common::socket::CancellableAccept(
         "From: %hs",
         std::format("{}", Location).c_str());
 
-    return true;
+    return;
 }
 
 std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(

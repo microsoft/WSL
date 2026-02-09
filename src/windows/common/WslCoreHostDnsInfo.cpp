@@ -105,6 +105,12 @@ wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsTunneli
     return dnsInfo;
 }
 
+std::vector<wsl::core::networking::IpAdapterAddress> wsl::core::networking::HostDnsInfo::GetAdapterAddresses()
+{
+    std::lock_guard<std::mutex> lock(m_lock);
+    return m_addresses;
+}
+
 std::vector<std::string> wsl::core::networking::HostDnsInfo::GetDnsServerStrings(
     _In_ const PIP_ADAPTER_DNS_SERVER_ADDRESS& FirstDnsServer, _In_ USHORT IpFamilyFilter, _In_ USHORT MaxValues)
 {
@@ -227,7 +233,7 @@ std::vector<std::string> wsl::core::networking::HostDnsInfo::GetInterfaceDnsSuff
 
 wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsSettings(_In_ DnsSettingsFlags Flags)
 {
-    std::vector<IpAdapterAddress> Addresses = AdapterAddresses::GetCurrent();
+    std::vector<IpAdapterAddress> Addresses = GetAdapterAddresses();
 
     auto RemoveFilter = [&](const IpAdapterAddress& Address) {
         // Ignore interfaces that are not currently "up".
@@ -320,6 +326,12 @@ wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsSetting
     return DnsSettings;
 }
 
+void wsl::core::networking::HostDnsInfo::UpdateNetworkInformation()
+{
+    std::lock_guard<std::mutex> lock(m_lock);
+    m_addresses = AdapterAddresses::GetCurrent();
+}
+
 std::string wsl::core::networking::GenerateResolvConf(_In_ const DnsInfo& Info)
 {
     std::string contents{};
@@ -333,10 +345,7 @@ std::string wsl::core::networking::GenerateResolvConf(_In_ const DnsInfo& Info)
             contents += c_asciiNewLine;
         }
 
-        // Add DNS suffix information using 'search' directive.
-        // Per resolv.conf(5): "The domain directive is an obsolete name for the search directive
-        // that handles one search list entry only."
-        // See: https://man7.org/linux/man-pages/man5/resolv.conf.5.html
+        // Add domain information if it is available.
         if (!Info.Domains.empty())
         {
             contents += "search ";
@@ -488,21 +497,28 @@ wsl::core::networking::DnsSuffixRegistryWatcher::DnsSuffixRegistryWatcher(Regist
     m_registryWatchers.swap(localRegistryWatchers);
 }
 
-wsl::shared::hns::DNS wsl::core::networking::BuildDnsNotification(const DnsInfo& settings, PCWSTR options)
+wsl::shared::hns::DNS wsl::core::networking::BuildDnsNotification(const DnsInfo& settings, bool useLinuxDomainEntry)
 {
     wsl::shared::hns::DNS dnsNotification{};
-    if (options)
-    {
-        dnsNotification.Options = options;
-    }
-
+    dnsNotification.Options = LX_INIT_RESOLVCONF_FULL_HEADER;
     dnsNotification.ServerList = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(settings.Servers, ','));
 
-    // Use 'search' entry for DNS suffix list.
-    // Per resolv.conf(5): "The domain directive is an obsolete name for the search directive
-    // that handles one search list entry only."
-    // See: https://man7.org/linux/man-pages/man5/resolv.conf.5.html
-    dnsNotification.Search = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(settings.Domains, ','));
+    if (useLinuxDomainEntry && !settings.Domains.empty())
+    {
+        // Use 'domain' entry for single DNS suffix (typically used when mirroring host DNS without tunneling)
+        dnsNotification.Domain = wsl::shared::string::MultiByteToWide(settings.Domains.front());
+    }
+    else
+    {
+        // Use 'search' entry for DNS suffix list
+        dnsNotification.Search = wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(settings.Domains, ','));
+    }
 
     return dnsNotification;
+}
+
+wsl::core::networking::DnsInfo wsl::core::networking::DnsUpdateHelper::GetCurrentDnsSettings(DnsSettingsFlags flags)
+{
+    m_hostDnsInfo.UpdateNetworkInformation();
+    return m_hostDnsInfo.GetDnsSettings(flags);
 }

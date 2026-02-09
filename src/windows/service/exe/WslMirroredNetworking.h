@@ -224,6 +224,9 @@ private:
     _Guarded_by_(m_networkLock) DnsInfo m_trackedDnsInfo;
     // The current DNS info on the host
     _Guarded_by_(m_networkLock) DnsInfo m_dnsInfo;
+    // m_hostDnsInfo is an optimization used to avoid allocating a large buffer every time we call
+    // GetAdaptersAddresses when querying host DNS info
+    _Guarded_by_(m_networkLock) HostDnsInfo m_hostDnsInfo;
 
     std::wstring m_dnsTunnelingIpAddress;
 

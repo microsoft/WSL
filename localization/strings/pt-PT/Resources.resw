@@ -292,11 +292,9 @@ e "wsl.exe --install &lt;Distro&gt;" para instalar.</value>
     <value>A distribuição legada não suporta o WSL 2.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>O WSL2 não consegue iniciar porque a virtualização não está ativada nesta máquina.
-Certifique-se de que o componente opcional "Plataforma de Máquina Virtual" está ativado e a virtualização está ligada nas definições de firmware do seu computador.
-
-Ative a "Plataforma de Máquina Virtual" ao executar: wsl.exe --install --no-distribution
-
+    <value>O WSL2 não é suportado com a configuração atual do computador.
+Ative o componente opcional "Plataforma de Máquinas Virtuais" e certifique-se de que a virtualização está ativada no BIOS.
+Ative a "Plataforma de Máquinas Virtuais" executando: wsl.exe --install --no-distribution
 Para obter informações, visite https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>

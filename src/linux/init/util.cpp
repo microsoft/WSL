@@ -53,7 +53,6 @@ Abstract:
 #define WSL_MOUNT_OPTION_SEP ','
 
 int g_IsVmMode = -1;
-static std::optional<int> g_CachedFeatureFlags;
 static sigset_t g_originalSignals;
 thread_local std::string g_threadName;
 
@@ -905,12 +904,11 @@ try
         }
         else if (strcmp(MountEnum.Current().FileSystemType, VIRTIO_FS_TYPE) == 0)
         {
-            MountSource = QueryVirtiofsMountSource(MountEnum.Current().Source);
+            MountSource = UtilParseVirtiofsMountSource(MountEnum.Current().Source);
             if (MountSource.empty())
             {
                 continue;
             }
-
             MountEnum.Current().Source = MountSource.data();
         }
         else if (strcmp(MountEnum.Current().FileSystemType, DRVFS_FS_TYPE) == 0)
@@ -1122,7 +1120,7 @@ catch (...)
     return {};
 }
 
-int UtilGetFeatureFlags()
+int UtilGetFeatureFlags(const wsl::linux::WslDistributionConfig& Config)
 
 /*++
 
@@ -1133,7 +1131,7 @@ Routine Description:
 
 Arguments:
 
-    None.
+    Config - Supplies the distribution config.
 
 Return Value:
 
@@ -1146,9 +1144,19 @@ Return Value:
     // If feature flags are already known, return them.
     //
 
+    static std::optional<int> g_CachedFeatureFlags;
     if (g_CachedFeatureFlags)
     {
         return *g_CachedFeatureFlags;
+    }
+
+    //
+    // If an error occurs, just return no features.
+    //
+
+    if (Config.FeatureFlags.has_value())
+    {
+        return Config.FeatureFlags.value();
     }
 
     //
@@ -1160,7 +1168,9 @@ Return Value:
     //
 
     int FeatureFlags = LxInitFeatureNone;
+
     const char* FeatureFlagEnv = getenv(WSL_FEATURE_FLAGS_ENV);
+
     if (FeatureFlagEnv != nullptr)
     {
         FeatureFlags = strtol(FeatureFlagEnv, nullptr, 16);
@@ -1168,7 +1178,7 @@ Return Value:
     else
     {
         //
-        // Query init for the value. If an error occurs, just return no features.
+        // Query init for the value.
         //
 
         wsl::shared::SocketChannel channel{UtilConnectUnix(WSL_INIT_INTEROP_SOCKET), "wslinfo"};
@@ -1185,43 +1195,9 @@ Return Value:
         FeatureFlags = channel.ReceiveMessage<RESULT_MESSAGE<int32_t>>().Result;
     }
 
-    UtilSetFeatureFlags(FeatureFlags, FeatureFlagEnv == nullptr);
+    g_CachedFeatureFlags = FeatureFlags;
     return FeatureFlags;
 }
-
-void UtilSetFeatureFlags(int FeatureFlags, bool UpdateEnv)
-
-/*++
-
-Routine Description:
-
-    This routine sets the feature flags and updates the cached value and environment variable.
-
-Arguments:
-
-    FeatureFlags - Supplies the feature flags to set.
-
-    UpdateEnv - Supplies a boolean that indicates whether the environment variable should be updated.
-
-Return Value:
-
-    None.
-
---*/
-
-try
-{
-    g_CachedFeatureFlags = FeatureFlags;
-    if (UpdateEnv)
-    {
-        auto FeatureFlagsString = std::format("{:x}", FeatureFlags);
-        if (setenv(WSL_FEATURE_FLAGS_ENV, FeatureFlagsString.c_str(), 1) < 0)
-        {
-            LOG_ERROR("setenv({}, {}, 1) failed {}", WSL_FEATURE_FLAGS_ENV, FeatureFlagsString, errno);
-        }
-    }
-}
-CATCH_LOG()
 
 std::optional<LX_MINI_INIT_NETWORKING_MODE> UtilGetNetworkingMode(void)
 
@@ -2069,6 +2045,41 @@ Return Value:
     }
 
     return {};
+}
+
+std::string UtilParseVirtiofsMountSource(std::string_view Source)
+
+/*++
+
+Routine Description:
+
+    This routine parses the mount source to determine the actual source of a
+    a VirtioFs mount.
+
+Arguments:
+
+    Source - Supplies the source string.
+
+Return Value:
+
+    The mount source, or NULL if the source is not valid.
+
+--*/
+
+{
+    std::string MountSource{};
+    if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) && (Source.size() >= sizeof(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG)))
+    {
+        MountSource = Source[sizeof(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) - 1];
+        MountSource += ":";
+    }
+    else if (wsl::shared::string::StartsWith(Source, LX_INIT_DRVFS_VIRTIO_TAG) && (Source.size() >= sizeof(LX_INIT_DRVFS_VIRTIO_TAG)))
+    {
+        MountSource = Source[sizeof(LX_INIT_DRVFS_VIRTIO_TAG) - 1];
+        MountSource += ":";
+    }
+
+    return MountSource;
 }
 
 std::vector<char> UtilParseWslEnv(char* NtEnvironment)

@@ -784,6 +784,9 @@ try
     // Impersonate the service.
     auto runAsSelf = wil::run_as_self();
 
+    // Update the instance's DNS information.
+    m_dnsInfo.UpdateNetworkInformation();
+
     // Update the resolv.conf file if it has changed.
     _UpdateNetworkConfigurationFiles(false);
     return;
@@ -796,7 +799,7 @@ void LxssInstance::_UpdateNetworkConfigurationFiles(_In_ bool UpdateAlways)
     wsl::core::networking::DnsSettingsFlags flags = wsl::core::networking::DnsSettingsFlags::IncludeIpv6Servers;
     WI_SetFlagIf(flags, wsl::core::networking::DnsSettingsFlags::IncludeVpn, m_enableVpnDetection);
 
-    const auto dnsSettings = wsl::core::networking::HostDnsInfo::GetDnsSettings(flags);
+    const auto dnsSettings = m_dnsInfo.GetDnsSettings(flags);
     std::string fileContents = GenerateResolvConf(dnsSettings);
     std::lock_guard<std::mutex> lock(m_resolvConfLock);
     if (!UpdateAlways && (fileContents == m_lastResolvConfContents))
