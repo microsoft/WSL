@@ -81,6 +81,9 @@ namespace wsl::windows::wslc
             }
         }
 
+        // Usage follows the Microsoft convention:
+        // https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/command-line-syntax-key
+
         // Output the command preamble and command chain
         infoOut << Localization::WSLCCLI_Usage(L"wslc2", std::wstring_view{commandChain});
 
@@ -88,8 +91,34 @@ namespace wsl::windows::wslc
         auto commands = GetVisibleCommands();
         auto arguments = GetVisibleArguments();
 
-        bool hasArguments = false;
-        bool hasOptions = false;
+        // Separate arguments by Kind
+        std::vector<Argument> standardArgs;
+        std::vector<Argument> positionalArgs;
+        std::vector<Argument> forwardArgs;
+        bool requiredPositionalArgsExist = false;
+        for (const auto& arg : arguments)
+        {
+            switch (arg.Kind())
+            {
+                case Kind::Standard:
+                    standardArgs.emplace_back(arg);
+                    break;
+                case Kind::Positional:
+                    positionalArgs.emplace_back(arg);
+                    if (arg.Required())
+                    {
+                        requiredPositionalArgsExist = true;
+                    }
+                    break;
+                case Kind::Forward:
+                    forwardArgs.emplace_back(arg);
+                    break;
+            }
+        }
+
+        bool hasArguments = !positionalArgs.empty();
+        bool hasOptions = !standardArgs.empty();
+        bool hasForwardArgs = !forwardArgs.empty();
 
         // Output the command token, made optional if arguments are present.
         if (!commands.empty())
@@ -109,51 +138,44 @@ namespace wsl::windows::wslc
             }
         }
 
-        // Arguments are required by a test to have all positionals first.
-        // TODO: Need to adjust this for wslc format.
-        // for WSLC format of command <options> <positional> <args | positional2..>
-        for (const auto& arg : arguments)
+        // For WSLC format of command [<options>] <positional> <args | positional2..>
+
+
+        // Add options to the usage if there are options present.
+        if (hasOptions)
         {
-            if (arg.Kind() == Kind::Positional)
+            infoOut << L" [<" << Localization::WSLCCLI_Options()<< L">]";
+        }
+
+        // Add arguments to the usage if there are arguments present. Positional come after
+        // options and may be optional or required.
+        for (const auto& arg : positionalArgs)
+        {   
+            infoOut << L' ';
+
+            if (!arg.Required())
             {
-                hasArguments = true;
-
-                infoOut << L' ';
-
-                if (!arg.Required())
-                {
-                    infoOut << L'[';
-                }
-
                 infoOut << L'[';
-
-                if (arg.Alias() == argument::NoAlias)
-                {
-                    infoOut << WSLC_CLI_ARG_ID_CHAR << WSLC_CLI_ARG_ID_CHAR << arg.Name();
-                }
-                else
-                {
-                    infoOut << WSLC_CLI_ARG_ID_CHAR << arg.Alias();
-                }
-
-                infoOut << L"] <" << arg.Name() << L'>';
-
-                if (arg.Limit() > 1)
-                {
-                    infoOut << L"...";
-                }
-
-                if (!arg.Required())
-                {
-                    infoOut << L']';
-                }
             }
-            else
+
+            infoOut << L'<' << arg.Name() << L'>';
+
+            if (arg.Limit() > 1)
             {
-                hasOptions = true;
-                infoOut << L" [<" << Localization::WSLCCLI_Options()<< L">]";
-                break;
+                infoOut << L"...";
             }
+
+            if (!arg.Required())
+            {
+                infoOut << L']';
+            }
+        }
+
+        if (hasForwardArgs)
+        {
+            // Assume only one forward arg is present, as multiple forwards would be
+            // ambiguous in usage. Revisit if this becomes a scenario.
+            infoOut << L" <" << forwardArgs.front().Name() << L">...";
         }
 
         infoOut <<
@@ -216,36 +238,41 @@ namespace wsl::windows::wslc
             {
                 infoOut << Localization::WSLCCLI_AvailableArguments() << std::endl;
 
-                size_t i = 0;
-                for (const auto& arg : arguments)
+                for (const auto& arg : positionalArgs)
                 {
-                    const std::wstring& argName = argNames[i++];
-                    if (arg.Kind() == Kind::Positional)
-                    {
-                        size_t fillChars = (maxArgNameLength - argName.length()) + 2;
-                        infoOut << L"  " << argName << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
-                    }
+                    size_t fillChars = (maxArgNameLength - arg.Name().length()) + 2;
+                    infoOut << L"  " << arg.Name() << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
                 }
             }
 
-            if (hasOptions)
+            if (hasForwardArgs)
             {
                 if (hasArguments)
                 {
                     infoOut << std::endl;
                 }
 
-                infoOut << Localization::WSLCCLI_AvailableOptions() << std::endl;
-
-                size_t i = 0;
-                for (const auto& arg : arguments)
+                infoOut << Localization::WSLCCLI_AvailableForwardArguments() << std::endl;
+                for (const auto& arg : forwardArgs)
                 {
-                    const std::wstring& argName = argNames[i++];
-                    if (arg.Kind() != Kind::Positional)
-                    {
-                        size_t fillChars = (maxArgNameLength - argName.length()) + 2;
-                        infoOut << L"  " << argName << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
-                    }
+                    size_t fillChars = (maxArgNameLength - arg.Name().length()) + 2;
+                    infoOut << L"  " << arg.Name() << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
+                }
+            }
+
+            if (hasOptions)
+            {
+                if (hasArguments || hasForwardArgs)
+                {
+                    infoOut << std::endl;
+                }
+
+                infoOut << Localization::WSLCCLI_AvailableOptions() << std::endl;
+                for (const auto& arg : standardArgs)
+                {
+                    auto usage = arg.GetUsageString();
+                    size_t fillChars = (maxArgNameLength - usage.length()) + 2;
+                    infoOut << L"  " << usage << std::wstring(fillChars, ' ') << arg.Description() << std::endl;
                 }
             }
         }
