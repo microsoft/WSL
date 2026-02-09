@@ -129,8 +129,8 @@ typedef enum WSLC_PORT_PROTOCOL
 
 typedef struct WSLC_CONTAINER_PORT_MAPPING
 {
-    _In_ UINT16 windowsPort;          // Port on Windows host
-    _In_ UINT16 containerPort;        // Port inside container
+    _In_ uint16_t  windowsPort;          // Port on Windows host
+    _In_ uint16_t  containerPort;        // Port inside container
     _In_ WSLC_PORT_PROTOCOL protocol; // TCP or UDP
 
     // if you want to override the default binding address
