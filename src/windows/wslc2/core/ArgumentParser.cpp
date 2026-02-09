@@ -22,15 +22,15 @@ namespace wsl::windows::wslc
         {
             switch (arg.Kind())
             {
-                case Kind::Standard:
-                    m_standardArgs.emplace_back(arg);
-                    break;
-                case Kind::Positional:
-                    m_positionalArgs.emplace_back(arg);
-                    break;
-                case Kind::Forward:
-                    m_forwardArgs.emplace_back(arg);
-                    break;
+            case Kind::Standard:
+                m_standardArgs.emplace_back(arg);
+                break;
+            case Kind::Positional:
+                m_positionalArgs.emplace_back(arg);
+                break;
+            case Kind::Forward:
+                m_forwardArgs.emplace_back(arg);
+                break;
             }
         }
 

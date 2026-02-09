@@ -175,7 +175,7 @@ namespace wsl::windows::wslc
         {
             // Assume only one forward arg is present, as multiple forwards would be
             // ambiguous in usage. Revisit if this becomes a scenario.
-            infoOut << L" <" << forwardArgs.front().Name() << L">...";
+            infoOut << L" [<" << forwardArgs.front().Name() << L">...]";
         }
 
         infoOut <<
@@ -247,12 +247,7 @@ namespace wsl::windows::wslc
 
             if (hasForwardArgs)
             {
-                if (hasArguments)
-                {
-                    infoOut << std::endl;
-                }
-
-                infoOut << Localization::WSLCCLI_AvailableForwardArguments() << std::endl;
+                ////infoOut << Localization::WSLCCLI_AvailableForwardArguments() << std::endl;
                 for (const auto& arg : forwardArgs)
                 {
                     size_t fillChars = (maxArgNameLength - arg.Name().length()) + 2;

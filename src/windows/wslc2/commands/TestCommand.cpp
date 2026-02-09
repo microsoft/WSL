@@ -22,7 +22,7 @@ namespace wsl::windows::wslc
             Argument::ForType(ArgType::Attach),
             Argument::ForType(ArgType::Interactive),
             Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::Port),
+            Argument::ForType(ArgType::Publish),
         };
     }
 
@@ -68,9 +68,9 @@ namespace wsl::windows::wslc
             PrintMessage(L"  Stored SessionId: " + context.Data.Get<Data::SessionId>());
         }
 
-        if (context.Args.Contains(ArgType::Port))
+        if (context.Args.Contains(ArgType::Publish))
         {
-            for (const auto& port : context.Args.GetAll<ArgType::Port>())
+            for (const auto& port : context.Args.GetAll<ArgType::Publish>())
             {
                 PrintMessage(L"  Port: " + port);
             }
