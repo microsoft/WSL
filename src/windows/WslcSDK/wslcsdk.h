@@ -394,17 +394,17 @@ typedef struct WSLC_REGISTRY_AUTHENTICATION_INFORMATION
     //TBD
 } WSLC_REGISTRY_AUTHENTICATION_INFORMATION;
 
-typedef struct WLSC_PULL_IMAGE_OPTIONS
+typedef struct WSLC_PULL_IMAGE_OPTIONS
 {
     _In_z_ PCSTR uri; // e.g. "my.registry.io/hello-world:latest" or just "hello-world:latest" which will default to docker
     _In_opt_ WslcContainerImageProgressCallback progressCallback;
     _In_opt_ PVOID progressCallbackContext;
-    _In_opt_ WSLC_REGISTRY_AUTHENTICATION_INFORMATION authInfo;
-} WLSC_PULL_IMAGE_OPTIONS;
+    _In_opt_ const WSLC_REGISTRY_AUTHENTICATION_INFORMATION* authInfo;
+} WSLC_PULL_IMAGE_OPTIONS;
 
 
 STDAPI WslcSessionImagePull(_In_ WslcSession session,
-                            _In_ const WLSC_PULL_IMAGE_OPTIONS* options,
+                            _In_ const WSLC_PULL_IMAGE_OPTIONS* options,
                             _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 
