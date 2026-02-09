@@ -83,6 +83,11 @@ namespace wsl::windows::wslc
         bool m_anchorPositionalArgumentFound = false;
         ArgType m_anchorPositional = ArgType::Max; // Invalid default value indicating no anchor positional found yet.
 
+        // Separate arguments by Kind
+        std::vector<Argument> m_standardArgs = {};
+        std::vector<Argument> m_positionalArgs = {};
+        std::vector<Argument> m_forwardArgs = {};
+
         State m_state;
     };
 }

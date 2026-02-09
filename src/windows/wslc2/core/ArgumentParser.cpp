@@ -18,6 +18,22 @@ namespace wsl::windows::wslc
         m_invocationItr(m_invocation.begin()),
         m_positionalSearchItr(m_arguments.begin())
     {
+        for (const auto& arg : m_arguments)
+        {
+            switch (arg.Kind())
+            {
+                case Kind::Standard:
+                    m_standardArgs.emplace_back(arg);
+                    break;
+                case Kind::Positional:
+                    m_positionalArgs.emplace_back(arg);
+                    break;
+                case Kind::Forward:
+                    m_forwardArgs.emplace_back(arg);
+                    break;
+            }
+        }
+
     }
 
     bool ParseArgumentsStateMachine::Step()
@@ -120,12 +136,8 @@ namespace wsl::windows::wslc
                 return {};
             }
 
-            // TODO: Also check that forwarded arg kind was not used earlier. Forwarded args
-            // should always be the last argument type encountered.
             // Check for forwarded arg existence.
-            auto forwardedArgItr = std::find_if(m_arguments.begin(), m_arguments.end(),
-                [](const Argument& arg) { return arg.Kind() == Kind::Forward; });
-            if (forwardedArgItr == m_arguments.end())
+            if (m_forwardArgs.empty())
             {
                 return ArgumentException(Localization::WSLCCLI_CommandHasNoForwardArgumentsError(currArg));
             }
@@ -155,7 +167,7 @@ namespace wsl::windows::wslc
             }
 
             // Add the vector to the forwarded ArgType.
-            m_executionArgs.Add(forwardedArgItr->Type(), std::move(forwardedArgs));
+            m_executionArgs.Add(m_forwardArgs.front().Type(), std::move(forwardedArgs));
             return {};
         }
         // This is the first positional argument we have encountered.
@@ -182,11 +194,13 @@ namespace wsl::windows::wslc
         // Now it must be at least 2 chars
         else if (currArg[1] != WSLC_CLI_ARG_ID_CHAR)
         {
+            // Prevent the parsing of Positional or Forward arguments. Standard only.
+
             // Parse the single character alias argument
             auto currChar = currArg[1];
 
-            auto itr = std::find_if(m_arguments.begin(), m_arguments.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
-            if (itr == m_arguments.end())
+            auto itr = std::find_if(m_standardArgs.begin(), m_standardArgs.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
+            if (itr == m_standardArgs.end())
             {
                 return ArgumentException(Localization::WSLCCLI_InvalidAliasError(currArg));
             }
@@ -256,7 +270,7 @@ namespace wsl::windows::wslc
                 argName = argName.substr(0, splitChar);
             }
 
-            for (const auto& arg : m_arguments)
+            for (const auto& arg : m_standardArgs)
             {
                 if (string::IsEqual(argName, arg.Name()) ||
                     string::IsEqual(argName, arg.AlternateName()))
