@@ -34,6 +34,7 @@ public:
     docker_schema::InspectContainer Inspect();
     std::string Id();
     std::string Name();
+    std::map<std::string, std::string> Labels();
 
 private:
     wil::com_ptr<IWSLAContainer> m_container;
@@ -57,6 +58,7 @@ public:
 
     void AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly);
     void AddPort(uint16_t WindowsPort, uint16_t ContainerPort, int Family);
+    void AddLabel(const std::string& Key, const std::string& Value);
 
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> CreateNoThrow(IWSLASession& Session);
     RunningWSLAContainer Create(IWSLASession& Session);
@@ -86,5 +88,8 @@ private:
     WSLAContainerFlags m_containerFlags = WSLAContainerFlagsNone;
     std::string m_hostname;
     std::string m_domainname;
+    std::vector<WSLA_LABEL> m_labels;
+    std::deque<std::string> m_labelKeys;
+    std::deque<std::string> m_labelValues;
 };
 } // namespace wsl::windows::common

@@ -270,6 +270,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Image,
     std::vector<WSLAVolumeMount>&& volumes,
     std::vector<WSLAPortMapping>&& ports,
+    std::map<std::string, std::string>&& labels,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -283,6 +284,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
+    m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
@@ -755,6 +757,20 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
     }
 
+    std::map<std::string, std::string> labels;
+    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
+    {
+        const auto& label = containerOptions.Labels[i];
+
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Key, "Label at index %lu has null key", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Value, "Label at index %lu has null value", i);
+
+        THROW_HR_IF_MSG(E_INVALIDARG, strcmp(label.Key, WSLAContainerMetadataLabel) == 0, "Label key '%hs' is reserved", WSLAContainerMetadataLabel);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), labels.contains(label.Key), "Duplicate label key: '%hs'", label.Key);
+
+        labels[label.Key] = label.Value;
+    }
+
     // Build WSLA metadata to store in a label for recovery on Open().
     WSLAContainerMetadataV1 metadata;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
@@ -762,6 +778,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.Ports = ports;
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
+    request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
     auto result =
@@ -774,6 +791,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::move(ports),
+        std::move(labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -799,14 +817,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    auto metadataIt = dockerContainer.Labels.find(WSLAContainerMetadataLabel);
+    auto labels(dockerContainer.Labels);
+    auto metadataIt = labels.find(WSLAContainerMetadataLabel);
+
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        metadataIt == dockerContainer.Labels.end(),
+        metadataIt == labels.end(),
         "Cannot open WSLA container %hs: missing WSLA metadata label",
         dockerContainer.Id.c_str());
 
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
+    labels.erase(metadataIt);
 
     // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
     // to open containers that are not running.
@@ -820,6 +841,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::string(dockerContainer.Image),
         std::move(metadata.Volumes),
         std::move(metadata.Ports),
+        std::move(labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -851,11 +873,6 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     {
         THROW_HR_MSG(E_FAIL, "Failed to inspect container: %hs ", e.what());
     }
-}
-
-void WSLAContainerImpl::GetID(LPSTR* Output)
-{
-    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_id.data()).release();
 }
 
 void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -986,12 +1003,6 @@ HRESULT WSLAContainer::Inspect(LPSTR* Output)
     return CallImpl(&WSLAContainerImpl::Inspect, Output);
 }
 
-HRESULT WSLAContainer::GetID(LPSTR* Id)
-{
-    *Id = nullptr;
-    return CallImpl(&WSLAContainerImpl::GetID, Id);
-}
-
 HRESULT WSLAContainer::Delete()
 try
 {
@@ -1035,5 +1046,51 @@ try
     *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
 
     return S_OK;
+}
+CATCH_RETURN();
+
+void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+{
+    std::lock_guard lock(m_lock);
+
+    if (m_labels.empty())
+    {
+        *Labels = nullptr;
+        *Count = 0;
+        return;
+    }
+
+    auto count = m_labels.size();
+    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(count);
+
+    auto cleanup = wil::scope_exit([&]() {
+        for (size_t j = 0; j < count; ++j)
+        {
+            CoTaskMemFree(labelsArray[j].Key);
+            CoTaskMemFree(labelsArray[j].Value);
+        }
+    });
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        const auto& label = std::next(m_labels.begin(), i);
+        labelsArray[i].Key = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->first.c_str()).release();
+        labelsArray[i].Value = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->second.c_str()).release();
+    }
+
+    cleanup.release();
+
+    *Count = static_cast<ULONG>(count);
+    *Labels = labelsArray.release();
+}
+
+HRESULT WSLAContainer::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+try
+{
+    RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
+
+    *Count = 0;
+    *Labels = nullptr;
+    return CallImpl(&WSLAContainerImpl::GetLabels, Labels, Count);
 }
 CATCH_RETURN();

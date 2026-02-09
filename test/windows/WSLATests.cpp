@@ -425,6 +425,12 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
+
+        // Validate that ImportImage fails if no tag is passed
+        {
+            VERIFY_ARE_EQUAL(
+                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+        }
     }
 
     TEST_METHOD(DeleteImage)
@@ -574,11 +580,9 @@ class WSLATests
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            LPSTR containerId = nullptr;
-            VERIFY_SUCCEEDED(container.Get().GetID(&containerId));
             WSLA_ERROR_INFO errorInfo{};
-            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(HandleToULong(containerTarFileHandle.get()), containerId, nullptr, &errorInfo));
-            CoTaskMemFree(containerId);
+            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(
+                HandleToULong(containerTarFileHandle.get()), container.Id().c_str(), nullptr, &errorInfo));
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
@@ -1298,6 +1302,15 @@ class WSLATests
             auto process = launcher.Launch(*m_defaultSession);
             ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // expect two spaces for the empty argument.
         }
+
+        // Validate error paths
+        {
+            WSLAProcessLauncher launcher("/bin/bash", {"/bin/bash"});
+            launcher.SetUser("nobody"); // Custom users are not supported for root namespace processes.
+
+            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+        }
     }
 
     TEST_METHOD(CrashDumpCollection)
@@ -1527,6 +1540,19 @@ class WSLATests
             auto process = container.GetInitProcess();
             ValidateProcessOutput(process, {{1, "nobody\n"}});
         }
+
+        // Validate that the group is correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-group", {"groups"});
+
+            launcher.SetUser("nobody:www-data");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "www-data\n"}});
+        }
+
+        // TODO: Add test coverage for error message when the user / group doesn't exist.
 
         // Validate that empty arguments are correctly handled.
         {
@@ -2009,6 +2035,15 @@ class WSLATests
 
             auto process = launcher.Launch(container.Get());
             ValidateProcessOutput(process, {{1, "nobody\n"}});
+        }
+
+        // Validate that the group is correctly wired.
+        {
+            WSLAProcessLauncher launcher({}, {"groups"});
+            launcher.SetUser("nobody:www-data");
+
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(process, {{1, "www-data\n"}});
         }
 
         // Validate that stdin is correctly wired.
@@ -3025,6 +3060,96 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ContainerLabels)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
+        std::map<std::string, std::string> labels = {{"key1", "value1"}, {"key2", std::string(10000, 'a')}};
+
+        // Test valid labels
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-labels", {"echo", "OK"});
+
+            for (const auto& [key, value] : labels)
+            {
+                launcher.AddLabel(key, value);
+            }
+
+            auto container = launcher.Launch(*m_defaultSession);
+            VERIFY_ARE_EQUAL(labels, container.Labels());
+
+            // Keep the container alive after the handle is dropped so we can validate labels are persisted across sessions.
+            container.SetDeleteOnClose(false);
+        }
+
+        {
+            // Restarting the test session will force the container to be reloaded from storage.
+            ResetTestSession();
+
+            // Validate that labels are correctly loaded.
+            auto container = OpenContainer(m_defaultSession.get(), "test-labels");
+            VERIFY_ARE_EQUAL(labels, container.Labels());
+        }
+
+        // Test nullptr key
+        {
+            WSLA_LABEL label{.Key = nullptr, .Value = "value"};
+
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-nullptr-key";
+            options.Labels = &label;
+            options.LabelsCount = 1;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test nullptr value
+        {
+            WSLA_LABEL label{.Key = "key", .Value = nullptr};
+
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-nullptr-value";
+            options.Labels = &label;
+            options.LabelsCount = 1;
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test duplicate keys
+        {
+            std::vector<WSLA_LABEL> labels(2);
+            labels.push_back({.Key = "key", .Value = "value"});
+            labels.push_back({.Key = "key", .Value = "value2"});
+
+            WSLA_CONTAINER_OPTIONS options{};
+            options.Image = "debian:latest";
+            options.Name = "test-labels-duplicate-keys";
+            options.Labels = labels.data();
+            options.LabelsCount = static_cast<ULONG>(labels.size());
+
+            wil::com_ptr<IWSLAContainer> container;
+            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+
+        // Test wsla metadata key conflict
+        {
+            WSLAContainerLauncher launcher("debian:latest");
+            launcher.AddLabel("com.microsoft.wsl.container.metadata", "value");
+
+            auto [hr, container] = launcher.CreateNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+        }
+    }
+
     TEST_METHOD(ContainerAttach)
     {
         WSL2_TEST_ONLY();
@@ -3181,6 +3306,42 @@ class WSLATests
             attachedReader.ExpectClosed();
             VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
         }
+    }
+
+    TEST_METHOD(InvalidNames)
+    {
+        WSL2_TEST_ONLY();
+
+        auto expectInvalidArg = [&](const std::string& name) {
+            wil::com_ptr<IWSLAContainer> container;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &container), E_INVALIDARG);
+            VERIFY_IS_NULL(container.get());
+        };
+
+        expectInvalidArg("container with spaces");
+        expectInvalidArg("?foo");
+        expectInvalidArg("?foo&bar");
+        expectInvalidArg("/url/path");
+        expectInvalidArg("");
+        expectInvalidArg("\\escaped\n\\chars");
+
+        auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
+            WSLA_ERROR_INFO errorInfo{};
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr, &errorInfo), E_INVALIDARG);
+
+            wil::unique_cotaskmem_ansistring message{errorInfo.UserErrorMessage};
+
+            VerifyPatternMatch(message.get(), errorPattern);
+        };
+
+        expectInvalidPull("?foo&bar/url\n:name", "invalid reference format");
+        expectInvalidPull("?:&", "invalid reference format");
+        expectInvalidPull("/:/", "invalid reference format");
+        expectInvalidPull("\n: ", "invalid reference format");
+        expectInvalidPull("invalid\nrepo:valid-image", "invalid reference format");
+        expectInvalidPull("bad!repo:valid-image", "invalid reference format");
+        expectInvalidPull("repo:badimage!name", "invalid tag format");
+        expectInvalidPull("bad+image", "invalid reference format");
     }
 
     TEST_METHOD(PageReporting)
