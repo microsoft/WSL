@@ -1302,6 +1302,15 @@ class WSLATests
             auto process = launcher.Launch(*m_defaultSession);
             ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // expect two spaces for the empty argument.
         }
+
+        // Validate error paths
+        {
+            WSLAProcessLauncher launcher("/bin/bash", {"/bin/bash"});
+            launcher.SetUser("nobody"); // Custom users are not supported for root namespace processes.
+
+            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+        }
     }
 
     TEST_METHOD(CrashDumpCollection)
@@ -1531,6 +1540,19 @@ class WSLATests
             auto process = container.GetInitProcess();
             ValidateProcessOutput(process, {{1, "nobody\n"}});
         }
+
+        // Validate that the group is correctly wired.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-group", {"groups"});
+
+            launcher.SetUser("nobody:www-data");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {{1, "www-data\n"}});
+        }
+
+        // TODO: Add test coverage for error message when the user / group doesn't exist.
 
         // Validate that empty arguments are correctly handled.
         {
@@ -2013,6 +2035,15 @@ class WSLATests
 
             auto process = launcher.Launch(container.Get());
             ValidateProcessOutput(process, {{1, "nobody\n"}});
+        }
+
+        // Validate that the group is correctly wired.
+        {
+            WSLAProcessLauncher launcher({}, {"groups"});
+            launcher.SetUser("nobody:www-data");
+
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(process, {{1, "www-data\n"}});
         }
 
         // Validate that stdin is correctly wired.
