@@ -349,10 +349,10 @@ STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process,
 
 typedef enum WSLC_PROCESS_STATE
 {
-    WSLC_CONTAINER_PROCESS_STATE_UNKNOWN = 0,
-    WSLC_CONTAINER_PROCESS_STATE_CREATED = 1,
-    WSLC_CONTAINER_PROCESS_STATE_RUNNING = 2,
-    WSLC_CONTAINER_PROCESS_STATE_EXITED = 3,
+    WSLC_PROCESS_STATE_UNKNOWN = 0,
+    WSLC_PROCESS_STATE_CREATED = 1,
+    WSLC_PROCESS_STATE_RUNNING = 2,
+    WSLC_PROCESS_STATE_EXITED = 3,
 } WSLC_PROCESS_STATE;
 STDAPI WslcProcessGetState(_In_ WslcProcess process,
                            _Out_ WSLC_PROCESS_STATE* state);
@@ -414,7 +414,7 @@ typedef struct WSLC_REGISTRY_AUTHENTICATION_INFORMATION
 typedef VOID(CALLBACK* WslcContainerImageProgressCallback)(const WSLC_IMAGE_PROGRESS_MESSAGE* progress, PVOID context);
 
 
-// options struct — typedef is a pointer type and _In_opt_ is valid
+// options struct Â— typedef is a pointer type and _In_opt_ is valid
 typedef struct WSLC_PULL_IMAGE_OPTIONS
 {
     _In_z_ PCSTR uri;
