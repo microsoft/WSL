@@ -188,13 +188,13 @@ STDAPI WslcContainerSettingsFlags(_In_ WslcContainerSettings containerSettings,
                                   _In_ WSLC_CONTAINER_FLAGS flags);
 
 STDAPI WslcContainerSettingsPortMapping(_In_ WslcContainerSettings containerSettings,
-                                        _In_ const WSLC_CONTAINER_PORT_MAPPING* portMappings);
+                                        _In_reads_(portMappingsCount) const WSLC_CONTAINER_PORT_MAPPING* portMappings,
+                                        _In_ UINT32 portMappingsCount);
 
                               // Add the container volume to the volumes array
-STDAPI WslcContainerSettingsVolume(_In_ WslcContainerSettings containerSettings, _In_ const WSLC_CONTAINER_VOLUME* volumes);
-
-
-
+STDAPI WslcContainerSettingsVolume(_In_ WslcContainerSettings containerSettings,
+                                   _In_reads_(volumesCount) const WSLC_CONTAINER_VOLUME* volumes,
+                                   _In_ UINT32 volumesCount);
 STDAPI WslcContainerExecProcess(_In_ WslcContainer container,
                                 _In_ WslcProcessSettings newProcessSettings,
                                 _Out_ WslcProcess* newProcess);
