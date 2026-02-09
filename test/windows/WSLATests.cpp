@@ -1983,19 +1983,14 @@ class WSLATests
         auto expectPorts = [&](const auto& actualPorts, const std::map<std::string, std::set<std::string>>& expectedPorts) {
             VERIFY_ARE_EQUAL(actualPorts.size(), expectedPorts.size());
 
-            for (const auto& [actualKey, _] : actualPorts)
-            {
-                if (!expectedPorts.contains(actualKey))
-                {
-                    LogError("Unexpected port key found: %hs", actualKey.c_str());
-                    VERIFY_FAIL();
-                }
-            }
-
             for (const auto& [expectedPort, expectedHostPorts] : expectedPorts)
             {
                 auto it = actualPorts.find(expectedPort);
-                VERIFY_IS_TRUE(it != actualPorts.end());
+                if (it == actualPorts.end())
+                {
+                    LogError("Expected port key not found: %hs", expectedPort.c_str());
+                    VERIFY_FAIL();
+                }
 
                 std::set<std::string> actualHostPorts;
                 for (const auto& binding : it->second)
@@ -2021,40 +2016,20 @@ class WSLATests
         auto expectMounts = [&](const auto& actualMounts, const std::vector<std::tuple<std::string, std::string, bool>>& expectedMounts) {
             VERIFY_ARE_EQUAL(actualMounts.size(), expectedMounts.size());
 
-            std::set<std::string> expectedDests;
-            for (const auto& [dest, _, __] : expectedMounts)
-            {
-                expectedDests.insert(dest);
-            }
-
-            std::set<std::string> seenDestinations;
-            for (const auto& mount : actualMounts)
-            {
-                VERIFY_IS_FALSE(mount.Destination.empty());
-                VERIFY_IS_FALSE(mount.Type.empty());
-
-                if (!expectedDests.contains(mount.Destination))
-                {
-                    LogError("Unexpected mount destination found: %hs", mount.Destination.c_str());
-                    VERIFY_FAIL();
-                }
-
-                auto [_, inserted] = seenDestinations.insert(mount.Destination);
-                if (!inserted)
-                {
-                    LogError("Duplicate mount destination found: %hs", mount.Destination.c_str());
-                    VERIFY_FAIL();
-                }
-            }
-
             for (const auto& [expectedDest, expectedType, expectedReadWrite] : expectedMounts)
             {
-                auto it = std::ranges::find_if(actualMounts, [&](const auto& m) { return m.Destination == expectedDest; });
-                VERIFY_IS_TRUE(it != actualMounts.end());
+                auto it = std::ranges::find_if(actualMounts, [&](const auto& mount) { return mount.Destination == expectedDest; });
+                if (it == actualMounts.end())
+                {
+                    LogError("Expected mount destination not found: %hs", expectedDest.c_str());
+                    VERIFY_FAIL();
+                }
+
+                VERIFY_IS_FALSE(it->Type.empty());
+                VERIFY_IS_FALSE(it->Source.empty());
 
                 VERIFY_ARE_EQUAL(it->Type, expectedType);
                 VERIFY_ARE_EQUAL(it->ReadWrite, expectedReadWrite);
-                VERIFY_IS_FALSE(it->Source.empty());
             }
         };
 
@@ -2130,8 +2105,8 @@ class WSLATests
             VERIFY_IS_FALSE(details.State.FinishedAt.empty());
 
             // Verify no ports or mounts for this simple container.
-            expectPorts(details.Ports, std::map<std::string, std::set<std::string>>{});
-            expectMounts(details.Mounts, std::vector<std::tuple<std::string, std::string, bool>>{});
+            expectPorts(details.Ports, {});
+            expectMounts(details.Mounts, {});
 
             VERIFY_SUCCEEDED(container.Get().Delete());
         }
