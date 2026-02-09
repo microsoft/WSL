@@ -90,7 +90,7 @@ typedef __callback VOID(CALLBACK WslcSessionTerminationCallback)(_In_ WSLC_SESSI
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath,
                                _In_ uint32_t cpuCount,
                                _In_ uint64_t memoryMb,
-                               _In_ WslcSessionSettings* sessionSettings);
+                               _Out_ WslcSessionSettings* sessionSettings);
 
 STDAPI WslcSessionCreate(_In_ WslcSessionSettings sessionSettings,
                          _Out_ WslcSession* session);
