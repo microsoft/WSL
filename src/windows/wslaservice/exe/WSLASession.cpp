@@ -616,6 +616,19 @@ try
     size_t index = 0;
     for (const auto& e : images)
     {
+        // Build a map from repo name to digest for this image
+        // RepoDigests format: "repo@sha256:digest"
+        std::map<std::string, std::string> repoToDigest;
+        for (const auto& repoDigest : e.RepoDigests)
+        {
+            size_t atPos = repoDigest.find('@');
+            if (atPos != std::string::npos && atPos > 0)
+            {
+                std::string repoName = repoDigest.substr(0, atPos);
+                repoToDigest[repoName] = repoDigest;
+            }
+        }
+
         if (e.RepoTags.empty())
         {
             // Image has no tags (dangling image)
@@ -634,23 +647,32 @@ try
 
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
             output[index].Size = e.Size;
-            output[index].VirtualSize = e.VirtualSize;
             output[index].Created = e.Created;
             index++;
         }
         else
         {
             // Image has tags - create one entry per tag
-            for (size_t tagIdx = 0; tagIdx < e.RepoTags.size(); ++tagIdx)
+            for (const auto& tag : e.RepoTags)
             {
-                const auto& tag = e.RepoTags[tagIdx];
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
 
-                // Set digest if available and matches the tag
-                if (tagIdx < e.RepoDigests.size())
+                // Extract repo name from tag (format: "repo:tag")
+                // and lookup corresponding digest from the map
+                size_t colonPos = tag.find(':');
+                if (colonPos != std::string::npos && colonPos > 0)
                 {
-                    THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, e.RepoDigests[tagIdx].c_str()) != 0);
+                    std::string repoName = tag.substr(0, colonPos);
+                    auto it = repoToDigest.find(repoName);
+                    if (it != repoToDigest.end())
+                    {
+                        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, it->second.c_str()) != 0);
+                    }
+                    else
+                    {
+                        output[index].Digest[0] = '\0';
+                    }
                 }
                 else
                 {
@@ -659,7 +681,6 @@ try
 
                 THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
                 output[index].Size = e.Size;
-                output[index].VirtualSize = e.VirtualSize;
                 output[index].Created = e.Created;
                 index++;
             }

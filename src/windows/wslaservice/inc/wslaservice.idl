@@ -122,14 +122,12 @@ struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
     // TODO: Details TBD.
 };
 
-
 struct WSLA_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     char Hash[256];
     char Digest[256];
     ULONGLONG Size;
-    ULONGLONG VirtualSize;
     LONGLONG Created; // Unix timestamp
     char ParentId[256];
 };

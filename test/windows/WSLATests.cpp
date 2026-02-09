@@ -419,11 +419,6 @@ class WSLATests
                     VERIFY_IS_TRUE(image.Size > 0);
                     LogInfo("Image %s - Size: %llu bytes", imageName.c_str(), image.Size);
 
-                    // Verify VirtualSize field
-                    VERIFY_IS_TRUE(image.VirtualSize > 0);
-                    VERIFY_IS_TRUE(image.VirtualSize >= image.Size);
-                    LogInfo("Image %s - VirtualSize: %llu bytes", imageName.c_str(), image.VirtualSize);
-
                     // Verify Created timestamp
                     VERIFY_IS_TRUE(image.Created > 0);
                     LogInfo("Image %s - Created: %lld", imageName.c_str(), image.Created);
