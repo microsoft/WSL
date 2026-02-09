@@ -312,7 +312,7 @@ STDAPI WslcProcessSettingsCmdLineArgs(WslcProcessSettings processSettings,
 }
 
 STDAPI WslcProcessSettingsEnvVariables(_In_ WslcProcessSettings processSettings,
-                                       _In_ PWCHAR const* key_value,
+                                       _In_reads_(argc) PCSTR const* key_value,
                                        size_t argc)
 {
     UNREFERENCED_PARAMETER(key_value);
