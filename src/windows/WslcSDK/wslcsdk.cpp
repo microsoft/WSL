@@ -446,7 +446,7 @@ STDAPI WslcSessionCreateVhd(_In_ WslcSession session,
 // INSTALL
 
 STDAPI WslcCanRun(_Out_ BOOL* canRun,
-                  _Out_ WSLC_COMPONENT_FLAGS missingComponents)
+                  _Out_ WSLC_COMPONENT_FLAGS* missingComponents)
 {
     UNREFERENCED_PARAMETER(canRun);
     UNREFERENCED_PARAMETER(missingComponents);
