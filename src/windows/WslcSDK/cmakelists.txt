@@ -1,7 +1,7 @@
 set(SOURCES wslcsdk.cpp)
 set(HEADERS
     wslcsdk.h
-    wslcsdkprivate.h
+    WslcsdkPrivate.h
 )
 
 add_library(wslcsdk SHARED ${SOURCES} ${HEADERS} wslcsdk.def)
