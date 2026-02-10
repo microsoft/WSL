@@ -29,7 +29,7 @@ Abstract:
 
 namespace wsl::windows::service::wsla {
 
-class DECLSPEC_UUID("C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91") WSLASessionFactory
+class DECLSPEC_UUID("9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3") WSLASessionFactory
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLASessionFactory, IFastRundown>
 {
 public:

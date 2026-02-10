@@ -264,7 +264,7 @@
                 </RegistryKey>
 
                 <!-- WSLASessionFactory - COM server in per-user process -->
-                <RegistryKey Root="HKCR" Key="CLSID\{C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91}">
+                <RegistryKey Root="HKCR" Key="CLSID\{9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3}">
                     <RegistryValue Value="WSLASessionFactory" Type="string" />
                     <RegistryKey Key="LocalServer32">
                         <RegistryValue Value="&quot;[INSTALLDIR]wslasession.exe&quot;" Type="string" />

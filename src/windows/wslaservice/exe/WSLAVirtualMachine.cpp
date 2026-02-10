@@ -263,11 +263,16 @@ CATCH_LOG();
 
 std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _In_ BOOL ReadOnly)
 {
+    std::lock_guard lock{m_lock};
+
     ULONG Lun{};
     std::string Device;
 
     // Delegate to IWSLAVirtualMachine for the privileged HCS operation
     THROW_IF_FAILED(m_vm->AttachDisk(Path, ReadOnly, &Lun));
+
+    // Detach on failure so the service-side state stays consistent.
+    auto detachOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(m_vm->DetachDisk(Lun)); });
 
     // Query the guest for the device path
     Device = GetVhdDevicePath(Lun);
@@ -280,6 +285,8 @@ std::pair<ULONG, std::string> WSLAVirtualMachine::AttachDisk(_In_ PCWSTR Path, _
         TraceLoggingValue(Lun, "Lun"));
 
     m_attachedDisks.emplace(Lun, AttachedDisk{Path, Device});
+
+    detachOnFailure.release();
 
     return {Lun, Device};
 }
@@ -315,9 +322,9 @@ void WSLAVirtualMachine::DetachDisk(_In_ ULONG Lun)
     THROW_HR_IF(E_FAIL, response.Result != 0);
 
     // Remove it from the VM
-    m_attachedDisks.erase(it);
-
     THROW_IF_FAILED(m_vm->DetachDisk(Lun));
+
+    m_attachedDisks.erase(it);
 }
 
 std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> WSLAVirtualMachine::Fork(enum WSLA_FORK::ForkType Type)
@@ -755,10 +762,11 @@ HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
     THROW_HR_IF(result, FAILED(result) && result != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
     auto shareId = it->second;
-    m_mountedWindowsFolders.erase(it);
 
     // Delegate to IWSLAVirtualMachine for the privileged share removal
     THROW_IF_FAILED(m_vm->RemoveShare(shareId));
+
+    m_mountedWindowsFolders.erase(it);
 
     return S_OK;
 }
