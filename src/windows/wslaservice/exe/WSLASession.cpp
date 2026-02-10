@@ -394,10 +394,8 @@ try
         {
             // pull failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
-            if (Error != nullptr)
-            {
-                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
-            }
+
+            common::wslutil::SetCOMErrorInfo(errorMessage);
         }
 
         if (pullResult.value() == boost::beast::http::status::not_found)
@@ -1030,6 +1028,11 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
+{
+    return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
+}
 
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {

@@ -39,6 +39,7 @@ ExecutionContext::~ExecutionContext()
 {
     g_currentContext = m_parent;
     WI_ASSERT(!m_errorString.has_value());
+    WI_ASSERT(!m_errorSource.has_value());
 }
 
 ExecutionContext* ExecutionContext::Current()
@@ -46,10 +47,11 @@ ExecutionContext* ExecutionContext::Current()
     return g_currentContext;
 }
 
-void ExecutionContext::SetErrorStringImpl(std::wstring&& string)
+void ExecutionContext::SetErrorStringImpl(std::wstring&& string, std::optional<std::wstring>&& source)
 {
     WI_ASSERT(!m_errorString.has_value());
     m_errorString = std::move(string);
+    m_errorSource = std::move(source);
 }
 
 bool ExecutionContext::CanCollectUserErrorMessage()
@@ -84,7 +86,7 @@ ULONGLONG ExecutionContext::CurrentContext() const noexcept
     return errorContext;
 }
 
-void ExecutionContext::CollectErrorImpl(HRESULT result, ULONGLONG context, std::optional<std::wstring>&& message)
+void ExecutionContext::CollectErrorImpl(HRESULT result, ULONGLONG context, std::optional<std::wstring>&& message, std::optional<std::wstring>&& source)
 {
     WI_ASSERT(m_parent == nullptr);
 
@@ -107,12 +109,13 @@ void ExecutionContext::CollectErrorImpl(HRESULT result, ULONGLONG context, std::
              */
 
             m_error->Message = std::move(message);
+            m_error->Source = std::move(source);
         }
 
         return;
     }
 
-    m_error.emplace(result, context, std::move(message));
+    m_error.emplace(result, context, std::move(message), std::move(source));
 }
 
 void ExecutionContext::CollectError(HRESULT result)
@@ -127,7 +130,7 @@ void ExecutionContext::CollectError(HRESULT result)
 
 void ExecutionContext::CollectErrorImpl(HRESULT result)
 {
-    RootContext().CollectErrorImpl(result, CurrentContext(), std::move(m_errorString));
+    RootContext().CollectErrorImpl(result, CurrentContext(), std::move(m_errorString), std::move(m_errorSource));
 
     m_errorString.reset();
 }
@@ -246,7 +249,7 @@ void ClientExecutionContext::CollectErrorImpl(HRESULT result)
         message = std::wstring(m_outError.Message);
     }
 
-    RootContext().CollectErrorImpl(result, errorContext, std::move(message));
+    RootContext().CollectErrorImpl(result, errorContext, std::move(message), {});
 }
 
 void ClientExecutionContext::FlushWarnings()
@@ -379,7 +382,22 @@ void wsl::windows::common::SetErrorMessage(std::wstring&& message)
         return; // no context to save the error to or empty message, ignore
     }
 
-    g_currentContext->SetErrorStringImpl(std::move(message));
+    g_currentContext->SetErrorStringImpl(std::move(message), {});
+}
+
+void wsl::windows::common::SetCOMErrorMessage()
+{
+    if (g_currentContext == nullptr)
+    {
+        return; // no context to save the error to, ignore
+    }
+
+    auto comErrorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+    if (comErrorInfo.has_value())
+    {
+        g_currentContext->SetErrorStringImpl(comErrorInfo->Message.get(), comErrorInfo->Source.get());
+    }
 }
 
 void wsl::windows::common::SetEventLog(HANDLE eventLog)

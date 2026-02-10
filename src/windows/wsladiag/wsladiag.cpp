@@ -391,7 +391,13 @@ static void PullImpl(IWSLASession& Session, const std::string& Image)
     Callback callback;
     WSLAErrorDetails error{};
     auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
-    error.ThrowIfFailed(result);
+
+    if (FAILED(result))
+    {
+        THROW_HR_WITH_COM_ERROR(result);
+
+        return;
+    }
 }
 
 static int Pull(std::wstring_view commandLine)
@@ -777,6 +783,14 @@ int wmain(int, wchar_t**)
             auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
             auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
             wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
+
+#ifdef DEBUG
+
+            if (strings.Source.has_value())
+            {
+                wslutil::PrintMessage(L"Error source: %ls", stdout, strings.Source->c_str());
+            }
+#endif
         }
         else
         {

@@ -28,6 +28,7 @@ struct ErrorStrings
 {
     std::wstring Message;
     std::wstring Code;
+    std::optional<std::wstring> Source;
 };
 } // namespace wsl::windows::common
 
@@ -74,6 +75,12 @@ struct WSLAErrorDetails
     void ThrowIfFailed(HRESULT Result);
 
     WSLA_ERROR_INFO Error{};
+};
+
+struct COMErrorInfo
+{
+    wil::unique_bstr Message;
+    wil::unique_bstr Source;
 };
 
 template <typename T>
@@ -126,6 +133,8 @@ std::wstring ErrorCodeToString(HRESULT Error);
 ErrorStrings ErrorToString(const Error& error);
 
 std::filesystem::path GetBasePath();
+
+std::optional<COMErrorInfo> GetCOMErrorInfo();
 
 DWORD GetDefaultVersion(void);
 
@@ -206,6 +215,25 @@ void PrintMessage(_In_ const std::wstring& message, _Inout_ FILE* const stream =
         ...);
 
     PrintMessageImpl(message, stream, std::forward<Args>(args)...);
+}
+
+inline void SetComErrorInfo(const std::wstring& Message, const std::source_location& source = std::source_location::current())
+{
+    wil::com_ptr<ICreateErrorInfo> errorInfo;
+    THROW_IF_FAILED(CreateErrorInfo(&errorInfo));
+
+    auto description = wil::make_bstr(Message.c_str());
+    THROW_IF_FAILED(errorInfo->SetDescription(description.get()));
+
+    auto sourceStr = std::format(L"{}", source);
+    THROW_IF_FAILED(errorInfo->SetSource(wil::make_bstr(sourceStr.c_str()).get()));
+
+    THROW_IF_FAILED(SetErrorInfo(0, errorInfo.query<IErrorInfo>().get()));
+}
+
+inline void SetCOMErrorInfo(const std::string& Message, const std::source_location& source = std::source_location::current())
+{
+    SetComErrorInfo(wsl::shared::string::MultiByteToWide(Message).c_str(), source);
 }
 
 void SetCrtEncoding(int Mode);

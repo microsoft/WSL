@@ -2,12 +2,21 @@
 
 #pragma once
 
+#include "wslutil.h"
+
 namespace wsl::windows::common {
 
 #define THROW_HR_WITH_USER_ERROR(Result, Message) \
     if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
     { \
         ::wsl::windows::common::SetErrorMessage(Message); \
+    } \
+    THROW_HR(Result)
+
+#define THROW_HR_WITH_COM_ERROR(Result) \
+    if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
+    { \
+        ::wsl::windows::common::SetCOMErrorMessage(); \
     } \
     THROW_HR(Result)
 
@@ -76,6 +85,7 @@ struct Error
     HRESULT Code = E_UNEXPECTED;
     ULONGLONG Context = 0;
     std::optional<std::wstring> Message;
+    std::optional<std::wstring> Source;
 };
 
 /*
@@ -106,11 +116,11 @@ public:
     bool CanCollectUserWarnings() const;
     void EmitUserWarning(const std::wstring& warning, const std::source_location& location = std::source_location::current());
 
-    void CollectErrorImpl(HRESULT result, ULONGLONG context, std::optional<std::wstring>&& message);
+    void CollectErrorImpl(HRESULT result, ULONGLONG context, std::optional<std::wstring>&& message, std::optional<std::wstring>&& source);
 
     const std::optional<Error>& ReportedError() const noexcept;
 
-    void SetErrorStringImpl(std::wstring&& string);
+    void SetErrorStringImpl(std::wstring&& string, std::optional<std::wstring>&& source);
 
     ULONGLONG CurrentContext() const noexcept;
 
@@ -128,6 +138,7 @@ private:
     ExecutionContext* m_parent = nullptr;
     Context m_context = Context::Empty;
     std::optional<std::wstring> m_errorString;
+    std::optional<std::wstring> m_errorSource;
 };
 
 class ClientExecutionContext : public ExecutionContext
@@ -183,6 +194,7 @@ void EnableContextualizedErrors(bool service);
 
 void SetErrorMessage(std::wstring&& message);
 void SetErrorMessage(std::string&& message);
+void SetCOMErrorMessage();
 
 void SetEventLog(HANDLE eventLog);
 

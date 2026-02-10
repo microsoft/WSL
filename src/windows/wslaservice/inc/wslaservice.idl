@@ -15,6 +15,7 @@ Abstract:
 
 import "unknwn.idl";
 import "wtypes.idl";
+import "oaidl.idl";
 
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLASessionManager;")
@@ -383,7 +384,7 @@ struct WSLA_DELETE_IMAGE_OPTIONS
     pointer_default(unique),
     object
 ]
-interface IWSLASession : IUnknown
+interface IWSLASession : ISupportErrorInfo
 {
     HRESULT GetId([out] ULONG* Id);
 

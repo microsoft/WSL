@@ -34,7 +34,7 @@ public:
 };
 
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown, ISupportErrorInfo>
 {
 public:
     WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated);
@@ -89,6 +89,9 @@ public:
     IFACEMETHOD(Terminate()) override;
 
     IFACEMETHOD(GetImplNoRef)(_Out_ WSLASession** Session) override;
+
+    // ISupportErrorInfo
+    IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
 
     // Testing.
     IFACEMETHOD(MountWindowsFolder)(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly) override;
