@@ -12,11 +12,11 @@ Abstract:
 
 --*/
 #pragma once
+#include <winsock2.h>
+#include <ws2tcpip.h> 
 #include <windows.h>
 #include <stdint.h>
-#include <winsock2.h>
-#include <specstrings.h> // defines _In_opt_, _In_z_, etc.
-
+#include <specstrings.h>
 
 EXTERN_C_START
 
