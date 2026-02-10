@@ -14,11 +14,11 @@ using wsl::core::VirtioNetworking;
 static constexpr auto c_loopbackDeviceName = TEXT(LX_INIT_LOOPBACK_DEVICE_NAME);
 
 VirtioNetworking::VirtioNetworking(
-    GnsChannel&& gnsChannel, bool enableLocalhostRelay, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
+    GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken) :
     m_guestDeviceManager(std::move(guestDeviceManager)),
     m_userToken(std::move(userToken)),
     m_gnsChannel(std::move(gnsChannel)),
-    m_enableLocalhostRelay(enableLocalhostRelay),
+    m_flags(flags),
     m_dnsOptions(dnsOptions)
 {
 }
@@ -66,17 +66,6 @@ void VirtioNetworking::Initialize()
         device_options << L"gateway_ip=" << default_route;
     }
 
-    // Get initial DNS settings for device options.
-    auto initialDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
-    if (!initialDns.Servers.empty())
-    {
-        if (device_options.tellp() > 0)
-        {
-            device_options << L";";
-        }
-        device_options << L"nameservers=" << wsl::shared::string::MultiByteToWide(wsl::shared::string::Join(initialDns.Servers, ','));
-    }
-
     auto lock = m_lock.lock_exclusive();
 
     // Add virtio net adapter to guest
@@ -107,10 +96,18 @@ void VirtioNetworking::Initialize()
     }
 
     // Send the initial DNS configuration to GNS and track it.
-    m_trackedDnsSettings = initialDns;
-    SendDnsUpdate(initialDns);
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
+    {
+        m_trackedDnsSettings = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
+    }
+    else
+    {
+        m_trackedDnsSettings = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    }
 
-    if (m_enableLocalhostRelay)
+    SendDnsUpdate(m_trackedDnsSettings);
+
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay))
     {
         SetupLoopbackDevice();
     }
@@ -175,7 +172,7 @@ HRESULT VirtioNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int 
         }
     }
 
-    if (m_enableLocalhostRelay && (unspecified || loopback))
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
     {
         SOCKADDR_INET localAddr = addr;
         if (!loopback)
@@ -261,11 +258,14 @@ try
     UpdateMtu();
 
     // Check for DNS changes and send update if needed.
-    auto currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
-    if (currentDns != m_trackedDnsSettings)
+    if (WI_IsFlagClear(m_flags, VirtioNetworkingFlags::DnsTunneling))
     {
-        m_trackedDnsSettings = currentDns;
-        SendDnsUpdate(currentDns);
+        auto currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+        if (currentDns != m_trackedDnsSettings)
+        {
+            m_trackedDnsSettings = currentDns;
+            SendDnsUpdate(currentDns);
+        }
     }
 }
 CATCH_LOG();

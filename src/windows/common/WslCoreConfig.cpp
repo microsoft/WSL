@@ -474,9 +474,12 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         EnableVirtio9p = false;
     }
 
-    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored)
+    if (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy)
     {
-        VALIDATE_CONFIG_OPTION((NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored), EnableDnsTunneling, false);
+        VALIDATE_CONFIG_OPTION(
+            (NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::Mirrored && NetworkingMode != NetworkingMode::VirtioProxy),
+            EnableDnsTunneling,
+            false);
     }
 
     if (!EnableDnsTunneling)

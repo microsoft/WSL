@@ -10,10 +10,18 @@
 
 namespace wsl::core {
 
+enum class VirtioNetworkingFlags
+{
+    None = 0x0,
+    LocalhostRelay = 0x1,
+    DnsTunneling = 0x2,
+};
+DEFINE_ENUM_FLAG_OPERATORS(VirtioNetworkingFlags);
+
 class VirtioNetworking : public INetworkingEngine
 {
 public:
-    VirtioNetworking(GnsChannel&& gnsChannel, bool enableLocalhostRelay, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
+    VirtioNetworking(GnsChannel&& gnsChannel, VirtioNetworkingFlags flags, LPCWSTR dnsOptions, std::shared_ptr<GuestDeviceManager> guestDeviceManager, wil::shared_handle userToken);
     ~VirtioNetworking();
 
     // Note: This class cannot be moved because m_networkNotifyHandle captures a 'this' pointer.
@@ -27,8 +35,6 @@ public:
     void TraceLoggingRundown() noexcept override;
     void FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& message) override;
     void StartPortTracker(wil::unique_socket&& socket) override;
-
-    void StartLegacyPortTracker(wil::unique_socket&& socket);
 
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
@@ -48,7 +54,7 @@ private:
     GnsChannel m_gnsChannel;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
-    bool m_enableLocalhostRelay;
+    VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
     GUID m_localhostAdapterId;
     GUID m_adapterId;
