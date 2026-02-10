@@ -1993,7 +1993,7 @@ Usage:
     <value>Specify the port to use</value>
   </data>
   <data name="WSLCCLI_ContainerIdArgDescription" xml:space="preserve">
-    <value>Specify the container name to use</value>
+    <value>Container ID</value>
   </data>
   <data name="WSLCCLI_MissingArgumentError" xml:space="preserve">
     <value>Missing argument value: '{}'</value>

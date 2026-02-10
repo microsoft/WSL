@@ -83,6 +83,9 @@ namespace wsl::windows::wslc
         Argument& SetRequired(bool required) { m_required = required; return *this; }
         Argument& SetCountLimit(size_t countLimit) { m_countLimit = countLimit; return *this; }
 
+        // Validates this argument's value in the provided args
+        void Validate(const Args& execArgs) const;
+
     private:
         ArgType m_argType;
         std::wstring m_name;

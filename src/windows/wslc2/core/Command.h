@@ -86,12 +86,12 @@ namespace wsl::windows::wslc
         virtual std::wstring_view ShortDescription() const = 0;
         virtual std::wstring_view LongDescription() const = 0;
 
-        virtual void OutputIntroHeader() const;
-        virtual void OutputHelp(const CommandException* exception = nullptr) const;
+        void OutputIntroHeader() const;
+        void OutputHelp(const CommandException* exception = nullptr) const;
 
-        virtual std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
-        virtual void ParseArguments(Invocation& inv, Args& execArgs) const;
-        virtual void ValidateArguments(Args& execArgs) const;
+        std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
+        void ParseArguments(Invocation& inv, Args& execArgs) const;
+        void ValidateArguments(Args& execArgs) const;
 
         virtual void Execute(CLIExecutionContext& context) const;
 

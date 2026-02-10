@@ -163,8 +163,8 @@ namespace wsl::windows::wslc::argument
     // Controls the visibility of the field.
     enum class Visibility
     {
-        // Shown in the example.
-        Example,
+        // Shown in the usage.
+        Usage,
         // Shown only in the table below the example.
         Help,
         // Not shown in help.

@@ -2,11 +2,13 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR}/core/foundation
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
     ${CMAKE_CURRENT_SOURCE_DIR}/services
 )
 
 set(HEADERS
+
     core/pch.h
     core/foundation/DateTime.h
     core/foundation/Errors.h
@@ -18,10 +20,10 @@ set(HEADERS
     core/foundation/StringUtilities.h
     core/foundation/DebugLogger.h
     core/foundation/FileLogger.h
-    core/ArgumentTypes.h
-    core/ArgumentDefinitions.h
-    core/Argument.h
-    core/ArgumentParser.h
+    arguments/ArgumentDefinitions.h
+    arguments/ArgumentTypes.h
+    arguments/Argument.h
+    arguments/ArgumentParser.h
     core/Command.h
     core/Core.h
     core/CLIExecutionContext.h
@@ -44,15 +46,22 @@ set(SOURCES
     core/foundation/Logging.cpp
     core/foundation/DebugLogger.cpp
     core/foundation/FileLogger.cpp
-    core/Argument.cpp
-    core/ArgumentParser.cpp
     core/Command.cpp
     core/CLIExecutionContext.cpp
     core/Core.cpp
     core/Main.cpp
+    arguments/Argument.cpp
+    arguments/ArgumentParser.cpp
+    arguments/ArgumentValidation.cpp
+    arguments/ContainerArgumentValidation.cpp
     commands/RootCommand.cpp
     commands/TestCommand.cpp
     commands/ContainerCommand.cpp
+    commands/ContainerCreateCommand.cpp
+    commands/ContainerKillCommand.cpp
+    commands/ContainerRunCommand.cpp
+    commands/ContainerStartCommand.cpp
+    commands/ContainerStopCommand.cpp
     tasks/TaskBase.cpp
     tasks/CommonTasks.cpp
     tasks/TestTasks.cpp

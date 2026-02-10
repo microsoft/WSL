@@ -326,13 +326,12 @@ namespace wsl::windows::wslc
     void Command::ValidateArguments(Args& execArgs) const
     {
         // If help is asked for, don't bother validating anything else
-        // Change from Args::Type::Help to ArgType::Help
         if (execArgs.Contains(ArgType::Help))
         {
             return;
         }
 
-        // Common arguments need to be validated with command arguments, as there may be common arguments blocked by Experimental Feature or Group Policy
+        // Common arguments need to be validated with command arguments
         auto allArgs = GetArguments();
         Argument::GetCommon(allArgs);
 
@@ -343,10 +342,16 @@ namespace wsl::windows::wslc
                 throw CommandException(Localization::WSLCCLI_RequiredArgumentError(arg.Name()));
             }
 
-            /* if (arg.Limit() < execArgs.Contains(arg.Type()))
+            if (arg.Limit() < execArgs.Count(arg.Type()))
             {
                 throw CommandException(Localization::WSLCCLI_TooManyArgumentsError(arg.Name()));
-            }*/
+            }
+
+            // Call type-specific validation for each argument.
+            if (execArgs.Contains(arg.Type()))
+            {
+                arg.Validate(execArgs);
+            }
         }
 
         Argument::ValidateExclusiveArguments(execArgs);

@@ -194,8 +194,6 @@ namespace wsl::windows::wslc
         // Now it must be at least 2 chars
         else if (currArg[1] != WSLC_CLI_ARG_ID_CHAR)
         {
-            // Prevent the parsing of Positional or Forward arguments. Standard only.
-
             // Parse the single character alias argument
             auto currChar = currArg[1];
 
@@ -213,8 +211,8 @@ namespace wsl::windows::wslc
                 {
                     currChar = currArg[i];
 
-                    auto itr2 = std::find_if(m_arguments.begin(), m_arguments.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
-                    if (itr2 == m_arguments.end())
+                    auto itr2 = std::find_if(m_standardArgs.begin(), m_standardArgs.end(), [&](const Argument& arg) { return (currChar == arg.Alias()); });
+                    if (itr2 == m_standardArgs.end())
                     {
                         return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
                     }

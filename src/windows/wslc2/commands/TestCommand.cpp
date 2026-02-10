@@ -16,7 +16,6 @@ namespace wsl::windows::wslc
     {
         return
         {
-            Argument::ForType(ArgType::TestArg),
             Argument::ForType(ArgType::ContainerId),
             Argument::ForType(ArgType::ForwardArgs),
             Argument::ForType(ArgType::Attach),
@@ -38,11 +37,7 @@ namespace wsl::windows::wslc
 
     void TestCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
-        if (context.Args.Contains(ArgType::TestArg))
-        {
-            context << task::OutputNinjaCat;
-            return;
-        }
+        context << task::StoreSessionId;
 
         if (context.Args.Contains(ArgType::ContainerId))
         {

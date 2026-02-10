@@ -21,8 +21,11 @@ namespace wsl::windows::wslc
         return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
             std::make_unique<TestCommand>(FullName()),
             std::make_unique<ContainerCommand>(FullName()),
+            std::make_unique<ContainerCreateCommand>(FullName()),
+            std::make_unique<ContainerKillCommand>(FullName()),
             std::make_unique<ContainerRunCommand>(FullName()),
             std::make_unique<ContainerStartCommand>(FullName()),
+            std::make_unique<ContainerStopCommand>(FullName()),
         });
     }
 
