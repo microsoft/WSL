@@ -175,7 +175,7 @@ STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* contai
                                            
 
 STDAPI WslcContainerSettingsSetHostName(_In_ WslcContainerSettings* containerSettings,
-                                     _In_ const PCSTR hostName);
+                                        _In_ PCSTR hostName);
 
 STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerSettings,
                                        _In_ const PCSTR domainName);
