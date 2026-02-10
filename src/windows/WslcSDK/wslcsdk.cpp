@@ -20,7 +20,10 @@ Abstract:
 
 namespace
 {
-    WSLAFeatureFlags ConvertFlags(WSLC_SESSION_FLAGS flags)
+    constexpr uint32_t s_DefaultCPUCount = 2;
+    constexpr uint64_t s_DefaultMemoryMB = 2000;
+
+    WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
     {
         WSLAFeatureFlags result = WslaFeatureFlagsNone;
 
@@ -33,15 +36,15 @@ namespace
         return result;
     }
 
-    LPCSTR ConvertType(WSLC_VhdType type)
+    LPCSTR ConvertType(WslcVhdType type)
     {
         // TODO: Correct strings? Doesn't appear so, as tracking the code suggests that this is the `filesystemtype` to the linux `mount` function.
         //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
         switch (type)
         {
-        case WSLC_VhdTypeDynamic:
+        case WSLC_VHDTYPEDYNAMIC:
             return "dynamic";
-        case WSLC_VhdTypeFixed:
+        case WSLC_VHDTYPEFIXED:
             return "fixed";
         default:
             return nullptr;
@@ -53,32 +56,53 @@ namespace
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 {
     // TODO: Do we need to check the path itself for anything?
-    // TODO: Ensure memoryMb is not larger than ULONG (unless API change)
 
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     *internalType = {};
 
     internalType->storagePath = storagePath;
-    internalType->cpuCount = cpuCount;
-    internalType->memoryMb = memoryMb;
+    internalType->cpuCount = s_DefaultCPUCount;
+    internalType->memoryMb = s_DefaultMemoryMB;
 
     return S_OK;
 }
 
 STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t cpuCount)
 {
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
-    UNREFERENCED_PARAMETER(cpuCount);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    if (cpuCount)
+    {
+        internalType->cpuCount = cpuCount;
+    }
+    else
+    {
+        // TODO: Does a 0 cause the internal systems to use a default value?
+        // From reading the code it appears to just send 0 to HcsCreateComputeSystem, but the documentation is not clear on what that will do.
+        internalType->cpuCount = s_DefaultCPUCount;
+    }
+
+    return S_OK;
 }
 
 STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint64_t memoryMb)
 {
-    UNREFERENCED_PARAMETER(memoryMb);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    RETURN_HR_IF(E_INVALIDARG, memoryMb > static_cast<uint64_t>(std::numeric_limits<ULONG>::max()));
+
+    if (memoryMb)
+    {
+        internalType->memoryMb = memoryMb;
+    }
+    else
+    {
+        // TODO: Does a 0 cause the internal systems to use a default value?
+        // From reading the code it appears to just send 0 to HcsCreateComputeSystem, but the documentation is not clear on what that will do.
+        internalType->memoryMb = s_DefaultMemoryMB;
+    }
+
+    return S_OK;
 }
 
 STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session) try
@@ -99,9 +123,7 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSe
     // TODO: Is this VHD requirements sizeInBytes?
     // runtimeSettings.MaximumStorageSizeMb;
     runtimeSettings.CpuCount = internalType->cpuCount;
-    // TODO: memoryMb probably doesn't need to be a 64 bit value, that would be ~2^84 B, or 16 YB. At a very conservatige $1 per GB, this would cost 16 Quadrillion dollars (or ~150 years of current global GDP).
-    //       A 32 bit value provides for 4 PB of memory, which is still quite a ways off from being a limiting factor for the API (CoPilot says 40-50 years IFF current scaling can keep going, 15-25 for some "SSDs swaps are integrated into the memory model" theoreticals).
-    //       Plus the runtime API only takes a 32 bit value...
+    // TODO: memoryMb probably doesn't need to be a 64 bit value
     runtimeSettings.MemoryMb = static_cast<ULONG>(internalType->memoryMb);
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
     // TODO: No user control over networking mode (NAT and VirtIO)?

@@ -16,7 +16,7 @@ Abstract:
 
 namespace
 {
-    WSLC_SESSION_TERMINATION_REASON ConvertReason(WSLAVirtualMachineTerminationReason Reason)
+    WslcSessionTerminationReason ConvertReason(WSLAVirtualMachineTerminationReason Reason)
     {
         switch (Reason)
         {
