@@ -1,0 +1,40 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+#pragma once
+#include "pch.h"
+#include "CLIExecutionContext.h"
+#include "ExecutionContextData.h"
+#include "ImageCommand.h"
+#include "CommonTasks.h"
+#include "TaskBase.h"
+
+using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::task;
+
+namespace wsl::windows::wslc
+{
+    // Image Prune Command
+    std::vector<Argument> ImagePruneCommand::GetArguments() const
+    {
+        return {
+            Argument::ForType(ArgType::AllPrune),
+            Argument::ForType(ArgType::SessionId),
+        };
+    }
+
+    std::wstring_view ImagePruneCommand::ShortDescription() const
+    {
+        return {L"Removes unused images."};
+    }
+
+    std::wstring_view ImagePruneCommand::LongDescription() const
+    {
+        return {L"Removes dangling (untagged) images in order to reclaim disk space. Using –a option removes all unused images that are not referenced by any container."};
+    }
+
+    void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
+    {
+        PrintMessage(L"Image Prune subcommand executing..", stdout);
+    }
+}

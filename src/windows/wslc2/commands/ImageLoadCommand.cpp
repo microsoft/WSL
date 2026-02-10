@@ -1,0 +1,40 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+#pragma once
+#include "pch.h"
+#include "CLIExecutionContext.h"
+#include "ExecutionContextData.h"
+#include "ImageCommand.h"
+#include "CommonTasks.h"
+#include "TaskBase.h"
+
+using namespace wsl::windows::common::wslutil;
+using namespace wsl::windows::wslc::execution;
+using namespace wsl::windows::wslc::task;
+
+namespace wsl::windows::wslc
+{
+    // Image Load Command
+    std::vector<Argument> ImageLoadCommand::GetArguments() const
+    {
+        return {
+            Argument::ForType(ArgType::Input),
+            Argument::ForType(ArgType::SessionId)
+        };
+    }
+
+    std::wstring_view ImageLoadCommand::ShortDescription() const
+    {
+        return {L"Loads an image from a tar archive file on disk. "};
+    }
+
+    std::wstring_view ImageLoadCommand::LongDescription() const
+    {
+        return {L"Loads an image from a tar archive file on disk. "};
+    }
+
+    void ImageLoadCommand::ExecuteInternal(CLIExecutionContext& context) const
+    {
+        PrintMessage(L"Image Load subcommand executing..");
+    }
+}

@@ -42,6 +42,68 @@ namespace wsl::windows::wslc
 
     void ContainerExecCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
-        PrintMessage(L"Container Exec subcommand executing..", stdout);
+        if (context.Args.Contains(ArgType::ContainerId))
+        {
+            auto containerId = context.Args.Get<ArgType::ContainerId>();
+            PrintMessage(L"Container Id: " + containerId);
+        }
+
+        if (context.Args.Contains(ArgType::ForwardArgsP))
+        {
+            auto forwardedArgs = context.Args.Get<ArgType::ForwardArgsP>();
+            PrintMessage(L"Command with " + std::to_wstring(forwardedArgs.size()) + L" args:");
+            std::wstring concatenatedArgs = std::accumulate(
+                forwardedArgs.begin(),
+                forwardedArgs.end(),
+                std::wstring{},
+                [](const std::wstring& a, const std::wstring& b) {
+                    return a.empty() ? b : a + L" " + b;
+                });
+
+            PrintMessage(L"  Concatenated: " + concatenatedArgs);
+        }
+
+        if (context.Args.Contains(ArgType::Detach))
+        {
+            PrintMessage(L"  Detached mode");
+        }
+
+        if (context.Args.Contains(ArgType::Interactive))
+        {
+            PrintMessage(L"  Interactive mode");
+        }
+
+        if (context.Args.Contains(ArgType::TTY))
+        {
+            PrintMessage(L"  TTY allocated");
+        }
+
+        if (context.Args.Contains(ArgType::User))
+        {
+            auto user = context.Args.Get<ArgType::User>();
+            PrintMessage(L"  User: " + user);
+        }
+
+        if (context.Args.Contains(ArgType::Env))
+        {
+            for (const auto& env : context.Args.GetAll<ArgType::Env>())
+            {
+                PrintMessage(L"  Env: " + env);
+            }
+        }
+
+        if (context.Args.Contains(ArgType::EnvFile))
+        {
+            auto envFile = context.Args.Get<ArgType::EnvFile>();
+            PrintMessage(L"  Env File: " + envFile);
+        }
+
+        // TODO: Implement actual container exec logic
+        // This will involve:
+        // 1. Resolving the container ID
+        // 2. Setting up environment variables
+        // 3. Configuring TTY/interactive mode if requested
+        // 4. Executing the command in the container via WSLA APIs
+        // 5. Handling detach mode if specified
     }
 }

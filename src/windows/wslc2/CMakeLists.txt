@@ -32,6 +32,7 @@ set(HEADERS
     commands/RootCommand.h
     commands/TestCommand.h
     commands/ContainerCommand.h
+    commands/ImageCommand.h
     tasks/TaskBase.h
     tasks/CommonTasks.h
     tasks/TestTasks.h
@@ -66,6 +67,15 @@ set(SOURCES
     commands/ContainerRunCommand.cpp
     commands/ContainerStartCommand.cpp
     commands/ContainerStopCommand.cpp
+    commands/ImageCommand.cpp
+    commands/ImageInspectCommand.cpp
+    commands/ImageListCommand.cpp
+    commands/ImageLoadCommand.cpp
+    commands/ImagePruneCommand.cpp
+    commands/ImagePullCommand.cpp
+    commands/ImagePushCommand.cpp
+    commands/ImageSaveCommand.cpp
+    commands/ImageTagCommand.cpp
     tasks/TaskBase.cpp
     tasks/CommonTasks.cpp
     tasks/TestTasks.cpp
