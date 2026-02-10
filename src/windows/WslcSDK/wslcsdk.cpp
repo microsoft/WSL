@@ -15,7 +15,39 @@ Abstract:
 
 #include "wslcsdk.h"
 #include "wslcsdkprivate.h"
+#include "TerminationCallback.h"
 
+
+namespace
+{
+    WSLAFeatureFlags ConvertFlags(WSLC_SESSION_FLAGS flags)
+    {
+        WSLAFeatureFlags result = WslaFeatureFlagsNone;
+
+        // TODO: Many missing flags?
+        if (WI_IsFlagSet(flags, WSLC_SESSION_FLAG_ENABLE_GPU))
+        {
+            result |= WslaFeatureFlagsGPU;
+        }
+
+        return result;
+    }
+
+    LPCSTR ConvertType(WSLC_VhdType type)
+    {
+        // TODO: Correct strings? Doesn't appear so, as tracking the code suggests that this is the `filesystemtype` to the linux `mount` function.
+        //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
+        switch (type)
+        {
+        case WSLC_VhdTypeDynamic:
+            return "dynamic";
+        case WSLC_VhdTypeFixed:
+            return "fixed";
+        default:
+            return nullptr;
+        }
+    }
+}
 
 // SESSION DEFINITIONS
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath,
@@ -23,13 +55,16 @@ STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath,
                                         _In_ uint64_t memoryMb,
                                         _Out_ WslcSessionSettings* sessionSettings)
 {
-    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+    // TODO: Do we need to check the path itself for anything?
+    // TODO: Ensure memoryMb is not larger than ULONG (unless API change)
 
-    *internalOptions = {};
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
-    internalOptions->storagePath = storagePath;
-    internalOptions->cpuCount = cpuCount;
-    internalOptions->memoryMb = memoryMb;
+    *internalType = {};
+
+    internalType->storagePath = storagePath;
+    internalType->cpuCount = cpuCount;
+    internalType->memoryMb = memoryMb;
 
     return S_OK;
 }
@@ -40,7 +75,7 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings,
     RETURN_HR_IF_NULL(E_POINTER, session);
     *session = nullptr;
 
-    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     wil::com_ptr<IWSLASessionManager> sessionManager;
     RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
@@ -48,9 +83,32 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings,
 
     auto result = std::make_unique<WslcSessionImpl>();
     WSLA_SESSION_SETTINGS runtimeSettings{};
-    // TODO: Translate from internal settings object
+    runtimeSettings.DisplayName = internalType->displayName;
+    runtimeSettings.StoragePath = internalType->storagePath;
+    // TODO: Is this VHD requirements sizeInBytes?
+    // runtimeSettings.MaximumStorageSizeMb;
+    runtimeSettings.CpuCount = internalType->cpuCount;
+    // TODO: memoryMb probably doesn't need to be a 64 bit value, that would be ~2^84 B, or 16 YB. At a very conservatige $1 per GB, this would cost 16 Quadrillion dollars (or ~150 years of current global GDP).
+    //       A 32 bit value provides for 4 PB of memory, which is still quite a ways off from being a limiting factor for the API (CoPilot says 40-50 years IFF current scaling can keep going, 15-25 for some "SSDs swaps are integrated into the memory model" theoreticals).
+    //       Plus the runtime API only takes a 32 bit value...
+    runtimeSettings.MemoryMb = static_cast<ULONG>(internalType->memoryMb);
+    runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
+    // TODO: No user control over networking mode (NAT and VirtIO)?
+    runtimeSettings.NetworkingMode = WSLANetworkingModeNone;
+    auto terminationCallback = TerminationCallback::CreateIf(internalType);
+    if (terminationCallback)
+    {
+        result->terminationCallback.attach(terminationCallback.as<ITerminationCallback>().detach());
+        runtimeSettings.TerminationCallback = terminationCallback.get();
+    }
+    runtimeSettings.FeatureFlags = ConvertFlags(internalType->flags);
+    // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
+    // runtimeSettings.DmesgOutput;
+    runtimeSettings.RootVhdOverride = internalType->vhdRequirements.path;
+    // TODO: I don't think that this VHD type override can be reused from the VHD requirements type
+    runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
-    // TODO: No user control over flags (Persistent and OpenExisting)
+    // TODO: No user control over flags (Persistent and OpenExisting)?
     RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
 
@@ -61,8 +119,15 @@ CATCH_RETURN()
 
 STDAPI WslcSessionTerminate(_In_ WslcSession session)
 {
-    UNREFERENCED_PARAMETER(session);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_TYPE(session);
+
+    if (internalType->session)
+    {
+        return internalType->session->Terminate();
+    }
+
+    // TODO: Should we fail if session invalid?
+    return S_FALSE;
 }
 
 STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* containerSettings,
@@ -76,9 +141,9 @@ STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* contai
 STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings,
                                          _In_ PCWSTR displayName)
 {
-    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
-    internalOptions->displayName = displayName;
+    internalType->displayName = displayName;
 
     return S_OK;
 }
@@ -86,12 +151,13 @@ STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettin
 STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings,
                                      uint32_t timeoutMS)
 {
-    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
-    internalOptions->timeoutMS = timeoutMS;
+    internalType->timeoutMS = timeoutMS;
 
     return S_OK;
 }
+
 STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion,
                             _In_ const WSLC_VHD_REQUIREMENTS* options)
 {
@@ -103,15 +169,15 @@ STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion,
 STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings,
                               _In_ WSLC_VHD_REQUIREMENTS* vhdRequirements)
 {
-    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     if (vhdRequirements)
     {
-        internalOptions->vhdRequirements = *vhdRequirements;
+        internalType->vhdRequirements = *vhdRequirements;
     }
     else
     {
-        internalOptions->vhdRequirements = {};
+        internalType->vhdRequirements = {};
     }
 
     return S_OK;
@@ -137,9 +203,9 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings,
                                 _In_ const WSLC_SESSION_FLAGS flags)
 {
-    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
-    internalOptions->flags = flags;
+    internalType->flags = flags;
 
     return S_OK;
 }
@@ -148,18 +214,24 @@ STDAPI WslcSessionSettingsSetTerminateCallback(_In_ WslcSessionSettings* session
                                             _In_ WslcSessionTerminationCallback terminationCallback,
                                             _In_ PVOID terminationContext)
 {
-    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+    WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
-    internalOptions->terminationCallback = terminationCallback;
-    internalOptions->terminationCallbackContext = terminationContext;
+    internalType->terminationCallback = terminationCallback;
+    internalType->terminationCallbackContext = terminationContext;
 
     return S_OK;
 }
 
 STDAPI WslcSessionRelease(_In_ WslcSession session)
 {
-    UNREFERENCED_PARAMETER(session);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_TYPE_FOR_RELEASE(session);
+
+    // Intentionally destroy session before termination callback in the event that
+    // the termination callback ends up being invoked by session destruction.
+    internalType->session.reset();
+    internalType->terminationCallback.reset();
+
+    return S_OK;
 }
 
 STDAPI WslcContainerRelease(_In_ WslcContainer container)

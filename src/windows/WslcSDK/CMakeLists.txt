@@ -1,7 +1,10 @@
-set(SOURCES 
+set(SOURCES
+    TerminationCallback.cpp
     wslcsdk.cpp
     WslcsdkPrivate.cpp
+)
 set(HEADERS
+    TerminationCallback.h
     wslcsdk.h
     WslcsdkPrivate.h
 )
