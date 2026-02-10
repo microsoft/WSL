@@ -178,7 +178,7 @@ STDAPI WslcContainerSettingsSetHostName(_In_ WslcContainerSettings* containerSet
                                         _In_ PCSTR hostName);
 
 STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerSettings,
-                                       _In_ const PCSTR domainName);
+                                          _In_ PCSTR domainName);
 
 
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings,
