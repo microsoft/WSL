@@ -569,11 +569,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
-                wsl::core::VirtioNetworkingFlags virtioFlags = wsl::core::VirtioNetworkingFlags::None;
-                WI_SetFlagIf(virtioFlags, wsl::core::VirtioNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
-                WI_SetFlagIf(virtioFlags, wsl::core::VirtioNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
+                wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::None;
+                WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
-                    std::move(gnsChannel), virtioFlags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
+                    std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {

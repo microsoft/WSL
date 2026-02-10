@@ -38,14 +38,11 @@ public:
 
 private:
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
-    static std::optional<ULONGLONG> FindVirtioInterfaceLuid(const SOCKADDR_INET& virtioAddress, const NL_NETWORK_CONNECTIVITY_HINT& currentConnectivityHint);
 
     HRESULT HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate) const noexcept;
     int ModifyOpenPorts(_In_ PCWSTR tag, _In_ const SOCKADDR_INET& addr, _In_ int protocol, _In_ bool isOpen) const;
-    void RefreshGuestConnection(NL_NETWORK_CONNECTIVITY_HINT hint) noexcept;
+    void RefreshGuestConnection() noexcept;
     void SetupLoopbackDevice();
-    void SendDnsUpdate(const networking::DnsInfo& dnsSettings);
-    void UpdateMtu();
 
     mutable wil::srwlock m_lock;
 
@@ -56,11 +53,11 @@ private:
     std::shared_ptr<networking::NetworkSettings> m_networkSettings;
     VirtioNetworkingFlags m_flags = VirtioNetworkingFlags::None;
     LPCWSTR m_dnsOptions = nullptr;
-    GUID m_localhostAdapterId;
-    GUID m_adapterId;
+    std::optional<GUID> m_localhostAdapterId;
+    std::optional<GUID> m_adapterId;
 
-    std::optional<ULONGLONG> m_interfaceLuid;
     ULONG m_networkMtu = 0;
+    std::wstring m_trackedDeviceOptions;
     networking::DnsInfo m_trackedDnsSettings;
 
     // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.
