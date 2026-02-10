@@ -9,9 +9,11 @@
 namespace wsl::windows::wslc
 {
     // Forward declarations of validation helpers defined in other files
+    // Pass the argType along in case some validation should be shared
+    // among very similar ArgTypes and the same validation is used for both.
     namespace validation
     {
-        void ValidatePublish(const Args& execArgs);
+        void ValidatePublish([[maybe_unused]]const ArgType argType, const Args& execArgs);
     }
 
     void Argument::Validate(const Args& execArgs) const
@@ -19,7 +21,7 @@ namespace wsl::windows::wslc
         switch (m_argType)
         {
             case ArgType::Publish:
-                validation::ValidatePublish(execArgs);
+                validation::ValidatePublish(m_argType, execArgs);
                 break;
 
             default:

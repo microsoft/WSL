@@ -57,11 +57,8 @@ namespace wsl::windows::wslc
 
     void ContainerRunCommand::ValidateArgumentsInternal(Args& execArgs) const
     {
-        // Validate that the required ImageId argument is present.
-        if (execArgs.Contains(ArgType::Publish))
-        {
-            ////THROW_HR(E_INVALIDARG);
-        }
+        // Argument validation is done in ArgumentValidation.cpp, including
+        // cross-argument validation, but this method is for command-specific validation.
     }
 
     void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const

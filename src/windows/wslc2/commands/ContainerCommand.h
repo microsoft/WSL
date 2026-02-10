@@ -33,11 +33,63 @@ namespace wsl::windows::wslc
         void ExecuteInternal(CLIExecutionContext& context) const override;
     };
 
+    // Delete Command
+    struct ContainerDeleteCommand final : public Command
+    {
+        constexpr static std::wstring_view CommandName = L"delete";
+        ContainerDeleteCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        std::vector<Argument> GetArguments() const override;
+        std::wstring_view ShortDescription() const override;
+        std::wstring_view LongDescription() const override;
+
+    protected:
+        void ExecuteInternal(CLIExecutionContext& context) const override;
+    };
+
+    // Exec Command
+    struct ContainerExecCommand final : public Command
+    {
+        constexpr static std::wstring_view CommandName = L"exec";
+        ContainerExecCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        std::vector<Argument> GetArguments() const override;
+        std::wstring_view ShortDescription() const override;
+        std::wstring_view LongDescription() const override;
+
+    protected:
+        void ExecuteInternal(CLIExecutionContext& context) const override;
+    };
+
+    // Inspect Command
+    struct ContainerInspectCommand final : public Command
+    {
+        constexpr static std::wstring_view CommandName = L"inspect";
+        ContainerInspectCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        std::vector<Argument> GetArguments() const override;
+        std::wstring_view ShortDescription() const override;
+        std::wstring_view LongDescription() const override;
+
+    protected:
+        void ExecuteInternal(CLIExecutionContext& context) const override;
+    };
+
     // Kill Command
     struct ContainerKillCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"kill";
         ContainerKillCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        std::vector<Argument> GetArguments() const override;
+        std::wstring_view ShortDescription() const override;
+        std::wstring_view LongDescription() const override;
+
+    protected:
+        void ExecuteInternal(CLIExecutionContext& context) const override;
+    };
+
+    // List Command
+    struct ContainerListCommand final : public Command
+    {
+        constexpr static std::wstring_view CommandName = L"list";
+        ContainerListCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;

@@ -14,6 +14,8 @@ using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc
 {
+    constexpr std::wstring_view s_ExecutableName = L"wslc";
+
     Command::Command(
         std::wstring_view name,
         std::vector<std::wstring_view> aliases,
@@ -85,7 +87,7 @@ namespace wsl::windows::wslc
         // https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/command-line-syntax-key
 
         // Output the command preamble and command chain
-        infoOut << Localization::WSLCCLI_Usage(L"wslc2", std::wstring_view{commandChain});
+        infoOut << Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
 
         auto commandAliases = Aliases();
         auto commands = GetVisibleCommands();

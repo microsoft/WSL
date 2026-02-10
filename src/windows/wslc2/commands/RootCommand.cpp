@@ -7,8 +7,11 @@
 #include "TaskBase.h"
 
 // Include all commands that parent to the root. 
-#include "TestCommand.h"
 #include "ContainerCommand.h"
+
+#ifdef _DEBUG
+#include "TestCommand.h"
+#endif
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
@@ -19,13 +22,20 @@ namespace wsl::windows::wslc
     std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     {
         return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-            std::make_unique<TestCommand>(FullName()),
             std::make_unique<ContainerCommand>(FullName()),
             std::make_unique<ContainerCreateCommand>(FullName()),
+            std::make_unique<ContainerDeleteCommand>(FullName()),
+            std::make_unique<ContainerExecCommand>(FullName()),
+            std::make_unique<ContainerInspectCommand>(FullName()),
             std::make_unique<ContainerKillCommand>(FullName()),
+            std::make_unique<ContainerListCommand>(FullName()),
             std::make_unique<ContainerRunCommand>(FullName()),
             std::make_unique<ContainerStartCommand>(FullName()),
             std::make_unique<ContainerStopCommand>(FullName()),
+
+#ifdef _DEBUG
+            std::make_unique<TestCommand>(FullName()),
+#endif
         });
     }
 
