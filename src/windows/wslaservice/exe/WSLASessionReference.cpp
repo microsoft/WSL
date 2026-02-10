@@ -107,9 +107,8 @@ HRESULT wsla::WSLASessionReference::IsElevated(_Out_ BOOL* Elevated)
 HRESULT wsla::WSLASessionReference::Terminate()
 try
 {
-    // Resolve the session first, then mark as terminated.
-    // OpenSession() checks m_terminated and returns ERROR_INVALID_STATE, so we must
-    // get the session reference before setting the flag.
+    // Attempt to open a running session and forward the termination request.
+    // If the session is no longer available or not running, treat it as already terminated.
     Microsoft::WRL::ComPtr<IWSLASession> session;
     if (SUCCEEDED(OpenSession(&session)))
     {

@@ -235,7 +235,7 @@ CallingProcessTokenInfo WSLASessionManagerImpl::GetCallingProcessTokenInfo()
 
     auto tokenInfo = wil::get_token_information<TOKEN_USER>(userToken.get());
 
-    wil::unique_cotaskmem_string sidString;
+    wil::unique_hlocal_string sidString;
     THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(tokenInfo->User.Sid, &sidString));
 
     auto elevated = wil::test_token_membership(userToken.get(), SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);

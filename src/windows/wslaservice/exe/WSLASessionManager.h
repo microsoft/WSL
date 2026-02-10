@@ -47,7 +47,7 @@ namespace wsl::windows::service::wsla {
 
 struct CallingProcessTokenInfo
 {
-    wil::unique_cotaskmem_string SidString;
+    wil::unique_hlocal_string SidString;
     bool Elevated;
 };
 

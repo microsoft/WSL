@@ -584,7 +584,6 @@ try
         TraceLoggingValue(static_cast<int>(Event->Type), "type"));
 
     auto* vm = reinterpret_cast<HcsVirtualMachine*>(Context);
-    vm->SetExitEvent();
     if (Event->Type == HcsEventSystemExited)
     {
         vm->OnExit(Event);
@@ -598,6 +597,8 @@ CATCH_LOG()
 
 void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 {
+    m_vmExitEvent.SetEvent();
+
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
     auto reason = WSLAlVirtualMachineTerminationReasonUnknown;
@@ -644,11 +645,6 @@ void HcsVirtualMachine::OnCrash(const HCS_EVENT* Event)
     {
         WriteCrashLog(crashReport.CrashLog);
     }
-}
-
-void HcsVirtualMachine::SetExitEvent()
-{
-    m_vmExitEvent.SetEvent();
 }
 
 void HcsVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket) const

@@ -66,7 +66,7 @@ CATCH_RETURN()
 HRESULT wsla::WSLASessionFactory::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
 try
 {
-    wil::unique_handle process{OpenProcess(PROCESS_ALL_ACCESS, FALSE, GetCurrentProcessId())};
+    wil::unique_handle process{OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId())};
     RETURN_LAST_ERROR_IF(!process);
 
     *ProcessHandle = process.release();

@@ -74,6 +74,7 @@ try
 
     // Initialize COM
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    wsl::windows::common::wslutil::CoInitializeSecurity();
 
     // Register the class factory (single-use: one factory per process)
     auto factory = winrt::make<WSLASessionFactoryClassFactory>();

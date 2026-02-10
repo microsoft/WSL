@@ -1894,7 +1894,7 @@ class WSLATests
             // Terminate the session
             ResetTestSession();
 
-            // Validate that calling into the container returns RPC_S_SERVER_UNAVAILABLE .
+            // Validate that calling into the container returns RPC_S_SERVER_UNAVAILABLE.
             WSLA_CONTAINER_STATE state = WslaContainerStateRunning;
             VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
             VERIFY_ARE_EQUAL(state, WslaContainerStateInvalid);

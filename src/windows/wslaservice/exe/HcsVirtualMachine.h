@@ -54,7 +54,6 @@ private:
     static void CALLBACK OnVmExitCallback(HCS_EVENT* Event, void* Context);
     void OnExit(const HCS_EVENT* Event);
     void OnCrash(const HCS_EVENT* Event);
-    void SetExitEvent();
 
     std::filesystem::path GetCrashDumpFolder();
     void CreateVmSavedStateFile(HANDLE UserToken);
