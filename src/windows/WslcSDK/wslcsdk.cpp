@@ -18,37 +18,53 @@ Abstract:
 
 
 // SESSION DEFINITIONS
-STDAPI_(void) WslcSessionInitSettings(_In_ PCWSTR storagePath,
+STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath,
                                         _In_ uint32_t cpuCount,
                                         _In_ uint64_t memoryMb,
                                         _Out_ WslcSessionSettings* sessionSettings)
 {
+    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
 
-    
-    // demo test code to show how to cast the opaque struct to the internal struct and set some values. The real implementation would have actual logic here.
-    //WSLC_SESSION_OPTIONS_INTERNAL* sessionSettingsinternal = (WSLC_SESSION_OPTIONS_INTERNAL*)sessionSettings;
-    sessionSettings = NULL;
-    UNREFERENCED_PARAMETER(storagePath);
-    UNREFERENCED_PARAMETER(cpuCount);
-    UNREFERENCED_PARAMETER(memoryMb);
-    //UNREFERENCED_PARAMETER(sessionSettings);
-    return;
+    *internalOptions = {};
+
+    internalOptions->storagePath = storagePath;
+    internalOptions->cpuCount = cpuCount;
+    internalOptions->memoryMb = memoryMb;
+
+    return S_OK;
 }
 
 STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings,
-                         _Out_ WslcSession* session)
+                         _Out_ WslcSession* session) try
 {
-    UNREFERENCED_PARAMETER(session);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
-}
+    RETURN_HR_IF_NULL(E_POINTER, session);
+    *session = nullptr;
 
+    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+
+    wil::com_ptr<IWSLASessionManager> sessionManager;
+    RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+
+    auto result = std::make_unique<WslcSessionImpl>();
+    WSLA_SESSION_SETTINGS runtimeSettings{};
+    // TODO: Translate from internal settings object
+
+    // TODO: No user control over flags (Persistent and OpenExisting)
+    RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session));
+    wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
+
+    *session = reinterpret_cast<WslcSession>(result.release());
+    return S_OK;
+}
+CATCH_RETURN()
 
 STDAPI WslcSessionTerminate(_In_ WslcSession session)
 {
     UNREFERENCED_PARAMETER(session);
     return E_NOTIMPL;
 }
+
 STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* containerSettings,
                                            _In_ WSLC_ContainerNetworkingMode networkingMode)
 {
@@ -60,17 +76,21 @@ STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* contai
 STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings,
                                          _In_ PCWSTR displayName)
 {
-    UNREFERENCED_PARAMETER(displayName);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+
+    internalOptions->displayName = displayName;
+
+    return S_OK;
 }
 
 STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings,
                                      uint32_t timeoutMS)
 {
-    UNREFERENCED_PARAMETER(timeoutMS);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+
+    internalOptions->timeoutMS = timeoutMS;
+
+    return S_OK;
 }
 STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion,
                             _In_ const WSLC_VHD_REQUIREMENTS* options)
@@ -83,9 +103,18 @@ STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion,
 STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings,
                               _In_ WSLC_VHD_REQUIREMENTS* vhdRequirements)
 {
-    UNREFERENCED_PARAMETER(vhdRequirements);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+
+    if (vhdRequirements)
+    {
+        internalOptions->vhdRequirements = *vhdRequirements;
+    }
+    else
+    {
+        internalOptions->vhdRequirements = {};
+    }
+
+    return S_OK;
 }
 STDAPI WslcContainerSettingsSetHostName(_In_ WslcContainerSettings* containerSettings,
                                      _In_ const PCSTR hostName)
@@ -108,19 +137,23 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings,
                                 _In_ const WSLC_SESSION_FLAGS flags)
 {
-    UNREFERENCED_PARAMETER(flags);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+
+    internalOptions->flags = flags;
+
+    return S_OK;
 }
 
 STDAPI WslcSessionSettingsSetTerminateCallback(_In_ WslcSessionSettings* sessionSettings,
                                             _In_ WslcSessionTerminationCallback terminationCallback,
                                             _In_ PVOID terminationContext)
 {
-    UNREFERENCED_PARAMETER(terminationCallback);
-    UNREFERENCED_PARAMETER(terminationContext);
-    UNREFERENCED_PARAMETER(sessionSettings);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_OPTIONS(sessionSettings);
+
+    internalOptions->terminationCallback = terminationCallback;
+    internalOptions->terminationCallbackContext = terminationContext;
+
+    return S_OK;
 }
 
 STDAPI WslcSessionRelease(_In_ WslcSession session)

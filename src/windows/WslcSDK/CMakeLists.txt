@@ -1,4 +1,6 @@
-set(SOURCES wslcsdk.cpp)
+set(SOURCES 
+    wslcsdk.cpp
+    WslcsdkPrivate.cpp
 set(HEADERS
     wslcsdk.h
     WslcsdkPrivate.h

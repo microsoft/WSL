@@ -88,7 +88,7 @@ typedef enum WSLC_SESSION_TERMINATION_REASON
 
 typedef __callback VOID(CALLBACK *WslcSessionTerminationCallback)(_In_ WSLC_SESSION_TERMINATION_REASON reason, _In_opt_ PVOID context);
 
-STDAPI_(void) WslcSessionInitSettings(_In_ PCWSTR storagePath,
+STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath,
                                       _In_ uint32_t cpuCount,
                                       _In_ uint64_t memoryMb,
                                       _Out_ WslcSessionSettings* sessionSettings);
