@@ -10,7 +10,7 @@ namespace wrl = Microsoft::WRL;
 class DeviceHostProxy : public wrl::RuntimeClass<wrl::RuntimeClassFlags<wrl::RuntimeClassType::ClassicCom>, IVmDeviceHostSupport, IPlan9FileSystemHost>
 {
 public:
-    DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId);
+    DeviceHostProxy(_In_ const wsl::windows::common::hcs::shared_hcs_system& system, _In_ const GUID& RuntimeId);
 
     GUID AddNewDevice(const GUID& Type, const wil::com_ptr<IPlan9FileSystem>& Plan9Fs, const std::wstring& VirtIoTag);
 
@@ -54,7 +54,7 @@ private:
 
     std::wstring m_systemId;
     GUID m_runtimeId;
-    wsl::windows::common::hcs::unique_hcs_system m_system;
+    wsl::windows::common::hcs::shared_hcs_system m_system;
     wil::srwlock m_lock;
     std::vector<RemoteFileSystemInfo> m_fileSystems;
     bool m_shutdown;

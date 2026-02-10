@@ -11,7 +11,7 @@ using wsl::core::MirroredNetworking;
 using wsl::core::networking::NetworkEndpoint;
 using namespace wsl::shared;
 
-MirroredNetworking::MirroredNetworking(HCS_SYSTEM system, GnsChannel&& gnsChannel, const Config& config, GUID runtimeId, wil::unique_socket&& dnsHvsocket) :
+MirroredNetworking::MirroredNetworking(const wsl::windows::common::hcs::shared_hcs_system& system, GnsChannel&& gnsChannel, const Config& config, GUID runtimeId, wil::unique_socket&& dnsHvsocket) :
     m_system(system), m_runtimeId(runtimeId), m_config(config), m_gnsChannel(std::move(gnsChannel))
 {
     // ensure the MTA apartment stays alive for the lifetime of this object in this process for our callback
@@ -285,7 +285,7 @@ void MirroredNetworking::Initialize()
             };
 
             m_networkManager = std::make_unique<wsl::core::networking::WslMirroredNetworkManager>(
-                m_system, m_config, std::move(networkManagerGnsMessageCallbackWithCallbackResult), std::move(addNetworkEndpointCallback), m_ephemeralPortRange);
+                m_system.get(), m_config, std::move(networkManagerGnsMessageCallbackWithCallbackResult), std::move(addNetworkEndpointCallback), m_ephemeralPortRange);
 
             // Register notifications for DNS suffix changes
             m_dnsSuffixRegistryWatcher.emplace(

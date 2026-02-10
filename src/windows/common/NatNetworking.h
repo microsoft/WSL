@@ -19,7 +19,7 @@ class NatNetworking final : public INetworkingEngine
 {
 public:
     NatNetworking(
-        HCS_SYSTEM system,
+        const wsl::windows::common::hcs::shared_hcs_system& system,
         wsl::windows::common::hcs::unique_hcn_network&& network,
         GnsChannel&& gnsChannel,
         Config& config,
@@ -56,8 +56,8 @@ private:
 
     mutable wil::srwlock m_lock;
 
-    // Handle for the Hcn* Api. Owned by the caller (WslCoreVm), this is a non-owning copy
-    const HCS_SYSTEM m_system{};
+    // Handle for the Hcn* Api. Shared with WslCoreVm
+    const wsl::windows::common::hcs::shared_hcs_system m_system;
     Config& m_config;
     wsl::windows::common::hcs::unique_hcn_network m_network{};
 

@@ -8,7 +8,7 @@ using wsl::core::BridgedNetworking;
 using wsl::core::networking::NetworkSettings;
 using namespace wsl::windows::common;
 
-BridgedNetworking::BridgedNetworking(HCS_SYSTEM system, const Config& config) : m_system(system), m_config(config)
+BridgedNetworking::BridgedNetworking(const wsl::windows::common::hcs::shared_hcs_system& system, const Config& config) : m_system(system), m_config(config)
 {
 }
 
@@ -64,7 +64,7 @@ void BridgedNetworking::Initialize()
     networkRequest.ResourcePath = networking::c_networkAdapterPrefix +
                                   wsl::shared::string::GuidToString<wchar_t>(m_endpoint.Id, wsl::shared::string::GuidToStringFlags::None);
 
-    windows::common::hcs::ModifyComputeSystem(m_system, wsl::shared::ToJsonW(networkRequest).c_str());
+    windows::common::hcs::ModifyComputeSystem(m_system.get(), wsl::shared::ToJsonW(networkRequest).c_str());
 }
 
 void BridgedNetworking::TraceLoggingRundown() noexcept

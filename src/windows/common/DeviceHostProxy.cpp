@@ -22,8 +22,11 @@ using GetVmWorkerProcessType = decltype(GetVmWorkerProcess(std::declval<Args>().
 
 using namespace wsl::windows::common::hcs;
 
-DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId) :
-    m_systemId{VmId}, m_runtimeId{RuntimeId}, m_system{wsl::windows::common::hcs::OpenComputeSystem(VmId.c_str(), GENERIC_ALL)}, m_shutdown{false}
+DeviceHostProxy::DeviceHostProxy(_In_ const wsl::windows::common::hcs::shared_hcs_system& system, _In_ const GUID& RuntimeId) :
+    m_systemId{wsl::shared::string::GuidToString<wchar_t>(RuntimeId, wsl::shared::string::GuidToStringFlags::Uppercase)},
+    m_runtimeId{RuntimeId},
+    m_system{system},
+    m_shutdown{false}
 {
     m_devicesShutdown = false;
 }

@@ -297,7 +297,7 @@ private:
     LX_MINI_INIT_MOUNT_DEVICE_TYPE m_systemDistroDeviceType = LxMiniInitMountDeviceTypeInvalid;
     ULONG m_systemDistroDeviceId = ULONG_MAX;
     ULONG m_kernelModulesDeviceId = ULONG_MAX;
-    wsl::windows::common::hcs::unique_hcs_system m_system;
+    wsl::windows::common::hcs::shared_hcs_system m_system;
     wil::unique_socket m_listenSocket;
     std::function<void(GUID)> m_onExit;
     wsl::shared::SocketChannel m_miniInitChannel;

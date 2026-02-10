@@ -12,7 +12,7 @@ namespace wsl::core {
 class BridgedNetworking : public INetworkingEngine
 {
 public:
-    BridgedNetworking(HCS_SYSTEM system, const Config& config);
+    BridgedNetworking(const wsl::windows::common::hcs::shared_hcs_system& system, const Config& config);
     ~BridgedNetworking() override = default;
 
     void Initialize() override;
@@ -21,8 +21,8 @@ public:
     void StartPortTracker(wil::unique_socket&& socket) override;
 
 private:
-    // Handle for the Hcn* Api. Owned by the caller (WslCoreVm), this is a non-owning copy
-    const HCS_SYSTEM m_system{};
+    // Handle for the Hcn* Api. Shared with WslCoreVm
+    const wsl::windows::common::hcs::shared_hcs_system m_system;
 
     const Config& m_config;
     wsl::core::networking::EphemeralHcnEndpoint m_endpoint;

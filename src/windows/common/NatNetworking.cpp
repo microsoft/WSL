@@ -26,7 +26,7 @@ static wil::srwlock g_endpointsInUseLock;
 static std::vector<GUID> g_endpointsInUse;
 
 NatNetworking::NatNetworking(
-    HCS_SYSTEM system,
+    const wsl::windows::common::hcs::shared_hcs_system& system,
     wsl::windows::common::hcs::unique_hcn_network&& network,
     GnsChannel&& gnsChannel,
     Config& config,
@@ -376,7 +376,7 @@ void NatNetworking::AttachEndpoint(wsl::core::networking::EphemeralHcnEndpoint&&
     const auto hr = wsl::shared::retry::RetryWithTimeout<HRESULT>(
         [&] {
             HRESULT exceptionHr = wil::ResultFromException(
-                [&] { wsl::windows::common::hcs::ModifyComputeSystem(m_system, wsl::shared::ToJsonW(networkRequest).c_str()); });
+                [&] { wsl::windows::common::hcs::ModifyComputeSystem(m_system.get(), wsl::shared::ToJsonW(networkRequest).c_str()); });
 
             WSL_LOG(
                 "NatNetworking::AttachEndpoint [ModifyComputeSystem(ModifyRequestType::Add)]",

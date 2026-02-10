@@ -4,8 +4,9 @@
 #include "GuestDeviceManager.h"
 #include "DeviceHostProxy.h"
 
-GuestDeviceManager::GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId) :
-    m_machineId(machineId), m_deviceHostSupport(wil::MakeOrThrow<DeviceHostProxy>(machineId, runtimeId))
+GuestDeviceManager::GuestDeviceManager(_In_ const wsl::windows::common::hcs::shared_hcs_system& system, _In_ const GUID& runtimeId) :
+    m_machineId(wsl::shared::string::GuidToString<wchar_t>(runtimeId, wsl::shared::string::GuidToStringFlags::Uppercase)),
+    m_deviceHostSupport(wil::MakeOrThrow<DeviceHostProxy>(system, runtimeId))
 {
 }
 

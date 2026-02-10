@@ -27,7 +27,7 @@ DEFINE_GUID(VIRTIO_PMEM_CLASS_ID, 0xABB755FC, 0x1B86, 0x4255, 0x83, 0xE2, 0xE5, 
 class GuestDeviceManager
 {
 public:
-    GuestDeviceManager(_In_ const std::wstring& machineId, _In_ const GUID& runtimeId);
+    GuestDeviceManager(_In_ const wsl::windows::common::hcs::shared_hcs_system& system, _In_ const GUID& runtimeId);
 
     _Requires_lock_not_held_(m_lock)
     GUID AddGuestDevice(

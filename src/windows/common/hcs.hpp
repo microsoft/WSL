@@ -35,6 +35,7 @@ using unique_hcn_network = wil::unique_any<HCN_NETWORK, decltype(&HcnCloseNetwor
 using unique_hcs_operation = wil::unique_any<HCS_OPERATION, decltype(&HcsCloseOperation), HcsCloseOperation>;
 
 using unique_hcs_system = wil::unique_any<HCS_SYSTEM, decltype(&HcsCloseComputeSystem), HcsCloseComputeSystem>;
+using shared_hcs_system = wil::shared_any<unique_hcs_system>;
 
 void AddPlan9Share(
     _In_ HCS_SYSTEM ComputeSystem,

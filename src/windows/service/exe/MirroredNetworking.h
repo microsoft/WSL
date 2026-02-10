@@ -19,7 +19,7 @@ namespace wsl::core {
 class MirroredNetworking : public INetworkingEngine
 {
 public:
-    MirroredNetworking(HCS_SYSTEM system, GnsChannel&& gnsChannel, const Config& config, GUID runtimeId, wil::unique_socket&& dnsHvsocket);
+    MirroredNetworking(const wsl::windows::common::hcs::shared_hcs_system& system, GnsChannel&& gnsChannel, const Config& config, GUID runtimeId, wil::unique_socket&& dnsHvsocket);
     ~MirroredNetworking() override;
 
     MirroredNetworking(const MirroredNetworking&) = delete;
@@ -66,8 +66,8 @@ private:
     static void GuestNetworkServiceCallback(DWORD NotificationType, HRESULT NotificationStatus, _In_opt_ PCWSTR NotificationData) noexcept;
     static void CALLBACK s_GuestNetworkServiceCallback(DWORD NotificationType, _In_ void* Context, HRESULT NotificationStatus, _In_opt_ PCWSTR NotificationData);
 
-    // Handle owned by WslCoreVm
-    const HCS_SYSTEM m_system{};
+    // Handle shared with WslCoreVm
+    const wsl::windows::common::hcs::shared_hcs_system m_system;
     const GUID m_runtimeId;
     const Config& m_config;
 

@@ -326,7 +326,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     WI_ASSERT(IsEqualGUID(VmId, m_runtimeId));
 
     // Initialize the guest device manager.
-    m_guestDeviceManager = std::make_shared<GuestDeviceManager>(m_machineId, m_runtimeId);
+    m_guestDeviceManager = std::make_shared<GuestDeviceManager>(m_system, m_runtimeId);
 
     // Create a socket listening for connections from mini_init.
     m_listenSocket = wsl::windows::common::hvsocket::Listen(m_runtimeId, LX_INIT_UTILITY_VM_INIT_PORT);
@@ -565,14 +565,14 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             if (m_vmConfig.NetworkingMode == NetworkingMode::Mirrored)
             {
                 m_networkingEngine = std::make_unique<wsl::core::MirroredNetworking>(
-                    m_system.get(), std::move(gnsChannel), m_vmConfig, m_runtimeId, std::move(dnsTunnelingSocket));
+                    m_system, std::move(gnsChannel), m_vmConfig, m_runtimeId, std::move(dnsTunnelingSocket));
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
             {
                 WI_ASSERT(natNetwork);
 
                 m_networkingEngine = std::make_unique<wsl::core::NatNetworking>(
-                    m_system.get(), std::move(natNetwork), std::move(gnsChannel), m_vmConfig, std::move(dnsTunnelingSocket));
+                    m_system, std::move(natNetwork), std::move(gnsChannel), m_vmConfig, std::move(dnsTunnelingSocket));
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
@@ -581,7 +581,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Bridged)
             {
-                m_networkingEngine = std::make_unique<wsl::core::BridgedNetworking>(m_system.get(), m_vmConfig);
+                m_networkingEngine = std::make_unique<wsl::core::BridgedNetworking>(m_system, m_vmConfig);
             }
             else
             {
@@ -750,20 +750,24 @@ WslCoreVm::~WslCoreVm() noexcept
         m_crashDumpCollectionThread.join();
     }
 
-    // Close the handle to the VM. This will wait for any outstanding callbacks.
-    m_system.reset();
+    // Tear down Plan 9 servers and the guest device manager before closing the HCS
+    // handle. The guest device manager holds a shared reference to m_system (via
+    // DeviceHostProxy), so it must be destroyed first to ensure m_system.reset()
+    // below is the final reference and actually closes the compute system (which
+    // waits for outstanding callbacks).
 
-    // This loops helps against a potential crash in build <= Windows 11 22H2.
+    // This loop helps against a potential crash in build <= Windows 11 22H2.
     for (const auto& e : m_plan9Servers)
     {
         LOG_IF_FAILED(e.second->Teardown());
     }
 
-    // Shutdown virtio device hosts.
-    if (m_guestDeviceManager)
-    {
-        m_guestDeviceManager->Shutdown();
-    }
+    // Destroy the guest device manager (virtio device hosts, DeviceHostProxy, etc.).
+    m_guestDeviceManager.reset();
+
+    // Close the handle to the VM. This will wait for any outstanding callbacks.
+    WI_ASSERT(!m_system || m_system.use_count() == 1);
+    m_system.reset();
 
     // Call RevokeVmAccess on each VHD that was added to the utility VM. This
     // ensures that the ACL on the VHD does not grow unbounded.
