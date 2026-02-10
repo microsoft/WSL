@@ -26,7 +26,6 @@ Abstract:
 #include "wslaservice.h"
 #include <wrl/implements.h>
 #include <wil/com.h>
-#include <string>
 
 namespace wsl::windows::service::wsla {
 
@@ -45,20 +44,9 @@ public:
 
     // IWSLASessionReference
     IFACEMETHOD(OpenSession)(_Out_ IWSLASession** Session) override;
-    IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
-    IFACEMETHOD(GetCreatorPid)(_Out_ DWORD* Pid) override;
-    IFACEMETHOD(GetDisplayName)(_Out_ LPWSTR* DisplayName) override;
-    IFACEMETHOD(GetSid)(_Out_ LPWSTR* Sid) override;
-    IFACEMETHOD(IsElevated)(_Out_ BOOL* Elevated) override;
     IFACEMETHOD(Terminate)() override;
 
 private:
-    const ULONG m_sessionId;
-    const DWORD m_creatorPid;
-    const std::wstring m_displayName;
-    const wil::unique_hlocal_string m_sidString;
-    const bool m_elevated;
-
     Microsoft::WRL::ComPtr<IWeakReference> m_weakSession;
 };
 

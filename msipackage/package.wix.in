@@ -267,7 +267,7 @@
                 <RegistryKey Root="HKCR" Key="CLSID\{9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3}">
                     <RegistryValue Value="WSLASessionFactory" Type="string" />
                     <RegistryKey Key="LocalServer32">
-                        <RegistryValue Value="&quot;[INSTALLDIR]wslasession.exe&quot;" Type="string" />
+                        <RegistryValue Value='"[INSTALLDIR]wslasession.exe"' Type="string" />
                     </RegistryKey>
                 </RegistryKey>
 

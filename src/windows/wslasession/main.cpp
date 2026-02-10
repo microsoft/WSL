@@ -60,6 +60,7 @@ try
 
     // Initialize telemetry
     WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
+    auto cleanup = wil::scope_exit([] { WslTraceLoggingUninitialize(); });
 
     // Don't kill the process on unknown C++ exceptions
     wil::g_fResultFailFastUnknownExceptions = false;
@@ -88,8 +89,6 @@ try
     g_exitEvent.wait();
 
     WSL_LOG("Per-user session server exiting", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
-
-    WslTraceLoggingUninitialize();
 
     return 0;
 }

@@ -40,7 +40,7 @@ namespace wslutil = wsl::windows::common::wslutil;
 WSLASessionManagerImpl::~WSLASessionManagerImpl()
 {
     // Terminate all sessions on shutdown.
-    ForEachSession<void>([](auto& sessionRef, const auto&) { LOG_IF_FAILED(sessionRef.Terminate()); });
+    ForEachSession<void>([](auto& entry, const auto&) { LOG_IF_FAILED(entry.Ref->Terminate()); });
 }
 
 void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
@@ -50,15 +50,12 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
     std::lock_guard lock(m_wslaSessionsLock);
 
     // Check for an existing session first.
-    auto result = ForEachSession<HRESULT>([&](auto& sessionRef, const wil::com_ptr<IWSLASession>& session) -> std::optional<HRESULT> {
-        wil::unique_cotaskmem_string displayName;
-        THROW_IF_FAILED(sessionRef.GetDisplayName(&displayName));
-
-        if (wsl::shared::string::IsEqual(displayName.get(), Settings->DisplayName))
+    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) -> std::optional<HRESULT> {
+        if (wsl::shared::string::IsEqual(entry.DisplayName.c_str(), Settings->DisplayName))
         {
             RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
 
-            THROW_IF_FAILED(CheckTokenAccess(&sessionRef, tokenInfo));
+            THROW_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
 
             session.copy_to(WslaSession);
             return S_OK;
@@ -92,14 +89,14 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
     wil::com_ptr<IWSLASessionReference> serviceRef;
     THROW_IF_FAILED(factory->CreateSession(&sessionSettings, vm.Get(), &session, &serviceRef));
 
-    // Track the session via its service ref.
-    m_sessions.emplace_back(std::move(serviceRef));
+    // Track the session via its service ref, along with metadata and security info.
+    m_sessions.push_back({std::move(serviceRef), sessionId, creatorPid, Settings->DisplayName, std::move(tokenInfo)});
 
     // For persistent sessions, also hold a strong reference to keep them alive.
     const bool persistent = WI_IsFlagSet(Flags, WSLASessionFlagsPersistent);
     if (persistent)
     {
-        m_persistentSessions.emplace_back(session);
+        m_persistentSessions.emplace_back(sessionId, session);
     }
 
     *WslaSession = session.detach();
@@ -108,13 +105,10 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
-    auto result = ForEachSession<HRESULT>([&](auto& sessionRef, const wil::com_ptr<IWSLASession>& session) {
-        ULONG sessionId = 0;
-        THROW_IF_FAILED(sessionRef.GetId(&sessionId));
-
-        if (sessionId == Id)
+    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) {
+        if (entry.SessionId == Id)
         {
-            THROW_IF_FAILED(CheckTokenAccess(&sessionRef, tokenInfo));
+            THROW_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
             session.copy_to(Session);
             return std::make_optional(S_OK);
         }
@@ -131,13 +125,10 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
 
-    auto result = ForEachSession<HRESULT>([&](auto& sessionRef, const wil::com_ptr<IWSLASession>& session) {
-        wil::unique_cotaskmem_string name;
-        THROW_IF_FAILED(sessionRef.GetDisplayName(&name));
-
-        if (wsl::shared::string::IsEqual(name.get(), DisplayName))
+    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) {
+        if (wsl::shared::string::IsEqual(entry.DisplayName.c_str(), DisplayName))
         {
-            THROW_IF_FAILED(CheckTokenAccess(&sessionRef, tokenInfo));
+            THROW_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
             session.copy_to(Session);
             return std::make_optional(S_OK);
         }
@@ -154,27 +145,17 @@ void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessi
 {
     std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
 
-    ForEachSession<void>([&](auto& sessionRef, const auto&) {
-        ULONG sessionId = 0;
-        DWORD creatorPid = 0;
-        wil::unique_cotaskmem_string displayName;
-        wil::unique_cotaskmem_string sidString;
+    ForEachSession<void>([&](auto& entry, const auto&) {
+        wil::unique_hlocal_string sidString;
+        THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString));
 
-        THROW_IF_FAILED(sessionRef.GetId(&sessionId));
-        THROW_IF_FAILED(sessionRef.GetCreatorPid(&creatorPid));
-        THROW_IF_FAILED(sessionRef.GetDisplayName(&displayName));
-        THROW_IF_FAILED(sessionRef.GetSid(&sidString));
-
-        auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = sessionId, .CreatorPid = creatorPid});
+        auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
         wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
-        wcscpy_s(it.DisplayName, _countof(it.DisplayName), displayName.get());
+        wcscpy_s(it.DisplayName, _countof(it.DisplayName), entry.DisplayName.c_str());
     });
 
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());
-    for (size_t i = 0; i < sessionInfo.size(); i++)
-    {
-        memcpy(&output[i], &sessionInfo[i], sizeof(WSLA_SESSION_INFORMATION));
-    }
+    memcpy(output.get(), sessionInfo.data(), sessionInfo.size() * sizeof(WSLA_SESSION_INFORMATION));
 
     *Sessions = output.release();
     *SessionsCount = static_cast<ULONG>(sessionInfo.size());
@@ -234,16 +215,12 @@ CallingProcessTokenInfo WSLASessionManagerImpl::GetCallingProcessTokenInfo()
     const wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
     auto tokenInfo = wil::get_token_information<TOKEN_USER>(userToken.get());
-
-    wil::unique_hlocal_string sidString;
-    THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(tokenInfo->User.Sid, &sidString));
-
     auto elevated = wil::test_token_membership(userToken.get(), SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
 
-    return {std::move(sidString), elevated};
+    return {std::move(tokenInfo), elevated};
 }
 
-HRESULT WSLASessionManagerImpl::CheckTokenAccess(IWSLASessionReference* SessionRef, const CallingProcessTokenInfo& TokenInfo)
+HRESULT WSLASessionManagerImpl::CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo)
 {
     // Allow elevated tokens to access all sessions.
     // Otherwise a token can only access sessions from the same SID and elevation status.
@@ -254,18 +231,9 @@ HRESULT WSLASessionManagerImpl::CheckTokenAccess(IWSLASessionReference* SessionR
         return S_OK; // Token is elevated, allow access.
     }
 
-    wil::unique_cotaskmem_string sessionSidString;
-    RETURN_IF_FAILED(SessionRef->GetSid(&sessionSidString));
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(Entry.Owner.TokenInfo->User.Sid, TokenInfo.TokenInfo->User.Sid)); // Different account, deny access.
 
-    RETURN_HR_IF(E_ACCESSDENIED, !wsl::shared::string::IsEqual(sessionSidString.get(), TokenInfo.SidString.get())); // Different account, deny access.
-
-    if (!TokenInfo.Elevated)
-    {
-        BOOL sessionElevated = FALSE;
-        RETURN_IF_FAILED(SessionRef->IsElevated(&sessionElevated));
-
-        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED), sessionElevated); // Non-elevated token trying to access elevated session, deny access.
-    }
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED), Entry.Owner.Elevated); // Non-elevated token trying to access elevated session, deny access.
 
     return S_OK;
 }

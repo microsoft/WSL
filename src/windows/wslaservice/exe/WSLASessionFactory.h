@@ -40,7 +40,7 @@ public:
 
     // Sets a callback invoked when the session in this process is destroyed.
     // Used by the COM server host to signal process exit.
-    void SetDestructionCallback(std::function<void()> callback);
+    void SetDestructionCallback(std::function<void()>&& callback);
 
     // IWSLASessionFactory
     IFACEMETHOD(CreateSession)

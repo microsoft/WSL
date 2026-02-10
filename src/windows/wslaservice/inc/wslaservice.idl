@@ -480,7 +480,8 @@ interface IWSLASession : IUnknown
 
 //
 // IWSLASessionReference - Weak reference to a session held by the SYSTEM service.
-// Stored in per-user process, allows service to check if session is still alive.
+// Stored in per-user process, allows service to check liveness and terminate sessions.
+// Session metadata (ID, name, etc.) is stored service-side in SessionEntry.
 //
 [
     uuid(B3A72F48-9D15-4E8A-A621-7C3E84F09B52),
@@ -492,13 +493,6 @@ interface IWSLASessionReference : IUnknown
     // Try to open the session. Fails if session was released or terminated.
     // Returns S_OK and a valid session if still alive.
     HRESULT OpenSession([out] IWSLASession** Session);
-
-    // Get session metadata for enumeration.
-    HRESULT GetId([out] ULONG* Id);
-    HRESULT GetCreatorPid([out] DWORD* Pid);
-    HRESULT GetDisplayName([out, string] LPWSTR* DisplayName);
-    HRESULT GetSid([out, string] LPWSTR* Sid);
-    HRESULT IsElevated([out] BOOL* Elevated);
 
     // Terminate the session if still alive.
     HRESULT Terminate();

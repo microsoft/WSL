@@ -85,16 +85,13 @@ try
     m_featureFlags = Settings->FeatureFlags;
 
     // Get user token for the current process
-    m_tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
-    m_elevatedToken = wsl::windows::common::security::IsTokenElevated(GetCurrentProcessToken());
-    m_creatorPid = Settings->CreatorPid;
+    const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
 
     WSL_LOG(
         "SessionInitialized",
+        TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
-        TraceLoggingValue(GetSidString().get(), "Sid"),
-        TraceLoggingValue(m_elevatedToken, "Elevated"),
-        TraceLoggingValue(m_creatorPid, "CreatorPid"));
+        TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
 
     // Create the VM.
     m_virtualMachine.emplace(Vm, Settings);
@@ -103,7 +100,7 @@ try
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
 
     // Configure storage.
-    ConfigureStorage(*Settings, m_tokenInfo->User.Sid);
+    ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
     // Launch dockerd
     StartDockerd();
@@ -129,7 +126,7 @@ CATCH_RETURN()
 
 WSLASession::~WSLASession()
 {
-    WSL_LOG("SessionTerminated", TraceLoggingLevel(WINEVENT_LEVEL_INFO));
+    WSL_LOG("SessionTerminated", TraceLoggingValue(m_id, "SessionId"), TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
     LOG_IF_FAILED(Terminate());
 
@@ -139,7 +136,7 @@ WSLASession::~WSLASession()
     }
 }
 
-void WSLASession::SetDestructionCallback(std::function<void()> callback)
+void WSLASession::SetDestructionCallback(std::function<void()>&& callback)
 {
     m_destructionCallback = std::move(callback);
 }
@@ -205,50 +202,11 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, P
     deleteVhdOnFailure.release();
 }
 
-const std::wstring& WSLASession::DisplayName() const
-{
-    return m_displayName;
-}
-
-DWORD WSLASession::GetCreatorPid() const noexcept
-{
-    return m_creatorPid;
-}
-
-ULONG WSLASession::GetId() const noexcept
-{
-    return m_id;
-}
-
 HRESULT WSLASession::GetId(ULONG* Id)
 {
     *Id = m_id;
 
     return S_OK;
-}
-
-PSID WSLASession::GetSid() const noexcept
-{
-    return m_tokenInfo->User.Sid;
-}
-
-wil::unique_hlocal_string WSLASession::GetSidString() const
-{
-    wil::unique_hlocal_string sid;
-    THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSid(m_tokenInfo->User.Sid, &sid));
-
-    return sid;
-}
-
-bool WSLASession::IsTokenElevated() const noexcept
-{
-    return m_elevatedToken;
-}
-
-void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
-{
-    THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);
-    wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
 void WSLASession::OnDockerdExited()

@@ -26,7 +26,6 @@ Abstract:
 
     The IWSLASessionReference allows the service to:
     - Check if a session is still alive (OpenSession fails if session is gone)
-    - Get session metadata for enumeration without holding strong refs
     - Terminate sessions when requested by elevated callers
 
 --*/
@@ -37,9 +36,9 @@ Abstract:
 #include "wslutil.h"
 #include <atomic>
 #include <algorithm>
+#include <string>
 #include <vector>
 #include <mutex>
-#include <string>
 
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -47,8 +46,19 @@ namespace wsl::windows::service::wsla {
 
 struct CallingProcessTokenInfo
 {
-    wil::unique_hlocal_string SidString;
+    wil::unique_tokeninfo_ptr<TOKEN_USER> TokenInfo;
     bool Elevated;
+};
+
+// Metadata for a tracked session, stored service-side at creation time.
+// Security info is stored here (not queried from the per-user process) to prevent spoofing.
+struct SessionEntry
+{
+    wil::com_ptr<IWSLASessionReference> Ref;
+    ULONG SessionId = 0;
+    DWORD CreatorPid = 0;
+    std::wstring DisplayName;
+    CallingProcessTokenInfo Owner;
 };
 
 class WSLASessionManagerImpl
@@ -68,7 +78,7 @@ public:
 
 private:
     // Iterates over all sessions, cleaning up released sessions.
-    // The routine receives an IWSLASessionReference& and can return an optional<T> to stop iteration.
+    // The routine receives a SessionEntry& and can return an optional<T> to stop iteration.
     template <typename T>
     inline auto ForEachSession(const auto& Routine)
     {
@@ -77,35 +87,29 @@ private:
         using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
         TResult result{};
 
-        auto each = [&](const wil::com_ptr<IWSLASessionReference>& SessionRef) {
+        auto each = [&](SessionEntry& entry) {
             // Try to open the session via the service ref.
             // Fails with ERROR_OBJECT_NO_LONGER_EXISTS if released,
             // ERROR_INVALID_STATE if terminated, or RPC error if per-user process is dead.
             wil::com_ptr<IWSLASession> lockedSession;
-            if (FAILED_LOG(SessionRef->OpenSession(&lockedSession)))
+            if (FAILED_LOG(entry.Ref->OpenSession(&lockedSession)))
             {
                 // Session is gone, drop the persistent reference if any.
-                ULONG refId = 0;
-                if (SUCCEEDED_LOG(SessionRef->GetId(&refId)))
-                {
-                    auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) {
-                        ULONG sessionId = 0;
-                        return SUCCEEDED(e->GetId(&sessionId)) && refId == sessionId;
-                    });
-                    m_persistentSessions.erase(remove.begin(), remove.end());
-                }
+                auto remove =
+                    std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == entry.SessionId; });
+                m_persistentSessions.erase(remove.begin(), remove.end());
                 return true; // Remove from tracking
             }
 
             if constexpr (std::is_same_v<T, void>)
             {
-                Routine(*SessionRef, lockedSession);
+                Routine(entry, lockedSession);
             }
             else
             {
                 if (!result.has_value())
                 {
-                    result = Routine(*SessionRef, lockedSession);
+                    result = Routine(entry, lockedSession);
                 }
             }
 
@@ -129,7 +133,7 @@ private:
     WSLA_SESSION_INIT_SETTINGS CreateSessionSettings(_In_ ULONG SessionId, _In_ DWORD CreatorPid, _In_ const WSLA_SESSION_SETTINGS* Settings);
     void EnsureJobObjectCreated();
     static CallingProcessTokenInfo GetCallingProcessTokenInfo();
-    static HRESULT CheckTokenAccess(IWSLASessionReference* SessionRef, const CallingProcessTokenInfo& TokenInfo);
+    static HRESULT CheckTokenAccess(const SessionEntry& Entry, const CallingProcessTokenInfo& TokenInfo);
 
     std::atomic<ULONG> m_nextSessionId{1};
     std::recursive_mutex m_wslaSessionsLock;
@@ -139,12 +143,13 @@ private:
     std::once_flag m_jobObjectInitFlag;
     wil::unique_handle m_sessionJobObject;
 
-    // All sessions tracked via IWSLASessionReference (which holds weak refs).
+    // All sessions tracked via SessionEntry (which holds weak refs and service-side security info).
     // Sessions are automatically cleaned up when the underlying session is released.
-    std::vector<wil::com_ptr<IWSLASessionReference>> m_sessions;
+    std::vector<SessionEntry> m_sessions;
 
     // Strong references to persistent sessions to keep them alive.
-    std::vector<wil::com_ptr<IWSLASession>> m_persistentSessions;
+    // Session ID is stored alongside so cleanup doesn't require cross-process COM calls.
+    std::vector<std::pair<ULONG, wil::com_ptr<IWSLASession>>> m_persistentSessions;
 };
 } // namespace wsl::windows::service::wsla
 

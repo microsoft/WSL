@@ -24,7 +24,7 @@ Abstract:
 namespace wslutil = wsl::windows::common::wslutil;
 namespace wsla = wsl::windows::service::wsla;
 
-void wsla::WSLASessionFactory::SetDestructionCallback(std::function<void()> callback)
+void wsla::WSLASessionFactory::SetDestructionCallback(std::function<void()>&& callback)
 {
     m_destructionCallback = std::move(callback);
 }
@@ -41,7 +41,7 @@ try
 
     // Pass the destruction callback directly to the session.
     // One session per process, so when it's destroyed, exit.
-    session->SetDestructionCallback(m_destructionCallback);
+    session->SetDestructionCallback(std::move(m_destructionCallback));
 
     // Initialize the session with the VM.
     RETURN_IF_FAILED(session->Initialize(Settings, Vm));

@@ -40,25 +40,11 @@ public:
 
     // Sets a callback invoked when this object is destroyed.
     // Used by the COM server host to signal process exit.
-    void SetDestructionCallback(std::function<void()> callback);
+    void SetDestructionCallback(std::function<void()>&& callback);
 
     // IWSLASession - initialization methods
     IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
     IFACEMETHOD(Initialize)(_In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm) override;
-
-    ULONG GetId() const noexcept;
-
-    PSID GetSid() const noexcept;
-
-    wil::unique_hlocal_string GetSidString() const;
-
-    DWORD GetCreatorPid() const noexcept;
-
-    bool IsTokenElevated() const noexcept;
-
-    const std::wstring& DisplayName() const;
-
-    void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
     IFACEMETHOD(GetState)(_Out_ WSLASessionState* State) override;
@@ -123,9 +109,6 @@ private:
     std::filesystem::path m_storageVhdPath;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
-    wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
-    bool m_elevatedToken{};
-    DWORD m_creatorPid{};
     std::recursive_mutex m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_dockerdProcess;

@@ -13,44 +13,23 @@ Abstract:
     This class provides a weak reference to a session that the SYSTEM service
     can use to:
     - Check if a session is still alive (OpenSession fails if session is gone)
-    - Get session metadata for enumeration without holding a strong ref
     - Terminate sessions when requested by elevated callers
 
 --*/
 
 #include "WSLASessionReference.h"
 #include "WSLASession.h"
-#include "wslutil.h"
 
-namespace wslutil = wsl::windows::common::wslutil;
 namespace wsla = wsl::windows::service::wsla;
 
-wsla::WSLASessionReference::WSLASessionReference(_In_ WSLASession* Session) :
-    m_sessionId(Session->GetId()),
-    m_creatorPid(Session->GetCreatorPid()),
-    m_displayName(Session->DisplayName()),
-    m_sidString(wslutil::SidToString(wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken())->User.Sid)),
-    m_elevated(Session->IsTokenElevated())
+wsla::WSLASessionReference::WSLASessionReference(_In_ WSLASession* Session)
 {
     Microsoft::WRL::ComPtr<IWeakReferenceSource> weakRefSource;
     THROW_IF_FAILED(Session->QueryInterface(IID_PPV_ARGS(&weakRefSource)));
     THROW_IF_FAILED(weakRefSource->GetWeakReference(&m_weakSession));
-
-    WSL_LOG(
-        "WSLASessionReferenceCreated",
-        TraceLoggingLevel(WINEVENT_LEVEL_INFO),
-        TraceLoggingUInt32(m_sessionId, "SessionId"),
-        TraceLoggingWideString(m_displayName.c_str(), "DisplayName"));
 }
 
-wsla::WSLASessionReference::~WSLASessionReference()
-{
-    WSL_LOG(
-        "WSLASessionReferenceDestroyed",
-        TraceLoggingLevel(WINEVENT_LEVEL_INFO),
-        TraceLoggingUInt32(m_sessionId, "SessionId"),
-        TraceLoggingWideString(m_displayName.c_str(), "DisplayName"));
-}
+wsla::WSLASessionReference::~WSLASessionReference() = default;
 
 HRESULT wsla::WSLASessionReference::OpenSession(_Out_ IWSLASession** Session)
 {
@@ -67,40 +46,6 @@ HRESULT wsla::WSLASessionReference::OpenSession(_Out_ IWSLASession** Session)
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), state != WSLASessionStateRunning);
 
     *Session = lockedSession.Detach();
-    return S_OK;
-}
-
-HRESULT wsla::WSLASessionReference::GetId(_Out_ ULONG* Id)
-{
-    *Id = m_sessionId;
-    return S_OK;
-}
-
-HRESULT wsla::WSLASessionReference::GetCreatorPid(_Out_ DWORD* Pid)
-{
-    *Pid = m_creatorPid;
-    return S_OK;
-}
-
-HRESULT wsla::WSLASessionReference::GetDisplayName(_Out_ LPWSTR* DisplayName)
-try
-{
-    *DisplayName = wil::make_cotaskmem_string(m_displayName.c_str()).release();
-    return S_OK;
-}
-CATCH_RETURN()
-
-HRESULT wsla::WSLASessionReference::GetSid(_Out_ LPWSTR* Sid)
-try
-{
-    *Sid = wil::make_cotaskmem_string(m_sidString.get()).release();
-    return S_OK;
-}
-CATCH_RETURN()
-
-HRESULT wsla::WSLASessionReference::IsElevated(_Out_ BOOL* Elevated)
-{
-    *Elevated = m_elevated ? TRUE : FALSE;
     return S_OK;
 }
 
