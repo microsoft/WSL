@@ -16,6 +16,8 @@ WslcProcessRelease
 WslcSessionSettingsSetFlags
 WslcSessionSettingsSetTerminateCallback
 WslcSessionSettingsSetDisplayName
+WslcSessionSettingsSetCpuCount
+WslcSessionSettingsSetMemory
 WslcSessionSettingsSetTimeout
 WslcSessionSettingsSetVHD
  

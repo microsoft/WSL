@@ -16,9 +16,9 @@ Abstract:
 #include "wslcsdk.h"
 #include "wslaservice.h"
 #include <stdint.h>
-#include <wil/com.h>      // COM helpers
-//#include <wil/resource.h> // handle wrappers
-//#include <wil/result.h>   // error handling
+#include <wil/com.h> // COM helpers
+// #include <wil/resource.h> // handle wrappers
+// #include <wil/result.h>   // error handling
 
 // SESSION DEFINITIONS
 typedef struct WSLC_SESSION_OPTIONS_INTERNAL
@@ -30,14 +30,17 @@ typedef struct WSLC_SESSION_OPTIONS_INTERNAL
     uint64_t memoryMb;
     uint32_t timeoutMS;
 
-    WSLC_VHD_REQUIREMENTS vhdRequirements;
-    WSLC_SESSION_FLAGS flags;
+    WslcVhdRequirements vhdRequirements;
+    WslcSessionFlags flags;
     WslcSessionTerminationCallback terminationCallback;
     PVOID terminationCallbackContext;
 } WSLC_SESSION_OPTIONS_INTERNAL;
 
-typedef char WSLC_SESSION_OPTIONS_INTERNAL_SIZE_ASSERT[sizeof(WSLC_SESSION_OPTIONS_INTERNAL)];//size = 80
-typedef char WSLC_SESSION_OPTIONS_INTERNAL_ALIGNMENT_ASSERT[__alignof(WSLC_SESSION_OPTIONS_INTERNAL)];//alignment = 8
+static_assert(sizeof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_SIZE, "WSLC_SESSION_OPTIONS_INTERNAL size mismatch");
+
+static_assert(
+    __alignof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_ALIGNMENT,
+    "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
 
 WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings);
 
@@ -52,8 +55,12 @@ typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
     PCSTR currentDirectory;
 } WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL;
 
-typedef char WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL_SIZE_ASSERT[sizeof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL)]; // size = 48
-typedef char WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL_ALIGNMENT_ASSERT[__alignof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL)]; // alignment = 8
+static_assert(
+    sizeof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_SIZE,
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 48 bytes");
+static_assert(
+    __alignof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
+    "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
 
 WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* GetInternalType(WslcProcessSettings* settings);
 
@@ -64,17 +71,21 @@ typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
     PCSTR runtimeName; // Container runtime name (expected to allow DNS resolution between containers)
     PCSTR HostName;
     PCSTR DomainName;
-    const WSLC_CONTAINER_PORT_MAPPING* ports;
+    const WslcContainerPortMapping* ports;
     UINT32 portsCount;
-    const WSLC_CONTAINER_VOLUME* volumes;
+    const WslcContainerVolume* volumes;
     UINT32 volumesCount;
     const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions;
-    WSLC_ContainerNetworkingMode networking;
-    WSLC_CONTAINER_FLAGS containerFlags;
+    WslcContainerNetworkingMode networking;
+    WslcContainerFlags containerFlags;
 
 } WSLC_CONTAINER_OPTIONS_INTERNAL;
-typedef char WSLC_CONTAINER_OPTIONS_INTERNAL_SIZE_ASSERT[sizeof(WSLC_CONTAINER_OPTIONS_INTERNAL)];         // size = 80
-typedef char WSLC_CONTAINER_OPTIONS_INTERNAL_ALIGNMENT_ASSERT[__alignof(WSLC_CONTAINER_OPTIONS_INTERNAL)]; // alignment = 8
+
+static_assert(
+    sizeof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL must be 80 bytes");
+static_assert(
+    __alignof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
+    "WSLC_CONTAINER_OPTIONS_INTERNAL must be 8-byte aligned");
 
 WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings);
 
