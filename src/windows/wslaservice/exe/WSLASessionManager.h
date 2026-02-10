@@ -47,7 +47,7 @@ namespace wsl::windows::service::wsla {
 
 struct CallingProcessTokenInfo
 {
-    wil::unique_tokeninfo_ptr<TOKEN_USER> Info;
+    wil::unique_cotaskmem_string SidString;
     bool Elevated;
 };
 

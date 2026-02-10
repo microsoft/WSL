@@ -54,7 +54,7 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
         wil::unique_cotaskmem_string displayName;
         THROW_IF_FAILED(sessionRef.GetDisplayName(&displayName));
 
-        if (wcscmp(displayName.get(), Settings->DisplayName) == 0)
+        if (wsl::shared::string::IsEqual(displayName.get(), Settings->DisplayName))
         {
             RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
 
@@ -135,7 +135,7 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
         wil::unique_cotaskmem_string name;
         THROW_IF_FAILED(sessionRef.GetDisplayName(&name));
 
-        if (wcscmp(name.get(), DisplayName) == 0)
+        if (wsl::shared::string::IsEqual(name.get(), DisplayName))
         {
             THROW_IF_FAILED(CheckTokenAccess(&sessionRef, tokenInfo));
             session.copy_to(Session);
@@ -235,9 +235,12 @@ CallingProcessTokenInfo WSLASessionManagerImpl::GetCallingProcessTokenInfo()
 
     auto tokenInfo = wil::get_token_information<TOKEN_USER>(userToken.get());
 
+    wil::unique_cotaskmem_string sidString;
+    THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(tokenInfo->User.Sid, &sidString));
+
     auto elevated = wil::test_token_membership(userToken.get(), SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS);
 
-    return {std::move(tokenInfo), elevated};
+    return {std::move(sidString), elevated};
 }
 
 HRESULT WSLASessionManagerImpl::CheckTokenAccess(IWSLASessionReference* SessionRef, const CallingProcessTokenInfo& TokenInfo)
@@ -254,21 +257,14 @@ HRESULT WSLASessionManagerImpl::CheckTokenAccess(IWSLASessionReference* SessionR
     wil::unique_cotaskmem_string sessionSidString;
     RETURN_IF_FAILED(SessionRef->GetSid(&sessionSidString));
 
-    PSID sessionSid = nullptr;
-    RETURN_IF_WIN32_BOOL_FALSE(ConvertStringSidToSidW(sessionSidString.get(), &sessionSid));
-    auto sidCleanup = wil::scope_exit([&] { LocalFree(sessionSid); });
+    RETURN_HR_IF(E_ACCESSDENIED, !wsl::shared::string::IsEqual(sessionSidString.get(), TokenInfo.SidString.get())); // Different account, deny access.
 
-    if (!EqualSid(sessionSid, TokenInfo.Info->User.Sid))
+    if (!TokenInfo.Elevated)
     {
-        return E_ACCESSDENIED; // Different account, deny access.
-    }
+        BOOL sessionElevated = FALSE;
+        RETURN_IF_FAILED(SessionRef->IsElevated(&sessionElevated));
 
-    BOOL sessionElevated = FALSE;
-    RETURN_IF_FAILED(SessionRef->IsElevated(&sessionElevated));
-
-    if (!TokenInfo.Elevated && sessionElevated)
-    {
-        return HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED); // Non-elevated token trying to access elevated session, deny access.
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED), sessionElevated); // Non-elevated token trying to access elevated session, deny access.
     }
 
     return S_OK;

@@ -29,7 +29,7 @@ wsla::WSLASessionReference::WSLASessionReference(_In_ WSLASession* Session) :
     m_sessionId(Session->GetId()),
     m_creatorPid(Session->GetCreatorPid()),
     m_displayName(Session->DisplayName()),
-    m_tokenInfo(wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken())),
+    m_sidString(wslutil::SidToString(wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken())->User.Sid)),
     m_elevated(Session->IsTokenElevated())
 {
     Microsoft::WRL::ComPtr<IWeakReferenceSource> weakRefSource;
@@ -53,29 +53,22 @@ wsla::WSLASessionReference::~WSLASessionReference()
 }
 
 HRESULT wsla::WSLASessionReference::OpenSession(_Out_ IWSLASession** Session)
-try
 {
     *Session = nullptr;
 
     Microsoft::WRL::ComPtr<IWSLASession> lockedSession;
-    THROW_IF_FAILED(m_weakSession->Resolve(__uuidof(IWSLASession), reinterpret_cast<IInspectable**>(lockedSession.GetAddressOf())));
+    RETURN_IF_FAILED(m_weakSession->Resolve(__uuidof(IWSLASession), reinterpret_cast<IInspectable**>(lockedSession.GetAddressOf())));
 
-    if (!lockedSession)
-    {
-        return HRESULT_FROM_WIN32(ERROR_OBJECT_NO_LONGER_EXISTS);
-    }
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_OBJECT_NO_LONGER_EXISTS), !lockedSession);
 
     WSLASessionState state{};
     RETURN_IF_FAILED(lockedSession->GetState(&state));
-    if (state == WSLASessionStateTerminated)
-    {
-        return HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
-    }
+
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), state != WSLASessionStateRunning);
 
     *Session = lockedSession.Detach();
     return S_OK;
 }
-CATCH_RETURN()
 
 HRESULT wsla::WSLASessionReference::GetId(_Out_ ULONG* Id)
 {
@@ -100,8 +93,7 @@ CATCH_RETURN()
 HRESULT wsla::WSLASessionReference::GetSid(_Out_ LPWSTR* Sid)
 try
 {
-    auto sidString = wslutil::SidToString(m_tokenInfo->User.Sid);
-    *Sid = wil::make_cotaskmem_string(sidString.get()).release();
+    *Sid = wil::make_cotaskmem_string(m_sidString.get()).release();
     return S_OK;
 }
 CATCH_RETURN()

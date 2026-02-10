@@ -26,7 +26,6 @@ Abstract:
 #include "wslaservice.h"
 #include <wrl/implements.h>
 #include <wil/com.h>
-#include <wil/token_helpers.h>
 #include <string>
 
 namespace wsl::windows::service::wsla {
@@ -57,7 +56,7 @@ private:
     const ULONG m_sessionId;
     const DWORD m_creatorPid;
     const std::wstring m_displayName;
-    const wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
+    const wil::unique_hlocal_string m_sidString;
     const bool m_elevated;
 
     Microsoft::WRL::ComPtr<IWeakReference> m_weakSession;
