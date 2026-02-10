@@ -97,7 +97,7 @@ STDAPI WslcContainerSettingsSetHostName(_In_ WslcContainerSettings* containerSet
 
 
 STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerSettings,
-                                       _In_ const PCSTR domainName)
+                                          _In_ PCSTR domainName)
 {
     UNREFERENCED_PARAMETER(domainName);
     UNREFERENCED_PARAMETER(containerSettings);
