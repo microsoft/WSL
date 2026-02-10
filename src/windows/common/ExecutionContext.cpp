@@ -5,6 +5,7 @@
 #include "wsleventschema.h"
 
 using wsl::windows::common::ClientExecutionContext;
+using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::common::Context;
 using wsl::windows::common::Error;
 using wsl::windows::common::ExecutionContext;
@@ -47,7 +48,7 @@ ExecutionContext* ExecutionContext::Current()
     return g_currentContext;
 }
 
-void ExecutionContext::SetErrorStringImpl(std::wstring&& string, std::optional<std::wstring>&& source)
+void ExecutionContext::SetErrorStringImpl(std::wstring&& string, std::wstring&& source)
 {
     WI_ASSERT(!m_errorString.has_value());
     m_errorString = std::move(string);
@@ -130,9 +131,27 @@ void ExecutionContext::CollectError(HRESULT result)
 
 void ExecutionContext::CollectErrorImpl(HRESULT result)
 {
+    if (!g_runningInService && !m_errorString.has_value() && !m_errorSource.has_value())
+    {
+        // If no error message has been reported, look for a COM error.
+        if (auto comError = common::wslutil::GetCOMErrorInfo())
+        {
+            if (comError->Message)
+            {
+                m_errorString = comError->Message.get();
+            }
+
+            if (comError->Source)
+            {
+                m_errorSource = comError->Source.get();
+            }
+        }
+    }
+
     RootContext().CollectErrorImpl(result, CurrentContext(), std::move(m_errorString), std::move(m_errorSource));
 
     m_errorString.reset();
+    m_errorSource.reset();
 }
 
 void ExecutionContext::EmitUserWarning(const std::wstring& warning, const std::source_location& location)
@@ -365,24 +384,55 @@ ServiceExecutionContext::~ServiceExecutionContext()
     }
 }
 
+COMServiceExecutionContext::COMServiceExecutionContext() : ExecutionContext(Empty)
+{
+}
+
+COMServiceExecutionContext::~COMServiceExecutionContext()
+{
+    if (m_error.has_value())
+    {
+        wil::com_ptr<ICreateErrorInfo> errorInfo;
+        THROW_IF_FAILED(CreateErrorInfo(&errorInfo));
+
+        if (m_error->Message.has_value())
+        {
+            auto description = wil::make_bstr(m_error->Message->c_str());
+            THROW_IF_FAILED(errorInfo->SetDescription(description.get()));
+        }
+
+        if (m_error->Source.has_value())
+        {
+            THROW_IF_FAILED(errorInfo->SetSource(wil::make_bstr(m_error->Source->c_str()).get()));
+        }
+
+        THROW_IF_FAILED(SetErrorInfo(0, errorInfo.query<IErrorInfo>().get()));
+    }
+}
+
+bool COMServiceExecutionContext::CanCollectUserErrorMessage()
+{
+    return true;
+}
+
 LXSS_ERROR_INFO* ClientExecutionContext::OutError() noexcept
 {
     return &m_outError;
 }
 
-void wsl::windows::common::SetErrorMessage(std::string&& message)
+void wsl::windows::common::SetErrorMessage(std::string&& message, const std::source_location& source)
 {
-    return SetErrorMessage(wsl::shared::string::MultiByteToWide(message));
+    return SetErrorMessage(wsl::shared::string::MultiByteToWide(message), source);
 }
 
-void wsl::windows::common::SetErrorMessage(std::wstring&& message)
+void wsl::windows::common::SetErrorMessage(std::wstring&& message, const std::source_location& source)
 {
     if (g_currentContext == nullptr || message.empty())
     {
         return; // no context to save the error to or empty message, ignore
     }
 
-    g_currentContext->SetErrorStringImpl(std::move(message), {});
+    g_currentContext->SetErrorStringImpl(std::move(message), std::format(L"{}", source));
 }
 
 void wsl::windows::common::SetCOMErrorMessage()

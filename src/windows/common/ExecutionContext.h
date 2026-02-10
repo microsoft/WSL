@@ -7,18 +7,12 @@
 namespace wsl::windows::common {
 
 #define THROW_HR_WITH_USER_ERROR(Result, Message) \
+    auto _messageWide = std::format(L"{}", Message); \
     if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
     { \
-        ::wsl::windows::common::SetErrorMessage(Message); \
+        ::wsl::windows::common::SetErrorMessage(std::wstring(_messageWide)); \
     } \
-    THROW_HR(Result)
-
-#define THROW_HR_WITH_COM_ERROR(Result) \
-    if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
-    { \
-        ::wsl::windows::common::SetCOMErrorMessage(); \
-    } \
-    THROW_HR(Result)
+    THROW_HR_MSG(Result, "%ls", _messageWide.c_str());
 
 #define EMIT_USER_WARNING(Warning) \
     if (::wsl::windows::common::ExecutionContext* context = ::wsl::windows::common::ExecutionContext::Current(); context != nullptr) \
@@ -120,7 +114,7 @@ public:
 
     const std::optional<Error>& ReportedError() const noexcept;
 
-    void SetErrorStringImpl(std::wstring&& string, std::optional<std::wstring>&& source);
+    void SetErrorStringImpl(std::wstring&& string, std::wstring&& source);
 
     ULONGLONG CurrentContext() const noexcept;
 
@@ -190,10 +184,23 @@ private:
     wil::unique_handle m_warningsPipe;
 };
 
+class COMServiceExecutionContext : public ExecutionContext
+{
+
+public:
+    NON_COPYABLE(COMServiceExecutionContext);
+    NON_MOVABLE(COMServiceExecutionContext);
+
+    COMServiceExecutionContext();
+    ~COMServiceExecutionContext() override;
+
+    bool CanCollectUserErrorMessage() override;
+};
+
 void EnableContextualizedErrors(bool service);
 
-void SetErrorMessage(std::wstring&& message);
-void SetErrorMessage(std::string&& message);
+void SetErrorMessage(std::wstring&& message, const std::source_location& source = std::source_location::current());
+void SetErrorMessage(std::string&& message, const std::source_location& source = std::source_location::current());
 void SetCOMErrorMessage();
 
 void SetEventLog(HANDLE eventLog);

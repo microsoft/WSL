@@ -325,14 +325,12 @@ void WSLASession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
 
-HRESULT WSLASession::PullImage(
-    LPCSTR ImageUri,
-    const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
-    IProgressCallback* ProgressCallback,
-    WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
+
+    COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
@@ -394,21 +392,19 @@ try
         {
             // pull failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
-
-            common::wslutil::SetCOMErrorInfo(errorMessage);
         }
 
         if (pullResult.value() == boost::beast::http::status::not_found)
         {
-            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
+            THROW_HR_WITH_USER_ERROR(WSLA_E_IMAGE_NOT_FOUND, errorMessage);
         }
         else if (pullResult.value() == boost::beast::http::status::bad_request)
         {
-            THROW_HR_MSG(E_INVALIDARG, "%hs", errorMessage.c_str());
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
         }
         else
         {
-            THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
         }
     }
 

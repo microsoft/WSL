@@ -60,12 +60,12 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("debian:latest", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("debian:latest", nullptr, nullptr));
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("python:3.12-alpine", nullptr, nullptr));
         }
 
         // Hacky way to delete all containers.
@@ -323,7 +323,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr));
 
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:linux");
@@ -337,13 +337,15 @@ class WSLATests
         }
 
         {
-            std::string expectedError =
-                "pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
-                "access to the resource is denied";
+            std::wstring expectedError =
+                L"pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
+                L"access to the resource is denied";
 
-            WSLAErrorDetails error;
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr, &error.Error), WSLA_E_IMAGE_NOT_FOUND);
-            VERIFY_ARE_EQUAL(expectedError, error.Error.UserErrorMessage);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLA_E_IMAGE_NOT_FOUND);
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+
+            VERIFY_ARE_EQUAL(expectedError, comError->Message.get());
         }
     }
 
@@ -438,7 +440,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Prepare alpine image to delete.
-        VERIFY_SUCCEEDED(m_defaultSession->PullImage("alpine:latest", nullptr, nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage("alpine:latest", nullptr, nullptr));
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
@@ -3326,12 +3328,12 @@ class WSLATests
         expectInvalidArg("\\escaped\n\\chars");
 
         auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
-            WSLA_ERROR_INFO errorInfo{};
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr, &errorInfo), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr), E_INVALIDARG);
 
-            wil::unique_cotaskmem_ansistring message{errorInfo.UserErrorMessage};
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
 
-            VerifyPatternMatch(message.get(), errorPattern);
+            VerifyPatternMatch(wsl::shared::string::WideToMultiByte(comError->Message.get()), errorPattern);
         };
 
         expectInvalidPull("?foo&bar/url\n:name", "invalid reference format");

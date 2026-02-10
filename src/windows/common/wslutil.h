@@ -217,25 +217,6 @@ void PrintMessage(_In_ const std::wstring& message, _Inout_ FILE* const stream =
     PrintMessageImpl(message, stream, std::forward<Args>(args)...);
 }
 
-inline void SetComErrorInfo(const std::wstring& Message, const std::source_location& source = std::source_location::current())
-{
-    wil::com_ptr<ICreateErrorInfo> errorInfo;
-    THROW_IF_FAILED(CreateErrorInfo(&errorInfo));
-
-    auto description = wil::make_bstr(Message.c_str());
-    THROW_IF_FAILED(errorInfo->SetDescription(description.get()));
-
-    auto sourceStr = std::format(L"{}", source);
-    THROW_IF_FAILED(errorInfo->SetSource(wil::make_bstr(sourceStr.c_str()).get()));
-
-    THROW_IF_FAILED(SetErrorInfo(0, errorInfo.query<IErrorInfo>().get()));
-}
-
-inline void SetCOMErrorInfo(const std::string& Message, const std::source_location& source = std::source_location::current())
-{
-    SetComErrorInfo(wsl::shared::string::MultiByteToWide(Message).c_str(), source);
-}
-
 void SetCrtEncoding(int Mode);
 
 void SetThreadDescription(LPCWSTR Name);

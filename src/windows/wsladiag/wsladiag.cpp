@@ -389,15 +389,7 @@ static void PullImpl(IWSLASession& Session, const std::string& Image)
     wil::com_ptr<IWSLASession> session = OpenCLISession();
 
     Callback callback;
-    WSLAErrorDetails error{};
-    auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
-
-    if (FAILED(result))
-    {
-        THROW_HR_WITH_COM_ERROR(result);
-
-        return;
-    }
+    THROW_IF_FAILED(session->PullImage(Image.c_str(), nullptr, &callback));
 }
 
 static int Pull(std::wstring_view commandLine)
