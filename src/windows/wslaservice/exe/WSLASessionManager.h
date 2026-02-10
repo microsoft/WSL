@@ -85,15 +85,15 @@ private:
             if (FAILED_LOG(SessionRef->OpenSession(&lockedSession)))
             {
                 // Session is gone, drop the persistent reference if any.
-                auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) {
-                    ULONG refId = 0, sessionId = 0;
-                    if (FAILED_LOG(SessionRef->GetId(&refId)))
-                    {
-                        return true; // Per-user process is dead, remove persistent ref
-                    }
-                    return SUCCEEDED(e->GetId(&sessionId)) && refId == sessionId;
-                });
-                m_persistentSessions.erase(remove.begin(), remove.end());
+                ULONG refId = 0;
+                if (SUCCEEDED_LOG(SessionRef->GetId(&refId)))
+                {
+                    auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) {
+                        ULONG sessionId = 0;
+                        return SUCCEEDED(e->GetId(&sessionId)) && refId == sessionId;
+                    });
+                    m_persistentSessions.erase(remove.begin(), remove.end());
+                }
                 return true; // Remove from tracking
             }
 

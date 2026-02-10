@@ -20,7 +20,6 @@ Abstract:
 #include <format>
 #include <filesystem>
 #include "ServiceProcessLauncher.h"
-#include "GuestDeviceManager.h"
 #include "wslutil.h"
 #include "lxinitshared.h"
 
@@ -203,12 +202,12 @@ void WSLAVirtualMachine::ConfigureNetworking()
     auto execResult = ExpectClosedChannelOrError(gnsChannel);
     THROW_HR_IF_MSG(E_FAIL, execResult != 0, "exec /gns failed with errno: %d", execResult);
 
-    // Call back to the service to configure the networking engine
-    // The service takes ownership of the sockets via system_handle marshalling
-    HANDLE gnsSocketHandle = reinterpret_cast<HANDLE>(gnsSocket.Socket.release());
-    HANDLE dnsSocketHandle = enableDnsTunneling ? reinterpret_cast<HANDLE>(dnsSocket.Socket.release()) : nullptr;
-    HANDLE* dnsSocketPtr = enableDnsTunneling ? &dnsSocketHandle : nullptr;
-    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsSocketHandle, dnsSocketPtr));
+    // Call back to the service to configure the networking engine.
+    // COM system_handle marshalling duplicates the sockets into the service process,
+    // so we keep ownership here and let unique_socket close our copies when done.
+    HANDLE gnsSocketHandle = reinterpret_cast<HANDLE>(gnsSocket.Socket.get());
+    HANDLE dnsSocketHandle = enableDnsTunneling ? reinterpret_cast<HANDLE>(dnsSocket.Socket.get()) : nullptr;
+    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsSocketHandle, enableDnsTunneling ? &dnsSocketHandle : nullptr));
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
