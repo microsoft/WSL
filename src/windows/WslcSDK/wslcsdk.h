@@ -160,16 +160,10 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
 
-STDAPI WslcContainerSettingsSetPortMapping(
-    _In_ WslcContainerSettings* containerSettings,
-    _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings,
-    _In_ UINT32 portMappingCount);
+STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount);
 
 // Add the container volumes to the volumes array
-STDAPI WslcContainerSettingsSetVolume(
-    _In_ WslcContainerSettings* containerSettings,
-    _In_reads_(volumeCount) const WslcContainerVolume* volumes,
-    _In_ UINT32 volumeCount);
+STDAPI WslcContainerSettingsSetVolume(_In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ UINT32 volumeCount);
 
 STDAPI WslcContainerExec(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess);
 
@@ -325,12 +319,12 @@ typedef struct WslcImageProgressDetail
 typedef enum WslcImageProgressStatus
 {
     WSLC_IMAGE_PROGRESS_UNKNOWN = 0,
-    WSLC_IMAGE_PROGRESS_PULLING,     // "Pulling fs layer"
-    WSLC_IMAGE_PROGRESS_WAITING,     // "Waiting"
-    WSLC_IMAGE_PROGRESS_DOWNLOADING, // "Downloading"
-    WSLC_IMAGE_PROGRESS_VERIFYING,   // "Verifying Checksum"
-    WSLC_IMAGE_PROGRESS_EXTRACTING,  // "Extracting"
-    WSLC_IMAGE_PROGRESS_COMPLETE     // "Pull complete"
+    WSLC_IMAGE_PROGRESS_PULLING = 1,     // "Pulling fs layer"
+    WSLC_IMAGE_PROGRESS_WAITING = 2,     // "Waiting"
+    WSLC_IMAGE_PROGRESS_DOWNLOADING = 3, // "Downloading"
+    WSLC_IMAGE_PROGRESS_VERIFYING = 4,   // "Verifying Checksum"
+    WSLC_IMAGE_PROGRESS_EXTRACTING = 5,  // "Extracting"
+    WSLC_IMAGE_PROGRESS_COMPLETE = 6     // "Pull complete"
 } WslcImageProgressStatus;
 
 typedef struct WslcImageProgressMessage
