@@ -8,7 +8,6 @@ include_directories(
 )
 
 set(HEADERS
-
     core/pch.h
     core/foundation/DateTime.h
     core/foundation/Errors.h
@@ -96,15 +95,33 @@ set(SOURCES
     services/ContainerService.cpp
 )
 
-add_executable(wslc2 ${HEADERS} ${SOURCES})
-
+# Object library for WSLC components for testing and building wslc.exe
+add_library(wslc2 OBJECT ${SOURCES} ${HEADERS})
+set_target_properties(wslc2 PROPERTIES FOLDER windows)
+target_include_directories(wslc2 PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/foundation
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks
+)
+target_precompile_headers(wslc2 REUSE_FROM common)
 target_link_libraries(wslc2
+    PRIVATE
     ${COMMON_LINK_LIBRARIES}
     common
 )
 
-target_precompile_headers(wslc2 REUSE_FROM common)
+# The WSLC executable
+add_executable(wslccli $<TARGET_OBJECTS:wslc2>)
+target_link_libraries(wslccli
+    PRIVATE
+    ${COMMON_LINK_LIBRARIES}
+    common
+)
+set_target_properties(wslccli PROPERTIES FOLDER windows)
+set_target_properties(wslccli PROPERTIES OUTPUT_NAME "wslc2")
 
+# For prettier source tree browsing
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})
-
-set_target_properties(wslc2 PROPERTIES FOLDER windows)

@@ -43,7 +43,11 @@
                 <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
                 <?endif?>
 
-                <!-- Installation folder -->
+              <!-- Add INSTALLDIR to system PATH to make wslc.exe and other CLI tools accessible -->
+              <!-- This is a temporary convenience until we can deploy wslc.exe to System32 like wsl.exe -->
+              <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]" Permanent="no" Part="last" Action="set" System="yes" />
+
+              <!-- Installation folder -->
                 <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\MSI">
                     <RegistryValue Name="InstallLocation" Value="[INSTALLDIR]" Type="string" />
                     <RegistryValue Name="ProductCode" Value="[ProductCode]" Type="string" />
