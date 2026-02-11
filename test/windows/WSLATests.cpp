@@ -1614,7 +1614,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
             // TODO: Uncomment once error messages are wired to WSLAContainer.
-            //ValidateCOMErrorMessage(L"The specified executable was not found inside the container image.");
+            // ValidateCOMErrorMessage(L"The specified executable was not found inside the container image.");
         }
 
         // Test null image name
