@@ -1607,9 +1607,9 @@ int WslaShell(_In_ std::wstring_view commandLine)
     else
     {
         THROW_IF_FAILED(sessionManager->CreateSession(&sessionSettings, WSLASessionFlagsNone, &session));
-
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
     }
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     std::optional<wil::com_ptr<IWSLAContainer>> container;
     std::optional<wsl::windows::common::ClientRunningWSLAProcess> process;
