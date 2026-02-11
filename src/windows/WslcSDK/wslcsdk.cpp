@@ -15,7 +15,6 @@ Abstract:
 
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
-EXTERN_C_START
 
 // SESSION DEFINITIONS
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
@@ -406,4 +405,3 @@ STDAPI WslcInstallWithDependencies(_In_opt_ __callback WslcInstallCallback progr
     return E_NOTIMPL;
 }
 
-EXTERN_C_END
