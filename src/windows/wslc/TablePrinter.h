@@ -4,14 +4,13 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    TableOutput.h
+    TablePrinter.h
 
 Abstract:
 
-    This file contains the TableOutput header implementation
+    This file contains the TablePrinter header implementation
 
 --*/
-
 #pragma once
 #include <iostream>
 #include <string>

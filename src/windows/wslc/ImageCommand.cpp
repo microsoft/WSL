@@ -16,7 +16,7 @@ Abstract:
 #include <CommandLine.h>
 #include <format>
 #include "ImageService.h"
-#include "TableOutput.h"
+#include "TablePrinter.h"
 
 namespace wslc::commands
 {

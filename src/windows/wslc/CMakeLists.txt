@@ -30,7 +30,7 @@ set(HEADERS
 
     # Others
     Utils.h
-    TableOutput.h
+    TablePrinter.h
 
     # Services
     ContainerService.h

@@ -15,7 +15,7 @@ Abstract:
 #include "Utils.h"
 #include "ShellCommand.h"
 #include "ShellService.h"
-#include "TableOutput.h"
+#include "TablePrinter.h"
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;

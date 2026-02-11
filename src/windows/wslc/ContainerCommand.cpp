@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
-#include "TableOutput.h"
+#include "TablePrinter.h"
 #include "Utils.h"
 #include <CommandLine.h>
 #include <format>
