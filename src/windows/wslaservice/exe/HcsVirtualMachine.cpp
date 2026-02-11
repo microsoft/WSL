@@ -601,7 +601,7 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
-    auto reason = WSLAlVirtualMachineTerminationReasonUnknown;
+    auto reason = WSLAVirtualMachineTerminationReasonUnknown;
 
     if (exitStatus.ExitType.has_value())
     {
@@ -615,7 +615,7 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
             reason = WSLAVirtualMachineTerminationReasonCrashed;
             break;
         default:
-            reason = WSLAlVirtualMachineTerminationReasonUnknown;
+            reason = WSLAVirtualMachineTerminationReasonUnknown;
             break;
         }
     }

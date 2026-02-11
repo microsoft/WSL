@@ -582,7 +582,7 @@ WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    if (m_state == WslaContainerStateRunning && m_initProcessControl && m_initProcessControl->GetState().first != WSLAProcessStateRunning)
+    if (m_state == WslaContainerStateRunning && m_initProcessControl && m_initProcessControl->GetState().first != WslaProcessStateRunning)
     {
         m_state = WslaContainerStateExited;
     }
