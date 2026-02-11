@@ -122,7 +122,7 @@ typedef struct WslcContainerPortMapping
     _In_ WslcPortProtocol protocol; // TCP or UDP
 
     // if you want to override the default binding address
-    _In_opt_ struct sockaddr_storage windowsAddress; // accepts ipv4/6
+    _In_opt_ struct sockaddr_storage* windowsAddress; // accepts ipv4/6
 } WslcContainerPortMapping;
 
 typedef struct WslcContainerVolume
@@ -342,7 +342,7 @@ typedef struct WslcResgistryAuthenticationInformation
 // pointer-to-function typedef (unambiguous)
 typedef VOID(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
-// options struct — typedef is a pointer type and _In_opt_ is valid
+// options struct Â— typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
 {
     _In_z_ PCSTR uri;
