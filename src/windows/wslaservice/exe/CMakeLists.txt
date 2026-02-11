@@ -1,18 +1,17 @@
 set(SOURCES
     application.manifest
     main.rc
+    HcsVirtualMachine.cpp
     ServiceMain.cpp
     WSLASessionManager.cpp
-    WSLASessionManagerFactory.cpp
-    HcsVirtualMachine.cpp
-    )
+    WSLASessionManagerFactory.cpp)
 
 set(HEADERS
     WSLASessionManager.h
     WSLASessionManagerFactory.h
     HcsVirtualMachine.h)
 
-include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
+include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslasession)
 
 add_executable(wslaservice ${SOURCES} ${HEADERS})
 add_dependencies(wslaservice wslaserviceidl)
@@ -22,13 +21,9 @@ add_compile_definitions(USE_COM_CONTEXT_DEF=1)
 set_target_properties(wslaservice PROPERTIES LINK_FLAGS "/merge:minATL=.rdata /include:__minATLObjMap_WSLASessionManager_COM")
 target_link_libraries(wslaservice
                       ${COMMON_LINK_LIBRARIES}
-                      computecore
                       common
                       configfile
-                      legacy_stdio_definitions
-                      VirtDisk.lib
-                      Winhttp.lib
-                      Synchronization.lib)
+                      legacy_stdio_definitions)
 
 target_precompile_headers(wslaservice REUSE_FROM common)
 set_target_properties(wslaservice PROPERTIES FOLDER windows)
