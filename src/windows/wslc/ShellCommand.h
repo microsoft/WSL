@@ -39,7 +39,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    bool m_verbose;
+    bool m_verbose{};
 };
 
 // wslc shell attach

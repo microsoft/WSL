@@ -55,11 +55,11 @@ int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
     else
     {
         TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
-        for (const auto& [imageName, size] : images)
+        for (const auto& image : images)
         {
             tablePrinter.AddRow({
-                std::wstring(imageName.begin(), imageName.end()), 
-                std::format(L"{:.2f} MB", static_cast<double>(size) / (1024 * 1024))
+                std::wstring(image.Name.begin(), image.Name.end()),
+                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))
             });
         }
 
@@ -82,6 +82,8 @@ int ImageCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffse
     }
 
     CMD_IF_HELP_PRINT_HELP();
-    CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
-    return 0;
+    CMD_ARG_REQUIRED(m_subverb, L"Error: Missing subcommand");
+    wslutil::PrintMessage(L"Error: Invalid subcommand specified", stderr);
+    PrintHelp();
+    return 1;
 }}

@@ -70,8 +70,9 @@ protected:
 
         CMD_IF_HELP_PRINT_HELP();
         CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
+        wslutil::PrintMessage(L"Error: Invalid subcommand specified", stderr);
         PrintHelp();
-        return 0;
+        return 1;
     }
 
 private:
@@ -99,12 +100,6 @@ int wslc_main(std::wstring_view commandLine)
     WSADATA data{};
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
-
-    // Parse the top-level verb (list, shell, --help).
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 1, true);
-    std::wstring verb;
-    parser.AddPositionalArgument(verb, 0);
-    parser.Parse();
 
     wslc::commands::RootCommand rootCommand;
     return rootCommand.Execute(commandLine, 1);

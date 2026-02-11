@@ -30,17 +30,8 @@ using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 void PullImpl(IWSLASession& Session, const std::string& Image)
 {
-    HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     // Configure console for interactive usage.
-    DWORD OriginalOutputMode{};
-    UINT OriginalOutputCP = GetConsoleOutputCP();
-    THROW_LAST_ERROR_IF(!::GetConsoleMode(Stdout, &OriginalOutputMode));
-
-    DWORD OutputMode = OriginalOutputMode;
-    WI_SetAllFlags(OutputMode, ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
-    THROW_IF_WIN32_BOOL_FALSE(::SetConsoleMode(Stdout, OutputMode));
-
-    THROW_LAST_ERROR_IF(!::SetConsoleOutputCP(CP_UTF8));
+    wsl::windows::common::ConsoleState console;
 
     // TODO: Handle terminal resizes.
     class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") Callback

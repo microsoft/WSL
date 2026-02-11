@@ -176,7 +176,7 @@ public:
     {
         return {
             "ids (pos. 0..): Container IDs",
-            "-a, --all: Stop all the running containers",
+            "-a, --all: Delete all containers",
             "-f, --force: Delete containers even if they are running ",
         };
     }

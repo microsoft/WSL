@@ -45,6 +45,7 @@ public:
         parser.AddArgument(m_help, L"--help", 'h');
         LoadArguments(parser);
         parser.Parse();
+        m_arguments.clear();
         for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
         {
             m_arguments.push_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));
@@ -54,7 +55,7 @@ public:
 
 protected:
     virtual int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) = 0;
-    bool m_help;
+    bool m_help{};
     wslc::services::SessionService m_sessionService;
 
 private:

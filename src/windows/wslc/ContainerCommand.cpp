@@ -111,7 +111,7 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
     }
     else if(containersToStop.empty())
     {
-        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to stop all containers.");
+        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to stop all containers.", stderr);
         return 1;
     }
 
@@ -135,12 +135,15 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
         auto allContainers = containerService.List(session);
         for(const auto& container : allContainers)
         {
-            containersToKill.push_back(container.Name);
+            if (container.State == WSLA_CONTAINER_STATE::WslaContainerStateRunning)
+            {
+                containersToKill.push_back(container.Name);
+            }
         }
     }
     else if(containersToKill.empty())
     {
-        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to kill all containers.");
+        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to kill all containers.", stderr);
         return 1;
     }
 
@@ -316,7 +319,9 @@ int ContainerCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
     }
 
     CMD_IF_HELP_PRINT_HELP();
-    CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
-    return 0;
+    CMD_ARG_REQUIRED(m_subverb, L"Error: Missing subcommand");
+    wslutil::PrintMessage(L"Error: Invalid subcommand specified", stderr);
+    PrintHelp();
+    return 1;
 }
 }

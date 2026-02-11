@@ -33,7 +33,7 @@ int ShellListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
     }
 
-    TablePrinter tablePrinter({L"ID", L"Creator PID", L"Display Name"});
+    TablePrinter tablePrinter({Localization::MessageWslaHeaderId(), Localization::MessageWslaHeaderCreatorPid(), Localization::MessageWslaHeaderDisplayName()});
     for (const auto& session : sessions)
     {
         tablePrinter.AddRow({
@@ -67,7 +67,9 @@ int ShellCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffse
     }
 
     CMD_IF_HELP_PRINT_HELP();
-    CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
-    return 0;
+    CMD_ARG_REQUIRED(m_subverb, L"Error: Missing subcommand");
+    wslutil::PrintMessage(L"Error: Invalid subcommand specified", stderr);
+    PrintHelp();
+    return 1;
 }
 }
