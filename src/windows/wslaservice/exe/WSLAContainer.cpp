@@ -333,6 +333,9 @@ WSLAContainerImpl::~WSLAContainerImpl()
         CATCH_LOG();
     }
 
+    // Unmount volumes.
+    UnmountVolumes(m_mountedVolumes, *m_parentVM);
+
     // Release port mappings.
     std::set<uint16_t> allocatedGuestPorts;
     for (const auto& e : m_mappedPorts)
@@ -478,7 +481,6 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
-
         std::lock_guard<std::recursive_mutex> lock(m_lock);
         m_state = WslaContainerStateExited;
 
@@ -490,6 +492,14 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         }
 
         m_processes.clear();
+
+        // If the Rm flag is set, delete the container. 
+        // This needs to be done in a detached thread because it will trigger deletion of this object.
+        if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+        {
+            auto comWrapper = m_comWrapper;
+            std::thread([comWrapper]() { LOG_IF_FAILED(comWrapper->Delete()); }).detach();
+        }
     }
 
     WSL_LOG(
@@ -757,6 +767,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // Build WSLA metadata to store in a label for recovery on Open().
     WSLAContainerMetadataV1 metadata;
+    metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
     metadata.Ports = ports;
@@ -826,7 +837,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         ioRelay,
         DockerStateToWSLAState(dockerContainer.State),
         metadata.InitProcessFlags,
-        WSLAContainerFlagsNone);
+        metadata.Flags);
 
     errorCleanup.release();
     volumeErrorCleanup.release();
@@ -1037,3 +1048,9 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+void WSLAContainer::NotifyDeleted()
+{
+    auto [lock, impl] = LockImpl();
+    m_onDeleted(impl);
+}

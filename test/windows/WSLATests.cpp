@@ -3198,4 +3198,74 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
     }
+
+    TEST_METHOD(ContainerAutoRemove)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        auto verifyContainerDeleted = [&](const char* containerName) {
+            // A container with the Rm flag is deleted asynchronously after it's stopped.
+            // This retry loop verifies the container is deleted within one second.
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    wil::com_ptr<IWSLAContainer> container;
+                    auto hr = m_defaultSession->OpenContainer(containerName, &container);
+                    THROW_HR_IF(E_FAIL, hr != HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+                },
+                std::chrono::milliseconds{100},
+                std::chrono::seconds{1});
+        };
+
+        // Test that a container with the Rm flag is automatically deleted when the init process exits.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            // Prevent container from being deleted when handle is closed so we can verify auto-remove behavior.
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGKILL));
+
+            verifyContainerDeleted("test-auto-remove");
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+        }
+
+        // Test that a container with the Rm flag is automatically deleted on Stop().
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            verifyContainerDeleted("test-auto-remove");
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+        }
+
+        // Test that the Rm flag is persisted across wsla sessions.
+        {
+            {
+                WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+                launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+                auto container = launcher.Create(*m_defaultSession);
+                container.SetDeleteOnClose(false);
+
+                ResetTestSession();
+            }
+
+            auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            verifyContainerDeleted("test-auto-remove");
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+        }
+    }
 };
