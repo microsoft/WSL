@@ -159,10 +159,12 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
 
-STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount);
+STDAPI WslcContainerSettingsSetPortMapping(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount);
 
 // Add the container volumes to the volumes array
-STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ UINT32 volumeCount);
+STDAPI WslcContainerSettingsAddVolume(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ UINT32 volumeCount);
 
 STDAPI WslcContainerExec(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess);
 
@@ -279,7 +281,8 @@ typedef enum WslcProcessIoHandle
 } WslcProcessIoHandle;
 
 // Pass in Null for WslcStdIOCallback to clear the callback for the given handle
-STDAPI WslcProcessSettingsSetIoCallback(_In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
+STDAPI WslcProcessSettingsSetIoCallback(
+    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
 
 // PROCESS MANAGEMENT
 
