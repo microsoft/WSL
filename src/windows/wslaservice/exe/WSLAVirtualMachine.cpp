@@ -74,16 +74,9 @@ WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const 
         auto cmdStr = std::format("echo {} > /sys/module/page_reporting/parameters/page_reporting_order", pageReportingOrder);
         std::vector<const char*> args{"/bin/sh", "-c", cmdStr.c_str()};
 
-        auto [_, __, channel] = Fork(m_initChannel, WSLA_FORK::Process);
-
-        wsl::shared::MessageWriter<WSLA_EXEC> execMessage;
-        execMessage.WriteString(execMessage->ExecutableIndex, "/bin/sh");
-        execMessage.WriteString(execMessage->CurrentDirectoryIndex, "/");
-        execMessage.WriteStringArray(execMessage->CommandLineIndex, args.data(), static_cast<ULONG>(args.size()));
-        execMessage.WriteStringArray(execMessage->EnvironmentIndex, nullptr, 0);
-
-        channel.SendMessage<WSLA_EXEC>(execMessage.Span());
-        ExpectClosedChannelOrError(channel);
+        WSLA_PROCESS_OPTIONS options{};
+        options.CommandLine = {.Values = args.data(), .Count = static_cast<ULONG>(args.size())};
+        CreateLinuxProcessImpl("/bin/sh", options, {}, nullptr, [](const auto&) {});
     }
 }
 
@@ -161,53 +154,57 @@ void WSLAVirtualMachine::ConfigureNetworking()
         return;
     }
 
-    // Fork to launch /gns
-    auto [pid, _, gnsChannel] = Fork(m_initChannel, WSLA_FORK::Process);
+    // Launch /gns with auto-allocated file descriptors for the GNS channel (and DNS channel if enabled).
+    std::vector<WSLAProcessFd> fds;
+    fds.emplace_back(WSLAProcessFd{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
 
-    // Allocate sockets for GNS channel (and DNS channel if enabled)
-    auto gnsSocket = ConnectSocket(gnsChannel, -1);
-
-    ConnectedSocket dnsSocket;
     bool enableDnsTunneling = FeatureEnabled(WslaFeatureFlagsDnsTunneling);
     if (enableDnsTunneling)
     {
-        dnsSocket = ConnectSocket(gnsChannel, -1);
+        fds.emplace_back(WSLAProcessFd{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
     }
 
-    // Build command line for /gns
+    // Because the file descriptor numbers aren't known in advance, the command line needs to be generated after the
+    // file descriptors are allocated.
     std::vector<const char*> cmd{"/gns", LX_INIT_GNS_SOCKET_ARG};
-    std::string gnsSocketFdArg = std::to_string(gnsSocket.Fd);
-    cmd.push_back(gnsSocketFdArg.c_str());
-
+    std::string gnsSocketFdArg;
     std::string dnsSocketFdArg;
-    if (enableDnsTunneling)
-    {
-        dnsSocketFdArg = std::to_string(dnsSocket.Fd);
-        cmd.push_back(LX_INIT_GNS_DNS_SOCKET_ARG);
-        cmd.push_back(dnsSocketFdArg.c_str());
-        cmd.push_back(LX_INIT_GNS_DNS_TUNNELING_IP);
-        cmd.push_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
-    }
+    int gnsChannelFd = -1;
+    int dnsChannelFd = -1;
 
-    // Send WSLA_EXEC to launch /gns via /init
-    wsl::shared::MessageWriter<WSLA_EXEC> execMessage;
-    execMessage.WriteString(execMessage->ExecutableIndex, "/init");
-    execMessage.WriteString(execMessage->CurrentDirectoryIndex, "/");
-    execMessage.WriteStringArray(execMessage->CommandLineIndex, cmd.data(), static_cast<ULONG>(cmd.size()));
-    execMessage.WriteStringArray(execMessage->EnvironmentIndex, nullptr, 0);
+    WSLA_PROCESS_OPTIONS options{};
+    auto prepareCommandLine = [&](const auto& sockets) {
+        gnsChannelFd = sockets[0].Fd;
+        gnsSocketFdArg = std::to_string(gnsChannelFd);
+        cmd.push_back(gnsSocketFdArg.c_str());
 
-    gnsChannel.SendMessage<WSLA_EXEC>(execMessage.Span());
+        if (enableDnsTunneling)
+        {
+            dnsChannelFd = sockets[1].Fd;
+            dnsSocketFdArg = std::to_string(dnsChannelFd);
+            cmd.push_back(LX_INIT_GNS_DNS_SOCKET_ARG);
+            cmd.push_back(dnsSocketFdArg.c_str());
+            cmd.push_back(LX_INIT_GNS_DNS_TUNNELING_IP);
+            cmd.push_back(LX_INIT_DNS_TUNNELING_IP_ADDRESS);
+        }
 
-    // Wait for exec to complete - on success the channel closes, on failure we get an error
-    auto execResult = ExpectClosedChannelOrError(gnsChannel);
-    THROW_HR_IF_MSG(E_FAIL, execResult != 0, "exec /gns failed with errno: %d", execResult);
+        options.CommandLine = {.Values = cmd.data(), .Count = static_cast<ULONG>(cmd.size())};
+    };
+
+    auto process = CreateLinuxProcessImpl("/init", options, fds, nullptr, prepareCommandLine);
 
     // Call back to the service to configure the networking engine.
-    // COM system_handle marshalling duplicates the sockets into the service process,
-    // so we keep ownership here and let unique_socket close our copies when done.
-    HANDLE gnsSocketHandle = reinterpret_cast<HANDLE>(gnsSocket.Socket.get());
-    HANDLE dnsSocketHandle = enableDnsTunneling ? reinterpret_cast<HANDLE>(dnsSocket.Socket.get()) : nullptr;
-    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsSocketHandle, enableDnsTunneling ? &dnsSocketHandle : nullptr));
+    auto gnsHandle = process->GetStdHandle(gnsChannelFd);
+
+    wil::unique_handle dnsHandle;
+    HANDLE dnsSocketHandle = nullptr;
+    if (enableDnsTunneling)
+    {
+        dnsHandle = process->GetStdHandle(dnsChannelFd);
+        dnsSocketHandle = dnsHandle.get();
+    }
+
+    THROW_IF_FAILED(m_vm->ConfigureNetworking(gnsHandle.get(), enableDnsTunneling ? &dnsSocketHandle : nullptr));
 
     // Launch port relay for port forwarding
     LaunchPortRelay();
