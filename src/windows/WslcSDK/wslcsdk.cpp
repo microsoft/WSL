@@ -185,7 +185,7 @@ STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes,  _In_ UINT32 volumeCount)
+STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes,  _In_ UINT32 volumeCount)
 {
     UNREFERENCED_PARAMETER(volumes);
     UNREFERENCED_PARAMETER(volumeCount);
