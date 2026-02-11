@@ -15,6 +15,7 @@ Abstract:
 
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
+EXTERN_C_START
 
 // SESSION DEFINITIONS
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
@@ -177,7 +178,7 @@ STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings,  _In_ UINT32 portMappingCount)
+STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount)
 {
     UNREFERENCED_PARAMETER(portMappings);
     UNREFERENCED_PARAMETER(containerSettings);
@@ -185,7 +186,7 @@ STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes,  _In_ UINT32 volumeCount)
+STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes, _In_ UINT32 volumeCount)
 {
     UNREFERENCED_PARAMETER(volumes);
     UNREFERENCED_PARAMETER(volumeCount);
@@ -300,7 +301,7 @@ STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent
     UNREFERENCED_PARAMETER(exitEvent);
     return E_NOTIMPL;
 }
-EXTERN_C_START
+
 
 // PROCESS RESULT / SIGNALS
 
