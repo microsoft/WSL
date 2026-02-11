@@ -33,6 +33,10 @@ using wsl::windows::service::wsla::WSLAVirtualMachine;
 using wsl::windows::service::wsla::WSLAVolumeMount;
 
 using namespace wsl::windows::common::docker_schema;
+namespace wsla_schema = wsl::windows::common::wsla_schema;
+
+using DockerInspectContainer = wsl::windows::common::docker_schema::InspectContainer;
+using WslaInspectContainer = wsl::windows::common::wsla_schema::InspectContainer;
 
 namespace {
 
@@ -270,6 +274,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::string&& Image,
     std::vector<WSLAVolumeMount>&& volumes,
     std::vector<WSLAPortMapping>&& ports,
+    std::map<std::string, std::string>&& labels,
     std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -283,6 +288,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_id(std::move(Id)),
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
+    m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
@@ -673,6 +679,61 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     }
 }
 
+WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect)
+{
+    WslaInspectContainer wslaInspect{};
+
+    wslaInspect.Id = dockerInspect.Id;
+    wslaInspect.Name = dockerInspect.Name;
+
+    // Remove leading '/' from Docker container names.
+    if (!wslaInspect.Name.empty() && wslaInspect.Name[0] == '/')
+    {
+        wslaInspect.Name = wslaInspect.Name.substr(1);
+    }
+
+    wslaInspect.Created = dockerInspect.Created;
+    wslaInspect.Image = m_image;
+
+    // Map container state.
+    wslaInspect.State.Status = dockerInspect.State.Status;
+    wslaInspect.State.Running = dockerInspect.State.Running;
+    wslaInspect.State.ExitCode = dockerInspect.State.ExitCode;
+    wslaInspect.State.StartedAt = dockerInspect.State.StartedAt;
+    wslaInspect.State.FinishedAt = dockerInspect.State.FinishedAt;
+
+    wslaInspect.HostConfig.NetworkMode = dockerInspect.HostConfig.NetworkMode;
+
+    // Map WSLA port mappings (Windows host ports only). HostIp is not set here and will use
+    // the default value ("127.0.0.1") defined in the InspectPortBinding schema.
+    for (const auto& e : m_mappedPorts)
+    {
+        // TODO: UDP support
+        // TODO: ipv6 support.
+        auto portKey = std::format("{}/tcp", e.ContainerPort);
+
+        wsla_schema::InspectPortBinding portBinding{};
+        portBinding.HostPort = std::to_string(e.HostPort);
+
+        wslaInspect.Ports[portKey].push_back(std::move(portBinding));
+    }
+
+    // Map volume mounts using WSLA's host-side data.
+    wslaInspect.Mounts.reserve(m_mountedVolumes.size());
+    for (const auto& volume : m_mountedVolumes)
+    {
+        wsla_schema::InspectMount mountInfo{};
+        // TODO: Support different mount types (plan9/VHD) when VHD volumes are implemented.
+        mountInfo.Type = "bind";
+        mountInfo.Source = wsl::shared::string::WideToMultiByte(volume.HostPath);
+        mountInfo.Destination = volume.ContainerPath;
+        mountInfo.ReadWrite = !volume.ReadOnly;
+        wslaInspect.Mounts.push_back(std::move(mountInfo));
+    }
+
+    return wslaInspect;
+}
+
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
@@ -758,11 +819,25 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     for (const auto& e : ports)
     {
         // TODO: UDP support
-        // TODO: Investigate ipv6 support.
+        // TODO: ipv6 support.
         auto portKey = std::format("{}/tcp", e.ContainerPort);
         request.ExposedPorts[portKey] = {};
         auto& portEntry = request.HostConfig.PortBindings[portKey];
         portEntry.emplace_back(common::docker_schema::PortMapping{.HostIp = "127.0.0.1", .HostPort = std::to_string(e.VmPort)});
+    }
+
+    std::map<std::string, std::string> labels;
+    for (ULONG i = 0; i < containerOptions.LabelsCount; i++)
+    {
+        const auto& label = containerOptions.Labels[i];
+
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Key, "Label at index %lu has null key", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, label.Value, "Label at index %lu has null value", i);
+
+        THROW_HR_IF_MSG(E_INVALIDARG, strcmp(label.Key, WSLAContainerMetadataLabel) == 0, "Label key '%hs' is reserved", WSLAContainerMetadataLabel);
+        THROW_HR_IF_MSG(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), labels.contains(label.Key), "Duplicate label key: '%hs'", label.Key);
+
+        labels[label.Key] = label.Value;
     }
 
     // Build WSLA metadata to store in a label for recovery on Open().
@@ -773,6 +848,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     metadata.Ports = ports;
 
     request.Labels[WSLAContainerMetadataLabel] = SerializeContainerMetadata(metadata);
+    request.Labels.insert(labels.begin(), labels.end());
 
     // Send the request to docker.
     auto result =
@@ -785,6 +861,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::move(ports),
+        std::move(labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -810,14 +887,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     // Extract container name from Docker's names list.
     std::string name = ExtractContainerName(dockerContainer.Names, dockerContainer.Id);
 
-    auto metadataIt = dockerContainer.Labels.find(WSLAContainerMetadataLabel);
+    auto labels(dockerContainer.Labels);
+    auto metadataIt = labels.find(WSLAContainerMetadataLabel);
+
     THROW_HR_IF_MSG(
         E_INVALIDARG,
-        metadataIt == dockerContainer.Labels.end(),
+        metadataIt == labels.end(),
         "Cannot open WSLA container %hs: missing WSLA metadata label",
         dockerContainer.Id.c_str());
 
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
+    labels.erase(metadataIt);
 
     // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
     // to open containers that are not running.
@@ -831,6 +911,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         std::string(dockerContainer.Image),
         std::move(metadata.Volumes),
         std::move(metadata.Ports),
+        std::move(labels),
         std::move(OnDeleted),
         EventTracker,
         DockerClient,
@@ -856,17 +937,21 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
 
     try
     {
-        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_dockerClient.InspectContainer(m_id).data()).release();
+        // Get Docker inspect data
+        auto dockerJson = m_dockerClient.InspectContainer(m_id);
+        auto dockerInspect = wsl::shared::FromJson<DockerInspectContainer>(dockerJson.c_str());
+
+        // Convert to WSLA schema
+        auto wslaInspect = BuildInspectContainer(dockerInspect);
+
+        // Serialize WSLA schema to JSON
+        std::string wslaJson = wsl::shared::ToJson(wslaInspect);
+        *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslaJson.c_str()).release();
     }
     catch (const DockerHTTPException& e)
     {
         THROW_HR_MSG(E_FAIL, "Failed to inspect container: %hs ", e.what());
     }
-}
-
-void WSLAContainerImpl::GetID(LPSTR* Output)
-{
-    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_id.data()).release();
 }
 
 void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -997,12 +1082,6 @@ HRESULT WSLAContainer::Inspect(LPSTR* Output)
     return CallImpl(&WSLAContainerImpl::Inspect, Output);
 }
 
-HRESULT WSLAContainer::GetID(LPSTR* Id)
-{
-    *Id = nullptr;
-    return CallImpl(&WSLAContainerImpl::GetID, Id);
-}
-
 HRESULT WSLAContainer::Delete()
 try
 {
@@ -1046,5 +1125,51 @@ try
     *Name = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Name().c_str()).release();
 
     return S_OK;
+}
+CATCH_RETURN();
+
+void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+{
+    std::lock_guard lock(m_lock);
+
+    if (m_labels.empty())
+    {
+        *Labels = nullptr;
+        *Count = 0;
+        return;
+    }
+
+    auto count = m_labels.size();
+    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(count);
+
+    auto cleanup = wil::scope_exit([&]() {
+        for (size_t j = 0; j < count; ++j)
+        {
+            CoTaskMemFree(labelsArray[j].Key);
+            CoTaskMemFree(labelsArray[j].Value);
+        }
+    });
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        const auto& label = std::next(m_labels.begin(), i);
+        labelsArray[i].Key = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->first.c_str()).release();
+        labelsArray[i].Value = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->second.c_str()).release();
+    }
+
+    cleanup.release();
+
+    *Count = static_cast<ULONG>(count);
+    *Labels = labelsArray.release();
+}
+
+HRESULT WSLAContainer::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+try
+{
+    RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
+
+    *Count = 0;
+    *Labels = nullptr;
+    return CallImpl(&WSLAContainerImpl::GetLabels, Labels, Count);
 }
 CATCH_RETURN();

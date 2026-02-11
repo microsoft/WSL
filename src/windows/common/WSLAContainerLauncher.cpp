@@ -135,6 +135,19 @@ void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& 
     m_volumes.push_back(vol);
 }
 
+void wsl::windows::common::WSLAContainerLauncher::AddLabel(const std::string& Key, const std::string& Value)
+{
+    // Store a copy of the key/value strings to the launcher to ensure the pointers in WSLA_LABEL remain valid.
+    const auto& key = m_labelKeys.emplace_back(Key);
+    const auto& value = m_labelValues.emplace_back(Value);
+
+    WSLA_LABEL label{};
+    label.Key = key.c_str();
+    label.Value = value.c_str();
+
+    m_labels.push_back(label);
+}
+
 std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::LaunchNoThrow(IWSLASession& Session, WSLAContainerStartFlags Flags)
 {
     auto [result, container] = CreateNoThrow(Session);
@@ -196,9 +209,12 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
     options.VolumesCount = static_cast<ULONG>(m_volumes.size());
     options.Volumes = m_volumes.size() > 0 ? m_volumes.data() : nullptr;
 
+    options.LabelsCount = static_cast<ULONG>(m_labels.size());
+    options.Labels = m_labels.size() > 0 ? m_labels.data() : nullptr;
+
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;
-    auto result = Session.CreateContainer(&options, &container, nullptr);
+    auto result = Session.CreateContainer(&options, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});
@@ -223,10 +239,26 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session, WSLACo
     return std::move(container.value());
 }
 
-wsl::windows::common::docker_schema::InspectContainer RunningWSLAContainer::Inspect()
+wsl::windows::common::wsla_schema::InspectContainer RunningWSLAContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(m_container->Inspect(&output));
 
-    return wsl::shared::FromJson<docker_schema::InspectContainer>(output.get());
+    return wsl::shared::FromJson<wsla_schema::InspectContainer>(output.get());
+}
+
+std::map<std::string, std::string> RunningWSLAContainer::Labels()
+{
+    wil::unique_cotaskmem_array_ptr<WSLA_LABEL_INFORMATION> labels;
+    THROW_IF_FAILED(m_container->GetLabels(&labels, labels.size_address<ULONG>()));
+
+    std::map<std::string, std::string> result;
+    for (size_t i = 0; i < labels.size(); i++)
+    {
+        result[labels[i].Key] = labels[i].Value;
+        CoTaskMemFree(labels[i].Key);
+        CoTaskMemFree(labels[i].Value);
+    }
+
+    return result;
 }
