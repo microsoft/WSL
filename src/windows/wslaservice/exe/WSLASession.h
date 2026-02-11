@@ -52,15 +52,15 @@ public:
     // Image management.
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR ImageUri,
-        _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
-        _In_ IProgressCallback* ProgressCallback,
+        _In_opt_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
+        _In_opt_ IProgressCallback* ProgressCallback,
         _Inout_opt_ WSLA_ERROR_INFO* ErrorInfo) override;
     IFACEMETHOD(BuildImage)(
         _In_ ULONG ContextHandle,
         _In_ ULONGLONG ContentLength,
-        _In_ LPCSTR DockerfilePath,
-        _In_ LPCSTR ImageTag,
-        _In_ IProgressCallback* ProgressCallback,
+        _In_opt_ LPCSTR DockerfilePath,
+        _In_opt_ LPCSTR ImageTag,
+        _In_opt_ IProgressCallback* ProgressCallback,
         _Inout_opt_ WSLA_ERROR_INFO* ErrorInfo) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;

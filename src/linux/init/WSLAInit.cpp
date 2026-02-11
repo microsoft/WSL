@@ -231,24 +231,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
 
     std::vector<gsl::byte> relayBuffer;
 
-    auto writeAll = [&](int fd, auto bytesRead) -> bool {
-        ssize_t totalWritten = 0;
-        while (totalWritten < bytesRead)
-        {
-            auto bytesWritten =
-                TEMP_FAILURE_RETRY(write(fd, reinterpret_cast<const char*>(relayBuffer.data()) + totalWritten, bytesRead - totalWritten));
-            if (bytesWritten <= 0)
-            {
-                LOG_ERROR("write failed {}", errno);
-                return false;
-            }
-
-            totalWritten += bytesWritten;
-        }
-
-        return true;
-    };
-
     while (true)
     {
         auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
@@ -268,8 +250,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
                 pollDescriptors[0].fd = -1;
                 break;
             }
-            else if (!writeAll(Channel.Socket(), bytesRead))
+            else if (UtilWriteBuffer(Channel.Socket(), relayBuffer.data(), bytesRead) < 0)
             {
+                LOG_ERROR("write failed {}", errno);
                 break;
             }
         }
@@ -293,8 +276,9 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
                     LOG_ERROR("shutdown({}, SHUT_WR) failed {}", socket.get(), errno);
                 }
             }
-            else if (!writeAll(socket.get(), bytesRead))
+            else if (UtilWriteBuffer(socket.get(), relayBuffer.data(), bytesRead) < 0)
             {
+                LOG_ERROR("write failed {}", errno);
                 break;
             }
         }

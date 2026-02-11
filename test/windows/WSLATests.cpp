@@ -482,17 +482,7 @@ class WSLATests
 
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr, WSLA_ERROR_INFO* errorInfo = nullptr)
     {
-        auto tarPath = std::filesystem::current_path() / std::format(L"{}.tar", contextDir.filename().wstring());
-        auto cleanupTar = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            std::error_code ec;
-            std::filesystem::remove(tarPath, ec);
-        });
-
-        wsl::windows::common::helpers::CreateDockerContextTarArchive(contextDir, tarPath);
-
-        wil::unique_hfile tarFile{
-            CreateFileW(tarPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == tarFile.get());
+        auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(contextDir);
 
         LARGE_INTEGER fileSize{};
         VERIFY_IS_TRUE(GetFileSizeEx(tarFile.get(), &fileSize));
@@ -669,7 +659,8 @@ class WSLATests
             for (int i = 0; i < fileSizeMb; i++)
             {
                 DWORD written = 0;
-                if (!WriteFile(largeFile.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &written, nullptr))
+                if (!WriteFile(largeFile.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &written, nullptr) ||
+                    written != static_cast<DWORD>(buffer.size()))
                 {
                     LogError("WriteFile failed at chunk %d/%d: 0x%08x", i, fileSizeMb, GetLastError());
                     VERIFY_FAIL();

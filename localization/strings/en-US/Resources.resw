@@ -1884,7 +1884,7 @@ Usage:
   wsladiag logs [--follow|-f] &lt;ContainerId&gt;
   wsladiag attach &lt;ContainerId&gt;
   wsladiag --help</value>
-    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--verbose|"}{Locked="--verbose|"}{Locked="--tag|"}{Locked="--file|"}{Locked="--interactive|"}{Locked="--tty|"}{Locked="--detach|"}{Locked="--name "}{Locked="--follow|"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
     <value>wslc - WSL Container CLI

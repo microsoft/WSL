@@ -304,25 +304,15 @@ try
         std::string contentString{Content.begin(), Content.end()};
         WSL_LOG("ImagePullProgress", TraceLoggingValue(ImageUri, "Image"), TraceLoggingValue(contentString.c_str(), "Content"));
 
-        if (ProgressCallback == nullptr || contentString.empty())
+        if (ProgressCallback == nullptr)
         {
             return;
         }
 
-        std::optional<docker_schema::CreateImageProgress> parsed;
-        try
-        {
-            parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
-        }
-        catch (...)
-        {
-            // Ignore JSON parsing errors for pull output - Docker may emit non-JSON lines
-            LOG_CAUGHT_EXCEPTION();
-            return;
-        }
+        auto parsed = wsl::shared::FromJson<docker_schema::CreateImageProgress>(contentString.c_str());
 
         THROW_IF_FAILED(ProgressCallback->OnProgress(
-            parsed->status.c_str(), parsed->id.c_str(), parsed->progressDetail.current, parsed->progressDetail.total));
+            parsed.status.c_str(), parsed.id.c_str(), parsed.progressDetail.current, parsed.progressDetail.total));
     };
 
     auto onCompleted = [&]() { io.Cancel(); };
@@ -421,35 +411,20 @@ try
             TraceLoggingValue(ImageTag != nullptr ? ImageTag : "(no tag)", "Image"),
             TraceLoggingValue(contentString.c_str(), "Content"));
 
-        if (contentString.empty())
-        {
-            return;
-        }
+        auto parsed = wsl::shared::FromJson<docker_schema::BuildProgress>(contentString.c_str());
 
-        std::optional<docker_schema::BuildProgress> parsed;
-        try
+        if (!parsed.stream.empty())
         {
-            parsed = wsl::shared::FromJson<docker_schema::BuildProgress>(contentString.c_str());
-        }
-        catch (...)
-        {
-            // If JSON parsing fails, log but don't display
-            LOG_CAUGHT_EXCEPTION();
-            return;
-        }
-
-        if (!parsed->stream.empty())
-        {
-            lastStreamMessage = parsed->stream;
+            lastStreamMessage = parsed.stream;
             if (ProgressCallback != nullptr)
             {
-                THROW_IF_FAILED(ProgressCallback->OnProgress(parsed->stream.c_str(), "", 0, 0));
+                THROW_IF_FAILED(ProgressCallback->OnProgress(parsed.stream.c_str(), "", 0, 0));
             }
         }
 
-        if (!parsed->error.empty())
+        if (!parsed.error.empty())
         {
-            errorJson = parsed->error;
+            errorJson = parsed.error;
         }
     };
 

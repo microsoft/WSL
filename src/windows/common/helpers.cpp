@@ -709,68 +709,82 @@ bool wsl::windows::common::helpers::TryAttachConsole()
     return ReopenStdHandles();
 }
 
-void wsl::windows::common::helpers::CreateDockerContextTarArchive(_In_ const std::filesystem::path& sourceDir, _In_ const std::filesystem::path& outputPath)
+std::vector<std::wstring> wsl::windows::common::helpers::ParseDockerIgnoreFile(_In_ const std::filesystem::path& sourceDir)
+{
+    std::vector<std::wstring> patterns;
+    std::ifstream ignoreFile(sourceDir / ".dockerignore");
+
+    for (std::string line; std::getline(ignoreFile, line);)
+    {
+        // Trim trailing whitespace.
+        while (!line.empty() && (line.back() == ' ' || line.back() == '\t' || line.back() == '\r'))
+        {
+            line.pop_back();
+        }
+
+        // Skip empty lines, comments, and negation patterns.
+        if (line.empty() || line[0] == '#' || line[0] == '!')
+        {
+            continue;
+        }
+
+        // Strip trailing directory slash.
+        if (line.back() == '/')
+        {
+            line.pop_back();
+        }
+
+        if (!line.empty())
+        {
+            // Escape embedded double quotes to prevent command line injection.
+            auto widePattern = wsl::shared::string::MultiByteToWide(line);
+            std::erase(widePattern, L'"');
+            patterns.emplace_back(std::move(widePattern));
+        }
+    }
+
+    return patterns;
+}
+
+wil::unique_hfile wsl::windows::common::helpers::CreateDockerContextTarArchive(_In_ const std::filesystem::path& sourceDir)
 {
     auto absoluteSourceDir = std::filesystem::absolute(sourceDir);
-    auto absoluteOutputPath = std::filesystem::absolute(outputPath);
+
+    SECURITY_ATTRIBUTES attributes{.nLength = sizeof(attributes), .bInheritHandle = TRUE};
+
+    auto tempPath = std::filesystem::temp_directory_path() / std::format(L"wsla-build-context-{}.tar", GetCurrentProcessId());
+    wil::unique_hfile tarFile{CreateFileW(
+        tempPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, &attributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE, nullptr)};
+    THROW_LAST_ERROR_IF(!tarFile);
 
     std::wstring systemDirectory;
     THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
     auto tarExecutable = std::filesystem::path(std::move(systemDirectory)) / L"tar.exe";
-    std::wstring commandLine = std::format(L"\"{}\" -cf \"{}\"", tarExecutable.wstring(), absoluteOutputPath.wstring());
 
-    // Parse .dockerignore and add --exclude arguments.
+    // Write the tar archive to stdout, which will be redirected to the temporary file.
+    std::wstring commandLine = std::format(L"\"{}\" -cf -", tarExecutable.wstring());
+
+    for (const auto& pattern : ParseDockerIgnoreFile(absoluteSourceDir))
     {
-        std::ifstream ignoreFile(absoluteSourceDir / ".dockerignore");
-
-        for (std::string line; std::getline(ignoreFile, line);)
-        {
-            // Trim trailing whitespace.
-            while (!line.empty() && (line.back() == ' ' || line.back() == '\t' || line.back() == '\r'))
-            {
-                line.pop_back();
-            }
-
-            // Skip empty lines, comments, and negation patterns.
-            if (line.empty() || line[0] == '#' || line[0] == '!')
-            {
-                continue;
-            }
-
-            // Strip trailing directory slash.
-            if (line.back() == '/')
-            {
-                line.pop_back();
-            }
-
-            if (!line.empty())
-            {
-                commandLine += std::format(L" --exclude \"{}\"", std::wstring(line.begin(), line.end()));
-            }
-        }
+        commandLine += std::format(L" --exclude \"{}\"", pattern);
     }
 
     commandLine += L" .";
-
-    SECURITY_ATTRIBUTES attributes{.nLength = sizeof(attributes), .bInheritHandle = TRUE};
 
     wil::unique_hfile stderrRead, stderrWrite;
     THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&stderrRead, &stderrWrite, &attributes, 0));
     THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stderrRead.get(), HANDLE_FLAG_INHERIT, 0));
 
-    STARTUPINFOW startupInfo{
-        .cb = sizeof(startupInfo), .dwFlags = STARTF_USESTDHANDLES, .hStdOutput = stderrWrite.get(), .hStdError = stderrWrite.get()};
+    auto workingDir = absoluteSourceDir.wstring();
+    SubProcess process(tarExecutable.c_str(), commandLine.c_str());
+    process.SetWorkingDirectory(workingDir.c_str());
+    process.SetFlags(CREATE_NO_WINDOW);
+    process.SetStdHandles(nullptr, tarFile.get(), stderrWrite.get());
 
-    wil::unique_process_information processInfo;
-    THROW_IF_WIN32_BOOL_FALSE(CreateProcessW(
-        nullptr, commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, absoluteSourceDir.wstring().c_str(), &startupInfo, &processInfo));
-
+    auto processHandle = process.Start();
     stderrWrite.reset();
 
-    THROW_LAST_ERROR_IF(WaitForSingleObject(processInfo.hProcess, INFINITE) != WAIT_OBJECT_0);
-
-    DWORD exitCode = 0;
-    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(processInfo.hProcess, &exitCode));
+    auto exitCode = SubProcess::GetExitCode(processHandle.get());
 
     if (exitCode != 0)
     {
@@ -785,4 +799,8 @@ void wsl::windows::common::helpers::CreateDockerContextTarArchive(_In_ const std
 
         THROW_HR_MSG(E_FAIL, "tar.exe failed with exit code %u: %hs", exitCode, errorOutput.c_str());
     }
+
+    THROW_LAST_ERROR_IF(SetFilePointer(tarFile.get(), 0, nullptr, FILE_BEGIN) == INVALID_SET_FILE_POINTER);
+
+    return std::move(tarFile);
 }

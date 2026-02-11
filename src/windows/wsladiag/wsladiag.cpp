@@ -415,23 +415,19 @@ static int Build(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
 
-    std::wstring contextPath;
+    std::filesystem::path inputPath;
     std::string tag;
     std::string dockerfilePath;
 
-    parser.AddPositionalArgument(contextPath, 0);
+    parser.AddPositionalArgument(AbsolutePath(inputPath), 0);
     parser.AddArgument(Utf8String{tag}, L"--tag", 't');
     parser.AddArgument(Utf8String{dockerfilePath}, L"--file", 'f');
 
     parser.Parse();
-    THROW_HR_IF(E_INVALIDARG, contextPath.empty());
+    THROW_HR_IF(E_INVALIDARG, inputPath.empty());
 
-    std::filesystem::path inputPath(contextPath);
     THROW_HR_IF_MSG(
-        HRESULT_FROM_WIN32(ERROR_DIRECTORY),
-        !std::filesystem::is_directory(inputPath),
-        "Path must be a directory: %ls",
-        contextPath.c_str());
+        HRESULT_FROM_WIN32(ERROR_DIRECTORY), !std::filesystem::is_directory(inputPath), "Path must be a directory: %ls", inputPath.c_str());
 
     // Configure console for interactive usage.
     // TODO: Add support for output only for Ctrl-C support with cleanup.
@@ -458,23 +454,10 @@ static int Build(std::wstring_view commandLine)
 
     wil::com_ptr<IWSLASession> session = OpenCLISession();
 
-    wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", contextPath), stdout);
-
-    auto tempDir = std::filesystem::temp_directory_path();
-    auto tempTarPath = tempDir / std::format(L"wsla-build-context-{}.tar", GetCurrentProcessId());
-
-    auto cleanupTar = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        std::error_code ec;
-        std::filesystem::remove(tempTarPath, ec);
-    });
+    wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", inputPath.wstring()), stdout);
 
     wprintf(L"Creating build context...\n");
-    wsl::windows::common::helpers::CreateDockerContextTarArchive(inputPath, tempTarPath);
-
-    wil::unique_hfile tarFile{
-        CreateFileW(tempTarPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-
-    THROW_LAST_ERROR_IF(!tarFile);
+    auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(inputPath);
 
     LARGE_INTEGER fileSize{};
     THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(tarFile.get(), &fileSize));
