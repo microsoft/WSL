@@ -1,14 +1,12 @@
 set(SOURCES
     ProgressCallback.cpp
     TerminationCallback.cpp
-    WslaErrorInfo.cpp
     wslcsdk.cpp
     WslcsdkPrivate.cpp
 )
 set(HEADERS
     ProgressCallback.h
     TerminationCallback.h
-    WslaErrorInfo.h
     wslcsdk.h
     WslcsdkPrivate.h
 )

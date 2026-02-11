@@ -27,7 +27,7 @@ typedef struct WSLC_SESSION_OPTIONS_INTERNAL
     PCWSTR storagePath;
 
     uint32_t cpuCount;
-    uint64_t memoryMb;
+    uint32_t memoryMb;
     uint32_t timeoutMS;
 
     WslcVhdRequirements vhdRequirements;

@@ -17,13 +17,13 @@ Abstract:
 #include "WslcsdkPrivate.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
-#include "WslaErrorInfo.h"
+#include "wslutil.h"
 
 
 namespace
 {
     constexpr uint32_t s_DefaultCPUCount = 2;
-    constexpr uint64_t s_DefaultMemoryMB = 2000;
+    constexpr uint32_t s_DefaultMemoryMB = 2000;
 
     WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
     {
@@ -38,18 +38,16 @@ namespace
         return result;
     }
 
-    LPCSTR ConvertType(WslcVhdType type)
+    void GetErrorInfoIf(PWSTR* errorMessage)
     {
-        // TODO: Correct strings? Doesn't appear so, as tracking the code suggests that this is the `filesystemtype` to the linux `mount` function.
-        //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
-        switch (type)
+        if (errorMessage)
         {
-        case WSLC_VHDTYPEDYNAMIC:
-            return "dynamic";
-        case WSLC_VHDTYPEFIXED:
-            return "fixed";
-        default:
-            return nullptr;
+            *errorMessage = nullptr;
+            auto errorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            if (errorInfo)
+            {
+                *errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorInfo->Message.get()).release();
+            }
         }
     }
 }
@@ -91,7 +89,6 @@ STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings,
 STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb)
 {
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
-    RETURN_HR_IF(E_INVALIDARG, memoryMb > static_cast<uint64_t>(std::numeric_limits<ULONG>::max()));
 
     if (memoryMb)
     {
@@ -125,8 +122,7 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSe
     // TODO: Is this VHD requirements sizeInBytes?
     // runtimeSettings.MaximumStorageSizeMb;
     runtimeSettings.CpuCount = internalType->cpuCount;
-    // TODO: memoryMb probably doesn't need to be a 64 bit value
-    runtimeSettings.MemoryMb = static_cast<ULONG>(internalType->memoryMb);
+    runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
     // TODO: No user control over networking mode (NAT and VirtIO)?
     runtimeSettings.NetworkingMode = WSLANetworkingModeNone;
@@ -137,11 +133,16 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSe
         runtimeSettings.TerminationCallback = terminationCallback.get();
     }
     runtimeSettings.FeatureFlags = ConvertFlags(internalType->flags);
+
     // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
     // runtimeSettings.DmesgOutput;
-    runtimeSettings.RootVhdOverride = internalType->vhdRequirements.path;
+
+    // TODO: VHD overrides; I'm not sure if we intend these to be provided.
+    // runtimeSettings.RootVhdOverride = internalType->vhdRequirements.path;
     // TODO: I don't think that this VHD type override can be reused from the VHD requirements type
-    runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
+    //       Tracking the code suggests that this is the `filesystemtype` to the linux `mount` function.
+    //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
+    // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
     // TODO: No user control over flags (Persistent and OpenExisting)?
     RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session));
@@ -487,12 +488,11 @@ STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOp
     RETURN_HR_IF_NULL(E_INVALIDARG, options->uri);
 
     auto progressCallback = ProgressCallback::CreateIf(options);
-    WslaErrorInfo errorInfo{ errorMessage != nullptr };
 
     // TODO: Auth
-    RETURN_IF_FAILED(internalType->session->PullImage(options->uri, nullptr, progressCallback.get(), errorInfo));
+    RETURN_IF_FAILED(internalType->session->PullImage(options->uri, nullptr, progressCallback.get()));
 
-    errorInfo.CopyMessageIf(errorMessage);
+    GetErrorInfoIf(errorMessage);
 
     return S_OK;
 }
