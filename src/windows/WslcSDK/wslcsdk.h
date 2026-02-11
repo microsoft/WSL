@@ -21,7 +21,7 @@ Abstract:
 EXTERN_C_START
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 88
+#define WSLC_SESSION_OPTIONS_SIZE 80
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -66,7 +66,6 @@ typedef enum WslcVhdType
 
 typedef struct WslcVhdRequirements
 {
-    _In_z_ PCWSTR path;      // Full path to the VHD/VHDX file
     _In_ UINT64 sizeInBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;   // Dynamic / Fixed
 } WslcVhdRequirements;
@@ -92,10 +91,10 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSe
 
 // OPTIONAL SESSION SETTINGS
 STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t cpuCount);
-STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint64_t memoryMb);
+STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb);
 STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, uint32_t timeoutMS);
 
-STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ WslcVhdRequirements* vhdRequirements);
+STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
 
 STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags);
 
@@ -122,7 +121,7 @@ typedef struct WslcContainerPortMapping
     _In_ WslcPortProtocol protocol; // TCP or UDP
 
     // if you want to override the default binding address
-    _In_opt_ struct sockaddr_storage windowsAddress; // accepts ipv4/6
+    _In_opt_ struct sockaddr_storage* windowsAddress; // accepts ipv4/6
 } WslcContainerPortMapping;
 
 typedef struct WslcContainerVolume
@@ -160,10 +159,12 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
 
-STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings);
+STDAPI WslcContainerSettingsSetPortMapping(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount);
 
-// Add the container volume to the volumes array
-STDAPI WslcContainerSettingsSetVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes);
+// Add the container volumes to the volumes array
+STDAPI WslcContainerSettingsAddVolume(
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ UINT32 volumeCount);
 
 STDAPI WslcContainerExec(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess);
 
@@ -225,8 +226,8 @@ STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _
 
 typedef enum WslcDeleteContainerFlags
 {
-    DELETE_FLAG_NONE = 0,
-    DELETE_FLAG_FORCE = 0x01
+    WSLC_DELETE_FLAG_NONE = 0,
+    WSLC_DELETE_FLAG_FORCE = 0x01
 } WslcDeleteContainerFlags;
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags);
@@ -236,9 +237,9 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings);
 
 // OPTIONAL PROCESS SETTINGS
 
-STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ const PCSTR entryPoint);
+STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR entryPoint);
 
-STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ const PCSTR currentDirectory);
+STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory);
 
 STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings, _In_ PCWSTR displayName);
 
@@ -271,7 +272,7 @@ STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSetti
 //     WSLC's internal I/O processing.
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
-typedef __callback VOID(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ UINT32 dataSize, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ UINT32 dataSize, _In_opt_ PVOID context);
 typedef enum WslcProcessIoHandle
 {
     WSLC_STDIN = 0,
@@ -279,9 +280,9 @@ typedef enum WslcProcessIoHandle
     WSLC_STDERR = 2
 } WslcProcessIoHandle;
 
-// Pass in Null for stdIOCallback to clear the callback for the given handle
+// Pass in Null for WslcStdIOCallback to clear the callback for the given handle
 STDAPI WslcProcessSettingsSetIoCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
+    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context);
 
 // PROCESS MANAGEMENT
 
@@ -319,12 +320,12 @@ typedef struct WslcImageProgressDetail
 typedef enum WslcImageProgressStatus
 {
     WSLC_IMAGE_PROGRESS_UNKNOWN = 0,
-    WSLC_IMAGE_PROGRESS_PULLING,     // "Pulling fs layer"
-    WSLC_IMAGE_PROGRESS_WAITING,     // "Waiting"
-    WSLC_IMAGE_PROGRESS_DOWNLOADING, // "Downloading"
-    WSLC_IMAGE_PROGRESS_VERIFYING,   // "Verifying Checksum"
-    WSLC_IMAGE_PROGRESS_EXTRACTING,  // "Extracting"
-    WSLC_IMAGE_PROGRESS_COMPLETE     // "Pull complete"
+    WSLC_IMAGE_PROGRESS_PULLING = 1,     // "Pulling fs layer"
+    WSLC_IMAGE_PROGRESS_WAITING = 2,     // "Waiting"
+    WSLC_IMAGE_PROGRESS_DOWNLOADING = 3, // "Downloading"
+    WSLC_IMAGE_PROGRESS_VERIFYING = 4,   // "Verifying Checksum"
+    WSLC_IMAGE_PROGRESS_EXTRACTING = 5,  // "Extracting"
+    WSLC_IMAGE_PROGRESS_COMPLETE = 6     // "Pull complete"
 } WslcImageProgressStatus;
 
 typedef struct WslcImageProgressMessage
@@ -334,21 +335,21 @@ typedef struct WslcImageProgressMessage
     _Out_ WslcImageProgressDetail detail;
 } WslcImageProgressMessage;
 
-typedef struct WslcResgistryAuthenticationInformation
+typedef struct WslcRegistryAuthenticationInformation
 {
     // TBD
-} WslcResgistryAuthenticationInformation;
+} WslcRegistryAuthenticationInformation;
 
 // pointer-to-function typedef (unambiguous)
 typedef VOID(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
-// options struct � typedef is a pointer type and _In_opt_ is valid
+// options struct typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
 {
     _In_z_ PCSTR uri;
     WslcContainerImageProgressCallback progressCallback;
     PVOID progressCallbackContext;
-    _In_opt_ const WslcResgistryAuthenticationInformation* authInfo;
+    _In_opt_ const WslcRegistryAuthenticationInformation* authInfo;
 } WslcPullImageOptions;
 
 STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
@@ -392,7 +393,7 @@ STDAPI WslcSessionImageDelete(_In_ WslcSession session, _In_z_ PCSTR NameOrId);
 //
 //   images
 //       On success, receives a pointer to a contiguous array of
-//       WSLC_CONTAINER_IMAGE_INFO structures describing the images
+//       WslcImageInfo structures describing the images
 //
 //       The array is allocated using CoTaskMemAlloc. The caller takes
 //       ownership of the memory and must free it by calling
@@ -410,11 +411,11 @@ STDAPI WslcSessionImageDelete(_In_ WslcSession session, _In_z_ PCSTR NameOrId);
 //   - The caller must pass non-null pointers for both 'images' and 'count'.
 //
 
-STDAPI WslcSessionImageList(_In_ WslcSession sesssion, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ UINT32* count);
+STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ UINT32* count);
 
 // STORAGE
 
-STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion, _In_ const WslcVhdRequirements* options);
+STDAPI WslcSessionCreateVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options);
 
 // INSTALL
 
@@ -436,7 +437,7 @@ typedef struct WslcVersion
 } WslcVersion;
 STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version);
 
-typedef __callback VOID(CALLBACK* WslcInstallCallback)(_In_ WslcComponentFlags component, _In_ UINT32 progress, _In_ UINT32 total, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcInstallCallback)(_In_ WslcComponentFlags component, _In_ UINT32 progress, _In_ UINT32 total, _In_opt_ PVOID context);
 
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
 

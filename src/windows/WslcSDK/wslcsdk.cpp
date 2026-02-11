@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 
 #include "wslcsdk.h"
-#include "wslcsdkprivate.h"
+#include "WslcsdkPrivate.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
 #include "WslaErrorInfo.h"
@@ -88,7 +88,7 @@ STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings,
     return S_OK;
 }
 
-STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint64_t memoryMb)
+STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb)
 {
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
     RETURN_HR_IF(E_INVALIDARG, memoryMb > static_cast<uint64_t>(std::numeric_limits<ULONG>::max()));
@@ -197,7 +197,7 @@ STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion, _In_ const WslcVhdRequire
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ WslcVhdRequirements* vhdRequirements)
+STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
 {
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
@@ -237,7 +237,7 @@ STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _I
 }
 
 STDAPI WslcSessionSettingsSetTerminateCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionTerminationCallback terminationCallback, _In_ PVOID terminationContext)
+    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext)
 {
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
@@ -313,16 +313,18 @@ STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings)
+STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount)
 {
     UNREFERENCED_PARAMETER(portMappings);
     UNREFERENCED_PARAMETER(containerSettings);
+    UNREFERENCED_PARAMETER(portMappingCount);
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes)
+STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes, _In_ UINT32 volumeCount)
 {
     UNREFERENCED_PARAMETER(volumes);
+    UNREFERENCED_PARAMETER(volumeCount);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
 }
@@ -434,7 +436,6 @@ STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent
     UNREFERENCED_PARAMETER(exitEvent);
     return E_NOTIMPL;
 }
-EXTERN_C_START
 
 // PROCESS RESULT / SIGNALS
 
@@ -549,5 +550,3 @@ STDAPI WslcInstallWithDependencies(_In_opt_ __callback WslcInstallCallback progr
     UNREFERENCED_PARAMETER(context);
     return E_NOTIMPL;
 }
-
-EXTERN_C_END
