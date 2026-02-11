@@ -1924,4 +1924,16 @@ Usage:
     <value>Unknown command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name = "MessageWslaInvalidImage" xml:space = "preserve" >
+    <value>Invalid image: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslaInvalidContainerName" xml:space = "preserve" >
+    <value>Invalid container name: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessagePathNotAbsolute" xml:space = "preserve" >
+    <value>Path is not absolute: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
 </root>
