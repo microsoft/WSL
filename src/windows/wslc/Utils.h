@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Utils.h
+
+Abstract:
+
+    This file contains the Utils function declarations
+
+--*/
 #pragma once
 
 #include "precomp.h"

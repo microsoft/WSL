@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ShellService.cpp
+
+Abstract:
+
+    This file contains the ShellService implementation
+
+--*/
 #include "precomp.h"
 #include "ShellService.h"
 #include <wslaservice.h>

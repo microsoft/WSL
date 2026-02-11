@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ShellService.h
+
+Abstract:
+
+    This file contains the SessionService definition
+
+--*/
 #pragma once
 
 #include <string>

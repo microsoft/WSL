@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    SessionModel.h
+
+Abstract:
+
+    This file contains the SessionModel definition
+
+--*/
 #pragma once
 
 #include <wslservice.h>

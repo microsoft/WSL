@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ImageService.h
+
+Abstract:
+
+    This file contains the ImageService definition
+
+--*/
 #pragma once
 
 #include "SessionModel.h"

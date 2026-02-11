@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerCommand.cpp
+
+Abstract:
+
+    This file contains the ContainerCommand implementation
+
+--*/
 #include "precomp.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"

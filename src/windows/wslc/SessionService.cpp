@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    SessionService.cpp
+
+Abstract:
+
+    This file contains the SessionService implementation
+
+--*/
 #include "precomp.h"
 #include "SessionService.h"
 #include <wslaservice.h>

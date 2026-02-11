@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ShellCommand.cpp
+
+Abstract:
+
+    This file contains the ShellCommand implementation
+
+--*/
 #include "precomp.h"
 #include "Utils.h"
 #include "ShellCommand.h"

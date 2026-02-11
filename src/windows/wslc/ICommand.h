@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ICommand.h
+
+Abstract:
+
+    This file contains the ICommand definition
+
+--*/
 #pragma once
 
 #include <CommandLine.h>

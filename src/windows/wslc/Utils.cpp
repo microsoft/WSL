@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Utils.cpp
+
+Abstract:
+
+    This file contains the Utils implementation
+
+--*/
 #include "Utils.h"
 #include "wslutil.h"
 #include "wslaservice.h"

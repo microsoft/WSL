@@ -1,3 +1,17 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerModel.h
+
+Abstract:
+
+    This file contains the ContainerModel definitions
+
+--*/
+
 #pragma once
 
 #include <wslservice.h>

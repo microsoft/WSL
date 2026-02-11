@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    SessionModel.cpp
+
+Abstract:
+
+    This file contains the SessionModel implementation.
+
+--*/
 #include "SessionModel.h"
 
 namespace wslc::models {

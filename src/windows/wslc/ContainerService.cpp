@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerService.cpp
+
+Abstract:
+
+    This file contains the ContainerService implementation
+
+--*/
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "Utils.h"

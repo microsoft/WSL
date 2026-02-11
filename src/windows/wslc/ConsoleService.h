@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ConsoleService.h
+
+Abstract:
+
+    This file contains the ConsoleService definition
+
+--*/
 #pragma once
 
 #include <wslaservice.h>

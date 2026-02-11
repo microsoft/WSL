@@ -1,4 +1,18 @@
-﻿#pragma once
+﻿/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    TableOutput.h
+
+Abstract:
+
+    This file contains the TableOutput header implementation
+
+--*/
+
+#pragma once
 #include <iostream>
 #include <string>
 #include <vector>

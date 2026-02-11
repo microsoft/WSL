@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ConsoleService.cpp
+
+Abstract:
+
+    This file contains the ConsoleService implementation
+
+--*/
 #include <precomp.h>
 #include <WSLAProcessLauncher.h>
 #include "ConsoleService.h"

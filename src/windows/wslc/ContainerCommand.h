@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerCommand.h
+
+Abstract:
+
+    This file contains the ContainerCommand definition
+
+--*/
 #pragma once
 #include "ICommand.h"
 #include "ContainerService.h"

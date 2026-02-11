@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ImageService.cpp
+
+Abstract:
+
+    This file contains the ImageService implementation
+
+--*/
 #include "ImageService.h"
 #include "Utils.h"
 #include "SessionService.h"

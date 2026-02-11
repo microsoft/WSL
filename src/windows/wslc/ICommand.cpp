@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ICommand.cpp
+
+Abstract:
+
+    This file contains the ICommand implementation
+
+--*/
 #include "precomp.h"
 #include "ICommand.h"
 

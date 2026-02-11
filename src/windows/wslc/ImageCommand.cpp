@@ -1,3 +1,15 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ImageCommand.cpp
+
+Abstract:
+    This file contains the ImageCommand implementation
+
+--*/
 #include "precomp.h"
 #include "ImageCommand.h"
 #include "Utils.h"

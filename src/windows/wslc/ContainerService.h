@@ -1,3 +1,16 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerService.h
+
+Abstract:
+
+    This file contains the ContainerService definition
+
+--*/
 #pragma once
 #include "SessionModel.h"
 #include "ContainerModel.h"
