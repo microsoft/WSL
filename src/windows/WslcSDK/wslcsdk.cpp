@@ -34,7 +34,7 @@ STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings,
     UNREFERENCED_PARAMETER(sessionSettings);
     return E_NOTIMPL;
 }
-STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint64_t memoryMb)
+STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb)
 {
     UNREFERENCED_PARAMETER(memoryMb);
     UNREFERENCED_PARAMETER(sessionSettings);
