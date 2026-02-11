@@ -392,7 +392,7 @@ STDAPI WslcSessionImageDelete(_In_ WslcSession session, _In_z_ PCSTR NameOrId);
 //
 //   images
 //       On success, receives a pointer to a contiguous array of
-//       WSLC_CONTAINER_IMAGE_INFO structures describing the images
+//       WslcImageInfo structures describing the images
 //
 //       The array is allocated using CoTaskMemAlloc. The caller takes
 //       ownership of the memory and must free it by calling
