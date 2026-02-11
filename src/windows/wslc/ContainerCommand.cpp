@@ -1,7 +1,6 @@
 #include "precomp.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
-#include "ConsoleModel.h"
 #include "TableOutput.h"
 #include "Utils.h"
 #include <CommandLine.h>

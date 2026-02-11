@@ -13,6 +13,11 @@ struct ContainerCreateOptions
     std::string Name;
 };
 
+struct ContainerRunOptions : public ContainerCreateOptions
+{
+    bool Detach = false;
+};
+
 struct CreateContainerResult
 {
     std::string Id;
@@ -20,8 +25,10 @@ struct CreateContainerResult
 
 struct StopContainerOptions
 {
+    static constexpr ULONG DefaultTimeout = 5;
+
     int Signal = WSLASignalSIGTERM;
-    ULONG Timeout = 5;
+    ULONG Timeout = DefaultTimeout;
 };
 
 struct KillContainerOptions

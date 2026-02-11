@@ -43,7 +43,6 @@ set(HEADERS
     ImageModel.h
     ContainerModel.h
     SessionModel.h
-    ConsoleModel.h
 )
 
 source_group("Services" FILES
@@ -75,7 +74,6 @@ source_group("Models" FILES
     ContainerModel.h
     SessionModel.h
     SessionModel.cpp
-    ConsoleModel.h
 )
 
 add_executable(wslc ${SOURCES} ${HEADERS})

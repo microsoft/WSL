@@ -102,9 +102,7 @@ int wslc_main(std::wstring_view commandLine)
 
     // Parse the top-level verb (list, shell, --help).
     ArgumentParser parser(std::wstring{commandLine}, L"wslc", 1, true);
-
     std::wstring verb;
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 1, true);
     parser.AddPositionalArgument(verb, 0);
     parser.Parse();
 

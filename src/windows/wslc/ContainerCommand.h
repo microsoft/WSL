@@ -17,6 +17,7 @@ public:
             "arguments (pos. 1..): Arguments to pass to container's init process",
             "-t, --tty: Open a TTY with the container process",
             "-i, --interactive: Keep stdin open",
+            "-d, --detach: Run container in background",
             "--name <name>: Assign a name to the container that will be used as its container id",
         };
     }
@@ -25,6 +26,7 @@ public:
         parser.AddPositionalArgument(wsl::shared::Utf8String{m_image}, 0);
         parser.AddArgument(m_options.Interactive, L"--interactive", 'i');
         parser.AddArgument(m_options.TTY, L"--tty", 't');
+        parser.AddArgument(m_options.Detach, L"--detach", 'd');
         parser.AddArgument(wsl::shared::Utf8String{m_options.Name}, L"--name");
     }
 
@@ -32,7 +34,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::models::ContainerCreateOptions m_options;
+    wslc::models::ContainerRunOptions m_options;
     std::string m_image;
 };
 

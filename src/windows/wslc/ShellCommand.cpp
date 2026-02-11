@@ -1,3 +1,4 @@
+#include "precomp.h"
 #include "Utils.h"
 #include "ShellCommand.h"
 #include "ShellService.h"
