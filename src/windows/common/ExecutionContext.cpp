@@ -14,13 +14,15 @@ using wsl::windows::common::ServiceExecutionContext;
 thread_local ExecutionContext* g_currentContext = nullptr;
 static bool g_enabled = false;
 bool g_runningInService = false;
+bool g_useComErrors = false;
 static HANDLE g_eventLog = nullptr;
 
-void wsl::windows::common::EnableContextualizedErrors(bool service)
+void wsl::windows::common::EnableContextualizedErrors(bool service, bool useComErrors)
 {
     WI_ASSERT(!g_enabled);
     g_enabled = true;
     g_runningInService = service;
+    g_useComErrors = useComErrors;
 }
 
 ExecutionContext::ExecutionContext(Context context, FILE* warningsFile) noexcept :
@@ -131,7 +133,7 @@ void ExecutionContext::CollectError(HRESULT result)
 
 void ExecutionContext::CollectErrorImpl(HRESULT result)
 {
-    if (!g_runningInService && !m_errorString.has_value() && !m_errorSource.has_value())
+    if (!g_runningInService && g_useComErrors && !m_errorString.has_value() && !m_errorSource.has_value())
     {
         // If no error message has been reported, look for a COM error.
         if (auto comError = common::wslutil::GetCOMErrorInfo())
@@ -433,21 +435,6 @@ void wsl::windows::common::SetErrorMessage(std::wstring&& message, const std::so
     }
 
     g_currentContext->SetErrorStringImpl(std::move(message), std::format(L"{}", source));
-}
-
-void wsl::windows::common::SetCOMErrorMessage()
-{
-    if (g_currentContext == nullptr)
-    {
-        return; // no context to save the error to, ignore
-    }
-
-    auto comErrorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
-
-    if (comErrorInfo.has_value())
-    {
-        g_currentContext->SetErrorStringImpl(comErrorInfo->Message.get(), comErrorInfo->Source.get());
-    }
 }
 
 void wsl::windows::common::SetEventLog(HANDLE eventLog)

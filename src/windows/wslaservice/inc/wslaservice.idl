@@ -15,7 +15,6 @@ Abstract:
 
 import "unknwn.idl";
 import "wtypes.idl";
-import "oaidl.idl";
 
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLASessionManager;")
@@ -265,12 +264,6 @@ enum WSLA_PROCESS_STATE
     WslaProcessStateSignalled = 3
 };
 
-// TODO: Design for localization.
-typedef struct _WSLA_ERROR_INFO{
-    [string] LPSTR UserErrorMessage;
-    ULONG WarningsPipe;
-} WSLA_ERROR_INFO;
-
 [
     uuid(1AD163CD-393D-4B33-83A2-8A3F3F23E608),
     pointer_default(unique),
@@ -384,7 +377,7 @@ struct WSLA_DELETE_IMAGE_OPTIONS
     pointer_default(unique),
     object
 ]
-interface IWSLASession : ISupportErrorInfo
+interface IWSLASession : IUnknown
 {
     HRESULT GetId([out] ULONG* Id);
 
@@ -392,15 +385,15 @@ interface IWSLASession : ISupportErrorInfo
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
-    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, out, unique] WSLA_ERROR_INFO * ErrorInfo);
+    HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
-    HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count);
 
     // Container management.
-    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
     HRESULT OpenContainer([in] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
-    HRESULT ExportContainer([in] ULONG OutputHandle, [in] LPCSTR ContainerID, [in, unique] IProgressCallback * ProgressCallback, [in,out,unique] WSLA_ERROR_INFO * ErrorInfo);
+    HRESULT ExportContainer([in] ULONG OutputHandle, [in] LPCSTR ContainerID, [in, unique] IProgressCallback * ProgressCallback);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in] LPCSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);

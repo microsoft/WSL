@@ -14,6 +14,12 @@ namespace wsl::windows::common {
     } \
     THROW_HR_MSG(Result, "%ls", _messageWide.c_str());
 
+#define THROW_HR_WITH_USER_ERROR_IF(Result, Message, Condition) \
+    if (Condition) \
+    { \
+        THROW_HR_WITH_USER_ERROR(Result, Message); \
+    }
+
 #define EMIT_USER_WARNING(Warning) \
     if (::wsl::windows::common::ExecutionContext* context = ::wsl::windows::common::ExecutionContext::Current(); context != nullptr) \
     { \
@@ -197,11 +203,10 @@ public:
     bool CanCollectUserErrorMessage() override;
 };
 
-void EnableContextualizedErrors(bool service);
+void EnableContextualizedErrors(bool service, bool useComErrors = false);
 
 void SetErrorMessage(std::wstring&& message, const std::source_location& source = std::source_location::current());
 void SetErrorMessage(std::string&& message, const std::source_location& source = std::source_location::current());
-void SetCOMErrorMessage();
 
 void SetEventLog(HANDLE eventLog);
 

@@ -66,17 +66,6 @@ struct GitHubRelease
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GitHubRelease, name, assets, created_at);
 };
 
-struct WSLAErrorDetails
-{
-    ~WSLAErrorDetails();
-
-    void Reset();
-
-    void ThrowIfFailed(HRESULT Result);
-
-    WSLA_ERROR_INFO Error{};
-};
-
 struct COMErrorInfo
 {
     wil::unique_bstr Message;

@@ -32,7 +32,6 @@ using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 class ChangeTerminalMode
 {
@@ -602,19 +601,17 @@ static int Run(std::wstring_view commandLine)
     }
 
     wil::com_ptr<IWSLAContainer> container;
-    WSLAErrorDetails error{};
-    auto result = session->CreateContainer(&options, &container, &error.Error);
+    auto result = session->CreateContainer(&options, &container);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         wslutil::PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
 
         PullImpl(*session.get(), image);
 
-        error.Reset();
-        result = session->CreateContainer(&options, &container, &error.Error);
+        result = session->CreateContainer(&options, &container);
     }
 
-    error.ThrowIfFailed(result);
+    THROW_IF_FAILED(result);
 
     THROW_IF_FAILED(container->Start(startFlags)); // TODO: Error message
 
@@ -752,7 +749,7 @@ int wsladiag_main(std::wstring_view commandLine)
 
 int wmain(int, wchar_t**)
 {
-    wsl::windows::common::EnableContextualizedErrors(false);
+    wsl::windows::common::EnableContextualizedErrors(false, true);
 
     // WSLADiag will be replaced by WSLC, so using WslC's context rather than creating a new soon-to-be-removed context.
     ExecutionContext context{Context::WslC};

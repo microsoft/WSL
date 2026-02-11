@@ -1619,31 +1619,3 @@ catch (...)
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
 }
-
-wsl::windows::common::wslutil::WSLAErrorDetails::~WSLAErrorDetails()
-{
-    Reset();
-}
-
-void wsl::windows::common::wslutil::WSLAErrorDetails::Reset()
-{
-    CoTaskMemFree(Error.UserErrorMessage);
-    Error = {};
-}
-
-void wsl::windows::common::wslutil::WSLAErrorDetails::ThrowIfFailed(HRESULT Result)
-{
-    if (SUCCEEDED(Result))
-    {
-        return;
-    }
-
-    if (Error.UserErrorMessage != nullptr)
-    {
-        THROW_HR_WITH_USER_ERROR(Result, Error.UserErrorMessage);
-    }
-    else
-    {
-        THROW_HR(Result);
-    }
-}
