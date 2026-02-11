@@ -340,10 +340,10 @@ typedef struct WslcImageProgressMessage
     _Out_ WslcImageProgressDetail detail;
 } WslcImageProgressMessage;
 
-typedef struct WslcResgistryAuthenticationInformation
+typedef struct WslcRegistryAuthenticationInformation
 {
     // TBD
-} WslcResgistryAuthenticationInformation;
+} WslcRegistryAuthenticationInformation;
 
 // pointer-to-function typedef (unambiguous)
 typedef VOID(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
@@ -354,7 +354,7 @@ typedef struct WslcPullImageOptions
     _In_z_ PCSTR uri;
     WslcContainerImageProgressCallback progressCallback;
     PVOID progressCallbackContext;
-    _In_opt_ const WslcResgistryAuthenticationInformation* authInfo;
+    _In_opt_ const WslcRegistryAuthenticationInformation* authInfo;
 } WslcPullImageOptions;
 
 STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage);
