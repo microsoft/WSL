@@ -177,16 +177,18 @@ STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings)
+STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings,  _In_ UINT32 portMappingCount)
 {
     UNREFERENCED_PARAMETER(portMappings);
     UNREFERENCED_PARAMETER(containerSettings);
+    UNREFERENCED_PARAMETER(portMappingCount);
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes)
+STDAPI WslcContainerSettingsSetVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes,  _In_ UINT32 volumeCount)
 {
     UNREFERENCED_PARAMETER(volumes);
+    UNREFERENCED_PARAMETER(volumeCount);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
 }
