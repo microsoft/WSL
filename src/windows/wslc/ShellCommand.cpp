@@ -39,7 +39,7 @@ int ShellListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         tablePrinter.AddRow({
             std::to_wstring(session.SessionId),
             std::to_wstring(session.CreatorPid),
-            std::wstring(session.DisplayName.begin(), session.DisplayName.end()),
+            session.DisplayName,
         });
     }
     tablePrinter.Print();
