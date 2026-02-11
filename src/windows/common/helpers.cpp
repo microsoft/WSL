@@ -754,7 +754,7 @@ wil::unique_hfile wsl::windows::common::helpers::CreateDockerContextTarArchive(_
 
     auto tempPath = std::filesystem::temp_directory_path() / std::format(L"wsla-build-context-{}.tar", GetCurrentProcessId());
     wil::unique_hfile tarFile{CreateFileW(
-        tempPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, &attributes, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE, nullptr)};
+        tempPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, &attributes, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr)};
     THROW_LAST_ERROR_IF(!tarFile);
 
     std::wstring systemDirectory;

@@ -435,7 +435,6 @@ try
 
     io.Run({});
 
-    THROW_HR_IF(E_ABORT, m_sessionTerminatingEvent.is_signaled());
     THROW_HR_IF(E_UNEXPECTED, !buildResult.has_value());
 
     WSL_LOG(
