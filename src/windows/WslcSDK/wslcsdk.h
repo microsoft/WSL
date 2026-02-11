@@ -348,7 +348,7 @@ typedef struct WslcRegistryAuthenticationInformation
 // pointer-to-function typedef (unambiguous)
 typedef VOID(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
-// options struct  typedef is a pointer type and _In_opt_ is valid
+// options struct typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
 {
     _In_z_ PCSTR uri;
