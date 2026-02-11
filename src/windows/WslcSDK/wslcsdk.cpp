@@ -80,7 +80,7 @@ STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion, _In_ const WslcVhdRequire
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ WslcVhdRequirements* vhdRequirements)
+STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
 {
     UNREFERENCED_PARAMETER(vhdRequirements);
     UNREFERENCED_PARAMETER(sessionSettings);
