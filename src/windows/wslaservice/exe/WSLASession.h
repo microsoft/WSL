@@ -31,11 +31,7 @@ class WSLASession;
 // The SYSTEM service creates the VM and passes IWSLAVirtualMachine to Initialize().
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
-<<<<<<< HEAD
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown, ISupportErrorInfo> ==
-      == ==
-    = : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IFastRundown>
->>>>>>> origin/feature/wsl-for-apps
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IFastRundown, ISupportErrorInfo>
 {
 public:
     WSLASession() = default;
