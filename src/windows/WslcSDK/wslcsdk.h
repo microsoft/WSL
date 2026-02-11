@@ -271,7 +271,7 @@ STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSetti
 //     WSLC's internal I/O processing.
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
-typedef __callback VOID(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ UINT32 dataSize, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ UINT32 dataSize, _In_opt_ PVOID context);
 typedef enum WslcProcessIoHandle
 {
     WSLC_STDIN = 0,
