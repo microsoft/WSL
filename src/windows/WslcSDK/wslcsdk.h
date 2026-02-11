@@ -95,7 +95,7 @@ STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings,
 STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb);
 STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, uint32_t timeoutMS);
 
-STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ WslcVhdRequirements* vhdRequirements);
+STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
 
 STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags);
 
