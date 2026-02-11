@@ -28,7 +28,7 @@ int ImagePullCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
     CMD_IF_HELP_PRINT_HELP();
     CMD_ARG_REQUIRED(m_image, L"Image name is required.");
     auto session = m_sessionService.CreateSession();
-    PullImpl(*session.Get(), m_image);
+    PullImpl(session, m_image);
     return 0;
 }
 
@@ -58,7 +58,7 @@ int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         for (const auto& image : images)
         {
             tablePrinter.AddRow({
-                std::wstring(image.Name.begin(), image.Name.end()),
+                wsl::shared::string::MultiByteToWide(image.Name),
                 std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))
             });
         }

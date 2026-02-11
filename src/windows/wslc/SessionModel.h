@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 
 #include <wslservice.h>
+#include <wslaservice.h>
 
 namespace wslc::models
 {

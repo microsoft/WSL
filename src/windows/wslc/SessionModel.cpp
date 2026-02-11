@@ -11,6 +11,8 @@ Abstract:
     This file contains the SessionModel implementation.
 
 --*/
+
+#include <precomp.h>
 #include "SessionModel.h"
 
 namespace wslc::models {

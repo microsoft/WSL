@@ -15,6 +15,7 @@ Abstract:
 #pragma once
 
 #include <wslservice.h>
+#include <wslaservice.h>
 #include <docker_schema.h>
 
 namespace wslc::models

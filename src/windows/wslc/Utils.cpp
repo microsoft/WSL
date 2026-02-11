@@ -28,7 +28,7 @@ using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::wslutil::WSLAErrorDetails;
 
-void PullImpl(IWSLASession& Session, const std::string& Image)
+void PullImpl(wslc::models::Session& session, const std::string& image)
 {
     // Configure console for interactive usage.
     wsl::windows::common::ConsoleState console;
@@ -122,10 +122,7 @@ void PullImpl(IWSLASession& Session, const std::string& Image)
         ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
     };
 
-    wslc::services::SessionService sessionService;
-    auto session = sessionService.CreateSession();
-
     wslc::services::ImageService imageService;
     Callback callback;
-    imageService.Pull(session, Image, &callback);
+    imageService.Pull(session, image, &callback);
 }

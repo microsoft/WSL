@@ -67,7 +67,7 @@ static void CreateInternal(Session& session, IWSLAContainer** container, WSLA_CO
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
-        PullImpl(*session.Get(), image);
+        PullImpl(session, image);
         error.Reset();
         result = session.Get()->CreateContainer(&containerOptions, container, &error.Error);
     }

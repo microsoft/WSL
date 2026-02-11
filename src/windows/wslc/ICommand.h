@@ -41,11 +41,12 @@ public:
     void PrintHelp() const;
     int Execute(std::wstring_view commandLine, int parserOffset = 0)
     {
+        m_help = false;
+        m_arguments.clear();
         wsl::shared::ArgumentParser parser(std::wstring{commandLine}, L"wslc", parserOffset, true);
         parser.AddArgument(m_help, L"--help", 'h');
         LoadArguments(parser);
         parser.Parse();
-        m_arguments.clear();
         for (size_t i = parser.ParseIndex(); i < parser.Argc(); i++)
         {
             m_arguments.push_back(wsl::shared::string::WideToMultiByte(parser.Argv(i)));

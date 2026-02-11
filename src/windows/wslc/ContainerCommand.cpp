@@ -223,9 +223,9 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
         for (const auto& container : containers)
         {
             tablePrinter.AddRow({
-                std::wstring(container.Id.begin(), container.Id.end()),
-                std::wstring(container.Name.begin(), container.Name.end()),
-                std::wstring(container.Image.begin(), container.Image.end()),
+                wsl::shared::string::MultiByteToWide(container.Id),
+                wsl::shared::string::MultiByteToWide(container.Name),
+                wsl::shared::string::MultiByteToWide(container.Image),
                 ContainerStateToString(container.State),
             });
         }

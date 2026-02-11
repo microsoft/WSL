@@ -15,8 +15,9 @@ Abstract:
 
 #include "precomp.h"
 #include "WSLAProcessLauncher.h"
+#include "SessionModel.h"
 
-void PullImpl(IWSLASession& Session, const std::string& Image);
+void PullImpl(wslc::models::Session& session, const std::string& image);
 
 class ChangeTerminalMode
 {
