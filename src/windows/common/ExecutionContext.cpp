@@ -391,6 +391,7 @@ COMServiceExecutionContext::COMServiceExecutionContext() : ExecutionContext(Empt
 }
 
 COMServiceExecutionContext::~COMServiceExecutionContext()
+try
 {
     if (m_error.has_value())
     {
@@ -408,9 +409,13 @@ COMServiceExecutionContext::~COMServiceExecutionContext()
             THROW_IF_FAILED(errorInfo->SetSource(wil::make_bstr(m_error->Source->c_str()).get()));
         }
 
-        THROW_IF_FAILED(SetErrorInfo(0, errorInfo.query<IErrorInfo>().get()));
+        if (m_error->Source.has_value() || m_error->Message.has_value())
+        {
+            THROW_IF_FAILED(SetErrorInfo(0, errorInfo.query<IErrorInfo>().get()));
+        }
     }
 }
+CATCH_LOG(); // Catch to avoid throwing from a destructor
 
 bool COMServiceExecutionContext::CanCollectUserErrorMessage()
 {

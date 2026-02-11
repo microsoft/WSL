@@ -672,7 +672,7 @@ std::wstring wsl::windows::common::wslutil::ErrorCodeToString(HRESULT Error)
 
 wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(const Error& error)
 {
-    ErrorStrings errorStrings{.Source = error.Source.value_or(L"")};
+    ErrorStrings errorStrings{.Source = error.Source};
 
     if (error.Message.has_value())
     {

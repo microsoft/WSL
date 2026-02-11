@@ -7,12 +7,15 @@
 namespace wsl::windows::common {
 
 #define THROW_HR_WITH_USER_ERROR(Result, Message) \
-    auto _messageWide = std::format(L"{}", Message); \
-    if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
+    do \
     { \
-        ::wsl::windows::common::SetErrorMessage(std::wstring(_messageWide)); \
-    } \
-    THROW_HR_MSG(Result, "%ls", _messageWide.c_str());
+        auto _messageWide = std::format(L"{}", Message); \
+        if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
+        { \
+            ::wsl::windows::common::SetErrorMessage(std::wstring(_messageWide)); \
+        } \
+        THROW_HR_MSG(Result, "%ls", _messageWide.c_str()); \
+    } while (false);
 
 #define THROW_HR_WITH_USER_ERROR_IF(Result, Message, Condition) \
     if (Condition) \

@@ -3351,6 +3351,8 @@ class WSLATests
             wil::com_ptr<IWSLAContainer> container;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &container), E_INVALIDARG);
             VERIFY_IS_NULL(container.get());
+
+            ValidateCOMErrorMessage(std::format(L"Invalid container name: '{}'", name));
         };
 
         expectInvalidArg("container with spaces");
@@ -3359,6 +3361,9 @@ class WSLATests
         expectInvalidArg("/url/path");
         expectInvalidArg("");
         expectInvalidArg("\\escaped\n\\chars");
+
+        std::string longName(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
+        expectInvalidArg(longName);
 
         auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
             VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr), E_INVALIDARG);

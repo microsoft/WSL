@@ -43,20 +43,18 @@ std::pair<std::string, std::optional<std::string>> ParseImage(const std::string&
 
 void ValidateContainerName(LPCSTR Name)
 {
-    size_t length = 0;
     const auto& locale = std::locale::classic();
-    while (*Name != '\0')
+    size_t i = 0;
+
+    for (; Name[i] != '\0'; i++)
     {
-        if (!std::isalnum(*Name, locale) && *Name != '_' && *Name != '-' && *Name != '.')
+        if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name));
         }
-
-        Name++;
-        length++;
     }
 
-    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), length == 0 || length > WSLA_MAX_CONTAINER_NAME_LENGTH);
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
 }
 
 } // namespace
@@ -405,7 +403,7 @@ try
         }
         else
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+            THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
         }
     }
 
