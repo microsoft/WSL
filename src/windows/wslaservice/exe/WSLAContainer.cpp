@@ -493,7 +493,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
         m_processes.clear();
 
-        // If the Rm flag is set, delete the container. 
+        // If the Rm flag is set, delete the container.
         // This needs to be done in a detached thread because it will trigger deletion of this object.
         if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
         {
@@ -1048,9 +1048,3 @@ try
     return S_OK;
 }
 CATCH_RETURN();
-
-void WSLAContainer::NotifyDeleted()
-{
-    auto [lock, impl] = LockImpl();
-    m_onDeleted(impl);
-}

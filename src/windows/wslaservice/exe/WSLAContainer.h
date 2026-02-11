@@ -135,9 +135,6 @@ public:
     IFACEMETHOD(GetId)(_Out_ WSLAContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
 
-    // Called by WSLAContainerImpl when Docker auto-removes the container.
-    void NotifyDeleted();
-
 private:
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;
 };
