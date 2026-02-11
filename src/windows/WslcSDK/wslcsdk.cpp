@@ -17,6 +17,7 @@ Abstract:
 #include "wslcsdkprivate.h"
 #include "ProgressCallback.h"
 #include "TerminationCallback.h"
+#include "WslaErrorInfo.h"
 
 
 namespace
@@ -477,7 +478,7 @@ STDAPI WslcProcessGetIOHandles(_In_ WslcProcess process, _In_ WslcProcessIoHandl
 }
 
 // IMAGE MANAGEMENT
-STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage) try
 {
     WSLC_GET_INTERNAL_TYPE(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
@@ -485,14 +486,16 @@ STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOp
     RETURN_HR_IF_NULL(E_INVALIDARG, options->uri);
 
     auto progressCallback = ProgressCallback::CreateIf(options);
-    // TODO: Safe error info and message handoff
-    WSLA_ERROR_INFO errorInfo{};
+    WslaErrorInfo errorInfo{ errorMessage != nullptr };
 
     // TODO: Auth
-    RETURN_IF_FAILED(internalType->session->PullImage(options->uri, nullptr, progressCallback.get(), &errorInfo));
+    RETURN_IF_FAILED(internalType->session->PullImage(options->uri, nullptr, progressCallback.get(), errorInfo));
+
+    errorInfo.CopyMessageIf(errorMessage);
 
     return S_OK;
 }
+CATCH_RETURN();
 
 STDAPI WslcSessionImageImport(_In_ WslcSession session, _In_ const WslcImportImageOptions* options)
 {
