@@ -17,8 +17,8 @@ Abstract:
 #include "SessionService.h"
 
 #define CMD_IF_HELP_PRINT_HELP() if (m_help) { PrintHelp(); return 0; }
-#define CMD_ARG_REQUIRED(arg, msg) if (arg.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
-#define CMD_ARG_ARRAY_REQUIRED(argArray, msg) if (argArray.empty()) { wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
+#define CMD_ARG_REQUIRED(arg, msg) if (arg.empty()) { wsl::windows::common::wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
+#define CMD_ARG_ARRAY_REQUIRED(argArray, msg) if (argArray.empty()) { wsl::windows::common::wslutil::PrintMessage(msg, stderr); PrintHelp(); return E_INVALIDARG; }
 
 namespace wslc::commands
 {

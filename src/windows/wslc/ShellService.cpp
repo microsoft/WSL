@@ -115,7 +115,7 @@ std::vector<SessionInformation> ShellService::List()
     wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
 
     wil::unique_cotaskmem_array_ptr<WSLA_SESSION_INFORMATION> sessions;
-    (sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
+    THROW_IF_FAILED(sessionManager->ListSessions(&sessions, sessions.size_address<ULONG>()));
     for (size_t i = 0; i < sessions.size(); ++i)
     {
         const auto& current = sessions[i];

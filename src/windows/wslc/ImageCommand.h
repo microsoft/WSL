@@ -41,7 +41,7 @@ protected:
 
 private:
     std::string m_format;
-    bool m_quiet;
+    bool m_quiet{};
 };
 
 // wslc image pull

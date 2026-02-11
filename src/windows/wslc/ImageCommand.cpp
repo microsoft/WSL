@@ -36,8 +36,8 @@ int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
 {
     CMD_IF_HELP_PRINT_HELP();
     auto session = m_sessionService.CreateSession();
-    wslc::services::ImageService imageServie;
-    auto images = imageServie.List(session);
+    wslc::services::ImageService imageService;
+    auto images = imageService.List(session);
     if (m_format == "json")
     {
         for (const models::ImageInformation& image : images)

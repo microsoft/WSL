@@ -103,8 +103,16 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
         auto allContainers = containerService.List(session);
         for(const auto& container : allContainers)
         {
-            containersToStop.push_back(container.Name);
+            if (container.State == WSLA_CONTAINER_STATE::WslaContainerStateRunning)
+            {
+                containersToStop.push_back(container.Name);
+            }
         }
+    }
+    else if(containersToStop.empty())
+    {
+        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to stop all containers.");
+        return 1;
     }
 
     for (const auto& id : containersToStop)
@@ -129,6 +137,11 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
         {
             containersToKill.push_back(container.Name);
         }
+    }
+    else if(containersToKill.empty())
+    {
+        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to kill all containers.");
+        return 1;
     }
 
     for (const auto& id : containersToKill)
@@ -239,7 +252,7 @@ int ContainerInspectCommand::ExecuteInternal(std::wstring_view commandLine, int 
 {
     CMD_IF_HELP_PRINT_HELP();
     auto arguments = Arguments();
-    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
+    CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
     std::vector<InspectContainer> result;

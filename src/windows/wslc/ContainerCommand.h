@@ -134,7 +134,7 @@ protected:
 
 private:
     wslc::models::StopContainerOptions m_options;
-    bool m_all;
+    bool m_all{};
 };
 
 // wslc container kill
@@ -162,7 +162,7 @@ protected:
 
 private:
     wslc::models::KillContainerOptions m_options;
-    bool m_all;
+    bool m_all{};
 };
 
 
@@ -190,8 +190,8 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    bool m_force;
-    bool m_all;
+    bool m_force{};
+    bool m_all{};
 };
 
 
@@ -221,9 +221,9 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    bool m_all;
+    bool m_all{};
     std::string m_format;
-    bool m_quiet;
+    bool m_quiet{};
 };
 
 
