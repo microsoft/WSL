@@ -301,7 +301,6 @@ STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent
     return E_NOTIMPL;
 }
 
-
 // PROCESS RESULT / SIGNALS
 
 STDAPI WslcProcessGetState(_In_ WslcProcess process, _Out_ WslcProcessState* state)
@@ -404,4 +403,5 @@ STDAPI WslcInstallWithDependencies(_In_opt_ __callback WslcInstallCallback progr
     UNREFERENCED_PARAMETER(context);
     return E_NOTIMPL;
 }
+
 
