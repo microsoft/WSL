@@ -9,6 +9,9 @@
 // Include all commands that parent to the root. 
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
+#include "RegistryCommand.h"
+#include "SessionCommand.h"
+#include "VolumeCommand.h"
 
 #ifdef _DEBUG
 #include "TestCommand.h"
@@ -25,6 +28,9 @@ namespace wsl::windows::wslc
         return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
             std::make_unique<ContainerCommand>(FullName()),
             std::make_unique<ImageCommand>(FullName()),
+            std::make_unique<RegistryCommand>(FullName()),
+            std::make_unique<SessionCommand>(FullName()),
+            std::make_unique<VolumeCommand>(FullName()),
             std::make_unique<ContainerCreateCommand>(FullName()),
             std::make_unique<ContainerDeleteCommand>(FullName()),
             std::make_unique<ContainerExecCommand>(FullName()),

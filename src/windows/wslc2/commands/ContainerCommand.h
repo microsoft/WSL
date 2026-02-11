@@ -137,5 +137,4 @@ namespace wsl::windows::wslc
     protected:
         void ExecuteInternal(CLIExecutionContext& context) const override;
     };
-
-    }
+}

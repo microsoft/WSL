@@ -35,6 +35,6 @@ namespace wsl::windows::wslc
 
     void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
-        PrintMessage(L"Image Prune subcommand executing..", stdout);
+        PrintMessage(L"Image Prune subcommand executing..");
     }
 }

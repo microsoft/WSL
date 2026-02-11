@@ -125,4 +125,4 @@ namespace wsl::windows::wslc
         void ExecuteInternal(CLIExecutionContext& context) const override;
     };
 
-    }
+}
