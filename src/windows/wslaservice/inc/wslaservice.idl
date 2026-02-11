@@ -171,6 +171,18 @@ struct WSLA_PORT_MAPPING
     int Family;
 };
 
+struct WSLA_LABEL
+{
+    [string] LPCSTR Key;
+    [string] LPCSTR Value;
+};
+
+struct WSLA_LABEL_INFORMATION
+{
+    [string] LPSTR Key;
+    [string] LPSTR Value;
+};
+
 enum WSLA_CONTAINER_NETWORK_TYPE
 {
     WSLA_CONTAINER_NETWORK_BRIDGE = 0,
@@ -214,6 +226,8 @@ struct WSLA_CONTAINER_OPTIONS
     ULONG VolumesCount;
     [unique, size_is(PortsCount)] struct WSLA_PORT_MAPPING* Ports;
     ULONG PortsCount;
+    [unique, size_is(LabelsCount)] const struct WSLA_LABEL* Labels;
+    ULONG LabelsCount;
     WSLAContainerFlags Flags;
     WSLASignal StopSignal;
     // TODO: List specific GPU devices.
@@ -293,6 +307,48 @@ typedef enum _WSLAFeatureFlags
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAFeatureFlags);")
 
+//
+// IWSLAVirtualMachine - Interface representing a single VM instance.
+// Operations are scoped to this VM. The VM ID is stored internally,
+// so only the holder of this interface can operate on the VM.
+//
+[
+    uuid(B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A),
+    pointer_default(unique),
+    object
+]
+interface IWSLAVirtualMachine : IUnknown
+{
+    // Gets the VM ID.
+    HRESULT GetId([out, retval] GUID* VmId);
+
+    // Accepts a connect from mini_init in the VM.
+    HRESULT AcceptConnection([out, system_handle(sh_socket)] HANDLE* Socket);
+
+    // Configures networking engine with sockets from the user process.
+    // GnsSocket is required; DnsSocket is optional (NULL if DNS tunneling is disabled).
+    // The service duplicates the socket handles.
+    HRESULT ConfigureNetworking(
+        [in, system_handle(sh_socket)] HANDLE GnsSocket,
+        [in, system_handle(sh_socket), unique] HANDLE* DnsSocket);
+
+    // Attaches a VHD or VHDX disk to the VM.
+    // GrantVmAccess is called by the service before attaching.
+    // Returns the SCSI LUN assigned to the disk.
+    HRESULT AttachDisk([in] LPCWSTR Path, [in] BOOL ReadOnly, [out, retval] ULONG* Lun);
+
+    // Detaches a previously attached disk from the VM.
+    HRESULT DetachDisk([in] ULONG Lun);
+
+    // Adds a filesystem share (Plan9 or VirtioFS) accessible to the VM.
+    // Returns an instance GUID that can be used to remove the share.
+    HRESULT AddShare([in] LPCWSTR WindowsPath, [in] BOOL ReadOnly, [out, retval] GUID* ShareId);
+
+    // Removes a previously added filesystem share.
+    HRESULT RemoveShare([in] REFGUID ShareId);
+}
+
+// Settings for IWSLASessionManager::CreateSession - full session configuration
 struct WSLA_SESSION_SETTINGS {
     LPCWSTR DisplayName;
     LPCWSTR StoragePath;
@@ -334,10 +390,10 @@ interface IWSLAContainer : IUnknown
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
     HRESULT Inspect([out] LPSTR* Output);
-    HRESULT GetID([out] LPSTR * Id);
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
+    HRESULT GetLabels([out, size_is(, *Count)] struct WSLA_LABEL_INFORMATION** Labels, [out] ULONG* Count);
 
     // Anonymous host port allocation (P1).
     //HRESULT AllocateHostPort([in] LPCSTR Name, [in] USHORT ContainerPort, [out] USHORT* AllocatedHostPort);
@@ -364,6 +420,12 @@ struct WSLA_DELETE_IMAGE_OPTIONS
     // TODO: Platforms: a json array of OCI platform strings.
 };
 
+typedef enum _WSLASessionState
+{
+    WSLASessionStateRunning = 0,
+    WSLASessionStateTerminated = 1
+} WSLASessionState;
+
 [
     uuid(EF0661E4-6364-40EA-B433-E2FDF11F3519),
     pointer_default(unique),
@@ -372,6 +434,7 @@ struct WSLA_DELETE_IMAGE_OPTIONS
 interface IWSLASession : IUnknown
 {
     HRESULT GetId([out] ULONG* Id);
+    HRESULT GetState([out] WSLASessionState* State);
 
     // Image management.
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
@@ -403,6 +466,58 @@ interface IWSLASession : IUnknown
     HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
     HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
+
+    // Session initialization - called by SYSTEM service after launching per-user process.
+    // Returns a handle to this COM server process (used to add to job object).
+    HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
+
+    // Initializes the session with a pre-created VM.
+    HRESULT Initialize(
+        [in] const struct WSLA_SESSION_INIT_SETTINGS* Settings,
+        [in] IWSLAVirtualMachine* Vm);
+
+}
+
+//
+// IWSLASessionReference - Weak reference to a session held by the SYSTEM service.
+// Stored in per-user process, allows service to check liveness and terminate sessions.
+// Session metadata (ID, name, etc.) is stored service-side in SessionEntry.
+//
+[
+    uuid(B3A72F48-9D15-4E8A-A621-7C3E84F09B52),
+    pointer_default(unique),
+    object
+]
+interface IWSLASessionReference : IUnknown
+{
+    // Try to open the session. Fails if session was released or terminated.
+    // Returns S_OK and a valid session if still alive.
+    HRESULT OpenSession([out] IWSLASession** Session);
+
+    // Terminate the session if still alive.
+    HRESULT Terminate();
+}
+
+//
+// IWSLASessionFactory - Creates sessions in the per-user COM server process.
+// Called by the SYSTEM service via CoCreateInstanceAsUser.
+//
+[
+    uuid(C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91),
+    pointer_default(unique),
+    object
+]
+interface IWSLASessionFactory : IUnknown
+{
+    // Creates a new session and returns both the session interface and a service reference.
+    HRESULT CreateSession(
+        [in] const struct WSLA_SESSION_INIT_SETTINGS* Settings,
+        [in] IWSLAVirtualMachine* Vm,
+        [out] IWSLASession** Session,
+        [out] IWSLASessionReference** ServiceRef);
+
+    // Gets the process handle for adding to job object.
+    HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 }
 
 struct WSLA_SESSION_INFORMATION
@@ -411,6 +526,19 @@ struct WSLA_SESSION_INFORMATION
     DWORD CreatorPid;
     wchar_t DisplayName[256];
     wchar_t Sid[256 + 1]; // MAX_SID_SIZE = 256
+};
+
+// Settings for IWSLASession::Initialize - passed from service to per-user process
+struct WSLA_SESSION_INIT_SETTINGS {
+    ULONG SessionId;
+    ULONG CreatorPid;
+    LPCWSTR DisplayName;
+    LPCWSTR StoragePath;
+    ULONGLONG MaximumStorageSizeMb;
+    ULONG BootTimeoutMs;
+    WSLANetworkingMode NetworkingMode;
+    WSLAFeatureFlags FeatureFlags;
+    [unique] LPCSTR RootVhdTypeOverride;
 };
 
 typedef enum _WSLASessionFlags
@@ -429,10 +557,10 @@ interface IWSLASessionManager : IUnknown
 {
     HRESULT GetVersion([out] WSLA_VERSION* Version);
 
-    // Session managment.
-    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out]IWSLASession** Session);
+    // Session management.
+    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
-    HRESULT OpenSession([in] ULONG Id, [out]IWSLASession** Session);
+    HRESULT OpenSession([in] ULONG Id, [out] IWSLASession** Session);
     HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
 }
 

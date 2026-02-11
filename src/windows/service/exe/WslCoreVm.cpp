@@ -158,7 +158,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Set the install path of the package.
     m_installPath = wsl::windows::common::wslutil::GetBasePath();
 
-    // Initialize the path to the tools folder.
+    // Initialize the path to the tools folder which also serves as the default rootfs path.
     m_rootFsPath = m_installPath / LXSS_TOOLS_DIRECTORY;
 
     // Store the path of the user profile.
