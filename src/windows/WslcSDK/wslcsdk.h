@@ -66,7 +66,6 @@ typedef enum WslcVhdType
 
 typedef struct WslcVhdRequirements
 {
-    _In_z_ PCWSTR path;      // Full path to the VHD/VHDX file
     _In_ UINT64 sizeInBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;   // Dynamic / Fixed
 } WslcVhdRequirements;
