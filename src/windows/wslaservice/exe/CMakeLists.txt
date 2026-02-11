@@ -11,8 +11,6 @@ set(HEADERS
     WSLASessionManagerFactory.h
     HcsVirtualMachine.h)
 
-include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslasession)
-
 add_executable(wslaservice ${SOURCES} ${HEADERS})
 add_dependencies(wslaservice wslaserviceidl)
 add_compile_definitions(__WRL_CLASSIC_COM__)
