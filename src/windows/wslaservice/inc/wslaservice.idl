@@ -122,13 +122,34 @@ struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
     // TODO: Details TBD.
 };
 
-
 struct WSLA_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     char Hash[256];
+    char Digest[256];
     ULONGLONG Size;
-    ULONGLONG DownloadTimestamp;
+    LONGLONG Created; // Unix timestamp
+    char ParentId[256];
+};
+
+typedef enum _WSLAListImagesFlags
+{
+    WSLAListImagesFlagsNone = 0,
+    WSLAListImagesFlagsAll = 1,           // Show all images (default hides intermediate images)
+    WSLAListImagesFlagsDigests = 2,       // Include digest information
+    WSLAListImagesFlagsDanglingTrue = 4,  // Show only dangling images (untagged)
+    WSLAListImagesFlagsDanglingFalse = 8, // Show only non-dangling images (tagged)
+    // Note: If neither dangling flag is set, show all images (both tagged and untagged)
+} WSLAListImagesFlags;
+
+struct WSLA_LIST_IMAGES_OPTIONS
+{
+    DWORD Flags; // WSLAListImagesFlags (can combine with bitwise OR)
+    [unique] LPCSTR Reference; // Filter by reference (name[:tag])
+    [unique] LPCSTR Before; // Filter: show images created before this image
+    [unique] LPCSTR Since; // Filter: show images created since this image
+    [unique, size_is(LabelsCount)] const struct WSLA_LABEL* Labels;
+    ULONG LabelsCount;
 };
 
 typedef enum _WSLAProcessFlags
@@ -412,11 +433,17 @@ struct WSLA_DELETED_IMAGE_INFORMATION
     WSLADeletedImageType Type;
 };
 
+typedef enum _WSLADeleteImageFlags
+{
+    WSLADeleteImageFlagsNone = 0,
+    WSLADeleteImageFlagsForce = 1,
+    WSLADeleteImageFlagsNoPrune = 2,
+} WSLADeleteImageFlags;
+
 struct WSLA_DELETE_IMAGE_OPTIONS
 {
     LPCSTR Image; // Image can be ID or Repo:Tag.
-    BOOL Force;
-    BOOL NoPrune;
+    DWORD Flags; // WSLADeleteImageFlags
     // TODO: Platforms: a json array of OCI platform strings.
 };
 
@@ -441,7 +468,7 @@ interface IWSLASession : IUnknown
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, out, unique] WSLA_ERROR_INFO * ErrorInfo);
-    HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
+    HRESULT ListImages([in, unique] const struct WSLA_LIST_IMAGES_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
 
     // Container management.

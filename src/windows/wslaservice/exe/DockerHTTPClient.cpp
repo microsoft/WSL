@@ -159,9 +159,47 @@ void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, 
     Transaction<docker_schema::EmptyRequest>(verb::post, url);
 }
 
-std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
+std::vector<docker_schema::Image> DockerHTTPClient::ListImages(bool all, bool digests, const ListImagesFilters& filters)
 {
-    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, URL::Create("/images/json"));
+    auto url = URL::Create("/images/json");
+
+    url.SetParameter("all", all);
+    url.SetParameter("digests", digests);
+
+    // Build filters JSON if any filters are set
+    nlohmann::json filtersJson;
+
+    if (filters.reference.has_value())
+    {
+        filtersJson["reference"] = nlohmann::json::array({filters.reference.value()});
+    }
+
+    if (filters.before.has_value())
+    {
+        filtersJson["before"] = nlohmann::json::array({filters.before.value()});
+    }
+
+    if (filters.since.has_value())
+    {
+        filtersJson["since"] = nlohmann::json::array({filters.since.value()});
+    }
+
+    if (filters.dangling.has_value())
+    {
+        filtersJson["dangling"] = nlohmann::json::array({filters.dangling.value() ? "true" : "false"});
+    }
+
+    if (!filters.labels.empty())
+    {
+        filtersJson["label"] = filters.labels;
+    }
+
+    if (!filtersJson.empty())
+    {
+        url.SetParameter("filters", filtersJson.dump());
+    }
+
+    return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, url);
 }
 
 std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTPClient::DeleteImage(const char* Image, bool Force, bool NoPrune)

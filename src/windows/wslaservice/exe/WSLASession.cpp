@@ -575,34 +575,178 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
 }
 
-HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
+DEFINE_ENUM_FLAG_OPERATORS(WSLAListImagesFlags);
+
+HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count, WSLA_ERROR_INFO* Error)
 try
 {
     *Count = 0;
     *Images = nullptr;
 
+    if (Options != nullptr)
+    {
+        RETURN_HR_IF(E_INVALIDARG, WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingTrue) && WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingFalse));
+    }
+
     std::lock_guard lock{m_lock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto images = m_dockerClient->ListImages();
+    // Extract options for Docker API
+    bool all = false;
+    bool digests = false;
+    DockerHTTPClient::ListImagesFilters filters;
 
-    // Compute the number of entries.
+    if (Options != nullptr)
+    {
+        all = WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsAll);
+        digests = WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDigests);
+
+        if (Options->Reference != nullptr)
+        {
+            filters.reference = Options->Reference;
+        }
+
+        if (Options->Before != nullptr)
+        {
+            filters.before = Options->Before;
+        }
+
+        if (Options->Since != nullptr)
+        {
+            filters.since = Options->Since;
+        }
+
+        // Check dangling flags (mutually exclusive in practice)
+        if (WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingTrue))
+        {
+            filters.dangling = true;
+        }
+        else if (WI_IsFlagSet(Options->Flags, WSLAListImagesFlagsDanglingFalse))
+        {
+            filters.dangling = false;
+        }
+        // If neither flag is set, filters.dangling remains std::nullopt (show all)
+
+        // Parse labels
+        if (Options->Labels != nullptr && Options->LabelsCount > 0)
+        {
+            for (ULONG i = 0; i < Options->LabelsCount; ++i)
+            {
+                const auto& label = Options->Labels[i];
+                if (label.Key != nullptr)
+                {
+                    std::string labelFilter = label.Key;
+                    if (label.Value != nullptr)
+                    {
+                        labelFilter += "=";
+                        labelFilter += label.Value;
+                    }
+                    filters.labels.push_back(labelFilter);
+                }
+            }
+        }
+    }
+
+    std::vector<docker_schema::Image> images;
+    try
+    {
+        images = m_dockerClient->ListImages(all, digests, filters);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage;
+        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            if (Error != nullptr)
+            {
+                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
+            }
+        }
+
+        THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
+    }
+
+    // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate<decltype(images.begin()), size_t>(
-        images.begin(), images.end(), 0, [](auto sum, const auto& e) { return sum + e.RepoTags.size(); });
+        images.begin(), images.end(), 0, [](auto sum, const auto& e) {
+            return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
+        });
 
     auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(entries);
 
     size_t index = 0;
     for (const auto& e : images)
     {
-        // TODO: download_timestamp
-        for (const auto& tag : e.RepoTags)
+        // Build a map from repo name to digest for this image
+        // RepoDigests format: "repo@sha256:digest"
+        std::map<std::string, std::string> repoToDigest;
+        for (const auto& repoDigest : e.RepoDigests)
         {
-            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+            size_t atPos = repoDigest.find('@');
+            if (atPos != std::string::npos && atPos > 0)
+            {
+                std::string repoName = repoDigest.substr(0, atPos);
+                repoToDigest[repoName] = repoDigest;
+            }
+        }
+
+        if (e.RepoTags.empty())
+        {
+            // Image has no tags (dangling image)
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, "<none>:<none>") != 0);
             THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+
+            // Set digest if available
+            if (!e.RepoDigests.empty())
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, e.RepoDigests[0].c_str()) != 0);
+            }
+            else
+            {
+                output[index].Digest[0] = '\0';
+            }
+
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
             output[index].Size = e.Size;
+            output[index].Created = e.Created;
             index++;
+        }
+        else
+        {
+            // Image has tags - create one entry per tag
+            for (const auto& tag : e.RepoTags)
+            {
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, tag.c_str()) != 0);
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Hash, e.Id.c_str()) != 0);
+
+                // Extract repo name from tag (format: "repo:tag")
+                // and lookup corresponding digest from the map
+                size_t colonPos = tag.find(':');
+                if (colonPos != std::string::npos && colonPos > 0)
+                {
+                    std::string repoName = tag.substr(0, colonPos);
+                    auto it = repoToDigest.find(repoName);
+                    if (it != repoToDigest.end())
+                    {
+                        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, it->second.c_str()) != 0);
+                    }
+                    else
+                    {
+                        output[index].Digest[0] = '\0';
+                    }
+                }
+                else
+                {
+                    output[index].Digest[0] = '\0';
+                }
+
+                THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].ParentId, e.ParentId.c_str()) != 0);
+                output[index].Size = e.Size;
+                output[index].Created = e.Created;
+                index++;
+            }
         }
     }
 
@@ -613,6 +757,8 @@ try
     return S_OK;
 }
 CATCH_RETURN();
+
+DEFINE_ENUM_FLAG_OPERATORS(WSLADeleteImageFlags);
 
 HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count, WSLA_ERROR_INFO* Error)
 try
@@ -632,7 +778,7 @@ try
     std::vector<docker_schema::DeletedImage> deletedImages;
     try
     {
-        deletedImages = m_dockerClient->DeleteImage(Options->Image, !!Options->Force, !!Options->NoPrune);
+        deletedImages = m_dockerClient->DeleteImage(Options->Image, WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsForce), WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsNoPrune));
     }
     catch (const DockerHTTPException& e)
     {

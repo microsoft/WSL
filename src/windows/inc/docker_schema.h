@@ -116,9 +116,12 @@ struct Image
 {
     std::string Id;
     std::vector<std::string> RepoTags;
+    std::vector<std::string> RepoDigests;
     uint64_t Size{};
+    int64_t Created{};
+    std::string ParentId;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Image, Id, RepoTags, Size);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Image, Id, RepoTags, RepoDigests, Size, Created, ParentId);
 };
 
 struct DeletedImage
