@@ -59,47 +59,59 @@ void ValidateContainerName(LPCSTR Name)
 
 } // namespace
 
-WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated) :
-    m_id(id),
-    m_displayName(Settings.DisplayName),
-    m_tokenInfo(std::move(TokenInfo)),
-    m_elevatedToken(Elevated),
-    m_featureFlags(Settings.FeatureFlags)
+namespace wsl::windows::service::wsla {
+
+HRESULT WSLASession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
+try
 {
-    auto callingProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
-    m_creatorPid = GetProcessId(callingProcess.get());
+    RETURN_HR_IF(E_POINTER, ProcessHandle == nullptr);
+
+    wil::unique_handle process{OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId())};
+    THROW_LAST_ERROR_IF(!process);
+
+    *ProcessHandle = process.release();
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::Initialize(_In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm)
+try
+{
+    RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
+
+    m_id = Settings->SessionId;
+    m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
+    m_featureFlags = Settings->FeatureFlags;
+
+    // Get user token for the current process
+    const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
 
     WSL_LOG(
-        "SessionCreated",
+        "SessionInitialized",
+        TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
-        TraceLoggingValue(GetSidString().get(), "Sid"),
-        TraceLoggingValue(Elevated, "Elevated"),
-        TraceLoggingValue(m_creatorPid, "CreatorPid"));
+        TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
 
-    m_virtualMachine.emplace(CreateVmSettings(Settings), m_tokenInfo->User.Sid);
-
-    if (Settings.TerminationCallback != nullptr)
-    {
-        m_virtualMachine->RegisterCallback(Settings.TerminationCallback);
-    }
-
-    m_virtualMachine->Start();
-
-    ConfigureStorage(Settings, m_tokenInfo->User.Sid);
+    // Create the VM.
+    m_virtualMachine.emplace(Vm, Settings);
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
+
+    // Configure storage.
+    ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
     // Launch dockerd
     StartDockerd();
 
     // Wait for dockerd to be ready before starting the event tracker.
     THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings.BootTimeoutMs), "Timed out waiting for dockerd to start");
+        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLA_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
     //  Start the event tracker.
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
@@ -108,57 +120,28 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::u
     RecoverExistingContainers();
 
     errorCleanup.release();
+    return S_OK;
 }
-
-WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings)
-{
-    WSLAVirtualMachine::Settings vmSettings{};
-    vmSettings.CpuCount = Settings.CpuCount;
-    vmSettings.MemoryMb = Settings.MemoryMb;
-    vmSettings.NetworkingMode = Settings.NetworkingMode;
-    vmSettings.BootTimeoutMs = Settings.BootTimeoutMs;
-    vmSettings.FeatureFlags = static_cast<WSLAFeatureFlags>(Settings.FeatureFlags);
-    vmSettings.DisplayName = Settings.DisplayName;
-
-    if (Settings.RootVhdOverride != nullptr)
-    {
-        THROW_HR_IF(E_INVALIDARG, Settings.RootVhdTypeOverride == nullptr);
-
-        vmSettings.RootVhd = Settings.RootVhdOverride;
-        vmSettings.RootVhdType = Settings.RootVhdTypeOverride;
-    }
-    else
-    {
-
-#ifdef WSL_SYSTEM_DISTRO_PATH
-
-        vmSettings.RootVhd = TEXT(WSL_SYSTEM_DISTRO_PATH);
-
-#else
-
-        vmSettings.RootVhd = std::filesystem::path(common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
-
-#endif
-
-        vmSettings.RootVhdType = "ext4";
-    }
-
-    if (Settings.DmesgOutput != 0)
-    {
-        vmSettings.DmesgHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Settings.DmesgOutput)));
-    }
-
-    return vmSettings;
-}
+CATCH_RETURN()
 
 WSLASession::~WSLASession()
 {
-    WSL_LOG("SessionTerminated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
+    WSL_LOG("SessionTerminated", TraceLoggingValue(m_id, "SessionId"), TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
     LOG_IF_FAILED(Terminate());
+
+    if (m_destructionCallback)
+    {
+        m_destructionCallback();
+    }
 }
 
-void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid)
+void WSLASession::SetDestructionCallback(std::function<void()>&& callback)
+{
+    m_destructionCallback = std::move(callback);
+}
+
+void WSLASession::ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid)
 {
     if (Settings.StoragePath == nullptr)
     {
@@ -184,7 +167,6 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID U
                 m_virtualMachine->DetachDisk(diskLun.value());
             }
 
-            auto runAsUser = wil::CoImpersonateClient();
             LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_storageVhdPath.c_str()));
         }
     });
@@ -203,8 +185,6 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID U
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
 
-        auto runAsUser = wil::CoImpersonateClient();
-
         std::filesystem::create_directories(storagePath);
         wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, false, false);
         vhdCreated = true;
@@ -222,50 +202,11 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID U
     deleteVhdOnFailure.release();
 }
 
-const std::wstring& WSLASession::DisplayName() const
-{
-    return m_displayName;
-}
-
-DWORD WSLASession::GetCreatorPid() const noexcept
-{
-    return m_creatorPid;
-}
-
-ULONG WSLASession::GetId() const noexcept
-{
-    return m_id;
-}
-
 HRESULT WSLASession::GetId(ULONG* Id)
 {
     *Id = m_id;
 
     return S_OK;
-}
-
-PSID WSLASession::GetSid() const noexcept
-{
-    return m_tokenInfo->User.Sid;
-}
-
-wil::unique_hlocal_string WSLASession::GetSidString() const
-{
-    wil::unique_hlocal_string sid;
-    THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSid(m_tokenInfo->User.Sid, &sid));
-
-    return sid;
-}
-
-bool WSLASession::IsTokenElevated() const noexcept
-{
-    return m_elevatedToken;
-}
-
-void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
-{
-    THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);
-    wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
 void WSLASession::OnDockerdExited()
@@ -902,11 +843,6 @@ try
 }
 CATCH_RETURN();
 
-void WSLASession::OnUserSessionTerminating()
-{
-    LOG_IF_FAILED(Terminate());
-}
-
 HRESULT WSLASession::Terminate()
 try
 {
@@ -960,7 +896,6 @@ try
         }
         CATCH_LOG();
 
-        m_virtualMachine->OnSessionTerminated();
         m_virtualMachine.reset();
     }
 
@@ -1029,20 +964,11 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.get() == Container; }) == 1);
 }
 
-HRESULT WSLASession::GetImplNoRef(_Out_ WSLASession** Session)
-{
-    // N.B. This returns a raw pointer to the implementation without calling AddRef.
-    // The caller must hold a separate strong reference to the owning WSLASession
-    // object for at least as long as this pointer is used, and must not store it
-    // beyond that lifetime.
-    *Session = this;
-    return S_OK;
-}
-
-bool WSLASession::Terminated()
+HRESULT WSLASession::GetState(_Out_ WSLASessionState* State)
 {
     std::lock_guard lock{m_lock};
-    return !m_virtualMachine;
+    *State = m_virtualMachine ? WSLASessionStateRunning : WSLASessionStateTerminated;
+    return S_OK;
 }
 
 void WSLASession::RecoverExistingContainers()
@@ -1079,3 +1005,5 @@ void WSLASession::RecoverExistingContainers()
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_containers.size(), "ContainerCount"));
 }
+
+} // namespace wsl::windows::service::wsla

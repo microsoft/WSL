@@ -34,6 +34,7 @@ extern bool g_fastTestRun;
 class WSLATests
 {
     WSL_TEST_CLASS(WSLATests)
+
     wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
     WSADATA m_wsadata;
     std::filesystem::path m_storagePath;
@@ -124,14 +125,16 @@ class WSLATests
 
     wil::com_ptr<IWSLASession> CreateSession(const WSLA_SESSION_SETTINGS& sessionSettings, WSLASessionFlags Flags = WSLASessionFlagsNone)
     {
-        wil::com_ptr<IWSLASessionManager> sessionManager;
-        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager.get());
+        const auto sessionManager = OpenSessionManager();
 
         wil::com_ptr<IWSLASession> session;
 
         VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
+        WSLASessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(state, WSLASessionStateRunning);
 
         return session;
     }
@@ -1305,7 +1308,7 @@ class WSLATests
 
             // Validate that the process object correctly handle requests after the VM has terminated.
             ResetTestSession();
-            VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
+            VERIFY_ARE_EQUAL(process.Get().Signal(WSLASignalSIGKILL), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
         }
 
         // Validate that empty arguments are correctly handled.
@@ -1928,9 +1931,9 @@ class WSLATests
             // Terminate the session
             ResetTestSession();
 
-            // Validate that calling into the container returns RPC_E_DISCONNECTED.
+            // Validate that calling into the container returns RPC_S_SERVER_UNAVAILABLE.
             WSLA_CONTAINER_STATE state = WslaContainerStateRunning;
-            VERIFY_ARE_EQUAL(container.Get().GetState(&state), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
             VERIFY_ARE_EQUAL(state, WslaContainerStateInvalid);
         }
     }
@@ -2348,7 +2351,7 @@ class WSLATests
         auto restore = createNewSession ? std::optional{ResetTestSession()} : std::nullopt;
         auto session = createNewSession ? CreateSession(settings) : m_defaultSession;
 
-        return std::make_pair(std::move(restore), session);
+        return std::make_pair(std::move(restore), std::move(session));
     }
 
     TEST_METHOD(PortMappingsNat)
@@ -2930,6 +2933,9 @@ class WSLATests
             VERIFY_ARE_EQUAL(manager->CreateSession(&settings, WSLASessionFlagsPersistent, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             VERIFY_SUCCEEDED(session1Copy->Terminate());
+            WSLASessionState state{};
+            VERIFY_SUCCEEDED(session1Copy->GetState(&state));
+            VERIFY_ARE_EQUAL(state, WSLASessionStateTerminated);
             expectSessions({c_testSessionName});
 
             // Validate that a new session is created if WSLASessionFlagsOpenExisting is set and no match is found.

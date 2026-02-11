@@ -1,35 +1,16 @@
 set(SOURCES
     application.manifest
-    ContainerEventTracker.cpp
-    DockerHTTPClient.cpp
     main.rc
-    IORelay.cpp
     ServiceMain.cpp
-    ServiceProcessLauncher.cpp
-    WSLAContainer.cpp
-    WSLAProcess.cpp
-    WSLAProcessControl.cpp
-    WSLAProcessIO.cpp
-    WSLASession.cpp
     WSLASessionManager.cpp
     WSLASessionManagerFactory.cpp
-    WSLAVirtualMachine.cpp
+    HcsVirtualMachine.cpp
     )
 
 set(HEADERS
-    COMImplClass.h
-    ContainerEventTracker.h
-    DockerHTTPClient.h
-    IORelay.h
-    ServiceProcessLauncher.h
-    WSLAContainer.h
-    WSLAProcess.h
-    WSLAProcessControl.h
-    WSLAProcessIO.h
-    WSLASession.h
     WSLASessionManager.h
     WSLASessionManagerFactory.h
-    WSLAVirtualMachine.h)
+    HcsVirtualMachine.h)
 
 include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
 

@@ -100,6 +100,8 @@ static int RunShellCommand(std::wstring_view commandLine)
         return ReportError(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), hr);
     }
 
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
     if (verbose)
     {
         wslutil::PrintMessage(std::format(L"[diag] Session opened: '{}'", sessionName), stdout);
