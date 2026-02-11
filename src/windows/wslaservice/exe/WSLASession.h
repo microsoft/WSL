@@ -25,37 +25,29 @@ namespace wsl::windows::service::wsla {
 
 class WSLASession;
 
-// This private interface is used to get a WSLASession pointer from its weak reference. It's only used within the service.
-class DECLSPEC_UUID("4559499B-4F07-4BD4-B098-9F4A432E9456") IWSLASessionImpl : public IInspectable
-{
-public:
-    // N.B. The caller must maintain a reference to the COM object for the return pointer to be used safely.
-    IFACEMETHOD(GetImplNoRef)(_Out_ WSLASession** Session) = 0;
-};
-
+//
+// WSLASession - Implements IWSLASession for container management.
+// Runs in a per-user COM server process for security isolation.
+// The SYSTEM service creates the VM and passes IWSLAVirtualMachine to Initialize().
+//
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IFastRundown>
 {
 public:
-    WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated);
+    WSLASession() = default;
 
     ~WSLASession();
 
-    ULONG GetId() const noexcept;
+    // Sets a callback invoked when this object is destroyed.
+    // Used by the COM server host to signal process exit.
+    void SetDestructionCallback(std::function<void()>&& callback);
 
-    PSID GetSid() const noexcept;
-
-    wil::unique_hlocal_string GetSidString() const;
-
-    DWORD GetCreatorPid() const noexcept;
-
-    bool IsTokenElevated() const noexcept;
-
-    const std::wstring& DisplayName() const;
-
-    void CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const;
+    // IWSLASession - initialization methods
+    IFACEMETHOD(GetProcessHandle)(_Out_ HANDLE* ProcessHandle) override;
+    IFACEMETHOD(Initialize)(_In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm) override;
 
     IFACEMETHOD(GetId)(_Out_ ULONG* Id) override;
+    IFACEMETHOD(GetState)(_Out_ WSLASessionState* State) override;
 
     // Image management.
     IFACEMETHOD(PullImage)(
@@ -95,24 +87,16 @@ public:
 
     IFACEMETHOD(Terminate()) override;
 
-    IFACEMETHOD(GetImplNoRef)(_Out_ WSLASession** Session) override;
-
     // Testing.
     IFACEMETHOD(MountWindowsFolder)(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly) override;
     IFACEMETHOD(UnmountWindowsFolder)(_In_ LPCSTR LinuxPath) override;
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
 
-    void OnUserSessionTerminating();
-
-    bool Terminated();
-
 private:
     ULONG m_id = 0;
 
-    static WSLAVirtualMachine::Settings CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings);
-
-    void ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid);
+    void ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
     void OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);
@@ -132,13 +116,11 @@ private:
     std::filesystem::path m_storageVhdPath;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
-    wil::unique_tokeninfo_ptr<TOKEN_USER> m_tokenInfo;
-    bool m_elevatedToken{};
-    DWORD m_creatorPid{};
     std::recursive_mutex m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLAFeatureFlags m_featureFlags{};
+    std::function<void()> m_destructionCallback;
 };
 
 } // namespace wsl::windows::service::wsla

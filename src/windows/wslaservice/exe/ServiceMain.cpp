@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains the entrypoint for the Lxss Manager service.
+    This file contains the entrypoint for the WSLA service.
 
 --*/
 
@@ -23,8 +23,6 @@ using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::string;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::policies;
-
-wil::unique_event g_networkingReady{wil::EventOptions::ManualReset};
 
 // Declare the WSLASessionManager COM class.
 CoCreatableClassWrlCreatorMapInclude(WSLASessionManager);
