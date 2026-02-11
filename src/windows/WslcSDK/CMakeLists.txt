@@ -1,9 +1,11 @@
 set(SOURCES
+    ProgressCallback.cpp
     TerminationCallback.cpp
     wslcsdk.cpp
     WslcsdkPrivate.cpp
 )
 set(HEADERS
+    ProgressCallback.h
     TerminationCallback.h
     wslcsdk.h
     WslcsdkPrivate.h

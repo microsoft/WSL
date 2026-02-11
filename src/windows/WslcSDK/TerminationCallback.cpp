@@ -11,7 +11,7 @@ Abstract:
     Implementation of a type that implements ITerminationCallback.
 
 --*/
-#pragma once
+#include "precomp.h"
 #include "TerminationCallback.h"
 
 namespace
@@ -30,16 +30,16 @@ namespace
     }
 }
 
-TerminationCallback::TerminationCallback(WslcSessionTerminationCallback terminationCallback, PVOID terminationCallbackContext) :
-    m_terminationCallback(terminationCallback), m_terminationCallbackContext(terminationCallbackContext)
+TerminationCallback::TerminationCallback(WslcSessionTerminationCallback callback, PVOID context) :
+    m_callback(callback), m_context(context)
 {}
 
 // TODO: Details is lost?
 HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR)
 {
-    if (m_terminationCallback)
+    if (m_callback)
     {
-        m_terminationCallback(ConvertReason(Reason), m_terminationCallbackContext);
+        m_callback(ConvertReason(Reason), m_context);
     }
 
     return S_OK;

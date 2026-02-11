@@ -19,7 +19,7 @@ Abstract:
 
 struct TerminationCallback : public winrt::implements<TerminationCallback, ITerminationCallback>
 {
-    TerminationCallback(WslcSessionTerminationCallback terminationCallback, PVOID terminationCallbackContext);
+    TerminationCallback(WslcSessionTerminationCallback callback, PVOID context);
 
     // ITerminationCallback
     HRESULT STDMETHODCALLTYPE OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR Details) override;
@@ -28,6 +28,6 @@ struct TerminationCallback : public winrt::implements<TerminationCallback, ITerm
     static winrt::com_ptr<TerminationCallback> CreateIf(const WSLC_SESSION_OPTIONS_INTERNAL* options);
 
 private:
-    WslcSessionTerminationCallback m_terminationCallback;
-    PVOID m_terminationCallbackContext;
+    WslcSessionTerminationCallback m_callback;
+    PVOID m_context;
 };
