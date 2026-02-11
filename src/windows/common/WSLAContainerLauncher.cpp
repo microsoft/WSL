@@ -214,7 +214,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;
-    auto result = Session.CreateContainer(&options, &container, nullptr);
+    auto result = Session.CreateContainer(&options, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});

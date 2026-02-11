@@ -27,7 +27,6 @@ using wsl::windows::common::WSLAContainerLauncher;
 using wsl::windows::common::WSLAProcessLauncher;
 using wsl::windows::common::relay::OverlappedIOHandle;
 using wsl::windows::common::relay::WriteHandle;
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 extern std::wstring g_testDataPath;
 extern bool g_fastTestRun;
@@ -61,12 +60,12 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("debian:latest", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("debian:latest", nullptr, nullptr));
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("python:3.12-alpine", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("python:3.12-alpine", nullptr, nullptr));
         }
 
         // Hacky way to delete all containers.
@@ -326,7 +325,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr));
 
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:linux");
@@ -340,13 +339,15 @@ class WSLATests
         }
 
         {
-            std::string expectedError =
-                "pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
-                "access to the resource is denied";
+            std::wstring expectedError =
+                L"pull access denied for does-not, repository does not exist or may require 'docker login': denied: requested "
+                L"access to the resource is denied";
 
-            WSLAErrorDetails error;
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr, &error.Error), WSLA_E_IMAGE_NOT_FOUND);
-            VERIFY_ARE_EQUAL(expectedError, error.Error.UserErrorMessage);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage("does-not:exist", nullptr, nullptr), WSLA_E_IMAGE_NOT_FOUND);
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+
+            VERIFY_ARE_EQUAL(expectedError, comError->Message.get());
         }
     }
 
@@ -365,7 +366,7 @@ class WSLATests
             WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-list-images", .Force = false, .NoPrune = false};
 
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
         });
 
         ExpectImagePresent(*m_defaultSession, "debian:test-list-images");
@@ -441,7 +442,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Prepare alpine image to delete.
-        VERIFY_SUCCEEDED(m_defaultSession->PullImage("alpine:latest", nullptr, nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->PullImage("alpine:latest", nullptr, nullptr));
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
@@ -463,11 +464,11 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(
             HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION),
-            m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+            m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
         // Force should suuceed.
         options.Force = TRUE;
-        VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
         VERIFY_IS_TRUE(deletedImages.size() > 0);
         VERIFY_IS_TRUE(std::strlen(deletedImages[0].Image) > 0);
 
@@ -476,8 +477,31 @@ class WSLATests
 
         // Test delete failed if image not exists.
         VERIFY_ARE_EQUAL(
-            WSLA_E_IMAGE_NOT_FOUND,
-            m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+            WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->DeleteImage(&options, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+    }
+
+    void ValidateCOMErrorMessage(const std::optional<std::wstring>& Expected)
+    {
+        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+
+        if (comError.has_value())
+        {
+            if (!Expected.has_value())
+            {
+                LogError("Unexpected COM error: '%ls'", comError->Message.get());
+                VERIFY_FAIL();
+            }
+
+            VERIFY_ARE_EQUAL(Expected.value(), comError->Message.get());
+        }
+        else
+        {
+            if (Expected.has_value())
+            {
+                LogError("Expected COM error: '%ls' but none was set", Expected->c_str());
+                VERIFY_FAIL();
+            }
+        }
     }
 
     TEST_METHOD(SaveImage)
@@ -510,9 +534,7 @@ class WSLATests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            WSLA_ERROR_INFO errorInfo{};
-            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, &errorInfo));
-            VERIFY_ARE_EQUAL(errorInfo.UserErrorMessage, nullptr);
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr));
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
@@ -545,13 +567,9 @@ class WSLATests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            WSLA_ERROR_INFO errorInfo{};
-            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, &errorInfo));
-            VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
-            std::string errMsg = errorInfo.UserErrorMessage;
-            VERIFY_IS_TRUE(errMsg.find("reference does not exist") != std::string::npos);
-            CoTaskMemFree(errorInfo.UserErrorMessage);
-            errorInfo.UserErrorMessage = nullptr;
+            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr));
+            ValidateCOMErrorMessage(L"reference does not exist");
+
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
         }
@@ -583,9 +601,7 @@ class WSLATests
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            WSLA_ERROR_INFO errorInfo{};
-            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(
-                HandleToULong(containerTarFileHandle.get()), container.Id().c_str(), nullptr, &errorInfo));
+            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(HandleToULong(containerTarFileHandle.get()), container.Id().c_str(), nullptr));
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
@@ -617,13 +633,10 @@ class WSLATests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            WSLA_ERROR_INFO errorInfo{};
-            VERIFY_ARE_EQUAL(m_defaultSession->ExportContainer(HandleToULong(contTarFileHandle.get()), "dummy", nullptr, &errorInfo), WSLA_E_CONTAINER_NOT_FOUND);
-            VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
-            std::string errMsg = errorInfo.UserErrorMessage;
-            LogInfo("Error message: %hs", errMsg.c_str());
-            VERIFY_IS_TRUE(errMsg.find("No such container") != std::string::npos);
-            CoTaskMemFree(errorInfo.UserErrorMessage);
+
+            VERIFY_ARE_EQUAL(m_defaultSession->ExportContainer(HandleToULong(contTarFileHandle.get()), "dummy", nullptr), WSLA_E_CONTAINER_NOT_FOUND);
+            ValidateCOMErrorMessage(L"No such container: dummy");
+
             VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
         }
@@ -1555,7 +1568,20 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "www-data\n"}});
         }
 
-        // TODO: Add test coverage for error message when the user / group doesn't exist.
+        // Validate error handling when the username / group doesn't exist
+
+        // TODO: Uncomment once error messages are wired to WSLAContainer.
+        /*
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-no-missing-user", {"groups"});
+
+            launcher.SetUser("does-not-exist");
+
+            auto [result, _] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+
+            ValidateCOMErrorMessage(L"The specified user does not exist.");
+        }*/
 
         // Validate that empty arguments are correctly handled.
         {
@@ -1590,7 +1616,8 @@ class WSLATests
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            // TODO: Validate error message.
+            // TODO: Uncomment once error messages are wired to WSLAContainer.
+            // ValidateCOMErrorMessage(L"The specified executable was not found inside the container image.");
         }
 
         // Test null image name
@@ -1601,7 +1628,7 @@ class WSLATests
             options.InitProcessOptions.CommandLine = {.Values = nullptr, .Count = 0};
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            auto hr = m_defaultSession->CreateContainer(&options, &container);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
@@ -1613,7 +1640,7 @@ class WSLATests
             options.InitProcessOptions.CommandLine = {.Values = nullptr, .Count = 0};
 
             wil::com_ptr<IWSLAContainer> container;
-            VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, &container, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->CreateContainer(&options, &container));
             VERIFY_SUCCEEDED(container->Delete());
         }
     }
@@ -1691,11 +1718,21 @@ class WSLATests
         // Test error paths
         {
             expectOpen("", E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid container name: ''");
+
             expectOpen("non-existing-container", HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
             expectOpen("/", E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid container name: '/'");
+
             expectOpen("?foo=bar", E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid container name: '?foo=bar'");
+
             expectOpen("\n", E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid container name: '\n'");
+
             expectOpen(" ", E_INVALIDARG);
+            ValidateCOMErrorMessage(L"Invalid container name: ' '");
         }
     }
 
@@ -2250,8 +2287,6 @@ class WSLATests
             // Validate that processes can't be launched in stopped containers.
             auto [result, _, __] = WSLAProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
-
-            // TODO: Implement proper handling of executables that don't exist in the container.
         }
     }
 
@@ -3248,7 +3283,7 @@ class WSLATests
             options.LabelsCount = 1;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            auto hr = m_defaultSession->CreateContainer(&options, &container);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
@@ -3263,7 +3298,7 @@ class WSLATests
             options.LabelsCount = 1;
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            auto hr = m_defaultSession->CreateContainer(&options, &container);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
@@ -3280,7 +3315,7 @@ class WSLATests
             options.LabelsCount = static_cast<ULONG>(labels.size());
 
             wil::com_ptr<IWSLAContainer> container;
-            auto hr = m_defaultSession->CreateContainer(&options, &container, nullptr);
+            auto hr = m_defaultSession->CreateContainer(&options, &container);
             VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
         }
 
@@ -3460,6 +3495,8 @@ class WSLATests
             wil::com_ptr<IWSLAContainer> container;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(name.c_str(), &container), E_INVALIDARG);
             VERIFY_IS_NULL(container.get());
+
+            ValidateCOMErrorMessage(std::format(L"Invalid container name: '{}'", name));
         };
 
         expectInvalidArg("container with spaces");
@@ -3469,13 +3506,16 @@ class WSLATests
         expectInvalidArg("");
         expectInvalidArg("\\escaped\n\\chars");
 
+        std::string longName(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a');
+        expectInvalidArg(longName);
+
         auto expectInvalidPull = [&](const char* name, const char* errorPattern) {
-            WSLA_ERROR_INFO errorInfo{};
-            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr, &errorInfo), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(m_defaultSession->PullImage(name, nullptr, nullptr), E_INVALIDARG);
 
-            wil::unique_cotaskmem_ansistring message{errorInfo.UserErrorMessage};
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
 
-            VerifyPatternMatch(message.get(), errorPattern);
+            VerifyPatternMatch(wsl::shared::string::WideToMultiByte(comError->Message.get()), errorPattern);
         };
 
         expectInvalidPull("?foo&bar/url\n:name", "invalid reference format");
