@@ -430,8 +430,7 @@ class WSLATests
 
         // Validate that ImportImage fails if no tag is passed
         {
-            VERIFY_ARE_EQUAL(
-                m_defaultSession->ImportImage(HandleToULong(imageTarFileHandle.get()), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(m_defaultSession->ImportImage(imageTarFileHandle.get(), "my-hello-world", nullptr, fileSize.QuadPart), E_INVALIDARG);
         }
     }
 
@@ -505,7 +504,7 @@ class WSLATests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             // Load the image from a saved tar
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(imageTarFileHandle.get(), nullptr, fileSize.QuadPart));
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:latest");
             WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
@@ -525,7 +524,7 @@ class WSLATests
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             WSLA_ERROR_INFO errorInfo{};
-            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-world:latest", nullptr, &errorInfo));
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(imageTarFileHandle.get(), "hello-world:latest", nullptr, &errorInfo));
             VERIFY_ARE_EQUAL(errorInfo.UserErrorMessage, nullptr);
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
@@ -540,7 +539,7 @@ class WSLATests
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             // Load the image from a saved tar
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(imageTarFileHandle.get(), nullptr, fileSize.QuadPart));
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:latest");
             WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
@@ -560,7 +559,7 @@ class WSLATests
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             WSLA_ERROR_INFO errorInfo{};
-            VERIFY_FAILED(m_defaultSession->SaveImage(HandleToULong(imageTarFileHandle.get()), "hello-wld:latest", nullptr, &errorInfo));
+            VERIFY_FAILED(m_defaultSession->SaveImage(imageTarFileHandle.get(), "hello-wld:latest", nullptr, &errorInfo));
             VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
             std::string errMsg = errorInfo.UserErrorMessage;
             VERIFY_IS_TRUE(errMsg.find("reference does not exist") != std::string::npos);
@@ -581,7 +580,7 @@ class WSLATests
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(imageTarFileHandle.get(), nullptr, fileSize.QuadPart));
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:latest");
             WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
@@ -598,8 +597,7 @@ class WSLATests
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             WSLA_ERROR_INFO errorInfo{};
-            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(
-                HandleToULong(containerTarFileHandle.get()), container.Id().c_str(), nullptr, &errorInfo));
+            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(containerTarFileHandle.get(), container.Id().c_str(), nullptr, &errorInfo));
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
@@ -612,7 +610,7 @@ class WSLATests
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
             LARGE_INTEGER fileSize{};
             VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(imageTarFileHandle.get(), nullptr, fileSize.QuadPart));
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:latest");
             WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
@@ -632,7 +630,7 @@ class WSLATests
             VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
             WSLA_ERROR_INFO errorInfo{};
-            VERIFY_ARE_EQUAL(m_defaultSession->ExportContainer(HandleToULong(contTarFileHandle.get()), "dummy", nullptr, &errorInfo), WSLA_E_CONTAINER_NOT_FOUND);
+            VERIFY_ARE_EQUAL(m_defaultSession->ExportContainer(contTarFileHandle.get(), "dummy", nullptr, &errorInfo), WSLA_E_CONTAINER_NOT_FOUND);
             VERIFY_IS_NOT_NULL(errorInfo.UserErrorMessage);
             std::string errMsg = errorInfo.UserErrorMessage;
             LogInfo("Error message: %hs", errMsg.c_str());
