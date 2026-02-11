@@ -403,5 +403,3 @@ STDAPI WslcInstallWithDependencies(_In_opt_ __callback WslcInstallCallback progr
     UNREFERENCED_PARAMETER(context);
     return E_NOTIMPL;
 }
-
-
