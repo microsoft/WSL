@@ -412,6 +412,13 @@ struct WSLA_DELETED_IMAGE_INFORMATION
     WSLADeletedImageType Type;
 };
 
+struct WSLA_TAG_IMAGE_OPTIONS
+{
+    LPCSTR Image; // Source image name or ID.
+    LPCSTR Repo;  // Target repository name.
+    LPCSTR Tag;   // Target tag name.
+};
+
 struct WSLA_DELETE_IMAGE_OPTIONS
 {
     LPCSTR Image; // Image can be ID or Repo:Tag.
@@ -443,6 +450,7 @@ interface IWSLASession : IUnknown
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback, [in, out, unique] WSLA_ERROR_INFO * ErrorInfo);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT TagImage([in] const struct WSLA_TAG_IMAGE_OPTIONS* Options, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
 
     // Container management.
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);

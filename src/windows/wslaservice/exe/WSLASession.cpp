@@ -690,6 +690,56 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLASession::TagImage(const WSLA_TAG_IMAGE_OPTIONS* Options, WSLA_ERROR_INFO* Error)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Options);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Repo);
+    RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
+
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    try
+    {
+        m_dockerClient->TagImage(Options->Image, Options->Repo, Options->Tag);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage;
+        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+            if (Error != nullptr)
+            {
+                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
+            }
+        }
+
+        if (e.StatusCode() == 404)
+        {
+            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
+        }
+        else if (e.StatusCode() == 400)
+        {
+            THROW_WIN32_MSG(ERROR_BAD_ARGUMENTS, "%hs", errorMessage.c_str());
+        }
+        else if (e.StatusCode() == 409)
+        {
+            THROW_WIN32_MSG(ERROR_SHARING_VIOLATION, "%hs", errorMessage.c_str());
+        }
+        else
+        {
+            THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
+        }
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container, WSLA_ERROR_INFO* Error)
 try
 {
