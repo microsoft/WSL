@@ -231,8 +231,8 @@ STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _
 
 typedef enum WslcDeleteContainerFlags
 {
-    DELETE_FLAG_NONE = 0,
-    DELETE_FLAG_FORCE = 0x01
+    WSLC_DELETE_FLAG_NONE = 0,
+    WSLC_DELETE_FLAG_FORCE = 0x01
 } WslcDeleteContainerFlags;
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags);
