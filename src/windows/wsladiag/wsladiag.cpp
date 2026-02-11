@@ -428,7 +428,7 @@ static int Logs(std::wstring_view commandLine)
     wil::unique_handle stdoutLogs;
     wil::unique_handle stderrLogs;
 
-    THROW_IF_FAILED(container->Logs(flags, reinterpret_cast<ULONG*>(&stdoutLogs), reinterpret_cast<ULONG*>(&stderrLogs), 0, 0, 0));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutLogs, &stderrLogs, 0, 0, 0));
 
     wsl::windows::common::relay::MultiHandleWait io;
 

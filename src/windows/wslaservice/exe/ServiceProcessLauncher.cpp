@@ -34,11 +34,7 @@ wil::unique_event ServiceRunningProcess::GetExitEvent()
 {
     // Unlike for std handles, the event handle needs to be duplicated, since we need to keep a reference to it
     // to signal it once the process exits.
-    wil::unique_event event;
-    THROW_IF_WIN32_BOOL_FALSE(
-        DuplicateHandle(GetCurrentProcess(), m_process->GetExitEvent(), GetCurrentProcess(), &event, SYNCHRONIZE, false, 0));
-
-    return event;
+    return wil::unique_event{wsl::windows::common::helpers::DuplicateHandle(m_process->GetExitEvent())};
 }
 
 WSLAProcess& ServiceRunningProcess::Get()

@@ -61,7 +61,7 @@ public:
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno);
     void Inspect(LPSTR* Output);
-    void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
+    void Logs(WSLALogsFlags Flags, HANDLE* Stdout, HANDLE* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count);
 
     IWSLAContainer& ComWrapper();
@@ -134,7 +134,7 @@ public:
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process, _Out_ int* Errno) override;
     IFACEMETHOD(Start)(WSLAContainerStartFlags Flags) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
-    IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
+    IFACEMETHOD(Logs)(_In_ WSLALogsFlags Flags, _Out_ HANDLE* Stdout, _Out_ HANDLE* Stderr, _In_ ULONGLONG Since, _In_ ULONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLAContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLA_LABEL_INFORMATION** Labels, _Out_ ULONG* Count) override;

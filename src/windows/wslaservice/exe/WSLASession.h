@@ -54,9 +54,9 @@ public:
         _In_ LPCSTR ImageUri,
         _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
         _In_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(LoadImage)(_In_ HANDLE ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
+    IFACEMETHOD(ImportImage)(_In_ HANDLE ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
+    IFACEMETHOD(SaveImage)(_In_ HANDLE OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
     IFACEMETHOD(DeleteImage)(_In_ const WSLA_DELETE_IMAGE_OPTIONS* Options, _Out_ WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, _Out_ ULONG* Count) override;
 
@@ -64,7 +64,7 @@ public:
     IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLAContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
-    IFACEMETHOD(ExportContainer)(_In_ ULONG OutputHandle, _In_ LPCSTR ContainerID, _In_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(ExportContainer)(_In_ HANDLE OutputHandle, _In_ LPCSTR ContainerID, _In_ IProgressCallback* ProgressCallback) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
@@ -93,11 +93,11 @@ private:
     void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();
     void StartDockerd();
-    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, ULONG InputHandle);
+    void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, HANDLE InputHandle);
     void RecoverExistingContainers();
 
-    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle);
-    void ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle);
+    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, HANDLE OutputHandle);
+    void ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, HANDLE OutputHandle);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLAVirtualMachine> m_virtualMachine;

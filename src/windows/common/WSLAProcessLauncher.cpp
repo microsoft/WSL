@@ -227,7 +227,7 @@ wil::unique_handle ClientRunningWSLAProcess::GetStdHandle(int Index)
 wil::unique_event ClientRunningWSLAProcess::GetExitEvent()
 {
     wil::unique_event event;
-    THROW_IF_FAILED(m_process->GetExitEvent(reinterpret_cast<ULONG*>(&event)));
+    THROW_IF_FAILED(m_process->GetExitEvent(&event));
 
     return event;
 }
