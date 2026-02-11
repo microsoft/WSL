@@ -15,7 +15,6 @@ Abstract:
 #include <windows.h>
 #include "wslcsdk.h"
 #include "wslaservice.h"
-#include "wslaservice.h"
 #include <stdint.h>
 #include <wil/com.h> // COM helpers
 // #include <wil/resource.h> // handle wrappers
