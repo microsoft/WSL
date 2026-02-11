@@ -31,7 +31,7 @@ class WSLASession;
 // The SYSTEM service creates the VM and passes IWSLAVirtualMachine to Initialize().
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IFastRundown, ISupportErrorInfo>
 {
 public:
     WSLASession() = default;
@@ -53,23 +53,18 @@ public:
     IFACEMETHOD(PullImage)(
         _In_ LPCSTR ImageUri,
         _In_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
-        _In_ IProgressCallback* ProgressCallback,
-        _Inout_opt_ WSLA_ERROR_INFO* ErrorInfo) override;
+        _In_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(LoadImage)(_In_ HANDLE ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ HANDLE ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
-    IFACEMETHOD(SaveImage)(_In_ HANDLE OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback, _Inout_opt_ WSLA_ERROR_INFO* Error) override;
+    IFACEMETHOD(SaveImage)(_In_ HANDLE OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(ListImages)(_Out_ WSLA_IMAGE_INFORMATION** Images, _Out_ ULONG* Count) override;
-    IFACEMETHOD(DeleteImage)(
-        _In_ const WSLA_DELETE_IMAGE_OPTIONS* Options,
-        _Out_ WSLA_DELETED_IMAGE_INFORMATION** DeletedImages,
-        _Out_ ULONG* Count,
-        _Inout_opt_ WSLA_ERROR_INFO* ErrorInfo) override;
+    IFACEMETHOD(DeleteImage)(_In_ const WSLA_DELETE_IMAGE_OPTIONS* Options, _Out_ WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, _Out_ ULONG* Count) override;
 
     // Container management.
-    IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container, _Inout_opt_ WSLA_ERROR_INFO* Error) override;
+    IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLAContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
-    IFACEMETHOD(ExportContainer)(_In_ HANDLE OutputHandle, _In_ LPCSTR ContainerID, _In_ IProgressCallback* ProgressCallback, _Inout_opt_ WSLA_ERROR_INFO* Error) override;
+    IFACEMETHOD(ExportContainer)(_In_ HANDLE OutputHandle, _In_ LPCSTR ContainerID, _In_ IProgressCallback* ProgressCallback) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
@@ -79,6 +74,9 @@ public:
     IFACEMETHOD(FormatVirtualDisk)(_In_ LPCWSTR Path) override;
 
     IFACEMETHOD(Terminate()) override;
+
+    // ISupportErrorInfo
+    IFACEMETHOD(InterfaceSupportsErrorInfo)(_In_ REFIID riid) override;
 
     // Testing.
     IFACEMETHOD(MountWindowsFolder)(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly) override;
@@ -98,8 +96,8 @@ private:
     void ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request, HANDLE InputHandle);
     void RecoverExistingContainers();
 
-    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, HANDLE OutputHandle, WSLA_ERROR_INFO* Error);
-    void ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, HANDLE OutputHandle, WSLA_ERROR_INFO* Error);
+    void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, HANDLE OutputHandle);
+    void ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, HANDLE OutputHandle);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLAVirtualMachine> m_virtualMachine;
