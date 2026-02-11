@@ -32,9 +32,9 @@ class WSLASession;
 //
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLASession
 <<<<<<< HEAD
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown, ISupportErrorInfo>
-=======
-    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IFastRundown>
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IWSLASessionImpl, IFastRundown, ISupportErrorInfo> ==
+      == ==
+    = : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLASession, IFastRundown>
 >>>>>>> origin/feature/wsl-for-apps
 {
 public:
