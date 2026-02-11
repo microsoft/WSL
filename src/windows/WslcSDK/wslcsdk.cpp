@@ -109,7 +109,7 @@ STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _I
 }
 
 STDAPI WslcSessionSettingsSetTerminateCallback(
-    _In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionTerminationCallback terminationCallback, _In_ PVOID terminationContext)
+    _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext)
 {
     UNREFERENCED_PARAMETER(terminationCallback);
     UNREFERENCED_PARAMETER(terminationContext);
