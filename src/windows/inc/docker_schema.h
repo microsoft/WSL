@@ -140,9 +140,8 @@ struct InspectContainer
     ContainerInspectState State;
     ContainerConfig Config;
     HostConfig HostConfig;
-    std::vector<InspectMount> Mounts;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig, Mounts);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig);
 };
 
 struct Image
