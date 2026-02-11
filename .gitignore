@@ -10,7 +10,6 @@ tmp
 *.user
 *.csproj
 *.vcxproj
-*.targets
 *.filters
 *.pdb
 *.lib
@@ -42,7 +41,6 @@ linux/init
 initrd/init
 bin/
 *.nupkg
-build/
 generated/
 *.nuspec
 test/linux/unit_tests/wsl_unit_tests
@@ -66,3 +64,6 @@ package/x64
 tools/clang-format.exe
 /linux-crashes
 doc/site/
+directory.build.targets
+test-storage/
+*.vhdx
