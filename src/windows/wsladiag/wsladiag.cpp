@@ -408,6 +408,73 @@ static int Pull(std::wstring_view commandLine)
     return 0;
 }
 
+static int Build(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
+
+    std::filesystem::path inputPath;
+    std::string tag;
+    std::string dockerfilePath;
+
+    parser.AddPositionalArgument(AbsolutePath(inputPath), 0);
+    parser.AddArgument(Utf8String{tag}, L"--tag", 't');
+    parser.AddArgument(Utf8String{dockerfilePath}, L"--file", 'f');
+
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, inputPath.empty());
+
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_DIRECTORY), !std::filesystem::is_directory(inputPath), "Path must be a directory: %ls", inputPath.c_str());
+
+    // Configure console for interactive usage.
+    // TODO: Add support for output only for Ctrl-C support with cleanup.
+    wsl::windows::common::ConsoleState console;
+
+    class DECLSPEC_UUID("8B2E4487-946B-472C-9E3A-34764E0B2E91") Callback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
+    {
+    public:
+        HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total) override
+        try
+        {
+            if (Status != nullptr && *Status != '\0')
+            {
+                wprintf(L"%hs", Status);
+            }
+            return S_OK;
+        }
+        CATCH_RETURN();
+
+    private:
+        ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
+    };
+
+    wil::com_ptr<IWSLASession> session = OpenCLISession();
+
+    wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", inputPath.wstring()), stdout);
+
+    wprintf(L"Creating build context...\n");
+    auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(inputPath);
+
+    LARGE_INTEGER fileSize{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(tarFile.get(), &fileSize));
+
+    wslutil::PrintMessage(std::format(L"Sending build context ({} bytes)...\n", fileSize.QuadPart), stdout);
+
+    Callback callback;
+
+    THROW_IF_FAILED(session->BuildImage(
+        HandleToULong(tarFile.get()),
+        static_cast<ULONGLONG>(fileSize.QuadPart),
+        dockerfilePath.empty() ? nullptr : dockerfilePath.c_str(),
+        tag.empty() ? nullptr : tag.c_str(),
+        &callback));
+
+    wprintf(L"\n");
+
+    return 0;
+}
+
 static int Logs(std::wstring_view commandLine)
 {
     ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
@@ -726,6 +793,10 @@ int wsladiag_main(std::wstring_view commandLine)
     else if (verb == L"pull")
     {
         return Pull(commandLine);
+    }
+    else if (verb == L"build")
+    {
+        return Build(commandLine);
     }
     else if (verb == L"run")
     {
