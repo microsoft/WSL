@@ -61,13 +61,13 @@ typedef enum WslcContainerNetworkingMode
 typedef enum WslcVhdType
 {
     WSLC_VHD_TYPE_DYNAMIC = 0, // Expanding VHDX (default)
-    WSLC_VHD_TYPE_FIXED = 1       // Fully allocated VHDX
+    WSLC_VHD_TYPE_FIXED = 1 // Fully allocated VHDX
 } WslcVhdType;
 
 typedef struct WslcVhdRequirements
 {
     _In_ uint64_t sizeInBytes; // Desired size (for create/expand)
-    _In_ WslcVhdType type;   // Dynamic / Fixed
+    _In_ WslcVhdType type; // Dynamic / Fixed
 } WslcVhdRequirements;
 
 typedef enum WslcSessionFlags
@@ -377,10 +377,10 @@ typedef struct WslcImageInfo
 {
     // we should expose this
     PCSTR repository; // e.g., "ubuntu"
-    PCSTR tag;        // e.g., "22.04"
+    PCSTR tag; // e.g., "22.04"
     uint8_t sha256[32]; // image digest (raw bytes)
 
-    uint64_t sizeBytes;        // total size of the image
+    uint64_t sizeBytes; // total size of the image
     uint64_t createdTimestamp; // Unix epoch (seconds or ms)
 } WslcImageInfo;
 
