@@ -249,12 +249,9 @@ int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int par
     auto arguments = Arguments();
     CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
     auto session = m_sessionService.CreateSession();
+    m_options.Arguments = arguments;
     ContainerService containerService;
-    ExecContainerOptions options;
-    options.Arguments = arguments;
-    options.Interactive = m_options.Interactive;
-    options.TTY = m_options.TTY;
-    return containerService.Exec(session, m_id, options);
+    return containerService.Exec(session, m_id, m_options);
 }
 
 int ContainerInspectCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
