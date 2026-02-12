@@ -19,7 +19,7 @@ namespace wsl::windows::wslc::services {
 class ContainerService
 {
 public:
-    int Run(models::Session& session, std::string image,models::ContainerRunOptions options);
+    int Run(models::Session& session, std::string image, models::ContainerRunOptions options);
     models::CreateContainerResult Create(models::Session& session, std::string image, models::ContainerCreateOptions options);
     void Start(models::Session& session, std::string id);
     void Stop(models::Session& session, std::string id, models::StopContainerOptions options);

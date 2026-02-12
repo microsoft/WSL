@@ -324,4 +324,4 @@ int ContainerCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
     PrintHelp();
     return 1;
 }
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands
