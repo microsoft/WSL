@@ -1158,14 +1158,13 @@ class WSLATests
         if (enableDnsTunneling)
         {
             auto result = ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"}, 0);
-
             VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
         }
     }
 
     TEST_METHOD(NATNetworking)
     {
-        ValidateNetworking(WSLANetworkingModeNAT);
+        ValidateNetworking(WSLANetworkingModeNAT, false);
     }
 
     TEST_METHOD(NATNetworkingWithDnsTunneling)
@@ -1175,7 +1174,7 @@ class WSLATests
 
     TEST_METHOD(VirtioProxyNetworking)
     {
-        ValidateNetworking(WSLANetworkingModeVirtioProxy);
+        ValidateNetworking(WSLANetworkingModeVirtioProxy, false);
     }
 
     void WaitForOutput(HANDLE Handle, const char* Content)

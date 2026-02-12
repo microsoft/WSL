@@ -158,7 +158,7 @@ void WSLAVirtualMachine::ConfigureNetworking()
     std::vector<WSLAProcessFd> fds;
     fds.emplace_back(WSLAProcessFd{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
 
-    bool enableDnsTunneling = FeatureEnabled(WslaFeatureFlagsDnsTunneling);
+    bool enableDnsTunneling = (m_networkingMode == WSLANetworkingModeNAT) && FeatureEnabled(WslaFeatureFlagsDnsTunneling);
     if (enableDnsTunneling)
     {
         fds.emplace_back(WSLAProcessFd{.Fd = -1, .Type = WSLAFdType::WSLAFdTypeDefault});
