@@ -269,7 +269,7 @@ STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processS
 
 // OPTIONAL PROCESS SETTINGS
 
-STDAPI WslcProcessSettingsSetCmdLineArgs(WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc)
+STDAPI WslcProcessSettingsSetCmdLineArgs(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc)
 {
     UNREFERENCED_PARAMETER(argv);
     UNREFERENCED_PARAMETER(argc);
