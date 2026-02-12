@@ -325,7 +325,7 @@ STDAPI WslcProcessSignal(_In_ WslcProcess process, _In_ WslcSignal signal)
 }
 
 STDAPI WslcProcessSettingsSetIoCallback(
-    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context)
+    _In_ WslcProcessSettings* processSettings, _In_ WslcProcessIoHandle ioHandle, _In_opt_ WslcStdIOCallback stdIOCallback, _In_opt_ PVOID context)
 {
     UNREFERENCED_PARAMETER(processSettings);
     UNREFERENCED_PARAMETER(ioHandle);
