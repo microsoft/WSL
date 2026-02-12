@@ -20,10 +20,10 @@ struct ProgressCallback : public winrt::implements<ProgressCallback, IProgressCa
 {
     ProgressCallback(WslcContainerImageProgressCallback callback, PVOID context);
 
-    // ITerminationCallback
+    // IProgressCallback
     HRESULT STDMETHODCALLTYPE OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total) override;
 
-    // Creates a TerminationCallback if the options provides a callback.
+    // Creates a ProgressCallback if the options provides a callback.
     static winrt::com_ptr<ProgressCallback> CreateIf(const WslcPullImageOptions* options);
 
 private:
