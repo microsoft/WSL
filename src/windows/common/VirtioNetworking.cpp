@@ -184,7 +184,9 @@ void NETIOAPI_API_ VirtioNetworking::OnNetworkConnectivityChange(PVOID context, 
 void VirtioNetworking::RefreshGuestConnection() noexcept
 try
 {
-    // Query current networking information before acquiring the lock.
+    // Acquire the lock and perform device updates.
+    auto lock = m_lock.lock_exclusive();
+
     m_networkSettings = GetHostEndpointSettings();
 
     // TODO: Determine gateway MAC address
@@ -220,20 +222,6 @@ try
 
     const auto newDeviceOptions = device_options.str();
 
-    networking::DnsInfo currentDns{};
-    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
-    {
-        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
-    }
-    else
-    {
-        currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
-    }
-
-    const auto minMtu = GetMinimumConnectedInterfaceMtu();
-
-    // Acquire the lock and perform device updates.
-    auto lock = m_lock.lock_exclusive();
     if (newDeviceOptions != m_trackedDeviceOptions)
     {
         m_trackedDeviceOptions = newDeviceOptions;
@@ -277,6 +265,16 @@ try
     }
 
     // Send DNS update if needed.
+    networking::DnsInfo currentDns{};
+    if (WI_IsFlagSet(m_flags, VirtioNetworkingFlags::DnsTunneling))
+    {
+        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
+    }
+    else
+    {
+        currentDns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn);
+    }
+
     if (currentDns != m_trackedDnsSettings)
     {
         m_trackedDnsSettings = currentDns;
@@ -288,6 +286,7 @@ try
     }
 
     // Send MTU update if needed.
+    const auto minMtu = GetMinimumConnectedInterfaceMtu();
     if (minMtu && minMtu.value() != m_networkMtu)
     {
         m_networkMtu = minMtu.value();
