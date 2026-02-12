@@ -14,25 +14,25 @@ Abstract:
 #include "precomp.h"
 #include "TerminationCallback.h"
 
-namespace
+namespace {
+WslcSessionTerminationReason ConvertReason(WSLAVirtualMachineTerminationReason Reason)
 {
-    WslcSessionTerminationReason ConvertReason(WSLAVirtualMachineTerminationReason Reason)
+    switch (Reason)
     {
-        switch (Reason)
-        {
-        case WSLAVirtualMachineTerminationReasonShutdown:
-            return WSLC_SESSION_TERMINATION_REASON_SHUTDOWN;
-        case WSLAVirtualMachineTerminationReasonCrashed:
-            return WSLC_SESSION_TERMINATION_REASON_CRASHED;
-        default:
-            return WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
-        }
+    case WSLAVirtualMachineTerminationReasonShutdown:
+        return WSLC_SESSION_TERMINATION_REASON_SHUTDOWN;
+    case WSLAVirtualMachineTerminationReasonCrashed:
+        return WSLC_SESSION_TERMINATION_REASON_CRASHED;
+    default:
+        return WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
     }
 }
+} // namespace
 
 TerminationCallback::TerminationCallback(WslcSessionTerminationCallback callback, PVOID context) :
     m_callback(callback), m_context(context)
-{}
+{
+}
 
 // TODO: Details from the runtime are dropped; should the SDK callback function be updated to include the reasons string?
 HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR)
