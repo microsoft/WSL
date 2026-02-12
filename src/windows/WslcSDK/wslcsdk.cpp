@@ -19,92 +19,90 @@ Abstract:
 #include "TerminationCallback.h"
 #include "wslutil.h"
 
-
 // TODO: Larger TODO bucket
 //          - DisplayName is more like SessionKey and must be provided
 //          - Networking mode has cannot be provided and is critical to pulling images
 //          - Process options separates executable and cmdline, but there is no separation in the runtime API
 
-namespace
+namespace {
+constexpr uint32_t s_DefaultCPUCount = 2;
+constexpr uint32_t s_DefaultMemoryMB = 2000;
+// Maximum value per use with HVSOCKET_CONNECT_TIMEOUT_MAX
+constexpr ULONG s_DefaultBootTimeout = 300000;
+// Default to 1 GB
+constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
+
+WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
 {
-    constexpr uint32_t s_DefaultCPUCount = 2;
-    constexpr uint32_t s_DefaultMemoryMB = 2000;
-    // Maximum value per use with HVSOCKET_CONNECT_TIMEOUT_MAX
-    constexpr ULONG s_DefaultBootTimeout = 300000;
-    // Default to 1 GB
-    constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
+    WSLAFeatureFlags result = WslaFeatureFlagsNone;
 
-    WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
+    // TODO: Many missing flags?
+    if (WI_IsFlagSet(flags, WSLC_SESSION_FLAG_ENABLE_GPU))
     {
-        WSLAFeatureFlags result = WslaFeatureFlagsNone;
-
-        // TODO: Many missing flags?
-        if (WI_IsFlagSet(flags, WSLC_SESSION_FLAG_ENABLE_GPU))
-        {
-            result |= WslaFeatureFlagsGPU;
-        }
-
-        return result;
+        result |= WslaFeatureFlagsGPU;
     }
 
-    WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
+    return result;
+}
+
+WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
+{
+    WSLAContainerFlags result = WSLAContainerFlagsNone;
+
+    // TODO: Many missing flags?
+    if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_ENABLE_GPU))
     {
-        WSLAContainerFlags result = WSLAContainerFlagsNone;
-
-        // TODO: Many missing flags?
-        if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_ENABLE_GPU))
-        {
-            result |= WSLAContainerFlagsGpu;
-        }
-
-        // TODO: Are these the same flags?
-        //if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
-        //{
-        //    result |= WSLAContainerFlagsInit;
-        //}
-
-        if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_AUTO_REMOVE))
-        {
-            result |= WSLAContainerFlagsRm;
-        }
-
-        return result;
+        result |= WSLAContainerFlagsGpu;
     }
 
-    std::optional<WSLASignal> ConvertSignal(WslcSignal signal)
+    // TODO: Are these the same flags?
+    // if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
+    //{
+    //    result |= WSLAContainerFlagsInit;
+    //}
+
+    if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_AUTO_REMOVE))
     {
-        switch (signal)
-        {
-        case WSLC_SIGNAL_NONE:
-            return WSLASignal::WSLASignalNone;
-        case WSLC_SIGNAL_SIGHUP:
-            return WSLASignal::WSLASignalSIGHUP;
-        case WSLC_SIGNAL_SIGINT:
-            return WSLASignal::WSLASignalSIGINT;
-        case WSLC_SIGNAL_SIGQUIT:
-            return WSLASignal::WSLASignalSIGQUIT;
-        case WSLC_SIGNAL_SIGKILL:
-            return WSLASignal::WSLASignalSIGKILL;
-        case WSLC_SIGNAL_SIGTERM:
-            return WSLASignal::WSLASignalSIGTERM;
-        default:
-            return std::nullopt;
-        }
+        result |= WSLAContainerFlagsRm;
     }
 
-    void GetErrorInfoIf(PWSTR* errorMessage)
+    return result;
+}
+
+std::optional<WSLASignal> ConvertSignal(WslcSignal signal)
+{
+    switch (signal)
     {
-        if (errorMessage)
+    case WSLC_SIGNAL_NONE:
+        return WSLASignal::WSLASignalNone;
+    case WSLC_SIGNAL_SIGHUP:
+        return WSLASignal::WSLASignalSIGHUP;
+    case WSLC_SIGNAL_SIGINT:
+        return WSLASignal::WSLASignalSIGINT;
+    case WSLC_SIGNAL_SIGQUIT:
+        return WSLASignal::WSLASignalSIGQUIT;
+    case WSLC_SIGNAL_SIGKILL:
+        return WSLASignal::WSLASignalSIGKILL;
+    case WSLC_SIGNAL_SIGTERM:
+        return WSLASignal::WSLASignalSIGTERM;
+    default:
+        return std::nullopt;
+    }
+}
+
+void GetErrorInfoIf(PWSTR* errorMessage)
+{
+    if (errorMessage)
+    {
+        *errorMessage = nullptr;
+        auto errorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
+        if (errorInfo)
         {
-            *errorMessage = nullptr;
-            auto errorInfo = wsl::windows::common::wslutil::GetCOMErrorInfo();
-            if (errorInfo)
-            {
-                *errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorInfo->Message.get()).release();
-            }
+            *errorMessage = wil::make_unique_string<wil::unique_cotaskmem_string>(errorInfo->Message.get()).release();
         }
     }
 }
+} // namespace
 
 // SESSION DEFINITIONS
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
@@ -160,7 +158,8 @@ STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _
     return S_OK;
 }
 
-STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session) try
+STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session)
+try
 {
     RETURN_HR_IF_NULL(E_POINTER, session);
     *session = nullptr;
@@ -352,7 +351,8 @@ STDAPI WslcContainerInitSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettin
     return S_OK;
 }
 
-STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage) try
+STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
 {
     RETURN_HR_IF_NULL(E_POINTER, container);
     *container = nullptr;
@@ -658,7 +658,8 @@ STDAPI WslcProcessGetIOHandles(_In_ WslcProcess process, _In_ WslcProcessIoHandl
 
     ULONG ulongHandle = 0;
 
-    HRESULT hr = internalType->process->GetStdHandle(static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIoHandle>>(ioHandle)), &ulongHandle);
+    HRESULT hr = internalType->process->GetStdHandle(
+        static_cast<ULONG>(static_cast<std::underlying_type_t<WslcProcessIoHandle>>(ioHandle)), &ulongHandle);
 
     if (SUCCEEDED_LOG(hr))
     {
@@ -669,7 +670,8 @@ STDAPI WslcProcessGetIOHandles(_In_ WslcProcess process, _In_ WslcProcessIoHandl
 }
 
 // IMAGE MANAGEMENT
-STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage) try
+STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
 {
     WSLC_GET_INTERNAL_TYPE(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
