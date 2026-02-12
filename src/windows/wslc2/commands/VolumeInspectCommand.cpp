@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> VolumeInspectCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::VolumeNameI),
+            Argument::Create(ArgType::VolumeName, true, 10, L"Names of the volumes to inspect"),        // Argument
             Argument::Create(ArgType::SessionId),
         };
     }

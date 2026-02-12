@@ -18,21 +18,21 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerRunCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ImageId),        // Argument
-            Argument::Create(ArgType::ForwardArgs),    // Forward
+            Argument::Create(ArgType::ImageId, true),
+            Argument::Create(ArgType::ForwardArgs),
             Argument::Create(ArgType::CIDFile),
             Argument::Create(ArgType::DNS),
             Argument::Create(ArgType::DNSDomain),
             Argument::Create(ArgType::DNSOption),
             Argument::Create(ArgType::DNSSearch),
             Argument::Create(ArgType::Entrypoint),
-            Argument::Create(ArgType::Env),
+            Argument::Create(ArgType::Env, false, 10),
             Argument::Create(ArgType::EnvFile),
             Argument::Create(ArgType::Interactive),
             Argument::Create(ArgType::Name),
             Argument::Create(ArgType::NoDNS),
             Argument::Create(ArgType::Progress),
-            Argument::Create(ArgType::Publish),
+            Argument::Create(ArgType::Publish, false, 10),
             Argument::Create(ArgType::Pull),
             Argument::Create(ArgType::Remove),
             Argument::Create(ArgType::Scheme),

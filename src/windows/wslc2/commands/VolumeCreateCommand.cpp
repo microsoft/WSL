@@ -18,9 +18,9 @@ namespace wsl::windows::wslc
     std::vector<Argument> VolumeCreateCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::VolumeNameC),
+            Argument::Create(ArgType::VolumeName, true, std::nullopt, L"Name to give to the volume"),        // Argument
             Argument::Create(ArgType::Label),
-            Argument::Create(ArgType::Opt),
+            Argument::Create(ArgType::Opt, std::nullopt, 10),
             Argument::Create(ArgType::SessionId),
             Argument::Create(ArgType::Size),
         };

@@ -30,7 +30,7 @@ namespace wsl::windows::wslc
         {
             switch (type)
             {
-#define WSLC_ARG_NAME_CASE(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit) \
+#define WSLC_ARG_NAME_CASE(EnumName, Name, Alias, Kind, DataType, Desc) \
             case ArgType::EnumName: \
                 return L#EnumName;
 
@@ -45,23 +45,23 @@ namespace wsl::windows::wslc
 
     Argument Argument::Create(
         ArgType type,
-        std::optional<std::wstring> desc,
         std::optional<bool> required,
-        std::optional<size_t> countLimit,
+        std::optional<int> countLimit,
+        std::optional<std::wstring> desc,
         std::optional<Visibility> visibility)
     {
         switch (type)
         {
-#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, Desc, DataType, Kind, DefVisibility, DefRequired, DefCountLimit) \
+#define WSLC_ARG_CREATE_CASE(EnumName, Name, Alias, Kind, DataType, Desc) \
         case ArgType::EnumName: \
             return Argument{type, \
                            L##Name, \
                            Alias, \
                            desc.value_or(Desc), \
                            Kind, \
-                           visibility.value_or(DefVisibility), \
-                           required.value_or(DefRequired), \
-                           countLimit.value_or(DefCountLimit)};
+                           visibility.value_or(Visibility::Help), \
+                           required.value_or(false), \
+                           countLimit.value_or(1)};
 
             WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE

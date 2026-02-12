@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImageLoadCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::Input),
+            Argument::Create(ArgType::Input, true),        // Argument
             Argument::Create(ArgType::SessionId)
         };
     }

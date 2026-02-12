@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> RegistryLoginCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::Server),
+            Argument::Create(ArgType::Server, true),        // Argument
             Argument::Create(ArgType::PasswordStdin),
             Argument::Create(ArgType::Scheme),
             Argument::Create(ArgType::SessionId),

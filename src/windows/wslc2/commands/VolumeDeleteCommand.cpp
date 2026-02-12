@@ -18,8 +18,8 @@ namespace wsl::windows::wslc
     std::vector<Argument> VolumeDeleteCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::VolumeNameD),
-            Argument::Create(ArgType::AllVolumes),
+            Argument::Create(ArgType::VolumeName, std::nullopt, 10, L"Names of the volumes to delete"),        // Argument
+            Argument::Create(ArgType::All, std::nullopt, std::nullopt, L"Delete all volumes"),
             Argument::Create(ArgType::SessionId),
         };
     }

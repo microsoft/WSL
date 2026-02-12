@@ -15,7 +15,7 @@ namespace wsl::windows::wslc
     {
         return
         {
-            Argument::Create(ArgType::ContainerId),
+            Argument::Create(ArgType::ContainerId, true),
             Argument::Create(ArgType::ForwardArgs),
             Argument::Create(ArgType::Attach),
             Argument::Create(ArgType::Interactive),

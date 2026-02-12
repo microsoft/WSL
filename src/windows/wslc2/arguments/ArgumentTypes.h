@@ -20,7 +20,7 @@ namespace wsl::windows::wslc::argument
     // Generate ArgType enum from X-macro
     enum class ArgType : size_t
     {
-#define WSLC_ARG_ENUM(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit) \
+#define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, DataType, Desc) \
         EnumName,
 
 #include "ArgumentDefinitions.h"
@@ -42,7 +42,7 @@ namespace wsl::windows::wslc::argument
 #define WSLC_REMOVE_PARENS(...) __VA_ARGS__
 
         // Generate data mappings from X-macro
-#define WSLC_ARG_MAPPING(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit) \
+#define WSLC_ARG_MAPPING(EnumName, Name, Alias, Kind, DataType, Desc) \
         template<> \
         struct ArgDataMapping<ArgType::EnumName> \
         { \
@@ -194,7 +194,7 @@ namespace wsl::windows::wslc::argument::validation {
     }
 
     // Validation: Vector types should be Kind::Forward
-    template <typename T, Kind K, size_t Limit, ArgType A>
+    template <typename T, Kind K, ArgType A>
     constexpr bool ValidateVectorUsage()
     {
         // Force instantiation of ArgTypeName<A> to show the enum value in error.
@@ -206,11 +206,11 @@ namespace wsl::windows::wslc::argument::validation {
     }
 
     // Master validation function
-    template <typename T, Kind K, size_t Limit, ArgType A>
+    template <typename T, Kind K, ArgType A>
     constexpr bool ValidateArgument()
     {
         return ValidateForwardKind<T, K, A>() && 
-               ValidateVectorUsage<T, K, Limit, A>();
+               ValidateVectorUsage<T, K, A>();
     }
 
     // Helper macro to remove parentheses from a type
@@ -220,9 +220,9 @@ namespace wsl::windows::wslc::argument::validation {
 
     // Macro to generate validation instances for each argument.
     // Also creates a specialized ArgTypeName for better error messages.
-    #define VALIDATE_ARGUMENT(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit) \
+    #define VALIDATE_ARGUMENT(EnumName, Name, Alias, Kind, DataType, Desc) \
         template<> struct ArgTypeName<ArgType::EnumName> { static constexpr auto name = #EnumName; }; \
-        inline constexpr bool validate_##EnumName = ValidateArgument<WSLC_REMOVE_PARENS DataType, Kind, CountLimit, ArgType::EnumName>();
+        inline constexpr bool validate_##EnumName = ValidateArgument<WSLC_REMOVE_PARENS DataType, Kind, ArgType::EnumName>();
 
     // Trigger validation for all arguments at compile time
     WSLC_ARGUMENTS(VALIDATE_ARGUMENT)

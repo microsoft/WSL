@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerKillCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ContainerIdOpt),
+            Argument::Create(ArgType::ContainerId, false, 10),
             Argument::Create(ArgType::All),
             Argument::Create(ArgType::SessionId),
             Argument::Create(ArgType::SignalK),

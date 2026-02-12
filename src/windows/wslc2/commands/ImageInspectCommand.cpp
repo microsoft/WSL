@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImageInspectCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ImageIdReq),
+            Argument::Create(ArgType::ImageId, true, 10),        // Argument
             Argument::Create(ArgType::SessionId),
         };
     }

@@ -18,10 +18,10 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerExecCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ContainerId),
-            Argument::Create(ArgType::ForwardArgsP),
+            Argument::Create(ArgType::ContainerId, true),
+            Argument::Create(ArgType::ProcessArgs),
             Argument::Create(ArgType::Detach),
-            Argument::Create(ArgType::Env),
+            Argument::Create(ArgType::Env, false, 10),
             Argument::Create(ArgType::EnvFile),
             Argument::Create(ArgType::Interactive),
             Argument::Create(ArgType::SessionId),
@@ -48,9 +48,9 @@ namespace wsl::windows::wslc
             PrintMessage(L"Container Id: " + containerId);
         }
 
-        if (context.Args.Contains(ArgType::ForwardArgsP))
+        if (context.Args.Contains(ArgType::ProcessArgs))
         {
-            auto forwardedArgs = context.Args.Get<ArgType::ForwardArgsP>();
+            auto forwardedArgs = context.Args.Get<ArgType::ProcessArgs>();
             PrintMessage(L"Command with " + std::to_wstring(forwardedArgs.size()) + L" args:");
             std::wstring concatenatedArgs = std::accumulate(
                 forwardedArgs.begin(),

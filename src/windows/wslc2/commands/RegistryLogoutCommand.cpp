@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> RegistryLogoutCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::Registry),
+            Argument::Create(ArgType::Registry, true),        // Argument
             Argument::Create(ArgType::SessionId)
         };
     }

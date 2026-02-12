@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImagePruneCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::AllPrune),
+            Argument::Create(ArgType::All, L"Remove all unused images not referenced by any container"),
             Argument::Create(ArgType::SessionId),
         };
     }

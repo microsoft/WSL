@@ -18,15 +18,15 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerCreateCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ImageId),        // Argument
-            Argument::Create(ArgType::ForwardArgs),    // Forward
+            Argument::Create(ArgType::ImageId, true),
+            Argument::Create(ArgType::ForwardArgs),
             Argument::Create(ArgType::CIDFile),
             Argument::Create(ArgType::DNS),
             Argument::Create(ArgType::DNSDomain),
             Argument::Create(ArgType::DNSOption),
             Argument::Create(ArgType::DNSSearch),
             Argument::Create(ArgType::Entrypoint),
-            Argument::Create(ArgType::Env),
+            Argument::Create(ArgType::Env, false, 10),
             Argument::Create(ArgType::EnvFile),
             Argument::Create(ArgType::GroupId),
             Argument::Create(ArgType::Interactive),

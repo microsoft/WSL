@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImagePushCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ImageId),
+            Argument::Create(ArgType::ImageId, true),        // Argument
             Argument::Create(ArgType::Progress),
             Argument::Create(ArgType::Scheme),
             Argument::Create(ArgType::SessionId),
