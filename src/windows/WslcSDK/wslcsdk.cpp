@@ -177,7 +177,7 @@ STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount)
+STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount)
 {
     UNREFERENCED_PARAMETER(portMappings);
     UNREFERENCED_PARAMETER(containerSettings);
@@ -185,7 +185,7 @@ STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes, _In_ UINT32 volumeCount)
+STDAPI WslcContainerSettingsAddVolume(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerVolume* volumes, _In_ uint32_t volumeCount)
 {
     UNREFERENCED_PARAMETER(volumes);
     UNREFERENCED_PARAMETER(volumeCount);
@@ -287,7 +287,7 @@ STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSetti
 
 // PROCESS MANAGEMENT
 
-STDAPI WslcProcessGetPid(_In_ WslcProcess process, _Out_ UINT32* pid)
+STDAPI WslcProcessGetPid(_In_ WslcProcess process, _Out_ uint32_t* pid)
 {
     UNREFERENCED_PARAMETER(process);
     UNREFERENCED_PARAMETER(pid);
@@ -372,7 +372,7 @@ STDAPI WslcSessionImageDelete(_In_ WslcSession session, _In_z_ PCSTR NameOrId)
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ UINT32* count)
+STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ uint32_t* count)
 {
     UNREFERENCED_PARAMETER(session);
     UNREFERENCED_PARAMETER(images);
