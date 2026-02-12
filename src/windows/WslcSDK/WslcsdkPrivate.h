@@ -65,8 +65,8 @@ typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
 {
     PCSTR image;       // Image name (repository:tag)
     PCSTR runtimeName; // Container runtime name (expected to allow DNS resolution between containers)
-    PCSTR HostName;
-    PCSTR DomainName;
+    PCSTR hostName;
+    PCSTR domainName;
     const WslcContainerPortMapping* ports;
     UINT32 portsCount;
     const WslcContainerVolume* volumes;
