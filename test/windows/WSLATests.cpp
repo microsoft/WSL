@@ -1570,8 +1570,6 @@ class WSLATests
 
         // Validate error handling when the username / group doesn't exist
 
-        // TODO: Uncomment once error messages are wired to WSLAContainer.
-        /*
         {
             WSLAContainerLauncher launcher("debian:latest", "test-no-missing-user", {"groups"});
 
@@ -1581,7 +1579,7 @@ class WSLATests
             VERIFY_ARE_EQUAL(result, E_FAIL);
 
             ValidateCOMErrorMessage(L"The specified user does not exist.");
-        }*/
+        }
 
         // Validate that empty arguments are correctly handled.
         {
@@ -1616,8 +1614,7 @@ class WSLATests
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            // TODO: Uncomment once error messages are wired to WSLAContainer.
-            // ValidateCOMErrorMessage(L"The specified executable was not found inside the container image.");
+            ValidateCOMErrorMessage(L"The specified executable was not found inside the container image.");
         }
 
         // Test null image name

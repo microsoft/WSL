@@ -22,19 +22,19 @@ Abstract:
 #include "docker_schema.h"
 
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
-    if ((_Ex).StatusCode() >= 400 && (_Ex).StatusCode() < 500) \
+    if ((_Ex).StatusCode() >= 400 && (_Ex).StatusCode() <= 500) \
     { \
         THROW_HR_WITH_USER_ERROR_MSG(E_FAIL, e.DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, __VA_ARGS__); \
     } \
     else \
     { \
-        THROW_HR_MSG(E_FAIL, _Msg ## ". Error: %hs", __VA_ARGS__, (_Ex).what()); \
+        THROW_HR_MSG(E_FAIL, _Msg##". Error: %hs", __VA_ARGS__, (_Ex).what()); \
     }
 
 #define CATCH_THROW_DOCKER_USER_ERROR(_Msg, ...) \
     catch (const DockerHTTPException& e) \
     { \
-        THROW_DOCKER_USER_ERROR_MSG(e, _Msg, __VA_ARGS__)\
+        THROW_DOCKER_USER_ERROR_MSG(e, _Msg, __VA_ARGS__) \
     }
 
 namespace wsl::windows::service::wsla {

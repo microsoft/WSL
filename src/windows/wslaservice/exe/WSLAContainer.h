@@ -141,7 +141,6 @@ public:
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
-
 private:
     std::function<void(const WSLAContainerImpl*)> m_onDeleted;
 };
