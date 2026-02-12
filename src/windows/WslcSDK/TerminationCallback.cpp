@@ -34,7 +34,7 @@ TerminationCallback::TerminationCallback(WslcSessionTerminationCallback callback
     m_callback(callback), m_context(context)
 {}
 
-// TODO: Details is lost?
+// TODO: Details from the runtime are dropped; should the SDK callback function be updated to include the reasons string?
 HRESULT STDMETHODCALLTYPE TerminationCallback::OnTermination(WSLAVirtualMachineTerminationReason Reason, LPCWSTR)
 {
     if (m_callback)

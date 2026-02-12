@@ -19,10 +19,6 @@ Abstract:
 #include "TerminationCallback.h"
 #include "wslutil.h"
 
-// TODO: Larger TODO bucket
-//          - DisplayName is more like SessionKey and must be provided
-//          - Networking mode has cannot be provided and is critical to pulling images
-//          - Process options separates executable and cmdline, but there is no separation in the runtime API
 
 namespace {
 constexpr uint32_t s_DefaultCPUCount = 2;
@@ -36,7 +32,6 @@ WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
 {
     WSLAFeatureFlags result = WslaFeatureFlagsNone;
 
-    // TODO: Many missing flags?
     if (WI_IsFlagSet(flags, WSLC_SESSION_FLAG_ENABLE_GPU))
     {
         result |= WslaFeatureFlagsGPU;
@@ -49,7 +44,6 @@ WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
 {
     WSLAContainerFlags result = WSLAContainerFlagsNone;
 
-    // TODO: Many missing flags?
     if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_ENABLE_GPU))
     {
         result |= WSLAContainerFlagsGpu;
@@ -57,9 +51,9 @@ WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
 
     // TODO: Are these the same flags?
     // if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
-    //{
-    //    result |= WSLAContainerFlagsInit;
-    //}
+    // {
+    //     result |= WSLAContainerFlagsInit;
+    // }
 
     if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_AUTO_REMOVE))
     {
@@ -107,8 +101,6 @@ void GetErrorInfoIf(PWSTR* errorMessage)
 // SESSION DEFINITIONS
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 {
-    // TODO: Do we need to check the path itself for anything?
-
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     *internalType = {};
@@ -132,8 +124,6 @@ STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings,
     }
     else
     {
-        // TODO: Does a 0 cause the internal systems to use a default value?
-        // From reading the code it appears to just send 0 to HcsCreateComputeSystem, but the documentation is not clear on what that will do.
         internalType->cpuCount = s_DefaultCPUCount;
     }
 
@@ -150,8 +140,6 @@ STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _
     }
     else
     {
-        // TODO: Does a 0 cause the internal systems to use a default value?
-        // From reading the code it appears to just send 0 to HcsCreateComputeSystem, but the documentation is not clear on what that will do.
         internalType->memoryMb = s_DefaultMemoryMB;
     }
 
@@ -174,12 +162,12 @@ try
     WSLA_SESSION_SETTINGS runtimeSettings{};
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
-    // TODO: Is this VHD requirements sizeInBytes?
+    // TODO: Is this the intended use for vhdRequirements.sizeInBytes?
     runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeInBytes / (1000 * 1000);
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
-    // TODO: No user control over networking mode (NAT and VirtIO)?
+    // TODO: No user control over networking mode (NAT and VirtIO); should be added to WslcSessionSettings.
     runtimeSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
     auto terminationCallback = TerminationCallback::CreateIf(internalType);
     if (terminationCallback)
@@ -211,14 +199,9 @@ CATCH_RETURN()
 STDAPI WslcSessionTerminate(_In_ WslcSession session)
 {
     WSLC_GET_INTERNAL_TYPE(session);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
 
-    if (internalType->session)
-    {
-        return internalType->session->Terminate();
-    }
-
-    // TODO: Should we fail if session invalid?
-    return S_FALSE;
+    RETURN_HR(internalType->session->Terminate());
 }
 
 STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerNetworkingMode networkingMode)
@@ -228,6 +211,7 @@ STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* contai
     return E_NOTIMPL;
 }
 
+// TODO: DisplayName is required (and is effectively `SessionKey`); it should be promoted to a required Init time parameter.
 STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings, _In_ PCWSTR displayName)
 {
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
@@ -237,7 +221,7 @@ STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettin
     return S_OK;
 }
 
-STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, uint32_t timeoutMS)
+STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS)
 {
     WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
@@ -247,7 +231,6 @@ STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, 
     }
     else
     {
-        // TODO: 0 is not treated as no timeout within the runtime, it is an immediate timeout.
         internalType->timeoutMS = s_DefaultBootTimeout;
     }
 
@@ -374,7 +357,7 @@ try
     if (initProcessOptions)
     {
         containerOptions.InitProcessOptions.CurrentDirectory = initProcessOptions->currentDirectory;
-        // TODO:Runtime needs update
+        // TODO: Runtime needs an update to take in LPCSTR const*
         containerOptions.InitProcessOptions.CommandLine.Values = const_cast<LPCSTR*>(initProcessOptions->commandLine);
         containerOptions.InitProcessOptions.CommandLine.Count = initProcessOptions->commandLineCount;
         containerOptions.InitProcessOptions.Environment.Values = const_cast<LPCSTR*>(initProcessOptions->environment);
@@ -423,9 +406,7 @@ STDAPI WslcContainerStart(_In_ WslcContainer container)
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
     // TODO: No user choice between None and Attach (where attach is what allows access to init process IO handles)
-    RETURN_IF_FAILED(internalType->container->Start(WSLAContainerStartFlagsAttach));
-
-    return S_OK;
+    RETURN_HR(internalType->container->Start(WSLAContainerStartFlagsAttach));
 }
 
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags)
@@ -441,7 +422,6 @@ STDAPI WslcContainerSettingsSetName(_In_ WslcContainerSettings* containerSetting
 {
     WSLC_GET_INTERNAL_TYPE(containerSettings);
 
-    // TODO: Is this the correct name? How does one set the DomainName and HostName?
     internalType->runtimeName = name;
 
     return S_OK;
@@ -530,9 +510,7 @@ STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _
     RETURN_HR_IF(E_INVALIDARG, !convertedSignal);
 
     // TODO: Resolve massive disparity between 32-bit unsigned millisecond input and 64-bit signed second target timeouts
-    RETURN_IF_FAILED(internalType->container->Stop(convertedSignal.value(), timeoutMS / 1000));
-
-    return S_OK;
+    RETURN_HR(internalType->container->Stop(convertedSignal.value(), timeoutMS / 1000));
 }
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags)
@@ -543,9 +521,7 @@ STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContaine
     // TODO: Flags?
     UNREFERENCED_PARAMETER(flags);
 
-    RETURN_IF_FAILED(internalType->container->Delete());
-
-    return S_OK;
+    RETURN_HR(internalType->container->Delete());
 }
 
 // PROCESS DEFINITIONS
@@ -558,6 +534,8 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings)
 
     return S_OK;
 }
+
+// TODO: Executable has no place in runtime settings; it should be removed in favor of placement as the first item in CmdLineArgs.
 STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable)
 {
     WSLC_GET_INTERNAL_TYPE(processSettings);
@@ -613,7 +591,6 @@ STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
     RETURN_HR_IF_NULL(E_POINTER, exitEvent);
 
-    // TODO: INVALID_HANDLE?
     *exitEvent = nullptr;
 
     ULONG ulongHandle = 0;
@@ -667,7 +644,6 @@ STDAPI WslcProcessGetIOHandles(_In_ WslcProcess process, _In_ WslcProcessIoHandl
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
     RETURN_HR_IF_NULL(E_POINTER, handle);
 
-    // TODO: INVALID_HANDLE?
     *handle = nullptr;
 
     ULONG ulongHandle = 0;

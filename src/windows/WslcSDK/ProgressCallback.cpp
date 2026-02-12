@@ -27,6 +27,9 @@ namespace
             return _status_; \
         }
 
+        // TODO: Mapping engine strings to status values seems fragile.
+        //       WSLA is intentionally avoiding this kind of thing for localization of engine strings, which amounts to the same thing.
+        //       If we keep this, a test should be added to explicitly validate that each status is returned properly.
         WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_PULLING, "Pulling fs layer");
         WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_WAITING, "Waiting");
         WSLC_STRING_TO_STATUS_MAPPING(WSLC_IMAGE_PROGRESS_STATUS_DOWNLOADING, "Downloading");
