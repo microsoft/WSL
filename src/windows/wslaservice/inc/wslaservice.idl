@@ -35,17 +35,9 @@ struct _WSLA_VERSION {
     ULONG Revision;
 } WSLA_VERSION;
 
-
-typedef enum _WSLAProcessState
-{
-    WSLAProcessStateUnknown,
-    WSLAProcessStateRunning,
-    WSLAProcessStateExited
-} WSLAProcessState;
-
 typedef enum _WSLAVirtualMachineTerminationReason
 {
-    WSLAlVirtualMachineTerminationReasonUnknown,
+    WSLAVirtualMachineTerminationReasonUnknown,
     WSLAVirtualMachineTerminationReasonShutdown,
     WSLAVirtualMachineTerminationReasonCrashed,
 } WSLAVirtualMachineTerminationReason;
@@ -200,7 +192,7 @@ struct WSLA_CONTAINER_NETWORK
 typedef enum _WSLAContainerFlags
 {
     WSLAContainerFlagsNone = 0,
-    WSLAContainerFlagsRm = 1, // Delete the container when it exists. TODO: Implement.
+    WSLAContainerFlagsRm = 1, // Delete the container when it exits. TODO: Implement.
     WSLAContainerFlagsGpu = 2, // Enable GPU access. TODO: implement.
     WSLAContainerFlagsInit = 4, // Run the container under an init process.
 } WSLAContainerFlags;
