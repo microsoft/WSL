@@ -672,7 +672,7 @@ std::wstring wsl::windows::common::wslutil::ErrorCodeToString(HRESULT Error)
 
 wsl::windows::common::ErrorStrings wsl::windows::common::wslutil::ErrorToString(const Error& error)
 {
-    ErrorStrings errorStrings;
+    ErrorStrings errorStrings{.Source = error.Source};
 
     if (error.Message.has_value())
     {
@@ -731,6 +731,24 @@ std::filesystem::path wsl::windows::common::wslutil::GetBasePath()
 
     path.resize(std::wcslen(path.c_str()));
     return std::filesystem::path(std::move(path));
+}
+
+std::optional<COMErrorInfo> wsl::windows::common::wslutil::GetCOMErrorInfo()
+{
+    wil::com_ptr<IErrorInfo> errorInfo;
+    THROW_IF_FAILED(GetErrorInfo(0, &errorInfo));
+
+    if (!errorInfo)
+    {
+        return {};
+    }
+
+    COMErrorInfo error{};
+
+    THROW_IF_FAILED(errorInfo->GetDescription(&error.Message));
+    THROW_IF_FAILED(errorInfo->GetSource(&error.Source));
+
+    return error;
 }
 
 std::wstring wsl::windows::common::wslutil::GetDebugShellPipeName(_In_ PSID Sid)
@@ -1600,32 +1618,4 @@ catch (...)
 {
     LOG_CAUGHT_EXCEPTION();
     return nullptr;
-}
-
-wsl::windows::common::wslutil::WSLAErrorDetails::~WSLAErrorDetails()
-{
-    Reset();
-}
-
-void wsl::windows::common::wslutil::WSLAErrorDetails::Reset()
-{
-    CoTaskMemFree(Error.UserErrorMessage);
-    Error = {};
-}
-
-void wsl::windows::common::wslutil::WSLAErrorDetails::ThrowIfFailed(HRESULT Result)
-{
-    if (SUCCEEDED(Result))
-    {
-        return;
-    }
-
-    if (Error.UserErrorMessage != nullptr)
-    {
-        THROW_HR_WITH_USER_ERROR(Result, Error.UserErrorMessage);
-    }
-    else
-    {
-        THROW_HR(Result);
-    }
 }

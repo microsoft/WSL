@@ -17,7 +17,6 @@ Abstract:
 #include "hcs_schema.h"
 #include "VirtioNetworking.h"
 #include "NatNetworking.h"
-#include "WSLAApi.h"
 #include "wslsecurity.h"
 #include "wslutil.h"
 #include "lxinitshared.h"
@@ -601,7 +600,7 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
 
     const auto exitStatus = wsl::shared::FromJson<wsl::windows::common::hcs::SystemExitStatus>(Event->EventData);
 
-    auto reason = WSLAlVirtualMachineTerminationReasonUnknown;
+    auto reason = WSLAVirtualMachineTerminationReasonUnknown;
 
     if (exitStatus.ExitType.has_value())
     {
@@ -615,7 +614,7 @@ void HcsVirtualMachine::OnExit(const HCS_EVENT* Event)
             reason = WSLAVirtualMachineTerminationReasonCrashed;
             break;
         default:
-            reason = WSLAlVirtualMachineTerminationReasonUnknown;
+            reason = WSLAVirtualMachineTerminationReasonUnknown;
             break;
         }
     }

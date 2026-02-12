@@ -32,7 +32,6 @@ using wsl::windows::common::relay::EventHandle;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 class ChangeTerminalMode
 {
@@ -391,9 +390,7 @@ static void PullImpl(IWSLASession& Session, const std::string& Image)
     wil::com_ptr<IWSLASession> session = OpenCLISession();
 
     Callback callback;
-    WSLAErrorDetails error{};
-    auto result = session->PullImage(Image.c_str(), nullptr, &callback, &error.Error);
-    error.ThrowIfFailed(result);
+    THROW_IF_FAILED(session->PullImage(Image.c_str(), nullptr, &callback));
 }
 
 static int Pull(std::wstring_view commandLine)
@@ -407,6 +404,73 @@ static int Pull(std::wstring_view commandLine)
     THROW_HR_IF(E_INVALIDARG, image.empty());
 
     PullImpl(*OpenCLISession(), image);
+
+    return 0;
+}
+
+static int Build(std::wstring_view commandLine)
+{
+    ArgumentParser parser(std::wstring{commandLine}, L"wsladiag", 2);
+
+    std::filesystem::path inputPath;
+    std::string tag;
+    std::string dockerfilePath;
+
+    parser.AddPositionalArgument(AbsolutePath(inputPath), 0);
+    parser.AddArgument(Utf8String{tag}, L"--tag", 't');
+    parser.AddArgument(Utf8String{dockerfilePath}, L"--file", 'f');
+
+    parser.Parse();
+    THROW_HR_IF(E_INVALIDARG, inputPath.empty());
+
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_DIRECTORY), !std::filesystem::is_directory(inputPath), "Path must be a directory: %ls", inputPath.c_str());
+
+    // Configure console for interactive usage.
+    // TODO: Add support for output only for Ctrl-C support with cleanup.
+    wsl::windows::common::ConsoleState console;
+
+    class DECLSPEC_UUID("8B2E4487-946B-472C-9E3A-34764E0B2E91") Callback
+        : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
+    {
+    public:
+        HRESULT OnProgress(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total) override
+        try
+        {
+            if (Status != nullptr && *Status != '\0')
+            {
+                wprintf(L"%hs", Status);
+            }
+            return S_OK;
+        }
+        CATCH_RETURN();
+
+    private:
+        ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
+    };
+
+    wil::com_ptr<IWSLASession> session = OpenCLISession();
+
+    wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", inputPath.wstring()), stdout);
+
+    wprintf(L"Creating build context...\n");
+    auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(inputPath);
+
+    LARGE_INTEGER fileSize{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(tarFile.get(), &fileSize));
+
+    wslutil::PrintMessage(std::format(L"Sending build context ({} bytes)...\n", fileSize.QuadPart), stdout);
+
+    Callback callback;
+
+    THROW_IF_FAILED(session->BuildImage(
+        HandleToULong(tarFile.get()),
+        static_cast<ULONGLONG>(fileSize.QuadPart),
+        dockerfilePath.empty() ? nullptr : dockerfilePath.c_str(),
+        tag.empty() ? nullptr : tag.c_str(),
+        &callback));
+
+    wprintf(L"\n");
 
     return 0;
 }
@@ -606,19 +670,17 @@ static int Run(std::wstring_view commandLine)
     }
 
     wil::com_ptr<IWSLAContainer> container;
-    WSLAErrorDetails error{};
-    auto result = session->CreateContainer(&options, &container, &error.Error);
+    auto result = session->CreateContainer(&options, &container);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         wslutil::PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
 
         PullImpl(*session.get(), image);
 
-        error.Reset();
-        result = session->CreateContainer(&options, &container, &error.Error);
+        result = session->CreateContainer(&options, &container);
     }
 
-    error.ThrowIfFailed(result);
+    THROW_IF_FAILED(result);
 
     THROW_IF_FAILED(container->Start(startFlags)); // TODO: Error message
 
@@ -732,6 +794,10 @@ int wsladiag_main(std::wstring_view commandLine)
     {
         return Pull(commandLine);
     }
+    else if (verb == L"build")
+    {
+        return Build(commandLine);
+    }
     else if (verb == L"run")
     {
         return Run(commandLine);
@@ -756,7 +822,7 @@ int wsladiag_main(std::wstring_view commandLine)
 
 int wmain(int, wchar_t**)
 {
-    wsl::windows::common::EnableContextualizedErrors(false);
+    wsl::windows::common::EnableContextualizedErrors(false, true);
 
     // WSLADiag will be replaced by WSLC, so using WslC's context rather than creating a new soon-to-be-removed context.
     ExecutionContext context{Context::WslC};
@@ -779,6 +845,14 @@ int wmain(int, wchar_t**)
             auto strings = wsl::windows::common::wslutil::ErrorToString(*reported);
             auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
             wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
+
+#ifdef DEBUG
+
+            if (strings.Source.has_value())
+            {
+                wslutil::PrintMessage(L"Error source: %ls", stdout, strings.Source->c_str());
+            }
+#endif
         }
         else
         {

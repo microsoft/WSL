@@ -19,7 +19,6 @@ Abstract:
 #include "CommandLine.h"
 #include <conio.h>
 #include "wslaservice.h"
-#include "WSLAApi.h"
 #include "WSLAProcessLauncher.h"
 #include "WslCoreFilesystem.h"
 

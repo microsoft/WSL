@@ -214,7 +214,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;
-    auto result = Session.CreateContainer(&options, &container, nullptr);
+    auto result = Session.CreateContainer(&options, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});
@@ -239,12 +239,12 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session, WSLACo
     return std::move(container.value());
 }
 
-wsl::windows::common::docker_schema::InspectContainer RunningWSLAContainer::Inspect()
+wsl::windows::common::wsla_schema::InspectContainer RunningWSLAContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(m_container->Inspect(&output));
 
-    return wsl::shared::FromJson<docker_schema::InspectContainer>(output.get());
+    return wsl::shared::FromJson<wsla_schema::InspectContainer>(output.get());
 }
 
 std::map<std::string, std::string> RunningWSLAContainer::Labels()
