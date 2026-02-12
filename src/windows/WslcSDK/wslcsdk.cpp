@@ -609,9 +609,23 @@ STDAPI WslcProcessGetPid(_In_ WslcProcess process, _Out_ uint32_t* pid)
 
 STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent)
 {
-    UNREFERENCED_PARAMETER(process);
-    UNREFERENCED_PARAMETER(exitEvent);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_TYPE(process);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
+    RETURN_HR_IF_NULL(E_POINTER, exitEvent);
+
+    // TODO: INVALID_HANDLE?
+    *exitEvent = nullptr;
+
+    ULONG ulongHandle = 0;
+
+    HRESULT hr = internalType->process->GetExitEvent(&ulongHandle);
+
+    if (SUCCEEDED_LOG(hr))
+    {
+        *exitEvent = ULongToHandle(ulongHandle);
+    }
+
+    return hr;
 }
 
 // PROCESS RESULT / SIGNALS
