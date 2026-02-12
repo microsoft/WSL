@@ -1602,7 +1602,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("doesnotexist", {});
 
-            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
+            auto [hresult, process, error] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
             VERIFY_ARE_EQUAL(error, 2); // ENOENT
             VERIFY_IS_FALSE(process.has_value());
@@ -1611,7 +1611,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("/", {});
 
-            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
+            auto [hresult, process, error] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
             VERIFY_ARE_EQUAL(error, 13); // EACCESS
             VERIFY_IS_FALSE(process.has_value());
@@ -1857,6 +1857,17 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "/tmp\n"}});
         }
 
+        // Validate that the current directory is created if it doesn't exist.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-bad-cwd", {"pwd"});
+            launcher.SetWorkingDirectory("/new-dir");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "/new-dir\n"}});
+        }
+
         // Validate that hostname and domainanme are correctly wired.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
@@ -1892,7 +1903,6 @@ class WSLATests
         }
 
         // Validate error handling when the username / group doesn't exist
-
         {
             WSLAContainerLauncher launcher("debian:latest", "test-no-missing-user", {"groups"});
 
@@ -1901,7 +1911,7 @@ class WSLATests
             auto [result, _] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(result, E_FAIL);
 
-            ValidateCOMErrorMessage(L"The specified user does not exist.");
+            ValidateCOMErrorMessage(L"unable to find user does-not-exist: no matching entries in passwd file");
         }
 
         // Validate that empty arguments are correctly handled.
@@ -1937,7 +1947,10 @@ class WSLATests
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            ValidateCOMErrorMessage(L"The specified executable was not found inside the container image.");
+            ValidateCOMErrorMessage(
+                L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create "
+                L"failed: unable to start container process: error during container init: exec: \"/does-not-exist\": stat "
+                L"/does-not-exist: no such file or directory: unknown");
         }
 
         // Test null image name
@@ -2592,6 +2605,43 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
+        // Validate that launching a non-existing command returns the correct error.
+        // TODO: Uncomment once exec launch errors are handled.
+
+        /*
+        {
+            WSLAProcessLauncher launcher({}, {"/not-found"});
+            auto [result, _] = launcher.LaunchNoThrow(container.Get());
+
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+
+            ValidateCOMErrorMessage(L"TODO");
+        }
+
+        // Validate that setting invalid current directory returns the correct error.
+        {
+            WSLAProcessLauncher launcher({}, {"/bin/cat"});
+            launcher.SetWorkingDirectory("/notfound");
+            auto [result, _] = launcher.LaunchNoThrow(container.Get());
+
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+
+            ValidateCOMErrorMessage(L"TODO");
+        }
+
+        // Validate that invalid usernames are correctly handled.
+        {
+            WSLAProcessLauncher launcher({}, {"/bin/cat"});
+            launcher.SetUser("does-not-exist");
+
+            auto [result, _] = launcher.LaunchNoThrow(container.Get());
+
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+            ValidateCOMErrorMessage(L"Not found");
+        }
+
+        */
+
         // Validate that an exec'd command returns when the container is stopped.
         {
             auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, WSLAProcessFlagsStdin).Launch(container.Get());
@@ -2602,10 +2652,9 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Code, 128 + WSLASignalSIGKILL);
         }
 
-        // Validate error paths
+        // Validate that processes can't be launched in stopped containers.
         {
-            // Validate that processes can't be launched in stopped containers.
-            auto [result, _, __] = WSLAProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
+            auto [result, _] = WSLAProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }

@@ -171,7 +171,7 @@ RunningWSLAProcess::ProcessResult RunningWSLAProcess::WaitAndCaptureOutput(DWORD
     return result;
 }
 
-std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)
+std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>, int> WSLAProcessLauncher::LaunchNoThrow(IWSLASession& Session)
 {
     auto [options, commandLine, env] = CreateProcessOptions();
 
@@ -180,15 +180,15 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
     auto result = Session.CreateRootNamespaceProcess(m_executable.c_str(), &options, &process, &error);
     if (FAILED(result))
     {
-        return std::make_tuple(result, error, std::optional<ClientRunningWSLAProcess>());
+        return std::make_tuple(result, std::optional<ClientRunningWSLAProcess>(), error);
     }
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
 
-    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), m_flags}};
+    return {S_OK, ClientRunningWSLAProcess{std::move(process), m_flags}, 0};
 }
 
-std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLAContainer& Container)
+std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>> WSLAProcessLauncher::LaunchNoThrow(IWSLAContainer& Container)
 {
     auto [options, commandLine, env] = CreateProcessOptions();
 
@@ -196,12 +196,12 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
     auto result = Container.Exec(&options, &process);
     if (FAILED(result))
     {
-        return std::make_tuple(result, 0, std::optional<ClientRunningWSLAProcess>());
+        return std::make_pair(result, std::optional<ClientRunningWSLAProcess>());
     }
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
 
-    return {S_OK, 0, ClientRunningWSLAProcess{std::move(process), m_flags}};
+    return {S_OK, ClientRunningWSLAProcess{std::move(process), m_flags}};
 }
 
 IWSLAProcess& ClientRunningWSLAProcess::Get()
