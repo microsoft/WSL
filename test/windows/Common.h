@@ -44,9 +44,16 @@ Abstract:
     }
 
 #define WSL2_TEST_ONLY() \
-    if (!LxsstuVmMode()) \
+    if (!LxsstuVmMode() || LxsstuWslaMode()) \
     { \
         LogSkipped("This test is only applicable to WSL2"); \
+        return; \
+    }
+
+#define WSLA_TEST_ONLY() \
+    if (!LxsstuWslaMode()) \
+    { \
+        LogSkipped("This test is only applicable to WSLA"); \
         return; \
     }
 
@@ -439,6 +446,7 @@ wil::unique_file FileFromHandle(_Inout_ wil::unique_handle& Handle, _In_ const c
 BOOL LxsstuInitialize(__in BOOLEAN RunInstanceTests);
 
 BOOL LxsstuVmMode(VOID);
+BOOL LxsstuWslaMode(VOID);
 
 std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode = 0);
 

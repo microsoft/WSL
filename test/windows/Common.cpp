@@ -58,7 +58,8 @@ static HANDLE g_OriginalStderr;
 static BOOL g_RelogEverything = TRUE;
 static bool g_LogDmesgAfterEachTest = false;
 static PTP_TIMER g_WatchdogTimer;
-static BOOL g_VmMode;
+static BOOL g_VmMode = FALSE;
+static BOOL g_WslaMode = FALSE;
 static std::wstring g_originalConfig;
 static std::wstring g_originalDefaultDistro;
 std::wstring g_dumpFolder;
@@ -473,6 +474,11 @@ Return Value:
 
 {
     return g_VmMode;
+}
+
+BOOL LxsstuWslaMode(VOID)
+{
+    return g_WslaMode;
 }
 
 // LxsstuLaunchPowershellAndCaptureOutput
@@ -2069,6 +2075,11 @@ Return Value:
     {
         g_VmMode = true;
     }
+    else if (version == L"wsla")
+    {
+        g_VmMode = true;
+        g_WslaMode = true;
+    }
     else
     {
         LogError("Unexpected version: %ls", version.c_str());
@@ -2082,21 +2093,30 @@ Return Value:
     const auto setupScript = getOptionalTestParam(L"SetupScript");
     if (!setupScript.has_value())
     {
-        // If no setup script is present, mark test_distro as the default distro here for convenience.
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--set-default " LXSS_DISTRO_NAME_TEST_L), 0L);
+        if (!g_WslaMode)
+        {
+            // If no setup script is present, mark test_distro as the default distro here for convenience.
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--set-default " LXSS_DISTRO_NAME_TEST_L), 0L);
+        }
+
         g_fastTestRun = true;
 
         return true;
     }
 
+    // WSLA tests only need the package installed — skip distro import and unit test copy.
     std::wstring Cmd =
         L"Powershell \
         -NoProfile \
         -ExecutionPolicy Bypass \
         -Command \"" +
-        setupScript.value() + L" -Version '" + getTestParam(L"Version") + L"'" + L" -DistroPath " + g_testDistroPath +
-        L" -DistroName " + LXSS_DISTRO_NAME_TEST_L + L" -Package '" + getTestParam(L"Package") + L"'" + L" -UnitTestsPath " +
-        getOptionalTestParam(L"UnitTestsPath").value_or(L"$null");
+        setupScript.value() + L" -Version '2'" + L" -Package '" + getTestParam(L"Package") + L"'";
+
+    if (!g_WslaMode)
+    {
+        Cmd += L" -DistroPath " + g_testDistroPath + L" -DistroName " + LXSS_DISTRO_NAME_TEST_L + L" -UnitTestsPath " +
+               getOptionalTestParam(L"UnitTestsPath").value_or(L"$null");
+    }
 
     if (getOptionalTestParam(L"AllowUnsigned") == L"1")
     {

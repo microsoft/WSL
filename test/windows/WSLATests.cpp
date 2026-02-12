@@ -149,7 +149,7 @@ class WSLATests
 
     TEST_METHOD(GetVersion)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         wil::com_ptr<IWSLASessionManager> sessionManager;
         VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
@@ -245,7 +245,7 @@ class WSLATests
 
     TEST_METHOD(ListSessionsReturnsSessionWithDisplayName)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto sessionManager = OpenSessionManager();
 
@@ -286,7 +286,7 @@ class WSLATests
 
     TEST_METHOD(OpenSessionByNameFindsExistingSession)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto sessionManager = OpenSessionManager();
 
@@ -322,7 +322,7 @@ class WSLATests
 
     TEST_METHOD(PullImage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         {
             VERIFY_SUCCEEDED(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr));
@@ -353,7 +353,7 @@ class WSLATests
 
     TEST_METHOD(ListImages)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // TODO: Add more test coverage once ListImages() is fully implemented.
 
@@ -380,7 +380,7 @@ class WSLATests
     // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(LoadImage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
         wil::unique_handle imageTarFileHandle{
@@ -406,7 +406,7 @@ class WSLATests
     // TODO: Test that invalid tars are correctly handled.
     TEST_METHOD(ImportImage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
         wil::unique_handle imageTarFileHandle{
@@ -439,7 +439,7 @@ class WSLATests
 
     TEST_METHOD(DeleteImage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Prepare alpine image to delete.
         VERIFY_SUCCEEDED(m_defaultSession->PullImage("alpine:latest", nullptr, nullptr));
@@ -525,7 +525,7 @@ class WSLATests
 
     TEST_METHOD(BuildImage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto contextDir = std::filesystem::current_path() / "build-context";
         std::filesystem::create_directories(contextDir);
@@ -553,7 +553,7 @@ class WSLATests
 
     TEST_METHOD(BuildImageWithContext)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto contextDir = std::filesystem::current_path() / "build-context-file";
         std::filesystem::create_directories(contextDir);
@@ -587,7 +587,7 @@ class WSLATests
 
     TEST_METHOD(BuildImageManyFiles)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         static constexpr int fileCount = 1024;
 
@@ -638,7 +638,7 @@ class WSLATests
 
     TEST_METHOD(BuildImageLargeFile)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rmi", "-f", "wsla-test-build-large:latest"});
         ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "builder", "prune", "-f"}, 0);
@@ -692,7 +692,7 @@ class WSLATests
 
     TEST_METHOD(BuildImageMultiStage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto contextDir = std::filesystem::current_path() / "build-context-multistage";
         std::filesystem::create_directories(contextDir);
@@ -731,7 +731,7 @@ class WSLATests
 
     TEST_METHOD(BuildImageDockerIgnore)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto contextDir = std::filesystem::current_path() / "build-context-dockerignore";
         std::filesystem::create_directories(contextDir / "temp");
@@ -777,7 +777,7 @@ class WSLATests
 
     TEST_METHOD(BuildImageFailure)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto contextDir = std::filesystem::current_path() / "build-context-failure";
         std::filesystem::create_directories(contextDir);
@@ -801,7 +801,7 @@ class WSLATests
 
     TEST_METHOD(BuildImageCustomDockerfile)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto contextDir = std::filesystem::current_path() / "build-context-custom";
         std::filesystem::create_directories(contextDir / "dockerfiles");
@@ -829,7 +829,7 @@ class WSLATests
 
     TEST_METHOD(SaveImage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         {
             std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
             wil::unique_handle imageTarFileHandle{
@@ -899,7 +899,7 @@ class WSLATests
     }
     TEST_METHOD(ExportContainer)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         // Load an image and launch a container to verify image is valid.
         {
             std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
@@ -967,7 +967,7 @@ class WSLATests
 
     TEST_METHOD(CustomDmesgOutput)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto createVmWithDmesg = [this](bool earlyBootLogging) {
             auto [read, write] = CreateSubprocessPipe(false, false);
@@ -1049,7 +1049,7 @@ class WSLATests
 
     TEST_METHOD(TerminationCallback)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         class DECLSPEC_UUID("7BC4E198-6531-4FA6-ADE2-5EF3D2A04DFF") CallbackInstance
             : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, ITerminationCallback, IFastRundown>
@@ -1093,7 +1093,7 @@ class WSLATests
 
     TEST_METHOD(InteractiveShell)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         WSLAProcessLauncher launcher("/bin/sh", {"/bin/sh"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin);
         auto process = launcher.Launch(*m_defaultSession);
@@ -1134,7 +1134,7 @@ class WSLATests
 
     void ValidateNetworking(WSLANetworkingMode mode, bool enableDnsTunneling = false)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Reuse the default session if settings match (same networking mode and DNS tunneling setting).
         auto createNewSession = mode != m_defaultSessionSettings.NetworkingMode ||
@@ -1209,7 +1209,7 @@ class WSLATests
 
     void ValidatePortMapping(WSLANetworkingMode networkingMode)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto settings = GetDefaultSessionSettings(L"port-mapping-test");
         settings.NetworkingMode = networkingMode;
@@ -1329,7 +1329,7 @@ class WSLATests
 
     TEST_METHOD(StuckVmTermination)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Create a 'stuck' process
         auto process = WSLAProcessLauncher{"/bin/cat", {"/bin/cat"}, {}, WSLAProcessFlagsStdin}.Launch(*m_defaultSession);
@@ -1411,20 +1411,20 @@ class WSLATests
 
     TEST_METHOD(WindowsMounts)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         ValidateWindowsMounts(false);
     }
 
     TEST_METHOD(WindowsMountsVirtioFs)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         ValidateWindowsMounts(true);
     }
 
     // This test case validates that no file descriptors are leaked to user processes.
     TEST_METHOD(Fd)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto result = ExpectCommandResult(
             m_defaultSession.get(), {"/bin/sh", "-c", "echo /proc/self/fd/* && (readlink -v /proc/self/fd/* || true)"}, 0);
@@ -1439,7 +1439,7 @@ class WSLATests
 
     TEST_METHOD(GPU)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Validate that trying to mount the shares without GPU support enabled fails.
         {
@@ -1483,7 +1483,7 @@ class WSLATests
 
     TEST_METHOD(Modules)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Sanity check.
         ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "lsmod | grep ^xsk_diag"}, 1);
@@ -1497,7 +1497,7 @@ class WSLATests
 
     TEST_METHOD(PmemVhds)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Test with SCSI boot VHDs.
         {
@@ -1536,7 +1536,7 @@ class WSLATests
 
     TEST_METHOD(CreateRootNamespaceProcess)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Simple case
         {
@@ -1654,7 +1654,7 @@ class WSLATests
 
     TEST_METHOD(CrashDumpCollection)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         int processId = 0;
 
@@ -1722,7 +1722,7 @@ class WSLATests
 
     TEST_METHOD(VhdFormatting)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         constexpr auto formatedVhd = L"test-format-vhd.vhdx";
 
@@ -1743,7 +1743,7 @@ class WSLATests
 
     TEST_METHOD(CreateContainer)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         // Test a simple container start.
@@ -1970,7 +1970,7 @@ class WSLATests
 
     TEST_METHOD(OpenContainer)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto expectOpen = [&](const char* Id, HRESULT expectedResult = S_OK) {
             wil::com_ptr<IWSLAContainer> container;
@@ -2061,7 +2061,7 @@ class WSLATests
 
     TEST_METHOD(ContainerState)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
@@ -2263,7 +2263,7 @@ class WSLATests
 
     TEST_METHOD(ContainerNetwork)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         auto expectContainerList = [&](const std::vector<std::tuple<std::string, std::string, WSLA_CONTAINER_STATE>>& expectedContainers) {
@@ -2366,7 +2366,7 @@ class WSLATests
 
     TEST_METHOD(ContainerInspect)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         // Helper to verify port mappings.
@@ -2504,7 +2504,7 @@ class WSLATests
 
     TEST_METHOD(Exec)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         // Create a container.
@@ -2817,7 +2817,7 @@ class WSLATests
 
     TEST_METHOD(PortMappingsNat)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeNAT);
 
@@ -2827,7 +2827,7 @@ class WSLATests
 
     TEST_METHOD(PortMappingsVirtioProxy)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto [restore, session] = SetupPortMappingsTest(WSLANetworkingModeVirtioProxy);
 
@@ -2848,7 +2848,7 @@ class WSLATests
 
     void ValidateContainerVolumes(bool enableVirtioFs)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession();
@@ -2924,7 +2924,7 @@ class WSLATests
 
     void ValidateContainerVolumeUnmountAllFoldersOnError(bool enableVirtioFs)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         auto hostFolder = std::filesystem::current_path() / "test-volume";
@@ -3169,7 +3169,7 @@ class WSLATests
 
     TEST_METHOD(ContainerRecoveryFromStorage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession(); // Required to access the storage folder.
@@ -3218,7 +3218,7 @@ class WSLATests
 
     TEST_METHOD(ContainerVolumeAndPortRecoveryFromStorage)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         auto restore = ResetTestSession();
@@ -3312,7 +3312,7 @@ class WSLATests
 
     TEST_METHOD(SessionManagement)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto manager = OpenSessionManager();
 
@@ -3433,7 +3433,7 @@ class WSLATests
 
     TEST_METHOD(ContainerLogs)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto expectLogs = [](auto& container,
                              const std::string& expectedStdout,
@@ -3564,7 +3564,7 @@ class WSLATests
 
     TEST_METHOD(ContainerLabels)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
         SKIP_TEST_ARM64();
 
         // Docker labels do not have a size limit, so test with a very large label value to validate that the API can handle it.
@@ -3654,7 +3654,7 @@ class WSLATests
 
     TEST_METHOD(ContainerAttach)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Validate attach behavior in a non-tty process.
         {
@@ -3812,7 +3812,7 @@ class WSLATests
 
     TEST_METHOD(InvalidNames)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         auto expectInvalidArg = [&](const std::string& name) {
             wil::com_ptr<IWSLAContainer> container;
@@ -3853,7 +3853,7 @@ class WSLATests
 
     TEST_METHOD(PageReporting)
     {
-        WSL2_TEST_ONLY();
+        WSLA_TEST_ONLY();
 
         // Determine expected page reporting order based on Windows version.
         // On Germanium or later: 5 (128k), otherwise: 9 (2MB).
