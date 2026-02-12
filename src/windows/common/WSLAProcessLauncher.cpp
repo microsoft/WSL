@@ -194,11 +194,10 @@ std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> WSLAProcessLau
     auto [options, commandLine, env] = CreateProcessOptions();
 
     wil::com_ptr<IWSLAProcess> process;
-    int error = -1;
-    auto result = Container.Exec(&options, &process, &error);
+    auto result = Container.Exec(&options, &process);
     if (FAILED(result))
     {
-        return std::make_tuple(result, error, std::optional<ClientRunningWSLAProcess>());
+        return std::make_tuple(result, 0, std::optional<ClientRunningWSLAProcess>());
     }
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
