@@ -28,7 +28,6 @@ Abstract:
 --*/
 
 #include "WSLASessionManager.h"
-#include "WSLASessionFactory.h"
 #include "HcsVirtualMachine.h"
 #include "wslutil.h"
 
@@ -80,7 +79,7 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
     auto vm = Microsoft::WRL::Make<HcsVirtualMachine>(Settings);
 
     // Launch per-user COM server factory and add it to our job object for crash cleanup.
-    auto factory = wslutil::CreateComServerAsUser<WSLASessionFactory, IWSLASessionFactory>(userToken.get());
+    auto factory = wslutil::CreateComServerAsUser<IWSLASessionFactory>(__uuidof(WSLASessionFactory), userToken.get());
     AddSessionProcessToJobObject(factory.get());
 
     // Create the session via the factory.

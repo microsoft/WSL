@@ -18,6 +18,7 @@ import "wtypes.idl";
 
 cpp_quote("#ifdef __cplusplus")
 cpp_quote("class DECLSPEC_UUID(\"a9b7a1b9-0671-405c-95f1-e0612cb4ce8f\") WSLASessionManager;")
+cpp_quote("class DECLSPEC_UUID(\"9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3\") WSLASessionFactory;")
 cpp_quote("#endif")
 
 #define WSLA_MAX_CONTAINER_NAME_LENGTH 255
