@@ -69,12 +69,17 @@ void HandleConsoleProgressBar::UpdateFileSize(HANDLE handle, ConsoleProgressIndi
 {
     try
     {
+        LONGLONG previousSize = -1;
         while (!m_event.is_signaled())
         {
             LARGE_INTEGER size{};
             THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(handle, &size));
 
-            progressBar.UpdateProgress(std::format(L" ({} MB)", size.QuadPart / _1MB));
+            if (size.QuadPart != previousSize)
+            {
+                progressBar.UpdateProgress(std::format(L" ({} MB)", size.QuadPart / _1MB));
+                previousSize = size.QuadPart;
+            }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
