@@ -19,11 +19,11 @@ Abstract:
 #include <docker_schema.h>
 #include <CommandLine.h>
 
-namespace wslc::services {
+namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
-using namespace wslc::models;
+using namespace wsl::windows::wslc::models;
 
 static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
 {
@@ -64,7 +64,7 @@ static void CreateInternal(Session& session, IWSLAContainer** container, WSLA_CO
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
-        PullImpl(session, image);
+        utils::PullImpl(session, image);
         result = session.Get()->CreateContainer(&containerOptions, container);
     }
 
@@ -181,7 +181,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
     return result;
 }
 
-int ContainerService::Exec(Session& session, std::string id, wslc::models::ExecContainerOptions options)
+int ContainerService::Exec(Session& session, std::string id, ExecContainerOptions options)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -212,4 +212,4 @@ InspectContainer ContainerService::Inspect(Session& session, std::string id)
     THROW_IF_FAILED(container->Inspect(&output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
-} // namespace wslc::services
+} // namespace wsl::windows::wslc::services

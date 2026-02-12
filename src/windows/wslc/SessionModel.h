@@ -16,7 +16,7 @@ Abstract:
 #include <wslservice.h>
 #include <wslaservice.h>
 
-namespace wslc::models {
+namespace wsl::windows::wslc::models {
 struct Session
 {
     explicit Session(wil::com_ptr<IWSLASession> session) : m_session(std::move(session))
@@ -43,4 +43,4 @@ private:
     WSLA_SESSION_SETTINGS m_sessionSettings;
     std::filesystem::path m_storagePath;
 };
-} // namespace wslc::models
+} // namespace wsl::windows::wslc::models

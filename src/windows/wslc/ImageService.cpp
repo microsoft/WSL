@@ -16,11 +16,11 @@ Abstract:
 #include "SessionService.h"
 #include <wslutil.h>
 
-namespace wslc::services {
+namespace wsl::windows::wslc::services {
 
-using namespace wslc::models;
+using namespace wsl::windows::wslc::models;
 
-std::vector<ImageInformation> ImageService::List(wslc::models::Session& session)
+std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Session& session)
 {
     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
     ULONG count = 0;
@@ -39,7 +39,7 @@ std::vector<ImageInformation> ImageService::List(wslc::models::Session& session)
     return result;
 }
 
-void ImageService::Pull(wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
+void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
@@ -68,4 +68,4 @@ void ImageService::Inspect()
 {
 }
 
-} // namespace wslc::services
+} // namespace wsl::windows::wslc::services

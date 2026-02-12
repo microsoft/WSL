@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "ICommand.h"
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -39,4 +39,4 @@ void ICommand::PrintHelp() const
 {
     wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(GetFullDescription()));
 }
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands

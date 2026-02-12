@@ -21,11 +21,11 @@ using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::WSLAProcessLauncher;
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 int ShellListCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
 {
     CMD_IF_HELP_PRINT_HELP();
-    wslc::services::ShellService shellService;
+    wsl::windows::wslc::services::ShellService shellService;
     auto sessions = shellService.List();
     if (m_verbose)
     {
@@ -33,7 +33,7 @@ int ShellListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
     }
 
-    TablePrinter tablePrinter(
+    utils::TablePrinter tablePrinter(
         {Localization::MessageWslaHeaderId(), Localization::MessageWslaHeaderCreatorPid(), Localization::MessageWslaHeaderDisplayName()});
     for (const auto& session : sessions)
     {
@@ -51,7 +51,7 @@ int ShellAttachCommand::ExecuteInternal(std::wstring_view commandLine, int parse
 {
     CMD_IF_HELP_PRINT_HELP();
     CMD_ARG_REQUIRED(m_name, L"Error: Session name is required to attach.");
-    wslc::services::ShellService shellService;
+    wsl::windows::wslc::services::ShellService shellService;
     return shellService.Attach(wsl::shared::string::MultiByteToWide(m_name));
 }
 
@@ -73,4 +73,4 @@ int ShellCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffse
     PrintHelp();
     return 1;
 }
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands

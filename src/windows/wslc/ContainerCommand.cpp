@@ -19,11 +19,11 @@ Abstract:
 #include <CommandLine.h>
 #include <format>
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 
 using namespace wsl::shared;
-using namespace wslc::models;
-using namespace wslc::services;
+using namespace wsl::windows::wslc::models;
+using namespace wsl::windows::wslc::services;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::docker_schema::InspectContainer;
 
@@ -85,7 +85,7 @@ int ContainerStartCommand::ExecuteInternal(std::wstring_view commandLine, int pa
     CMD_IF_HELP_PRINT_HELP();
     CMD_ARG_REQUIRED(m_id, L"Error: container value is required.");
     auto session = m_sessionService.CreateSession();
-    wslc::services::ContainerService containerService;
+    ContainerService containerService;
     containerService.Start(session, m_id);
     return 0;
 }
@@ -95,7 +95,7 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
     CMD_IF_HELP_PRINT_HELP();
     auto containersToStop = Arguments();
     auto session = m_sessionService.CreateSession();
-    wslc::services::ContainerService containerService;
+    ContainerService containerService;
 
     if (m_all)
     {
@@ -127,7 +127,7 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
     CMD_IF_HELP_PRINT_HELP();
     auto containersToKill = Arguments();
     auto session = m_sessionService.CreateSession();
-    wslc::services::ContainerService containerService;
+    ContainerService containerService;
 
     if (m_all)
     {
@@ -159,7 +159,7 @@ int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int p
     CMD_IF_HELP_PRINT_HELP();
     auto containersToDelete = Arguments();
     auto session = m_sessionService.CreateSession();
-    wslc::services::ContainerService containerService;
+    ContainerService containerService;
 
     if (m_all)
     {
@@ -182,14 +182,14 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
 {
     CMD_IF_HELP_PRINT_HELP();
     auto session = m_sessionService.CreateSession();
-    wslc::services::ContainerService containerService;
+    ContainerService containerService;
     auto containers = containerService.List(session);
     auto argIds = Arguments();
 
     // Filter by running state if --all is not specified
     if (!m_all)
     {
-        auto shouldRemove = [](const wslc::models::ContainerInformation& container) {
+        auto shouldRemove = [](const ContainerInformation& container) {
             return container.State != WSLA_CONTAINER_STATE::WslaContainerStateRunning;
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
@@ -198,7 +198,7 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
     // Filter by name if provided
     if (!argIds.empty())
     {
-        auto shouldRemove = [&argIds](const wslc::models::ContainerInformation& container) {
+        auto shouldRemove = [&argIds](const ContainerInformation& container) {
             return std::find(argIds.begin(), argIds.end(), container.Name) == argIds.end();
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
@@ -219,7 +219,7 @@ int ContainerListCommand::ExecuteInternal(std::wstring_view commandLine, int par
     }
     else
     {
-        TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
+        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
         for (const auto& container : containers)
         {
             tablePrinter.AddRow({
@@ -243,8 +243,8 @@ int ContainerExecCommand::ExecuteInternal(std::wstring_view commandLine, int par
     auto arguments = Arguments();
     CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one command needs to be specified.");
     auto session = m_sessionService.CreateSession();
-    wslc::services::ContainerService containerService;
-    wslc::models::ExecContainerOptions options;
+    ContainerService containerService;
+    ExecContainerOptions options;
     options.Arguments = arguments;
     options.Interactive = m_options.Interactive;
     options.TTY = m_options.TTY;
@@ -257,7 +257,7 @@ int ContainerInspectCommand::ExecuteInternal(std::wstring_view commandLine, int 
     auto arguments = Arguments();
     CMD_ARG_ARRAY_REQUIRED(arguments, L"Error: at least one container needs to be specified.");
     auto session = m_sessionService.CreateSession();
-    wslc::services::ContainerService containerService;
+    ContainerService containerService;
     std::vector<InspectContainer> result;
 
     for (const auto& id : arguments)

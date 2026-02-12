@@ -15,7 +15,7 @@ Abstract:
 
 #include <docker_schema.h>
 
-namespace wslc::models {
+namespace wsl::windows::wslc::models {
 struct ImageInformation
 {
     std::string Name;
@@ -23,4 +23,4 @@ struct ImageInformation
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ImageInformation, Name, Size);
 };
-} // namespace wslc::models
+} // namespace wsl::windows::wslc::models

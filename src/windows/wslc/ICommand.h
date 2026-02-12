@@ -37,7 +37,7 @@ Abstract:
         return E_INVALIDARG; \
     }
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 class ICommand
 {
 public:
@@ -73,9 +73,9 @@ public:
 protected:
     virtual int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) = 0;
     bool m_help{};
-    wslc::services::SessionService m_sessionService;
+    wsl::windows::wslc::services::SessionService m_sessionService;
 
 private:
     std::vector<std::string> m_arguments;
 };
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands

@@ -16,10 +16,10 @@ Abstract:
 #include "SessionModel.h"
 #include <wslaservice.h>
 
-namespace wslc::services {
+namespace wsl::windows::wslc::services {
 class SessionService
 {
 public:
-    wslc::models::Session CreateSession(std::optional<wslc::models::SessionOptions> options = std::nullopt);
+    wsl::windows::wslc::models::Session CreateSession(std::optional<wsl::windows::wslc::models::SessionOptions> options = std::nullopt);
 };
-} // namespace wslc::services
+} // namespace wsl::windows::wslc::services

@@ -15,7 +15,7 @@ Abstract:
 #include <WSLAProcessLauncher.h>
 #include "ConsoleService.h"
 
-namespace wslc::services {
+namespace wsl::windows::wslc::services {
 
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::relay::ReadHandle;
@@ -123,4 +123,4 @@ int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWS
 
     return process.Wait();
 }
-} // namespace wslc::services
+} // namespace wsl::windows::wslc::services

@@ -18,7 +18,7 @@ Abstract:
 #include "ImageService.h"
 #include "TablePrinter.h"
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -27,7 +27,7 @@ int ImagePullCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
     CMD_IF_HELP_PRINT_HELP();
     CMD_ARG_REQUIRED(m_image, L"Image name is required.");
     auto session = m_sessionService.CreateSession();
-    PullImpl(session, m_image);
+    utils::PullImpl(session, m_image);
     return 0;
 }
 
@@ -35,7 +35,7 @@ int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
 {
     CMD_IF_HELP_PRINT_HELP();
     auto session = m_sessionService.CreateSession();
-    wslc::services::ImageService imageService;
+    wsl::windows::wslc::services::ImageService imageService;
     auto images = imageService.List(session);
     if (m_format == "json")
     {
@@ -53,7 +53,7 @@ int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
     }
     else
     {
-        TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
+        utils::TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
         for (const auto& image : images)
         {
             tablePrinter.AddRow(
@@ -84,4 +84,4 @@ int ImageCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffse
     PrintHelp();
     return 1;
 }
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands

@@ -16,7 +16,7 @@ Abstract:
 #include <string>
 #include <vector>
 
-namespace wslc::services {
+namespace wsl::windows::wslc::services {
 struct SessionInformation
 {
     ULONG SessionId;
@@ -30,4 +30,4 @@ public:
     int Attach(std::wstring name);
     std::vector<SessionInformation> List();
 };
-} // namespace wslc::services
+} // namespace wsl::windows::wslc::services

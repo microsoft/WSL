@@ -15,7 +15,7 @@ Abstract:
 #include "ICommand.h"
 #include "ContainerService.h"
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 // wslc container run
 class ContainerRunCommand : public ICommand
 {
@@ -52,7 +52,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::models::ContainerRunOptions m_options;
+    models::ContainerRunOptions m_options;
     std::string m_image;
 };
 
@@ -90,7 +90,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::models::ContainerCreateOptions m_options;
+    models::ContainerCreateOptions m_options;
     std::string m_image;
 };
 
@@ -156,7 +156,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::models::StopContainerOptions m_options;
+    models::StopContainerOptions m_options;
     bool m_all{};
 };
 
@@ -190,7 +190,7 @@ protected:
     int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override;
 
 private:
-    wslc::models::KillContainerOptions m_options;
+    models::KillContainerOptions m_options;
     bool m_all{};
 };
 
@@ -298,7 +298,7 @@ protected:
 
 private:
     std::string m_id;
-    wslc::models::ExecContainerOptions m_options;
+    models::ExecContainerOptions m_options;
 };
 
 // wslc container inspect
@@ -369,4 +369,4 @@ private:
     ContainerExecCommand m_exec;
     ContainerInspectCommand m_inspect;
 };
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands

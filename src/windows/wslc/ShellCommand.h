@@ -16,7 +16,7 @@ Abstract:
 #include "precomp.h"
 #include "ICommand.h"
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 
 // wslc shell list
 class ShellListCommand : public ICommand
@@ -110,4 +110,4 @@ private:
     ShellListCommand m_list;
     ShellAttachCommand m_attach;
 };
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands

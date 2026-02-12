@@ -17,7 +17,9 @@ Abstract:
 #include "WSLAProcessLauncher.h"
 #include "SessionModel.h"
 
-void PullImpl(wslc::models::Session& session, const std::string& image);
+namespace wsl::windows::wslc::utils {
+
+void PullImpl(wsl::windows::wslc::models::Session& session, const std::string& image);
 
 class ChangeTerminalMode
 {
@@ -43,3 +45,5 @@ private:
     HANDLE m_console{};
     CONSOLE_CURSOR_INFO m_originalCursorInfo{};
 };
+
+} // namespace wsl::windows::wslc::utils

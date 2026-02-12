@@ -15,7 +15,7 @@ Abstract:
 
 #include "ICommand.h"
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 // wslc image list
 class ImageListCommand : public ICommand
 {
@@ -111,4 +111,4 @@ private:
     ImageListCommand m_list;
     ImagePullCommand m_pull;
 };
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands

@@ -19,7 +19,7 @@ Abstract:
 #include <wslutil.h>
 #include <sstream>
 
-namespace wslc {
+namespace wsl::windows::wslc::utils {
 
 class TablePrinter
 {
@@ -93,4 +93,4 @@ private:
         wsl::windows::common::wslutil::PrintMessage(ss.str(), stdout);
     }
 };
-} // namespace wslc
+} // namespace wsl::windows::wslc::utils

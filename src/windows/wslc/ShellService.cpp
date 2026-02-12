@@ -16,7 +16,7 @@ Abstract:
 #include <wslaservice.h>
 #include "Utils.h"
 
-namespace wslc::services {
+namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -124,4 +124,4 @@ std::vector<SessionInformation> ShellService::List()
 
     return result;
 }
-} // namespace wslc::services
+} // namespace wsl::windows::wslc::services

@@ -15,7 +15,7 @@ Abstract:
 #include <precomp.h>
 #include "SessionModel.h"
 
-namespace wslc::models {
+namespace wsl::windows::wslc::models {
 SessionOptions SessionOptions::Default()
 {
     // TODO: Have a configuration file for those.
@@ -41,4 +41,4 @@ SessionOptions::operator const WSLA_SESSION_SETTINGS*() const
     const_cast<SessionOptions*>(this)->m_sessionSettings.StoragePath = m_storagePath.c_str();
     return &m_sessionSettings;
 }
-} // namespace wslc::models
+} // namespace wsl::windows::wslc::models

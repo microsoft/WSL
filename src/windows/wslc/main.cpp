@@ -30,7 +30,7 @@ namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
-namespace wslc::commands {
+namespace wsl::windows::wslc::commands {
 // wslc image
 class RootCommand : public ICommand
 {
@@ -87,7 +87,7 @@ private:
     ContainerCommand m_container;
     ShellCommand m_shell;
 };
-} // namespace wslc::commands
+} // namespace wsl::windows::wslc::commands
 
 int wslc_main(std::wstring_view commandLine)
 {
@@ -107,7 +107,7 @@ int wslc_main(std::wstring_view commandLine)
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
-    wslc::commands::RootCommand rootCommand;
+    wsl::windows::wslc::commands::RootCommand rootCommand;
     return rootCommand.Execute(commandLine, 1);
 }
 
