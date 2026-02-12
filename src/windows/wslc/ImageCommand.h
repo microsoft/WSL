@@ -15,14 +15,19 @@ Abstract:
 
 #include "ICommand.h"
 
-namespace wslc::commands
-{
+namespace wslc::commands {
 // wslc image list
 class ImageListCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "list"; }
-    std::string Description() const override { return "Lists all the locally present images."; }
+    std::string Name() const override
+    {
+        return "list";
+    }
+    std::string Description() const override
+    {
+        return "Lists all the locally present images.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -48,8 +53,14 @@ private:
 class ImagePullCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "pull"; }
-    std::string Description() const override { return "Pulls an image from a registry."; }
+    std::string Name() const override
+    {
+        return "pull";
+    }
+    std::string Description() const override
+    {
+        return "Pulls an image from a registry.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -72,8 +83,14 @@ private:
 class ImageCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "image"; }
-    std::string Description() const override { return "Manage images."; }
+    std::string Name() const override
+    {
+        return "image";
+    }
+    std::string Description() const override
+    {
+        return "Manage images.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -94,4 +111,4 @@ private:
     ImageListCommand m_list;
     ImagePullCommand m_pull;
 };
-}
+} // namespace wslc::commands

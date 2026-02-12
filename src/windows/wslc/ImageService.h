@@ -16,18 +16,17 @@ Abstract:
 #include "SessionModel.h"
 #include "ImageModel.h"
 
-namespace wslc::services
+namespace wslc::services {
+class ImageService
 {
-    class ImageService
-    {
-    public:
-        std::vector<wslc::models::ImageInformation> List(wslc::models::Session& session);
-        void Pull(wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
-        void Push();
-        void Save();
-        void Load();
-        void Tag();
-        void Prune();
-        void Inspect();
-    };
-}
+public:
+    std::vector<wslc::models::ImageInformation> List(wslc::models::Session& session);
+    void Pull(wslc::models::Session& session, const std::string& image, IProgressCallback* callback);
+    void Push();
+    void Save();
+    void Load();
+    void Tag();
+    void Prune();
+    void Inspect();
+};
+} // namespace wslc::services

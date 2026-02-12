@@ -19,11 +19,10 @@ Abstract:
 #include <docker_schema.h>
 #include <CommandLine.h>
 
-namespace wslc::services
-{
-using wsl::windows::common::wslutil::PrintMessage;
+namespace wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
+using wsl::windows::common::wslutil::PrintMessage;
 using namespace wslc::models;
 
 static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
@@ -96,7 +95,8 @@ int ContainerService::Run(Session& session, std::string image, ContainerRunOptio
         THROW_IF_FAILED(container->GetInitProcess(&process));
 
         ConsoleService consoleService;
-        return consoleService.AttachToCurrentConsole(ClientRunningWSLAProcess(std::move(process), containerOptions.InitProcessOptions.Flags));
+        return consoleService.AttachToCurrentConsole(
+            ClientRunningWSLAProcess(std::move(process), containerOptions.InitProcessOptions.Flags));
     }
 
     WSLAContainerId containerId{};
@@ -105,7 +105,7 @@ int ContainerService::Run(Session& session, std::string image, ContainerRunOptio
     return 0;
 }
 
- CreateContainerResult ContainerService::Create(Session& session, std::string image, ContainerCreateOptions runOptions)
+CreateContainerResult ContainerService::Create(Session& session, std::string image, ContainerCreateOptions runOptions)
 {
     wil::com_ptr<IWSLAContainer> container;
     WSLA_CONTAINER_OPTIONS containerOptions{};
@@ -212,4 +212,4 @@ InspectContainer ContainerService::Inspect(Session& session, std::string id)
     THROW_IF_FAILED(container->Inspect(&output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
 }
-}
+} // namespace wslc::services

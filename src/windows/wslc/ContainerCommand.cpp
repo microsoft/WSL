@@ -97,11 +97,11 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
 
-    if(m_all)
+    if (m_all)
     {
         containersToStop.clear();
         auto allContainers = containerService.List(session);
-        for(const auto& container : allContainers)
+        for (const auto& container : allContainers)
         {
             if (container.State == WSLA_CONTAINER_STATE::WslaContainerStateRunning)
             {
@@ -109,7 +109,7 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
             }
         }
     }
-    else if(containersToStop.empty())
+    else if (containersToStop.empty())
     {
         wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to stop all containers.", stderr);
         return 1;
@@ -129,11 +129,11 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
 
-    if(m_all)
+    if (m_all)
     {
         containersToKill.clear();
         auto allContainers = containerService.List(session);
-        for(const auto& container : allContainers)
+        for (const auto& container : allContainers)
         {
             if (container.State == WSLA_CONTAINER_STATE::WslaContainerStateRunning)
             {
@@ -141,7 +141,7 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
             }
         }
     }
-    else if(containersToKill.empty())
+    else if (containersToKill.empty())
     {
         wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to kill all containers.", stderr);
         return 1;
@@ -161,11 +161,11 @@ int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int p
     auto session = m_sessionService.CreateSession();
     wslc::services::ContainerService containerService;
 
-    if(m_all)
+    if (m_all)
     {
         containersToDelete.clear();
         auto allContainers = containerService.List(session);
-        for(const auto& container : allContainers)
+        for (const auto& container : allContainers)
         {
             containersToDelete.push_back(container.Name);
         }
@@ -324,4 +324,4 @@ int ContainerCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
     PrintHelp();
     return 1;
 }
-}
+} // namespace wslc::commands

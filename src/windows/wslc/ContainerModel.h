@@ -18,8 +18,7 @@ Abstract:
 #include <wslaservice.h>
 #include <docker_schema.h>
 
-namespace wslc::models
-{
+namespace wslc::models {
 struct ContainerCreateOptions
 {
     bool TTY = false;
@@ -67,4 +66,4 @@ struct ExecContainerOptions
     bool Interactive = false;
     std::vector<std::string> Arguments;
 };
-}
+} // namespace wslc::models

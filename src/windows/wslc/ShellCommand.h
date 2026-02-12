@@ -22,8 +22,14 @@ namespace wslc::commands {
 class ShellListCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "list"; }
-    std::string Description() const override { return "Lists all the shell sessions."; }
+    std::string Name() const override
+    {
+        return "list";
+    }
+    std::string Description() const override
+    {
+        return "Lists all the shell sessions.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -46,8 +52,14 @@ private:
 class ShellAttachCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "attach"; }
-    std::string Description() const override { return "Attaches to a running shell session."; }
+    std::string Name() const override
+    {
+        return "attach";
+    }
+    std::string Description() const override
+    {
+        return "Attaches to a running shell session.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -70,8 +82,14 @@ private:
 class ShellCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "shell"; }
-    std::string Description() const override { return "Manage shell sessions."; }
+    std::string Name() const override
+    {
+        return "shell";
+    }
+    std::string Description() const override
+    {
+        return "Manage shell sessions.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -92,4 +110,4 @@ private:
     ShellListCommand m_list;
     ShellAttachCommand m_attach;
 };
-}
+} // namespace wslc::commands

@@ -16,8 +16,7 @@ Abstract:
 #include "SessionService.h"
 #include <wslutil.h>
 
-namespace wslc::services
-{
+namespace wslc::services {
 
 using namespace wslc::models;
 
@@ -69,4 +68,4 @@ void ImageService::Inspect()
 {
 }
 
-}
+} // namespace wslc::services

@@ -16,11 +16,12 @@ Abstract:
 #include <wslservice.h>
 #include <wslaservice.h>
 
-namespace wslc::models
-{
+namespace wslc::models {
 struct Session
 {
-    explicit Session(wil::com_ptr<IWSLASession> session) : m_session(std::move(session)) {}
+    explicit Session(wil::com_ptr<IWSLASession> session) : m_session(std::move(session))
+    {
+    }
     IWSLASession* Get() const noexcept
     {
         return m_session.get();
@@ -42,4 +43,4 @@ private:
     WSLA_SESSION_SETTINGS m_sessionSettings;
     std::filesystem::path m_storagePath;
 };
-}
+} // namespace wslc::models

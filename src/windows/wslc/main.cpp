@@ -35,8 +35,14 @@ namespace wslc::commands {
 class RootCommand : public ICommand
 {
 public:
-    std::string Name() const override { return ""; }
-    std::string Description() const override { return "wslc root command"; }
+    std::string Name() const override
+    {
+        return "";
+    }
+    std::string Description() const override
+    {
+        return "wslc root command";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -81,7 +87,7 @@ private:
     ContainerCommand m_container;
     ShellCommand m_shell;
 };
-}
+} // namespace wslc::commands
 
 int wslc_main(std::wstring_view commandLine)
 {

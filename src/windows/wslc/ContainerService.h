@@ -15,8 +15,7 @@ Abstract:
 #include "SessionModel.h"
 #include "ContainerModel.h"
 
-namespace wslc::services
-{
+namespace wslc::services {
 class ContainerService
 {
 public:
@@ -30,4 +29,4 @@ public:
     int Exec(wslc::models::Session& session, std::string id, wslc::models::ExecContainerOptions options);
     wsl::windows::common::docker_schema::InspectContainer Inspect(wslc::models::Session& session, std::string id);
 };
-}
+} // namespace wslc::services

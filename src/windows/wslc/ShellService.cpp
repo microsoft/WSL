@@ -16,8 +16,7 @@ Abstract:
 #include <wslaservice.h>
 #include "Utils.h"
 
-namespace wslc::services
-{
+namespace wslc::services {
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -40,7 +39,8 @@ int ShellService::Attach(std::wstring sessionName)
         }
 
         auto errorString = wsl::windows::common::wslutil::ErrorCodeToString(hr);
-        wslutil::PrintMessage(Localization::MessageErrorCode(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), errorString), stderr);
+        wslutil::PrintMessage(
+            Localization::MessageErrorCode(Localization::MessageWslaOpenSessionFailed(sessionName.c_str()), errorString), stderr);
         return 1;
     }
 
@@ -124,4 +124,4 @@ std::vector<SessionInformation> ShellService::List()
 
     return result;
 }
-}
+} // namespace wslc::services

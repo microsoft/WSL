@@ -33,7 +33,8 @@ int ShellListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         wslutil::PrintMessage(std::format(L"[wslc] Found {} session{}", sessions.size(), plural), stdout);
     }
 
-    TablePrinter tablePrinter({Localization::MessageWslaHeaderId(), Localization::MessageWslaHeaderCreatorPid(), Localization::MessageWslaHeaderDisplayName()});
+    TablePrinter tablePrinter(
+        {Localization::MessageWslaHeaderId(), Localization::MessageWslaHeaderCreatorPid(), Localization::MessageWslaHeaderDisplayName()});
     for (const auto& session : sessions)
     {
         tablePrinter.AddRow({
@@ -72,4 +73,4 @@ int ShellCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffse
     PrintHelp();
     return 1;
 }
-}
+} // namespace wslc::commands

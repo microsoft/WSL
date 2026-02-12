@@ -15,13 +15,11 @@ Abstract:
 #include <WSLAProcessLauncher.h>
 #include "ConsoleService.h"
 
-namespace wslc::services
-{
+namespace wslc::services {
 
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::relay::ReadHandle;
 using wsl::windows::common::relay::RelayHandle;
-
 
 static void RelayInteractiveTty(ClientRunningWSLAProcess& Process, HANDLE Tty, bool triggerRefresh = false)
 {
@@ -125,4 +123,4 @@ int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWS
 
     return process.Wait();
 }
-}
+} // namespace wslc::services

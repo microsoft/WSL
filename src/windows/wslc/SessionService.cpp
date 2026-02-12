@@ -15,8 +15,7 @@ Abstract:
 #include "SessionService.h"
 #include <wslaservice.h>
 
-namespace wslc::services
-{
+namespace wslc::services {
 using namespace wslc::models;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
@@ -34,4 +33,4 @@ Session SessionService::CreateSession(std::optional<SessionOptions> options)
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     return Session(std::move(session));
 }
-}
+} // namespace wslc::services

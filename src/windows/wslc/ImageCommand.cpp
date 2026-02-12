@@ -18,8 +18,7 @@ Abstract:
 #include "ImageService.h"
 #include "TablePrinter.h"
 
-namespace wslc::commands
-{
+namespace wslc::commands {
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -57,10 +56,8 @@ int ImageListCommand::ExecuteInternal(std::wstring_view commandLine, int parserO
         TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
         for (const auto& image : images)
         {
-            tablePrinter.AddRow({
-                wsl::shared::string::MultiByteToWide(image.Name),
-                std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))
-            });
+            tablePrinter.AddRow(
+                {wsl::shared::string::MultiByteToWide(image.Name), std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))});
         }
 
         tablePrinter.Print();
@@ -86,4 +83,5 @@ int ImageCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffse
     wslutil::PrintMessage(L"Error: Invalid subcommand specified", stderr);
     PrintHelp();
     return 1;
-}}
+}
+} // namespace wslc::commands

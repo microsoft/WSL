@@ -15,14 +15,19 @@ Abstract:
 #include "ICommand.h"
 #include "ContainerService.h"
 
-namespace wslc::commands
-{
+namespace wslc::commands {
 // wslc container run
 class ContainerRunCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "run"; }
-    std::string Description() const override { return "Create and run a new container from an image."; }
+    std::string Name() const override
+    {
+        return "run";
+    }
+    std::string Description() const override
+    {
+        return "Create and run a new container from an image.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -55,8 +60,14 @@ private:
 class ContainerCreateCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "create"; }
-    std::string Description() const override { return "Creates a container but does not start it."; }
+    std::string Name() const override
+    {
+        return "create";
+    }
+    std::string Description() const override
+    {
+        return "Creates a container but does not start it.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -87,8 +98,14 @@ private:
 class ContainerStartCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "start"; }
-    std::string Description() const override { return "Start a container."; }
+    std::string Name() const override
+    {
+        return "start";
+    }
+    std::string Description() const override
+    {
+        return "Start a container.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -111,8 +128,14 @@ private:
 class ContainerStopCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "stop"; }
-    std::string Description() const override { return "Stop a container."; }
+    std::string Name() const override
+    {
+        return "stop";
+    }
+    std::string Description() const override
+    {
+        return "Stop a container.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -141,8 +164,14 @@ private:
 class ContainerKillCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "kill"; }
-    std::string Description() const override { return "Sends SIGKILL (default option) to running containers to immediately kill the containers."; }
+    std::string Name() const override
+    {
+        return "kill";
+    }
+    std::string Description() const override
+    {
+        return "Sends SIGKILL (default option) to running containers to immediately kill the containers.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -165,13 +194,18 @@ private:
     bool m_all{};
 };
 
-
 // wslc container delete
 class ContainerDeleteCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "delete"; }
-    std::string Description() const override { return "Deletes specified container(s)."; }
+    std::string Name() const override
+    {
+        return "delete";
+    }
+    std::string Description() const override
+    {
+        return "Deletes specified container(s).";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -194,13 +228,18 @@ private:
     bool m_all{};
 };
 
-
 // wslc container list
 class ContainerListCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "list"; }
-    std::string Description() const override { return "List running containers."; }
+    std::string Name() const override
+    {
+        return "list";
+    }
+    std::string Description() const override
+    {
+        return "List running containers.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -226,13 +265,18 @@ private:
     bool m_quiet{};
 };
 
-
 // wslc container exec
 class ContainerExecCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "exec"; }
-    std::string Description() const override { return "Allows execution of a command inside of a running container."; }
+    std::string Name() const override
+    {
+        return "exec";
+    }
+    std::string Description() const override
+    {
+        return "Allows execution of a command inside of a running container.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -261,8 +305,14 @@ private:
 class ContainerInspectCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "inspect"; }
-    std::string Description() const override { return "Outputs details about the container(s) specified using container ID(s) in JSON format."; }
+    std::string Name() const override
+    {
+        return "inspect";
+    }
+    std::string Description() const override
+    {
+        return "Outputs details about the container(s) specified using container ID(s) in JSON format.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -278,8 +328,14 @@ protected:
 class ContainerCommand : public ICommand
 {
 public:
-    std::string Name() const override { return "container"; }
-    std::string Description() const override { return "Manage containers."; }
+    std::string Name() const override
+    {
+        return "container";
+    }
+    std::string Description() const override
+    {
+        return "Manage containers.";
+    }
     std::vector<std::string> Options() const override
     {
         return {
@@ -291,8 +347,7 @@ public:
             m_delete.GetShortDescription(),
             m_list.GetShortDescription(),
             m_exec.GetShortDescription(),
-            m_inspect.GetShortDescription()
-        };
+            m_inspect.GetShortDescription()};
     }
     void LoadArguments(wsl::shared::ArgumentParser& parser) override
     {
@@ -314,4 +369,4 @@ private:
     ContainerExecCommand m_exec;
     ContainerInspectCommand m_inspect;
 };
-}
+} // namespace wslc::commands

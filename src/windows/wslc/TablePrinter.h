@@ -19,23 +19,23 @@ Abstract:
 #include <wslutil.h>
 #include <sstream>
 
-namespace wslc
-{
+namespace wslc {
 
 class TablePrinter
 {
 public:
-    explicit TablePrinter(const std::vector<std::wstring>& headers)
-        : m_headers(headers),
-          m_widths(headers.size(), 0) {}
+    explicit TablePrinter(const std::vector<std::wstring>& headers) : m_headers(headers), m_widths(headers.size(), 0)
+    {
+    }
 
-    TablePrinter(std::initializer_list<std::wstring> headers)
-        : m_headers(headers),
-          m_widths(headers.size(), 0) {}
+    TablePrinter(std::initializer_list<std::wstring> headers) : m_headers(headers), m_widths(headers.size(), 0)
+    {
+    }
 
     void AddRow(const std::vector<std::wstring>& row)
     {
-        if (row.size() != m_headers.size()) {
+        if (row.size() != m_headers.size())
+        {
             THROW_HR(E_INVALIDARG);
         }
         m_rows.push_back(row);
@@ -61,9 +61,11 @@ private:
 
     void ComputeWidths()
     {
-        for (size_t i = 0; i < m_headers.size(); ++i) {
+        for (size_t i = 0; i < m_headers.size(); ++i)
+        {
             m_widths[i] = m_headers[i].size();
-            for (const auto& row : m_rows) {
+            for (const auto& row : m_rows)
+            {
                 m_widths[i] = std::max(m_widths[i], row[i].size());
             }
         }
@@ -73,7 +75,8 @@ private:
     {
         std::wstringstream ss;
         ss << "+";
-        for (size_t w : m_widths) {
+        for (size_t w : m_widths)
+        {
             ss << std::wstring(w + 2, '-') << "+";
         }
         wsl::windows::common::wslutil::PrintMessage(ss.str(), stdout);
@@ -83,12 +86,11 @@ private:
     {
         std::wstringstream ss;
         ss << "|";
-        for (size_t i = 0; i < row.size(); ++i) {
-            ss << " " << row[i]
-               << std::wstring(m_widths[i] - row[i].size(), ' ')
-               << " |";
+        for (size_t i = 0; i < row.size(); ++i)
+        {
+            ss << " " << row[i] << std::wstring(m_widths[i] - row[i].size(), ' ') << " |";
         }
         wsl::windows::common::wslutil::PrintMessage(ss.str(), stdout);
     }
 };
-}
+} // namespace wslc
