@@ -21,7 +21,6 @@ Abstract:
 
 namespace wslc::services
 {
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 using wsl::windows::common::wslutil::PrintMessage;
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
@@ -62,17 +61,15 @@ static void CreateInternal(Session& session, IWSLAContainer** container, WSLA_CO
     SetContainerTTYOptions(containerOptions);
     SetContainerArguments(containerOptions, options.Arguments, argsStorage);
 
-    WSLAErrorDetails error{};
-    auto result = session.Get()->CreateContainer(&containerOptions, container, &error.Error);
+    auto result = session.Get()->CreateContainer(&containerOptions, container);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
         PullImpl(session, image);
-        error.Reset();
-        result = session.Get()->CreateContainer(&containerOptions, container, &error.Error);
+        result = session.Get()->CreateContainer(&containerOptions, container);
     }
 
-    error.ThrowIfFailed(result);
+    THROW_IF_FAILED(result);
 }
 
 static void StopInternal(IWSLAContainer& container, int signal, ULONG timeout = StopContainerOptions::DefaultTimeout)

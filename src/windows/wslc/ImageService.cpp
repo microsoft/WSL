@@ -19,7 +19,6 @@ Abstract:
 namespace wslc::services
 {
 
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 using namespace wslc::models;
 
 std::vector<ImageInformation> ImageService::List(wslc::models::Session& session)
@@ -43,9 +42,7 @@ std::vector<ImageInformation> ImageService::List(wslc::models::Session& session)
 
 void ImageService::Pull(wslc::models::Session& session, const std::string& image, IProgressCallback* callback)
 {
-    WSLAErrorDetails error{};
-    auto result = session.Get()->PullImage(image.c_str(), nullptr, callback, &error.Error);
-    error.ThrowIfFailed(result);
+    THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
 void ImageService::Push()

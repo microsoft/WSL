@@ -26,7 +26,6 @@ namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 using wsl::windows::common::relay::MultiHandleWait;
-using wsl::windows::common::wslutil::WSLAErrorDetails;
 
 void PullImpl(wslc::models::Session& session, const std::string& image)
 {
