@@ -18,7 +18,6 @@ Abstract:
 #pragma once
 #include "wslaservice.h"
 #include "hcs.hpp"
-#include "WSLAApi.h"
 #include "WSLAProcess.h"
 
 namespace wsl::windows::service::wsla {
