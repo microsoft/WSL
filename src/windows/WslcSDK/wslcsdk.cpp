@@ -253,14 +253,14 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings)
     UNREFERENCED_PARAMETER(processSettings);
     return E_NOTIMPL;
 }
-STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ const PCSTR executable)
+STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable)
 {
     UNREFERENCED_PARAMETER(executable);
     UNREFERENCED_PARAMETER(processSettings);
     return E_NOTIMPL;
 }
 
-STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ const PCSTR currentDirectory)
+STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory)
 {
     UNREFERENCED_PARAMETER(currentDirectory);
     UNREFERENCED_PARAMETER(processSettings);
