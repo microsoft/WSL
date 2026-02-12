@@ -49,6 +49,12 @@ void wsl::windows::common::ConsoleProgressIndicator::UpdateProgress(std::wstring
         return;
     }
 
+    // Only update if the new progress message differs from the previous one
+    if (Progress == m_progressMessage)
+    {
+        return;
+    }
+
     for (auto i = 0; i < m_progressMessage.size(); i++)
     {
         fwprintf(stderr, L"\b \b");
