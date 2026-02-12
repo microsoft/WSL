@@ -15,10 +15,10 @@ namespace wsl::windows::wslc
     // be required, such as exclusive types or paired arguments.
     namespace validation
     {
-        void ValidatePublish([[maybe_unused]]const ArgType argType, const Args& execArgs);
+        void ValidatePublish([[maybe_unused]]const ArgType argType, const ArgMap& execArgs);
     }
 
-    void Argument::Validate(const Args& execArgs) const
+    void Argument::Validate(const ArgMap& execArgs) const
     {
         switch (m_argType)
         {

@@ -71,7 +71,7 @@ namespace wsl::windows::wslc
         Argument& SetCountLimit(int countLimit) { m_countLimit = countLimit; return *this; }
 
         // Validates this argument's value in the provided args
-        void Validate(const Args& execArgs) const;
+        void Validate(const ArgMap& execArgs) const;
 
     private:
         ArgType m_argType;

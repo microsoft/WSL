@@ -54,6 +54,26 @@ namespace WSLCCLIExecutionUnitTests
             return true;
         }
 
+        // Test: Verify EnumVariantMap on DataMap for Context Data
+        TEST_METHOD(EnumVariantMap_DataMapValidation)
+        {
+            // DataMap is an EnumVariantMap
+            wsl::windows::wslc::execution::DataMap dataMap;
+
+            // Verify all data enum values defined.
+
+            // Verify basic add
+            dataMap.Add<Data::SessionId>(L"Session1234");
+            VERIFY_IS_TRUE(dataMap.Contains(Data::SessionId));
+
+            // Verify basic retrieval.
+            auto sessionId = dataMap.Get<Data::SessionId>();
+            VERIFY_ARE_EQUAL(L"Session1234", sessionId);
+
+            // Other more complex EnumVariantMap tests are in the Args unit tests.
+            // This one will just verify all the data types in the Data Map work as expected.
+        }
+
         // Test: Parse various command lines and verify results
         TEST_METHOD(CommandLineParsing_AllCases)
         {

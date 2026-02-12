@@ -19,7 +19,7 @@ namespace wsl::windows::wslc
     // and determine the likely state of the word to be completed.
     struct ParseArgumentsStateMachine
     {
-        ParseArgumentsStateMachine(Invocation& inv, Args& execArgs, std::vector<Argument> arguments);
+        ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments);
 
         ParseArgumentsStateMachine(const ParseArgumentsStateMachine&) = delete;
         ParseArgumentsStateMachine& operator=(const ParseArgumentsStateMachine&) = delete;
@@ -75,7 +75,7 @@ namespace wsl::windows::wslc
         void EscapeAndQuoteForwardedArgument(std::wstring& arg);
 
         Invocation& m_invocation;
-        Args& m_executionArgs;
+        ArgMap& m_executionArgs;
         std::vector<Argument> m_arguments;
 
         Invocation::iterator m_invocationItr;

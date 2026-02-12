@@ -60,7 +60,7 @@ namespace wsl::windows::wslc::execution
         CLIExecutionContext& operator=(const CLIExecutionContext&) = delete;
         CLIExecutionContext& operator=(CLIExecutionContext&&) = delete;
 
-        Args Args;
+        ArgMap Args;
 
         // Map of data stored in the context.
         DataMap Data;

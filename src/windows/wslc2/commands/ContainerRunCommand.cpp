@@ -26,13 +26,13 @@ namespace wsl::windows::wslc
             Argument::Create(ArgType::DNSOption),
             Argument::Create(ArgType::DNSSearch),
             Argument::Create(ArgType::Entrypoint),
-            Argument::Create(ArgType::Env, false, 10),
+            Argument::Create(ArgType::Env, std::nullopt, 10),
             Argument::Create(ArgType::EnvFile),
             Argument::Create(ArgType::Interactive),
             Argument::Create(ArgType::Name),
             Argument::Create(ArgType::NoDNS),
             Argument::Create(ArgType::Progress),
-            Argument::Create(ArgType::Publish, false, 10),
+            Argument::Create(ArgType::Publish, std::nullopt, 10),
             Argument::Create(ArgType::Pull),
             Argument::Create(ArgType::Remove),
             Argument::Create(ArgType::Scheme),
@@ -55,7 +55,7 @@ namespace wsl::windows::wslc
         return { L"Create and run a new container from an image." };
     }
 
-    void ContainerRunCommand::ValidateArgumentsInternal(Args& execArgs) const
+    void ContainerRunCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
     {
         // Argument validation is done in ArgumentValidation.cpp, including
         // cross-argument validation, but this method is for command-specific validation.

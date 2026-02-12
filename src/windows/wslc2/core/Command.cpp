@@ -297,7 +297,11 @@ namespace wsl::windows::wslc
         throw CommandException(Localization::WSLCCLI_UnrecognizedCommandError(std::wstring_view{*itr}));
     }
 
-    void Command::ParseArguments(Invocation& inv, Args& execArgs) const
+    // Convert the invocation vector into a map of argument types and their associated values.
+    // Argument map is based on the arguments that the command defines and are stored as
+    // an enum -> variant multimap. This is parsing and value storage only, not validation of
+    // the argument data.
+    void Command::ParseArguments(Invocation& inv, ArgMap& execArgs) const
     {
         auto definedArgs = GetArguments();
         Argument::GetCommon(definedArgs);
@@ -310,7 +314,12 @@ namespace wsl::windows::wslc
         }
     }
 
-    void Command::ValidateArguments(Args& execArgs) const
+    // Validates the ArgMap produced by ParseArguments. ArgMap is assuemd to have
+    // been populated and parsed successfully from the invocation and now we are validating
+    // that the arguments provided meet the requirements of the command. This includes checking
+    // that all required arguments are present and no arguments exceed their count limits.
+    // Any defined validation for specific ArgTypes are also run.
+    void Command::ValidateArguments(ArgMap& execArgs) const
     {
         // If help is asked for, don't bother validating anything else
         if (execArgs.Contains(ArgType::Help))
@@ -344,29 +353,30 @@ namespace wsl::windows::wslc
         ValidateArgumentsInternal(execArgs);
     }
 
+    // This enables the command to do any optional validation that is specific to the command and
+    // not otherwise covered by type-specific or common argument validation.
+    void Command::ValidateArgumentsInternal(ArgMap&) const
+    {
+        // Do nothing by default.
+        // Commands may not need any extra validation.
+    }
+
+    // Assumed to be called after all arguments have been parsed and validated.
     void Command::Execute(CLIExecutionContext& context) const
     {
+        // If Help was part of the validated argument set, we will output help instead of executing.
         if (context.Args.Contains(ArgType::Help))
         {
             OutputHelp();
         }
         else
         {
+            // Execute internal has the actual command execution path.
             ExecuteInternal(context);
         }
     }
 
-    void Command::SelectCurrentCommandIfUnrecognizedSubcommandFound(bool value)
-    {
-        m_selectCurrentCommandIfUnrecognizedSubcommandFound = value;
-    }
-
-    void Command::ValidateArgumentsInternal(Args&) const
-    {
-        // Do nothing by default.
-        // Commands may not need any extra validation.
-    }
-
+    // Commands must override this and provide an implementation.
     void Command::ExecuteInternal(CLIExecutionContext& context) const
     {
         // This is a developer error if we get here, should never be user-facing.
@@ -379,6 +389,7 @@ namespace wsl::windows::wslc
         return m_visibility;
     }
 
+    // Filters subcommands to only the visible set. Used by OutputHelp to not include hidden subcommands.
     std::vector<std::unique_ptr<Command>> Command::GetVisibleCommands() const
     {
         auto commands = GetCommands();
@@ -392,6 +403,7 @@ namespace wsl::windows::wslc
         return commands;
     }
 
+    // Filters arguments to only the visible set. Used by OutputHelp to not include hidden arguments.
     std::vector<Argument> Command::GetVisibleArguments() const
     {
         auto arguments = GetArguments();
@@ -420,6 +432,9 @@ namespace wsl::windows::wslc
         }
     }
 
+    // External execution entry point called by the core execution flow. Errors are expected to be caught and
+    // and handled by ExecuteWithoutLoggingSuccess, with appropriate logging of the errors and successful
+    // execution of the commands.
     int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
     {
         ExecuteWithoutLoggingSuccess(context, command.get());

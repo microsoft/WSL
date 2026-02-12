@@ -66,15 +66,13 @@ namespace wsl::windows::wslc
         void OutputHelp(const CommandException* exception = nullptr) const;
 
         std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
-        void ParseArguments(Invocation& inv, Args& execArgs) const;
-        void ValidateArguments(Args& execArgs) const;
+        void ParseArguments(Invocation& inv, ArgMap& execArgs) const;
+        void ValidateArguments(ArgMap& execArgs) const;
 
         virtual void Execute(CLIExecutionContext& context) const;
 
     protected:
-        void SelectCurrentCommandIfUnrecognizedSubcommandFound(bool value);
-
-        virtual void ValidateArgumentsInternal(Args& execArgs) const;
+        virtual void ValidateArgumentsInternal(ArgMap& execArgs) const;
         virtual void ExecuteInternal(CLIExecutionContext& context) const;
 
     private:

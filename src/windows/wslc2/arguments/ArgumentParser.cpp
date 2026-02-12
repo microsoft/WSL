@@ -11,7 +11,7 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc
 {
-    ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, Args& execArgs, std::vector<Argument> arguments) :
+    ParseArgumentsStateMachine::ParseArgumentsStateMachine(Invocation& inv, ArgMap& execArgs, std::vector<Argument> arguments) :
         m_invocation(inv),
         m_executionArgs(execArgs),
         m_arguments(std::move(arguments)),
@@ -268,7 +268,7 @@ namespace wsl::windows::wslc
         size_t currentPos = 1 + aliasLength;
         
         // Check if this argument expects a value
-        if (argument::Args::GetValueType(firstArg->Type()) != ValueType::Bool)
+        if (argument::ArgMap::GetValueType(firstArg->Type()) != ValueType::Bool)
         {
             // Non-boolean alias must have a value
             if (currentPos >= currArg.length())
@@ -300,7 +300,7 @@ namespace wsl::windows::wslc
                 return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
             }
             
-            if (argument::Args::GetValueType(nextArg->Type()) != ValueType::Bool)
+            if (argument::ArgMap::GetValueType(nextArg->Type()) != ValueType::Bool)
             {
                 return ArgumentException(Localization::WSLCCLI_AdjoinedNotFlagError(currArg));
             }
@@ -350,7 +350,7 @@ namespace wsl::windows::wslc
             if (string::IsEqual(argName, arg.Name()))
             {
                 // Found a match, process by type.
-                if (argument::Args::GetValueType(arg.Type()) == ValueType::Bool)
+                if (argument::ArgMap::GetValueType(arg.Type()) == ValueType::Bool)
                 {
                     // TODO: Consider supporting --flag and --flag=true or --flag=false for boolean args.
                     if (hasAdjoinedValue)

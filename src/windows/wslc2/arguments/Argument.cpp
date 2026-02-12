@@ -20,7 +20,7 @@ namespace wsl::windows::wslc
 
     namespace
     {
-        bool ContainsArgumentFromList(const Args& args, const std::vector<ArgType>& argTypes)
+        bool ContainsArgumentFromList(const ArgMap& args, const std::vector<ArgType>& argTypes)
         {
             return std::any_of(argTypes.begin(), argTypes.end(), [&](ArgType arg) { return args.Contains(arg); });
         }

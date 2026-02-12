@@ -116,7 +116,7 @@ namespace wsl::windows::wslc::argument
             MakeArgValueTypeLookupTable(std::make_index_sequence<static_cast<size_t>(ArgType::Max)>());
     }
 
-    struct Args : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping>
+    struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::wslc::argument::details::ArgDataMapping>
     {
         // O(1) runtime lookup with no switch statement needed
         static constexpr ValueType GetValueType(ArgType argType)

@@ -46,14 +46,14 @@ namespace WSLCCLIArgumentUnitTests
         }
 
         // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
-        TEST_METHOD(ArgumentForType_CreatesAllArgumentTypes)
+        TEST_METHOD(ArgumentCreate_AllArguments)
         {
             // Iterate through all ArgType enum values except Max
             for (int i = 0; i < static_cast<int>(ArgType::Max); ++i)
             {
                 ArgType argType = static_cast<ArgType>(i);
         
-                // Create argument using ForType
+                // Create argument using Create
                 Argument arg = Argument::Create(argType);
 
                 // Verify the argument was created successfully by checking its type matches
@@ -66,7 +66,7 @@ namespace WSLCCLIArgumentUnitTests
 
                 // Create Args collection and add a valid type and emplace into the map successfully
                 // using the runtime function Add instead of the template function Add.
-                Args args;
+                ArgMap args;
                 VERIFY_IS_FALSE(args.Contains(argType));
                 auto valueType = args.GetValueType(argType);
                 switch (valueType)
@@ -93,8 +93,8 @@ namespace WSLCCLIArgumentUnitTests
         // Test: Verify EnumVariantMap
         TEST_METHOD(EnumVariantMap_AllDataTypes)
         {
-            // Args is an EnumVariantMap
-            Args argsContainer;
+            // ArgMap is an EnumVariantMap
+            ArgMap argsContainer;
 
             // Verify basic add
             argsContainer.Add<ArgType::Help>(true);
@@ -154,12 +154,12 @@ namespace WSLCCLIArgumentUnitTests
             VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::ContainerId), 1);
             VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::ForwardArgs), 1);
             VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 1);
+            VERIFY_ARE_EQUAL(argsContainer.GetCount(), 4);
             argsContainer.Remove(ArgType::Help);
             argsContainer.Remove(ArgType::ContainerId);
             argsContainer.Remove(ArgType::ForwardArgs);
             argsContainer.Remove(ArgType::Publish);
             VERIFY_ARE_EQUAL(argsContainer.GetCount(), 0);
         }
-
     };
 } // namespace WSLCCLIArgumentUnitTests

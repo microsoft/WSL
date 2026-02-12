@@ -108,7 +108,7 @@ namespace wsl::windows::wslc
         std::wstring_view LongDescription() const override;
 
     protected:
-        void ValidateArgumentsInternal(Args& execArgs) const override;
+        void ValidateArgumentsInternal(ArgMap& execArgs) const override;
         void ExecuteInternal(CLIExecutionContext& context) const override;
     };
 
