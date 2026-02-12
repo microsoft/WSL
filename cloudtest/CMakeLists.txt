@@ -25,7 +25,13 @@ else()
 endif()
 
 function(add_test_group image version)
-    set(DIR ${OUT}/${image}-wsl${version})
+    if("${version}" STREQUAL "wsla")
+        set(dir_suffix ${version})
+    else()
+        set(dir_suffix wsl${version})
+    endif()
+
+    set(DIR ${OUT}/${image}-${dir_suffix})
 
     file(MAKE_DIRECTORY ${DIR})
 

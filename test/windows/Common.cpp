@@ -2110,7 +2110,8 @@ Return Value:
         -NoProfile \
         -ExecutionPolicy Bypass \
         -Command \"" +
-        setupScript.value() + L" -Version '2'" + L" -Package '" + getTestParam(L"Package") + L"'";
+        setupScript.value() + L" -Version '" + (g_WslaMode ? L"2" : getTestParam(L"Version")) + L"'" + L" -Package '" +
+        getTestParam(L"Package") + L"'";
 
     if (!g_WslaMode)
     {

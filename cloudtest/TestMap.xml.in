@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TestMap>
-  <TestJobGroup Name="TaefTestsGroup" TestSystem="Default" ConfigPath="[BuildRoot]\testbin\${TARGET_PLATFORM}\cloudtest\${image}-wsl${version}\TestGroup.xml" IsActive="true"/>
+  <TestJobGroup Name="TaefTestsGroup" TestSystem="Default" ConfigPath="[BuildRoot]\testbin\${TARGET_PLATFORM}\cloudtest\${image}-${dir_suffix}\TestGroup.xml" IsActive="true"/>
   <Providers>
     <Provider Type="PipelineArtifacts">
       <Properties>
