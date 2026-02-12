@@ -27,18 +27,6 @@ using namespace wsl::windows::wslc::services;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::docker_schema::InspectContainer;
 
-static std::string GetContainerName(const std::string& name)
-{
-    if (!name.empty())
-    {
-        return name;
-    }
-
-    GUID guid;
-    THROW_IF_FAILED(CoCreateGuid(&guid));
-    return wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
-}
-
 static std::wstring ContainerStateToString(WSLA_CONTAINER_STATE state)
 {
     switch (state)
@@ -63,7 +51,6 @@ int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int pars
     CMD_ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = m_sessionService.CreateSession();
     m_options.Arguments = Arguments();
-    m_options.Name = GetContainerName(m_options.Name);
     PullImageCallback callback;
     ContainerService containerService;
     return containerService.Run(session, m_image, m_options, &callback);
@@ -75,7 +62,6 @@ int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int p
     CMD_ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = m_sessionService.CreateSession();
     m_options.Arguments = Arguments();
-    m_options.Name = GetContainerName(m_options.Name);
     PullImageCallback callback;
     ContainerService containerService;
     auto result = containerService.Create(session, m_image, m_options, &callback);
