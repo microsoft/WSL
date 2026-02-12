@@ -17,7 +17,6 @@ Abstract:
 #include "hcs_schema.h"
 #include "VirtioNetworking.h"
 #include "NatNetworking.h"
-#include "WSLAApi.h"
 #include "wslsecurity.h"
 #include "wslutil.h"
 #include "lxinitshared.h"
