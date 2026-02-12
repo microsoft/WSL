@@ -34,9 +34,7 @@ private:
 struct SessionOptions
 {
     static SessionOptions Default();
-
-    void StoragePath(std::filesystem::path path);
-
+    void StoragePath(const std::filesystem::path& path);
     operator const WSLA_SESSION_SETTINGS*() const;
 
 private:

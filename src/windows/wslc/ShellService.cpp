@@ -120,7 +120,7 @@ std::vector<SessionInformation> ShellService::List()
         SessionInformation info;
         info.CreatorPid = current.CreatorPid;
         info.SessionId = current.SessionId;
-        info.DisplayName = current.DisplayName ? current.DisplayName : L"";
+        info.DisplayName = current.DisplayName;
         result.emplace_back(info);
     }
 

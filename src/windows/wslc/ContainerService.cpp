@@ -110,7 +110,7 @@ static void CreateInternal(
     THROW_IF_FAILED(result);
 }
 
-static void StopInternal(IWSLAContainer& container, int signal, ULONG timeout = StopContainerOptions::DefaultTimeout)
+static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone, ULONG timeout = -1)
 {
     THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
 }
@@ -181,7 +181,7 @@ void ContainerService::Delete(Session& session, const std::string& id, bool forc
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
     if (force)
     {
-        StopInternal(*container, WSLASignalSIGKILL, StopContainerOptions::DefaultTimeout);
+        StopInternal(*container, WSLASignalSIGKILL);
     }
 
     THROW_IF_FAILED(container->Delete());

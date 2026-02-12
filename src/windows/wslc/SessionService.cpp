@@ -20,7 +20,7 @@ using namespace wsl::windows::wslc::models;
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
 
-Session SessionService::CreateSession(std::optional<SessionOptions> options)
+Session SessionService::CreateSession(const std::optional<SessionOptions>& options)
 {
     SessionOptions sessionOptions = options.has_value() ? options.value() : SessionOptions::Default();
     const WSLA_SESSION_SETTINGS* settings = sessionOptions;

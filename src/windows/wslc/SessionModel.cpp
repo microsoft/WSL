@@ -31,9 +31,9 @@ SessionOptions SessionOptions::Default()
     return options;
 }
 
-void SessionOptions::StoragePath(std::filesystem::path path)
+void SessionOptions::StoragePath(const std::filesystem::path& path)
 {
-    m_storagePath = std::move(path);
+    m_storagePath = path;
     m_sessionSettings.StoragePath = m_storagePath.c_str();
 }
 
