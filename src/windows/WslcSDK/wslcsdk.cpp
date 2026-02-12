@@ -47,6 +47,30 @@ namespace
         return result;
     }
 
+    WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
+    {
+        WSLAContainerFlags result = WSLAContainerFlagsNone;
+
+        // TODO: Many missing flags?
+        if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_ENABLE_GPU))
+        {
+            result |= WSLAContainerFlagsGpu;
+        }
+
+        // TODO: Are these the same flags?
+        //if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
+        //{
+        //    result |= WSLAContainerFlagsInit;
+        //}
+
+        if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_AUTO_REMOVE))
+        {
+            result |= WSLAContainerFlagsRm;
+        }
+
+        return result;
+    }
+
     std::optional<WSLASignal> ConvertSignal(WslcSignal signal)
     {
         switch (signal)
@@ -344,6 +368,7 @@ STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings*
     containerOptions.Name = internalContainerSettings->runtimeName;
     containerOptions.HostName = internalContainerSettings->HostName;
     containerOptions.DomainName = internalContainerSettings->DomainName;
+    containerOptions.Flags = ConvertFlags(internalContainerSettings->containerFlags);
 
     const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions = internalContainerSettings->initProcessOptions;
     if (initProcessOptions)
@@ -367,7 +392,6 @@ STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings*
     // containerOptions.VolumesCount;
     // containerOptions.Ports;
     // containerOptions.PortsCount;
-    // containerOptions.Flags;
     // containerOptions.ContainerNetwork;
 
     // TODO: No user access
@@ -406,9 +430,11 @@ STDAPI WslcContainerStart(_In_ WslcContainer container)
 
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags)
 {
-    UNREFERENCED_PARAMETER(flags);
-    UNREFERENCED_PARAMETER(containerSettings);
-    return E_NOTIMPL;
+    WSLC_GET_INTERNAL_TYPE(containerSettings);
+
+    internalType->containerFlags = flags;
+
+    return S_OK;
 }
 
 STDAPI WslcContainerSettingsSetName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR name)
@@ -511,9 +537,15 @@ STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags)
 {
-    UNREFERENCED_PARAMETER(container);
+    WSLC_GET_INTERNAL_TYPE(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+
+    // TODO: Flags?
     UNREFERENCED_PARAMETER(flags);
-    return E_NOTIMPL;
+
+    RETURN_IF_FAILED(internalType->container->Delete());
+
+    return S_OK;
 }
 
 // PROCESS DEFINITIONS
