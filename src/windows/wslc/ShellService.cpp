@@ -14,7 +14,7 @@ Abstract:
 #include "precomp.h"
 #include "ShellService.h"
 #include <wslaservice.h>
-#include "Utils.h"
+#include <WSLAProcessLauncher.h>
 
 namespace wsl::windows::wslc::services {
 using namespace wsl::shared;

@@ -12,14 +12,12 @@ Abstract:
 
 --*/
 #include "precomp.h"
-#include "Utils.h"
 #include "ShellCommand.h"
 #include "ShellService.h"
 #include "TablePrinter.h"
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
-using wsl::windows::common::WSLAProcessLauncher;
 
 namespace wsl::windows::wslc::commands {
 int ShellListCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)

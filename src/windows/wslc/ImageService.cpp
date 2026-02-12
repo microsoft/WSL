@@ -12,7 +12,6 @@ Abstract:
 
 --*/
 #include "ImageService.h"
-#include "Utils.h"
 #include "SessionService.h"
 #include <wslutil.h>
 

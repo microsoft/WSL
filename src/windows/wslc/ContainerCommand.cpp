@@ -14,8 +14,8 @@ Abstract:
 #include "precomp.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
+#include "ImageCommand.h"
 #include "TablePrinter.h"
-#include "Utils.h"
 #include <CommandLine.h>
 #include <format>
 
@@ -64,8 +64,9 @@ int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int pars
     auto session = m_sessionService.CreateSession();
     m_options.Arguments = Arguments();
     m_options.Name = GetContainerName(m_options.Name);
+    PullImageCallback callback;
     ContainerService containerService;
-    return containerService.Run(session, m_image, m_options);
+    return containerService.Run(session, m_image, m_options, &callback);
 }
 
 int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int parserOffset)
@@ -75,8 +76,9 @@ int ContainerCreateCommand::ExecuteInternal(std::wstring_view commandLine, int p
     auto session = m_sessionService.CreateSession();
     m_options.Arguments = Arguments();
     m_options.Name = GetContainerName(m_options.Name);
+    PullImageCallback callback;
     ContainerService containerService;
-    auto result = containerService.Create(session, m_image, m_options);
+    auto result = containerService.Create(session, m_image, m_options, &callback);
     wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(result.Id));
     return 0;
 }

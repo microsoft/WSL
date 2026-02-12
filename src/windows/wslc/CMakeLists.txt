@@ -7,9 +7,6 @@ set(SOURCES
     ContainerCommand.cpp
     ICommand.cpp
 
-    # Others
-    Utils.cpp
-
     # Services
     ContainerService.cpp
     ImageService.cpp
@@ -29,7 +26,6 @@ set(HEADERS
     ICommand.h
 
     # Others
-    Utils.h
     TablePrinter.h
 
     # Services

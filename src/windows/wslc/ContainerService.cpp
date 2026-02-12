@@ -13,7 +13,7 @@ Abstract:
 --*/
 #include "ContainerService.h"
 #include "ConsoleService.h"
-#include "Utils.h"
+#include "ImageService.h"
 #include <wslutil.h>
 #include <WSLAProcessLauncher.h>
 #include <docker_schema.h>
@@ -50,7 +50,13 @@ static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, const std::vect
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static void CreateInternal(Session& session, IWSLAContainer** container, WSLA_CONTAINER_OPTIONS& containerOptions, std::string image, const ContainerCreateOptions& options)
+static void CreateInternal(
+    Session& session,
+    IWSLAContainer** container,
+    WSLA_CONTAINER_OPTIONS& containerOptions,
+    std::string image,
+    const ContainerCreateOptions& options,
+    IProgressCallback* callback)
 {
     WI_SetFlagIf(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsTty, options.TTY);
@@ -64,7 +70,8 @@ static void CreateInternal(Session& session, IWSLAContainer** container, WSLA_CO
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
         PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
-        utils::PullImpl(session, image);
+        ImageService imageService;
+        imageService.Pull(session, image, callback);
         result = session.Get()->CreateContainer(&containerOptions, container);
     }
 
@@ -76,12 +83,12 @@ static void StopInternal(IWSLAContainer& container, int signal, ULONG timeout = 
     THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
 }
 
-int ContainerService::Run(Session& session, std::string image, ContainerRunOptions runOptions)
+int ContainerService::Run(Session& session, std::string image, ContainerRunOptions runOptions, IProgressCallback* callback)
 {
     // Create the container
     wil::com_ptr<IWSLAContainer> container;
     WSLA_CONTAINER_OPTIONS containerOptions{};
-    CreateInternal(session, &container, containerOptions, image, runOptions);
+    CreateInternal(session, &container, containerOptions, image, runOptions, callback);
 
     // Start the created container
     WSLAContainerStartFlags startFlags{};
@@ -105,11 +112,11 @@ int ContainerService::Run(Session& session, std::string image, ContainerRunOptio
     return 0;
 }
 
-CreateContainerResult ContainerService::Create(Session& session, std::string image, ContainerCreateOptions runOptions)
+CreateContainerResult ContainerService::Create(Session& session, std::string image, ContainerCreateOptions runOptions, IProgressCallback* callback)
 {
     wil::com_ptr<IWSLAContainer> container;
     WSLA_CONTAINER_OPTIONS containerOptions{};
-    CreateInternal(session, &container, containerOptions, image, runOptions);
+    CreateInternal(session, &container, containerOptions, image, runOptions, callback);
 
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(container->Inspect(&output));
