@@ -825,14 +825,15 @@ WslCoreVm::~WslCoreVm() noexcept
 
 wil::unique_socket WslCoreVm::AcceptConnection(_In_ DWORD ReceiveTimeout, _In_ const std::source_location& Location) const
 {
-    auto socket =
-        wsl::windows::common::hvsocket::Accept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
+    auto socket = hvsocket::CancellableAccept(m_listenSocket.get(), m_vmConfig.KernelBootTimeout, m_terminatingEvent.get(), Location);
+    THROW_HR_IF(E_ABORT, !socket.has_value());
+
     if (ReceiveTimeout != 0)
     {
-        THROW_LAST_ERROR_IF(setsockopt(socket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
+        THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&ReceiveTimeout, sizeof(ReceiveTimeout)) == SOCKET_ERROR);
     }
 
-    return socket;
+    return std::move(socket.value());
 }
 
 _Requires_lock_held_(m_guestDeviceLock)
@@ -1086,13 +1087,16 @@ void WslCoreVm::CollectCrashDumps(wil::unique_socket&& listenSocket) const
     {
         try
         {
-            auto socket = wsl::windows::common::hvsocket::Accept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+            if (!socket.has_value())
+            {
+                break; // VM is exiting.
+            }
 
             DWORD receiveTimeout = m_vmConfig.KernelBootTimeout;
-            THROW_LAST_ERROR_IF(
-                setsockopt(listenSocket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
+            THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&receiveTimeout, sizeof(receiveTimeout)) == SOCKET_ERROR);
 
-            auto channel = wsl::shared::SocketChannel{std::move(socket), "crash_dump", m_terminatingEvent.get()};
+            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_terminatingEvent.get()};
 
             const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
             const char* process = reinterpret_cast<const char*>(&message.Buffer);
@@ -2558,10 +2562,14 @@ try
     for (;;)
     {
         // Create a worker thread to handle each request.
-        wsl::shared::SocketChannel channel{
-            wsl::windows::common::hvsocket::Accept(listenSocket.get(), INFINITE, m_terminatingEvent.get()),
-            "VirtioFs",
-            m_terminatingEvent.get()};
+
+        auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_terminatingEvent.get());
+        if (!socket.has_value())
+        {
+            break;
+        }
+
+        wsl::shared::SocketChannel channel{std::move(socket.value()), "VirtioFs", m_terminatingEvent.get()};
         std::thread([this, channel = std::move(channel)]() mutable {
             try
             {

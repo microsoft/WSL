@@ -150,4 +150,156 @@ private:
     std::function<void()> m_onDestroy;
 };
 
+enum class IOHandleStatus
+{
+    Standby,
+    Pending,
+    Completed
+};
+
+struct HandleWrapper
+{
+    DEFAULT_MOVABLE(HandleWrapper);
+    NON_COPYABLE(HandleWrapper)
+
+    HandleWrapper(
+        wil::unique_handle&& handle, std::function<void()>&& OnClose = []() {}) :
+        Handle(handle.get()), OwnedHandle(std::move(handle)), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(
+        wil::unique_socket&& handle, std::function<void()>&& OnClose = []() {}) :
+        Handle((HANDLE)handle.get()), OwnedHandle(wil::unique_socket{handle.release()}), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(
+        wil::unique_event&& handle, std::function<void()>&& OnClose = []() {}) :
+        Handle(handle.get()), OwnedHandle(wil::unique_handle{handle.release()}), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(
+        SOCKET handle, std::function<void()>&& OnClose = []() {}) :
+        Handle(reinterpret_cast<HANDLE>(handle)), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(HANDLE handle, std::function<void()>&& OnClose = []() {}) : Handle(handle), OnClose(std::move(OnClose))
+    {
+    }
+
+    HandleWrapper(
+        wil::unique_hfile&& handle, std::function<void()>&& OnClose = []() {}) :
+        Handle(handle.get()), OwnedHandle(wil::unique_handle{handle.release()}), OnClose(std::move(OnClose))
+    {
+    }
+
+    ~HandleWrapper()
+    {
+        Reset();
+    }
+
+    HANDLE Get() const
+    {
+        return Handle;
+    }
+
+    void Reset()
+    {
+        if (OnClose != nullptr)
+        {
+            OnClose();
+            OnClose = nullptr;
+        }
+
+        OwnedHandle = {};
+        Handle = nullptr;
+    }
+
+private:
+    HANDLE Handle{};
+    std::variant<wil::unique_handle, wil::unique_socket> OwnedHandle;
+    std::function<void()> OnClose;
+};
+
+class OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(OverlappedIOHandle)
+    NON_MOVABLE(OverlappedIOHandle)
+
+    OverlappedIOHandle() = default;
+    virtual ~OverlappedIOHandle() = default;
+    virtual void Schedule() = 0;
+    virtual void Collect() = 0;
+    virtual HANDLE GetHandle() const = 0;
+    IOHandleStatus GetState() const;
+
+protected:
+    IOHandleStatus State = IOHandleStatus::Standby;
+};
+
+class EventHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(EventHandle)
+    NON_MOVABLE(EventHandle)
+
+    EventHandle(HandleWrapper&& Handle, std::function<void()>&& OnSignalled = []() {});
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    HandleWrapper Handle;
+    std::function<void()> OnSignalled;
+};
+
+class SingleAcceptHandle : public OverlappedIOHandle
+{
+public:
+    NON_COPYABLE(SingleAcceptHandle)
+    NON_MOVABLE(SingleAcceptHandle)
+
+    SingleAcceptHandle(HandleWrapper&& ListenSocket, HandleWrapper&& AcceptedSocket, std::function<void()>&& OnAccepted);
+    ~SingleAcceptHandle();
+
+    void Schedule() override;
+    void Collect() override;
+    HANDLE GetHandle() const override;
+
+private:
+    HandleWrapper ListenSocket;
+    HandleWrapper AcceptedSocket;
+    wil::unique_event Event{wil::EventOptions::ManualReset};
+    OVERLAPPED Overlapped{};
+    std::function<void()> OnAccepted;
+    char AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)];
+};
+
+class MultiHandleWait
+{
+public:
+    enum Flags
+    {
+        None = 0,
+        CancelOnCompleted = 1,
+        IgnoreErrors = 2
+    };
+
+    MultiHandleWait() = default;
+
+    void AddHandle(std::unique_ptr<OverlappedIOHandle>&& handle, Flags flags = Flags::None);
+    bool Run(std::optional<std::chrono::milliseconds> Timeout);
+    void Cancel();
+
+private:
+    std::vector<std::pair<Flags, std::unique_ptr<OverlappedIOHandle>>> m_handles;
+    bool m_cancel = false;
+};
+
+DEFINE_ENUM_FLAG_OPERATORS(MultiHandleWait::Flags);
+
 } // namespace wsl::windows::common::relay
