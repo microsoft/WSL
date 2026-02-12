@@ -39,7 +39,14 @@ namespace wslutil = wsl::windows::common::wslutil;
 WSLASessionManagerImpl::~WSLASessionManagerImpl()
 {
     // Terminate all sessions on shutdown.
-    ForEachSession<void>([](auto& entry, const auto&) { LOG_IF_FAILED(entry.Ref->Terminate()); });
+    // Call Terminate() directly rather than going through ForEachSession(),
+    // which would needlessly resolve weak references and call GetState().
+    // Terminate() already handles the "session is gone" case gracefully.
+    std::lock_guard lock(m_wslaSessionsLock);
+    for (auto& entry : m_sessions)
+    {
+        LOG_IF_FAILED(entry.Ref->Terminate());
+    }
 }
 
 void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
