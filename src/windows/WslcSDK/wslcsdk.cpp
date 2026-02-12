@@ -398,8 +398,8 @@ STDAPI WslcContainerStart(_In_ WslcContainer container)
     WSLC_GET_INTERNAL_TYPE(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: No user access to Attach
-    RETURN_IF_FAILED(internalType->container->Start(WSLAContainerStartFlagsNone));
+    // TODO: No user choice between None and Attach (where attach is what allows access to init process IO handles)
+    RETURN_IF_FAILED(internalType->container->Start(WSLAContainerStartFlagsAttach));
 
     return S_OK;
 }
