@@ -1012,6 +1012,7 @@ try
         m_virtualMachine.reset();
     }
 
+    m_terminated = true;
     return S_OK;
 }
 CATCH_RETURN();
@@ -1079,7 +1080,7 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 
 HRESULT WSLASession::GetState(_Out_ WSLASessionState* State)
 {
-    *State = m_sessionTerminatingEvent.is_signaled() ? WSLASessionStateTerminated : WSLASessionStateRunning;
+    *State = m_terminated ? WSLASessionStateTerminated : WSLASessionStateRunning;
     return S_OK;
 }
 
