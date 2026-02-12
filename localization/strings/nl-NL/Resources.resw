@@ -292,11 +292,12 @@ en 'wsl.exe --install &lt;Distro&gt;' om te installeren.</value>
     <value>WSL 2 wordt niet ondersteund door de verouderde distributie.</value>
   </data>
   <data name="MessageEnableVirtualization" xml:space="preserve">
-    <value>WSL2 wordt niet ondersteund met de huidige computerconfiguratie. 
+    <value>WSL2 kan niet worden gestart omdat virtualisatie niet is ingeschakeld op deze machine.
+Zorg dat het optionele onderdeel 'Platform voor virtuele machine' is ingeschakeld en dat virtualisatie aanstaat in de firmware-instellingen van je computer.
 
-Schakel het optionele onderdeel Virtual Machine Platform in en zorg ervoor dat virtualisatie is ingeschakeld in het BIOS.
-Schakel Virtual Machine Platform in door uit te voeren: wsl.exe --install --no-distribution
-Ga naar https://aka.ms/enablevirtualization</value>
+Schakel 'Platform voor virtuele machine' in door het volgende uit te voeren: wsl.exe --install --no-distribution
+
+Meer informatie vind je op https://aka.ms/enablevirtualization</value>
     <comment>{Locked="--install "}{Locked="--no-distribution
 "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
@@ -1883,10 +1884,8 @@ Usage:
   <data name="MessageWslcUsage" xml:space="preserve">
     <value>wslc - WSL Container CLI
 Usage:
-  wslc list
-  wslc shell &lt;SessionName&gt; [--verbose]
   wslc --help</value>
-    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslaSessionNotFound" xml:space="preserve">
     <value>Session not found: '{}'</value>
@@ -1918,6 +1917,18 @@ Usage:
   </data>
   <data name="MessageWslaUnknownCommand" xml:space="preserve">
     <value>Unknown command: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidImage" xml:space="preserve">
+    <value>Invalid image: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslaInvalidContainerName" xml:space="preserve">
+    <value>Invalid container name: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessagePathNotAbsolute" xml:space="preserve">
+    <value>Path is not absolute: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>
