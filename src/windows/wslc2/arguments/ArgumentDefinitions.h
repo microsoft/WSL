@@ -43,8 +43,7 @@ _(Remove,         "remove",              L"rm",             Kind::Standard,    (
 _(Scheme,         "scheme",              NO_ALIAS,          Kind::Standard,    (std::wstring),               L"Use this scheme for registry connection") \
 _(Server,         "server",              NO_ALIAS,          Kind::Positional,  (std::wstring),               L"Registry server name") \
 _(SessionId,      "session",             NO_ALIAS,          Kind::Standard,    (std::wstring),               Localization::WSLCCLI_SessionIdArgDescription()) \
-_(SignalK,        "signal",              L"s",              Kind::Standard,    (std::wstring),               L"Signal to send (default: SIGKILL)") \
-_(SignalS,        "signal",              L"s",              Kind::Standard,    (std::wstring),               L"Signal to send (default: SIGTERM)") \
+_(Signal,         "signal",              L"s",              Kind::Standard,    (std::wstring),               L"Signal to send (default: SIGKILL)") \
 _(Size,           "size",                L"s",              Kind::Standard,    (std::wstring),               L"Size of the volume in bytes. Suffixes (K, M, G, T, or P)") \
 _(Source,         "source",              NO_ALIAS,          Kind::Positional,  (std::wstring),               L"Current or existing image in the image-name[:tag] format") \
 _(Target,         "target",              NO_ALIAS,          Kind::Positional,  (std::wstring),               L"New name for the image in the image-name[:tag] format") \

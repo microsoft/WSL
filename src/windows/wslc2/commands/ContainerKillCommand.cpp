@@ -21,7 +21,7 @@ namespace wsl::windows::wslc
             Argument::Create(ArgType::ContainerId, false, 10),
             Argument::Create(ArgType::All),
             Argument::Create(ArgType::SessionId),
-            Argument::Create(ArgType::SignalK),
+            Argument::Create(ArgType::Signal),
         };
     }
 

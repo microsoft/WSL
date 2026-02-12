@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerListCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ContainerId, false, 10, L"Desc Override"),
+            Argument::Create(ArgType::ContainerId, std::nullopt, 10, L"Desc Override"),
             Argument::Create(ArgType::All),
             Argument::Create(ArgType::Format),
             Argument::Create(ArgType::Quiet),

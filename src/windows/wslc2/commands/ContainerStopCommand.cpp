@@ -18,10 +18,10 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerStopCommand::GetArguments() const
     {
         return {
-            Argument::Create(ArgType::ContainerId, false, 10),
+            Argument::Create(ArgType::ContainerId, std::nullopt, 10),
             Argument::Create(ArgType::All),
             Argument::Create(ArgType::SessionId),
-            Argument::Create(ArgType::SignalS),
+            Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGTERM)"),
             Argument::Create(ArgType::Time),
         };
     }
