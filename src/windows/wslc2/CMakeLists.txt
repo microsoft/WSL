@@ -1,24 +1,16 @@
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/core
-    ${CMAKE_CURRENT_SOURCE_DIR}/core/foundation
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/arguments
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
-    ${CMAKE_CURRENT_SOURCE_DIR}/services
 )
 
 set(HEADERS
     core/pch.h
-    core/foundation/DateTime.h
-    core/foundation/Errors.h
-    core/foundation/Exceptions.h
-    core/foundation/EnumVariantMap.h
-    core/foundation/SharedThreadGlobals.h
-    core/foundation/Logging.h
-    core/foundation/SystemUtilities.h
-    core/foundation/StringUtilities.h
-    core/foundation/DebugLogger.h
-    core/foundation/FileLogger.h
+    core/Errors.h
+    core/Exceptions.h
+    core/EnumVariantMap.h
+    core/StringUtilities.h
     arguments/ArgumentDefinitions.h
     arguments/ArgumentTypes.h
     arguments/Argument.h
@@ -37,18 +29,10 @@ set(HEADERS
     commands/VolumeCommand.h
     tasks/TaskBase.h
     tasks/CommonTasks.h
-    tasks/TestTasks.h
-    services/ContainerService.h
 )
 
 set(SOURCES
-    core/foundation/DateTime.cpp
-    core/foundation/SystemUtilities.cpp
-    core/foundation/StringUtilities.cpp
-    core/foundation/SharedThreadGlobals.cpp
-    core/foundation/Logging.cpp
-    core/foundation/DebugLogger.cpp
-    core/foundation/FileLogger.cpp
+    core/StringUtilities.cpp
     core/Command.cpp
     core/CLIExecutionContext.cpp
     core/Core.cpp
@@ -91,17 +75,15 @@ set(SOURCES
     commands/VolumePruneCommand.cpp
     tasks/TaskBase.cpp
     tasks/CommonTasks.cpp
-    tasks/TestTasks.cpp
-    services/ContainerService.cpp
 )
 
-# Object library for WSLC components for testing and building wslc.exe
+# Object library for WSLC components.
+# Used to build the executable and also unit testing components.
 add_library(wslc2 OBJECT ${SOURCES} ${HEADERS})
 set_target_properties(wslc2 PROPERTIES FOLDER windows)
 target_include_directories(wslc2 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/core
-    ${CMAKE_CURRENT_SOURCE_DIR}/core/foundation
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/arguments
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks

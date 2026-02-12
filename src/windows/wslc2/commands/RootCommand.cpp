@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 #pragma once
 #include "pch.h"
-#include "SystemUtilities.h"
 #include "RootCommand.h"
 #include "TaskBase.h"
 
@@ -51,7 +50,7 @@ namespace wsl::windows::wslc
     {
         return
         {
-            Argument::ForType(ArgType::Info),
+            Argument::Create(ArgType::Info),
         };
     }
 
@@ -67,16 +66,7 @@ namespace wsl::windows::wslc
 
     void RootCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
-        if (context.Args.Contains(ArgType::Info))
-        {
-            std::wostringstream info;
-            info << L"Windows: " << wsl::windows::wslc::util::GetOSVersion();
-            PrintMessage(info.str(), stdout);
-        }
-        else
-        {
-            OutputHelp();
-        }
+        OutputHelp();
     }
 }
 

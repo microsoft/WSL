@@ -9,7 +9,7 @@ namespace wsl::windows::wslc
     {
         constexpr static std::wstring_view CommandName = L"test";
 
-        TestCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        TestCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
 
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;

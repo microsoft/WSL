@@ -18,11 +18,11 @@ namespace wsl::windows::wslc
     std::vector<Argument> VolumeCreateCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::VolumeNameC),
-            Argument::ForType(ArgType::Label),
-            Argument::ForType(ArgType::Opt),
-            Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::Size),
+            Argument::Create(ArgType::VolumeNameC),
+            Argument::Create(ArgType::Label),
+            Argument::Create(ArgType::Opt),
+            Argument::Create(ArgType::SessionId),
+            Argument::Create(ArgType::Size),
         };
     }
 

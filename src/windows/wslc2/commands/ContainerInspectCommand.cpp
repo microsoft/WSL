@@ -18,8 +18,8 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerInspectCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ContainerIdReq),
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::ContainerIdReq),
+            Argument::Create(ArgType::SessionId),
         };
     }
 

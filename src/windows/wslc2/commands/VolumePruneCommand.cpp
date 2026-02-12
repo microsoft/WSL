@@ -18,7 +18,7 @@ namespace wsl::windows::wslc
     std::vector<Argument> VolumePruneCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::SessionId),
         };
     }
 

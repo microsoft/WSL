@@ -18,15 +18,15 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerExecCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ContainerId),
-            Argument::ForType(ArgType::ForwardArgsP),
-            Argument::ForType(ArgType::Detach),
-            Argument::ForType(ArgType::Env),
-            Argument::ForType(ArgType::EnvFile),
-            Argument::ForType(ArgType::Interactive),
-            Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::TTY),
-            Argument::ForType(ArgType::User),
+            Argument::Create(ArgType::ContainerId),
+            Argument::Create(ArgType::ForwardArgsP),
+            Argument::Create(ArgType::Detach),
+            Argument::Create(ArgType::Env),
+            Argument::Create(ArgType::EnvFile),
+            Argument::Create(ArgType::Interactive),
+            Argument::Create(ArgType::SessionId),
+            Argument::Create(ArgType::TTY),
+            Argument::Create(ArgType::User),
         };
     }
 

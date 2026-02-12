@@ -9,6 +9,7 @@ set(WSLC_TEST_SOURCES
 
 set(WSLC_TEST_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/WSLCCLITestHelpers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/CommandLineTestCases.h 
 )
 
 # Add the sources to the parent wsltests target.
@@ -26,7 +27,6 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/test/windows
     ${CMAKE_SOURCE_DIR}/src/windows/wslc2/core
-    ${CMAKE_SOURCE_DIR}/src/windows/wslc2/core/foundation
     ${CMAKE_SOURCE_DIR}/src/windows/wslc2/commands
     ${CMAKE_SOURCE_DIR}/src/windows/wslc2/arguments
     ${CMAKE_SOURCE_DIR}/src/windows/wslc2/tasks

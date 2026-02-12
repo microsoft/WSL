@@ -23,14 +23,6 @@ using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc
 {
-    // Flags to control the behavior of the command output.
-    enum class CommandOutputFlags : int
-    {
-        None = 0x0,
-    };
-
-    DEFINE_ENUM_FLAG_OPERATORS(CommandOutputFlags);
-
     struct Command
     {
         // Controls the visibility of the field.
@@ -38,28 +30,14 @@ namespace wsl::windows::wslc
         {
             // Shown in help.
             Show,
+
             // Not shown in help.
             Hidden,
         };
 
         Command(std::wstring_view name, std::wstring parent) :
-            Command(name, {}, parent, Command::Visibility::Show) {}
-        Command(std::wstring_view name, std::wstring parent, Command::Visibility visibility) :
-            Command(name, {}, parent, visibility, CommandOutputFlags::None) {}
-        Command(std::wstring_view name, std::wstring parent, CommandOutputFlags outputFlags) :
-            Command(name, {}, parent, Command::Visibility::Show, outputFlags) {}
-        Command(std::wstring_view name, std::vector<std::wstring_view> aliases, std::wstring parent) :
-            Command(name, aliases, parent, Command::Visibility::Show) {}
-        Command(std::wstring_view name, std::vector<std::wstring_view> aliases, std::wstring parent, CommandOutputFlags outputFlags) :
-            Command(name, aliases, parent, Command::Visibility::Show, outputFlags) {}
-        Command(std::wstring_view name, std::vector<std::wstring_view> aliases, std::wstring parent, Command::Visibility visibility) :
-            Command(name, aliases, parent, visibility, CommandOutputFlags::None) {}
-
-        Command(std::wstring_view name,
-            std::vector<std::wstring_view> aliases,
-            std::wstring parent,
-            Command::Visibility visibility,
-            CommandOutputFlags outputFlags);
+            Command(name, parent, Command::Visibility::Show) {}
+        Command(std::wstring_view name, std::wstring parent, Command::Visibility visibility);
 
         virtual ~Command() = default;
 
@@ -73,10 +51,8 @@ namespace wsl::windows::wslc
         constexpr static wchar_t ParentSplitChar = L':';
 
         std::wstring_view Name() const { return m_name; }
-        const std::vector<std::wstring_view>& Aliases() const& { return m_aliases; }
         const std::wstring& FullName() const { return m_fullName; }
         Command::Visibility GetVisibility() const;
-        CommandOutputFlags GetOutputFlags() const { return m_outputFlags; }
 
         virtual std::vector<std::unique_ptr<Command>> GetCommands() const { return {}; }
         virtual std::vector<Argument> GetArguments() const { return {}; }
@@ -104,13 +80,13 @@ namespace wsl::windows::wslc
     private:
         std::wstring_view m_name;
         std::wstring m_fullName;
-        std::vector<std::wstring_view> m_aliases;
         Command::Visibility m_visibility;
-        CommandOutputFlags m_outputFlags;
         bool m_selectCurrentCommandIfUnrecognizedSubcommandFound = false;
         std::wstring m_commandArguments;
     };
 
+    // Helper to initialize a container of move-only types from an initializer list.
+    // This is used for greater efficiency when initializing the command tree.
     template <typename Container>
     Container InitializeFromMoveOnly(std::initializer_list<typename Container::value_type> il)
     {
@@ -124,7 +100,6 @@ namespace wsl::windows::wslc
 
         return result;
     }
-
 
     int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
 }

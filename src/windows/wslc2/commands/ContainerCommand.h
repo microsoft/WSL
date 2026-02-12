@@ -9,7 +9,7 @@ namespace wsl::windows::wslc
     struct ContainerCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"container";
-        ContainerCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -24,7 +24,7 @@ namespace wsl::windows::wslc
     struct ContainerCreateCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"create";
-        ContainerCreateCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerCreateCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -37,7 +37,7 @@ namespace wsl::windows::wslc
     struct ContainerDeleteCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"delete";
-        ContainerDeleteCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerDeleteCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -50,7 +50,7 @@ namespace wsl::windows::wslc
     struct ContainerExecCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"exec";
-        ContainerExecCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerExecCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -63,7 +63,7 @@ namespace wsl::windows::wslc
     struct ContainerInspectCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"inspect";
-        ContainerInspectCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerInspectCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -76,7 +76,7 @@ namespace wsl::windows::wslc
     struct ContainerKillCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"kill";
-        ContainerKillCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerKillCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -89,7 +89,7 @@ namespace wsl::windows::wslc
     struct ContainerListCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"list";
-        ContainerListCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerListCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -102,7 +102,7 @@ namespace wsl::windows::wslc
     struct ContainerRunCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"run";
-        ContainerRunCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerRunCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -116,7 +116,7 @@ namespace wsl::windows::wslc
     struct ContainerStartCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"start";
-        ContainerStartCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerStartCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -129,7 +129,7 @@ namespace wsl::windows::wslc
     struct ContainerStopCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"stop";
-        ContainerStopCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ContainerStopCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;

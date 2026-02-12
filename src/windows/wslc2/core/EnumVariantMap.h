@@ -14,8 +14,9 @@
 #include <variant>
 #include <vector>
 
-#include "Logging.h"
-
+// This template set is used for Arg storage and Context Data storage by enum type.
+// The backing storage is a std::multimap of the enum to a variant of types.
+// This enables strongly typed storage and retrieval of values based on an enum key.
 namespace wsl::windows::wslc
 {
     // Get the integral value for an enum.
@@ -128,14 +129,14 @@ namespace wsl::windows::wslc
             // Check if the type matches the SPECIFIC enum value at compile time if possible
             using CleanV = std::remove_cvref_t<V>;
             
-            WSLC_LOG(Debug, Verbose, << L"Adding value to enum " << ToIntegral(e)
-                 << L" with type: " << typeid(V).name());
+            ////WSLC_LOG(Debug, Verbose, << L"Adding value to enum " << ToIntegral(e)
+            ////     << L" with type: " << typeid(V).name());
 
             // Pre-check if this type matches the specific enum value being added to
             if (!IsMatchingType<CleanV>(e))
             {
-                WSLC_LOG(Fail, Error, << L"Type mismatch: Type " << typeid(CleanV).name()
-                     << L" does not match the expected type for enum value " << ToIntegral(e));
+                ////WSLC_LOG(Fail, Error, << L"Type mismatch: Type " << typeid(CleanV).name()
+                ////     << L" does not match the expected type for enum value " << ToIntegral(e));
                 THROW_HR_MSG(E_INVALIDARG, "Type mismatch: provided type does not match the expected type for enum value %d", static_cast<int>(e));
             }
 
@@ -226,9 +227,9 @@ namespace wsl::windows::wslc
             constexpr size_t expectedIndex = Variant::Index(E);
             if (itr->second.index() != expectedIndex)
             {
-                WSLC_LOG(Fail, Error, << L"Variant index mismatch for enum " << ToIntegral(E) 
-                     << L": expected index " << expectedIndex
-                     << L", actual index " << itr->second.index());
+                ////WSLC_LOG(Fail, Error, << L"Variant index mismatch for enum " << ToIntegral(E) 
+                //// << L": expected index " << expectedIndex
+                //// << L", actual index " << itr->second.index());
                 THROW_HR_MSG(E_UNEXPECTED, "Get(%d): variant type mismatch - expected index %zu, got %zu",
                     static_cast<int>(E), expectedIndex, itr->second.index());
             }
@@ -251,9 +252,9 @@ namespace wsl::windows::wslc
             constexpr size_t expectedIndex = Variant::Index(E);
             if (itr->second.index() != expectedIndex)
             {
-                WSLC_LOG(Fail, Error, << L"Variant index mismatch for enum " << ToIntegral(E)
-                     << L": expected index " << expectedIndex
-                     << L", actual index " << itr->second.index());
+                ////WSLC_LOG(Fail, Error, << L"Variant index mismatch for enum " << ToIntegral(E)
+                //// << L": expected index " << expectedIndex
+                //// << L", actual index " << itr->second.index());
                 THROW_HR_MSG(E_UNEXPECTED, "Get(%d): variant type mismatch - expected index %zu, got %zu",
                     static_cast<int>(E), expectedIndex, itr->second.index());
             }
@@ -422,8 +423,8 @@ namespace wsl::windows::wslc
             if (!handled)
             {
                 using CleanV = std::remove_cvref_t<V>;
-                WSLC_LOG(Fail, Error, << L"Invalid enum value " << ToIntegral(e)
-                     << L" or type mismatch. Provided type: " << typeid(CleanV).name());
+                ////WSLC_LOG(Fail, Error, << L"Invalid enum value " << ToIntegral(e)
+                //// << L" or type mismatch. Provided type: " << typeid(CleanV).name());
                 THROW_HR_MSG(E_INVALIDARG, "Invalid enum value: %d", static_cast<int>(e));
             }
         }
@@ -449,23 +450,23 @@ namespace wsl::windows::wslc
             {
                 if constexpr (requires { std::wostream{} << value; })
                 {
-                    WSLC_LOG(Debug, Verbose, << L"Emplacing value: " << value << L" at index " << Index);
+                    ////WSLC_LOG(Debug, Verbose, << L"Emplacing value: " << value << L" at index " << Index);
                 }
                 else
                 {
-                    WSLC_LOG(Debug, Verbose, << L"Emplacing value of type " << typeid(V).name() << L" at index " << Index);
+                    ////WSLC_LOG(Debug, Verbose, << L"Emplacing value of type " << typeid(V).name() << L" at index " << Index);
                 }
 
                 variant.template emplace<Index>(std::forward<V>(value));
             }
             else
             {
-                WSLC_LOG(Fail, Error, << L"Type mismatch at index " << Index
-                     << L": CleanV=" << typeid(CleanV).name()
-                     << L", TargetType=" << typeid(TargetType).name()
-                     << L", same=" << is_same_type
-                     << L", convertible=" << is_convertible
-                     << L", constructible=" << is_constructible);
+                ////WSLC_LOG(Fail, Error, << L"Type mismatch at index " << Index
+                //// << L": CleanV=" << typeid(CleanV).name()
+                //// << L", TargetType=" << typeid(TargetType).name()
+                //// << L", same=" << is_same_type
+                //// << L", convertible=" << is_convertible
+                //// << L", constructible=" << is_constructible);
 
                 throw std::runtime_error("Runtime type mismatch: cannot convert value to target type for this enum value");
             }

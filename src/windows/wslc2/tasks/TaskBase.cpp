@@ -52,13 +52,13 @@ namespace wsl::windows::wslc::task
                     auto strings = wslutil::ErrorToString(*reported);
                     auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
                     wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);
-                    WSLC_LOG(Fail, Error, << wslutil::ErrorCodeToString(result) << L": " << errorMessage);
+                    ////WSLC_LOG(Fail, Error, << wslutil::ErrorCodeToString(result) << L": " << errorMessage);
                 }
                 else
                 {
                     // Fallback for errors without context
                     wslutil::PrintMessage(Localization::MessageErrorCode("", wslutil::ErrorCodeToString(result)), stderr);
-                    WSLC_LOG(Fail, Error, << wslutil::ErrorCodeToString(result) << L": <Unknown>");
+                    ////WSLC_LOG(Fail, Error, << wslutil::ErrorCodeToString(result) << L": <Unknown>");
                 }
             }
 

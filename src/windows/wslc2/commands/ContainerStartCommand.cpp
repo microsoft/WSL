@@ -18,10 +18,10 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerStartCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ContainerId),
-            Argument::ForType(ArgType::Attach),
-            Argument::ForType(ArgType::Interactive),
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::ContainerId),
+            Argument::Create(ArgType::Attach),
+            Argument::Create(ArgType::Interactive),
+            Argument::Create(ArgType::SessionId),
         };
     }
 

@@ -16,5 +16,4 @@
 #include <format>
 
 // wslc
-#include "Logging.h"
 #include "Errors.h"

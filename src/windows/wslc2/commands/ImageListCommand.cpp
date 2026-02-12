@@ -18,10 +18,10 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImageListCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::Format),
-            Argument::ForType(ArgType::Quiet),
-            Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::Verbose),
+            Argument::Create(ArgType::Format),
+            Argument::Create(ArgType::Quiet),
+            Argument::Create(ArgType::SessionId),
+            Argument::Create(ArgType::Verbose),
         };
     }
 

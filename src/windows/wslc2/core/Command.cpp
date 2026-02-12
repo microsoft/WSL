@@ -18,11 +18,9 @@ namespace wsl::windows::wslc
 
     Command::Command(
         std::wstring_view name,
-        std::vector<std::wstring_view> aliases,
         std::wstring parent,
-        Command::Visibility visibility,
-        CommandOutputFlags outputFlags) :
-        m_name(name), m_aliases(std::move(aliases)), m_visibility(visibility), m_outputFlags(outputFlags)
+        Command::Visibility visibility) :
+        m_name(name), m_visibility(visibility)
     {
         if (!parent.empty())
         {
@@ -89,7 +87,6 @@ namespace wsl::windows::wslc
         // Output the command preamble and command chain
         infoOut << Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
 
-        auto commandAliases = Aliases();
         auto commands = GetVisibleCommands();
         auto arguments = GetVisibleArguments();
 
@@ -142,7 +139,6 @@ namespace wsl::windows::wslc
 
         // For WSLC format of command [<options>] <positional> <args | positional2..>
 
-
         // Add options to the usage if there are options present.
         if (hasOptions)
         {
@@ -184,17 +180,6 @@ namespace wsl::windows::wslc
             std::endl <<
             std::endl;
 
-        if (!commandAliases.empty())
-        {
-            infoOut << Localization::WSLCCLI_AvailableCommandAliases() << std::endl;
-            
-            for (const auto& commandAlias : commandAliases)
-            {
-                infoOut << L"  " << commandAlias << std::endl;
-            }
-            infoOut << std::endl;
-        }
-
         if (!commands.empty())
         {
             if (Name() == FullName())
@@ -218,7 +203,7 @@ namespace wsl::windows::wslc
                 infoOut << L"  " << command->Name() << std::wstring(fillChars, L' ') << command->ShortDescription() << std::endl;
             }
 
-            infoOut << std::endl << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_HELP_CHAR << L']' << std::endl;
+            infoOut << std::endl << Localization::WSLCCLI_HelpForDetails() << L" [" << WSLC_CLI_HELP_ARG_STRING << L']' << std::endl;
         }
 
         if (!arguments.empty())
@@ -355,8 +340,6 @@ namespace wsl::windows::wslc
                 arg.Validate(execArgs);
             }
         }
-
-        Argument::ValidateExclusiveArguments(execArgs);
 
         ValidateArgumentsInternal(execArgs);
     }

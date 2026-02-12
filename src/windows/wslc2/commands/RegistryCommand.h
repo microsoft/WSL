@@ -9,7 +9,7 @@ namespace wsl::windows::wslc
     struct RegistryCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"registry";
-        RegistryCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        RegistryCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -24,7 +24,7 @@ namespace wsl::windows::wslc
     struct RegistryLoginCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"login";
-        RegistryLoginCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        RegistryLoginCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -38,7 +38,7 @@ namespace wsl::windows::wslc
     struct RegistryLogoutCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"logout";
-        RegistryLogoutCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        RegistryLogoutCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;

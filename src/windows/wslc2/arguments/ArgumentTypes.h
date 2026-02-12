@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+
 #pragma once
 #include "pch.h"
 #include "EnumVariantMap.h"
@@ -10,10 +11,16 @@
 
 namespace wsl::windows::wslc::argument
 {
+    // This file defines the ArgTpes, the data types of the args, conversion and deduction of types, 
+    // and additional argument properties, such as Visibility and Kind.
+    // The actual ArgType definitions are in ArgumentDefinitions.h, which is used to generate the enum and mappings.
+    // The template at the bottom of this file validates the ArgumentDefinitions at compile time and will
+    // produce a compile error if any of the static_asserts fail, with the enum value included in the error message.
+
     // Generate ArgType enum from X-macro
     enum class ArgType : size_t
     {
-#define WSLC_ARG_ENUM(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
+#define WSLC_ARG_ENUM(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit) \
         EnumName,
 
 #include "ArgumentDefinitions.h"
@@ -35,7 +42,7 @@ namespace wsl::windows::wslc::argument
 #define WSLC_REMOVE_PARENS(...) __VA_ARGS__
 
         // Generate data mappings from X-macro
-#define WSLC_ARG_MAPPING(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
+#define WSLC_ARG_MAPPING(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit) \
         template<> \
         struct ArgDataMapping<ArgType::EnumName> \
         { \
@@ -140,34 +147,16 @@ namespace wsl::windows::wslc::argument
         Forward,
     };
 
-    // Categories an arg type can belong to.
-    // Used to reason about the arguments present without having to repeat the same
-    // lists every time.
-    enum class Category : uint32_t
-    {
-        None = 0x0,
-    };
-
-    DEFINE_ENUM_FLAG_OPERATORS(Category);
-
-    // Exclusive sets an argument can belong to.
-    // Only one argument from each exclusive set is allowed at a time.
-    enum class ExclusiveSet : uint32_t
-    {
-        None = 0x0,
-        Max = 0x1, // This should always be at the end; used for validation
-    };
-
-    DEFINE_ENUM_FLAG_OPERATORS(ExclusiveSet);
-
     // Controls the visibility of the field.
     enum class Visibility
     {
-        // Shown in the usage.
+        // Visible in help and also shown in the usage string.
         Usage,
-        // Shown only in the table below the example.
+
+        // Visible in help.
         Help,
-        // Not shown in help.
+
+        // Not shown in help. The argument is still present and functional.
         Hidden,
     };
 
@@ -175,9 +164,10 @@ namespace wsl::windows::wslc::argument
     constexpr static wchar_t NoAlias = L'\0';
 }
 
-// Compile-time validation of argument definitions
+// Compile-time validation of the argument table in ArgumentDefinitions.h.
 namespace wsl::windows::wslc::argument::validation {
-    // Helper to check if a type is a vector
+
+    // Helper to check if a type is a vector.
     template <typename T>
     struct is_vector : std::false_type {};
 
@@ -187,15 +177,15 @@ namespace wsl::windows::wslc::argument::validation {
     template <typename T>
     inline constexpr bool is_vector_v = is_vector<T>::value;
 
-    // Forward declare a type name holder that will be specialized per enum
+    // Forward declare a type name holder that will be specialized per enum.
     template <ArgType A>
     struct ArgTypeName;
 
-    // Validation: Forward arguments must be vector types
+    // Validation: Forward arguments must be vector types.
     template <typename T, Kind K, ArgType A>
     constexpr bool ValidateForwardKind()
     {
-        // Force instantiation of ArgTypeName<A> to show the enum value in error
+        // Force instantiation of ArgTypeName<A> to show the enum value in error.
         using FailedArgument = ArgTypeName<A>;
         static_assert(K != Kind::Forward || is_vector_v<T>,
             "Arguments with Kind::Forward must have a vector data type (e.g., std::vector<std::wstring>). "
@@ -207,7 +197,7 @@ namespace wsl::windows::wslc::argument::validation {
     template <typename T, Kind K, size_t Limit, ArgType A>
     constexpr bool ValidateVectorUsage()
     {
-        // Force instantiation of ArgTypeName<A> to show the enum value in error
+        // Force instantiation of ArgTypeName<A> to show the enum value in error.
         using FailedArgument = ArgTypeName<A>;
         static_assert(!is_vector_v<T> || K == Kind::Forward,
             "Vector data types must be Kind::Forward. "
@@ -226,11 +216,11 @@ namespace wsl::windows::wslc::argument::validation {
     // Helper macro to remove parentheses from a type
     #define WSLC_REMOVE_PARENS(...) __VA_ARGS__
 
-    #include "ArgumentDefinitions.h" // Ensure this is included before using WSLC_ARGUMENTS
+    #include "ArgumentDefinitions.h"
 
-    // Macro to generate validation instances for each argument
-    // Also creates a specialized ArgTypeName for better error messages
-    #define VALIDATE_ARGUMENT(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit, Category, ExclusiveSet) \
+    // Macro to generate validation instances for each argument.
+    // Also creates a specialized ArgTypeName for better error messages.
+    #define VALIDATE_ARGUMENT(EnumName, Name, Alias, Desc, DataType, Kind, Visibility, Required, CountLimit) \
         template<> struct ArgTypeName<ArgType::EnumName> { static constexpr auto name = #EnumName; }; \
         inline constexpr bool validate_##EnumName = ValidateArgument<WSLC_REMOVE_PARENS DataType, Kind, CountLimit, ArgType::EnumName>();
 

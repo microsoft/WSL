@@ -10,6 +10,8 @@ using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc::validation
 {
+    // This is mostly just a placeholder validation to show how to set up specific arg validation.
+    // This Publish validate is likely not complete or as thorough as we need, it's just a stand-in.
     void ValidatePublish([[maybe_unused]]const ArgType argType, const Args& execArgs)
     {
         const auto& publishArgs = execArgs.GetAll<ArgType::Publish>();
@@ -42,6 +44,4 @@ namespace wsl::windows::wslc::validation
             }
         }
     }
-
-    // Add more container-related validation functions here
 }

@@ -18,10 +18,10 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImagePushCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ImageId),
-            Argument::ForType(ArgType::Progress),
-            Argument::ForType(ArgType::Scheme),
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::ImageId),
+            Argument::Create(ArgType::Progress),
+            Argument::Create(ArgType::Scheme),
+            Argument::Create(ArgType::SessionId),
         };
     }
 

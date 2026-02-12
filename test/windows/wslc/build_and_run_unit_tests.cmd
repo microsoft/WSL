@@ -1,11 +1,35 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 :: Get the directory where this script is located
 set SCRIPT_DIR=%~dp0
 
+:: Parse arguments
+set RUN_TESTS=1
+set CONFIGURE_DEBUG=0
+set EXTRA_ARGS=
+
+:parse_args
+if "%~1"=="" goto end_parse
+if /i "%~1"=="-ConfigureDebug" (
+    set CONFIGURE_DEBUG=1
+    set RUN_TESTS=0
+    shift
+    goto parse_args
+)
+if /i "%~1"=="-SkipTests" (
+    set RUN_TESTS=0
+    shift
+    goto parse_args
+)
+set EXTRA_ARGS=!EXTRA_ARGS! %1
+shift
+goto parse_args
+
+:end_parse
+
 :: Navigate to repo root (3 levels up from test\windows\wslc)
-cd /d "%SCRIPT_DIR%..\..\..\"
+cd /d "%SCRIPT_DIR%..\..\..\\"
 
 echo.
 echo ============================================================================
@@ -32,13 +56,28 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo.
-echo ============================================================================
-echo Running WSLC CLI Tests
-echo ============================================================================
-echo.
+:: Configure debugging if requested
+if "%CONFIGURE_DEBUG%"=="1" (
+    echo.
+    echo ============================================================================
+    echo Configuring Visual Studio Debugging
+    echo ============================================================================
+    echo.
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%configure_debugging.ps1" %EXTRA_ARGS%
+    exit /b %errorlevel%
+)
 
-:: Run the existing test script
-call test\windows\wslc\run_unit_tests.cmd %*
+:: Run tests if not skipped
+if "%RUN_TESTS%"=="1" (
+    echo.
+    echo ============================================================================
+    echo Running WSLC CLI Tests
+    echo ============================================================================
+    echo.
 
-exit /b %errorlevel%
+    :: Run the existing test script, passing through all arguments
+    call test\windows\wslc\run_unit_tests.cmd %EXTRA_ARGS%
+    exit /b !errorlevel!
+)
+
+exit /b 0

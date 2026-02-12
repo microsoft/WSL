@@ -18,10 +18,10 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerDeleteCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ContainerIdOpt),
-            Argument::ForType(ArgType::All),
-            Argument::ForType(ArgType::ForceD),
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::ContainerIdOpt),
+            Argument::Create(ArgType::All, L"Select all the running containers."),
+            Argument::Create(ArgType::Force),
+            Argument::Create(ArgType::SessionId),
         };
     }
 

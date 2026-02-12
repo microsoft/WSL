@@ -18,29 +18,29 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerCreateCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ImageId),        // Argument
-            Argument::ForType(ArgType::ForwardArgs),    // Forward
-            Argument::ForType(ArgType::CIDFile),
-            Argument::ForType(ArgType::DNS),
-            Argument::ForType(ArgType::DNSDomain),
-            Argument::ForType(ArgType::DNSOption),
-            Argument::ForType(ArgType::DNSSearch),
-            Argument::ForType(ArgType::Entrypoint),
-            Argument::ForType(ArgType::Env),
-            Argument::ForType(ArgType::EnvFile),
-            Argument::ForType(ArgType::GroupId),
-            Argument::ForType(ArgType::Interactive),
-            Argument::ForType(ArgType::Name),
-            Argument::ForType(ArgType::NoDNS),
-            Argument::ForType(ArgType::Progress),
-            Argument::ForType(ArgType::Remove),
-            Argument::ForType(ArgType::Scheme),
-            Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::TMPFS),
-            Argument::ForType(ArgType::TTY),
-            Argument::ForType(ArgType::User),
-            Argument::ForType(ArgType::Volume),
-            Argument::ForType(ArgType::Virtual),
+            Argument::Create(ArgType::ImageId),        // Argument
+            Argument::Create(ArgType::ForwardArgs),    // Forward
+            Argument::Create(ArgType::CIDFile),
+            Argument::Create(ArgType::DNS),
+            Argument::Create(ArgType::DNSDomain),
+            Argument::Create(ArgType::DNSOption),
+            Argument::Create(ArgType::DNSSearch),
+            Argument::Create(ArgType::Entrypoint),
+            Argument::Create(ArgType::Env),
+            Argument::Create(ArgType::EnvFile),
+            Argument::Create(ArgType::GroupId),
+            Argument::Create(ArgType::Interactive),
+            Argument::Create(ArgType::Name),
+            Argument::Create(ArgType::NoDNS),
+            Argument::Create(ArgType::Progress),
+            Argument::Create(ArgType::Remove),
+            Argument::Create(ArgType::Scheme),
+            Argument::Create(ArgType::SessionId),
+            Argument::Create(ArgType::TMPFS),
+            Argument::Create(ArgType::TTY),
+            Argument::Create(ArgType::User),
+            Argument::Create(ArgType::Volume),
+            Argument::Create(ArgType::Virtual),
         };
     }
 

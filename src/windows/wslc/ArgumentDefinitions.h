@@ -22,7 +22,7 @@ _(Detach,         "detach",          L"d",           L"Run a process inside the 
 _(Entrypoint,     "entrypoint",      NO_ALIAS,        L"Specifies the container init process executable",           (std::wstring),               Kind::Standard,    Visibility::Help,    false,  1) \
 _(Env,            "env",             L"e",           L"Key=Value pairs for environment variables",                 (std::wstring),               Kind::Standard,    Visibility::Help,    false, 10) \
 _(EnvFile,        "env-file",        NO_ALIAS,        L"File containing key=value pairs of env variables",          (std::wstring),               Kind::Standard,    Visibility::Help,    false,  1) \
-_(Force,          "force",           L"f",            L"Delete containers even if they are running",                (bool),                       Kind::Standard,    Visibility::Help,    false,  1) \
+_(ForceD,         "force",           L"f",           L"Delete containers even if they are running",                (bool),                       Kind::Standard,    Visibility::Help,    false,  1) \
 _(Format,         "format",          NO_ALIAS,        L"Output formatting (json or table) (Default:table)",         (std::wstring),               Kind::Standard,    Visibility::Help,    false,  1) \
 _(ForwardArgs,    "arguments",       NO_ALIAS,        L"Arguments to pass to container's init process",             (std::vector<std::wstring>),  Kind::Forward,     Visibility::Help,    false,  1) \
 _(ForwardArgsP,   "process arguments", NO_ALIAS,      L"Arguments to pass to command to be run inside the container", (std::vector<std::wstring>),Kind::Forward,     Visibility::Help,    false,  1) \

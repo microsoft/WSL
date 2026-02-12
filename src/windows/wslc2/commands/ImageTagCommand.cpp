@@ -18,9 +18,9 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImageTagCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::Source),
-            Argument::ForType(ArgType::Target),
-            Argument::ForType(ArgType::SessionId)
+            Argument::Create(ArgType::Source),
+            Argument::Create(ArgType::Target),
+            Argument::Create(ArgType::SessionId)
         };
     }
 

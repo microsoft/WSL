@@ -5,7 +5,6 @@
 #include "TestCommand.h"
 #include "TaskBase.h"
 #include "CommonTasks.h"
-#include "TestTasks.h"
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
@@ -16,12 +15,12 @@ namespace wsl::windows::wslc
     {
         return
         {
-            Argument::ForType(ArgType::ContainerId),
-            Argument::ForType(ArgType::ForwardArgs),
-            Argument::ForType(ArgType::Attach),
-            Argument::ForType(ArgType::Interactive),
-            Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::Publish),
+            Argument::Create(ArgType::ContainerId),
+            Argument::Create(ArgType::ForwardArgs),
+            Argument::Create(ArgType::Attach),
+            Argument::Create(ArgType::Interactive),
+            Argument::Create(ArgType::SessionId),
+            Argument::Create(ArgType::Publish),
         };
     }
 

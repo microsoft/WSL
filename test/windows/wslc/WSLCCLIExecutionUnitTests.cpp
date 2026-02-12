@@ -37,7 +37,6 @@ namespace WSLCCLIExecutionUnitTests
     {
         std::wstring commandLine;
         std::wstring expectedCommand;
-        std::wstring expectedSubcommand;
         bool shouldSucceed;
     };
 
@@ -60,9 +59,10 @@ namespace WSLCCLIExecutionUnitTests
         {
             // Define all test cases inline
             std::vector<CommandLineTestCase> testCases = {
-                { L"container create --name test ubuntu", L"container", L"create", true },
-                { L"container list --all", L"container", L"list", true },
-                { L"container run -d ubuntu", L"container", L"run", false },
+                #define COMMAND_LINE_TEST_CASE(cmdLine, expectedCmd, shouldPass) \
+                    { cmdLine, expectedCmd, shouldPass },
+                #include "CommandLineTestCases.h"
+                #undef COMMAND_LINE_TEST_CASE
             };
 
             // Run all test cases
@@ -70,10 +70,12 @@ namespace WSLCCLIExecutionUnitTests
             {
                 LogComment(L"Testing: " + testCase.commandLine);
 
+                // Pre-pend executable name, which will get stripped off by CommandLineToArgvW
+                auto fullCommandLine = L"wslc " + testCase.commandLine;
                 
                 // Process the command line as Windows does.
                 int argc = 0;
-                auto argv = CommandLineToArgvW(testCase.commandLine.c_str(), &argc);
+                auto argv = CommandLineToArgvW(fullCommandLine.c_str(), &argc);
                 std::vector<std::wstring> args;
                 for (int i = 1; i < argc; ++i)
                 {
@@ -81,6 +83,7 @@ namespace WSLCCLIExecutionUnitTests
                 }
 
                 // And now process the command line like WSLC does.
+                bool succeeded = true;
                 try
                 {
                     Invocation invocation{ std::move(args) };
@@ -92,34 +95,27 @@ namespace WSLCCLIExecutionUnitTests
                         subCommand = command->FindSubCommand(invocation);
                     }
 
+                    // Ensure we found the expected command
+                    VERIFY_ARE_EQUAL(testCase.expectedCommand, command->Name());
+
                     CLIExecutionContext context;
+
+                    // Parse and validate and compare to expected results.
                     command->ParseArguments(invocation, context.Args);
                     command->ValidateArguments(context.Args);
                 }
-                catch (...)
+                catch (const CommandException& ce)
                 {
-                    if (testCase.shouldSucceed)
-                    {
-                        VERIFY_FAIL(L"Expected command to succeed but it failed");
-                    }
-                    else
-                    {
-                        LogComment(L"Command failed as expected");
-                    }
-
-                    continue;
+                    LogComment(L"Command line parsing threw an exception: " + ce.Message());
+                    succeeded = false;
+                }
+                catch(...)
+                {
+                    LogComment(L"Command line parsing threw an unexpected exception.");
+                    succeeded = false;
                 }
 
-                // If we reach here it did not fail.
-                if (testCase.shouldSucceed)
-                {
-                    LogComment(L"  Expected: Command=" + testCase.expectedCommand + 
-                              L", Subcommand=" + testCase.expectedSubcommand);
-                }
-                else
-                {
-                    VERIFY_FAIL(L"Expected command to fail but it succeeded");
-                }
+                VERIFY_ARE_EQUAL(testCase.shouldSucceed, succeeded);
             }
         }
     };

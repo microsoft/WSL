@@ -60,8 +60,6 @@ namespace wsl::windows::wslc
 
         const State& GetState() const { return m_state; }
 
-        bool PositionalArgumentFound() const { return m_anchorPositionalArgumentFound; }
-
         // Gets the next positional argument, or nullptr if there is not one.
         const Argument* NextPositional();
 
@@ -69,9 +67,11 @@ namespace wsl::windows::wslc
 
     private:
         State StepInternal();
-
+        State ProcessFirstPositionalArgument(const std::wstring_view& currArg);
+        State ProcessRemainingPositionals(const std::wstring_view& currArg);
+        State ProcessAliasArgument(const std::wstring_view& currArg);
+        State ProcessNamedArgument(const std::wstring_view& currArg);
         void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
-
         void EscapeAndQuoteForwardedArgument(std::wstring& arg);
 
         Invocation& m_invocation;
@@ -80,8 +80,9 @@ namespace wsl::windows::wslc
 
         Invocation::iterator m_invocationItr;
         std::vector<Argument>::iterator m_positionalSearchItr;
-        bool m_anchorPositionalArgumentFound = false;
-        ArgType m_anchorPositional = ArgType::Max; // Invalid default value indicating no anchor positional found yet.
+
+        // The anchor positional is the first positional argument processed.
+        std::optional<Argument> m_anchorPositional = std::nullopt;
 
         // Separate arguments by Kind
         std::vector<Argument> m_standardArgs = {};

@@ -18,11 +18,11 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerStopCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ContainerIdOpt),
-            Argument::ForType(ArgType::All),
-            Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::SignalS),
-            Argument::ForType(ArgType::Time),
+            Argument::Create(ArgType::ContainerIdOpt),
+            Argument::Create(ArgType::All),
+            Argument::Create(ArgType::SessionId),
+            Argument::Create(ArgType::SignalS),
+            Argument::Create(ArgType::Time),
         };
     }
 

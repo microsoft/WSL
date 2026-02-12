@@ -18,8 +18,8 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImagePruneCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::AllPrune),
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::AllPrune),
+            Argument::Create(ArgType::SessionId),
         };
     }
 
@@ -30,7 +30,7 @@ namespace wsl::windows::wslc
 
     std::wstring_view ImagePruneCommand::LongDescription() const
     {
-        return {L"Removes dangling (untagged) images in order to reclaim disk space. Using –a option removes all unused images that are not referenced by any container."};
+        return {L"Removes dangling (untagged) images in order to reclaim disk space. Using ï¿½a option removes all unused images that are not referenced by any container."};
     }
 
     void ImagePruneCommand::ExecuteInternal(CLIExecutionContext& context) const

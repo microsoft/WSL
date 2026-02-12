@@ -18,10 +18,10 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerKillCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ContainerIdOpt),
-            Argument::ForType(ArgType::All),
-            Argument::ForType(ArgType::SessionId),
-            Argument::ForType(ArgType::SignalK),
+            Argument::Create(ArgType::ContainerIdOpt),
+            Argument::Create(ArgType::All),
+            Argument::Create(ArgType::SessionId),
+            Argument::Create(ArgType::SignalK),
         };
     }
 

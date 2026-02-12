@@ -4,7 +4,10 @@ param(
     [string]$Configuration = "debug",
     [string]$Platform = "x64",
     [string]$Version = "2",  # WSL version to test (1 or 2)
-    [switch]$SkipDistroCheck  # Skip checking for test distro (for tests that don't need it)
+    [switch]$SkipDistroCheck,  # Skip checking for test distro (for tests that don't need it)
+    [switch]$WaitForDebugger,
+    [ValidateSet("None", "BreakOnCreate", "BreakOnInvoke", "Wait")]
+    [string]$Debug = "None"  # Debug mode selection
 )
 
 # Function to check if running as administrator.
@@ -127,6 +130,7 @@ try {
     $teArgs = @(
         $testDll
         "/name:$Filter"
+        "/inproc"  # Always run tests in-process for debugging
         "/p:Version=$Version"
         "/p:SetupScript="
         "/p:DistroPath=$distroPath"
@@ -136,6 +140,28 @@ try {
         "/p:PullRequest=false"
         "/p:AllowUnsigned=1"
     )
+
+    # Add debug options based on selection
+    switch ($Debug) {
+        "BreakOnCreate" {
+            Write-Host "Will break when test process starts" -ForegroundColor Yellow
+            $teArgs += "/breakOnCreate"
+        }
+        "BreakOnInvoke" {
+            Write-Host "Will break at each test method" -ForegroundColor Yellow
+            $teArgs += "/breakOnInvoke"
+        }
+        "Wait" {
+            Write-Host "Will break on test failures - attach debugger now" -ForegroundColor Yellow
+            $teArgs += "/breakOnError"  # Break on test failures
+        }
+    }
+
+    # Add wait for debugger flag if requested
+    if ($WaitForDebugger) {
+        Write-Host "Will wait for debugger to attach..." -ForegroundColor Yellow
+        $teArgs += "/waitfordebugger"
+    }
 
     # Run tests with required runtime parameters
     & $teExe @teArgs

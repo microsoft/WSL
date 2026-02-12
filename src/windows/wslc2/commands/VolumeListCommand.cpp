@@ -18,9 +18,9 @@ namespace wsl::windows::wslc
     std::vector<Argument> VolumeListCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::Format),
-            Argument::ForType(ArgType::Quiet),
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::Format),
+            Argument::Create(ArgType::Quiet),
+            Argument::Create(ArgType::SessionId),
         };
     }
 

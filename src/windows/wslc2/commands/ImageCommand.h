@@ -9,7 +9,7 @@ namespace wsl::windows::wslc
     struct ImageCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"image";
-        ImageCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImageCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -24,7 +24,7 @@ namespace wsl::windows::wslc
     struct ImageInspectCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"inspect";
-        ImageInspectCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImageInspectCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -38,7 +38,7 @@ namespace wsl::windows::wslc
     struct ImageListCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"list";
-        ImageListCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImageListCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -51,7 +51,7 @@ namespace wsl::windows::wslc
     struct ImageLoadCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"load";
-        ImageLoadCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImageLoadCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -64,7 +64,7 @@ namespace wsl::windows::wslc
     struct ImagePruneCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"prune";
-        ImagePruneCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImagePruneCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -77,7 +77,7 @@ namespace wsl::windows::wslc
     struct ImagePullCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"pull";
-        ImagePullCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImagePullCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -90,7 +90,7 @@ namespace wsl::windows::wslc
     struct ImagePushCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"push";
-        ImagePushCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImagePushCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -103,7 +103,7 @@ namespace wsl::windows::wslc
     struct ImageSaveCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"save";
-        ImageSaveCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImageSaveCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -116,7 +116,7 @@ namespace wsl::windows::wslc
     struct ImageTagCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"tag";
-        ImageTagCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        ImageTagCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;

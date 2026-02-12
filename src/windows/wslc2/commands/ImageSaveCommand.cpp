@@ -18,9 +18,9 @@ namespace wsl::windows::wslc
     std::vector<Argument> ImageSaveCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ImageId),
-            Argument::ForType(ArgType::Output),
-            Argument::ForType(ArgType::SessionId)
+            Argument::Create(ArgType::ImageId),
+            Argument::Create(ArgType::Output),
+            Argument::Create(ArgType::SessionId)
         };
     }
 

@@ -9,7 +9,7 @@ namespace wsl::windows::wslc
     struct VolumeCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"volume";
-        VolumeCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        VolumeCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -25,7 +25,7 @@ namespace wsl::windows::wslc
     struct VolumeCreateCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"create";
-        VolumeCreateCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        VolumeCreateCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -38,7 +38,7 @@ namespace wsl::windows::wslc
     struct VolumeDeleteCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"delete";
-        VolumeDeleteCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        VolumeDeleteCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -51,7 +51,7 @@ namespace wsl::windows::wslc
     struct VolumeInspectCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"inspect";
-        VolumeInspectCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        VolumeInspectCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -64,7 +64,7 @@ namespace wsl::windows::wslc
     struct VolumeListCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"list";
-        VolumeListCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        VolumeListCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -77,7 +77,7 @@ namespace wsl::windows::wslc
     struct VolumePruneCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"prune";
-        VolumePruneCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        VolumePruneCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -90,7 +90,7 @@ namespace wsl::windows::wslc
     struct VolumeSaveCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"save";
-        VolumeSaveCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        VolumeSaveCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;

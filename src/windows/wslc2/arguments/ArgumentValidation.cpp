@@ -11,6 +11,8 @@ namespace wsl::windows::wslc
     // Forward declarations of validation helpers defined in other files
     // Pass the argType along in case some validation should be shared
     // among very similar ArgTypes and the same validation is used for both.
+    // All the exec args are passed for any cross-validation that may
+    // be required, such as exclusive types or paired arguments.
     namespace validation
     {
         void ValidatePublish([[maybe_unused]]const ArgType argType, const Args& execArgs);

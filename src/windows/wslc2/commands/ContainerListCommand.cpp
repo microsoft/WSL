@@ -18,11 +18,11 @@ namespace wsl::windows::wslc
     std::vector<Argument> ContainerListCommand::GetArguments() const
     {
         return {
-            Argument::ForType(ArgType::ContainerIdOpt),
-            Argument::ForType(ArgType::All),
-            Argument::ForType(ArgType::Format),
-            Argument::ForType(ArgType::Quiet),
-            Argument::ForType(ArgType::SessionId),
+            Argument::Create(ArgType::ContainerId, L"Desc Override", false, 10),
+            Argument::Create(ArgType::All),
+            Argument::Create(ArgType::Format),
+            Argument::Create(ArgType::Quiet),
+            Argument::Create(ArgType::SessionId),
         };
     }
 

@@ -9,7 +9,7 @@ namespace wsl::windows::wslc
     struct SessionCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"session";
-        SessionCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        SessionCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
@@ -24,7 +24,7 @@ namespace wsl::windows::wslc
     struct SessionListCommand final : public Command
     {
         constexpr static std::wstring_view CommandName = L"list";
-        SessionListCommand(std::wstring parent) : Command(CommandName, {}, parent, Visibility::Show) {}
+        SessionListCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show) {}
         std::vector<Argument> GetArguments() const override;
         std::wstring_view ShortDescription() const override;
         std::wstring_view LongDescription() const override;
