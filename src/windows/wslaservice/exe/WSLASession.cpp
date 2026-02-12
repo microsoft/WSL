@@ -20,6 +20,7 @@ Abstract:
 
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
+using wsl::shared::Localization;
 using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 
@@ -27,79 +28,90 @@ constexpr auto c_containerdStorage = "/var/lib/docker";
 
 namespace {
 
-std::pair<std::string, std::string> ParseImage(const std::string& Input)
+std::pair<std::string, std::optional<std::string>> ParseImage(const std::string& Input)
 {
-    size_t separator = Input.find(':');
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        separator == std::string::npos || separator >= Input.size() - 1 || separator == 0,
-        "Invalid image: %hs",
-        Input.c_str());
+    size_t separator = Input.find_last_of(':');
+    if (separator == std::string::npos)
+    {
+        return {Input, {}};
+    }
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidImage(Input), separator >= Input.size() - 1 || separator == 0);
 
     return {Input.substr(0, separator), Input.substr(separator + 1)};
 }
 
-bool IsContainerNameValid(LPCSTR Name)
+void ValidateContainerName(LPCSTR Name)
 {
-    size_t length = 0;
     const auto& locale = std::locale::classic();
-    while (*Name != '\0')
-    {
-        if (!std::isalnum(*Name, locale) && *Name != '_' && *Name != '-' && *Name != '.')
-        {
-            return false;
-        }
+    size_t i = 0;
 
-        Name++;
-        length++;
+    for (; Name[i] != '\0'; i++)
+    {
+        if (!std::isalnum(Name[i], locale) && Name[i] != '_' && Name[i] != '-' && Name[i] != '.')
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name));
+        }
     }
 
-    return length > 0 && length <= WSLA_MAX_CONTAINER_NAME_LENGTH;
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
 }
 
 } // namespace
 
-WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::unique_tokeninfo_ptr<TOKEN_USER>&& TokenInfo, bool Elevated) :
-    m_id(id),
-    m_displayName(Settings.DisplayName),
-    m_tokenInfo(std::move(TokenInfo)),
-    m_elevatedToken(Elevated),
-    m_featureFlags(Settings.FeatureFlags)
+namespace wsl::windows::service::wsla {
+
+HRESULT WSLASession::GetProcessHandle(_Out_ HANDLE* ProcessHandle)
+try
 {
-    auto callingProcess = wslutil::OpenCallingProcess(PROCESS_QUERY_LIMITED_INFORMATION);
-    m_creatorPid = GetProcessId(callingProcess.get());
+    RETURN_HR_IF(E_POINTER, ProcessHandle == nullptr);
+
+    wil::unique_handle process{OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, GetCurrentProcessId())};
+    THROW_LAST_ERROR_IF(!process);
+
+    *ProcessHandle = process.release();
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::Initialize(_In_ const WSLA_SESSION_INIT_SETTINGS* Settings, _In_ IWSLAVirtualMachine* Vm)
+try
+{
+    RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
+
+    m_id = Settings->SessionId;
+    m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
+    m_featureFlags = Settings->FeatureFlags;
+
+    // Get user token for the current process
+    const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
 
     WSL_LOG(
-        "SessionCreated",
+        "SessionInitialized",
+        TraceLoggingValue(m_id, "SessionId"),
         TraceLoggingValue(m_displayName.c_str(), "DisplayName"),
-        TraceLoggingValue(GetSidString().get(), "Sid"),
-        TraceLoggingValue(Elevated, "Elevated"),
-        TraceLoggingValue(m_creatorPid, "CreatorPid"));
+        TraceLoggingValue(Settings->CreatorPid, "CreatorPid"));
 
-    m_virtualMachine.emplace(CreateVmSettings(Settings), m_tokenInfo->User.Sid);
-
-    if (Settings.TerminationCallback != nullptr)
-    {
-        m_virtualMachine->RegisterCallback(Settings.TerminationCallback);
-    }
-
-    m_virtualMachine->Start();
-
-    ConfigureStorage(Settings, m_tokenInfo->User.Sid);
+    // Create the VM.
+    m_virtualMachine.emplace(Vm, Settings);
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
+
+    // Configure storage.
+    ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
     // Launch dockerd
     StartDockerd();
 
     // Wait for dockerd to be ready before starting the event tracker.
     THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings.BootTimeoutMs), "Timed out waiting for dockerd to start");
+        ERROR_TIMEOUT, !m_containerdReadyEvent.wait(Settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
 
     auto [_, __, channel] = m_virtualMachine->Fork(WSLA_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->ExitingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
 
     //  Start the event tracker.
     m_eventTracker.emplace(m_dockerClient.value(), m_id, m_ioRelay);
@@ -108,57 +120,28 @@ WSLASession::WSLASession(ULONG id, const WSLA_SESSION_SETTINGS& Settings, wil::u
     RecoverExistingContainers();
 
     errorCleanup.release();
+    return S_OK;
 }
-
-WSLAVirtualMachine::Settings WSLASession::CreateVmSettings(const WSLA_SESSION_SETTINGS& Settings)
-{
-    WSLAVirtualMachine::Settings vmSettings{};
-    vmSettings.CpuCount = Settings.CpuCount;
-    vmSettings.MemoryMb = Settings.MemoryMb;
-    vmSettings.NetworkingMode = Settings.NetworkingMode;
-    vmSettings.BootTimeoutMs = Settings.BootTimeoutMs;
-    vmSettings.FeatureFlags = static_cast<WSLAFeatureFlags>(Settings.FeatureFlags);
-    vmSettings.DisplayName = Settings.DisplayName;
-
-    if (Settings.RootVhdOverride != nullptr)
-    {
-        THROW_HR_IF(E_INVALIDARG, Settings.RootVhdTypeOverride == nullptr);
-
-        vmSettings.RootVhd = Settings.RootVhdOverride;
-        vmSettings.RootVhdType = Settings.RootVhdTypeOverride;
-    }
-    else
-    {
-
-#ifdef WSL_SYSTEM_DISTRO_PATH
-
-        vmSettings.RootVhd = TEXT(WSL_SYSTEM_DISTRO_PATH);
-
-#else
-
-        vmSettings.RootVhd = std::filesystem::path(common::wslutil::GetMsiPackagePath().value()) / L"system.vhd";
-
-#endif
-
-        vmSettings.RootVhdType = "ext4";
-    }
-
-    if (Settings.DmesgOutput != 0)
-    {
-        vmSettings.DmesgHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(Settings.DmesgOutput)));
-    }
-
-    return vmSettings;
-}
+CATCH_RETURN()
 
 WSLASession::~WSLASession()
 {
-    WSL_LOG("SessionTerminated", TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
+    WSL_LOG("SessionTerminated", TraceLoggingValue(m_id, "SessionId"), TraceLoggingValue(m_displayName.c_str(), "DisplayName"));
 
     LOG_IF_FAILED(Terminate());
+
+    if (m_destructionCallback)
+    {
+        m_destructionCallback();
+    }
 }
 
-void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID UserSid)
+void WSLASession::SetDestructionCallback(std::function<void()>&& callback)
+{
+    m_destructionCallback = std::move(callback);
+}
+
+void WSLASession::ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid)
 {
     if (Settings.StoragePath == nullptr)
     {
@@ -168,7 +151,7 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID U
     }
 
     std::filesystem::path storagePath{Settings.StoragePath};
-    THROW_HR_IF_MSG(E_INVALIDARG, !storagePath.is_absolute(), "Storage path is not absolute: %ls", storagePath.c_str());
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Settings.StoragePath), !storagePath.is_absolute());
 
     m_storageVhdPath = storagePath / "storage.vhdx";
 
@@ -184,7 +167,6 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID U
                 m_virtualMachine->DetachDisk(diskLun.value());
             }
 
-            auto runAsUser = wil::CoImpersonateClient();
             LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_storageVhdPath.c_str()));
         }
     });
@@ -203,8 +185,6 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID U
         // If the VHD wasn't found, create it.
         WSL_LOG("CreateStorageVhd", TraceLoggingValue(m_storageVhdPath.c_str(), "StorageVhdPath"));
 
-        auto runAsUser = wil::CoImpersonateClient();
-
         std::filesystem::create_directories(storagePath);
         wsl::core::filesystem::CreateVhd(m_storageVhdPath.c_str(), Settings.MaximumStorageSizeMb * _1MB, UserSid, false, false);
         vhdCreated = true;
@@ -222,50 +202,11 @@ void WSLASession::ConfigureStorage(const WSLA_SESSION_SETTINGS& Settings, PSID U
     deleteVhdOnFailure.release();
 }
 
-const std::wstring& WSLASession::DisplayName() const
-{
-    return m_displayName;
-}
-
-DWORD WSLASession::GetCreatorPid() const noexcept
-{
-    return m_creatorPid;
-}
-
-ULONG WSLASession::GetId() const noexcept
-{
-    return m_id;
-}
-
 HRESULT WSLASession::GetId(ULONG* Id)
 {
     *Id = m_id;
 
     return S_OK;
-}
-
-PSID WSLASession::GetSid() const noexcept
-{
-    return m_tokenInfo->User.Sid;
-}
-
-wil::unique_hlocal_string WSLASession::GetSidString() const
-{
-    wil::unique_hlocal_string sid;
-    THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSid(m_tokenInfo->User.Sid, &sid));
-
-    return sid;
-}
-
-bool WSLASession::IsTokenElevated() const noexcept
-{
-    return m_elevatedToken;
-}
-
-void WSLASession::CopyDisplayName(_Out_writes_z_(bufferLength) PWSTR buffer, size_t bufferLength) const
-{
-    THROW_HR_IF(E_BOUNDS, m_displayName.size() + 1 > bufferLength);
-    wcscpy_s(buffer, bufferLength, m_displayName.c_str());
 }
 
 void WSLASession::OnDockerdExited()
@@ -324,14 +265,12 @@ void WSLASession::StartDockerd()
         m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
 
-HRESULT WSLASession::PullImage(
-    LPCSTR ImageUri,
-    const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
-    IProgressCallback* ProgressCallback,
-    WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(RegistryAuthenticationInformation);
+
+    COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageUri);
 
@@ -339,7 +278,7 @@ try
 
     std::lock_guard lock{m_lock};
 
-    auto requestContext = m_dockerClient->PullImage(repo.c_str(), tag.c_str());
+    auto requestContext = m_dockerClient->PullImage(repo, tag);
 
     relay::MultiHandleWait io;
 
@@ -393,18 +332,135 @@ try
         {
             // pull failed, parse the error message.
             errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str()).message;
-            if (Error != nullptr)
-            {
-                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
-            }
         }
 
         if (pullResult.value() == boost::beast::http::status::not_found)
         {
-            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
+            THROW_HR_WITH_USER_ERROR(WSLA_E_IMAGE_NOT_FOUND, errorMessage);
+        }
+        else if (pullResult.value() == boost::beast::http::status::bad_request)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+        }
+        else
+        {
+            THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+        }
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::BuildImage(ULONG ContextHandle, ULONGLONG ContentLength, LPCSTR DockerfilePath, LPCSTR ImageTag, IProgressCallback* ProgressCallback)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF(E_INVALIDARG, ContextHandle == 0);
+
+    std::optional<std::string> dockerfilePath;
+    if (DockerfilePath != nullptr && *DockerfilePath != '\0')
+    {
+        dockerfilePath = std::string(DockerfilePath);
+    }
+
+    std::optional<std::string> tag;
+    if (ImageTag != nullptr && *ImageTag != '\0')
+    {
+        tag = std::string(ImageTag);
+    }
+
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    wil::unique_handle contextFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ContextHandle))};
+
+    auto requestContext = m_dockerClient->BuildImage(ContentLength, dockerfilePath, tag);
+
+    relay::MultiHandleWait io;
+
+    std::optional<boost::beast::http::status> buildResult;
+
+    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
+        WSL_LOG("BuildHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
+
+        buildResult = response.result();
+    };
+
+    std::string errorJson;
+    std::string lastStreamMessage;
+
+    auto onChunk = [&](const gsl::span<char>& Content) {
+        if (buildResult.has_value() && buildResult.value() != boost::beast::http::status::ok)
+        {
+            // If the status code is an error, then this is an error message, not a progress update.
+            errorJson.append(Content.data(), Content.size());
+            return;
         }
 
-        THROW_HR_MSG(E_FAIL, "Image import failed: %hs", errorMessage.c_str());
+        std::string contentString{Content.begin(), Content.end()};
+        WSL_LOG(
+            "ImageBuildProgress",
+            TraceLoggingValue(ImageTag != nullptr ? ImageTag : "(no tag)", "Image"),
+            TraceLoggingValue(contentString.c_str(), "Content"));
+
+        auto parsed = wsl::shared::FromJson<docker_schema::BuildProgress>(contentString.c_str());
+
+        if (!parsed.stream.empty())
+        {
+            lastStreamMessage = parsed.stream;
+            if (ProgressCallback != nullptr)
+            {
+                THROW_IF_FAILED(ProgressCallback->OnProgress(parsed.stream.c_str(), "", 0, 0));
+            }
+        }
+
+        if (!parsed.error.empty())
+        {
+            errorJson = parsed.error;
+        }
+    };
+
+    auto onCompleted = [&]() { io.Cancel(); };
+
+    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
+        common::relay::HandleWrapper{std::move(contextFileHandle)}, common::relay::HandleWrapper{requestContext->stream.native_handle()}));
+
+    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
+        *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+
+    io.Run({});
+
+    THROW_HR_IF(E_UNEXPECTED, !buildResult.has_value());
+
+    WSL_LOG(
+        "BuildCompleted",
+        TraceLoggingValue(static_cast<int>(buildResult.value()), "StatusCode"),
+        TraceLoggingValue(errorJson.c_str(), "ErrorJson"),
+        TraceLoggingValue(lastStreamMessage.c_str(), "LastStreamMessage"));
+
+    if (buildResult.value() != boost::beast::http::status::ok || !errorJson.empty())
+    {
+        std::string errorMessage = !errorJson.empty() ? std::move(errorJson) : std::move(lastStreamMessage);
+
+        // For HTTP-level errors, the error body is a JSON object - parse the message from it.
+        if (buildResult.value() != boost::beast::http::status::ok)
+        {
+            try
+            {
+                errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorMessage.c_str()).message;
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+            }
+        }
+
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 
     return S_OK;
@@ -415,6 +471,8 @@ HRESULT WSLASession::LoadImage(ULONG ImageHandle, IProgressCallback* ProgressCal
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
+
+    COMServiceExecutionContext context;
 
     std::lock_guard lock{m_lock};
 
@@ -431,15 +489,20 @@ HRESULT WSLASession::ImportImage(ULONG ImageHandle, LPCSTR ImageName, IProgressC
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
+
+    COMServiceExecutionContext context;
+
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
 
     auto [repo, tag] = ParseImage(ImageName);
+
+    THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
 
     std::lock_guard lock{m_lock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    auto requestContext = m_dockerClient->ImportImage(repo, tag, ContentSize);
+    auto requestContext = m_dockerClient->ImportImage(repo, tag.value(), ContentSize);
 
     ImportImageImpl(*requestContext, ImageHandle);
     return S_OK;
@@ -499,26 +562,29 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
 
         // TODO: Return error message to client.
-        THROW_HR_MSG(E_FAIL, "Image import failed: %hs", error.message.c_str());
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
 }
 
-HRESULT WSLASession::ExportContainer(ULONG OutHandle, LPCSTR ContainerID, IProgressCallback* ProgressCallback, WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::ExportContainer(ULONG OutHandle, LPCSTR ContainerID, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
+
+    COMServiceExecutionContext context;
+
     RETURN_HR_IF_NULL(E_POINTER, ContainerID);
     std::lock_guard lock{m_lock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto retVal = m_dockerClient->ExportContainer(ContainerID);
-    ExportContainerImpl(retVal, OutHandle, Error);
+    ExportContainerImpl(retVal, OutHandle);
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
+void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle)
 {
     wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
@@ -555,36 +621,31 @@ void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& S
     {
         // Export failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-        if (Error != nullptr)
-        {
-            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
-        }
 
-        if (SocketCodePair.first == 404)
-        {
-            THROW_HR_MSG(WSLA_E_CONTAINER_NOT_FOUND, "%hs", error.message.c_str());
-        }
-
-        THROW_HR_MSG(E_FAIL, "Container export failed: %hs", error.message.c_str());
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
     }
 }
 
-HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback, WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback)
 try
 {
     UNREFERENCED_PARAMETER(ProgressCallback);
+
+    COMServiceExecutionContext context;
+
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
     std::lock_guard lock{m_lock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
     auto retVal = m_dockerClient->SaveImage(ImageNameOrID);
-    SaveImageImpl(retVal, OutHandle, Error);
+    SaveImageImpl(retVal, OutHandle);
     return S_OK;
 }
 CATCH_RETURN();
 
-void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle, WSLA_ERROR_INFO* Error)
+void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle)
 {
     wil::unique_handle imageFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
 
@@ -617,18 +678,15 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     {
         // Save failed, parse the error message.
         auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-        if (Error != nullptr)
-        {
-            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(error.message.c_str()).release();
-        }
-
-        THROW_HR_MSG(E_FAIL, "Image save failed: %hs", error.message.c_str());
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message.c_str());
     }
 }
 
 HRESULT WSLASession::ListImages(WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
 try
 {
+    COMServiceExecutionContext context;
+
     *Count = 0;
     *Images = nullptr;
 
@@ -665,9 +723,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count, WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::DeleteImage(const WSLA_DELETE_IMAGE_OPTIONS* Options, WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, ULONG* Count)
 try
 {
+    COMServiceExecutionContext context;
+
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
     RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
@@ -691,24 +751,11 @@ try
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
-            if (Error != nullptr)
-            {
-                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
-            }
         }
 
-        if (e.StatusCode() == 404)
-        {
-            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
-        }
-        else if (e.StatusCode() == 409)
-        {
-            THROW_WIN32_MSG(ERROR_SHARING_VIOLATION, "%hs", errorMessage.c_str());
-        }
-        else
-        {
-            THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
-        }
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), errorMessage, e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 
     THROW_HR_IF_MSG(E_FAIL, deletedImages.empty(), "Failed to delete image: %hs", Options->Image);
@@ -741,9 +788,11 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container, WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::CreateContainer(const WSLA_CONTAINER_OPTIONS* containerOptions, IWSLAContainer** Container)
 try
 {
+    COMServiceExecutionContext context;
+
     RETURN_HR_IF_NULL(E_POINTER, containerOptions);
 
     // Validate that Image is not null.
@@ -753,11 +802,10 @@ try
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Validate that name & images are valid.
-    RETURN_HR_IF_MSG(
-        E_INVALIDARG,
-        containerOptions->Name != nullptr && !IsContainerNameValid(containerOptions->Name),
-        "Invalid container name: %hs",
-        containerOptions->Name);
+    if (containerOptions->Name != nullptr)
+    {
+        ValidateContainerName(containerOptions->Name);
+    }
 
     RETURN_HR_IF(E_INVALIDARG, strlen(containerOptions->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
@@ -785,21 +833,9 @@ try
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
 
-        if (Error != nullptr)
-        {
-            Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
-        }
-
-        if (e.StatusCode() == 404)
-        {
-            THROW_HR_MSG(WSLA_E_IMAGE_NOT_FOUND, "%hs", errorMessage.c_str());
-        }
-        else if (e.StatusCode() == 409)
-        {
-            THROW_WIN32_MSG(ERROR_ALREADY_EXISTS, "%hs", errorMessage.c_str());
-        }
-
-        return E_FAIL;
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), errorMessage, e.StatusCode() == 409);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
 }
 CATCH_RETURN();
@@ -807,7 +843,9 @@ CATCH_RETURN();
 HRESULT WSLASession::OpenContainer(LPCSTR Id, IWSLAContainer** Container)
 try
 {
-    THROW_HR_IF_MSG(E_INVALIDARG, !IsContainerNameValid(Id), "Invalid container name: %hs", Id);
+    COMServiceExecutionContext context;
+
+    ValidateContainerName(Id);
 
     // Look for an exact ID match first.
     std::lock_guard lock{m_lock};
@@ -844,6 +882,8 @@ CATCH_RETURN();
 HRESULT WSLASession::ListContainers(WSLA_CONTAINER** Containers, ULONG* Count)
 try
 {
+    COMServiceExecutionContext context;
+
     *Count = 0;
     *Containers = nullptr;
 
@@ -869,6 +909,8 @@ CATCH_RETURN();
 HRESULT WSLASession::CreateRootNamespaceProcess(LPCSTR Executable, const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
 try
 {
+    COMServiceExecutionContext context;
+
     if (Errno != nullptr)
     {
         *Errno = -1; // Make sure not to return 0 if something fails.
@@ -896,7 +938,9 @@ void WSLASession::Ext4Format(const std::string& Device)
 HRESULT WSLASession::FormatVirtualDisk(LPCWSTR Path)
 try
 {
-    THROW_HR_IF_MSG(E_INVALIDARG, !std::filesystem::path(Path).is_absolute(), "FormatVirtualDisk called with a relative path: %ls", Path);
+    COMServiceExecutionContext context;
+
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Path), !std::filesystem::path(Path).is_absolute());
 
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
@@ -913,11 +957,6 @@ try
     return S_OK;
 }
 CATCH_RETURN();
-
-void WSLASession::OnUserSessionTerminating()
-{
-    LOG_IF_FAILED(Terminate());
-}
 
 HRESULT WSLASession::Terminate()
 try
@@ -972,7 +1011,6 @@ try
         }
         CATCH_LOG();
 
-        m_virtualMachine->OnSessionTerminated();
         m_virtualMachine.reset();
     }
 
@@ -983,6 +1021,8 @@ CATCH_RETURN();
 HRESULT WSLASession::MountWindowsFolder(LPCWSTR WindowsPath, LPCSTR LinuxPath, BOOL ReadOnly)
 try
 {
+    COMServiceExecutionContext context;
+
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -993,6 +1033,8 @@ CATCH_RETURN();
 HRESULT WSLASession::UnmountWindowsFolder(LPCSTR LinuxPath)
 try
 {
+    COMServiceExecutionContext context;
+
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -1003,6 +1045,8 @@ CATCH_RETURN();
 HRESULT WSLASession::MapVmPort(int Family, short WindowsPort, short LinuxPort)
 try
 {
+    COMServiceExecutionContext context;
+
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -1014,6 +1058,8 @@ CATCH_RETURN();
 HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort, short LinuxPort)
 try
 {
+    COMServiceExecutionContext context;
+
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -1022,26 +1068,22 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
+{
+    return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
+}
+
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
     std::lock_guard lock{m_lock};
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.get() == Container; }) == 1);
 }
 
-HRESULT WSLASession::GetImplNoRef(_Out_ WSLASession** Session)
-{
-    // N.B. This returns a raw pointer to the implementation without calling AddRef.
-    // The caller must hold a separate strong reference to the owning WSLASession
-    // object for at least as long as this pointer is used, and must not store it
-    // beyond that lifetime.
-    *Session = this;
-    return S_OK;
-}
-
-bool WSLASession::Terminated()
+HRESULT WSLASession::GetState(_Out_ WSLASessionState* State)
 {
     std::lock_guard lock{m_lock};
-    return !m_virtualMachine;
+    *State = m_virtualMachine ? WSLASessionStateRunning : WSLASessionStateTerminated;
+    return S_OK;
 }
 
 void WSLASession::RecoverExistingContainers()
@@ -1078,3 +1120,5 @@ void WSLASession::RecoverExistingContainers()
         TraceLoggingValue(m_displayName.c_str(), "SessionName"),
         TraceLoggingValue(m_containers.size(), "ContainerCount"));
 }
+
+} // namespace wsl::windows::service::wsla
