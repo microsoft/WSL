@@ -397,7 +397,7 @@ STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version)
     return E_NOTIMPL;
 }
 
-STDAPI WslcInstallWithDependencies(_In_opt_ __callback WslcInstallCallback progressCallback, _In_opt_ PVOID context)
+STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context)
 {
     UNREFERENCED_PARAMETER(progressCallback);
     UNREFERENCED_PARAMETER(context);
