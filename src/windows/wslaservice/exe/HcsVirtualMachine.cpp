@@ -443,10 +443,12 @@ try
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
         THROW_HR_IF_MSG(E_INVALIDARG, DnsSocket != nullptr, "DNS socket should not be provided with virtio proxy networking mode");
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            FeatureEnabled(WslaFeatureFlagsDnsTunneling),
+            "DNS tunneling not supported for VirtioProxy");
 
         auto flags = wsl::core::VirtioNetworkingFlags::None;
-        WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, FeatureEnabled(WslaFeatureFlagsDnsTunneling));
-
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
             wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
