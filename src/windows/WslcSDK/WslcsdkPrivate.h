@@ -47,9 +47,9 @@ typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
 {
     PCSTR executable; // path to executable inside container
     PCSTR* commandLine;
-    UINT32 commandLineCount;
+    uint32_t commandLineCount;
     PCSTR* environment;
-    UINT32 environmentCount;
+    uint32_t environmentCount;
     PCSTR currentDirectory;
 } WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL;
 
@@ -65,12 +65,12 @@ typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
 {
     PCSTR image;       // Image name (repository:tag)
     PCSTR runtimeName; // Container runtime name (expected to allow DNS resolution between containers)
-    PCSTR hostName;
-    PCSTR domainName;
+    PCSTR HostName;
+    PCSTR DomainName;
     const WslcContainerPortMapping* ports;
-    UINT32 portsCount;
+    uint32_t portsCount;
     const WslcContainerVolume* volumes;
-    UINT32 volumesCount;
+    uint32_t volumesCount;
     const WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* initProcessOptions;
     WslcContainerNetworkingMode networking;
     WslcContainerFlags containerFlags;
