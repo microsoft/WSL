@@ -48,9 +48,9 @@ WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings);
 typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
 {
     PCSTR executable; // path to executable inside container
-    PCSTR* commandLine;
+    PCSTR const* commandLine;
     UINT32 commandLineCount;
-    PCSTR* environment;
+    PCSTR const* environment;
     UINT32 environmentCount;
     PCSTR currentDirectory;
 } WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL;
@@ -113,9 +113,11 @@ struct WslcProcessImpl
 WslcProcessImpl* GetInternalType(WslcProcess handle);
 
 // Returns an error on null input then converts to a local named `internalType`.
-#define WSLC_GET_INTERNAL_TYPE(_input_) \
+#define WSLC_GET_INTERNAL_TYPE_NAMED(_input_,_name_) \
     RETURN_HR_IF_NULL(E_POINTER, _input_); \
-    auto internalType = GetInternalType(_input_) \
+    auto _name_ = GetInternalType(_input_) \
+
+#define WSLC_GET_INTERNAL_TYPE(_input_) WSLC_GET_INTERNAL_TYPE_NAMED(_input_, internalType)
 
 // Returns an error on null input then converts to a unique_ptr local named `internalType`.
 // Use for Release functions to clean up the implementation object on return.
