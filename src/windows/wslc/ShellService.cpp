@@ -23,11 +23,7 @@ namespace wslutil = wsl::windows::common::wslutil;
 
 int ShellService::Attach(std::wstring sessionName)
 {
-if (sessionName.empty())
-    {
-        THROW_HR_WITH_USER_ERROR(
-            E_INVALIDARG, wsl::shared::Localization::MessageMissingArgument(L"<SessionName>", L"wsladiag shell"));
-    }
+    THROW_HR_IF(E_INVALIDARG, sessionName.empty());
 
     wil::com_ptr<IWSLASessionManager> manager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));

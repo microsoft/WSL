@@ -17,6 +17,7 @@ Abstract:
 #include <vector>
 #include <algorithm>
 #include <wslutil.h>
+#include <sstream>
 
 namespace wslc
 {

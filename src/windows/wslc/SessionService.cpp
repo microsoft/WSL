@@ -23,7 +23,7 @@ DEFINE_ENUM_FLAG_OPERATORS(WSLASessionFlags);
 
 Session SessionService::CreateSession(std::optional<SessionOptions> options)
 {
-    const SessionOptions& sessionOptions = options.has_value() ? options.value() : SessionOptions::Default();
+    SessionOptions sessionOptions = options.has_value() ? options.value() : SessionOptions::Default();
     const WSLA_SESSION_SETTINGS* settings = sessionOptions;
     wil::com_ptr<IWSLASessionManager> sessionManager;
     THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));

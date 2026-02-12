@@ -26,21 +26,21 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
 using namespace wslc::models;
 
-static void SetContainerTTYOptions(WSLA_CONTAINER_OPTIONS& options)
+static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
 {
-    if (WI_IsFlagSet(options.InitProcessOptions.Flags, WSLAProcessFlagsTty))
+    if (WI_IsFlagSet(options.Flags, WSLAProcessFlagsTty))
     {
         HANDLE Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
         HANDLE Stdin = GetStdHandle(STD_INPUT_HANDLE);
         CONSOLE_SCREEN_BUFFER_INFOEX info{};
         info.cbSize = sizeof(info);
         THROW_IF_WIN32_BOOL_FALSE(::GetConsoleScreenBufferInfoEx(Stdout, &info));
-        options.InitProcessOptions.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
-        options.InitProcessOptions.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
+        options.TtyColumns = info.srWindow.Right - info.srWindow.Left + 1;
+        options.TtyRows = info.srWindow.Bottom - info.srWindow.Top + 1;
     }
 }
 
-static void SetContainerArguments(WSLA_CONTAINER_OPTIONS& options, const std::vector<std::string>& args, std::vector<const char*>& argsStorage)
+static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, const std::vector<std::string>& args, std::vector<const char*>& argsStorage)
 {
     argsStorage.clear();
     argsStorage.reserve(args.size());
@@ -48,7 +48,7 @@ static void SetContainerArguments(WSLA_CONTAINER_OPTIONS& options, const std::ve
     {
         argsStorage.push_back(arg.c_str());
     }
-    options.InitProcessOptions.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
+    options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
 static void CreateInternal(Session& session, IWSLAContainer** container, WSLA_CONTAINER_OPTIONS& containerOptions, std::string image, const ContainerCreateOptions& options)
@@ -58,8 +58,8 @@ static void CreateInternal(Session& session, IWSLAContainer** container, WSLA_CO
     containerOptions.Name = options.Name.c_str();
     containerOptions.Image = image.c_str();
     std::vector<const char*> argsStorage;
-    SetContainerTTYOptions(containerOptions);
-    SetContainerArguments(containerOptions, options.Arguments, argsStorage);
+    SetContainerTTYOptions(containerOptions.InitProcessOptions);
+    SetContainerArguments(containerOptions.InitProcessOptions, options.Arguments, argsStorage);
 
     auto result = session.Get()->CreateContainer(&containerOptions, container);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
@@ -85,7 +85,7 @@ int ContainerService::Run(Session& session, std::string image, ContainerRunOptio
     CreateInternal(session, &container, containerOptions, image, runOptions);
 
     // Start the created container
-    WSLAContainerStartFlags startFlags;
+    WSLAContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLAContainerStartFlagsAttach, !runOptions.Detach);
     THROW_IF_FAILED(container->Start(startFlags)); // TODO: Error message
 
@@ -131,7 +131,7 @@ void ContainerService::Stop(Session& session, std::string id, StopContainerOptio
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    // AMIR
+    StopInternal(*container, options.Signal, options.Timeout);
 }
 
 void ContainerService::Kill(Session& session, std::string id, int signal)
@@ -183,21 +183,25 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 
 int ContainerService::Exec(Session& session, std::string id, wslc::models::ExecContainerOptions options)
 {
-    ConsoleService consoleService;
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    int error = -1;
-    WSLA_CONTAINER_OPTIONS containerOptions{};
-    containerOptions.Name = id.c_str();
-    containerOptions.InitProcessOptions.CurrentDirectory = nullptr;
-    containerOptions.InitProcessOptions.Environment = {};
-    std::vector<const char*> argsStorage;
-    SetContainerTTYOptions(containerOptions);
-    SetContainerArguments(containerOptions, options.Arguments, argsStorage);
 
+    // Set up the options for the process to be created
+    WSLA_PROCESS_OPTIONS processOptions{};
+    WI_SetFlagIf(processOptions.Flags, WSLAProcessFlagsStdin, options.Interactive);
+    WI_SetFlagIf(processOptions.Flags, WSLAProcessFlagsTty, options.TTY);
+    processOptions.CurrentDirectory = nullptr;
+    processOptions.Environment = {};
+    std::vector<const char*> argsStorage;
+    SetContainerTTYOptions(processOptions);
+    SetContainerArguments(processOptions, options.Arguments, argsStorage);
+
+    // Execute the process inside the container
     wil::com_ptr<IWSLAProcess> process;
-    THROW_IF_FAILED(container->Exec(&containerOptions.InitProcessOptions, &process, &error));
-    return consoleService.AttachToCurrentConsole(ClientRunningWSLAProcess(std::move(process), containerOptions.InitProcessOptions.Flags));
+    int error = -1;
+    THROW_IF_FAILED(container->Exec(&processOptions, &process, &error));
+    ConsoleService consoleService;
+    return consoleService.AttachToCurrentConsole(ClientRunningWSLAProcess(std::move(process), processOptions.Flags));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, std::string id)

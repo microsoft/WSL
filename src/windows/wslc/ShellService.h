@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains the SessionService definition
+    This file contains the ShellService definition
 
 --*/
 #pragma once
