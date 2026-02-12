@@ -573,8 +573,6 @@ void WSLAContainerImpl::Delete()
 
     m_dockerClient.DeleteContainer(m_id);
 
-    UnmountVolumes(m_mountedVolumes, *m_parentVM);
-
     m_state = WslaContainerStateDeleted;
 }
 

@@ -74,6 +74,15 @@ public:
 
     const std::string& ID() const noexcept;
 
+    // Called when the container stop event is observed so the
+    // implementation can update its internal state and notify
+    // any exec processes.
+    void OnStopped();
+
+    // Returns the container flags used to decide whether to
+    // auto-delete the container on stop.
+    WSLAContainerFlags Flags() const noexcept { return m_containerFlags; }
+
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLAVirtualMachine& parentVM,
