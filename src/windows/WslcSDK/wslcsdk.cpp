@@ -73,9 +73,9 @@ STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, 
     UNREFERENCED_PARAMETER(sessionSettings);
     return E_NOTIMPL;
 }
-STDAPI WslcSessionCreateVhd(_In_ WslcSession sesssion, _In_ const WslcVhdRequirements* options)
+STDAPI WslcSessionCreateVhd(_In_ WslcSession session, _In_ const WslcVhdRequirements* options)
 {
-    UNREFERENCED_PARAMETER(sesssion);
+    UNREFERENCED_PARAMETER(session);
     UNREFERENCED_PARAMETER(options);
     return E_NOTIMPL;
 }
