@@ -316,13 +316,11 @@ try
     auto onCompleted = [&]() { io.Cancel(); };
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
-    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
         *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
 
     io.Run({});
 
-    THROW_HR_IF(E_ABORT, m_sessionTerminatingEvent.is_signaled());
     THROW_HR_IF(E_UNEXPECTED, !pullResult.has_value());
 
     if (pullResult.value() != boost::beast::http::status::ok)
@@ -1081,8 +1079,7 @@ void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 
 HRESULT WSLASession::GetState(_Out_ WSLASessionState* State)
 {
-    std::lock_guard lock{m_lock};
-    *State = m_virtualMachine ? WSLASessionStateRunning : WSLASessionStateTerminated;
+    *State = m_sessionTerminatingEvent.is_signaled() ? WSLASessionStateTerminated : WSLASessionStateRunning;
     return S_OK;
 }
 
