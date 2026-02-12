@@ -177,7 +177,7 @@ STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* container
     return E_NOTIMPL;
 }
 
-STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_ const WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount)
+STDAPI WslcContainerSettingsSetPortMapping(_In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount)
 {
     UNREFERENCED_PARAMETER(portMappings);
     UNREFERENCED_PARAMETER(containerSettings);
