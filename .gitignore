@@ -66,4 +66,4 @@ tools/clang-format.exe
 doc/site/
 directory.build.targets
 test-storage/
-*.vhdx
+*.vhdx_codeql_detected_source_root
