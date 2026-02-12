@@ -13,7 +13,6 @@ Abstract:
 --*/
 #pragma once
 
-#include "precomp.h"
 #include "ICommand.h"
 
 namespace wsl::windows::wslc::commands {

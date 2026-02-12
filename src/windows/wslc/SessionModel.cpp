@@ -34,6 +34,7 @@ SessionOptions SessionOptions::Default()
 void SessionOptions::StoragePath(std::filesystem::path path)
 {
     m_storagePath = std::move(path);
+    m_sessionSettings.StoragePath = m_storagePath.c_str();
 }
 
 SessionOptions::operator const WSLA_SESSION_SETTINGS*() const

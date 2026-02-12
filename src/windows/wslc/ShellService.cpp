@@ -44,6 +44,8 @@ int ShellService::Attach(std::wstring sessionName)
         return 1;
     }
 
+    wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+
     // Console size for TTY.
     CONSOLE_SCREEN_BUFFER_INFO info{};
     THROW_LAST_ERROR_IF(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));

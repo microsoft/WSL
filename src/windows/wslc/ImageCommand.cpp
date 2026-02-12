@@ -155,24 +155,24 @@ CONSOLE_SCREEN_BUFFER_INFO PullImageCallback::Info()
     return info;
 }
 
-std::wstring PullImageCallback::GenerateStatusLine(LPCSTR Status, LPCSTR Id, ULONGLONG Current, ULONGLONG Total, const CONSOLE_SCREEN_BUFFER_INFO& Info)
+std::wstring PullImageCallback::GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info)
 {
     std::wstring line;
-    if (Total != 0)
+    if (total != 0)
     {
-        line = std::format(L"{} '{}': {}%", Status, Id, Current * 100 / Total);
+        line = std::format(L"{} '{}': {}%", status, id, current * 100 / total);
     }
-    else if (Current != 0)
+    else if (current != 0)
     {
-        line = std::format(L"{} '{}': {}s", Status, Id, Current);
+        line = std::format(L"{} '{}': {}s", status, id, current);
     }
     else
     {
-        line = std::format(L"{} '{}'", Status, Id);
+        line = std::format(L"{} '{}'", status, id);
     }
 
     // Erase any previously written char on that line.
-    while (line.size() < Info.dwSize.X)
+    while (line.size() < info.dwSize.X)
     {
         line += L' ';
     }
