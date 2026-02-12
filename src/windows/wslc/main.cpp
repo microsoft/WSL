@@ -75,7 +75,7 @@ protected:
         }
 
         CMD_IF_HELP_PRINT_HELP();
-        CMD_ARG_REQUIRED(m_subverb, L"Error: Invalid or missing subcommand.");
+        CMD_ARG_REQUIRED(m_subverb, L"Error: Missing subcommand.");
         wslutil::PrintMessage(L"Error: Invalid subcommand specified", stderr);
         PrintHelp();
         return 1;

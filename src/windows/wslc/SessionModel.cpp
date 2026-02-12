@@ -38,7 +38,6 @@ void SessionOptions::StoragePath(std::filesystem::path path)
 
 SessionOptions::operator const WSLA_SESSION_SETTINGS*() const
 {
-    const_cast<SessionOptions*>(this)->m_sessionSettings.StoragePath = m_storagePath.c_str();
     return &m_sessionSettings;
 }
 } // namespace wsl::windows::wslc::models

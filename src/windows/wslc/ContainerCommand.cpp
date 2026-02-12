@@ -63,6 +63,7 @@ int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int pars
     CMD_ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = m_sessionService.CreateSession();
     m_options.Arguments = Arguments();
+    m_options.Name = GetContainerName(m_options.Name);
     ContainerService containerService;
     return containerService.Run(session, m_image, m_options);
 }
@@ -111,7 +112,7 @@ int ContainerStopCommand::ExecuteInternal(std::wstring_view commandLine, int par
     }
     else if (containersToStop.empty())
     {
-        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to stop all containers.", stderr);
+        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to stop all running containers.", stderr);
         return 1;
     }
 
@@ -143,7 +144,7 @@ int ContainerKillCommand::ExecuteInternal(std::wstring_view commandLine, int par
     }
     else if (containersToKill.empty())
     {
-        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to kill all containers.", stderr);
+        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to kill all running containers.", stderr);
         return 1;
     }
 
@@ -169,6 +170,11 @@ int ContainerDeleteCommand::ExecuteInternal(std::wstring_view commandLine, int p
         {
             containersToDelete.push_back(container.Name);
         }
+    }
+    else if (containersToDelete.empty())
+    {
+        wslutil::PrintMessage(L"Error: at least one container must be specified, or use --all to delete all containers.", stderr);
+        return 1;
     }
 
     for (const auto& id : containersToDelete)
