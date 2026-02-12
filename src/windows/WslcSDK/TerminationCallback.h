@@ -16,7 +16,6 @@ Abstract:
 #include "wslcsdkprivate.h"
 #include <winrt/base.h>
 
-
 struct TerminationCallback : public winrt::implements<TerminationCallback, ITerminationCallback>
 {
     TerminationCallback(WslcSessionTerminationCallback callback, PVOID context);

@@ -15,7 +15,6 @@ Abstract:
 
 #include "wslcsdkprivate.h"
 
-
 WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings)
 {
     return reinterpret_cast<WSLC_SESSION_OPTIONS_INTERNAL*>(settings);
