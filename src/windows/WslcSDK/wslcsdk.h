@@ -54,19 +54,19 @@ DECLARE_HANDLE(WslcProcess);
 
 typedef enum WslcContainerNetworkingMode
 {
-    WSLC_NetworkingModeNone = 0, // No networking / isolated
-    WSLC_NetworkingModeBridged,
+    WSLC_CONTAINER_NETWORKING_MODE_NONE = 0, // No networking / isolated
+    WSLC_CONTAINER_NETWORKING_MODE_BRIDGED = 1
 } WslcContainerNetworkingMode;
 
 typedef enum WslcVhdType
 {
-    WSLC_VHDTYPEDYNAMIC = 0, // Expanding VHDX (default)
-    WSLC_VHDTYPEFIXED,       // Fully allocated VHDX
+    WSLC_VHD_TYPE_DYNAMIC = 0, // Expanding VHDX (default)
+    WSLC_VHD_TYPE_FIXED = 1       // Fully allocated VHDX
 } WslcVhdType;
 
 typedef struct WslcVhdRequirements
 {
-    _In_ UINT64 sizeInBytes; // Desired size (for create/expand)
+    _In_ uint64_t sizeInBytes; // Desired size (for create/expand)
     _In_ WslcVhdType type;   // Dynamic / Fixed
 } WslcVhdRequirements;
 
@@ -83,7 +83,7 @@ typedef enum WslcSessionTerminationReason
     WSLC_SESSION_TERMINATION_REASON_CRASHED = 2,
 } WslcSessionTerminationReason;
 
-typedef __callback VOID(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
 
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
@@ -109,8 +109,8 @@ STDAPI WslcSessionRelease(_In_ WslcSession session);
 
 typedef enum WslcPortProtocol
 {
-    WSLC_PROTOCOL_TCP = 0,
-    WSLC_PROTOCOL_UDP = 1
+    WSLC_PORT_PROTOCOL_TCP = 0,
+    WSLC_PORT_PROTOCOL_UDP = 1
 } WslcPortProtocol;
 
 typedef struct WslcContainerPortMapping
@@ -160,11 +160,11 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags);
 
 STDAPI WslcContainerSettingsSetPortMapping(
-    _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ UINT32 portMappingCount);
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(portMappingCount) const WslcContainerPortMapping* portMappings, _In_ uint32_t portMappingCount);
 
 // Add the container volumes to the volumes array
 STDAPI WslcContainerSettingsAddVolume(
-    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ UINT32 volumeCount);
+    _In_ WslcContainerSettings* containerSettings, _In_reads_(volumeCount) const WslcContainerVolume* volumes, _In_ uint32_t volumeCount);
 
 STDAPI WslcContainerExec(_In_ WslcContainer container, _In_ WslcProcessSettings* newProcessSettings, _Out_ WslcProcess* newProcess);
 
@@ -226,8 +226,8 @@ STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _
 
 typedef enum WslcDeleteContainerFlags
 {
-    WSLC_DELETE_FLAG_NONE = 0,
-    WSLC_DELETE_FLAG_FORCE = 0x01
+    WSLC_DELETE_CONTAINER_FLAG_NONE = 0,
+    WSLC_DELETE_CONTAINER_FLAG_FORCE = 0x01
 } WslcDeleteContainerFlags;
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags);
@@ -272,12 +272,12 @@ STDAPI WslcProcessSettingsSetEnvVariables(_In_ WslcProcessSettings* processSetti
 //     WSLC's internal I/O processing.
 //   - The buffer is not null-terminated; it is a raw byte sequence.
 //
-typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ UINT32 dataSize, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcStdIOCallback)(_In_reads_bytes_(dataSize) const BYTE* data, _In_ uint32_t dataSize, _In_opt_ PVOID context);
 typedef enum WslcProcessIoHandle
 {
-    WSLC_STDIN = 0,
-    WSLC_STDOUT = 1,
-    WSLC_STDERR = 2
+    WSLC_PROCESS_IO_HANDLE_STDIN = 0,
+    WSLC_PROCESS_IO_HANDLE_STDOUT = 1,
+    WSLC_PROCESS_IO_HANDLE_STDERR = 2
 } WslcProcessIoHandle;
 
 // Pass in Null for WslcStdIOCallback to clear the callback for the given handle
@@ -286,7 +286,7 @@ STDAPI WslcProcessSettingsSetIoCallback(
 
 // PROCESS MANAGEMENT
 
-STDAPI WslcProcessGetPid(_In_ WslcProcess process, _Out_ UINT32* pid);
+STDAPI WslcProcessGetPid(_In_ WslcProcess process, _Out_ uint32_t* pid);
 
 STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent);
 
@@ -319,13 +319,13 @@ typedef struct WslcImageProgressDetail
 
 typedef enum WslcImageProgressStatus
 {
-    WSLC_IMAGE_PROGRESS_UNKNOWN = 0,
-    WSLC_IMAGE_PROGRESS_PULLING = 1,     // "Pulling fs layer"
-    WSLC_IMAGE_PROGRESS_WAITING = 2,     // "Waiting"
-    WSLC_IMAGE_PROGRESS_DOWNLOADING = 3, // "Downloading"
-    WSLC_IMAGE_PROGRESS_VERIFYING = 4,   // "Verifying Checksum"
-    WSLC_IMAGE_PROGRESS_EXTRACTING = 5,  // "Extracting"
-    WSLC_IMAGE_PROGRESS_COMPLETE = 6     // "Pull complete"
+    WSLC_IMAGE_PROGRESS_STATUS_UNKNOWN = 0,
+    WSLC_IMAGE_PROGRESS_STATUS_PULLING = 1,     // "Pulling fs layer"
+    WSLC_IMAGE_PROGRESS_STATUS_WAITING = 2,     // "Waiting"
+    WSLC_IMAGE_PROGRESS_STATUS_DOWNLOADING = 3, // "Downloading"
+    WSLC_IMAGE_PROGRESS_STATUS_VERIFYING = 4,   // "Verifying Checksum"
+    WSLC_IMAGE_PROGRESS_STATUS_EXTRACTING = 5,  // "Extracting"
+    WSLC_IMAGE_PROGRESS_STATUS_COMPLETE = 6     // "Pull complete"
 } WslcImageProgressStatus;
 
 typedef struct WslcImageProgressMessage
@@ -341,7 +341,7 @@ typedef struct WslcRegistryAuthenticationInformation
 } WslcRegistryAuthenticationInformation;
 
 // pointer-to-function typedef (unambiguous)
-typedef VOID(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
+typedef void(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
 // options struct typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
@@ -366,7 +366,7 @@ STDAPI WslcSessionImageImport(_In_ WslcSession session, _In_ const WslcImportIma
 typedef struct WslcLoadImageOptions
 {
     HANDLE ImageHandle;
-    UINT64 ContentLength;
+    uint64_t ContentLength;
     WslcContainerImageProgressCallback progressCallback;
     PVOID progressCallbackContext;
 } WslcLoadImageOptions;
@@ -378,10 +378,10 @@ typedef struct WslcImageInfo
     // we should expose this
     PCSTR repository; // e.g., "ubuntu"
     PCSTR tag;        // e.g., "22.04"
-    UINT8 sha256[32]; // image digest (raw bytes)
+    uint8_t sha256[32]; // image digest (raw bytes)
 
-    UINT64 sizeBytes;        // total size of the image
-    UINT64 createdTimestamp; // Unix epoch (seconds or ms)
+    uint64_t sizeBytes;        // total size of the image
+    uint64_t createdTimestamp; // Unix epoch (seconds or ms)
 } WslcImageInfo;
 
 STDAPI WslcSessionImageDelete(_In_ WslcSession session, _In_z_ PCSTR NameOrId);
@@ -411,7 +411,7 @@ STDAPI WslcSessionImageDelete(_In_ WslcSession session, _In_z_ PCSTR NameOrId);
 //   - The caller must pass non-null pointers for both 'images' and 'count'.
 //
 
-STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ UINT32* count);
+STDAPI WslcSessionImageList(_In_ WslcSession session, _Outptr_result_buffer_(*count) WslcImageInfo** images, _Out_ uint32_t* count);
 
 // STORAGE
 
@@ -421,23 +421,23 @@ STDAPI WslcSessionCreateVhd(_In_ WslcSession session, _In_ const WslcVhdRequirem
 
 typedef enum WslcComponentFlags
 {
-    WSLC_INSTALL_COMPONENT_NONE = 0,
-    WSLC_INSTALL_COMPONENT_VMPOC = 1,
-    WSLC_INSTALL_COMPONENT_WSL_OC = 2,
-    WSLC_INSTALL_COMPONENT_WSL_PACKAGE = 4,
+    WSLC_COMPONENT_FLAG_NONE = 0,
+    WSLC_COMPONENT_FLAG_VMPOC = 1,
+    WSLC_COMPONENT_FLAG_WSL_OC = 2,
+    WSLC_COMPONENT_FLAG_WSL_PACKAGE = 4,
 } WslcComponentFlags;
 
 STDAPI WslcCanRun(_Out_ BOOL* canRun, _Out_ WslcComponentFlags* missingComponents);
 
 typedef struct WslcVersion
 {
-    UINT32 major;
-    UINT32 minor;
-    UINT32 revision;
+    uint32_t major;
+    uint32_t minor;
+    uint32_t revision;
 } WslcVersion;
 STDAPI WslcGetVersion(_Out_writes_(1) WslcVersion* version);
 
-typedef __callback void(CALLBACK* WslcInstallCallback)(_In_ WslcComponentFlags component, _In_ UINT32 progress, _In_ UINT32 total, _In_opt_ PVOID context);
+typedef __callback void(CALLBACK* WslcInstallCallback)(_In_ WslcComponentFlags component, _In_ uint32_t progress, _In_ uint32_t total, _In_opt_ PVOID context);
 
 STDAPI WslcInstallWithDependencies(_In_opt_ WslcInstallCallback progressCallback, _In_opt_ PVOID context);
 
