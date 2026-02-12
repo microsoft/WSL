@@ -101,7 +101,7 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
     return E_NOTIMPL;
 }
 
-STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcSessionFlags flags)
+STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags)
 {
     UNREFERENCED_PARAMETER(flags);
     UNREFERENCED_PARAMETER(sessionSettings);
