@@ -51,7 +51,7 @@ typedef struct WslcProcessSettings
 } WslcProcessSettings;
 
 DECLARE_HANDLE(WslcProcess);
-//ToDO: fix all the enum values so the prefix matches the enum name. Ie: WSLC_ to Wslc
+
 typedef enum WslcContainerNetworkingMode
 {
     WSLC_NetworkingModeNone = 0, // No networking / isolated
