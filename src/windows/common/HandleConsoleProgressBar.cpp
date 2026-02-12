@@ -69,7 +69,7 @@ void HandleConsoleProgressBar::UpdateFileSize(HANDLE handle, ConsoleProgressIndi
 {
     try
     {
-        LONGLONG previousSize = -1;
+        LONGLONG previousSize = 0;
         while (!m_event.is_signaled())
         {
             LARGE_INTEGER size{};
