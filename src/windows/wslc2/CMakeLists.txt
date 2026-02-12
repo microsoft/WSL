@@ -10,7 +10,6 @@ set(HEADERS
     core/Errors.h
     core/Exceptions.h
     core/EnumVariantMap.h
-    core/StringUtilities.h
     arguments/ArgumentDefinitions.h
     arguments/ArgumentTypes.h
     arguments/Argument.h
@@ -32,7 +31,6 @@ set(HEADERS
 )
 
 set(SOURCES
-    core/StringUtilities.cpp
     core/Command.cpp
     core/CLIExecutionContext.cpp
     core/Core.cpp
