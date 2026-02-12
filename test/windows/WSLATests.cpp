@@ -1159,13 +1159,24 @@ class WSLATests
         {
             auto result = ExpectCommandResult(session.get(), {"/bin/grep", "-iF", "nameserver ", "/etc/resolv.conf"}, 0);
 
-            VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+            if (mode == WSLANetworkingModeNAT)
+            {
+                VERIFY_ARE_EQUAL(result.Output[1], std::format("nameserver {}\n", LX_INIT_DNS_TUNNELING_IP_ADDRESS));
+            }
+            else if (mode == WSLANetworkingModeVirtioProxy)
+            {
+                // For virtio proxy mode, the nameserver should be the eth0 default gateway address.
+                auto gateway =
+                    ExpectCommandResult(session.get(), {"/bin/sh", "-c", "ip -4 route show default dev eth0 | awk '{print $3}'"}, 0);
+
+                VERIFY_ARE_EQUAL(result.Output[1], "nameserver " + gateway.Output[1]);
+            }
         }
     }
 
     TEST_METHOD(NATNetworking)
     {
-        ValidateNetworking(WSLANetworkingModeNAT);
+        ValidateNetworking(WSLANetworkingModeNAT, false);
     }
 
     TEST_METHOD(NATNetworkingWithDnsTunneling)
@@ -1175,7 +1186,12 @@ class WSLATests
 
     TEST_METHOD(VirtioProxyNetworking)
     {
-        ValidateNetworking(WSLANetworkingModeVirtioProxy);
+        ValidateNetworking(WSLANetworkingModeVirtioProxy, false);
+    }
+
+    TEST_METHOD(VirtioProxyNetworkingWithDnsTunneling)
+    {
+        ValidateNetworking(WSLANetworkingModeVirtioProxy, true);
     }
 
     void WaitForOutput(HANDLE Handle, const char* Content)

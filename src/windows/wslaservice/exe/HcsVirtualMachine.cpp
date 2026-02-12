@@ -397,20 +397,15 @@ try
         return S_OK;
     }
 
+    // If DNS tunneling is requested, determine if it is supported by the host OS.
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+        FeatureEnabled(WslaFeatureFlagsDnsTunneling) && FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods()),
+        "DNS tunneling is not supported on this version of Windows");
+
     // Duplicate the socket handles - COM manages the lifetime of the marshalled handles,
     // so we need our own copies to take ownership.
     wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(helpers::DuplicateHandle(GnsSocket))};
-    wil::unique_socket dnsSocketHandle;
-    if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
-    {
-        THROW_HR_IF(E_INVALIDARG, DnsSocket == nullptr);
-        THROW_HR_IF_MSG(
-            E_NOTIMPL, m_networkingMode == WSLANetworkingModeVirtioProxy, "DNS tunneling not supported for VirtioProxy");
-
-        THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
-        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(helpers::DuplicateHandle(*DnsSocket)));
-    }
-
     if (m_networkingMode == WSLANetworkingModeNAT)
     {
         // TODO: refactor this to avoid using wsl config
@@ -420,13 +415,21 @@ try
             config.FirewallConfig.reset();
         }
 
-        // Enable DNS tunneling if a DNS socket was provided
+        // Enable DNS tunneling if requested
+        wil::unique_socket dnsSocketHandle;
         if (FeatureEnabled(WslaFeatureFlagsDnsTunneling))
         {
+            THROW_HR_IF(E_INVALIDARG, DnsSocket == nullptr);
+
+            dnsSocketHandle.reset(reinterpret_cast<SOCKET>(helpers::DuplicateHandle(*DnsSocket)));
             config.EnableDnsTunneling = true;
             in_addr address{};
             WI_VERIFY(inet_pton(AF_INET, LX_INIT_DNS_TUNNELING_IP_ADDRESS, &address) == 1);
             config.DnsTunnelingIpAddress = address.S_un.S_addr;
+        }
+        else
+        {
+            THROW_HR_IF(E_INVALIDARG, DnsSocket != nullptr);
         }
 
         m_networkEngine = std::make_unique<wsl::core::NatNetworking>(
@@ -439,8 +442,13 @@ try
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
+        THROW_HR_IF_MSG(E_INVALIDARG, DnsSocket != nullptr, "DNS socket should not be provided with virtio proxy networking mode");
+
+        auto flags = wsl::core::VirtioNetworkingFlags::None;
+        WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::DnsTunneling, FeatureEnabled(WslaFeatureFlagsDnsTunneling));
+
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), false, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
     else
     {
