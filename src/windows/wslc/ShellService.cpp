@@ -20,7 +20,7 @@ namespace wsl::windows::wslc::services {
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 
-int ShellService::Attach(std::wstring sessionName)
+int ShellService::Attach(const std::wstring& sessionName)
 {
     THROW_HR_IF(E_INVALIDARG, sessionName.empty());
 

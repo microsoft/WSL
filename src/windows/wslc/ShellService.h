@@ -27,7 +27,7 @@ struct SessionInformation
 class ShellService
 {
 public:
-    int Attach(std::wstring name);
+    int Attach(const std::wstring& name);
     std::vector<SessionInformation> List();
 };
 } // namespace wsl::windows::wslc::services
