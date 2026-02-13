@@ -846,7 +846,7 @@ CATCH_RETURN();
 HRESULT WSLASession::Terminate()
 try
 {
-    // m_sessionTerminatingEvent is always valid, so it can be signalled with the lock.
+    // m_sessionTerminatingEvent is always valid, so it can be signalled without the lock.
     // This allows a session to be unblocked if a stuck operation is holding the lock.
     m_sessionTerminatingEvent.SetEvent();
 
@@ -958,10 +958,22 @@ HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
     return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
 }
 
-void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
+std::unique_ptr<WSLAContainerImpl> WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
     std::lock_guard lock{m_lock};
-    WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.get() == Container; }) == 1);
+    auto it =
+        std::find_if(m_containers.begin(), m_containers.end(), [Container](const auto& e) { return e.get() == Container; });
+
+    WI_ASSERT(it != m_containers.end());
+
+    auto removed = std::move(*it);
+    m_containers.erase(it);
+
+    // Return ownership to the caller. The caller is responsible for destroying the container
+    // outside COMImplClass::m_lock, so the destruction chain (~WSLAContainerImpl ->
+    // ~ContainerTrackingReference -> UnregisterContainerStateUpdates) can freely acquire
+    // ContainerEventTracker::m_lock without a lock ordering inversion.
+    return removed;
 }
 
 HRESULT WSLASession::GetState(_Out_ WSLASessionState* State)

@@ -89,7 +89,7 @@ private:
 
     void ConfigureStorage(const WSLA_SESSION_INIT_SETTINGS& Settings, PSID UserSid);
     void Ext4Format(const std::string& Device);
-    void OnContainerDeleted(const WSLAContainerImpl* Container);
+    std::unique_ptr<WSLAContainerImpl> OnContainerDeleted(const WSLAContainerImpl* Container);
     void OnDockerdLog(const gsl::span<char>& Data);
     void OnDockerdExited();
     void StartDockerd();
