@@ -28,8 +28,8 @@ parameters:
   - name: targets
     type: object
     default:
-      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslaclient;wslaservice;wslaserviceproxystub;wsladiag;wslc;wsltests"
-        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslaclient.dll,wslaservice.exe,wslaserviceproxystub.dll,wsladiag.exe,wslc.exe"
+      - target: "wsl;libwsl;wslg;wslservice;wslhost;wslrelay;wslinstaller;wslinstall;wslserviceproxystub;wslsettings;wslinstallerproxystub;testplugin;wslaservice;wslaserviceproxystub;wsladiag;wslc;wsltests"
+        pattern: "wsl.exe,libwsl.dll,wslg.exe,wslservice.exe,wslhost.exe,wslrelay.exe,wslinstaller.exe,wslinstall.dll,wslserviceproxystub.dll,wslsettings/wslsettings.dll,wslsettings/wslsettings.exe,wslinstallerproxystub.dll,wsldevicehost.dll,WSLDVCPlugin.dll,testplugin.dll,wsldeps.dll,wslaservice.exe,wslaserviceproxystub.dll,wsladiag.exe,wslc.exe"
       - target: "msixgluepackage"
         pattern: "gluepackage.msix"
       - target: "msipackage"
@@ -393,7 +393,6 @@ stages:
 
                 Move-Item -Path "bin\$arch\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\wsltests.dll"
                 Move-Item -Path "bin\$arch\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\testplugin.dll"
-                Move-Item -Path "bin\$arch\release\wslaclient.dll" -Destination "$(ob_outputDirectory)\testbin\$arch\release\wslaclient.dll"
                 Move-Item -Path "packages\Microsoft.Taef.$taefVersion\build\Binaries\$arch" -Destination "$(ob_outputDirectory)\testbin\$arch\release\taef"
               }
 
