@@ -1,4 +1,4 @@
-set(NUGET_PACKAGES Microsoft.WSL.PluginApi.nuspec Microsoft.WSL.Api.nuspec)
+set(NUGET_PACKAGES Microsoft.WSL.PluginApi.nuspec)
 
 # generate vars with native paths since nuget won't accept unix path separators
 cmake_path(NATIVE_PATH CMAKE_SOURCE_DIR CMAKE_SOURCE_DIR_NATIVE)
