@@ -1,6 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
 
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ArgumentTypes.h
+
+Abstract:
+
+    Declaration of the ArgumentTypes, which includes all ArgTypes and their properties.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "EnumVariantMap.h"

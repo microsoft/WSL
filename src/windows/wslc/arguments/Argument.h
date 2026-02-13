@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Argument.h
+
+Abstract:
+
+    Declaration of the Argument class for command-line argument handling.
+
+--*/
 #pragma once
 #include "ArgumentTypes.h"
 

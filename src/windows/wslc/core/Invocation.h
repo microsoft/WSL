@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Invocation.h
+
+Abstract:
+
+    Header file for walking through and processing a command line invocation.
+
+--*/
 #pragma once
 #include <map>
 #include <string>

@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    pch.h
+
+Abstract:
+
+    Base header for the CLI.
+
+--*/
 #pragma once
 #include "precomp.h"
 #include <windows.h>

@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Argument.cpp
+
+Abstract:
+
+    Implementation of the Argument class.
+
+--*/
 #include "Argument.h"
 #include "Command.h"
 #include "Exceptions.h"

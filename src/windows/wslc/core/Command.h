@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Command.h
+
+Abstract:
+
+    Declaration of command class.
+
+--*/
 #pragma once
 #include "precomp.h"
 #include "Argument.h"

@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Core.cpp
+
+Abstract:
+
+    Core CLI initialization and entry point.
+
+--*/
 #include "pch.h"
 #include "Errors.h"
 #include "CLIExecutionContext.h"

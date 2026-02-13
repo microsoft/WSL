@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Errors.h
+
+Abstract:
+
+    Header file for Errors.
+
+--*/
 #pragma once
 #include <windows.h>
 

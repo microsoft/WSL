@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    EnumVariantMap.h
+
+Abstract:
+
+    Template for enum-based variant maps.
+
+--*/
 #pragma once
 #include <functional>
 #include <initializer_list>
