@@ -26,8 +26,8 @@ set_source_files_properties(${WSLC_TEST_SOURCES}
 target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/test
     ${CMAKE_SOURCE_DIR}/test/windows
-    ${CMAKE_SOURCE_DIR}/src/windows/wslc2/core
-    ${CMAKE_SOURCE_DIR}/src/windows/wslc2/commands
-    ${CMAKE_SOURCE_DIR}/src/windows/wslc2/arguments
-    ${CMAKE_SOURCE_DIR}/src/windows/wslc2/tasks
+    ${CMAKE_SOURCE_DIR}/src/windows/wslc/core
+    ${CMAKE_SOURCE_DIR}/src/windows/wslc/commands
+    ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments
+    ${CMAKE_SOURCE_DIR}/src/windows/wslc/tasks
 )

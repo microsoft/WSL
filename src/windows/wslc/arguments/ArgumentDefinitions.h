@@ -9,11 +9,14 @@
 // but not all arguments need to be used by all commands, and additional properties of the arguments can be set in the command's
 // GetArguments function when creating the Argument with Argument::Create.
 
-// The Kind determines the data type automatically:
+// The Kind determines the data type:
 // - Kind::Flag       -> bool
 // - Kind::Value      -> std::wstring
 // - Kind::Positional -> std::wstring
 // - Kind::Forward    -> std::vector<std::wstring>
+
+// No other files other than ArgumentValidation need to be changed when adding a new argument, and that is only
+// if you wish to add validation for the new argument or have it use existing validation.
 
 // X-Macro for defining all arguments in one place
 // Format: ARGUMENT(EnumName, Name, Alias, Kind, Desc)

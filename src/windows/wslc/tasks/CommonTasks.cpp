@@ -6,9 +6,10 @@
 #include "TaskBase.h"
 #include "CommonTasks.h"
 
-
 using namespace wsl::windows::common;
 using namespace wsl::windows::wslc::execution;
+
+using namespace wsl::shared;
 
 namespace wsl::windows::wslc::task
 {
