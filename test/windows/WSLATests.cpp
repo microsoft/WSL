@@ -959,7 +959,7 @@ class WSLATests
 
         // Negative test: Null options pointer.
         {
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(nullptr));
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->TagImage(nullptr));
         }
 
         // Negative test: Null Image field.

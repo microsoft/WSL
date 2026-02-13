@@ -172,7 +172,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::ImportIm
 
 void DockerHTTPClient::TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag)
 {
-    auto url = URL::Create("/images/{}", Id);
+    auto url = URL::Create("/images/{}/tag", Id);
     url.SetParameter("repo", Repo);
     url.SetParameter("tag", Tag);
 
