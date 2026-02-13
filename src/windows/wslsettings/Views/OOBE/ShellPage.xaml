@@ -112,11 +112,11 @@
                         <BitmapIcon ShowAsMonochrome="False" UriSource="/Assets/SettingsOOBEVSCodeIcon.png" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-				<NavigationViewItem x:Uid="Settings_Shell_VSIntegration" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.OOBE.VSIntegrationViewModel">
-					<NavigationViewItem.Icon>
-						<BitmapIcon ShowAsMonochrome="False" UriSource="/Assets/SettingsOOBEVSIcon.png" />
-					</NavigationViewItem.Icon>
-				</NavigationViewItem>
+                <NavigationViewItem x:Uid="Settings_Shell_VSIntegration" helpers:NavigationHelper.NavigateTo="WslSettings.ViewModels.OOBE.VSIntegrationViewModel">
+                    <NavigationViewItem.Icon>
+                        <BitmapIcon ShowAsMonochrome="False" UriSource="/Assets/SettingsOOBEVSIcon.png" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
                 <!--
