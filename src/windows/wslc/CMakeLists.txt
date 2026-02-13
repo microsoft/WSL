@@ -21,13 +21,7 @@ set(HEADERS
     core/Invocation.h
     commands/RootCommand.h
     commands/DiagCommand.h
-    commands/ContainerCommand.h
-    commands/ImageCommand.h
-    commands/RegistryCommand.h
-    commands/SessionCommand.h
-    commands/VolumeCommand.h
     tasks/TaskBase.h
-    tasks/CommonTasks.h
     tasks/DiagTasks.h
 )
 
@@ -39,42 +33,10 @@ set(SOURCES
     arguments/Argument.cpp
     arguments/ArgumentParser.cpp
     arguments/ArgumentValidation.cpp
-    arguments/ContainerArgumentValidation.cpp
     commands/RootCommand.cpp
     commands/DiagCommand.cpp
     commands/DiagListCommand.cpp
-    commands/ContainerCommand.cpp
-    commands/ContainerCreateCommand.cpp
-    commands/ContainerDeleteCommand.cpp
-    commands/ContainerExecCommand.cpp
-    commands/ContainerInspectCommand.cpp
-    commands/ContainerKillCommand.cpp
-    commands/ContainerListCommand.cpp
-    commands/ContainerRunCommand.cpp
-    commands/ContainerStartCommand.cpp
-    commands/ContainerStopCommand.cpp
-    commands/ImageCommand.cpp
-    commands/ImageInspectCommand.cpp
-    commands/ImageListCommand.cpp
-    commands/ImageLoadCommand.cpp
-    commands/ImagePruneCommand.cpp
-    commands/ImagePullCommand.cpp
-    commands/ImagePushCommand.cpp
-    commands/ImageSaveCommand.cpp
-    commands/ImageTagCommand.cpp
-    commands/RegistryCommand.cpp
-    commands/RegistryLoginCommand.cpp
-    commands/RegistryLogoutCommand.cpp
-    commands/SessionCommand.cpp
-    commands/SessionListCommand.cpp
-    commands/VolumeCommand.cpp
-    commands/VolumeCreateCommand.cpp
-    commands/VolumeDeleteCommand.cpp
-    commands/VolumeInspectCommand.cpp
-    commands/VolumeListCommand.cpp
-    commands/VolumePruneCommand.cpp
     tasks/TaskBase.cpp
-    tasks/CommonTasks.cpp
     tasks/DiagTasks.cpp
 )
 

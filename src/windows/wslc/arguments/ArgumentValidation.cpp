@@ -17,7 +17,7 @@ namespace wsl::windows::wslc
     // maintained separately.
     namespace validation
     {
-        void ValidatePublish([[maybe_unused]]const ArgType argType, const ArgMap& execArgs);
+        ////void ValidatePublish([[maybe_unused]]const ArgType argType, const ArgMap& execArgs);
     }
 
     // Any ArgType specific validation is defined in this dispatcher.
@@ -30,6 +30,7 @@ namespace wsl::windows::wslc
     // the validation of either argument.
     void Argument::Validate(const ArgMap& execArgs) const
     {
+        /* Commenting out ArgType validation flow for initial checkin 
         switch (m_argType)
         {
             case ArgType::Publish:
@@ -39,5 +40,6 @@ namespace wsl::windows::wslc
             default:
                 break;
         }
+        */
     }
 }

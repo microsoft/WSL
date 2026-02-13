@@ -4,7 +4,7 @@
 #include "pch.h"
 #include "CLIExecutionContext.h"
 #include "TaskBase.h"
-#include "CommonTasks.h"
+#include "DiagTasks.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common;

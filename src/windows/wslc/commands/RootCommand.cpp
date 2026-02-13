@@ -6,11 +6,6 @@
 #include "TaskBase.h"
 
 // Include all commands that parent to the root. 
-#include "ContainerCommand.h"
-#include "ImageCommand.h"
-#include "RegistryCommand.h"
-#include "SessionCommand.h"
-#include "VolumeCommand.h"
 #include "DiagCommand.h"
 
 using namespace wsl::shared;
@@ -22,21 +17,8 @@ namespace wsl::windows::wslc
     std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
     {
         return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-            std::make_unique<ContainerCommand>(FullName()),
-            std::make_unique<ImageCommand>(FullName()),
-            std::make_unique<RegistryCommand>(FullName()),
-            std::make_unique<SessionCommand>(FullName()),
-            std::make_unique<VolumeCommand>(FullName()),
             std::make_unique<DiagCommand>(FullName()),
-            std::make_unique<ContainerCreateCommand>(FullName()),
-            std::make_unique<ContainerDeleteCommand>(FullName()),
-            std::make_unique<ContainerExecCommand>(FullName()),
-            std::make_unique<ContainerInspectCommand>(FullName()),
-            std::make_unique<ContainerKillCommand>(FullName()),
-            std::make_unique<ContainerListCommand>(FullName()),
-            std::make_unique<ContainerRunCommand>(FullName()),
-            std::make_unique<ContainerStartCommand>(FullName()),
-            std::make_unique<ContainerStopCommand>(FullName()),
+            std::make_unique<DiagListCommand>(FullName()),
         });
     }
 

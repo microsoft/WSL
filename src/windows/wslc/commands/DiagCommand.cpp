@@ -5,7 +5,6 @@
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "DiagCommand.h"
-#include "CommonTasks.h"
 #include "TaskBase.h"
 
 using namespace wsl::windows::common::wslutil;
@@ -39,6 +38,6 @@ namespace wsl::windows::wslc
 
     void DiagCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
-        PrintMessage(L"Diag base command executing..", stdout);
+        OutputHelp();
     }
 }
