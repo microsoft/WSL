@@ -22,7 +22,7 @@ foreach(binary ${WINDOWS_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${PACKAGE_INPUT_DIR}/${binary}")
 endforeach()
 
-set(LINUX_BINARIES init;initrd.img)
+set(LINUX_BINARIES init)
 foreach(binary ${LINUX_BINARIES})
     list(APPEND BINARIES_DEPENDENCIES "${BIN}/${binary}")
 endforeach()
