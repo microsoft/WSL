@@ -230,7 +230,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
     pollDescriptors[1].events = POLLIN;
 
     std::vector<gsl::byte> relayBuffer;
-
     while (true)
     {
         auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
