@@ -70,15 +70,13 @@ static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, std::vector<con
 }
 
 static wsl::windows::common::RunningWSLAContainer CreateInternal(
-    Session& session,
-    const std::string& image,
-    const ContainerCreateOptions& options,
-    IProgressCallback* callback)
+    Session& session, const std::string& image, const ContainerCreateOptions& options, IProgressCallback* callback)
 {
     auto processFlags = WSLAProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
     WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
-    wsl::windows::common::WSLAContainerLauncher containerLauncher(image, options.Name, options.Arguments, {}, WSLA_CONTAINER_NETWORK_HOST, processFlags);
+    wsl::windows::common::WSLAContainerLauncher containerLauncher(
+        image, options.Name, options.Arguments, {}, WSLA_CONTAINER_NETWORK_HOST, processFlags);
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
@@ -104,7 +102,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerR
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions, callback);
     runningContainer.SetDeleteOnClose(false);
-    auto &container = runningContainer.Get();
+    auto& container = runningContainer.Get();
 
     // Start the created container
     WSLAContainerStartFlags startFlags{};
