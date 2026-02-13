@@ -18,14 +18,11 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
-#include "WSLAApi.h"
 
 using namespace wsl::windows::common::registry;
 
 extern std::wstring g_dumpFolder;
 static std::wstring g_pipelineBuildId;
-
-DEFINE_ENUM_FLAG_OPERATORS(WslInstallComponent);
 
 class InstallerTests
 {
@@ -1092,6 +1089,8 @@ class InstallerTests
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
     }
 
+    /*
+     TODO: Uncomment when the functionalily is implemented in the SDK.
     TEST_METHOD(WSLAInstall)
     {
         auto expectComponents = [](WslInstallComponent expected) {
@@ -1179,4 +1178,5 @@ class InstallerTests
         VERIFY_ARE_EQUAL(WslInstallComponents(components, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
         VERIFY_ARE_EQUAL(progressedComponents, expectedComponents);
     }
+    */
 };
