@@ -42,31 +42,30 @@ set(SOURCES
 
 # Object library for WSLC components.
 # Used to build the executable and also unit testing components.
-add_library(wslc OBJECT ${SOURCES} ${HEADERS})
-set_target_properties(wslc PROPERTIES FOLDER windows)
-target_include_directories(wslc PUBLIC
+add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
+set_target_properties(wslclib PROPERTIES FOLDER windows)
+target_include_directories(wslclib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/arguments
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
 )
-target_precompile_headers(wslc REUSE_FROM common)
-target_link_libraries(wslc
+target_precompile_headers(wslclib REUSE_FROM common)
+target_link_libraries(wslclib
     PRIVATE
     ${COMMON_LINK_LIBRARIES}
     common
 )
 
-# The WSLC executable
-add_executable(wslccli $<TARGET_OBJECTS:wslc>)
-target_link_libraries(wslccli
+# Create wslc.exe
+add_executable(wslc $<TARGET_OBJECTS:wslclib>)
+target_link_libraries(wslc
     PRIVATE
     ${COMMON_LINK_LIBRARIES}
     common
 )
-set_target_properties(wslccli PROPERTIES FOLDER windows)
-set_target_properties(wslccli PROPERTIES OUTPUT_NAME "wslc")
+set_target_properties(wslc PROPERTIES FOLDER windows)
 
 # For prettier source tree browsing
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})
