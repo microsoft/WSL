@@ -64,7 +64,6 @@ private:
     std::wstring m_trackedDeviceOptions;
     std::wstring m_trackedDefaultRoute;
     networking::DnsInfo m_trackedDnsSettings{};
-    networking::EndpointIpAddress m_trackedIpAddress{};
 
     // Note: this field must be destroyed first to stop the callbacks before any other field is destroyed.
     networking::unique_notify_handle m_networkNotifyHandle;
