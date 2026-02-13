@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    DiagCommand.h
+
+Abstract:
+
+    Declaration of DiagCommand command tree.
+
+--*/
 #pragma once
 #include "Command.h"
 

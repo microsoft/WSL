@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Command.cpp
+
+Abstract:
+
+    Implementation of command execution logic.
+
+--*/
 #include "pch.h"
 #include "Argument.h"
 #include "Command.h"

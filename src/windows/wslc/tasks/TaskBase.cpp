@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    TaskBase.cpp
+
+Abstract:
+
+    Implementation of task execution logic.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "TaskBase.h"

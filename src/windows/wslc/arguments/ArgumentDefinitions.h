@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ArgumentDefinitions.h
+
+Abstract:
+
+    Declaration of the available Arguments with their base properties.
+
+--*/
 #pragma once
 
 // Here is where base argument types are defined, with their name, alias, kind, and default description.

@@ -1,6 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
 
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    CLIExecutionContext.h
+
+Abstract:
+
+    Declaration of CLI execution context.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "Errors.h"

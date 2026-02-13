@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ArgumentValidation.cpp
+
+Abstract:
+
+    Implementation of the Argument Validation dispatcher.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "Argument.h"

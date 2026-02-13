@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ArgumentParser.cpp
+
+Abstract:
+
+    Implementation of the ArgumentParser class.
+
+--*/
 #include "pch.h"
 #include "ArgumentParser.h"
 #include "Localization.h"

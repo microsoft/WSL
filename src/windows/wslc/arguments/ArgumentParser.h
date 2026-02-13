@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ArgumentParser.h
+
+Abstract:
+
+    Declaration of the ArgumentParser class for command-line argument parsing.
+
+--*/
 #pragma once
 #include "Argument.h"
 #include "Exceptions.h"

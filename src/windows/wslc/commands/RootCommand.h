@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    RootCommand.h
+
+Abstract:
+
+    Declaration of the RootCommand, which is the root of all commands in the CLI.
+
+--*/
 #pragma once
 #include "Command.h"
 

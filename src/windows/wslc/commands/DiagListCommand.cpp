@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    DiagListCommand.cpp
+
+Abstract:
+
+    Implementation of the diag list command.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"

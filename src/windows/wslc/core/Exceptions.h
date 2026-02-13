@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Exceptions.h
+
+Abstract:
+
+    Header file for Exceptions.
+
+--*/
 #pragma once
 #include "pch.h"
 

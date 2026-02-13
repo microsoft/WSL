@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ExecutionContextData.h
+
+Abstract:
+
+    Header file for defining execution context data mappings.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "EnumVariantMap.h"

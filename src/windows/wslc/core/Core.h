@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    Core.h
+
+Abstract:
+
+    Header file for Core.
+
+--*/
 #include "pch.h"
 
 namespace wsl::windows::wslc
