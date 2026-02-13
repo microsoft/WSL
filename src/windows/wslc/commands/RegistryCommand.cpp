@@ -26,10 +26,11 @@ namespace wsl::windows::wslc {
 // Registry Root Command
 std::vector<std::unique_ptr<Command>> RegistryCommand::GetCommands() const
 {
-    return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-        std::make_unique<RegistryLoginCommand>(FullName()),
-        std::make_unique<RegistryLogoutCommand>(FullName()),
-    });
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.reserve(2);
+    commands.push_back(std::make_unique<RegistryLoginCommand>(FullName()));
+    commands.push_back(std::make_unique<RegistryLogoutCommand>(FullName()));
+    return commands;
 }
 
 std::vector<Argument> RegistryCommand::GetArguments() const

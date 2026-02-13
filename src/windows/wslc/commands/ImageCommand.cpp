@@ -26,16 +26,17 @@ namespace wsl::windows::wslc {
 // Image Root Command
 std::vector<std::unique_ptr<Command>> ImageCommand::GetCommands() const
 {
-    return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-        std::make_unique<ImageInspectCommand>(FullName()),
-        std::make_unique<ImageListCommand>(FullName()),
-        std::make_unique<ImageLoadCommand>(FullName()),
-        std::make_unique<ImagePullCommand>(FullName()),
-        std::make_unique<ImagePushCommand>(FullName()),
-        std::make_unique<ImagePruneCommand>(FullName()),
-        std::make_unique<ImageSaveCommand>(FullName()),
-        std::make_unique<ImageTagCommand>(FullName()),
-    });
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.reserve(8);
+    commands.push_back(std::make_unique<ImageInspectCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageListCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageLoadCommand>(FullName()));
+    commands.push_back(std::make_unique<ImagePullCommand>(FullName()));
+    commands.push_back(std::make_unique<ImagePushCommand>(FullName()));
+    commands.push_back(std::make_unique<ImagePruneCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageSaveCommand>(FullName()));
+    commands.push_back(std::make_unique<ImageTagCommand>(FullName()));
+    return commands;
 }
 
 std::vector<Argument> ImageCommand::GetArguments() const

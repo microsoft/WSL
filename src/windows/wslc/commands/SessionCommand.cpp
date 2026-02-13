@@ -26,9 +26,10 @@ namespace wsl::windows::wslc {
 // Session Root Command
 std::vector<std::unique_ptr<Command>> SessionCommand::GetCommands() const
 {
-    return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-        std::make_unique<SessionListCommand>(FullName()),
-    });
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.reserve(1);
+    commands.push_back(std::make_unique<SessionListCommand>(FullName()));
+    return commands;
 }
 
 std::vector<Argument> SessionCommand::GetArguments() const

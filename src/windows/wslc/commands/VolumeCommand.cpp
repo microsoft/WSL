@@ -26,13 +26,14 @@ namespace wsl::windows::wslc {
 // Volume Root Command
 std::vector<std::unique_ptr<Command>> VolumeCommand::GetCommands() const
 {
-    return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-        std::make_unique<VolumeCreateCommand>(FullName()),
-        std::make_unique<VolumeDeleteCommand>(FullName()),
-        std::make_unique<VolumeInspectCommand>(FullName()),
-        std::make_unique<VolumeListCommand>(FullName()),
-        std::make_unique<VolumePruneCommand>(FullName()),
-    });
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.reserve(5);
+    commands.push_back(std::make_unique<VolumeCreateCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumeDeleteCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumeInspectCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumeListCommand>(FullName()));
+    commands.push_back(std::make_unique<VolumePruneCommand>(FullName()));
+    return commands;
 }
 
 std::vector<Argument> VolumeCommand::GetArguments() const
