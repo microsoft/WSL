@@ -1134,8 +1134,6 @@ CATCH_RETURN();
 
 void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
 {
-    COMServiceExecutionContext context;
-
     std::lock_guard lock(m_lock);
 
     if (m_labels.empty())
@@ -1184,5 +1182,5 @@ CATCH_RETURN();
 
 HRESULT WSLAContainer::InterfaceSupportsErrorInfo(REFIID riid)
 {
-    return riid == __uuidof(WSLAContainer) ? S_OK : S_FALSE;
+    return riid == __uuidof(IWSLAContainer) ? S_OK : S_FALSE;
 }

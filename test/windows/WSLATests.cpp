@@ -1753,6 +1753,9 @@ class WSLATests
             auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            // Validate that GetInitProcess fails with the process argument is null.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().GetInitProcess(nullptr));
         }
 
         // Validate that env is correctly wired.
