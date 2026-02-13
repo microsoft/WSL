@@ -64,7 +64,8 @@ static_assert(
     __alignof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
 
-static_assert(std::is_trivial_v<WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
+static_assert(
+    std::is_trivial_v<WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
 
 WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* GetInternalType(WslcProcessSettings* settings);
 
@@ -126,8 +127,5 @@ WslcProcessImpl* GetInternalType(WslcProcess handle);
 // Converts to a unique_ptr of the internal type and returns an error on null input.
 // Use for Release functions to clean up the implementation object on return.
 #define WSLC_GET_INTERNAL_TYPE_FOR_RELEASE(_input_) \
-    std::unique_ptr<std::remove_pointer_t<decltype(GetInternalType(_input_))>> \
-    { \
-        GetInternalType(_input_) \
-    }; \
+    std::unique_ptr<std::remove_pointer_t<decltype(GetInternalType(_input_))>>{GetInternalType(_input_)}; \
     RETURN_HR_IF_NULL(E_POINTER, _input_)\
