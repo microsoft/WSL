@@ -19,7 +19,6 @@ parameters:
     type: object
     default:
       - Microsoft.WSL.PluginApi.nuspec
-      - Microsoft.WSL.Api.nuspec
 
   - name: traceLoggingConfig
     type: string
