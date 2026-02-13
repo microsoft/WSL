@@ -18,14 +18,11 @@ Abstract:
 #include "Common.h"
 #include "registry.hpp"
 #include "PluginTests.h"
-#include "WSLAApi.h"
 
 using namespace wsl::windows::common::registry;
 
 extern std::wstring g_dumpFolder;
 static std::wstring g_pipelineBuildId;
-
-DEFINE_ENUM_FLAG_OPERATORS(WslInstallComponent);
 
 class InstallerTests
 {
@@ -1092,6 +1089,8 @@ class InstallerTests
         VerifyWslSettingsProtocolAssociationExistsWithRetry();
     }
 
+    /*
+     TODO: Uncomment when the functionality is implemented in the SDK.
     TEST_METHOD(WSLAInstall)
     {
         auto expectComponents = [](WslInstallComponent expected) {
@@ -1140,12 +1139,12 @@ class InstallerTests
             expectComponents(WslInstallComponentNone);
 
             progressedComponents = WslInstallComponentNone;
-            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentVMPOC, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
-            VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentVMPOC);
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentVMPOC, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentVMPOC);
 
             progressedComponents = WslInstallComponentNone;
-            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslOC, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
-            VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslOC);
+            VERIFY_ARE_EQUAL(WslInstallComponents(WslInstallComponentWslOC, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, WslInstallComponentWslOC);
         }
 
         {
@@ -1176,7 +1175,8 @@ class InstallerTests
             *reinterpret_cast<WslInstallComponent*>(Context) |= Component;
         };
 
-        VERIFY_ARE_EQUAL(WslInstallComponents(components, callback, &progressedComponents), HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED));
-        VERIFY_ARE_EQUAL(progressedComponents, expectedComponents);
+        VERIFY_ARE_EQUAL(WslInstallComponents(components, callback, &progressedComponents),
+    HRESULT_FROM_WIN32(ERROR_SUCCESS_REBOOT_REQUIRED)); VERIFY_ARE_EQUAL(progressedComponents, expectedComponents);
     }
+    */
 };
