@@ -25,18 +25,6 @@ using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
 
-static std::string GetContainerName(const std::string& name)
-{
-    if (!name.empty())
-    {
-        return name;
-    }
-
-    GUID guid;
-    THROW_IF_FAILED(CoCreateGuid(&guid));
-    return wsl::shared::string::GuidToString<char>(guid, wsl::shared::string::GuidToStringFlags::None);
-}
-
 static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
 {
     if (!WI_IsFlagSet(options.Flags, WSLAProcessFlagsTty))
@@ -81,33 +69,29 @@ static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, std::vector<con
     options.CommandLine = {.Values = argsStorage.data(), .Count = static_cast<ULONG>(argsStorage.size())};
 }
 
-static void CreateInternal(
+static wsl::windows::common::RunningWSLAContainer CreateInternal(
     Session& session,
-    IWSLAContainer** container,
-    WSLA_CONTAINER_OPTIONS& containerOptions,
     const std::string& image,
     const ContainerCreateOptions& options,
     IProgressCallback* callback)
 {
-    auto containerName = GetContainerName(options.Name);
-    WI_SetFlagIf(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsStdin, options.Interactive);
-    WI_SetFlagIf(containerOptions.InitProcessOptions.Flags, WSLAProcessFlagsTty, options.TTY);
-    containerOptions.Name = containerName.c_str();
-    containerOptions.Image = image.c_str();
-    auto argsStorage = wsl::shared::string::StringPointersFromArray(options.Arguments, false);
-    SetContainerTTYOptions(containerOptions.InitProcessOptions);
-    SetContainerArguments(containerOptions.InitProcessOptions, argsStorage);
-
-    auto result = session.Get()->CreateContainer(&containerOptions, container);
+    auto processFlags = WSLAProcessFlagsNone;
+    WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
+    WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
+    wsl::windows::common::WSLAContainerLauncher containerLauncher(image, options.Name, options.Arguments, {}, WSLA_CONTAINER_NETWORK_HOST, processFlags);
+    auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
-        PrintMessage(L"Image '%hs' not found, pulling", stderr, containerOptions.Image);
+        PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
         ImageService imageService;
         imageService.Pull(session, image, callback);
-        result = session.Get()->CreateContainer(&containerOptions, container);
+        auto [retryResult, _] = containerLauncher.CreateNoThrow(*session.Get());
+        result = retryResult;
     }
 
     THROW_IF_FAILED(result);
+    ASSERT(runningContainer);
+    return std::move(*runningContainer);
 }
 
 static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone, ULONG timeout = -1)
@@ -118,39 +102,35 @@ static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone,
 int ContainerService::Run(Session& session, const std::string& image, ContainerRunOptions runOptions, IProgressCallback* callback)
 {
     // Create the container
-    wil::com_ptr<IWSLAContainer> container;
-    WSLA_CONTAINER_OPTIONS containerOptions{};
-    CreateInternal(session, &container, containerOptions, image, runOptions, callback);
+    auto runningContainer = CreateInternal(session, image, runOptions, callback);
+    runningContainer.SetDeleteOnClose(false);
+    auto &container = runningContainer.Get();
 
     // Start the created container
     WSLAContainerStartFlags startFlags{};
     WI_SetFlagIf(startFlags, WSLAContainerStartFlagsAttach, !runOptions.Detach);
-    THROW_IF_FAILED(container->Start(startFlags)); // TODO: Error message
+    THROW_IF_FAILED(container.Start(startFlags)); // TODO: Error message
 
     // Handle attach if requested
     if (WI_IsFlagSet(startFlags, WSLAContainerStartFlagsAttach))
     {
-        wil::com_ptr<IWSLAProcess> process;
-        THROW_IF_FAILED(container->GetInitProcess(&process));
-
         ConsoleService consoleService;
-        return consoleService.AttachToCurrentConsole(
-            ClientRunningWSLAProcess(std::move(process), containerOptions.InitProcessOptions.Flags));
+        return consoleService.AttachToCurrentConsole(runningContainer.GetInitProcess());
     }
 
     WSLAContainerId containerId{};
-    THROW_IF_FAILED(container->GetId(containerId));
+    THROW_IF_FAILED(container.GetId(containerId));
     PrintMessage(L"%hs", stdout, containerId);
     return 0;
 }
 
 CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerCreateOptions runOptions, IProgressCallback* callback)
 {
-    wil::com_ptr<IWSLAContainer> container;
-    WSLA_CONTAINER_OPTIONS containerOptions{};
-    CreateInternal(session, &container, containerOptions, image, runOptions, callback);
+    auto runningContainer = CreateInternal(session, image, runOptions, callback);
+    runningContainer.SetDeleteOnClose(false);
+    auto& container = runningContainer.Get();
     WSLAContainerId id{};
-    THROW_IF_FAILED(container->GetId(id));
+    THROW_IF_FAILED(container.GetId(id));
     return {.Id = id};
 }
 
