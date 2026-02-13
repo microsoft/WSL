@@ -35,9 +35,14 @@ namespace wsl::windows::wslc
         }
     }
 
+    // This is the header applied before every help output, for product and copyright information.
+    // It is separate in case we need to show it in other contexts, such as error messages, or
+    // during specific command executions.
     void Command::OutputIntroHeader() const
     {
-        // TODO: Product name, version, copyright info in resources.
+        // Placeholder header.
+        // TODO: Get better product version information dynamicallly instead of hardcoding it here.
+        // TODO: Strings should be in resources.
         std::wostringstream infoOut;
         infoOut << L"Windows Subsystem for Linux Container CLI (Preview) v1.0.0" << std::endl;
         infoOut << L"Copyright (c) Microsoft Corporation. All rights reserved." << std::endl;
@@ -99,7 +104,10 @@ namespace wsl::windows::wslc
         {
             switch (arg.Kind())
             {
-                case Kind::Standard:
+                case Kind::Flag:
+                    standardArgs.emplace_back(arg);
+                    break;
+                case Kind::Value:
                     standardArgs.emplace_back(arg);
                     break;
                 case Kind::Positional:

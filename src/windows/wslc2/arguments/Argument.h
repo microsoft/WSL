@@ -28,7 +28,7 @@ namespace wsl::windows::wslc
             std::wstring name,
             std::wstring alias,
             std::wstring desc,
-            argument::Kind kind = Kind::Standard,
+            argument::Kind kind = Kind::Flag,
             Visibility visibility = Visibility::Help,
             bool required = false,
             int countLimit = 1) :
@@ -79,7 +79,7 @@ namespace wsl::windows::wslc
         std::wstring m_desc;
         std::wstring m_alias;
         bool m_required = false;
-        argument::Kind m_type = Kind::Standard;
+        argument::Kind m_type = Kind::Flag;
         Visibility m_visibility = Visibility::Help;
         int m_countLimit = 1;
     };

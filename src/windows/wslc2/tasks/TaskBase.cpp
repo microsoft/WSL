@@ -81,6 +81,8 @@ CLIExecutionContext& operator<<(CLIExecutionContext& context, wsl::windows::wslc
 
 CLIExecutionContext& operator<<(CLIExecutionContext& context, const wsl::windows::wslc::task::Task& task)
 {
+    // This is a common termination check automatically executed before every task.
+    // If the context has been terminated, we will skip executing this task.
     if (!context.IsTerminated())
     {
         task(context);

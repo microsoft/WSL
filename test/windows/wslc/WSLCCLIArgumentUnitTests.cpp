@@ -68,16 +68,18 @@ namespace WSLCCLIArgumentUnitTests
                 // using the runtime function Add instead of the template function Add.
                 ArgMap args;
                 VERIFY_IS_FALSE(args.Contains(argType));
-                auto valueType = args.GetValueType(argType);
-                switch (valueType)
+                switch (arg.Kind())
                 {
-                    case ValueType::String:
+                    case Kind::Value:
                         args.Add(argType, std::wstring(L"test"));
                         break;
-                    case ValueType::StringSet:
+                    case Kind::Positional:
+                        args.Add(argType, std::wstring(L"test"));
+                        break;
+                    case Kind::Forward:
                         args.Add(argType, std::vector<std::wstring>{ L"test1", L"test2" });
                         break;
-                    case ValueType::Bool:
+                    case Kind::Flag:
                         args.Add(argType, true);
                         break;
                     default:

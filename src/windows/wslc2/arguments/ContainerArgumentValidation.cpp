@@ -28,7 +28,7 @@ namespace wsl::windows::wslc::validation
             auto hostPortStr = publishArg.substr(0, colonPos);
             auto containerPortStr = publishArg.substr(colonPos + 1);
 
-            // Validate that both hostPort and containerPort are valid integers
+            // Validate that both hostPort and containerPort are valid positive integers
             try
             {
                 auto hostPort = std::stoi(std::wstring(hostPortStr));

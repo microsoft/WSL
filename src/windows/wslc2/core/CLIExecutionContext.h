@@ -84,7 +84,7 @@ namespace wsl::windows::wslc::execution
             return m_terminationHR;
         }
 
-        // Set the context to the terminated state.
+        // Terminate the context with the specified HR.
         void Terminate(HRESULT hr, std::string_view file = {}, size_t line = {});
 
         // Set the termination hr of the context.

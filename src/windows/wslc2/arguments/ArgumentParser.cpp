@@ -17,11 +17,15 @@ namespace wsl::windows::wslc
         m_arguments(std::move(arguments)),
         m_invocationItr(m_invocation.begin())
     {
+        // Create sublists by Kind for easier processing in the state machine.
         for (const auto& arg : m_arguments)
         {
             switch (arg.Kind())
             {
-            case Kind::Standard:
+            case Kind::Value:
+                m_standardArgs.emplace_back(arg);
+                break;
+            case Kind::Flag:
                 m_standardArgs.emplace_back(arg);
                 break;
             case Kind::Positional:
@@ -154,7 +158,7 @@ namespace wsl::windows::wslc
         return {};
     }
 
-    // Assumes one positional has already been found and therefore there are no remaining Kind::Standard arguments.
+    // Assumes one positional has already been found and therefore there are no remaining Kind Value/Flag arguments.
     // Only Kind::Positional or Kind::Forward arguments should remain.
     ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessRemainingPositionals(const std::wstring_view& currArg)
     {
@@ -268,7 +272,7 @@ namespace wsl::windows::wslc
         size_t currentPos = 1 + aliasLength;
         
         // Check if this argument expects a value
-        if (argument::ArgMap::GetValueType(firstArg->Type()) != ValueType::Bool)
+        if (firstArg->Kind() == Kind::Value)
         {
             // Non-boolean alias must have a value
             if (currentPos >= currArg.length())
@@ -300,7 +304,7 @@ namespace wsl::windows::wslc
                 return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
             }
             
-            if (argument::ArgMap::GetValueType(nextArg->Type()) != ValueType::Bool)
+            if (nextArg->Kind() == Kind::Value)
             {
                 return ArgumentException(Localization::WSLCCLI_AdjoinedNotFlagError(currArg));
             }
@@ -349,10 +353,10 @@ namespace wsl::windows::wslc
         {
             if (string::IsEqual(argName, arg.Name()))
             {
-                // Found a match, process by type.
-                if (argument::ArgMap::GetValueType(arg.Type()) == ValueType::Bool)
+                // Found a match, process by kind.
+                if (arg.Kind() == Kind::Flag)
                 {
-                    // TODO: Consider supporting --flag and --flag=true or --flag=false for boolean args.
+                    // TODO: Consider supporting --flag and --flag=true or --flag=false for bool args.
                     if (hasAdjoinedValue)
                     {
                         return ArgumentException(Localization::WSLCCLI_FlagContainAdjoinedError(currArg));
@@ -362,8 +366,7 @@ namespace wsl::windows::wslc
                     return {};
                 }
 
-                // Not a bool, must be a string value.
-                // Validation enforces this cannot be a string vector.
+                // Not a Flag, must be a Value, and therefore must have a value provided.
                 if (hasAdjoinedValue)
                 {
                     ProcessAdjoinedValue(arg.Type(), argValue);
