@@ -225,7 +225,8 @@ int ContainerService::Exec(Session& session, const std::string& id, ExecContaine
     WI_SetFlagIf(execFlags, WSLAProcessFlagsTty, options.TTY);
 
     ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, {}, execFlags).Launch(*container));
+    return consoleService.AttachToCurrentConsole(
+        wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, {}, execFlags).Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
