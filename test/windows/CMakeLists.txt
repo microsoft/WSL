@@ -31,5 +31,5 @@ target_link_libraries(wsltests
                       Dbghelp.lib
                       sfc.lib)
 
-add_dependencies(wsltests wslserviceidl wslaclient)
+add_dependencies(wsltests wslserviceidl)
 add_subdirectory(testplugin)
