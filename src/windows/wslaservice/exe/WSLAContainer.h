@@ -81,7 +81,10 @@ public:
 
     // Returns the container flags used to decide whether to
     // auto-delete the container on stop.
-    WSLAContainerFlags Flags() const noexcept { return m_containerFlags; }
+    WSLAContainerFlags Flags() const noexcept
+    {
+        return m_containerFlags;
+    }
 
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
@@ -102,6 +105,7 @@ public:
 private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
+    void ReleaseResources();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
     wsl::windows::common::wsla_schema::InspectContainer BuildInspectContainer(const wsl::windows::common::docker_schema::InspectContainer& dockerInspect);
