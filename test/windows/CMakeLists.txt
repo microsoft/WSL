@@ -9,8 +9,7 @@ set(SOURCES
     PluginTests.cpp
     PolicyTests.cpp
     InstallerTests.cpp
-    WSLATests.cpp
-)
+    WSLATests.cpp)
 
 set(HEADERS
     Common.h
@@ -36,6 +35,3 @@ target_link_libraries(wsltests
 
 add_dependencies(wsltests wslserviceidl wslaclient)
 add_subdirectory(testplugin)
-
-# For prettier source tree browsing
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})
