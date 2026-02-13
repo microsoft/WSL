@@ -101,7 +101,7 @@ static void CreateInternal(
     auto result = session.Get()->CreateContainer(&containerOptions, container);
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
-        PrintMessage(std::format(L"Image '{}' not found, pulling", image), stderr);
+        PrintMessage(L"Image '%hs' not found, pulling", stderr, containerOptions.Image);
         ImageService imageService;
         imageService.Pull(session, image, callback);
         result = session.Get()->CreateContainer(&containerOptions, container);
@@ -140,7 +140,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerR
 
     WSLAContainerId containerId{};
     THROW_IF_FAILED(container->GetId(containerId));
-    PrintMessage(L"%hs\n", stdout, containerId);
+    PrintMessage(L"%hs", stdout, containerId);
     return 0;
 }
 
