@@ -23,29 +23,28 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+// Diag List Command
+std::vector<Argument> DiagListCommand::GetArguments() const
 {
-    // Diag List Command
-    std::vector<Argument> DiagListCommand::GetArguments() const
-    {
-        return {
-            // Adding the Verbose flag arg, overriding description and leaving other defaults alone.
-            Argument::Create(ArgType::Verbose, std::nullopt, std::nullopt, L"Show detailed information about the listed containers."),
-        };
-    }
-
-    std::wstring_view DiagListCommand::ShortDescription() const
-    {
-        return {L"List containers."};
-    }
-
-    std::wstring_view DiagListCommand::LongDescription() const
-    {
-        return {L"Lists specified container(s)."};
-    }
-
-    void DiagListCommand::ExecuteInternal(CLIExecutionContext& context) const
-    {
-        context << task::ListContainers;
-    }
+    return {
+        // Adding the Verbose flag arg, overriding description and leaving other defaults alone.
+        Argument::Create(ArgType::Verbose, std::nullopt, std::nullopt, L"Show detailed information about the listed containers."),
+    };
 }
+
+std::wstring_view DiagListCommand::ShortDescription() const
+{
+    return {L"List containers."};
+}
+
+std::wstring_view DiagListCommand::LongDescription() const
+{
+    return {L"Lists specified container(s)."};
+}
+
+void DiagListCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    context << task::ListContainers;
+}
+} // namespace wsl::windows::wslc

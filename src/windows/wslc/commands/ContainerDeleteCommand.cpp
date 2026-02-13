@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerDeleteCommand.cpp
+
+Abstract:
+
+    Implementation of command execution logic.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
@@ -12,32 +23,32 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+// Container Delete Command
+std::vector<Argument> ContainerDeleteCommand::GetArguments() const
 {
-    // Container Delete Command
-    std::vector<Argument> ContainerDeleteCommand::GetArguments() const
-    {
-        return {
-            Argument::Create(ArgType::ContainerId, false, 10),
-            Argument::Create(ArgType::All, L"Select all the running containers."),
-            Argument::Create(ArgType::Force),
-            Argument::Create(ArgType::SessionId),
-        };
-    }
-
-    std::wstring_view ContainerDeleteCommand::ShortDescription() const
-    {
-        return {L"Delete containers."};
-    }
-
-    std::wstring_view ContainerDeleteCommand::LongDescription() const
-    {
-        return {L"Deletes specified container(s). Use --force to delete "
-            "running containers. Use --all to delete all the running containers. "};
-    }
-
-    void ContainerDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
-    {
-        PrintMessage(L"Container Delete subcommand executing..", stdout);
-    }
+    return {
+        Argument::Create(ArgType::ContainerId, false, 10),
+        Argument::Create(ArgType::All, L"Select all the running containers."),
+        Argument::Create(ArgType::Force),
+        Argument::Create(ArgType::SessionId),
+    };
 }
+
+std::wstring_view ContainerDeleteCommand::ShortDescription() const
+{
+    return {L"Delete containers."};
+}
+
+std::wstring_view ContainerDeleteCommand::LongDescription() const
+{
+    return {
+        L"Deletes specified container(s). Use --force to delete "
+        "running containers. Use --all to delete all the running containers. "};
+}
+
+void ContainerDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    PrintMessage(L"Container Delete subcommand executing..", stdout);
+}
+} // namespace wsl::windows::wslc

@@ -30,74 +30,73 @@ using namespace WEX::Logging;
 using namespace WEX::Common;
 using namespace WEX::TestExecution;
 
-namespace WSLCCLICommandUnitTests
+namespace WSLCCLICommandUnitTests {
+class WSLCCLICommandUnitTests
 {
-    class WSLCCLICommandUnitTests
+    WSL_TEST_CLASS(WSLCCLICommandUnitTests)
+
+    TEST_CLASS_SETUP(TestClassSetup)
     {
-        WSL_TEST_CLASS(WSLCCLICommandUnitTests)
+        Log::Comment(L"WSLC CLI Command Unit Tests - Class Setup");
+        return true;
+    }
 
-        TEST_CLASS_SETUP(TestClassSetup)
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        Log::Comment(L"WSLC CLI Command Unit Tests - Class Cleanup");
+        return true;
+    }
+
+    // Test: Verify RootCommand has subcommands
+    TEST_METHOD(RootCommand_HasSubcommands)
+    {
+        auto cmd = RootCommand();
+
+        auto subcommands = cmd.GetCommands();
+
+        // Verify it has subcommands
+        VERIFY_IS_TRUE(subcommands.size() > 0);
+        LogComment(L"RootCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
+
+        // Verify each subcommand is valid
+        for (const auto& subcmd : subcommands)
         {
-            Log::Comment(L"WSLC CLI Command Unit Tests - Class Setup");
-            return true;
+            VERIFY_IS_NOT_NULL(subcmd.get());
+        }
+    }
+
+    // Test: Verify ContainerCommand has subcommands
+    TEST_METHOD(ContainerCommand_HasSubcommands)
+    {
+        auto cmd = ContainerCommand(L"container");
+        auto subcommands = cmd.GetCommands();
+
+        // Verify it has subcommands (create, list, run, etc.)
+        VERIFY_IS_TRUE(subcommands.size() > 0);
+        LogComment(L"ContainerCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
+
+        // Log subcommand types
+        for (const auto& subcmd : subcommands)
+        {
+            VERIFY_IS_NOT_NULL(subcmd.get());
+        }
+    }
+
+    // Test: Verify RootCommand contains expected subcommands
+    TEST_METHOD(RootCommand_ContainsExpectedSubcommands)
+    {
+        auto cmd = RootCommand();
+        auto subcommands = cmd.GetCommands();
+
+        // Log all subcommand types for visibility
+        for (const auto& subcmd : subcommands)
+        {
+            LogComment(L"Subcommand found");
         }
 
-        TEST_CLASS_CLEANUP(TestClassCleanup)
-        {
-            Log::Comment(L"WSLC CLI Command Unit Tests - Class Cleanup");
-            return true;
-        }
+        // At minimum, verify we have some subcommands
+        VERIFY_IS_TRUE(subcommands.size() >= 1);
+    }
+};
 
-        // Test: Verify RootCommand has subcommands
-        TEST_METHOD(RootCommand_HasSubcommands)
-        {
-            auto cmd = RootCommand();
-            
-            auto subcommands = cmd.GetCommands();
-            
-            // Verify it has subcommands
-            VERIFY_IS_TRUE(subcommands.size() > 0);
-            LogComment(L"RootCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
-            
-            // Verify each subcommand is valid
-            for (const auto& subcmd : subcommands)
-            {
-                VERIFY_IS_NOT_NULL(subcmd.get());
-            }
-        }
-
-        // Test: Verify ContainerCommand has subcommands
-        TEST_METHOD(ContainerCommand_HasSubcommands)
-        {
-            auto cmd = ContainerCommand(L"container");
-            auto subcommands = cmd.GetCommands();
-            
-            // Verify it has subcommands (create, list, run, etc.)
-            VERIFY_IS_TRUE(subcommands.size() > 0);
-            LogComment(L"ContainerCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
-            
-            // Log subcommand types
-            for (const auto& subcmd : subcommands)
-            {
-                VERIFY_IS_NOT_NULL(subcmd.get());
-            }
-        }
-
-        // Test: Verify RootCommand contains expected subcommands
-        TEST_METHOD(RootCommand_ContainsExpectedSubcommands)
-        {
-            auto cmd = RootCommand();
-            auto subcommands = cmd.GetCommands();
-            
-            // Log all subcommand types for visibility
-            for (const auto& subcmd : subcommands)
-            {
-                LogComment(L"Subcommand found");
-            }
-            
-            // At minimum, verify we have some subcommands
-            VERIFY_IS_TRUE(subcommands.size() >= 1);
-        }
-    };
-    
 } // namespace WSLCCLICommandUnitTests

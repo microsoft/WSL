@@ -32,83 +32,95 @@ Abstract:
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::argument;
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+struct Command
 {
-    struct Command
+    // Controls the visibility of the field.
+    enum class Visibility
     {
-        // Controls the visibility of the field.
-        enum class Visibility
-        {
-            // Shown in help.
-            Show,
+        // Shown in help.
+        Show,
 
-            // Not shown in help.
-            Hidden,
-        };
-
-        Command(std::wstring_view name, std::wstring parent) :
-            Command(name, parent, Command::Visibility::Show) {}
-        Command(std::wstring_view name, std::wstring parent, Command::Visibility visibility);
-
-        virtual ~Command() = default;
-
-        Command(const Command&) = default;
-        Command& operator=(const Command&) = default;
-
-        Command(Command&&) = default;
-        Command& operator=(Command&&) = default;
-
-        // The character used to split between commands and their parents in FullName.
-        constexpr static wchar_t ParentSplitChar = L':';
-
-        std::wstring_view Name() const { return m_name; }
-        const std::wstring& FullName() const { return m_fullName; }
-        Command::Visibility GetVisibility() const;
-
-        virtual std::vector<std::unique_ptr<Command>> GetCommands() const { return {}; }
-        virtual std::vector<Argument> GetArguments() const { return {}; }
-        std::vector<std::unique_ptr<Command>> GetVisibleCommands() const;
-        std::vector<Argument> GetVisibleArguments() const;
-
-        virtual std::wstring_view ShortDescription() const = 0;
-        virtual std::wstring_view LongDescription() const = 0;
-
-        void OutputIntroHeader() const;
-        void OutputHelp(const CommandException* exception = nullptr) const;
-
-        std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
-        void ParseArguments(Invocation& inv, ArgMap& execArgs) const;
-        void ValidateArguments(ArgMap& execArgs) const;
-
-        virtual void Execute(CLIExecutionContext& context) const;
-
-    protected:
-        virtual void ValidateArgumentsInternal(ArgMap& execArgs) const;
-        virtual void ExecuteInternal(CLIExecutionContext& context) const;
-
-    private:
-        std::wstring_view m_name;
-        std::wstring m_fullName;
-        Command::Visibility m_visibility;
-        bool m_selectCurrentCommandIfUnrecognizedSubcommandFound = false;
-        std::wstring m_commandArguments;
+        // Not shown in help.
+        Hidden,
     };
 
-    // Helper to initialize a container of move-only types from an initializer list.
-    // This is used for greater efficiency when initializing the command tree.
-    template <typename Container>
-    Container InitializeFromMoveOnly(std::initializer_list<typename Container::value_type> il)
+    Command(std::wstring_view name, std::wstring parent) : Command(name, parent, Command::Visibility::Show)
     {
-        using String = typename Container::value_type;
-        Container result;
+    }
+    Command(std::wstring_view name, std::wstring parent, Command::Visibility visibility);
 
-        for (const auto& v : il)
-        {
-            result.emplace_back(std::move(*const_cast<String*>(&v)));
-        }
+    virtual ~Command() = default;
 
-        return result;
+    Command(const Command&) = default;
+    Command& operator=(const Command&) = default;
+
+    Command(Command&&) = default;
+    Command& operator=(Command&&) = default;
+
+    // The character used to split between commands and their parents in FullName.
+    constexpr static wchar_t ParentSplitChar = L':';
+
+    std::wstring_view Name() const
+    {
+        return m_name;
+    }
+    const std::wstring& FullName() const
+    {
+        return m_fullName;
+    }
+    Command::Visibility GetVisibility() const;
+
+    virtual std::vector<std::unique_ptr<Command>> GetCommands() const
+    {
+        return {};
+    }
+    virtual std::vector<Argument> GetArguments() const
+    {
+        return {};
+    }
+    std::vector<std::unique_ptr<Command>> GetVisibleCommands() const;
+    std::vector<Argument> GetVisibleArguments() const;
+
+    virtual std::wstring_view ShortDescription() const = 0;
+    virtual std::wstring_view LongDescription() const = 0;
+
+    void OutputIntroHeader() const;
+    void OutputHelp(const CommandException* exception = nullptr) const;
+
+    std::unique_ptr<Command> FindSubCommand(Invocation& inv) const;
+    void ParseArguments(Invocation& inv, ArgMap& execArgs) const;
+    void ValidateArguments(ArgMap& execArgs) const;
+
+    virtual void Execute(CLIExecutionContext& context) const;
+
+protected:
+    virtual void ValidateArgumentsInternal(ArgMap& execArgs) const;
+    virtual void ExecuteInternal(CLIExecutionContext& context) const;
+
+private:
+    std::wstring_view m_name;
+    std::wstring m_fullName;
+    Command::Visibility m_visibility;
+    bool m_selectCurrentCommandIfUnrecognizedSubcommandFound = false;
+    std::wstring m_commandArguments;
+};
+
+// Helper to initialize a container of move-only types from an initializer list.
+// This is used for greater efficiency when initializing the command tree.
+template <typename Container>
+Container InitializeFromMoveOnly(std::initializer_list<typename Container::value_type> il)
+{
+    using String = typename Container::value_type;
+    Container result;
+
+    for (const auto& v : il)
+    {
+        result.emplace_back(std::move(*const_cast<String*>(&v)));
     }
 
-    int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
+    return result;
 }
+
+int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
+} // namespace wsl::windows::wslc

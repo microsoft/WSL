@@ -14,6 +14,7 @@ set(HEADERS
     arguments/ArgumentTypes.h
     arguments/Argument.h
     arguments/ArgumentParser.h
+    arguments/ArgumentValidation.h
     core/Command.h
     core/Core.h
     core/CLIExecutionContext.h
@@ -39,10 +40,15 @@ set(SOURCES
     arguments/Argument.cpp
     arguments/ArgumentParser.cpp
     arguments/ArgumentValidation.cpp
-    arguments/ContainerArgumentValidation.cpp
     commands/RootCommand.cpp
     commands/DiagCommand.cpp
+    commands/DiagAttachCommand.cpp
+    commands/DiagBuildCommand.cpp
     commands/DiagListCommand.cpp
+    commands/DiagLogsCommand.cpp
+    commands/DiagPullCommand.cpp
+    commands/DiagRunCommand.cpp
+    commands/DiagShellCommand.cpp
     commands/ContainerCommand.cpp
     commands/ContainerCreateCommand.cpp
     commands/ContainerDeleteCommand.cpp

@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ContainerListCommand.cpp
+
+Abstract:
+
+    Implementation of command execution logic.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
@@ -12,32 +23,31 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+// Container List Command
+std::vector<Argument> ContainerListCommand::GetArguments() const
 {
-    // Container List Command
-    std::vector<Argument> ContainerListCommand::GetArguments() const
-    {
-        return {
-            Argument::Create(ArgType::ContainerId, std::nullopt, 10, L"Desc Override"),
-            Argument::Create(ArgType::All),
-            Argument::Create(ArgType::Format),
-            Argument::Create(ArgType::Quiet),
-            Argument::Create(ArgType::SessionId),
-        };
-    }
-
-    std::wstring_view ContainerListCommand::ShortDescription() const
-    {
-        return {L"List containers."};
-    }
-
-    std::wstring_view ContainerListCommand::LongDescription() const
-    {
-        return {L"Lists specified container(s). Use --all to list all the running containers. "};
-    }
-
-    void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
-    {
-        PrintMessage(L"Container List subcommand executing..", stdout);
-    }
+    return {
+        Argument::Create(ArgType::ContainerId, std::nullopt, 10, L"Desc Override"),
+        Argument::Create(ArgType::All),
+        Argument::Create(ArgType::Format),
+        Argument::Create(ArgType::Quiet),
+        Argument::Create(ArgType::SessionId),
+    };
 }
+
+std::wstring_view ContainerListCommand::ShortDescription() const
+{
+    return {L"List containers."};
+}
+
+std::wstring_view ContainerListCommand::LongDescription() const
+{
+    return {L"Lists specified container(s). Use --all to list all the running containers. "};
+}
+
+void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    PrintMessage(L"Container List subcommand executing..", stdout);
+}
+} // namespace wsl::windows::wslc

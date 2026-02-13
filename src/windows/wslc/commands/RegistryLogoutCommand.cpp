@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    RegistryLogoutCommand.cpp
+
+Abstract:
+
+    Implementation of command execution logic.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
@@ -12,29 +23,27 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+// Registry Logout Command
+std::vector<Argument> RegistryLogoutCommand::GetArguments() const
 {
-    // Registry Logout Command
-    std::vector<Argument> RegistryLogoutCommand::GetArguments() const
-    {
-        return {
-            Argument::Create(ArgType::Registry, true),        // Argument
-            Argument::Create(ArgType::SessionId)
-        };
-    }
-
-    std::wstring_view RegistryLogoutCommand::ShortDescription() const
-    {
-        return {L"Logs out of the registry."};
-    }
-
-    std::wstring_view RegistryLogoutCommand::LongDescription() const
-    {
-        return {L"Logs out of the registry. The cached/stored credentials must be removed. "};
-    }
-
-    void RegistryLogoutCommand::ExecuteInternal(CLIExecutionContext& context) const
-    {
-        PrintMessage(L"Registry Logout subcommand executing..");
-    }
+    return {
+        Argument::Create(ArgType::Registry, true), // Argument
+        Argument::Create(ArgType::SessionId)};
 }
+
+std::wstring_view RegistryLogoutCommand::ShortDescription() const
+{
+    return {L"Logs out of the registry."};
+}
+
+std::wstring_view RegistryLogoutCommand::LongDescription() const
+{
+    return {L"Logs out of the registry. The cached/stored credentials must be removed. "};
+}
+
+void RegistryLogoutCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    PrintMessage(L"Registry Logout subcommand executing..");
+}
+} // namespace wsl::windows::wslc

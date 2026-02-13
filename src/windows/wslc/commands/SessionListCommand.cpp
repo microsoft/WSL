@@ -1,5 +1,16 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    SessionListCommand.cpp
+
+Abstract:
+
+    Implementation of command execution logic.
+
+--*/
 #pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
@@ -12,27 +23,25 @@ using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+// Session List Command
+std::vector<Argument> SessionListCommand::GetArguments() const
 {
-    // Session List Command
-    std::vector<Argument> SessionListCommand::GetArguments() const
-    {
-        return {
-        };
-    }
-
-    std::wstring_view SessionListCommand::ShortDescription() const
-    {
-        return {L"Lists sessions."};
-    }
-
-    std::wstring_view SessionListCommand::LongDescription() const
-    {
-        return {L"Lists sessions."};
-    }
-
-    void SessionListCommand::ExecuteInternal(CLIExecutionContext& context) const
-    {
-        PrintMessage(L"Session List subcommand executing..", stdout);
-    }
+    return {};
 }
+
+std::wstring_view SessionListCommand::ShortDescription() const
+{
+    return {L"Lists sessions."};
+}
+
+std::wstring_view SessionListCommand::LongDescription() const
+{
+    return {L"Lists sessions."};
+}
+
+void SessionListCommand::ExecuteInternal(CLIExecutionContext& context) const
+{
+    PrintMessage(L"Session List subcommand executing..", stdout);
+}
+} // namespace wsl::windows::wslc

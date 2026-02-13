@@ -31,6 +31,7 @@ Abstract:
 
 // X-Macro for defining all arguments in one place
 // Format: ARGUMENT(EnumName, Name, Alias, Kind, Desc)
+// clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(All,            "all",                 L"a",              Kind::Flag,        L"Select all the running containers") \
 _(Attach,         "attach",              L"a",              Kind::Flag,        Localization::WSLCCLI_AttachArgDescription()) \
@@ -44,6 +45,7 @@ _(Detach,         "detach",              L"d",              Kind::Flag,        L
 _(Entrypoint,     "entrypoint",          NO_ALIAS,          Kind::Value,       L"Specifies the container init process executable") \
 _(Env,            "env",                 L"e",              Kind::Value,       L"Key=Value pairs for environment variables") \
 _(EnvFile,        "env-file",            NO_ALIAS,          Kind::Value,       L"File containing key=value pairs of env variables") \
+_(Follow,         "follow",              L"f",              Kind::Flag,        L"Follow the logs of the container") \
 _(Force,          "force",               L"f",              Kind::Flag,        L"Delete containers even if they are running") \
 _(Format,         "format",              NO_ALIAS,          Kind::Value,       L"Output formatting (json or table) (Default:table)") \
 _(ForwardArgs,    "arguments",           NO_ALIAS,          Kind::Forward,     L"Arguments to pass to container's init process") \
@@ -82,3 +84,4 @@ _(Verbose,        "verbose",             L"v",              Kind::Flag,        L
 _(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container") \
 _(Volume,         "volume",              NO_ALIAS,          Kind::Value,       L"Bind mount a volume to the container") \
 _(VolumeName,     "name",                NO_ALIAS,          Kind::Positional,  L"Name to give to the volume")
+// clang-format on

@@ -26,7 +26,7 @@ target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests
                       common
                       wslaclient
-                      wslc
+                      wslclib
                       ${TAEF_LINK_LIBRARIES}
                       ${COMMON_LINK_LIBRARIES}
                       VirtDisk.lib
@@ -34,7 +34,7 @@ target_link_libraries(wsltests
                       Dbghelp.lib
                       sfc.lib)
 
-add_dependencies(wsltests wslserviceidl wslaclient wslc wslccli)
+add_dependencies(wsltests wslserviceidl wslaclient wslclib wslc)
 add_subdirectory(testplugin)
 add_subdirectory(wslc)
 

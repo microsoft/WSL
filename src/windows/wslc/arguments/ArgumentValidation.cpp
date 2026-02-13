@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Implementation of the Argument Validation dispatcher.
+    Implementation of the Argument Validation.
 
 --*/
 #pragma once
@@ -16,39 +16,63 @@ Abstract:
 #include "Argument.h"
 #include "ArgumentTypes.h"
 #include "Exceptions.h"
+#include "ArgumentValidation.h"
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+// Any ArgType specific validation is defined in this dispatcher.
+// Multiple types can share a validation function.  The ArgType of this argument is
+// passed in, along with the entire ArgMap. This allows for validation to be shared
+// among very similar ArgTypes, and for cross-validation to occur for arguments based
+// on the presence of other arguments. For example, arguments that are mutually
+// exclusive or may have conflicting values can be validated together by checking
+// the ArgMap for the presence of the relevant arguments and their values during
+// the validation of either argument.
+void Argument::Validate(const ArgMap& execArgs) const
 {
-    // Forward declarations of validation helpers defined in other files.
-    // These are called from Argument::Validate, which is defined below and called as part of
-    // a command's argument validation. Here we can centralize the validation of arguments that
-    // are shared across multiple commands, or that have complex validation logic that is easier
-    // to maintain in a separate function. This also keeps the command files cleaner and more
-    // focused on the execution logic of the command itself, while the validation logic can be
-    // maintained separately.
-    namespace validation
+    switch (m_argType)
     {
-        void ValidatePublish([[maybe_unused]]const ArgType argType, const ArgMap& execArgs);
+    case ArgType::Publish:
+        validation::ValidatePublish(m_argType, execArgs);
+        break;
+
+    default:
+        break;
     }
+}
+} // namespace wsl::windows::wslc
 
-    // Any ArgType specific validation is defined in this dispatcher.
-    // Multiple types can share a validation function.  The ArgType of this argument is
-    // passed in, along with the entire ArgMap. This allows for validation to be shared
-    // among very similar ArgTypes, and for cross-validation to occur for arguments based
-    // on the presence of other arguments. For example, arguments that are mutually
-    // exclusive or may have conflicting values can be validated together by checking
-    // the ArgMap for the presence of the relevant arguments and their values during
-    // the validation of either argument.
-    void Argument::Validate(const ArgMap& execArgs) const
+namespace wsl::windows::wslc::validation {
+
+void ValidatePublish([[maybe_unused]] const ArgType argType, const ArgMap& execArgs)
+{
+    const auto& publishArgs = execArgs.GetAll<ArgType::Publish>();
+
+    for (const auto& publishArg : publishArgs)
     {
-        switch (m_argType)
+        // Basic validation: ensure the format is "hostPort:containerPort"
+        auto colonPos = publishArg.find(L':');
+        if (colonPos == std::wstring::npos || colonPos == 0 || colonPos == publishArg.length() - 1)
         {
-            case ArgType::Publish:
-                validation::ValidatePublish(m_argType, execArgs);
-                break;
+            throw ArgumentException(L"Localization::WSLCCLI_InvalidPublishFormatError(publishArg) " + publishArg);
+        }
 
-            default:
-                break;
+        auto hostPortStr = publishArg.substr(0, colonPos);
+        auto containerPortStr = publishArg.substr(colonPos + 1);
+
+        // Validate that both hostPort and containerPort are valid positive integers
+        try
+        {
+            auto hostPort = std::stoi(std::wstring(hostPortStr));
+            auto containerPort = std::stoi(std::wstring(containerPortStr));
+            if (hostPort <= 0 || hostPort > 65535 || containerPort <= 0 || containerPort > 65535)
+            {
+                throw ArgumentException(L"Localization::WSLCCLI_PortOutOfRangeError(publishArg) " + publishArg);
+            }
+        }
+        catch (const std::exception&)
+        {
+            throw ArgumentException(L"Localization::WSLCCLI_InvalidPublishFormatError(publishArg) " + publishArg);
         }
     }
 }
+} // namespace wsl::windows::wslc::validation

@@ -68,4 +68,4 @@ COMMAND_LINE_TEST_CASE(L"registry logout myregistry", L"logout", true)
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
 COMMAND_LINE_TEST_CASE(L"container invalid", L"", false)
-COMMAND_LINE_TEST_CASE(L"container create", L"create", false)  // Missing required args
+COMMAND_LINE_TEST_CASE(L"container create", L"create", false) // Missing required args
