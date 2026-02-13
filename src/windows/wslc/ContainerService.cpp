@@ -220,22 +220,12 @@ int ContainerService::Exec(Session& session, const std::string& id, ExecContaine
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
 
-    // Set up the options for the process to be created
-    WSLA_PROCESS_OPTIONS processOptions{};
-    WI_SetFlagIf(processOptions.Flags, WSLAProcessFlagsStdin, options.Interactive);
-    WI_SetFlagIf(processOptions.Flags, WSLAProcessFlagsTty, options.TTY);
-    processOptions.CurrentDirectory = nullptr;
-    processOptions.Environment = {};
-    auto argsStorage = wsl::shared::string::StringPointersFromArray(options.Arguments, false);
-    SetContainerTTYOptions(processOptions);
-    SetContainerArguments(processOptions, argsStorage);
+    auto execFlags = WSLAProcessFlagsNone;
+    WI_SetFlagIf(execFlags, WSLAProcessFlagsStdin, options.Interactive);
+    WI_SetFlagIf(execFlags, WSLAProcessFlagsTty, options.TTY);
 
-    // Execute the process inside the container
-    wil::com_ptr<IWSLAProcess> process;
-    int error = -1;
-    THROW_IF_FAILED(container->Exec(&processOptions, &process, &error));
     ConsoleService consoleService;
-    return consoleService.AttachToCurrentConsole(ClientRunningWSLAProcess(std::move(process), processOptions.Flags));
+    return consoleService.AttachToCurrentConsole(wsl::windows::common::WSLAProcessLauncher({}, options.Arguments, {}, execFlags).Launch(*container));
 }
 
 InspectContainer ContainerService::Inspect(Session& session, const std::string& id)
