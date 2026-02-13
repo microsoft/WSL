@@ -35,10 +35,10 @@ struct SessionOptions
 {
     static SessionOptions Default();
     void StoragePath(const std::filesystem::path& path);
-    operator const WSLA_SESSION_SETTINGS*() const;
+    const WSLA_SESSION_SETTINGS* Get() const;
 
 private:
-    WSLA_SESSION_SETTINGS m_sessionSettings;
+    WSLA_SESSION_SETTINGS m_sessionSettings{};
     std::filesystem::path m_storagePath;
 };
 } // namespace wsl::windows::wslc::models
