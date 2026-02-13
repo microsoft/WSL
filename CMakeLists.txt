@@ -146,6 +146,16 @@ if (OFFICIAL_BUILD AND NOT PACKAGE_VERSION MATCHES "^([0-9]+).([0-9]+).([0-9]+).
     message(FATAL_ERROR "PACKAGE_VERSION is invalid: '${PACKAGE_VERSION}'. Needs to match '([0-9]+).([0-9]+).([0-9]+).0' for official builds")
 endif()
 
+if (${TARGET_PLATFORM} STREQUAL "x64")
+    set(DCAT_PRODUCT_NAME WSL.amd64)
+endif()
+
+if (${TARGET_PLATFORM} STREQUAL "arm64")
+    set(DCAT_PRODUCT_NAME WSL.arm64)
+endif()
+
+set(DCAT_REGISTRATION_KEY SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Update\\TargetingInfo\\DynamicInstalled\\${DCAT_PRODUCT_NAME})
+
 # Configure output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/${TARGET_PLATFORM})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug)
