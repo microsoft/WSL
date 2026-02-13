@@ -122,10 +122,10 @@ WslcProcessImpl* GetInternalType(WslcProcess handle);
 // Converts to the internal type and returns an error on null input.
 #define WSLC_GET_INTERNAL_TYPE(_input_) \
     GetInternalType(_input_); \
-    RETURN_HR_IF_NULL(E_POINTER, _input_)
+    RETURN_HR_IF_NULL(E_POINTER, _input_);
 
 // Converts to a unique_ptr of the internal type and returns an error on null input.
 // Use for Release functions to clean up the implementation object on return.
 #define WSLC_GET_INTERNAL_TYPE_FOR_RELEASE(_input_) \
     std::unique_ptr<std::remove_pointer_t<decltype(GetInternalType(_input_))>>{GetInternalType(_input_)}; \
-    RETURN_HR_IF_NULL(E_POINTER, _input_)\
+    RETURN_HR_IF_NULL(E_POINTER, _input_);

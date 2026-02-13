@@ -55,7 +55,7 @@ HRESULT STDMETHODCALLTYPE ProgressCallback::OnProgress(LPCSTR Status, LPCSTR Id,
         message.detail.current = Current;
         message.detail.total = Total;
 
-        m_callback(&message, m_context);
+        return m_callback(&message, m_context);
     }
 
     return S_OK;

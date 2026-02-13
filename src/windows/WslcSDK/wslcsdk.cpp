@@ -29,37 +29,23 @@ constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 
 WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
 {
-    WSLAFeatureFlags result = WslaFeatureFlagsNone;
+    static_assert(WSLC_SESSION_FLAG_ENABLE_GPU == WslaFeatureFlagsGPU, "Session GPU flag values differ.");
 
-    if (WI_IsFlagSet(flags, WSLC_SESSION_FLAG_ENABLE_GPU))
-    {
-        result |= WslaFeatureFlagsGPU;
-    }
+    WslcSessionFlags allFlagsMask = WSLC_SESSION_FLAG_ENABLE_GPU;
 
-    return result;
+    return static_cast<WSLAFeatureFlags>(flags & allFlagsMask);
 }
 
 WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
 {
-    WSLAContainerFlags result = WSLAContainerFlagsNone;
-
-    if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_ENABLE_GPU))
-    {
-        result |= WSLAContainerFlagsGpu;
-    }
-
+    static_assert(WSLC_CONTAINER_FLAG_AUTO_REMOVE == WSLAContainerFlagsRm, "Container auto remove flag values differ.");
+    static_assert(WSLC_CONTAINER_FLAG_ENABLE_GPU == WSLAContainerFlagsGpu, "Container GPU flag values differ.");
     // TODO: Are these the same flags?
-    // if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_PRIVILEGED))
-    // {
-    //     result |= WSLAContainerFlagsInit;
-    // }
+    // static_assert(WSLC_CONTAINER_FLAG_PRIVILEGED == WSLAContainerFlagsInit, "Container privileged flag values differ.");
 
-    if (WI_IsFlagSet(flags, WSLC_CONTAINER_FLAG_AUTO_REMOVE))
-    {
-        result |= WSLAContainerFlagsRm;
-    }
+    WslcContainerFlags allFlagsMask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
 
-    return result;
+    return static_cast<WSLAContainerFlags>(flags & allFlagsMask);
 }
 
 std::optional<WSLASignal> ConvertSignal(WslcSignal signal)
@@ -83,7 +69,7 @@ std::optional<WSLASignal> ConvertSignal(WslcSignal signal)
     }
 }
 
-void GetErrorInfoIf(PWSTR* errorMessage)
+void GetErrorInfoFromCOM(PWSTR* errorMessage)
 {
     if (errorMessage)
     {
@@ -286,6 +272,7 @@ STDAPI WslcSessionSettingsSetTerminateCallback(
     _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext)
 {
     auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    RETURN_HR_IF(E_INVALIDARG, terminationCallback == nullptr && terminationContext != nullptr);
 
     internalType->terminationCallback = terminationCallback;
     internalType->terminationCallbackContext = terminationContext;
@@ -356,10 +343,9 @@ try
     if (initProcessOptions)
     {
         containerOptions.InitProcessOptions.CurrentDirectory = initProcessOptions->currentDirectory;
-        // TODO: Runtime needs an update to take in LPCSTR const*
-        containerOptions.InitProcessOptions.CommandLine.Values = const_cast<LPCSTR*>(initProcessOptions->commandLine);
+        containerOptions.InitProcessOptions.CommandLine.Values = initProcessOptions->commandLine;
         containerOptions.InitProcessOptions.CommandLine.Count = initProcessOptions->commandLineCount;
-        containerOptions.InitProcessOptions.Environment.Values = const_cast<LPCSTR*>(initProcessOptions->environment);
+        containerOptions.InitProcessOptions.Environment.Values = initProcessOptions->environment;
         containerOptions.InitProcessOptions.Environment.Count = initProcessOptions->environmentCount;
 
         // TODO: No user access
@@ -387,7 +373,7 @@ try
 
     if (FAILED_LOG(hr))
     {
-        GetErrorInfoIf(errorMessage);
+        GetErrorInfoFromCOM(errorMessage);
     }
     else
     {
@@ -674,7 +660,7 @@ try
 
     if (FAILED_LOG(hr))
     {
-        GetErrorInfoIf(errorMessage);
+        GetErrorInfoFromCOM(errorMessage);
     }
 
     return hr;
