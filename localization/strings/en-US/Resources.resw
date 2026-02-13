@@ -1876,10 +1876,15 @@ You can also access more VS Code Remote options through the command palette with
   <data name="MessageWsladiagUsage" xml:space="preserve">
     <value>wsladiag - WSLA diagnostics tool
 Usage:
-  wsladiag list
-  wsladiag shell &lt;SessionName&gt; [--verbose]
+  wsladiag list [--verbose|-v]
+  wsladiag shell &lt;SessionName&gt; [--verbose|-v]
+  wsladiag pull &lt;Image&gt;
+  wsladiag build [--tag|-t &lt;Tag&gt;] [--file|-f &lt;Dockerfile&gt;] &lt;Directory&gt;
+  wsladiag run [--interactive|-i] [--tty|-t] [--detach|-d] [--name &lt;Name&gt;] &lt;Image&gt; [Command...]
+  wsladiag logs [--follow|-f] &lt;ContainerId&gt;
+  wsladiag attach &lt;ContainerId&gt;
   wsladiag --help</value>
-    <comment>{Locked="--verbose]"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--verbose|"}{Locked="--verbose|"}{Locked="--tag|"}{Locked="--file|"}{Locked="--interactive|"}{Locked="--tty|"}{Locked="--detach|"}{Locked="--name "}{Locked="--follow|"}{Locked="--help"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcUsage" xml:space="preserve">
     <value>wslc - WSL Container CLI
@@ -2045,5 +2050,17 @@ Usage:
   </data>
   <data name="WSLCCLI_AvailableForwardArguments" xml:space="preserve">
     <value>Forwarded arguments supported:</value>
+  </data>
+  <data name = "MessageWslaInvalidImage" xml:space = "preserve" >
+    <value>Invalid image: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessageWslaInvalidContainerName" xml:space = "preserve" >
+    <value>Invalid container name: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name = "MessagePathNotAbsolute" xml:space = "preserve" >
+    <value>Path is not absolute: '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

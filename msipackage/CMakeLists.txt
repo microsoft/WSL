@@ -12,7 +12,7 @@ set(OUTPUT_PACKAGE ${BIN}/wsl.msi)
 set(PACKAGE_WIX_IN ${CMAKE_CURRENT_LIST_DIR}/package.wix.in)
 set(PACKAGE_WIX ${BIN}/package.wix)
 set(CAB_CACHE ${BIN}/cab)
-set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wslinstall.dll;wslaservice.exe;wsladiag.exe;wslc.exe)
+set(WINDOWS_BINARIES wsl.exe;wslg.exe;wslhost.exe;wslrelay.exe;wslservice.exe;wslserviceproxystub.dll;wslinstall.dll;wslaservice.exe;wslaserviceproxystub.dll;wsladiag.exe;wslc.exe;wslasession.exe)
 if (WSL_BUILD_WSL_SETTINGS)
     list(APPEND WINDOWS_BINARIES "wslsettings/wslsettings.dll;wslsettings/wslsettings.exe;libwsl.dll")
 endif()
@@ -52,7 +52,7 @@ add_custom_command(
 
 add_custom_target(msipackage DEPENDS ${OUTPUT_PACKAGE})
 set_target_properties(msipackage PROPERTIES EXCLUDE_FROM_ALL FALSE SOURCES ${PACKAGE_WIX_IN})
-add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init initramfs wslinstall msixgluepackage wslaservice wslaserviceproxystub wsladiag wslc)
+add_dependencies(msipackage wsl wslg wslservice wslhost wslrelay wslserviceproxystub init wslinstall msixgluepackage wslaservice wslaserviceproxystub wsladiag wslc wslasession)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_dependencies(msipackage wslsettings libwsl)
