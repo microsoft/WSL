@@ -34,11 +34,6 @@ public:
     NON_COPYABLE(WSLAContainerImpl);
     NON_MOVABLE(WSLAContainerImpl);
 
-    // OnDeletedCallback: Removes the container from its owner (WSLASession) and returns ownership
-    // of the impl. The caller is responsible for destroying the returned unique_ptr outside any
-    // locks that participate in the lock ordering with ContainerEventTracker::m_lock.
-    using OnDeletedCallback = std::function<std::unique_ptr<WSLAContainerImpl>(const WSLAContainerImpl*)>;
-
     WSLAContainerImpl(
         WSLAVirtualMachine* parentVM,
         std::string&& Id,
@@ -47,7 +42,7 @@ public:
         std::vector<WSLAVolumeMount>&& volumes,
         std::vector<WSLAPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
-        OnDeletedCallback&& onDeleted,
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay,
@@ -75,16 +70,23 @@ public:
     const std::string& Name() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
-    void OnStopped();
-    WSLAContainerFlags Flags() const noexcept { return m_containerFlags; }
     void OnProcessReleased(DockerExecProcessControl* process);
 
     const std::string& ID() const noexcept;
 
+    // Called when the container stop event is observed so the
+    // implementation can update its internal state and notify
+    // any exec processes.
+    void OnStopped();
+
+    // Returns the container flags used to decide whether to
+    // auto-delete the container on stop.
+    WSLAContainerFlags Flags() const noexcept { return m_containerFlags; }
+
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLAVirtualMachine& parentVM,
-        OnDeletedCallback&& OnDeleted,
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay);
@@ -92,12 +94,13 @@ public:
     static std::unique_ptr<WSLAContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLAVirtualMachine& parentVM,
-        OnDeletedCallback&& OnDeleted,
+        std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
         IORelay& Relay);
 
 private:
+    void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
@@ -120,6 +123,7 @@ private:
     Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
     DockerContainerProcessControl* m_initProcessControl = nullptr;
     ContainerEventTracker& m_eventTracker;
+    ContainerEventTracker::ContainerTrackingReference m_containerEvents;
     IORelay& m_ioRelay;
 };
 
@@ -129,7 +133,7 @@ class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLAContainer
 {
 
 public:
-    WSLAContainer(WSLAContainerImpl* impl, WSLAContainerImpl::OnDeletedCallback&& OnDeleted, ContainerEventTracker& EventTracker, const std::string& ContainerId);
+    WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
@@ -144,14 +148,7 @@ public:
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLA_LABEL_INFORMATION** Labels, _Out_ ULONG* Count) override;
 
-    // Unregister event callbacks. Called from ~WSLAContainerImpl to ensure callbacks are
-    // removed before the event tracker is destroyed, since the COM wrapper may outlive the impl.
-    void ResetContainerEvents() { m_containerEvents.Reset(); }
-
 private:
-    void OnEvent(ContainerEvent event, std::optional<int> exitCode);
-
-    WSLAContainerImpl::OnDeletedCallback m_onDeleted;
-    ContainerEventTracker::ContainerTrackingReference m_containerEvents;
+    std::function<void(const WSLAContainerImpl*)> m_onDeleted;
 };
 } // namespace wsl::windows::service::wsla

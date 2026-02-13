@@ -275,7 +275,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     std::vector<WSLAVolumeMount>&& volumes,
     std::vector<WSLAPortMapping>&& ports,
     std::map<std::string, std::string>&& labels,
-    OnDeletedCallback&& onDeleted,
+    std::function<void(const WSLAContainerImpl*)>&& onDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     IORelay& Relay,
@@ -289,10 +289,12 @@ WSLAContainerImpl::WSLAContainerImpl(
     m_mountedVolumes(std::move(volumes)),
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
-    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted), EventTracker, m_id)),
+    m_comWrapper(wil::MakeOrThrow<WSLAContainer>(this, std::move(onDeleted))),
     m_dockerClient(DockerClient),
     m_eventTracker(EventTracker),
     m_ioRelay(Relay),
+    m_containerEvents(EventTracker.RegisterContainerStateUpdates(
+        m_id, std::bind(&WSLAContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2))),
     m_state(InitialState),
     m_initProcessFlags(InitProcessFlags),
     m_containerFlags(ContainerFlags)
@@ -322,8 +324,9 @@ WSLAContainerImpl::~WSLAContainerImpl()
         }
     }
 
+    m_containerEvents.Reset();
+
     // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
-    m_comWrapper->ResetContainerEvents();
     m_comWrapper->Disconnect();
 
     // Stop running containers.
@@ -479,19 +482,37 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
     cleanup.release();
 }
 
-void WSLAContainerImpl::OnStopped()
+void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCode)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
-    m_state = WslaContainerStateExited;
-
-    // Notify all processes that the container has exited.
-    // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
-    for (auto& process : m_processes)
+    if (event == ContainerEvent::Stop)
     {
-        process->OnContainerReleased();
+        THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
+        std::lock_guard<std::recursive_mutex> lock(m_lock);
+        m_state = WslaContainerStateExited;
+
+        // Notify all processes that the container has exited.
+        // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
+        for (auto& process : m_processes)
+        {
+            process->OnContainerReleased();
+        }
+
+        m_processes.clear();
+
+        // If the Rm flag is set, delete the container.
+        // This needs to be done in a detached thread because it will trigger deletion of this object.
+        if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+        {
+            auto comWrapper = m_comWrapper;
+            std::thread([comWrapper]() { LOG_IF_FAILED(comWrapper->Delete()); }).detach();
+        }
     }
 
-    m_processes.clear();
+    WSL_LOG(
+        "ContainerEvent",
+        TraceLoggingValue(m_name.c_str(), "Name"),
+        TraceLoggingValue(m_id.c_str(), "Id"),
+        TraceLoggingValue((int)event, "Event"));
 }
 
 void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
@@ -714,7 +735,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLAVirtualMachine& parentVM,
-    OnDeletedCallback&& OnDeleted,
+    std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     IORelay& IoRelay)
@@ -856,7 +877,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLAVirtualMachine& parentVM,
-    OnDeletedCallback&& OnDeleted,
+    std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
     IORelay& ioRelay)
@@ -1010,11 +1031,8 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     return std::make_unique<RelayedProcessIO>(std::move(fds));
 }
 
-WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, WSLAContainerImpl::OnDeletedCallback&& OnDeleted, ContainerEventTracker& EventTracker, const std::string& ContainerId) :
-    COMImplClass<WSLAContainerImpl>(impl),
-    m_onDeleted(std::move(OnDeleted)),
-    m_containerEvents(EventTracker.RegisterContainerStateUpdates(
-        ContainerId, std::bind(&WSLAContainer::OnEvent, this, std::placeholders::_1, std::placeholders::_2)))
+WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
+    COMImplClass<WSLAContainerImpl>(impl), m_onDeleted(std::move(OnDeleted))
 {
 }
 
@@ -1062,50 +1080,14 @@ HRESULT WSLAContainer::Inspect(LPSTR* Output)
     return CallImpl(&WSLAContainerImpl::Inspect, Output);
 }
 
-void WSLAContainer::OnEvent(ContainerEvent event, std::optional<int> exitCode)
-{
-    // The impl must be destroyed outside COMImplClass::m_lock to avoid a lock ordering
-    // inversion. The destruction chain (~WSLAContainerImpl -> ~ContainerTrackingReference ->
-    // UnregisterContainerStateUpdates) acquires ContainerEventTracker::m_lock, which the IORelay
-    // thread (our caller) may already hold. Destroying under COMImplClass::m_lock would create:
-    //   IORelay: ContainerEventTracker::m_lock -> COMImplClass::m_lock
-    //   Destroy: COMImplClass::m_lock -> ContainerEventTracker::m_lock
-    std::unique_ptr<WSLAContainerImpl> implGuard;
-
-    {
-        auto [lock, impl] = LockImpl();
-
-        WSL_LOG(
-            "ContainerEvent",
-            TraceLoggingValue(impl->Name().c_str(), "Name"),
-            TraceLoggingValue(impl->ID().c_str(), "Id"),
-            TraceLoggingValue((int)event, "Event"));
-
-        if (event == ContainerEvent::Stop)
-        {
-            THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
-
-            impl->OnStopped();
-
-            if (WI_IsFlagSet(impl->Flags(), WSLAContainerFlagsRm))
-            {
-                impl->Delete();
-                implGuard = m_onDeleted(impl);
-            }
-        }
-    }
-}
-
 HRESULT WSLAContainer::Delete()
 try
 {
-    std::unique_ptr<WSLAContainerImpl> implGuard;
+    // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
+    auto [lock, impl] = LockImpl();
 
-    {
-        auto [lock, impl] = LockImpl();
-        impl->Delete();
-        implGuard = m_onDeleted(impl);
-    }
+    impl->Delete();
+    m_onDeleted(impl);
 
     return S_OK;
 }
