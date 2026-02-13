@@ -36,12 +36,12 @@ std::vector<Argument> DiagCommand::GetArguments() const
     return {};
 }
 
-std::wstring_view DiagCommand::ShortDescription() const
+std::wstring DiagCommand::ShortDescription() const
 {
     return {L"Diag command"};
 }
 
-std::wstring_view DiagCommand::LongDescription() const
+std::wstring DiagCommand::LongDescription() const
 {
     return {L"Diag command for demonstration purposes."};
 }

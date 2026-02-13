@@ -32,12 +32,12 @@ std::vector<Argument> DiagListCommand::GetArguments() const
     };
 }
 
-std::wstring_view DiagListCommand::ShortDescription() const
+std::wstring DiagListCommand::ShortDescription() const
 {
     return {L"List containers."};
 }
 
-std::wstring_view DiagListCommand::LongDescription() const
+std::wstring DiagListCommand::LongDescription() const
 {
     return {L"Lists specified container(s)."};
 }

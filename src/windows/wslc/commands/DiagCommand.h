@@ -23,8 +23,8 @@ struct DiagCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
-    std::wstring_view ShortDescription() const override;
-    std::wstring_view LongDescription() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
 
     std::vector<std::unique_ptr<Command>> GetCommands() const override;
 
@@ -40,8 +40,8 @@ struct DiagListCommand final : public Command
     {
     }
     std::vector<Argument> GetArguments() const override;
-    std::wstring_view ShortDescription() const override;
-    std::wstring_view LongDescription() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
 
 protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;

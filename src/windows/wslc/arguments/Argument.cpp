@@ -70,11 +70,11 @@ Argument Argument::Create(ArgType type, std::optional<bool> required, std::optio
             type, \
             L##Name, \
             Alias, \
-            desc.value_or(Desc), \
+            desc.has_value() ? std::move(desc.value()) : std::wstring(Desc), \
             ArgumentKind, \
-            visibility.value_or(Visibility::Help), \
-            required.value_or(false), \
-            countLimit.value_or(1)};
+            visibility.value_or(DefaultVisibility), \
+            required.value_or(DefaultRequired), \
+            countLimit.value_or(DefaultCountLimit)};
 
         WSLC_ARGUMENTS(WSLC_ARG_CREATE_CASE)
 #undef WSLC_ARG_CREATE_CASE
@@ -88,7 +88,7 @@ Argument Argument::Create(ArgType type, std::optional<bool> required, std::optio
 // This starts with Help, but if there are other arguments that are common, they can be added.
 void Argument::GetCommon(std::vector<Argument>& args)
 {
-    args.push_back(Create(ArgType::Help));
+    args.emplace_back(Create(ArgType::Help));
 }
 
 // Retrieves the usage string of the Argument, based on its Alias and Name.

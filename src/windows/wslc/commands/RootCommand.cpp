@@ -39,12 +39,12 @@ std::vector<Argument> RootCommand::GetArguments() const
     };
 }
 
-std::wstring_view RootCommand::ShortDescription() const
+std::wstring RootCommand::ShortDescription() const
 {
     return {L"WSLC is the Windows Subsystem for Linux Container CLI tool."};
 }
 
-std::wstring_view RootCommand::LongDescription() const
+std::wstring RootCommand::LongDescription() const
 {
     return {
         L"WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL containers "

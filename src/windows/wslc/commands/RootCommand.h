@@ -25,8 +25,8 @@ struct RootCommand final : public Command
 
     std::vector<std::unique_ptr<Command>> GetCommands() const override;
     std::vector<Argument> GetArguments() const override;
-    std::wstring_view ShortDescription() const override;
-    std::wstring_view LongDescription() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
 
 protected:
     virtual void ExecuteInternal(CLIExecutionContext& context) const;

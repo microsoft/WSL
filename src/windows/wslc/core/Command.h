@@ -82,8 +82,8 @@ struct Command
     std::vector<std::unique_ptr<Command>> GetVisibleCommands() const;
     std::vector<Argument> GetVisibleArguments() const;
 
-    virtual std::wstring_view ShortDescription() const = 0;
-    virtual std::wstring_view LongDescription() const = 0;
+    virtual std::wstring ShortDescription() const = 0;
+    virtual std::wstring LongDescription() const = 0;
 
     void OutputIntroHeader() const;
     void OutputHelp(const CommandException* exception = nullptr) const;
