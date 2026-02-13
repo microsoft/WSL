@@ -102,17 +102,6 @@ struct Argument
         return m_visibility;
     }
 
-    Argument& SetRequired(bool required)
-    {
-        m_required = required;
-        return *this;
-    }
-    Argument& SetCountLimit(int countLimit)
-    {
-        m_countLimit = countLimit;
-        return *this;
-    }
-
     // Validates this argument's value in the provided args
     void Validate(const ArgMap& execArgs) const;
 

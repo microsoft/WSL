@@ -47,13 +47,8 @@ Command::Command(std::wstring_view name, std::wstring parent, Command::Visibilit
 // during specific command executions.
 void Command::OutputIntroHeader() const
 {
-    // Placeholder header.
-    // TODO: Get better product version information dynamically instead of hardcoding it here.
-    // TODO: Strings should be in resources.
-    std::wostringstream infoOut;
-    infoOut << L"Windows Subsystem for Linux Container CLI (Preview) v1.0.0" << std::endl;
-    infoOut << L"Copyright (c) Microsoft Corporation. All rights reserved." << std::endl;
-    PrintMessage(infoOut.str(), stdout);
+    // Just doing the copyright header for now, same as wsl.exe.
+    PrintMessage(Localization::WSLCCLI_CopyrightHeaderMessage(), stdout);
 }
 
 void Command::OutputHelp(const CommandException* exception) const

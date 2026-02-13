@@ -28,7 +28,8 @@ std::vector<Argument> DiagAttachCommand::GetArguments() const
 {
     return {
         // Adding the Verbose flag arg, overriding description and leaving other defaults alone.
-        Argument::Create(ArgType::Verbose, std::nullopt, std::nullopt, L"Show detailed information about the attached containers."),
+        Argument::Create(
+            ArgType::Verbose, std::nullopt, std::nullopt, L"Show detailed information about the attached containers."),
     };
 }
 

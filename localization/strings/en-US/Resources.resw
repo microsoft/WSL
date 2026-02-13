@@ -2044,6 +2044,10 @@ Usage:
      <value>Invalid extra argument encountered: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_CopyrightHeaderMessage" xml:space="preserve">
+     <value>Copyright (c) Microsoft Corporation. All rights reserved.
+For privacy information about this product please visit https://aka.ms/privacy.</value>
+  </data>
   <data name = "MessageWslaInvalidImage" xml:space = "preserve" >
     <value>Invalid image: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
