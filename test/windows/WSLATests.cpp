@@ -509,18 +509,11 @@ class WSLATests
 
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
     {
-        auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(contextDir);
-
-        LARGE_INTEGER fileSize{};
-        VERIFY_IS_TRUE(GetFileSizeEx(tarFile.get(), &fileSize));
-        VERIFY_IS_TRUE(fileSize.QuadPart > 0);
-
-        auto buildResult = m_defaultSession->BuildImage(
-            HandleToULong(tarFile.get()), static_cast<ULONGLONG>(fileSize.QuadPart), dockerfilePath, imageTag, nullptr);
+        auto buildResult = m_defaultSession->BuildImage(contextDir.wstring().c_str(), dockerfilePath, imageTag, nullptr);
 
         if (FAILED(buildResult))
         {
-            LogInfo("BuildImage failed: 0x%08x, tar size: %lld", buildResult, fileSize.QuadPart);
+            LogInfo("BuildImage failed: 0x%08x", buildResult);
         }
 
         return buildResult;

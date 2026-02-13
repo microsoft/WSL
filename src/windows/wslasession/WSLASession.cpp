@@ -350,116 +350,115 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::BuildImage(ULONG ContextHandle, ULONGLONG ContentLength, LPCSTR DockerfilePath, LPCSTR ImageTag, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::BuildImage(LPCWSTR ContextPath, LPCSTR DockerfilePath, LPCSTR ImageTag, IProgressCallback* ProgressCallback)
 try
 {
     COMServiceExecutionContext context;
 
-    RETURN_HR_IF(E_INVALIDARG, ContextHandle == 0);
-
-    std::optional<std::string> dockerfilePath;
-    if (DockerfilePath != nullptr && *DockerfilePath != '\0')
-    {
-        dockerfilePath = std::string(DockerfilePath);
-    }
-
-    std::optional<std::string> tag;
-    if (ImageTag != nullptr && *ImageTag != '\0')
-    {
-        tag = std::string(ImageTag);
-    }
+    RETURN_HR_IF_NULL(E_POINTER, ContextPath);
+    RETURN_HR_IF(E_INVALIDARG, *ContextPath == L'\0');
 
     std::lock_guard lock{m_lock};
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    wil::unique_handle contextFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(ContextHandle))};
+    static constexpr char mountPath[] = "/tmp/wsla-build-context";
+    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(ContextPath, mountPath, TRUE));
+    auto unmountGuard = wil::scope_exit([&]() { m_virtualMachine->UnmountWindowsFolder(mountPath); });
 
-    auto requestContext = m_dockerClient->BuildImage(ContentLength, dockerfilePath, tag);
+    std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
+    if (ImageTag != nullptr && *ImageTag != '\0')
+    {
+        buildArgs.push_back("-t");
+        buildArgs.push_back(ImageTag);
+    }
+    if (DockerfilePath != nullptr && *DockerfilePath != '\0')
+    {
+        buildArgs.push_back("-f");
+        buildArgs.push_back(std::string(mountPath) + "/" + std::string(DockerfilePath));
+    }
+    buildArgs.push_back(mountPath);
+
+    WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
+
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs);
+    auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     relay::MultiHandleWait io;
+    std::string allOutput;
+    std::string pendingJson;
+    std::set<std::string> reportedSteps;
+    std::set<std::string> reportedErrors;
 
-    std::optional<boost::beast::http::status> buildResult;
-
-    auto onHttpResponse = [&](const boost::beast::http::message<false, boost::beast::http::buffer_body>& response) {
-        WSL_LOG("BuildHttpResponse", TraceLoggingValue(static_cast<int>(response.result()), "StatusCode"));
-
-        buildResult = response.result();
+    auto reportProgress = [&](const std::string& message) {
+        if (ProgressCallback != nullptr)
+        {
+            THROW_IF_FAILED(ProgressCallback->OnProgress(message.c_str(), "", 0, 0));
+        }
     };
 
-    std::string errorJson;
-    std::string lastStreamMessage;
+    // Accumulate lines and use accept() to detect complete JSON objects. Check for non-JSON lines between JSON objects and add
+    // them to the output in case they contain helpful information about the build.
+    auto captureOutput = [&](const gsl::span<char>& content) {
+        std::string line{content.begin(), content.end()};
 
-    auto onChunk = [&](const gsl::span<char>& Content) {
-        if (buildResult.has_value() && buildResult.value() != boost::beast::http::status::ok)
+        pendingJson.append(line);
+
+        if (!nlohmann::json::accept(pendingJson))
         {
-            // If the status code is an error, then this is an error message, not a progress update.
-            errorJson.append(Content.data(), Content.size());
+            if (pendingJson.empty() || pendingJson[0] != '{')
+            {
+                allOutput.append(pendingJson).append("\n");
+                pendingJson.clear();
+            }
+
             return;
         }
 
-        std::string contentString{Content.begin(), Content.end()};
-        WSL_LOG(
-            "ImageBuildProgress",
-            TraceLoggingValue(ImageTag != nullptr ? ImageTag : "(no tag)", "Image"),
-            TraceLoggingValue(contentString.c_str(), "Content"));
+        auto json = nlohmann::json::parse(pendingJson);
+        pendingJson.clear();
 
-        auto parsed = wsl::shared::FromJson<docker_schema::BuildProgress>(contentString.c_str());
+        docker_schema::BuildKitSolveStatus status{};
+        from_json(json, status);
 
-        if (!parsed.stream.empty())
+        for (const auto& vertex : status.vertexes)
         {
-            lastStreamMessage = parsed.stream;
-            if (ProgressCallback != nullptr)
+            if (!vertex.started.empty() && reportedSteps.insert(vertex.digest).second)
             {
-                THROW_IF_FAILED(ProgressCallback->OnProgress(parsed.stream.c_str(), "", 0, 0));
-            }
-        }
+                allOutput.append(vertex.name).append("\n");
 
-        if (!parsed.error.empty())
-        {
-            errorJson = parsed.error;
+                if (!vertex.name.empty() && vertex.name[0] == '[' && vertex.name.find("[internal]") == std::string::npos)
+                {
+                    reportProgress(vertex.name + "\n");
+                }
+            }
+
+            if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
+            {
+                allOutput.append(vertex.error).append("\n");
+                reportProgress(vertex.error + "\n");
+            }
         }
     };
 
-    auto onCompleted = [&]() { io.Cancel(); };
+    // Drain stdout to prevent blocking; --progress=rawjson writes progress to stderr.
+    io.AddHandle(std::make_unique<relay::ReadHandle>(
+        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
 
-    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-        common::relay::HandleWrapper{std::move(contextFileHandle)}, common::relay::HandleWrapper{requestContext->stream.native_handle()}));
+    io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
 
-    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
+    io.AddHandle(std::make_unique<relay::EventHandle>(buildProcess.GetExitEvent(), [&]() { io.Cancel(); }));
 
     io.Run({});
 
-    THROW_HR_IF(E_UNEXPECTED, !buildResult.has_value());
+    int exitCode = buildProcess.GetExitCode();
+    WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
+    THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 
-    WSL_LOG(
-        "BuildCompleted",
-        TraceLoggingValue(static_cast<int>(buildResult.value()), "StatusCode"),
-        TraceLoggingValue(errorJson.c_str(), "ErrorJson"),
-        TraceLoggingValue(lastStreamMessage.c_str(), "LastStreamMessage"));
-
-    if (buildResult.value() != boost::beast::http::status::ok || !errorJson.empty())
-    {
-        std::string errorMessage = !errorJson.empty() ? std::move(errorJson) : std::move(lastStreamMessage);
-
-        // For HTTP-level errors, the error body is a JSON object - parse the message from it.
-        if (buildResult.value() != boost::beast::http::status::ok)
-        {
-            try
-            {
-                errorMessage = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorMessage.c_str()).message;
-            }
-            catch (...)
-            {
-                LOG_CAUGHT_EXCEPTION();
-            }
-        }
-
-        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
-    }
+    std::string tag = (ImageTag != nullptr && *ImageTag != '\0') ? ImageTag : "";
+    reportProgress(tag.empty() ? "\nBuild complete.\n" : "\nBuild complete: " + tag + "\n");
 
     return S_OK;
 }

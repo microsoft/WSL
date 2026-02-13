@@ -453,22 +453,10 @@ static int Build(std::wstring_view commandLine)
 
     wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", inputPath.wstring()), stdout);
 
-    wprintf(L"Creating build context...\n");
-    auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(inputPath);
-
-    LARGE_INTEGER fileSize{};
-    THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(tarFile.get(), &fileSize));
-
-    wslutil::PrintMessage(std::format(L"Sending build context ({} bytes)...\n", fileSize.QuadPart), stdout);
-
     Callback callback;
 
     THROW_IF_FAILED(session->BuildImage(
-        HandleToULong(tarFile.get()),
-        static_cast<ULONGLONG>(fileSize.QuadPart),
-        dockerfilePath.empty() ? nullptr : dockerfilePath.c_str(),
-        tag.empty() ? nullptr : tag.c_str(),
-        &callback));
+        inputPath.wstring().c_str(), dockerfilePath.empty() ? nullptr : dockerfilePath.c_str(), tag.empty() ? nullptr : tag.c_str(), &callback));
 
     wprintf(L"\n");
 
