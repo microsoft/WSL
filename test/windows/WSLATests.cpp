@@ -830,8 +830,7 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        auto runTagImage = [&](LPCSTR Image, LPCSTR Repo, LPCSTR Tag)
-        {
+        auto runTagImage = [&](LPCSTR Image, LPCSTR Repo, LPCSTR Tag) {
             WSLA_TAG_IMAGE_OPTIONS options{};
             options.Image = Image;
             options.Repo = Repo;
