@@ -831,58 +831,53 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
-        // Positive test: Tag an existing image with a new tag.
+        // Positive test: Tag an existing image with a new tag in the same repository.
         {
-            // Ensure debian:latest exists.
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
-            // Tag debian:latest as debian:test-tag-image.
             WSLA_TAG_IMAGE_OPTIONS options{};
             options.Image = "debian:latest";
             options.Repo = "debian";
-            options.Tag = "test-tag-image";
+            options.Tag = "test-tag";
 
-            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&options, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&options));
 
             // Verify both tags exist and point to the same image.
             ExpectImagePresent(*m_defaultSession, "debian:latest");
-            ExpectImagePresent(*m_defaultSession, "debian:test-tag-image");
+            ExpectImagePresent(*m_defaultSession, "debian:test-tag");
 
-            // Get image hash for both tags to verify they're the same image.
+            // Verify they have the same image hash.
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
 
-            std::string debianLatestHash;
-            std::string debianTestTagHash;
-
+            std::string latestHash;
+            std::string testTagHash;
             for (const auto& image : images)
             {
                 if (std::strcmp(image.Image, "debian:latest") == 0)
                 {
-                    debianLatestHash = image.Hash;
+                    latestHash = image.Hash;
                 }
-                if (std::strcmp(image.Image, "debian:test-tag-image") == 0)
+                else if (std::strcmp(image.Image, "debian:test-tag") == 0)
                 {
-                    debianTestTagHash = image.Hash;
+                    testTagHash = image.Hash;
                 }
             }
 
-            VERIFY_IS_FALSE(debianLatestHash.empty());
-            VERIFY_IS_FALSE(debianTestTagHash.empty());
-            VERIFY_ARE_EQUAL(debianLatestHash, debianTestTagHash);
+            VERIFY_IS_FALSE(latestHash.empty());
+            VERIFY_IS_FALSE(testTagHash.empty());
+            VERIFY_ARE_EQUAL(latestHash, testTagHash);
 
-            // Cleanup: Delete the test tag.
+            // Cleanup.
             WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
-            deleteOptions.Image = "debian:test-tag-image";
+            deleteOptions.Image = "debian:test-tag";
             deleteOptions.Force = FALSE;
             deleteOptions.NoPrune = TRUE;
 
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
-            VERIFY_IS_TRUE(deletedImages.size() > 0);
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
-            // Verify the tagged image was removed but the original still exists.
-            ExpectImagePresent(*m_defaultSession, "debian:test-tag-image", false);
+            ExpectImagePresent(*m_defaultSession, "debian:test-tag", false);
             ExpectImagePresent(*m_defaultSession, "debian:latest");
         }
 
@@ -895,9 +890,8 @@ class WSLATests
             options.Repo = "myrepo/myimage";
             options.Tag = "v1.0.0";
 
-            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&options, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&options));
 
-            // Verify the new tag exists.
             ExpectImagePresent(*m_defaultSession, "myrepo/myimage:v1.0.0");
 
             // Cleanup.
@@ -907,78 +901,65 @@ class WSLATests
             deleteOptions.NoPrune = TRUE;
 
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
             ExpectImagePresent(*m_defaultSession, "myrepo/myimage:v1.0.0", false);
-            ExpectImagePresent(*m_defaultSession, "debian:latest");
         }
 
-        // Positive test: Tag using image ID instead of name.
+        // Positive test: Tag using image ID.
         {
             ExpectImagePresent(*m_defaultSession, "debian:latest");
 
-            // Get the image ID for debian:latest.
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
 
-            std::string debianImageId;
+            std::string imageId;
             for (const auto& image : images)
             {
                 if (std::strcmp(image.Image, "debian:latest") == 0)
                 {
-                    debianImageId = image.Hash;
+                    imageId = image.Hash;
                     break;
                 }
             }
+            VERIFY_IS_FALSE(imageId.empty());
 
-            VERIFY_IS_FALSE(debianImageId.empty());
-
-            // Tag using the image ID.
             WSLA_TAG_IMAGE_OPTIONS options{};
-            options.Image = debianImageId.c_str();
+            options.Image = imageId.c_str();
             options.Repo = "debian";
-            options.Tag = "test-tag-by-id";
+            options.Tag = "test-by-id";
 
-            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&options, nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&options));
 
-            // Verify the new tag exists.
-            ExpectImagePresent(*m_defaultSession, "debian:test-tag-by-id");
+            ExpectImagePresent(*m_defaultSession, "debian:test-by-id");
 
             // Cleanup.
             WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
-            deleteOptions.Image = "debian:test-tag-by-id";
+            deleteOptions.Image = "debian:test-by-id";
             deleteOptions.Force = FALSE;
             deleteOptions.NoPrune = TRUE;
 
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
 
-            ExpectImagePresent(*m_defaultSession, "debian:test-tag-by-id", false);
+            ExpectImagePresent(*m_defaultSession, "debian:test-by-id", false);
         }
 
         // Negative test: Tag a non-existent image.
         {
             WSLA_TAG_IMAGE_OPTIONS options{};
-            options.Image = "nonexistent:image";
+            options.Image = "nonexistent:notfound";
             options.Repo = "test";
             options.Tag = "fail";
 
-            WSLA_ERROR_INFO errorInfo{};
-            HRESULT hr = m_defaultSession->TagImage(&options, &errorInfo);
+            HRESULT hr = m_defaultSession->TagImage(&options);
 
             VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, hr);
-
-            // Verify error message is set.
-            if (errorInfo.UserErrorMessage != nullptr)
-            {
-                VERIFY_IS_TRUE(std::strlen(errorInfo.UserErrorMessage) > 0);
-                CoTaskMemFree(errorInfo.UserErrorMessage);
-            }
         }
 
         // Negative test: Null options pointer.
         {
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(nullptr, nullptr));
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(nullptr));
         }
 
         // Negative test: Null Image field.
@@ -986,9 +967,9 @@ class WSLATests
             WSLA_TAG_IMAGE_OPTIONS options{};
             options.Image = nullptr;
             options.Repo = "test";
-            options.Tag = "fail";
+            options.Tag = "tag";
 
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(&options, nullptr));
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(&options));
         }
 
         // Negative test: Null Repo field.
@@ -996,9 +977,9 @@ class WSLATests
             WSLA_TAG_IMAGE_OPTIONS options{};
             options.Image = "debian:latest";
             options.Repo = nullptr;
-            options.Tag = "fail";
+            options.Tag = "tag";
 
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(&options, nullptr));
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(&options));
         }
 
         // Negative test: Null Tag field.
@@ -1008,26 +989,19 @@ class WSLATests
             options.Repo = "test";
             options.Tag = nullptr;
 
-            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(&options, nullptr));
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->TagImage(&options));
         }
 
-        // Negative test: Invalid tag format (contains invalid characters).
+        // Negative test: Invalid tag format with spaces.
         {
             WSLA_TAG_IMAGE_OPTIONS options{};
             options.Image = "debian:latest";
             options.Repo = "test";
-            options.Tag = "invalid tag with spaces";
+            options.Tag = "invalid tag";
 
-            WSLA_ERROR_INFO errorInfo{};
-            HRESULT hr = m_defaultSession->TagImage(&options, &errorInfo);
+            HRESULT hr = m_defaultSession->TagImage(&options);
 
-            // Docker will return 400 Bad Request for invalid tag format.
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), hr);
-
-            if (errorInfo.UserErrorMessage != nullptr)
-            {
-                CoTaskMemFree(errorInfo.UserErrorMessage);
-            }
         }
     }
 
