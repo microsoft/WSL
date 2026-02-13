@@ -27,6 +27,6 @@ struct ProgressCallback : public winrt::implements<ProgressCallback, IProgressCa
     static winrt::com_ptr<ProgressCallback> CreateIf(const WslcPullImageOptions* options);
 
 private:
-    WslcContainerImageProgressCallback m_callback;
-    PVOID m_context;
+    WslcContainerImageProgressCallback m_callback = nullptr;
+    PVOID m_context = nullptr;
 };

@@ -101,7 +101,7 @@ void GetErrorInfoIf(PWSTR* errorMessage)
 // SESSION DEFINITIONS
 STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     *internalType = {};
 
@@ -116,7 +116,7 @@ STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSetting
 
 STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t cpuCount)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     if (cpuCount)
     {
@@ -132,7 +132,7 @@ STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings,
 
 STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     if (memoryMb)
     {
@@ -152,7 +152,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, session);
     *session = nullptr;
 
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     wil::com_ptr<IWSLASessionManager> sessionManager;
     RETURN_IF_FAILED(CoCreateInstance(__uuidof(WSLASessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&sessionManager)));
@@ -163,7 +163,7 @@ try
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
     // TODO: Is this the intended use for vhdRequirements.sizeInBytes?
-    runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeInBytes / (1000 * 1000);
+    runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeInBytes / _1MB;
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
@@ -194,11 +194,11 @@ try
     *session = reinterpret_cast<WslcSession>(result.release());
     return S_OK;
 }
-CATCH_RETURN()
+CATCH_RETURN();
 
 STDAPI WslcSessionTerminate(_In_ WslcSession session)
 {
-    WSLC_GET_INTERNAL_TYPE(session);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
 
     RETURN_HR(internalType->session->Terminate());
@@ -214,7 +214,7 @@ STDAPI WslcContainerSettingsSetNetworkingMode(_In_ WslcContainerSettings* contai
 // TODO: DisplayName is required (and is effectively `SessionKey`); it should be promoted to a required Init time parameter.
 STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings, _In_ PCWSTR displayName)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     internalType->displayName = displayName;
 
@@ -223,7 +223,7 @@ STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettin
 
 STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     if (timeoutMS)
     {
@@ -246,7 +246,7 @@ STDAPI WslcSessionCreateVhd(_In_ WslcSession session, _In_ const WslcVhdRequirem
 
 STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     if (vhdRequirements)
     {
@@ -276,7 +276,7 @@ STDAPI WslcContainerSettingsSetDomainName(_In_ WslcContainerSettings* containerS
 
 STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     internalType->flags = flags;
 
@@ -286,7 +286,7 @@ STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _I
 STDAPI WslcSessionSettingsSetTerminateCallback(
     _In_ WslcSessionSettings* sessionSettings, _In_opt_ WslcSessionTerminationCallback terminationCallback, _In_opt_ PVOID terminationContext)
 {
-    WSLC_GET_INTERNAL_TYPE(sessionSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(sessionSettings);
 
     internalType->terminationCallback = terminationCallback;
     internalType->terminationCallbackContext = terminationContext;
@@ -296,7 +296,7 @@ STDAPI WslcSessionSettingsSetTerminateCallback(
 
 STDAPI WslcSessionRelease(_In_ WslcSession session)
 {
-    WSLC_GET_INTERNAL_TYPE_FOR_RELEASE(session);
+    auto internalType = WSLC_GET_INTERNAL_TYPE_FOR_RELEASE(session);
 
     // Intentionally destroy session before termination callback in the event that
     // the termination callback ends up being invoked by session destruction.
@@ -324,7 +324,7 @@ STDAPI WslcProcessRelease(_In_ WslcProcess process)
 
 STDAPI WslcContainerInitSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings)
 {
-    WSLC_GET_INTERNAL_TYPE(containerSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(containerSettings);
     RETURN_HR_IF_NULL(E_POINTER, imageName);
 
     *internalType = {};
@@ -340,9 +340,9 @@ try
     RETURN_HR_IF_NULL(E_POINTER, container);
     *container = nullptr;
 
-    WSLC_GET_INTERNAL_TYPE_NAMED(session, internalSession);
+    auto internalSession = WSLC_GET_INTERNAL_TYPE(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalSession->session);
-    WSLC_GET_INTERNAL_TYPE_NAMED(containerSettings, internalContainerSettings);
+    auto internalContainerSettings = WSLC_GET_INTERNAL_TYPE(containerSettings);
 
     auto result = std::make_unique<WslcContainerImpl>();
 
@@ -402,7 +402,7 @@ CATCH_RETURN();
 
 STDAPI WslcContainerStart(_In_ WslcContainer container)
 {
-    WSLC_GET_INTERNAL_TYPE(container);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
     // TODO: No user choice between None and Attach (where attach is what allows access to init process IO handles)
@@ -411,7 +411,7 @@ STDAPI WslcContainerStart(_In_ WslcContainer container)
 
 STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettings, _In_ WslcContainerFlags flags)
 {
-    WSLC_GET_INTERNAL_TYPE(containerSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(containerSettings);
 
     internalType->containerFlags = flags;
 
@@ -420,7 +420,7 @@ STDAPI WslcContainerSettingsSetFlags(_In_ WslcContainerSettings* containerSettin
 
 STDAPI WslcContainerSettingsSetName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR name)
 {
-    WSLC_GET_INTERNAL_TYPE(containerSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(containerSettings);
 
     internalType->runtimeName = name;
 
@@ -429,7 +429,7 @@ STDAPI WslcContainerSettingsSetName(_In_ WslcContainerSettings* containerSetting
 
 STDAPI WslcContainerSettingsSetInitProcess(_In_ WslcContainerSettings* containerSettings, _In_ WslcProcessSettings* initProcess)
 {
-    WSLC_GET_INTERNAL_TYPE(containerSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(containerSettings);
 
     internalType->initProcessOptions = GetInternalType(initProcess);
 
@@ -479,7 +479,7 @@ STDAPI WslcContainerInspect(_In_ WslcContainer container, _Outptr_result_z_ PCST
 
 STDAPI WslcContainerGetInitProcess(_In_ WslcContainer container, _Out_ WslcProcess* initProcess)
 {
-    WSLC_GET_INTERNAL_TYPE(container);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
     RETURN_HR_IF_NULL(E_POINTER, initProcess);
 
@@ -503,7 +503,7 @@ STDAPI WslcContainerGetState(_In_ WslcContainer container, _Out_ WslcContainerSt
 
 STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutMS)
 {
-    WSLC_GET_INTERNAL_TYPE(container);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
     auto convertedSignal = ConvertSignal(signal);
@@ -515,7 +515,7 @@ STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags)
 {
-    WSLC_GET_INTERNAL_TYPE(container);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
     // TODO: Flags?
@@ -528,7 +528,7 @@ STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContaine
 
 STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings)
 {
-    WSLC_GET_INTERNAL_TYPE(processSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(processSettings);
 
     *internalType = {};
 
@@ -538,7 +538,7 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings)
 // TODO: Executable has no place in runtime settings; it should be removed in favor of placement as the first item in CmdLineArgs.
 STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable)
 {
-    WSLC_GET_INTERNAL_TYPE(processSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(processSettings);
 
     internalType->executable = executable;
 
@@ -556,7 +556,7 @@ STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processS
 
 STDAPI WslcProcessSettingsSetCmdLineArgs(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc)
 {
-    WSLC_GET_INTERNAL_TYPE(processSettings);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(processSettings);
     RETURN_HR_IF(
         E_INVALIDARG,
         (argv == nullptr && argc != 0) || (argv != nullptr && argc == 0) ||
@@ -587,7 +587,7 @@ STDAPI WslcProcessGetPid(_In_ WslcProcess process, _Out_ uint32_t* pid)
 
 STDAPI WslcProcessGetExitEvent(_In_ WslcProcess process, _Out_ HANDLE* exitEvent)
 {
-    WSLC_GET_INTERNAL_TYPE(process);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(process);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
     RETURN_HR_IF_NULL(E_POINTER, exitEvent);
 
@@ -640,7 +640,7 @@ STDAPI WslcProcessSettingsSetIoCallback(
 
 STDAPI WslcProcessGetIOHandles(_In_ WslcProcess process, _In_ WslcProcessIoHandle ioHandle, _Out_ HANDLE* handle)
 {
-    WSLC_GET_INTERNAL_TYPE(process);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(process);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
     RETURN_HR_IF_NULL(E_POINTER, handle);
 
@@ -663,7 +663,7 @@ STDAPI WslcProcessGetIOHandles(_In_ WslcProcess process, _In_ WslcProcessIoHandl
 STDAPI WslcSessionImagePull(_In_ WslcSession session, _In_ const WslcPullImageOptions* options, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
-    WSLC_GET_INTERNAL_TYPE(session);
+    auto internalType = WSLC_GET_INTERNAL_TYPE(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->session);
     RETURN_HR_IF_NULL(E_POINTER, options);
     RETURN_HR_IF_NULL(E_INVALIDARG, options->uri);

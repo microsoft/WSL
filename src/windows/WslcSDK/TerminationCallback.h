@@ -27,6 +27,6 @@ struct TerminationCallback : public winrt::implements<TerminationCallback, ITerm
     static winrt::com_ptr<TerminationCallback> CreateIf(const WSLC_SESSION_OPTIONS_INTERNAL* options);
 
 private:
-    WslcSessionTerminationCallback m_callback;
-    PVOID m_context;
+    WslcSessionTerminationCallback m_callback = nullptr;
+    PVOID m_context = nullptr;
 };

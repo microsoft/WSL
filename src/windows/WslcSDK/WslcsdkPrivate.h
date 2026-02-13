@@ -42,6 +42,8 @@ static_assert(
     __alignof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_ALIGNMENT,
     "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
 
+static_assert(std::is_trivial_v<WSLC_SESSION_OPTIONS_INTERNAL>, "WSLC_SESSION_OPTIONS_INTERNAL must be trivial");
+
 WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings);
 
 // PROCESS DEFINITIONS
@@ -61,6 +63,8 @@ static_assert(
 static_assert(
     __alignof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
+
+static_assert(std::is_trivial_v<WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
 
 WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* GetInternalType(WslcProcessSettings* settings);
 
@@ -87,6 +91,8 @@ static_assert(
     __alignof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_OPTIONS_INTERNAL must be 8-byte aligned");
 
+static_assert(std::is_trivial_v<WSLC_CONTAINER_OPTIONS_INTERNAL>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
+
 WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings);
 
 // Use to allocate the actual objects on the heap to keep it alive.
@@ -112,18 +118,16 @@ struct WslcProcessImpl
 
 WslcProcessImpl* GetInternalType(WslcProcess handle);
 
-// Returns an error on null input then converts to a local named `internalType`.
-#define WSLC_GET_INTERNAL_TYPE_NAMED(_input_, _name_) \
-    RETURN_HR_IF_NULL(E_POINTER, _input_); \
-    auto _name_ = GetInternalType(_input_)
+// Converts to the internal type and returns an error on null input.
+#define WSLC_GET_INTERNAL_TYPE(_input_) \
+    GetInternalType(_input_); \
+    RETURN_HR_IF_NULL(E_POINTER, _input_)
 
-#define WSLC_GET_INTERNAL_TYPE(_input_) WSLC_GET_INTERNAL_TYPE_NAMED(_input_, internalType)
-
-// Returns an error on null input then converts to a unique_ptr local named `internalType`.
+// Converts to a unique_ptr of the internal type and returns an error on null input.
 // Use for Release functions to clean up the implementation object on return.
 #define WSLC_GET_INTERNAL_TYPE_FOR_RELEASE(_input_) \
-    RETURN_HR_IF_NULL(E_POINTER, _input_); \
-    std::unique_ptr<std::remove_pointer_t<decltype(GetInternalType(_input_))>> internalType \
+    std::unique_ptr<std::remove_pointer_t<decltype(GetInternalType(_input_))>> \
     { \
         GetInternalType(_input_) \
-    }\
+    }; \
+    RETURN_HR_IF_NULL(E_POINTER, _input_)\
