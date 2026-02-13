@@ -45,70 +45,75 @@ Abstract:
 
 using namespace wsl::windows::wslc::argument;
 
-namespace wsl::windows::wslc
-{
-    struct Command;
+namespace wsl::windows::wslc {
+struct Command;
 }
 
-namespace wsl::windows::wslc::task
-{
-    struct Task;
+namespace wsl::windows::wslc::task {
+struct Task;
 }
 
-namespace wsl::windows::wslc::execution
+namespace wsl::windows::wslc::execution {
+// The context within which all commands execute.
+// Contains arguments via Args.
+struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 {
-    // The context within which all commands execute.
-    // Contains arguments via Args.
-    struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
+    CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC)
     {
-        CLIExecutionContext() : wsl::windows::common::ExecutionContext(wsl::windows::common::Context::WslC) {}
-        ~CLIExecutionContext() override = default;
+    }
+    ~CLIExecutionContext() override = default;
 
-        CLIExecutionContext(const CLIExecutionContext&) = delete;
-        CLIExecutionContext(CLIExecutionContext&&) = delete;
+    CLIExecutionContext(const CLIExecutionContext&) = delete;
+    CLIExecutionContext(CLIExecutionContext&&) = delete;
 
-        CLIExecutionContext& operator=(const CLIExecutionContext&) = delete;
-        CLIExecutionContext& operator=(CLIExecutionContext&&) = delete;
+    CLIExecutionContext& operator=(const CLIExecutionContext&) = delete;
+    CLIExecutionContext& operator=(CLIExecutionContext&&) = delete;
 
-        ArgMap Args;
+    ArgMap Args;
 
-        // Map of data stored in the context.
-        DataMap Data;
+    // Map of data stored in the context.
+    DataMap Data;
 
-        // Returns a value indicating whether the context is terminated.
-        bool IsTerminated() const
-        {
-            return m_isTerminated;
-        }
+    // Returns a value indicating whether the context is terminated.
+    bool IsTerminated() const
+    {
+        return m_isTerminated;
+    }
 
-        // Resets the context to a nonterminated state.
-        void ResetTermination()
-        {
-            m_terminationHR = S_OK;
-            m_isTerminated = false;
-        }
+    // Resets the context to a nonterminated state.
+    void ResetTermination()
+    {
+        m_terminationHR = S_OK;
+        m_isTerminated = false;
+    }
 
-        // Gets the HRESULT reason for the termination.
-        HRESULT GetTerminationHR() const
-        {
-            return m_terminationHR;
-        }
+    // Gets the HRESULT reason for the termination.
+    HRESULT GetTerminationHR() const
+    {
+        return m_terminationHR;
+    }
 
-        // Terminate the context with the specified HR.
-        void Terminate(HRESULT hr, std::string_view file = {}, size_t line = {});
+    // Terminate the context with the specified HR.
+    void Terminate(HRESULT hr, std::string_view file = {}, size_t line = {});
 
-        // Set the termination hr of the context.
-        void SetTerminationHR(HRESULT hr);
+    // Set the termination hr of the context.
+    void SetTerminationHR(HRESULT hr);
 
-        // Gets the executing command
-        wsl::windows::wslc::Command* GetExecutingCommand() { return m_executingCommand; }
+    // Gets the executing command
+    wsl::windows::wslc::Command* GetExecutingCommand()
+    {
+        return m_executingCommand;
+    }
 
-        // Sets the executing command
-        void SetExecutingCommand(wsl::windows::wslc::Command* command) { m_executingCommand = command; }
+    // Sets the executing command
+    void SetExecutingCommand(wsl::windows::wslc::Command* command)
+    {
+        m_executingCommand = command;
+    }
 
-    private:
-        bool m_isTerminated = false;
-        HRESULT m_terminationHR = S_OK;
-        wsl::windows::wslc::Command* m_executingCommand = nullptr;
-    };
-}
+private:
+    bool m_isTerminated = false;
+    HRESULT m_terminationHR = S_OK;
+    wsl::windows::wslc::Command* m_executingCommand = nullptr;
+};
+} // namespace wsl::windows::wslc::execution

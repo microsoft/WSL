@@ -31,7 +31,9 @@ Abstract:
 
 // X-Macro for defining all arguments in one place
 // Format: ARGUMENT(EnumName, Name, Alias, Kind, Desc)
+// clang-format off
 #define WSLC_ARGUMENTS(_) \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(Info,           "info",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_InfoArgDescription()) \
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details")
+// clang-format on

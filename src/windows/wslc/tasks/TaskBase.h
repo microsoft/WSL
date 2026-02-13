@@ -20,44 +20,56 @@ Abstract:
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 
-namespace wsl::windows::wslc::task
+namespace wsl::windows::wslc::task {
+struct Task
 {
-    struct Task
+    using Func = void (*)(CLIExecutionContext&);
+
+    Task(Func f) : m_isFunc(true), m_func(f)
     {
-        using Func = void (*)(CLIExecutionContext&);
+    }
+    Task(std::wstring_view name) : m_name(name)
+    {
+    }
 
-        Task(Func f) : m_isFunc(true), m_func(f) {}
-        Task(std::wstring_view name) : m_name(name) {}
+    virtual ~Task() = default;
 
-        virtual ~Task() = default;
+    Task(const Task&) = default;
+    Task& operator=(const Task&) = default;
 
-        Task(const Task&) = default;
-        Task& operator=(const Task&) = default;
+    Task(Task&&) = default;
+    Task& operator=(Task&&) = default;
 
-        Task(Task&&) = default;
-        Task& operator=(Task&&) = default;
+    bool operator==(const Task& other) const;
 
-        bool operator==(const Task& other) const;
+    virtual void operator()(CLIExecutionContext& context) const;
 
-        virtual void operator()(CLIExecutionContext& context) const;
+    const std::wstring& GetName() const
+    {
+        return m_name;
+    }
+    bool IsFunction() const
+    {
+        return m_isFunc;
+    }
+    Func Function() const
+    {
+        return m_func;
+    }
 
-        const std::wstring& GetName() const { return m_name; }
-        bool IsFunction() const { return m_isFunc; }
-        Func Function() const { return m_func; }
+private:
+    bool m_isFunc = false;
+    Func m_func = nullptr;
+    std::wstring m_name;
+};
 
-    private:
-        bool m_isFunc = false;
-        Func m_func = nullptr;
-        std::wstring m_name;
-    };
+// Helper to report exceptions and return the HRESULT.
+// If context is null, no output will be attempted.
+HRESULT HandleException(CLIExecutionContext* context, std::exception_ptr exception);
 
-    // Helper to report exceptions and return the HRESULT.
-    // If context is null, no output will be attempted.
-    HRESULT HandleException(CLIExecutionContext* context, std::exception_ptr exception);
-
-    // Helper to report exceptions and return the HRESULT.
-    HRESULT HandleException(CLIExecutionContext& context, std::exception_ptr exception);
-}
+// Helper to report exceptions and return the HRESULT.
+HRESULT HandleException(CLIExecutionContext& context, std::exception_ptr exception);
+} // namespace wsl::windows::wslc::task
 
 // The purpose of this model is to allow chaining of tasks and functions in a way that allows for short-circuiting
 // if the context has been marked as terminated. For example, this allows for a task to be conditionally executed

@@ -19,79 +19,111 @@ Abstract:
 #include <vector>
 #include <cstdint>
 
-#define WSLC_CLI_ARG_ID_CHAR        L'-'
-#define WSLC_CLI_ARG_ID_STRING      L"-"
-#define WSLC_CLI_ARG_SPLIT_CHAR     L'='
-#define WSLC_CLI_HELP_ARG           L"?"
-#define WSLC_CLI_HELP_ARG_STRING    WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
-#define NO_ALIAS                    L""
+#define WSLC_CLI_ARG_ID_CHAR L'-'
+#define WSLC_CLI_ARG_ID_STRING L"-"
+#define WSLC_CLI_ARG_SPLIT_CHAR L'='
+#define WSLC_CLI_HELP_ARG L"?"
+#define WSLC_CLI_HELP_ARG_STRING WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
+#define NO_ALIAS L""
 
 using namespace wsl::windows::wslc::argument;
 
-namespace wsl::windows::wslc
+namespace wsl::windows::wslc {
+// An argument to a command.
+struct Argument
 {
-    // An argument to a command.
-    struct Argument
+    // Full constructor with all parameters
+    Argument(
+        ArgType argType,
+        std::wstring name,
+        std::wstring alias,
+        std::wstring desc,
+        argument::Kind kind = Kind::Flag,
+        Visibility visibility = Visibility::Help,
+        bool required = false,
+        int countLimit = 1) :
+        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_visibility(visibility), m_required(required), m_countLimit(countLimit)
     {
-        // Full constructor with all parameters
-        Argument(
-            ArgType argType,
-            std::wstring name,
-            std::wstring alias,
-            std::wstring desc,
-            argument::Kind kind = Kind::Flag,
-            Visibility visibility = Visibility::Help,
-            bool required = false,
-            int countLimit = 1) :
-            m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind),
-            m_visibility(visibility), m_required(required), m_countLimit(countLimit) {}
+    }
 
-        ~Argument() = default;
+    ~Argument() = default;
 
-        Argument(const Argument&) = default;
-        Argument& operator=(const Argument&) = default;
+    Argument(const Argument&) = default;
+    Argument& operator=(const Argument&) = default;
 
-        Argument(Argument&&) = default;
-        Argument& operator=(Argument&&) = default;
+    Argument(Argument&&) = default;
+    Argument& operator=(Argument&&) = default;
 
-        // Creates an argument with optional overrides for table defaults
-        static Argument Create(
-            ArgType type,
-            std::optional<bool> required = false,
-            std::optional<int> countLimit = 1,
-            std::optional<std::wstring> desc = std::nullopt,
-            std::optional<Visibility> visibility = Visibility::Help);
+    // Creates an argument with optional overrides for table defaults
+    static Argument Create(
+        ArgType type,
+        std::optional<bool> required = false,
+        std::optional<int> countLimit = 1,
+        std::optional<std::wstring> desc = std::nullopt,
+        std::optional<Visibility> visibility = Visibility::Help);
 
-        // Gets the common arguments for all commands.
-        static void GetCommon(std::vector<Argument>& args);
+    // Gets the common arguments for all commands.
+    static void GetCommon(std::vector<Argument>& args);
 
-        // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
-        std::wstring GetUsageString() const;
+    // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
+    std::wstring GetUsageString() const;
 
-        // Arguments are not localized, but the description is.
-        std::wstring Name() const { return m_name; }
-        std::wstring Alias() const { return m_alias; }
-        const std::wstring Description() const { return m_desc; }
-        bool Required() const { return m_required; }
-        ArgType Type() const { return m_argType; }
-        Kind Kind() const { return m_type; }
-        int Limit() const { return m_countLimit; }
-        Visibility GetVisibility() const { return m_visibility; }
+    // Arguments are not localized, but the description is.
+    std::wstring Name() const
+    {
+        return m_name;
+    }
+    std::wstring Alias() const
+    {
+        return m_alias;
+    }
+    const std::wstring Description() const
+    {
+        return m_desc;
+    }
+    bool Required() const
+    {
+        return m_required;
+    }
+    ArgType Type() const
+    {
+        return m_argType;
+    }
+    Kind Kind() const
+    {
+        return m_type;
+    }
+    int Limit() const
+    {
+        return m_countLimit;
+    }
+    Visibility GetVisibility() const
+    {
+        return m_visibility;
+    }
 
-        Argument& SetRequired(bool required) { m_required = required; return *this; }
-        Argument& SetCountLimit(int countLimit) { m_countLimit = countLimit; return *this; }
+    Argument& SetRequired(bool required)
+    {
+        m_required = required;
+        return *this;
+    }
+    Argument& SetCountLimit(int countLimit)
+    {
+        m_countLimit = countLimit;
+        return *this;
+    }
 
-        // Validates this argument's value in the provided args
-        void Validate(const ArgMap& execArgs) const;
+    // Validates this argument's value in the provided args
+    void Validate(const ArgMap& execArgs) const;
 
-    private:
-        ArgType m_argType;
-        std::wstring m_name;
-        std::wstring m_desc;
-        std::wstring m_alias;
-        bool m_required = false;
-        argument::Kind m_type = Kind::Flag;
-        Visibility m_visibility = Visibility::Help;
-        int m_countLimit = 1;
-    };
-}
+private:
+    ArgType m_argType;
+    std::wstring m_name;
+    std::wstring m_desc;
+    std::wstring m_alias;
+    bool m_required = false;
+    argument::Kind m_type = Kind::Flag;
+    Visibility m_visibility = Visibility::Help;
+    int m_countLimit = 1;
+};
+} // namespace wsl::windows::wslc
