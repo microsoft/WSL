@@ -1090,7 +1090,7 @@ class InstallerTests
     }
 
     /*
-     TODO: Uncomment when the functionalily is implemented in the SDK.
+     TODO: Uncomment when the functionality is implemented in the SDK.
     TEST_METHOD(WSLAInstall)
     {
         auto expectComponents = [](WslInstallComponent expected) {
