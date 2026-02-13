@@ -224,12 +224,11 @@ void Command::OutputHelp(const CommandException* exception) const
             infoOut << std::endl;
         }
 
-        std::vector<std::wstring> argNames;
         size_t maxArgNameLength = 0;
         for (const auto& arg : arguments)
         {
-            argNames.emplace_back(arg.GetUsageString());
-            maxArgNameLength = std::max(maxArgNameLength, argNames.back().length());
+            auto argLength = arg.GetUsageString().length();
+            maxArgNameLength = std::max(maxArgNameLength, argLength);
         }
 
         if (hasArguments)
@@ -295,12 +294,6 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
             inv.consume(itr);
             return std::move(command);
         }
-    }
-
-    // The command has opted-in to be executed when it has subcommands and the next token is a positional parameter value
-    if (m_selectCurrentCommandIfUnrecognizedSubcommandFound)
-    {
-        return {};
     }
 
     // TODO: If we get to a large number of commands, do a fuzzy search much like git

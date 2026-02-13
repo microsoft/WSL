@@ -102,8 +102,6 @@ private:
     std::wstring_view m_name;
     std::wstring m_fullName;
     Command::Visibility m_visibility;
-    bool m_selectCurrentCommandIfUnrecognizedSubcommandFound = false;
-    std::wstring m_commandArguments;
 };
 
 int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
