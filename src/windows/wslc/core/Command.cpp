@@ -48,7 +48,7 @@ Command::Command(std::wstring_view name, std::wstring parent, Command::Visibilit
 void Command::OutputIntroHeader() const
 {
     // Placeholder header.
-    // TODO: Get better product version information dynamicallly instead of hardcoding it here.
+    // TODO: Get better product version information dynamically instead of hardcoding it here.
     // TODO: Strings should be in resources.
     std::wostringstream infoOut;
     infoOut << L"Windows Subsystem for Linux Container CLI (Preview) v1.0.0" << std::endl;
@@ -245,7 +245,6 @@ void Command::OutputHelp(const CommandException* exception) const
 
         if (hasForwardArgs)
         {
-            ////infoOut << Localization::WSLCCLI_AvailableForwardArguments() << std::endl;
             for (const auto& arg : forwardArgs)
             {
                 size_t fillChars = (maxArgNameLength - arg.Name().length()) + 2;
@@ -325,7 +324,7 @@ void Command::ParseArguments(Invocation& inv, ArgMap& execArgs) const
     }
 }
 
-// Validates the ArgMap produced by ParseArguments. ArgMap is assuemd to have
+// Validates the ArgMap produced by ParseArguments. ArgMap is assumed to have
 // been populated and parsed successfully from the invocation and now we are validating
 // that the arguments provided meet the requirements of the command. This includes checking
 // that all required arguments are present and no arguments exceed their count limits.

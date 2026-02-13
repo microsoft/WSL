@@ -11,7 +11,6 @@ Abstract:
     Implementation of the Argument Validation dispatcher.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "Argument.h"
 #include "ArgumentTypes.h"

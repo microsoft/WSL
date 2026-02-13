@@ -11,7 +11,6 @@ Abstract:
     Implementation of the RootCommand, which is the root of all commands in the CLI.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "RootCommand.h"
 #include "TaskBase.h"
@@ -26,10 +25,11 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 {
-    return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-        std::make_unique<DiagCommand>(FullName()),
-        std::make_unique<DiagListCommand>(FullName()),
-    });
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.reserve(2);
+    commands.push_back(std::make_unique<DiagCommand>(FullName()));
+    commands.push_back(std::make_unique<DiagListCommand>(FullName()));
+    return commands;
 }
 
 std::vector<Argument> RootCommand::GetArguments() const

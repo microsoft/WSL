@@ -11,7 +11,6 @@ Abstract:
     Implementation of CLIExecutionContext functionality.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "Argument.h"
 #include "Command.h"

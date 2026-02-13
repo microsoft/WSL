@@ -11,7 +11,6 @@ Abstract:
     Implementation of DiagCommand command tree.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
@@ -26,9 +25,10 @@ namespace wsl::windows::wslc {
 // Diag Root Command
 std::vector<std::unique_ptr<Command>> DiagCommand::GetCommands() const
 {
-    return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-        std::make_unique<DiagListCommand>(FullName()),
-    });
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.reserve(1);
+    commands.push_back(std::make_unique<DiagListCommand>(FullName()));
+    return commands;
 }
 
 std::vector<Argument> DiagCommand::GetArguments() const

@@ -106,21 +106,5 @@ private:
     std::wstring m_commandArguments;
 };
 
-// Helper to initialize a container of move-only types from an initializer list.
-// This is used for greater efficiency when initializing the command tree.
-template <typename Container>
-Container InitializeFromMoveOnly(std::initializer_list<typename Container::value_type> il)
-{
-    using String = typename Container::value_type;
-    Container result;
-
-    for (const auto& v : il)
-    {
-        result.emplace_back(std::move(*const_cast<String*>(&v)));
-    }
-
-    return result;
-}
-
 int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
 } // namespace wsl::windows::wslc
