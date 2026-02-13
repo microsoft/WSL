@@ -14,7 +14,6 @@ Abstract:
 
 #include "precomp.h"
 #include "Common.h"
-#include "WSLAApi.h"
 #include "wslaservice.h"
 #include "WSLAProcessLauncher.h"
 #include "WSLAContainerLauncher.h"
