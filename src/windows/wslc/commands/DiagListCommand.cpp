@@ -11,7 +11,6 @@ Abstract:
     Implementation of the diag list command.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"

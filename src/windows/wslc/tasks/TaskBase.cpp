@@ -11,7 +11,6 @@ Abstract:
     Implementation of task execution logic.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "TaskBase.h"
 #include <wil/result_macros.h>
@@ -57,8 +56,9 @@ HRESULT HandleException(CLIExecutionContext* context, std::exception_ptr excepti
         auto result = wil::ResultFromCaughtException();
         if (FAILED(result))
         {
-            if (const auto& reported = context->ReportedError())
+            if (context && context->ReportedError())
             {
+                const auto& reported = context->ReportedError();
                 auto strings = wslutil::ErrorToString(*reported);
                 auto errorMessage = strings.Message.empty() ? strings.Code : strings.Message;
                 wslutil::PrintMessage(Localization::MessageErrorCode(errorMessage, wslutil::ErrorCodeToString(result)), stderr);

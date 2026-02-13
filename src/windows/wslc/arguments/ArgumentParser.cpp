@@ -121,13 +121,13 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
         return ProcessRemainingPositionals(currArg);
     }
 
-    // Arg does not begin with '-' so it is niether an alias nor a named value, must be positional.
+    // Arg does not begin with '-' so it is neither an alias nor a named value, must be positional.
     if (currArg.empty() || currArg[0] != WSLC_CLI_ARG_ID_CHAR)
     {
         return ProcessFirstPositionalArgument(currArg);
     }
 
-    // The currentArg is non-empty, and and starts with a -.
+    // The currentArg is non-empty, and starts with a -.
     if (currArg.length() == 1)
     {
         // If it is only one character, then it is an error since it is neither an alias nor a named argument.

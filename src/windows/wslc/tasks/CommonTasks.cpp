@@ -11,7 +11,6 @@ Abstract:
     Implementation of task execution logic.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
 #include "TaskBase.h"

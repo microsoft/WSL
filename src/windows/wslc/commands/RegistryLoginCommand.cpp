@@ -11,7 +11,6 @@ Abstract:
     Implementation of command execution logic.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"

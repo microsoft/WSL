@@ -2008,10 +2008,6 @@ Usage:
     <value>Argument alias was not recognized for the current command: '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_TooManyPositionalArgumentsError" xml:space="preserve">
-     <value>Found a positional argument when none was expected: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_InvalidArgumentSpecifierError" xml:space="preserve">
      <value>Invalid argument specifier: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2047,9 +2043,6 @@ Usage:
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Invalid extra argument encountered: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_AvailableForwardArguments" xml:space="preserve">
-    <value>Forwarded arguments supported:</value>
   </data>
   <data name = "MessageWslaInvalidImage" xml:space = "preserve" >
     <value>Invalid image: '{}'</value>

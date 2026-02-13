@@ -11,7 +11,6 @@ Abstract:
     Implementation of DiagCommand command tree.
 
 --*/
-#pragma once
 #include "pch.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
@@ -27,15 +26,16 @@ namespace wsl::windows::wslc {
 // Diag Root Command
 std::vector<std::unique_ptr<Command>> DiagCommand::GetCommands() const
 {
-    return InitializeFromMoveOnly<std::vector<std::unique_ptr<Command>>>({
-        std::make_unique<DiagAttachCommand>(FullName()),
-        std::make_unique<DiagBuildCommand>(FullName()),
-        std::make_unique<DiagListCommand>(FullName()),
-        std::make_unique<DiagLogsCommand>(FullName()),
-        std::make_unique<DiagPullCommand>(FullName()),
-        std::make_unique<DiagRunCommand>(FullName()),
-        std::make_unique<DiagShellCommand>(FullName()),
-    });
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.reserve(7);
+    commands.push_back(std::make_unique<DiagAttachCommand>(FullName()));
+    commands.push_back(std::make_unique<DiagBuildCommand>(FullName()));
+    commands.push_back(std::make_unique<DiagListCommand>(FullName()));
+    commands.push_back(std::make_unique<DiagLogsCommand>(FullName()));
+    commands.push_back(std::make_unique<DiagPullCommand>(FullName()));
+    commands.push_back(std::make_unique<DiagRunCommand>(FullName()));
+    commands.push_back(std::make_unique<DiagShellCommand>(FullName()));
+    return commands;
 }
 
 std::vector<Argument> DiagCommand::GetArguments() const
