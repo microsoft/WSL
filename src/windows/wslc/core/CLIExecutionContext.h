@@ -25,7 +25,7 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
     {
     }
     ~CLIExecutionContext() override = default;
-    
+
     CLIExecutionContext(const CLIExecutionContext&) = default;
     CLIExecutionContext& operator=(const CLIExecutionContext&) = default;
 

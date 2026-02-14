@@ -38,14 +38,7 @@ struct Argument
     static constexpr int DefaultCountLimit = 1;
 
     // Full constructor with all parameters
-    Argument(
-        ArgType argType,
-        std::wstring name,
-        std::wstring alias,
-        std::wstring desc,
-        argument::Kind kind = DefaultKind,
-        bool required = DefaultRequired,
-        int countLimit = DefaultCountLimit) :
+    Argument(ArgType argType, std::wstring name, std::wstring alias, std::wstring desc, argument::Kind kind = DefaultKind, bool required = DefaultRequired, int countLimit = DefaultCountLimit) :
         m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_countLimit(countLimit)
     {
     }

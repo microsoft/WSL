@@ -25,4 +25,3 @@ Abstract:
 // std
 #include <thread>
 #include <format>
-

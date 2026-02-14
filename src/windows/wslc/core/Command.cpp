@@ -24,8 +24,7 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 constexpr std::wstring_view s_ExecutableName = L"wslc";
 
-Command::Command(std::wstring_view name, std::wstring parent) :
-    m_name(name)
+Command::Command(std::wstring_view name, std::wstring parent) : m_name(name)
 {
     if (!parent.empty())
     {

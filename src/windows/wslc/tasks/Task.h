@@ -64,6 +64,3 @@ inline CLIExecutionContext& operator<<(CLIExecutionContext& context, void (*f)(C
 }
 
 } // namespace wsl::windows::wslc::task
-
-
-
