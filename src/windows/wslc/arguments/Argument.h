@@ -43,8 +43,6 @@ struct Argument
     {
     }
 
-    ~Argument() = default;
-
     Argument(const Argument&) = default;
     Argument& operator=(const Argument&) = default;
 
