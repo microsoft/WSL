@@ -265,8 +265,6 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
 
 } // namespace
 
-static constexpr DWORD stopTimeout = 60000; // 60 seconds
-
 WSLAContainerImpl::WSLAContainerImpl(
     WSLAVirtualMachine* parentVM,
     std::string&& Id,
@@ -325,36 +323,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
     }
 
     m_containerEvents.Reset();
-
-    // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
-    m_comWrapper->Disconnect();
-
-    // Stop running containers.
-    if (m_state == WslaContainerStateRunning)
-    {
-        try
-        {
-            Stop(WSLASignalSIGKILL, stopTimeout);
-        }
-        CATCH_LOG();
-    }
-
-    // Release port mappings.
-    std::set<uint16_t> allocatedGuestPorts;
-    for (const auto& e : m_mappedPorts)
-    {
-        WI_ASSERT(e.MappedToHost);
-
-        try
-        {
-            m_parentVM->UnmapPort(e.Family, e.HostPort, e.VmPort);
-        }
-        CATCH_LOG();
-
-        allocatedGuestPorts.insert(e.VmPort);
-    }
-
-    m_parentVM->ReleasePorts(allocatedGuestPorts);
+    ReleaseResources();
 }
 
 void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process)
@@ -417,8 +386,9 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
     handles.emplace_back(
         std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
 
-    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+    handles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(handles));
 
@@ -484,7 +454,6 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
-
         std::lock_guard<std::recursive_mutex> lock(m_lock);
         m_state = WslaContainerStateExited;
 
@@ -496,6 +465,11 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         }
 
         m_processes.clear();
+
+        if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+        {
+            Delete();
+        }
     }
 
     WSL_LOG(
@@ -533,20 +507,24 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
     catch (const DockerHTTPException& e)
     {
         // HTTP 304 is returned when the container is already stopped.
-        if (e.StatusCode() == 304)
+        if (e.StatusCode() != 304)
         {
-            return;
-        }
+            WSL_LOG(
+                "StopContainerFailed",
+                TraceLoggingValue(m_name.c_str(), "Name"),
+                TraceLoggingValue(m_id.c_str(), "Id"),
+                TraceLoggingValue(e.what(), "Error"));
 
-        WSL_LOG(
-            "StopContainerFailed",
-            TraceLoggingValue(m_name.c_str(), "Name"),
-            TraceLoggingValue(m_id.c_str(), "Id"),
-            TraceLoggingValue(e.what(), "Error"));
-        throw;
+            throw;
+        }
     }
 
     m_state = WslaContainerStateExited;
+
+    if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+    {
+        Delete();
+    }
 }
 
 void WSLAContainerImpl::Delete()
@@ -562,8 +540,7 @@ void WSLAContainerImpl::Delete()
         m_state);
 
     m_dockerClient.DeleteContainer(m_id);
-
-    UnmountVolumes(m_mountedVolumes, *m_parentVM);
+    ReleaseResources();
 
     m_state = WslaContainerStateDeleted;
 }
@@ -793,8 +770,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 
-        request.HostConfig.Mounts.emplace_back(common::docker_schema::Mount{
-            .Source = parentVMPath, .Target = volume.ContainerPath, .Type = "bind", .ReadOnly = static_cast<bool>(volume.ReadOnly)});
+        request.HostConfig.Mounts.emplace_back(
+            common::docker_schema::Mount{
+                .Source = parentVMPath, .Target = volume.ContainerPath, .Type = "bind", .ReadOnly = static_cast<bool>(volume.ReadOnly)});
     }
 
     // Mount volumes.
@@ -832,6 +810,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // Build WSLA metadata to store in a label for recovery on Open().
     WSLAContainerMetadataV1 metadata;
+    metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
     metadata.Ports = ports;
@@ -907,7 +886,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         ioRelay,
         DockerStateToWSLAState(dockerContainer.State),
         metadata.InitProcessFlags,
-        WSLAContainerFlagsNone);
+        metadata.Flags);
 
     errorCleanup.release();
     volumeErrorCleanup.release();
@@ -1014,12 +993,51 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLAFDStdout, stdoutRead.release());
     fds.emplace(WSLAFDStderr, stderrRead.release());
 
-    ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
-        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
+    ioHandles.emplace_back(
+        std::make_unique<DockerIORelayHandle>(
+            std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(ioHandles));
 
     return std::make_unique<RelayedProcessIO>(std::move(fds));
+}
+
+void WSLAContainerImpl::ReleaseResources()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    // Disconnect the COM wrapper so no new RPC calls can reach this container.
+    if (m_comWrapper)
+    {
+        m_comWrapper->Disconnect();
+        m_comWrapper.Reset();
+    }
+
+    // Unmount volumes.
+    UnmountVolumes(m_mountedVolumes, *m_parentVM);
+    m_mountedVolumes.clear();
+
+    // Unmap and release ports.
+    std::set<uint16_t> allocatedGuestPorts;
+    for (const auto& e : m_mappedPorts)
+    {
+        WI_ASSERT(e.MappedToHost);
+
+        try
+        {
+            m_parentVM->UnmapPort(e.Family, e.HostPort, e.VmPort);
+        }
+        CATCH_LOG();
+
+        allocatedGuestPorts.insert(e.VmPort);
+    }
+
+    if (!allocatedGuestPorts.empty())
+    {
+        m_parentVM->ReleasePorts(allocatedGuestPorts);
+    }
+
+    m_mappedPorts.clear();
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :

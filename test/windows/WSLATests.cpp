@@ -3115,15 +3115,18 @@ class WSLATests
             std::string readStdout;
             std::string readStderr;
 
-            io.AddHandle(std::make_unique<DockerIORelayHandle>(
-                std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+            io.AddHandle(
+                std::make_unique<DockerIORelayHandle>(
+                    std::move(readPipe), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
             io.AddHandle(std::make_unique<WriteHandle>(std::move(writePipe), Input));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutRead), [&](const auto& buffer) { readStdout.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stdoutRead), [&](const auto& buffer) {
+                readStdout.append(buffer.data(), buffer.size());
+            }));
 
-            io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrRead), [&](const auto& buffer) { readStderr.append(buffer.data(), buffer.size()); }));
+            io.AddHandle(std::make_unique<ReadHandle>(std::move(stderrRead), [&](const auto& buffer) {
+                readStderr.append(buffer.data(), buffer.size());
+            }));
 
             io.Run({});
 
@@ -3864,5 +3867,71 @@ class WSLATests
             ExpectCommandResult(m_defaultSession.get(), {"/bin/cat", "/sys/module/page_reporting/parameters/page_reporting_order"}, 0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
+    }
+
+    TEST_METHOD(ContainerAutoRemove)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        // Test that a container with the Rm flag is automatically deleted on Stop().
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            // verifyContainerDeleted("test-auto-remove");
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that a container with the Rm flag is automatically deleted when the init process exits.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            // Prevent container from being deleted when handle is closed so we can verify auto-remove behavior.
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGKILL));
+            process.Wait();
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that the Rm flag is persisted across wsla sessions.
+        {
+            {
+                WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+                launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+                auto container = launcher.Create(*m_defaultSession);
+                container.SetDeleteOnClose(false);
+
+                ResetTestSession();
+            }
+
+            auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            // verifyContainerDeleted("test-auto-remove");
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
     }
 };
