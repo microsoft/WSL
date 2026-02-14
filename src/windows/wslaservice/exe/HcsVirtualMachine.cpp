@@ -667,7 +667,7 @@ void HcsVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket) con
             }
 
             THROW_LAST_ERROR_IF(
-                setsockopt(listenSocket.get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&RECEIVE_TIMEOUT, sizeof(RECEIVE_TIMEOUT)) == SOCKET_ERROR);
+                setsockopt(socket.value().get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&RECEIVE_TIMEOUT, sizeof(RECEIVE_TIMEOUT)) == SOCKET_ERROR);
 
             auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmExitEvent.get()};
 
