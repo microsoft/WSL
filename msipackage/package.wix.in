@@ -540,8 +540,7 @@
             <!-- This needs to run after the registry is written because this action needs to read the install path -->
             <Custom Action="RegisterLspCategories" After="WriteRegistryValues" Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED)  and (not UPGRADINGPRODUCTCODE) and (not SKIPLSP = 1)' />
 
-            <!-- Generate initrd.img from the init binary during installation.
-                 Only run when the tools component is being installed ($tools=3), not during same-version reinstalls -->
+            <!-- Generate initrd.img from the init binary whenever the tools component is being installed -->
             <Custom Action="CreateInitrd" After="RegisterLspCategories" Condition='$tools=3' />
 
             <!-- This needs to run before the registry is cleared because this action needs to read the install path.
