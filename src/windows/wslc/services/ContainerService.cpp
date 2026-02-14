@@ -84,8 +84,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
         ImageService imageService;
         imageService.Pull(session, image, callback);
-        auto [retryResult, _] = containerLauncher.CreateNoThrow(*session.Get());
-        result = retryResult;
+        std::tie(result, runningContainer) = containerLauncher.CreateNoThrow(*session.Get());
     }
 
     THROW_IF_FAILED(result);
