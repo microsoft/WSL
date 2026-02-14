@@ -325,10 +325,10 @@ class SimpleTests
             THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(cpioHandle.get(), &cpioSize));
             VERIFY_ARE_EQUAL(cpioSize.QuadPart % 512, 0LL); // Archive padded to 512-byte boundary
 
-            char header[110] = {};
+            char header[111] = {};
             DWORD bytesRead;
-            THROW_IF_WIN32_BOOL_FALSE(ReadFile(cpioHandle.get(), header, sizeof(header), &bytesRead, nullptr));
-            VERIFY_ARE_EQUAL(bytesRead, static_cast<DWORD>(sizeof(header)));
+            THROW_IF_WIN32_BOOL_FALSE(ReadFile(cpioHandle.get(), header, 110, &bytesRead, nullptr));
+            VERIFY_ARE_EQUAL(bytesRead, 110u);
 
             // Parse CPIO newc header: magic(6) ino mode uid gid nlink mtime filesize devmajor devminor rdevmajor rdevminor namesize check
             DWORD fileSize, nameSize;

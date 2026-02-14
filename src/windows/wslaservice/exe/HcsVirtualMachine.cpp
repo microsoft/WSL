@@ -17,7 +17,6 @@ Abstract:
 #include "hcs_schema.h"
 #include "VirtioNetworking.h"
 #include "NatNetworking.h"
-#include "WSLAApi.h"
 #include "wslsecurity.h"
 #include "wslutil.h"
 #include "lxinitshared.h"
@@ -411,6 +410,10 @@ try
         THROW_IF_FAILED(wsl::core::networking::DnsResolver::LoadDnsResolverMethods());
         dnsSocketHandle.reset(reinterpret_cast<SOCKET>(helpers::DuplicateHandle(*DnsSocket)));
     }
+    else
+    {
+        THROW_HR_IF(E_INVALIDARG, DnsSocket != nullptr);
+    }
 
     if (m_networkingMode == WSLANetworkingModeNAT)
     {
@@ -440,8 +443,9 @@ try
     }
     else if (m_networkingMode == WSLANetworkingModeVirtioProxy)
     {
+        wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::None;
         m_networkEngine = std::make_unique<wsl::core::VirtioNetworking>(
-            wsl::core::GnsChannel(std::move(gnsSocketHandle)), false, nullptr, m_guestDeviceManager, m_userToken);
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)), flags, nullptr, m_guestDeviceManager, m_userToken);
     }
     else
     {

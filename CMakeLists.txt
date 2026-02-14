@@ -275,8 +275,9 @@ endif()
 
 # Determine the Visual Studio installation directory which contains LLVM tools
 # N.B. The version is set to VS2022 to ensure local runs match pipeline behavior
+# Require that Clang be installed in the product to potentially de-deduplicate
 execute_process(
-    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,18.0)" -products * -property installationPath
+    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,19.0)" -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath -prerelease
     OUTPUT_VARIABLE VS_INSTALL_DIR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     COMMAND_ERROR_IS_FATAL ANY
@@ -293,7 +294,7 @@ else()
 endif()
 
 if (NOT EXISTS ${LLVM_INSTALL_DIR})
-    message(FATAL_ERROR "C++ Clang Compiler for Windows is not installed. Please install it from the Visual Studio Installer.")
+    message(FATAL_ERROR "C++ Clang Compiler for Windows is not installed at ${LLVM_INSTALL_DIR}. Please install it from the Visual Studio Installer.")
 endif()
 
 # Generate the clang-format script which contains a path to clang-format.exe
@@ -434,9 +435,9 @@ add_subdirectory(src/windows/wslg)
 add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
-add_subdirectory(src/windows/wslaclient)
 add_subdirectory(src/windows/wsladiag)
 add_subdirectory(src/windows/wslc)
+add_subdirectory(src/windows/WslcSDK)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)

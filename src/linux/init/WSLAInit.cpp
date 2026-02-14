@@ -230,6 +230,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
     pollDescriptors[1].events = POLLIN;
 
     std::vector<gsl::byte> relayBuffer;
+
     while (true)
     {
         auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
@@ -249,14 +250,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
                 pollDescriptors[0].fd = -1;
                 break;
             }
-            else
+            else if (UtilWriteBuffer(Channel.Socket(), relayBuffer.data(), bytesRead) < 0)
             {
-                auto bytesWritten = write(Channel.Socket(), relayBuffer.data(), bytesRead);
-                if (bytesWritten < 0)
-                {
-                    LOG_ERROR("write failed {}", errno);
-                    break;
-                }
+                LOG_ERROR("write failed {}", errno);
+                break;
             }
         }
 
@@ -279,14 +276,10 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
                     LOG_ERROR("shutdown({}, SHUT_WR) failed {}", socket.get(), errno);
                 }
             }
-            else
+            else if (UtilWriteBuffer(socket.get(), relayBuffer.data(), bytesRead) < 0)
             {
-                auto bytesWritten = write(socket.get(), relayBuffer.data(), bytesRead);
-                if (bytesWritten < 0)
-                {
-                    LOG_ERROR("write failed {}", errno);
-                    break;
-                }
+                LOG_ERROR("write failed {}", errno);
+                break;
             }
         }
     }

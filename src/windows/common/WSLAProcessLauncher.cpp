@@ -14,7 +14,6 @@ Abstract:
 
 #include <precomp.h>
 #include "WSLAProcessLauncher.h"
-#include "WSLAApi.h"
 
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::RunningWSLAProcess;

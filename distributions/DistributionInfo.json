@@ -6,12 +6,12 @@
                 "FriendlyName": "Ubuntu",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://releases.ubuntu.com/24.04.3/ubuntu-24.04.3-wsl-amd64.wsl",
-                    "Sha256": "c74833a55e525b1e99e1541509c566bb3e32bdb53bf27ea3347174364a57f47c"
+                    "Url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-wsl-amd64.wsl",
+                    "Sha256": "9b2f7730dc68227dd04a9f3e5eab86ad85caf556b8606ad94f1f29ff5c4fd3f5"
                 },
                 "Arm64Url": {
-                    "Url": "https://cdimages.ubuntu.com/releases/24.04.3/release/ubuntu-24.04.3-wsl-arm64.wsl",
-                    "Sha256": "edaf375ea0d1319da08e7154e9bc64cd4eead5af21ea032f2edaa335fadf0970"
+                    "Url": "https://cdimages.ubuntu.com/releases/24.04.4/release/ubuntu-24.04.4-wsl-arm64.wsl",
+                    "Sha256": "6b244d89f412a68f51e58f396fab65bed3b5896a25c045a99bef9c78a07df507"
                 }
             },
             {
@@ -19,12 +19,12 @@
                 "FriendlyName": "Ubuntu 24.04 LTS",
                 "Default": false,
                 "Amd64Url": {
-                    "Url": "https://releases.ubuntu.com/24.04.3/ubuntu-24.04.3-wsl-amd64.wsl",
-                    "Sha256": "c74833a55e525b1e99e1541509c566bb3e32bdb53bf27ea3347174364a57f47c"
+                    "Url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-wsl-amd64.wsl",
+                    "Sha256": "9b2f7730dc68227dd04a9f3e5eab86ad85caf556b8606ad94f1f29ff5c4fd3f5"
                 },
                 "Arm64Url": {
-                    "Url": "https://cdimages.ubuntu.com/releases/24.04.3/release/ubuntu-24.04.3-wsl-arm64.wsl",
-                    "Sha256": "edaf375ea0d1319da08e7154e9bc64cd4eead5af21ea032f2edaa335fadf0970"
+                    "Url": "https://cdimages.ubuntu.com/releases/24.04.4/release/ubuntu-24.04.4-wsl-arm64.wsl",
+                    "Sha256": "6b244d89f412a68f51e58f396fab65bed3b5896a25c045a99bef9c78a07df507"
                 }
             }
         ],

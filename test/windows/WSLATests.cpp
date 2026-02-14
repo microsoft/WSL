@@ -14,7 +14,6 @@ Abstract:
 
 #include "precomp.h"
 #include "Common.h"
-#include "WSLAApi.h"
 #include "wslaservice.h"
 #include "WSLAProcessLauncher.h"
 #include "WSLAContainerLauncher.h"
@@ -101,7 +100,7 @@ class WSLATests
         settings.MemoryMb = 2024;
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
-        settings.MaximumStorageSizeMb = 1000; // 1GB.
+        settings.MaximumStorageSizeMb = 4096; // 4GB.
         settings.NetworkingMode = networkingMode;
 
         return settings;
@@ -502,6 +501,329 @@ class WSLATests
                 VERIFY_FAIL();
             }
         }
+    }
+
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
+    {
+        auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(contextDir);
+
+        LARGE_INTEGER fileSize{};
+        VERIFY_IS_TRUE(GetFileSizeEx(tarFile.get(), &fileSize));
+        VERIFY_IS_TRUE(fileSize.QuadPart > 0);
+
+        auto buildResult = m_defaultSession->BuildImage(
+            HandleToULong(tarFile.get()), static_cast<ULONGLONG>(fileSize.QuadPart), dockerfilePath, imageTag, nullptr);
+
+        if (FAILED(buildResult))
+        {
+            LogInfo("BuildImage failed: 0x%08x, tar size: %lld", buildResult, fileSize.QuadPart);
+        }
+
+        return buildResult;
+    }
+
+    TEST_METHOD(BuildImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "CMD [\"echo\", \"Hello from a WSL container!\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build:latest"));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build:latest", "wsla-build-test-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from a WSL container!") != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageWithContext)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-file";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "COPY message.txt /message.txt\n";
+            dockerfile << "CMD [\"cat\", \"/message.txt\"]\n";
+        }
+
+        {
+            std::ofstream message(contextDir / "message.txt");
+            message << "Hello from a WSL container context file!\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-context:latest"));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-context:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-context:latest", "wsla-build-context-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("Hello from a WSL container context file!") != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageManyFiles)
+    {
+        WSL2_TEST_ONLY();
+
+        static constexpr int fileCount = 1024;
+
+        auto contextDir = std::filesystem::current_path() / "build-context-many";
+        std::filesystem::create_directories(contextDir / "files");
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        // Generate the context files.
+        for (int i = 0; i < fileCount; i++)
+        {
+            auto name = std::format("file{:04d}.txt", i);
+            auto content = std::format("content-{:04d}\n", i);
+            std::ofstream file(contextDir / "files" / name);
+            file << content;
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "COPY files/ /files/\n";
+            // Verify every file is present and contains the expected content.
+            // Only mismatches are printed; on success just the sentinel.
+            dockerfile << "CMD [\"sh\", \"-c\", "
+                       << "\"cd /files && failed=0 && "
+                       << "for i in $(seq 0 " << (fileCount - 1) << "); do "
+                       << "f=$(printf 'file%04d.txt' $i); "
+                       << "e=$(printf 'content-%04d' $i); "
+                       << "if [ ! -f $f ]; then echo MISSING:$f; failed=1; "
+                       << "elif ! grep -q $e $f; then echo BAD:$f; failed=1; fi; "
+                       << "done && "
+                       << "[ $failed -eq 0 ] && echo all_ok_" << fileCount << "\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-many:latest"));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-many:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-many:latest", "wsla-build-many-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        auto sentinel = std::format("all_ok_{}", fileCount);
+        VERIFY_IS_TRUE(result.Output[1].find(sentinel) != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageLargeFile)
+    {
+        WSL2_TEST_ONLY();
+
+        RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "rmi", "-f", "wsla-test-build-large:latest"});
+        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "builder", "prune", "-f"}, 0);
+
+        auto contextDir = std::filesystem::current_path() / "build-context-large";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        static constexpr int fileSizeMb = 1024;
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "COPY large.bin /large.bin\n";
+            dockerfile << std::format(
+                "CMD [\"sh\", \"-c\", \"test $(stat -c %s /large.bin) -eq {} && echo size_ok\"]\n",
+                static_cast<long long>(fileSizeMb) * 1024 * 1024);
+        }
+
+        {
+            auto largePath = contextDir / "large.bin";
+            wil::unique_hfile largeFile{CreateFileW(largePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == largeFile.get());
+
+            std::vector<char> buffer(1024 * 1024, '\0');
+            for (int i = 0; i < fileSizeMb; i++)
+            {
+                DWORD written = 0;
+                if (!WriteFile(largeFile.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &written, nullptr) ||
+                    written != static_cast<DWORD>(buffer.size()))
+                {
+                    LogError("WriteFile failed at chunk %d/%d: 0x%08x", i, fileSizeMb, GetLastError());
+                    VERIFY_FAIL();
+                }
+            }
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-large:latest"));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-large:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-large:latest", "wsla-build-large-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("size_ok") != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageMultiStage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-multistage";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            // Two independent stages that can build in parallel, each producing
+            // part of the final output.  The last stage combines them.
+            dockerfile << "FROM alpine AS greeting\n";
+            dockerfile << "RUN echo -n 'WSL containers' > /part.txt\n";
+            dockerfile << "\n";
+            dockerfile << "FROM alpine AS description\n";
+            dockerfile << "RUN echo -n 'support multi-stage builds' > /part.txt\n";
+            dockerfile << "\n";
+            dockerfile << "FROM alpine\n";
+            dockerfile << "COPY --from=greeting /part.txt /greeting.txt\n";
+            dockerfile << "COPY --from=description /part.txt /description.txt\n";
+            dockerfile << "CMD [\"sh\", \"-c\", "
+                       << "\"echo \\\"$(cat /greeting.txt) $(cat /description.txt)\\\"\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-multistage:latest"));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-multistage:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-multistage:latest", "wsla-build-multistage-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("WSL containers support multi-stage builds") != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageDockerIgnore)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-dockerignore";
+        std::filesystem::create_directories(contextDir / "temp");
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream ignore(contextDir / ".dockerignore");
+            ignore << "# Ignore log files and temp directory\n";
+            ignore << "*.log\n";
+            ignore << "temp/\n";
+        }
+
+        {
+            std::ofstream(contextDir / "keep.txt") << "kept\n";
+            std::ofstream(contextDir / "debug.log") << "excluded\n";
+            std::ofstream(contextDir / "temp" / "cache.dat") << "excluded\n";
+        }
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "COPY . /ctx/\n";
+            dockerfile << "CMD [\"sh\", \"-c\", "
+                       << "\"test -f /ctx/keep.txt "
+                       << "&& ! test -f /ctx/debug.log "
+                       << "&& ! test -d /ctx/temp "
+                       << "&& echo dockerignore_ok\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-dockerignore:latest"));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-dockerignore:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-dockerignore:latest", "wsla-build-dockerignore-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("dockerignore_ok") != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageFailure)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-failure";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM does-not-exist:invalid\n";
+        }
+
+        VERIFY_FAILED(BuildImageFromContext(contextDir, "wsla-test-build-failure:latest"));
+        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+        VERIFY_IS_TRUE(comError.has_value());
+        LogInfo("Expected build error: %ls", comError->Message.get());
+
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-failure:latest", false);
+    }
+
+    TEST_METHOD(BuildImageCustomDockerfile)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-custom";
+        std::filesystem::create_directories(contextDir / "dockerfiles");
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            std::ofstream dockerfile(contextDir / "dockerfiles" / "Dockerfile.custom");
+            dockerfile << "FROM alpine\n";
+            dockerfile << "CMD [\"echo\", \"custom-dockerfile-ok\"]\n";
+        }
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-custom:latest", "dockerfiles/Dockerfile.custom"));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-custom:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-custom:latest", "wsla-build-custom-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("custom-dockerfile-ok") != std::string::npos);
     }
 
     TEST_METHOD(SaveImage)
