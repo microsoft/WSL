@@ -38,7 +38,8 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
 
 WSL1_UNSUPPORTED_XATTRS = ['security.selinux', 'security.ima', 'security.evm']
 
-WSL_CONF_KEYS = ['automount.enabled',
+WSL_CONF_KEYS = ['automount.cgroups',
+                 'automount.enabled',
                  'automount.ldconfig',
                  'automount.mountfstab',
                  'automount.options',
