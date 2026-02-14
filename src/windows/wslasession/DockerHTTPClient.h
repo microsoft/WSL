@@ -31,7 +31,7 @@ Abstract:
         THROW_HR_MSG(E_FAIL, _Msg ". Error: %hs", __VA_ARGS__, (_Ex).what()); \
     }
 
-#define CATCH_THROW_DOCKER_USER_ERROR(_Msg, ...) \
+#define CATCH_AND_THROW_DOCKER_USER_ERROR (_Msg, ...) \
     catch (const DockerHTTPException& e) \
     { \
         THROW_DOCKER_USER_ERROR_MSG(e, _Msg, __VA_ARGS__) \
