@@ -645,18 +645,7 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->process);
     RETURN_HR_IF_NULL(E_POINTER, exitEvent);
 
-    *exitEvent = nullptr;
-
-    ULONG ulongHandle = 0;
-
-    HRESULT hr = internalType->process->GetExitEvent(&ulongHandle);
-
-    if (SUCCEEDED_LOG(hr))
-    {
-        *exitEvent = ULongToHandle(ulongHandle);
-    }
-
-    return hr;
+    return internalType->process->GetExitEvent(exitEvent);
 }
 CATCH_RETURN();
 
