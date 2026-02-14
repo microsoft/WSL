@@ -281,7 +281,6 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
     auto commands = GetCommands();
     if (commands.empty())
     {
-        // No more subcommands
         return {};
     }
 
@@ -294,7 +293,6 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
         }
     }
 
-    // TODO: If we get to a large number of commands, do a fuzzy search much like git
     throw CommandException(Localization::WSLCCLI_UnrecognizedCommandError(std::wstring_view{*itr}));
 }
 
@@ -342,7 +340,6 @@ void Command::ValidateArguments(ArgMap& execArgs) const
     }
 }
 
-// Assumed to be called after all arguments have been parsed and validated.
 void Command::Execute(CLIExecutionContext& context) const
 {
     // If Help was part of the validated argument set, we will output help instead of executing.
@@ -357,10 +354,9 @@ void Command::Execute(CLIExecutionContext& context) const
     }
 }
 
-// Commands must override this and provide an implementation.
 void Command::ExecuteInternal(CLIExecutionContext& context) const
 {
-    // This is a developer error if we get here, should never be user-facing.
+    // Commands must override this and provide an implementation.
     PrintMessage(L"ExecuteInternal for command '" + FullName() + L"' not implemented.\n", stdout);
     THROW_HR(E_NOTIMPL);
 }
