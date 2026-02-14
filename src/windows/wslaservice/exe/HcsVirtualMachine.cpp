@@ -309,53 +309,56 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLA_SESSION_SETTINGS* Settings)
 
 HcsVirtualMachine::~HcsVirtualMachine()
 {
-    std::lock_guard lock(m_lock);
-
-    // Wait up to 5 seconds for the VM to terminate gracefully.
-    bool forceTerminate = false;
-    if (!m_vmExitEvent.wait(5000))
     {
-        forceTerminate = true;
-        try
+        std::lock_guard lock(m_lock);
+
+        // Wait up to 5 seconds for the VM to terminate gracefully.
+        bool forceTerminate = false;
+        if (!m_vmExitEvent.wait(5000))
         {
-            hcs::TerminateComputeSystem(m_computeSystem.get());
-        }
-        CATCH_LOG()
-    }
-
-    WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"));
-
-    // N.B. Destruction order matters: the networking engine and device manager must be torn down
-    // before the compute system handle is closed. The networking engine holds a shared_ptr to
-    // GuestDeviceManager, so it must be released first for the device manager reset to be effective.
-    m_networkEngine.reset();
-    m_guestDeviceManager.reset();
-    m_computeSystem.reset();
-
-    // Revoke VM access for attached disks
-    for (const auto& e : m_attachedDisks)
-    {
-        try
-        {
-            if (e.second.AccessGranted)
+            forceTerminate = true;
+            try
             {
-                hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str());
+                hcs::TerminateComputeSystem(m_computeSystem.get());
             }
+            CATCH_LOG()
         }
-        CATCH_LOG()
-    }
 
-    // If the VM did not crash, the saved state file should be empty, so we can remove it.
-    if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
-    {
-        try
+        WSL_LOG("WSLATerminateVm", TraceLoggingValue(forceTerminate, "forced"));
+
+        // N.B. Destruction order matters: the networking engine and device manager must be torn down
+        // before the compute system handle is closed. The networking engine holds a shared_ptr to
+        // GuestDeviceManager, so it must be released first for the device manager reset to be effective.
+        m_networkEngine.reset();
+        m_guestDeviceManager.reset();
+        m_computeSystem.reset();
+
+        // Revoke VM access for attached disks
+        for (const auto& e : m_attachedDisks)
         {
-            WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
-            std::filesystem::remove(m_vmSavedStateFile);
+            try
+            {
+                if (e.second.AccessGranted)
+                {
+                    hcs::RevokeVmAccess(m_vmIdString.c_str(), e.second.Path.c_str());
+                }
+            }
+            CATCH_LOG()
         }
-        CATCH_LOG()
+
+        // If the VM did not crash, the saved state file should be empty, so we can remove it.
+        if (!m_vmSavedStateFile.empty() && !m_vmSavedStateCaptured)
+        {
+            try
+            {
+                WI_ASSERT(std::filesystem::is_empty(m_vmSavedStateFile));
+                std::filesystem::remove(m_vmSavedStateFile);
+            }
+            CATCH_LOG()
+        }
     }
 
+    // Join the crash dump thread after dropping the lock.
     if (m_crashDumpThread.joinable())
     {
         m_crashDumpThread.join();

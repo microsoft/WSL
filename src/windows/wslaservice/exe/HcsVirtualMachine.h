@@ -20,6 +20,7 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "Dmesg.h"
 #include "INetworkingEngine.h"
+#include <atomic>
 #include <filesystem>
 #include <map>
 #include <thread>
@@ -90,8 +91,8 @@ private:
     std::thread m_crashDumpThread;
     std::filesystem::path m_vmSavedStateFile;
     std::filesystem::path m_crashDumpFolder;
-    bool m_vmSavedStateCaptured = false;
-    bool m_crashLogCaptured = false;
+    std::atomic<bool> m_vmSavedStateCaptured = false;
+    std::atomic<bool> m_crashLogCaptured = false;
 
     wil::com_ptr<ITerminationCallback> m_terminationCallback;
 };
