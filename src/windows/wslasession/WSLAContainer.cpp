@@ -401,7 +401,7 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
     {
         ioHandle = m_dockerClient.AttachContainer(m_id);
     }
-    CATCH_AND_THROW_DOCKER_USER_ERROR ("Failed to attach to container '%hs'", m_id.c_str());
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
@@ -476,7 +476,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
     {
         m_dockerClient.StartContainer(m_id);
     }
-    CATCH_AND_THROW_DOCKER_USER_ERROR ("Failed to start container '%hs'", m_id.c_str());
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
     m_state = WslaContainerStateRunning;
     cleanup.release();
@@ -563,7 +563,7 @@ void WSLAContainerImpl::Delete()
     {
         m_dockerClient.DeleteContainer(m_id);
     }
-    CATCH_AND_THROW_DOCKER_USER_ERROR ("Failed to delete container '%hs'", m_id.c_str());
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
     UnmountVolumes(m_mountedVolumes, *m_parentVM);
 
@@ -665,7 +665,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
         THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
     }
-    CATCH_AND_THROW_DOCKER_USER_ERROR ("Failed to exec process in container %hs", m_id.c_str());
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to exec process in container %hs", m_id.c_str());
 }
 
 WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect)
@@ -936,7 +936,7 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
         std::string wslaJson = wsl::shared::ToJson(wslaInspect);
         *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslaJson.c_str()).release();
     }
-    CATCH_AND_THROW_DOCKER_USER_ERROR ("Failed to inspect container '%hs'", m_id.c_str());
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
 void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -948,7 +948,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
     {
         socket = m_dockerClient.ContainerLogs(m_id, Flags, Since, Until, Tail);
     }
-    CATCH_AND_THROW_DOCKER_USER_ERROR ("Failed to get logs from '%hs'", m_id.c_str());
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to get logs from '%hs'", m_id.c_str());
 
     if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
     {
