@@ -102,16 +102,4 @@ struct ArgMap : wsl::windows::wslc::EnumBasedVariantMap<ArgType, wsl::windows::w
 {
 };
 
-// Controls the visibility of the field.
-enum class Visibility
-{
-    // Visible in help and also shown in the usage string.
-    Usage,
-
-    // Visible in help.
-    Help,
-
-    // Not shown in help. The argument is still present and functional.
-    Hidden,
-};
 } // namespace wsl::windows::wslc::argument

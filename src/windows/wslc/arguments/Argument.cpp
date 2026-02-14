@@ -60,7 +60,7 @@ namespace {
 // function below inside the command. In this way all arguments default to "1" use and not required, and
 // this can only be changed in the command's GetArguments function, so the defaults are always clear and
 // consistent. Visibility can also be overridden and is defaulted to "Help".
-Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<int> countLimit, std::optional<std::wstring> desc, std::optional<Visibility> visibility)
+Argument Argument::Create(ArgType type, std::optional<bool> required, std::optional<int> countLimit, std::optional<std::wstring> desc)
 {
     switch (type)
     {
@@ -72,7 +72,6 @@ Argument Argument::Create(ArgType type, std::optional<bool> required, std::optio
             Alias, \
             desc.has_value() ? std::move(desc.value()) : std::wstring(Desc), \
             ArgumentKind, \
-            visibility.value_or(DefaultVisibility), \
             required.value_or(DefaultRequired), \
             countLimit.value_or(DefaultCountLimit)};
 
@@ -82,13 +81,6 @@ Argument Argument::Create(ArgType type, std::optional<bool> required, std::optio
     default:
         THROW_HR(E_UNEXPECTED);
     }
-}
-
-// Arguments common to ALL commands are defined here so they do not need to be added each time.
-// This starts with Help, but if there are other arguments that are common, they can be added.
-void Argument::GetCommon(std::vector<Argument>& args)
-{
-    args.emplace_back(Create(ArgType::Help));
 }
 
 // Retrieves the usage string of the Argument, based on its Alias and Name.

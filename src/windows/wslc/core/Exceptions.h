@@ -16,7 +16,7 @@ Abstract:
 
 namespace wsl::windows::wslc {
 // Base exception for all command-related errors
-struct CommandException : std::exception
+struct CommandException
 {
     CommandException(std::wstring_view message) : m_message(message)
     {
@@ -25,13 +25,6 @@ struct CommandException : std::exception
     const std::wstring& Message() const
     {
         return m_message;
-    }
-
-    const char* what() const noexcept override
-    {
-        static thread_local std::string buffer;
-        buffer = wsl::windows::common::string::WideToMultiByte(m_message.c_str());
-        return buffer.c_str();
     }
 
 protected:

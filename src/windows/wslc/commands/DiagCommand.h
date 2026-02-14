@@ -19,7 +19,7 @@ namespace wsl::windows::wslc {
 struct DiagCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"diag";
-    DiagCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show)
+    DiagCommand(std::wstring parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -36,7 +36,7 @@ protected:
 struct DiagListCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"list";
-    DiagListCommand(std::wstring parent) : Command(CommandName, parent, Visibility::Show)
+    DiagListCommand(std::wstring parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;

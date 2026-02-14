@@ -35,20 +35,10 @@ using namespace wsl::windows::wslc::argument;
 namespace wsl::windows::wslc {
 struct Command
 {
-    // Controls the visibility of the field.
-    enum class Visibility
-    {
-        // Shown in help.
-        Show,
+    // The character used to split between commands and their parents in FullName.
+    constexpr static wchar_t ParentSplitChar = L':';
 
-        // Not shown in help.
-        Hidden,
-    };
-
-    Command(std::wstring_view name, std::wstring parent) : Command(name, parent, Command::Visibility::Show)
-    {
-    }
-    Command(std::wstring_view name, std::wstring parent, Command::Visibility visibility);
+    Command(std::wstring_view name, std::wstring parent);
 
     virtual ~Command() = default;
 
@@ -58,9 +48,6 @@ struct Command
     Command(Command&&) = default;
     Command& operator=(Command&&) = default;
 
-    // The character used to split between commands and their parents in FullName.
-    constexpr static wchar_t ParentSplitChar = L':';
-
     std::wstring_view Name() const
     {
         return m_name;
@@ -69,7 +56,6 @@ struct Command
     {
         return m_fullName;
     }
-    Command::Visibility GetVisibility() const;
 
     virtual std::vector<std::unique_ptr<Command>> GetCommands() const
     {
@@ -79,8 +65,13 @@ struct Command
     {
         return {};
     }
-    std::vector<std::unique_ptr<Command>> GetVisibleCommands() const;
-    std::vector<Argument> GetVisibleArguments() const;
+
+    virtual std::vector<Argument> GetAllArguments() const
+    {
+        auto args = GetArguments();
+        args.emplace_back(Argument::Create(ArgType::Help));
+        return args;
+    }
 
     virtual std::wstring ShortDescription() const = 0;
     virtual std::wstring LongDescription() const = 0;
@@ -95,14 +86,12 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
-    virtual void ValidateArgumentsInternal(ArgMap& execArgs) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const;
 
 private:
     std::wstring_view m_name;
     std::wstring m_fullName;
-    Command::Visibility m_visibility;
 };
 
-int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
+void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command);
 } // namespace wsl::windows::wslc

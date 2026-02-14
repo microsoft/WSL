@@ -12,8 +12,9 @@ Abstract:
 
 --*/
 #include "pch.h"
+#include "Argument.h"
 #include "CLIExecutionContext.h"
-#include "TaskBase.h"
+#include "Task.h"
 #include "DiagTasks.h"
 
 using namespace wsl::shared;

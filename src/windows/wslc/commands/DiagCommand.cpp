@@ -15,11 +15,8 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "DiagCommand.h"
-#include "TaskBase.h"
 
-using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
-using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc {
 // Diag Root Command

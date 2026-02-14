@@ -15,19 +15,17 @@ Abstract:
 #include "Argument.h"
 #include "Command.h"
 #include "Invocation.h"
-#include "TaskBase.h"
 #include "ArgumentParser.h"
 
 using namespace wsl::shared;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
-using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc {
 constexpr std::wstring_view s_ExecutableName = L"wslc";
 
-Command::Command(std::wstring_view name, std::wstring parent, Command::Visibility visibility) :
-    m_name(name), m_visibility(visibility)
+Command::Command(std::wstring_view name, std::wstring parent) :
+    m_name(name)
 {
     if (!parent.empty())
     {
@@ -97,8 +95,8 @@ void Command::OutputHelp(const CommandException* exception) const
     // Output the command preamble and command chain
     infoOut << Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
 
-    auto commands = GetVisibleCommands();
-    auto arguments = GetVisibleArguments();
+    auto commands = GetCommands();
+    auto arguments = GetAllArguments();
 
     // Separate arguments by Kind
     std::vector<Argument> standardArgs;
@@ -306,8 +304,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 // the argument data.
 void Command::ParseArguments(Invocation& inv, ArgMap& execArgs) const
 {
-    auto definedArgs = GetArguments();
-    Argument::GetCommon(definedArgs);
+    auto definedArgs = GetAllArguments();
 
     ParseArgumentsStateMachine stateMachine{inv, execArgs, std::move(definedArgs)};
 
@@ -324,16 +321,13 @@ void Command::ParseArguments(Invocation& inv, ArgMap& execArgs) const
 // Any defined validation for specific ArgTypes are also run.
 void Command::ValidateArguments(ArgMap& execArgs) const
 {
-    // If help is asked for, don't bother validating anything else
+    // If help is asked for, don't bother validating anything else.
     if (execArgs.Contains(ArgType::Help))
     {
         return;
     }
 
-    // Common arguments need to be validated with command arguments
-    auto allArgs = GetArguments();
-    Argument::GetCommon(allArgs);
-
+    auto allArgs = GetAllArguments();
     for (const auto& arg : allArgs)
     {
         if (arg.Required() && !execArgs.Contains(arg.Type()))
@@ -345,23 +339,7 @@ void Command::ValidateArguments(ArgMap& execArgs) const
         {
             throw CommandException(Localization::WSLCCLI_TooManyArgumentsError(arg.Name()));
         }
-
-        // Call type-specific validation for each argument.
-        if (execArgs.Contains(arg.Type()))
-        {
-            arg.Validate(execArgs);
-        }
     }
-
-    ValidateArgumentsInternal(execArgs);
-}
-
-// This enables the command to do any optional validation that is specific to the command and
-// not otherwise covered by type-specific or common argument validation.
-void Command::ValidateArgumentsInternal(ArgMap&) const
-{
-    // Do nothing by default.
-    // Commands may not need any extra validation.
 }
 
 // Assumed to be called after all arguments have been parsed and validated.
@@ -387,68 +365,9 @@ void Command::ExecuteInternal(CLIExecutionContext& context) const
     THROW_HR(E_NOTIMPL);
 }
 
-Command::Visibility Command::GetVisibility() const
+// External execution entry point called by the core execution flow.
+void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
 {
-    return m_visibility;
-}
-
-// Filters subcommands to only the visible set. Used by OutputHelp to not include hidden subcommands.
-std::vector<std::unique_ptr<Command>> Command::GetVisibleCommands() const
-{
-    auto commands = GetCommands();
-
-    commands.erase(
-        std::remove_if(
-            commands.begin(),
-            commands.end(),
-            [](const std::unique_ptr<Command>& command) { return command->GetVisibility() == Command::Visibility::Hidden; }),
-        commands.end());
-
-    return commands;
-}
-
-// Filters arguments to only the visible set. Used by OutputHelp to not include hidden arguments.
-std::vector<Argument> Command::GetVisibleArguments() const
-{
-    auto arguments = GetArguments();
-    Argument::GetCommon(arguments);
-
-    arguments.erase(
-        std::remove_if(
-            arguments.begin(),
-            arguments.end(),
-            [](const Argument& arg) { return arg.GetVisibility() == argument::Visibility::Hidden; }),
-        arguments.end());
-
-    return arguments;
-}
-
-// This is the main execution wrapper for a command. It will catch any exceptions and set the return code
-// based on the exception and/or results of the command execution.
-void ExecuteWithoutLoggingSuccess(CLIExecutionContext& context, Command* command)
-{
-    try
-    {
-        command->Execute(context);
-    }
-    catch (...)
-    {
-        context.SetTerminationHR(task::HandleException(context, std::current_exception()));
-    }
-}
-
-// External execution entry point called by the core execution flow. Errors are expected to be caught and
-// and handled by ExecuteWithoutLoggingSuccess, with appropriate logging of the errors and successful
-// execution of the commands.
-int Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
-{
-    ExecuteWithoutLoggingSuccess(context, command.get());
-
-    if (SUCCEEDED(context.GetTerminationHR()))
-    {
-        ////Logging::Telemetry().LogCommandSuccess(command->FullName());
-    }
-
-    return context.GetTerminationHR();
+    command->Execute(context);
 }
 } // namespace wsl::windows::wslc

@@ -34,7 +34,6 @@ struct Argument
 {
     // Default argument configuration constants
     static constexpr Kind DefaultKind = Kind::Flag;
-    static constexpr Visibility DefaultVisibility = Visibility::Help;
     static constexpr bool DefaultRequired = false;
     static constexpr int DefaultCountLimit = 1;
 
@@ -45,10 +44,9 @@ struct Argument
         std::wstring alias,
         std::wstring desc,
         argument::Kind kind = DefaultKind,
-        Visibility visibility = DefaultVisibility,
         bool required = DefaultRequired,
         int countLimit = DefaultCountLimit) :
-        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_visibility(visibility), m_required(required), m_countLimit(countLimit)
+        m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_countLimit(countLimit)
     {
     }
 
@@ -65,11 +63,7 @@ struct Argument
         ArgType type,
         std::optional<bool> required = std::nullopt,
         std::optional<int> countLimit = std::nullopt,
-        std::optional<std::wstring> desc = std::nullopt,
-        std::optional<Visibility> visibility = std::nullopt);
-
-    // Gets the common arguments for all commands.
-    static void GetCommon(std::vector<Argument>& args);
+        std::optional<std::wstring> desc = std::nullopt);
 
     // Gets the argument usage string in the format of "-alias,--name" or just "--name" if no alias.
     std::wstring GetUsageString() const;
@@ -103,13 +97,6 @@ struct Argument
     {
         return m_countLimit;
     }
-    Visibility GetVisibility() const
-    {
-        return m_visibility;
-    }
-
-    // Validates this argument's value in the provided args
-    void Validate(const ArgMap& execArgs) const;
 
 private:
     ArgType m_argType;
@@ -118,7 +105,6 @@ private:
     std::wstring m_alias;
     bool m_required = DefaultRequired;
     argument::Kind m_type = DefaultKind;
-    Visibility m_visibility = DefaultVisibility;
     int m_countLimit = DefaultCountLimit;
 };
 } // namespace wsl::windows::wslc

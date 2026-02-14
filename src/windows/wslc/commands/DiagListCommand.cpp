@@ -16,7 +16,7 @@ Abstract:
 #include "ExecutionContextData.h"
 #include "DiagCommand.h"
 #include "DiagTasks.h"
-#include "TaskBase.h"
+#include "Task.h"
 
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;

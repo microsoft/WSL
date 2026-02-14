@@ -7,7 +7,6 @@ include_directories(
 
 set(HEADERS
     core/pch.h
-    core/Errors.h
     core/Exceptions.h
     core/EnumVariantMap.h
     arguments/ArgumentDefinitions.h
@@ -15,28 +14,23 @@ set(HEADERS
     arguments/Argument.h
     arguments/ArgumentParser.h
     core/Command.h
-    core/Core.h
     core/CLIExecutionContext.h
     core/ExecutionContextData.h
     core/Invocation.h
     commands/RootCommand.h
     commands/DiagCommand.h
-    tasks/TaskBase.h
+    tasks/Task.h
     tasks/DiagTasks.h
 )
 
 set(SOURCES
     core/Command.cpp
-    core/CLIExecutionContext.cpp
-    core/Core.cpp
     core/Main.cpp
     arguments/Argument.cpp
     arguments/ArgumentParser.cpp
-    arguments/ArgumentValidation.cpp
     commands/RootCommand.cpp
     commands/DiagCommand.cpp
     commands/DiagListCommand.cpp
-    tasks/TaskBase.cpp
     tasks/DiagTasks.cpp
 )
 

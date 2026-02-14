@@ -13,7 +13,6 @@ Abstract:
 --*/
 #include "pch.h"
 #include "RootCommand.h"
-#include "TaskBase.h"
 
 // Include all commands that parent to the root.
 #include "DiagCommand.h"
