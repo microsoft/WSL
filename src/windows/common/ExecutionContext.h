@@ -17,6 +17,17 @@ namespace wsl::windows::common {
         THROW_HR_MSG(Result, "%ls", _messageWide.c_str()); \
     } while (false);
 
+#define THROW_HR_WITH_USER_ERROR_MSG(Result, Message, Format, ...) \
+    do \
+    { \
+        auto _messageWide = std::format(L"{}", Message); \
+        if (wsl::windows::common::ExecutionContext::ShouldCollectErrorMessage()) \
+        { \
+            ::wsl::windows::common::SetErrorMessage(std::wstring(_messageWide)); \
+        } \
+        THROW_HR_MSG(Result, "%ls" Format, _messageWide.c_str(), __VA_ARGS__); \
+    } while (false);
+
 #define THROW_HR_WITH_USER_ERROR_IF(Result, Message, Condition) \
     if (Condition) \
     { \
