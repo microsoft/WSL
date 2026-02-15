@@ -135,7 +135,7 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAProcessFlags);")
 
 typedef struct _WSLAStringArray
 {
-    [unique, size_is(Count)] LPCSTR* Values;
+    [unique, size_is(Count)] LPCSTR const* Values;
     ULONG Count;
 } WSLAStringArray;
 
