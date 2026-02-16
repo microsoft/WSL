@@ -33,7 +33,7 @@ enum class Kind
     // Positional argument (implied by position, no flag). Data type: std::wstring
     Positional,
 
-    // Forward arguments (remaining args passed through). Data type: std::vector<std::wstring>
+    // Forward arguments (remaining args passed through). Data type: std::wstring
     Forward,
 };
 
@@ -76,7 +76,7 @@ namespace details {
     template <>
     struct KindToType<Kind::Forward>
     {
-        using type = std::vector<std::wstring>;
+        using type = std::wstring;
     };
 
     template <ArgType D>

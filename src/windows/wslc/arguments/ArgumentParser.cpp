@@ -207,32 +207,17 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessRemainingPo
         return ArgumentException(Localization::WSLCCLI_CommandHasNoForwardArgumentsError(currArg));
     }
 
-    // We have forwarded args type. Collect all remaining args as forwarded args.
-    std::vector<std::wstring> forwardedArgs;
-
-    // Add the current arg
-    forwardedArgs.push_back(std::wstring{currArg});
-
-    // Collect all remaining args from the invocation
+    // currArg is the first forwarded argument
+    // m_invocationItr has already been incremented past currArg in StepInternal
+    // So m_invocationItr.index() - 1 gives us the index of currArg
+    size_t firstForwardedArgIndex = m_invocationItr.index() - 1;
+    auto forwardedArgs = std::wstring{m_invocation.GetRemainingRawCommandLineFromIndex(firstForwardedArgIndex)};
+    m_executionArgs.Add(m_forwardArgs.front().Type(), std::move(forwardedArgs));
     while (m_invocationItr != m_invocation.end())
     {
-        forwardedArgs.push_back(std::wstring{*m_invocationItr});
         ++m_invocationItr;
     }
 
-    // Process each forwarded argument to escape quotes and wrap in quotes if needed
-    for (auto& arg : forwardedArgs)
-    {
-        // Note that the innate argv parsing logic will have already stripped out any quotes
-        // around arguments, and we cannot reliably figure out where the previous arguments have
-        // been escaped from the raw command line, but we know that the arguments that remain
-        // have been validly parsed into the argv array, so we just need to escape existing
-        // quotes and re-add quotes if there are spaces.
-        EscapeAndQuoteForwardedArgument(arg);
-    }
-
-    // Add the vector to the forwarded ArgType.
-    m_executionArgs.Add(m_forwardArgs.front().Type(), std::move(forwardedArgs));
     return {};
 }
 
@@ -397,39 +382,5 @@ void ParseArgumentsStateMachine::ProcessAdjoinedValue(ArgType type, std::wstring
     }
 
     m_executionArgs.Add(type, std::wstring{value});
-}
-
-void ParseArgumentsStateMachine::EscapeAndQuoteForwardedArgument(std::wstring& arg)
-{
-    // Step 1: Escape any existing quotes by replacing " with \"
-    size_t pos = 0;
-    while ((pos = arg.find(L'"', pos)) != std::wstring::npos)
-    {
-        arg.insert(pos, L"\\");
-        pos += 2; // Move past the escaped quote
-    }
-
-    // Step 2: Add quotes around the string if there are spaces.
-    size_t spacePos = arg.find(L' ');
-    if (spacePos != std::wstring::npos)
-    {
-        size_t equalPos = arg.find(L'=');
-
-        // If there's an '=' before the first space, wrap only the part after '='.
-        if (equalPos != std::wstring::npos && equalPos < spacePos)
-        {
-            // Insert opening quote after the '='.
-            arg.insert(equalPos + 1, L"\"");
-
-            // Append closing quote at the end.
-            arg.append(L"\"");
-        }
-        else
-        {
-            // Wrap the entire string in quotes.
-            arg.insert(0, L"\"");
-            arg.append(L"\"");
-        }
-    }
 }
 } // namespace wsl::windows::wslc

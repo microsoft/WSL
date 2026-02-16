@@ -101,7 +101,6 @@ private:
     State ProcessAliasArgument(const std::wstring_view& currArg);
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);
-    void EscapeAndQuoteForwardedArgument(std::wstring& arg);
 
     Invocation& m_invocation;
     ArgMap& m_executionArgs;

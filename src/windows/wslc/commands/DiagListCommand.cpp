@@ -27,7 +27,6 @@ namespace wsl::windows::wslc {
 std::vector<Argument> DiagListCommand::GetArguments() const
 {
     return {
-        // Adding the Verbose flag arg, overriding description and leaving other defaults alone.
         Argument::Create(ArgType::Verbose, std::nullopt, std::nullopt, L"Show detailed information about the listed containers."),
     };
 }
@@ -46,4 +45,4 @@ void DiagListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context << task::ListContainers;
 }
-} // namespace wsl::windows::wslc
+}// namespace wsl::windows::wslc
