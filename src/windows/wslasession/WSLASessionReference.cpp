@@ -52,14 +52,16 @@ HRESULT wsla::WSLASessionReference::OpenSession(_Out_ IWSLASession** Session)
 HRESULT wsla::WSLASessionReference::Terminate()
 try
 {
-    // Attempt to open a running session and forward the termination request.
-    // If the session is no longer available or not running, treat it as already terminated.
+    // Resolve the weak reference directly (bypassing OpenSession which checks GetState).
+    // We want to terminate regardless of session state.
     Microsoft::WRL::ComPtr<IWSLASession> session;
-    if (SUCCEEDED(OpenSession(&session)))
+    RETURN_IF_FAILED(m_weakSession->Resolve(__uuidof(IWSLASession), reinterpret_cast<IInspectable**>(session.GetAddressOf())));
+
+    if (session)
     {
         return session->Terminate();
     }
 
-    return S_OK; // Session already gone
+    return S_OK; // Session already released
 }
 CATCH_RETURN()

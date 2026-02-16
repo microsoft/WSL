@@ -131,7 +131,6 @@ set(HEADERS
     wslutil.h
     )
 
-include_directories(${CMAKE_SOURCE_DIR}/src/windows/wslaclient)
 add_library(common STATIC ${SOURCES} ${HEADERS})
 add_dependencies(common wslserviceidl wslaserviceidl localization wslservicemc wslinstalleridl wslaserviceproxystub)
 
