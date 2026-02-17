@@ -118,6 +118,7 @@ private:
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLAFeatureFlags m_featureFlags{};
     std::function<void()> m_destructionCallback;
+    std::atomic<bool> m_terminated{false};
 };
 
 } // namespace wsl::windows::service::wsla
