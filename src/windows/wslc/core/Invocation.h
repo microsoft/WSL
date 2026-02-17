@@ -25,8 +25,7 @@ struct Invocation
     }
 
     // Constructor for unit testing.
-    Invocation(std::vector<std::wstring>&& args, const wchar_t* rawCommandLine)
-        : m_args(std::move(args))
+    Invocation(std::vector<std::wstring>&& args, const wchar_t* rawCommandLine) : m_args(std::move(args))
     {
         if (rawCommandLine != nullptr)
         {
@@ -107,6 +106,7 @@ struct Invocation
 
     std::wstring_view GetRemainingRawCommandLineFromIndex(size_t argvIndex) const noexcept
     {
+        // Lazy initialized only when needed, and any allocation errors are swallowed.
         if (!m_mappingInitialized)
         {
             try
@@ -116,13 +116,12 @@ struct Invocation
             }
             catch (...)
             {
+                // TODO: Log this situation.
                 return {};
             }
         }
 
-        if (m_rawCommandLine.empty() ||
-            argvIndex >= m_argvPositions.size() ||
-            m_argvPositions[argvIndex] == std::wstring::npos)
+        if (m_rawCommandLine.empty() || argvIndex >= m_argvPositions.size() || m_argvPositions[argvIndex] == std::wstring::npos)
         {
             return {};
         }
@@ -137,6 +136,8 @@ struct Invocation
     }
 
 private:
+    // This creates a map of argv index to the position in the raw command line.
+    // where that argument begins, allowing return of raw command line at any index.
     void MapArgvToRawCommandLine() const noexcept
     {
         m_argvPositions.resize(m_args.size(), std::wstring::npos);
@@ -147,11 +148,9 @@ private:
         }
 
         size_t pos = SkipExecutablePath();
-
         for (size_t argIndex = 0; argIndex < m_args.size(); ++argIndex)
         {
-            while (pos < m_rawCommandLine.length() &&
-                   (m_rawCommandLine[pos] == L' ' || m_rawCommandLine[pos] == L'\t'))
+            while (pos < m_rawCommandLine.length() && (m_rawCommandLine[pos] == L' ' || m_rawCommandLine[pos] == L'\t'))
             {
                 pos++;
             }
@@ -176,6 +175,7 @@ private:
         size_t pos = 0;
 
         // Executable path may be quoted with "...". Anything in between is taken as-is.
+        // https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments?view=msvc-170
         if (m_rawCommandLine[0] == L'"')
         {
             // Find the closing quote
@@ -216,13 +216,16 @@ private:
         bool inQuotes = false;
         size_t pos = startPos;
 
-        // Parse using Windows command line rules:
+        // Parse using Windows command line rules for CommandLineToArgvW
         // - 2n backslashes + quote -> n backslashes, toggle quote mode
         // - 2n+1 backslashes + quote -> n backslashes, literal quote
         // - backslashes not before quote -> literal backslashes
+        // - "" -> literal quote AND toggle quote mode (undocumented rule)
+        // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
         while (pos < m_rawCommandLine.length())
         {
             wchar_t ch = m_rawCommandLine[pos];
+
             if (ch == L'\\')
             {
                 size_t backslashCount = 0;
@@ -243,8 +246,21 @@ private:
             }
             else if (ch == L'"')
             {
-                inQuotes = !inQuotes;
-                pos++;
+                // Check for "" (two consecutive quotes)
+                // This is a special known deviation of CommandLineToArgvW where "" produces a literal quote AND exits quoted
+                // mode. Commentary on the undocumented rule: https://stackoverflow.com/a/3476890
+                if (inQuotes && pos + 1 < m_rawCommandLine.length() && m_rawCommandLine[pos + 1] == L'"')
+                {
+                    // Two quotes: produces literal quote AND exits quoted mode (CommandLineToArgvW quirk!)
+                    pos += 2;         // Skip both quotes
+                    inQuotes = false; // Exit quoted mode
+                }
+                else
+                {
+                    // Single quote: toggle quote mode
+                    inQuotes = !inQuotes;
+                    pos++;
+                }
             }
             else if ((ch == L' ' || ch == L'\t') && !inQuotes)
             {
@@ -262,7 +278,7 @@ private:
     std::vector<std::wstring> m_args;
     size_t m_currentFirstArg = 0;
     std::wstring m_rawCommandLine;
-    mutable std::vector<size_t> m_argvPositions;  // Lazy initialized
+    mutable std::vector<size_t> m_argvPositions; // Lazy initialized
     mutable bool m_mappingInitialized = false;
 };
 } // namespace wsl::windows::wslc

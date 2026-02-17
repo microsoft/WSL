@@ -12,10 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "pch.h"
 #include "CLIExecutionContext.h"
-#include <string>
-#include <string_view>
 #include <functional>
 
 using namespace wsl::windows::wslc::execution;
