@@ -33,7 +33,7 @@ inline wsl::windows::wslc::Invocation CreateInvocationFromCommandLine(const std:
     // Convert to vector for Invocation, skipping argv[0] (executable path)
     // This is what we do in wmain() to populate Invocation input vector.
     std::vector<std::wstring> args;
-    for (int i = 1; i < argc; ++i)  // Skip argv[0]
+    for (int i = 1; i < argc; ++i) // Skip argv[0]
     {
         args.push_back(argv[i]);
     }

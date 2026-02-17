@@ -129,7 +129,8 @@ class WSLCCLIParserUnitTests
 
                 // Get remaining command line from this index
                 auto remaining = inv.GetRemainingRawCommandLineFromIndex(currentIndex);
-                Log::Comment(String().Format(L"  [%zu] arg='%ls', remaining='%.*ls'",
+                Log::Comment(String().Format(
+                    L"  [%zu] arg='%ls', remaining='%.*ls'",
                     currentIndex,
                     it->c_str(),
                     static_cast<int>(remaining.length()),
@@ -141,9 +142,15 @@ class WSLCCLIParserUnitTests
                 // Verify: Each remaining command line should be smaller than the previous.
                 if (currentIndex > 0)
                 {
-                    VERIFY_IS_LESS_THAN(remaining.length(), commandLineLengths[currentIndex - 1],
-                        String().Format(L"Remaining at index %zu (%zu chars) should be < index %zu (%zu chars)",
-                            currentIndex, remaining.length(), currentIndex - 1, commandLineLengths[currentIndex - 1]));
+                    VERIFY_IS_LESS_THAN(
+                        remaining.length(),
+                        commandLineLengths[currentIndex - 1],
+                        String().Format(
+                            L"Remaining at index %zu (%zu chars) should be < index %zu (%zu chars)",
+                            currentIndex,
+                            remaining.length(),
+                            currentIndex - 1,
+                            commandLineLengths[currentIndex - 1]));
                 }
 
                 // Verify: The remaining command line should contain the current argument
@@ -151,10 +158,10 @@ class WSLCCLIParserUnitTests
                 {
                     std::wstring currentArg = *it;
                     bool found = false;
-                    
+
                     // Check various forms the argument might appear in the raw command line
                     // (quoted, unquoted, escaped, etc.)
-                    
+
                     // Check if argument appears quoted
                     std::wstring quotedArg = L"\"" + currentArg + L"\"";
                     if (remaining.find(quotedArg) != std::wstring::npos)
@@ -177,8 +184,10 @@ class WSLCCLIParserUnitTests
                         found = !remaining.empty();
                     }
 
-                    VERIFY_IS_TRUE(found,
-                        String().Format(L"Remaining should relate to current argument: '%s' in '%.*s'",
+                    VERIFY_IS_TRUE(
+                        found,
+                        String().Format(
+                            L"Remaining should relate to current argument: '%s' in '%.*s'",
                             currentArg.c_str(),
                             static_cast<int>(std::min(remaining.length(), 100ull)),
                             remaining.data()));
@@ -187,20 +196,22 @@ class WSLCCLIParserUnitTests
 
             // Verify: Number of unique remaining command lines equals number of arguments
             std::set<std::wstring> uniqueRemaining(remainingCommandLines.begin(), remainingCommandLines.end());
-            
+
             Log::Comment(String().Format(L"  Total args: %zu", inv.size()));
             Log::Comment(String().Format(L"  Unique remaining command lines: %zu", uniqueRemaining.size()));
 
-            VERIFY_ARE_EQUAL(uniqueRemaining.size(), inv.size(),
-                String().Format(L"Should have %zu unique remaining command lines for %zu arguments",
-                    inv.size(), inv.size()));
+            VERIFY_ARE_EQUAL(
+                uniqueRemaining.size(),
+                inv.size(),
+                String().Format(L"Should have %zu unique remaining command lines for %zu arguments", inv.size(), inv.size()));
 
             // Verify: Each remaining command line should be unique
             for (size_t i = 1; i < remainingCommandLines.size(); ++i)
             {
-                VERIFY_ARE_NOT_EQUAL(remainingCommandLines[i], remainingCommandLines[i - 1],
-                    String().Format(L"Remaining command lines at indices %zu and %zu should be different",
-                        i - 1, i));
+                VERIFY_ARE_NOT_EQUAL(
+                    remainingCommandLines[i],
+                    remainingCommandLines[i - 1],
+                    String().Format(L"Remaining command lines at indices %zu and %zu should be different", i - 1, i));
             }
 
             Log::Comment(L"  [OK] Test case passed\n");
@@ -219,12 +230,12 @@ class WSLCCLIParserUnitTests
             LR"(wslc --verbose cont1)",
 
             // Value tests, flag and non-flag, multi-value.
-            LR"(wslc --publish=80:80 cont1)",           // adjoined
-            LR"(wslc --publish 80:80 cont1)",           // non-adjoined
-            LR"(wslc -p=80:80 cont1)",                  // adjoined
-            LR"(wslc -p 80:80 cont1)",                  // non-adjoined
-            LR"(wslc -p 80:80 -p 443:443 cont1)",       // multiple values
-            LR"(wslc -p=80:80 -p=443:443 cont1)",       // multiple values
+            LR"(wslc --publish=80:80 cont1)",     // adjoined
+            LR"(wslc --publish 80:80 cont1)",     // non-adjoined
+            LR"(wslc -p=80:80 cont1)",            // adjoined
+            LR"(wslc -p 80:80 cont1)",            // non-adjoined
+            LR"(wslc -p 80:80 -p 443:443 cont1)", // multiple values
+            LR"(wslc -p=80:80 -p=443:443 cont1)", // multiple values
 
             // Flag parse tests
             LR"(wslc -v cont1)",
@@ -248,7 +259,7 @@ class WSLCCLIParserUnitTests
                 auto inv = WSLCTestHelpers::CreateInvocationFromCommandLine(testCase);
 
                 std::vector<Argument> definedArgs = {
-                    Argument::Create(ArgType::ContainerId, true),  // Required positional argument
+                    Argument::Create(ArgType::ContainerId, true), // Required positional argument
                     Argument::Create(ArgType::ForwardArgs, false),
                     Argument::Create(ArgType::Help),
                     Argument::Create(ArgType::Interactive),
@@ -281,8 +292,8 @@ class WSLCCLIParserUnitTests
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ForwardArgs));
                     auto forwardArgs = args.Get<ArgType::ForwardArgs>();
-                    VERIFY_IS_TRUE(forwardArgs.find(L"hello world") != std::wstring::npos);  // Forward args should contain hello world
-                    VERIFY_IS_TRUE(forwardArgs.find(L"cont1") == std::wstring::npos);        // Forward args should not contain the containerId
+                    VERIFY_IS_TRUE(forwardArgs.find(L"hello world") != std::wstring::npos); // Forward args should contain hello world
+                    VERIFY_IS_TRUE(forwardArgs.find(L"cont1") == std::wstring::npos); // Forward args should not contain the containerId
                     LogComment(L"Forwarded Args: " + forwardArgs);
                 }
 
@@ -290,8 +301,8 @@ class WSLCCLIParserUnitTests
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::Publish));
                     auto publishArgs = args.GetAll<ArgType::Publish>();
-                    VERIFY_ARE_EQUAL(2, publishArgs.size());                // Should have both publish args
-                    VERIFY_ARE_NOT_EQUAL(publishArgs[0], publishArgs[1]);   // Both publish args should be different
+                    VERIFY_ARE_EQUAL(2, publishArgs.size());              // Should have both publish args
+                    VERIFY_ARE_NOT_EQUAL(publishArgs[0], publishArgs[1]); // Both publish args should be different
                 }
             }
             catch (ArgumentException& ex)

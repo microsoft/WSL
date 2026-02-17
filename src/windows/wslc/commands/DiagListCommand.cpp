@@ -45,4 +45,4 @@ void DiagListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context << task::ListContainers;
 }
-}// namespace wsl::windows::wslc
+} // namespace wsl::windows::wslc
