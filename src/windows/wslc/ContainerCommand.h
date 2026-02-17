@@ -36,6 +36,7 @@ public:
             "-t, --tty: Open a TTY with the container process",
             "-i, --interactive: Keep stdin open",
             "-d, --detach: Run container in background",
+            "-p, --publish: Publish a port from container to host (format: [host-ip:]host-port:container-port[/protocol])",
             "--name <name>: Assign a name to the container that will be used as its container id",
         };
     }
@@ -46,6 +47,7 @@ public:
         parser.AddArgument(m_options.TTY, L"--tty", 't');
         parser.AddArgument(m_options.Detach, L"--detach", 'd');
         parser.AddArgument(wsl::shared::Utf8String{m_options.Name}, L"--name");
+        parser.AddArgument(wsl::shared::Utf8String{m_options.Port}, L"--publish", 'p');
     }
 
 protected:
@@ -75,6 +77,7 @@ public:
             "arguments (pos. 1..): Arguments to pass to container's init process",
             "-t, --tty: Open a TTY with the container process",
             "-i, --interactive: Keep stdin open",
+            "-p, --publish: Publish a port from container to host (format: [host-ip:]host-port:container-port[/protocol])",
             "--name <name>: Assign a name to the container that will be used as its container id",
         };
     }
@@ -84,6 +87,7 @@ public:
         parser.AddArgument(m_options.Interactive, L"--interactive", 'i');
         parser.AddArgument(m_options.TTY, L"--tty", 't');
         parser.AddArgument(wsl::shared::Utf8String{m_options.Name}, L"--name");
+        parser.AddArgument(wsl::shared::Utf8String{m_options.Port}, L"--publish", 'p');
     }
 
 protected:

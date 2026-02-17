@@ -16,6 +16,7 @@ set(SOURCES
 
     # Models
     SessionModel.cpp
+    ContainerModel.cpp
 )
 
 set(HEADERS
@@ -68,6 +69,7 @@ source_group("Commands" FILES
 source_group("Models" FILES
     ImageModel.h
     ContainerModel.h
+    ContainerModel.cpp
     SessionModel.h
     SessionModel.cpp
 )
