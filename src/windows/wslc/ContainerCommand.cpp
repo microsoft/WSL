@@ -51,16 +51,6 @@ int ContainerRunCommand::ExecuteInternal(std::wstring_view commandLine, int pars
     CMD_ARG_REQUIRED(m_image, L"Error: image name is required.");
     auto session = m_sessionService.CreateSession();
     m_options.Arguments = Arguments();
-    if (!m_options.Port.empty())
-    {
-        auto port = PublishPort::Parse(m_options.Port);
-        port;
-    }
-    if(true)
-    {
-        return 0;
-    }
-
     PullImageCallback callback;
     ContainerService containerService;
     return containerService.Run(session, m_image, m_options, &callback);

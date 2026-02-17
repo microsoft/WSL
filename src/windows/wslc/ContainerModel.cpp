@@ -17,60 +17,73 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-static PublishPort::PortRange ParsePortPart(const std::string& portPart)
+PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
 {
+    static auto parsePort = [](const std::string& value, const char* errorMessage) -> int {
+        try
+        {
+            size_t idx = 0;
+            int port = std::stoi(value, &idx, 10);
+            if (idx != value.size())
+            {
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+            }
+            return port;
+        }
+        catch (const std::exception&)
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+        }
+    };
+
     // Find optional port range separator
     auto dashPos = portPart.find('-');
     if (dashPos != std::string::npos)
     {
         // Port range specified
-        try
-        {
-            auto startPortStr = portPart.substr(0, dashPos);
-            auto endPortStr = portPart.substr(dashPos + 1);
-            return PublishPort::PortRange{ .Start = std::stoi(startPortStr), .End = std::stoi(endPortStr) };
-        }
-        catch (const std::exception&)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid port range specified in port mapping.");
-        }
+        auto startPortStr = portPart.substr(0, dashPos);
+        auto endPortStr = portPart.substr(dashPos + 1);
+        int startPort = parsePort(startPortStr, "Invalid port range specified in port mapping.");
+        int endPort = parsePort(endPortStr, "Invalid port range specified in port mapping.");
+
+        PublishPort::PortRange result{};
+        result.m_start = startPort;
+        result.m_end = endPort;
+        return result;
     }
     else
     {
         // Single port specified
-        try
-        {
-            int port = std::stoi(portPart);
-            return PublishPort::PortRange{ .Start = port, .End = port };
-        }
-        catch (const std::exception&)
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid port specified in port mapping.");
-        }
+        int port = parsePort(portPart, "Invalid port specified in port mapping.");
+
+        PublishPort::PortRange result{};
+        result.m_start = port;
+        result.m_end = port;
+        return result;
     }
 }
 
-static PublishPort::IPAddress ParseHostIP(const std::string& hostIpPart)
+PublishPort::IPAddress PublishPort::IPAddress::ParseHostIP(const std::string& hostIpPart)
 {
     PublishPort::IPAddress ipAddress;
 
     // Check if it's an IPv6 address (enclosed in square brackets)
     if (!hostIpPart.empty() && hostIpPart.front() == '[' && hostIpPart.back() == ']')
     {
-        ipAddress.Value = hostIpPart.substr(1, hostIpPart.size() - 2);
-        ipAddress.IsIPv6 = true;
+        ipAddress.m_value = hostIpPart.substr(1, hostIpPart.size() - 2);
+        ipAddress.m_isIPv6 = true;
         sockaddr_in6 sa6{};
-        if (inet_pton(AF_INET6, ipAddress.Value.c_str(), &(sa6.sin6_addr)) != 1)
+        if (inet_pton(AF_INET6, ipAddress.m_value.c_str(), &(sa6.sin6_addr)) != 1)
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv6 address specified in port mapping.");
         }
     }
     else
     {
-        ipAddress.Value = hostIpPart;
-        ipAddress.IsIPv6 = false;
+        ipAddress.m_value = hostIpPart;
+        ipAddress.m_isIPv6 = false;
         sockaddr_in sa4{};
-        if (inet_pton(AF_INET, ipAddress.Value.c_str(), &(sa4.sin_addr)) != 1)
+        if (inet_pton(AF_INET, ipAddress.m_value.c_str(), &(sa4.sin_addr)) != 1)
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv4 address specified in port mapping.");
         }
@@ -82,7 +95,7 @@ static PublishPort::IPAddress ParseHostIP(const std::string& hostIpPart)
 PublishPort PublishPort::Parse(const std::string& value)
 {
     PublishPort result{};
-    result.Original = value;
+    result.m_original = value;
     
     // 1. Strip optional protocol suffix
     std::string portPart = value;
@@ -93,11 +106,11 @@ PublishPort PublishPort::Parse(const std::string& value)
         auto protocolPart = value.substr(slashPos + 1);
         if (protocolPart == "tcp")
         {
-            result.PortProtocol = PublishPort::Protocol::TCP;
+            result.m_protocol = PublishPort::Protocol::TCP;
         }
         else if (protocolPart == "udp")
         {
-            result.PortProtocol = PublishPort::Protocol::UDP;
+            result.m_protocol = PublishPort::Protocol::UDP;
         }
         else
         {
@@ -110,12 +123,12 @@ PublishPort PublishPort::Parse(const std::string& value)
     std::optional<std::string> hostPortPart;
     if (colonPos != std::string::npos)
     {
-        result.ContainerPort = ParsePortPart(portPart.substr(colonPos + 1));
+        result.m_containerPort = PublishPort::PortRange::ParsePortPart(portPart.substr(colonPos + 1));
         hostPortPart = portPart.substr(0, colonPos);
     }
     else
     {
-        result.ContainerPort = ParsePortPart(portPart);
+        result.m_containerPort = PublishPort::PortRange::ParsePortPart(portPart);
     }
 
     // 3. Parse the host port
@@ -124,16 +137,16 @@ PublishPort PublishPort::Parse(const std::string& value)
         auto colonPos = hostPortPart->rfind(':');
         if (colonPos != std::string::npos)
         {
-            result.HostIP = ParseHostIP(hostPortPart->substr(0, colonPos));
+            result.m_hostIP = PublishPort::IPAddress::ParseHostIP(hostPortPart->substr(0, colonPos));
             auto hostPort = hostPortPart->substr(colonPos + 1);
             if(!hostPort.empty())
             {
-                result.HostPort = ParsePortPart(hostPort);
+                result.m_hostPort = PublishPort::PortRange::ParsePortPart(hostPort);
             }
         }
         else
         {
-            result.HostPort = ParsePortPart(*hostPortPart);
+            result.m_hostPort = PublishPort::PortRange::ParsePortPart(*hostPortPart);
         }
     }
 
@@ -142,14 +155,14 @@ PublishPort PublishPort::Parse(const std::string& value)
 }
 
 void PublishPort::Validate() const {
-    if (ContainerPort.Count() == 0)
+    if (m_containerPort.Count() == 0)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must specify at least one port.");
     }
 
-    if (!ContainerPort.IsValid())
+    if (!m_containerPort.IsValid())
     {
-        if (ContainerPort.IsSingle())
+        if (m_containerPort.IsSingle())
         {
             THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must be a valid port number (1-65535).");
         }
@@ -159,7 +172,7 @@ void PublishPort::Validate() const {
         }
     }
 
-    if (HostPort.has_value() && HostPort->Count() != ContainerPort.Count())
+    if (m_hostPort.has_value() && m_hostPort->Count() != m_containerPort.Count())
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port range must match the container port range.");
     }
