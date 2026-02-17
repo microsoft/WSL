@@ -771,6 +771,16 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         request.Domainname = containerOptions.DomainName;
     }
 
+    if (containerOptions.DnsServers.Count > 0)
+    {
+        request.HostConfig.Dns = StringArrayToVector(containerOptions.DnsServers);
+    }
+
+    if (containerOptions.DnsSearchDomains.Count > 0)
+    {
+        request.HostConfig.DnsSearch = StringArrayToVector(containerOptions.DnsSearchDomains);
+    }
+
     if (containerOptions.InitProcessOptions.User != nullptr)
     {
         request.User = containerOptions.InitProcessOptions.User;

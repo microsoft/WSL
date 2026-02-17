@@ -2052,6 +2052,17 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "my-host-name.my-domain-name\n"}});
         }
 
+        // Validate that containers without DNS configuration use default DNS.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-no-dns", {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            auto result = process.WaitAndCaptureOutput();
+            VERIFY_ARE_EQUAL(0, result.Code);
+        }
+
         // Validate that the username is correctly wired.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-username", {"whoami"});

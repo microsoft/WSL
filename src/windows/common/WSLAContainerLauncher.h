@@ -72,6 +72,8 @@ public:
     void SetContainerFlags(WSLAContainerFlags Flags);
     void SetHostname(std::string&& Hostname);
     void SetDomainname(std::string&& Domainame);
+    void SetDnsServers(std::vector<std::string>&& DnsServers);
+    void SetDnsSearchDomains(std::vector<std::string>&& DnsSearchDomains);
 
     using WSLAProcessLauncher::SetUser;
     using WSLAProcessLauncher::SetWorkingDirectory;
@@ -89,6 +91,8 @@ private:
     WSLAContainerFlags m_containerFlags = WSLAContainerFlagsNone;
     std::string m_hostname;
     std::string m_domainname;
+    std::vector<std::string> m_dnsServers;
+    std::vector<std::string> m_dnsSearchDomains;
     std::vector<WSLA_LABEL> m_labels;
     std::deque<std::string> m_labelKeys;
     std::deque<std::string> m_labelValues;
