@@ -254,17 +254,15 @@ void WSLASession::StartDockerd()
     m_dockerdProcess = launcher.Launch(*m_virtualMachine);
 
     // Read stdout & stderr.
-    m_ioRelay.AddHandle(
-        std::make_unique<windows::common::relay::LineBasedReadHandle>(
-            m_dockerdProcess->GetStdHandle(1), [&](const auto& data) { OnDockerdLog(data); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        m_dockerdProcess->GetStdHandle(1), [&](const auto& data) { OnDockerdLog(data); }, false));
 
-    m_ioRelay.AddHandle(
-        std::make_unique<windows::common::relay::LineBasedReadHandle>(
-            m_dockerdProcess->GetStdHandle(2), [&](const auto& data) { OnDockerdLog(data); }, false));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::LineBasedReadHandle>(
+        m_dockerdProcess->GetStdHandle(2), [&](const auto& data) { OnDockerdLog(data); }, false));
 
     // Monitor dockerd's exist so we can detect abnormal exits.
-    m_ioRelay.AddHandle(
-        std::make_unique<windows::common::relay::EventHandle>(m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
+    m_ioRelay.AddHandle(std::make_unique<windows::common::relay::EventHandle>(
+        m_dockerdProcess->GetExitEvent(), std::bind(&WSLASession::OnDockerdExited, this)));
 }
 
 HRESULT WSLASession::PullImage(LPCSTR ImageUri, const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, IProgressCallback* ProgressCallback)
@@ -544,15 +542,13 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     auto onCompleted = [&]() { io.Cancel(); };
 
-    io.AddHandle(
-        std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
-            common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
+    io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
+        common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
 
-    io.AddHandle(
-        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-            Request, std::move(onHttpResponse), std::move(onProgress), std::move(onCompleted)));
+    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
+        Request, std::move(onHttpResponse), std::move(onProgress), std::move(onCompleted)));
 
     io.Run({});
 
@@ -611,10 +607,9 @@ void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& S
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)},
-                common::relay::HandleWrapper{std::move(containerFileHandle), std::move(onCompleted)}));
+        io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
+            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
+            common::relay::HandleWrapper{std::move(containerFileHandle), std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }
 
@@ -669,10 +664,9 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
     }
     else
     {
-        io.AddHandle(
-            std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)},
-                common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
+        io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
+            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
+            common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
         io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     }
 
@@ -817,14 +811,13 @@ try
 
     try
     {
-        auto& it = m_containers.emplace_back(
-            WSLAContainerImpl::Create(
-                *containerOptions,
-                *m_virtualMachine,
-                std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
-                m_eventTracker.value(),
-                m_dockerClient.value(),
-                m_ioRelay));
+        auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
+            *containerOptions,
+            *m_virtualMachine,
+            std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
+            m_eventTracker.value(),
+            m_dockerClient.value(),
+            m_ioRelay));
 
         THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
 

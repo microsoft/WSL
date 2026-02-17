@@ -386,9 +386,8 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
     handles.emplace_back(
         std::make_unique<RelayHandle<ReadHandle>>(HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, ioHandle.get()));
 
-    handles.emplace_back(
-        std::make_unique<DockerIORelayHandle>(
-            std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
+    handles.emplace_back(std::make_unique<DockerIORelayHandle>(
+        std::move(ioHandle), std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(handles));
 
@@ -770,9 +769,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 
-        request.HostConfig.Mounts.emplace_back(
-            common::docker_schema::Mount{
-                .Source = parentVMPath, .Target = volume.ContainerPath, .Type = "bind", .ReadOnly = static_cast<bool>(volume.ReadOnly)});
+        request.HostConfig.Mounts.emplace_back(common::docker_schema::Mount{
+            .Source = parentVMPath, .Target = volume.ContainerPath, .Type = "bind", .ReadOnly = static_cast<bool>(volume.ReadOnly)});
     }
 
     // Mount volumes.
@@ -993,9 +991,8 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     fds.emplace(WSLAFDStdout, stdoutRead.release());
     fds.emplace(WSLAFDStderr, stderrRead.release());
 
-    ioHandles.emplace_back(
-        std::make_unique<DockerIORelayHandle>(
-            std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
+    ioHandles.emplace_back(std::make_unique<DockerIORelayHandle>(
+        std::move(stream), std::move(stdoutWrite), std::move(stderrWrite), common::relay::DockerIORelayHandle::Format::Raw));
 
     m_ioRelay.AddHandles(std::move(ioHandles));
 
