@@ -149,7 +149,7 @@ public:
 
     // Write an array of strings.
     // Each field is prefixed with its size as int32_t, and the array ends with a -1 terminator.
-    void WriteStringArray(unsigned int& Index, const char** String, size_t Count)
+    void WriteStringArray(unsigned int& Index, const char* const* String, size_t Count)
     {
         size_t totalSize = sizeof(int32_t); // The array ends with a '-1' terminator.
         for (size_t i = 0; i < Count; i++)
