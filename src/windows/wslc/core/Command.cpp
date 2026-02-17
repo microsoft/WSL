@@ -353,13 +353,6 @@ void Command::Execute(CLIExecutionContext& context) const
     }
 }
 
-void Command::ExecuteInternal(CLIExecutionContext& context) const
-{
-    // Commands must override this and provide an implementation.
-    PrintMessage(L"ExecuteInternal for command '" + FullName() + L"' not implemented.\n", stdout);
-    THROW_HR(E_NOTIMPL);
-}
-
 // External execution entry point called by the core execution flow.
 void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
 {

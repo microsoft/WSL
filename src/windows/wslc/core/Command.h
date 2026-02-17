@@ -86,7 +86,7 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
-    virtual void ExecuteInternal(CLIExecutionContext& context) const;
+    virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 
 private:
     std::wstring_view m_name;

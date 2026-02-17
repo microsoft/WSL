@@ -284,7 +284,7 @@ class WSLCCLIParserUnitTests
 
                 if (testCase.find(L"rm") != std::wstring::npos)
                 {
-                    // Ensure 'rm' was parsed werever it was found.
+                    // Ensure 'rm' was parsed wherever it was found.
                     VERIFY_IS_TRUE(args.Contains(ArgType::Remove));
                 }
 
