@@ -43,7 +43,7 @@ typedef struct WslcContainerSettings
 DECLARE_HANDLE(WslcContainer);
 
 // Process values
-#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 48
+#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 40
 #define WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT 8
 typedef struct WslcProcessSettings
 {
@@ -244,7 +244,7 @@ typedef enum WslcSignal
     WSLC_SIGNAL_SIGTERM = 15, // SIGTERM: graceful shutdown
 } WslcSignal;
 
-STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutMS);
+STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds);
 
 typedef enum WslcDeleteContainerFlags
 {
@@ -258,8 +258,6 @@ STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContaine
 STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings);
 
 // OPTIONAL PROCESS SETTINGS
-
-STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable);
 
 STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory);
 

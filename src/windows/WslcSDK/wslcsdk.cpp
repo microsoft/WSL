@@ -575,14 +575,13 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutMS)
+STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds)
 try
 {
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: Resolve massive disparity between 32-bit unsigned millisecond input and 64-bit signed second target timeouts
-    RETURN_HR(internalType->container->Stop(ConvertSignal(signal), timeoutMS / 1000));
+    RETURN_HR(internalType->container->Stop(ConvertSignal(signal), timeoutSeconds));
 }
 CATCH_RETURN();
 
@@ -607,18 +606,6 @@ try
     auto internalType = CheckAndGetInternalType(processSettings);
 
     *internalType = {};
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-// TODO: Executable has no place in runtime settings; it should be removed in favor of placement as the first item in CmdLineArgs.
-STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable)
-try
-{
-    auto internalType = CheckAndGetInternalType(processSettings);
-
-    internalType->executable = executable;
 
     return S_OK;
 }

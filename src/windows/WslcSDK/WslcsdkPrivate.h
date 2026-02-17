@@ -51,7 +51,6 @@ WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings);
 // PROCESS DEFINITIONS
 typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
 {
-    PCSTR executable; // path to executable inside container
     PCSTR const* commandLine;
     uint32_t commandLineCount;
     PCSTR const* environment;
