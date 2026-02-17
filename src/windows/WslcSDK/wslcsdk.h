@@ -77,10 +77,19 @@ typedef struct WslcVhdRequirements
     _In_ WslcVhdType type;
 } WslcVhdRequirements;
 
+typedef enum WslcSessionFeatureFlags
+{
+    WSLC_SESSION_FEATURE_FLAG_NONE = 0x00000000,
+    WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU = 0x00000004
+} WslcSessionFeatureFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcSessionFeatureFlags);
+
 typedef enum WslcSessionFlags
 {
     WSLC_SESSION_FLAG_NONE = 0x00000000,
-    WSLC_SESSION_FLAG_ENABLE_GPU = 0x00000004
+    WSLC_SESSION_FLAG_PERSISTENT = 0x00000001,
+    WSLC_SESSION_FLAG_OPEN_EXISTING = 0x00000002
 } WslcSessionFlags;
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcSessionFlags);
@@ -106,6 +115,7 @@ STDAPI WslcSessionSettingsSetNetworkingMode(_In_ WslcSessionSettings* sessionSet
 
 STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
 
+STDAPI WslcSessionSettingsSetFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags);
 
 // Pass in Null for callback to clear the termination callback

@@ -27,13 +27,23 @@ constexpr ULONG s_DefaultBootTimeout = 300000;
 // Default to 1 GB
 constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 
-WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
+WSLAFeatureFlags ConvertFlags(WslcSessionFeatureFlags flags)
 {
-    static_assert(WSLC_SESSION_FLAG_ENABLE_GPU == WslaFeatureFlagsGPU, "Session GPU flag values differ.");
+    static_assert(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU == WslaFeatureFlagsGPU, "Session GPU feature flag values differ.");
 
-    WslcSessionFlags allFlagsMask = WSLC_SESSION_FLAG_ENABLE_GPU;
+    WslcSessionFeatureFlags allFlagsMask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
 
     return static_cast<WSLAFeatureFlags>(flags & allFlagsMask);
+}
+
+WSLASessionFlags ConvertFlags(WslcSessionFlags flags)
+{
+    static_assert(WSLC_SESSION_FLAG_PERSISTENT == WSLASessionFlagsPersistent, "Session persistent flag values differ.");
+    static_assert(WSLC_SESSION_FLAG_OPEN_EXISTING == WSLASessionFlagsOpenExisting, "Session open existing flag values differ.");
+
+    WslcSessionFlags allFlagsMask = WSLC_SESSION_FLAG_PERSISTENT | WSLC_SESSION_FLAG_OPEN_EXISTING;
+
+    return static_cast<WSLASessionFlags>(flags & allFlagsMask);
 }
 
 WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
@@ -73,7 +83,8 @@ WSLANetworkingMode Convert(WslcSessionNetworkingMode mode)
 {
     static_assert(WSLC_SESSION_NETWORKING_MODE_NONE == WSLANetworkingModeNone, "Session networking none values differ.");
     static_assert(WSLC_SESSION_NETWORKING_MODE_NAT == WSLANetworkingModeNAT, "Session networking NAT values differ.");
-    static_assert(WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY == WSLANetworkingModeVirtioProxy, "Session networking Virt IO values differ.");
+    static_assert(
+        WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY == WSLANetworkingModeVirtioProxy, "Session networking Virt IO values differ.");
 
     THROW_HR_IF(E_INVALIDARG, !(WSLC_SESSION_NETWORKING_MODE_NONE <= mode && mode <= WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY));
 
@@ -176,7 +187,7 @@ try
         result->terminationCallback.attach(terminationCallback.as<ITerminationCallback>().detach());
         runtimeSettings.TerminationCallback = terminationCallback.get();
     }
-    runtimeSettings.FeatureFlags = ConvertFlags(internalType->flags);
+    runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
 
     // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
     // runtimeSettings.DmesgOutput;
@@ -188,8 +199,7 @@ try
     //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
     // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
-    // TODO: No user control over flags (Persistent and OpenExisting)?
-    RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session));
+    RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, ConvertFlags(internalType->flags), &result->session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
 
     *session = reinterpret_cast<WslcSession>(result.release());
@@ -299,6 +309,17 @@ try
     UNREFERENCED_PARAMETER(domainName);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
+}
+CATCH_RETURN();
+
+STDAPI WslcSessionSettingsSetFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags)
+try
+{
+    auto internalType = CheckAndGetInternalType(sessionSettings);
+
+    internalType->featureFlags = flags;
+
+    return S_OK;
 }
 CATCH_RETURN();
 
