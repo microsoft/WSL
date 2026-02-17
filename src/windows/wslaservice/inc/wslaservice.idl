@@ -135,7 +135,7 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAProcessFlags);")
 
 typedef struct _WSLAStringArray
 {
-    [unique, size_is(Count)] LPCSTR* Values;
+    [unique, size_is(Count)] LPCSTR const* Values;
     ULONG Count;
 } WSLAStringArray;
 
@@ -375,7 +375,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
-    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);
@@ -397,6 +397,13 @@ struct WSLA_DELETED_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
     WSLADeletedImageType Type;
+};
+
+struct WSLA_TAG_IMAGE_OPTIONS
+{
+    LPCSTR Image; // Source image name or ID.
+    LPCSTR Repo;  // Target repository name.
+    LPCSTR Tag;   // Target tag name.
 };
 
 struct WSLA_DELETE_IMAGE_OPTIONS
@@ -431,6 +438,7 @@ interface IWSLASession : IUnknown
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
     HRESULT ListImages([out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count);
+    HRESULT TagImage([in] const struct WSLA_TAG_IMAGE_OPTIONS* Options);
 
     // Container management.
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);

@@ -826,6 +826,176 @@ class WSLATests
         VERIFY_IS_TRUE(result.Output[1].find("custom-dockerfile-ok") != std::string::npos);
     }
 
+    TEST_METHOD(TagImage)
+    {
+        WSL2_TEST_ONLY();
+
+        auto runTagImage = [&](LPCSTR Image, LPCSTR Repo, LPCSTR Tag) {
+            WSLA_TAG_IMAGE_OPTIONS options{};
+            options.Image = Image;
+            options.Repo = Repo;
+            options.Tag = Tag;
+
+            return m_defaultSession->TagImage(&options);
+        };
+
+        // Positive test: Tag an existing image with a new tag in the same repository.
+        {
+            ExpectImagePresent(*m_defaultSession, "debian:latest");
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                deleteOptions.Image = "debian:test-tag";
+                deleteOptions.Force = FALSE;
+                deleteOptions.NoPrune = TRUE;
+
+                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                VERIFY_SUCCEEDED(
+                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+
+                ExpectImagePresent(*m_defaultSession, "debian:test-tag", false);
+                ExpectImagePresent(*m_defaultSession, "debian:latest");
+            });
+
+            VERIFY_SUCCEEDED(runTagImage("debian:latest", "debian", "test-tag"));
+
+            // Verify both tags exist and point to the same image.
+            ExpectImagePresent(*m_defaultSession, "debian:latest");
+            ExpectImagePresent(*m_defaultSession, "debian:test-tag");
+
+            // Verify they have the same image hash.
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+
+            std::string latestHash;
+            std::string testTagHash;
+            for (const auto& image : images)
+            {
+                if (std::strcmp(image.Image, "debian:latest") == 0)
+                {
+                    latestHash = image.Hash;
+                }
+                else if (std::strcmp(image.Image, "debian:test-tag") == 0)
+                {
+                    testTagHash = image.Hash;
+                }
+            }
+
+            VERIFY_IS_FALSE(latestHash.empty());
+            VERIFY_IS_FALSE(testTagHash.empty());
+            VERIFY_ARE_EQUAL(latestHash, testTagHash);
+        }
+
+        // Positive test: Tag with a different repository name.
+        {
+            ExpectImagePresent(*m_defaultSession, "debian:latest");
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                deleteOptions.Image = "myrepo/myimage:v1.0.0";
+                deleteOptions.Force = FALSE;
+                deleteOptions.NoPrune = TRUE;
+
+                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                VERIFY_SUCCEEDED(
+                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+
+                ExpectImagePresent(*m_defaultSession, "myrepo/myimage:v1.0.0", false);
+            });
+
+            VERIFY_SUCCEEDED(runTagImage("debian:latest", "myrepo/myimage", "v1.0.0"));
+
+            ExpectImagePresent(*m_defaultSession, "myrepo/myimage:v1.0.0");
+        }
+
+        // Positive test: Tag using image ID.
+        {
+            ExpectImagePresent(*m_defaultSession, "debian:latest");
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                deleteOptions.Image = "debian:test-by-id";
+                deleteOptions.Force = FALSE;
+                deleteOptions.NoPrune = TRUE;
+
+                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                VERIFY_SUCCEEDED(
+                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+
+                ExpectImagePresent(*m_defaultSession, "debian:test-by-id", false);
+            });
+
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+
+            std::string imageId;
+            for (const auto& image : images)
+            {
+                if (std::strcmp(image.Image, "debian:latest") == 0)
+                {
+                    imageId = image.Hash;
+                    break;
+                }
+            }
+            VERIFY_IS_FALSE(imageId.empty());
+
+            VERIFY_SUCCEEDED(runTagImage(imageId.c_str(), "debian", "test-by-id"));
+
+            ExpectImagePresent(*m_defaultSession, "debian:test-by-id");
+        }
+
+        // Positive test: Overwrite existing tag.
+        {
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
+                deleteOptions.Image = "test:duplicate-tag";
+                deleteOptions.Force = FALSE;
+                deleteOptions.NoPrune = TRUE;
+
+                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                VERIFY_SUCCEEDED(
+                    m_defaultSession->DeleteImage(&deleteOptions, deletedImages.addressof(), deletedImages.size_address<ULONG>()));
+
+                ExpectImagePresent(*m_defaultSession, "test:duplicate-tag", false);
+            });
+
+            VERIFY_SUCCEEDED(runTagImage("debian:latest", "test", "duplicate-tag"));
+            VERIFY_SUCCEEDED(runTagImage("debian:latest", "test", "duplicate-tag"));
+        }
+
+        // Negative test: Null options pointer.
+        {
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), m_defaultSession->TagImage(nullptr));
+        }
+
+        // Negative test: Null Image field.
+        {
+            VERIFY_ARE_EQUAL(E_POINTER, runTagImage(nullptr, "test", "tag"));
+        }
+
+        // Negative test: Null Repo field.
+        {
+            VERIFY_ARE_EQUAL(E_POINTER, runTagImage("debian:latest", nullptr, "tag"));
+        }
+
+        // Negative test: Null Tag field.
+        {
+            VERIFY_ARE_EQUAL(E_POINTER, runTagImage("debian:latest", "test", nullptr));
+        }
+
+        // Negative test: Tag a non-existent image.
+        {
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, runTagImage("nonexistent:notfound", "test", "fail"));
+            ValidateCOMErrorMessage(L"No such image: nonexistent:notfound");
+        }
+
+        // Negative test: Invalid tag format with spaces.
+        {
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), runTagImage("debian:latest", "test", "invalid tag"));
+            ValidateCOMErrorMessage(L"invalid tag format");
+        }
+    }
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
@@ -1601,7 +1771,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("doesnotexist", {});
 
-            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
+            auto [hresult, process, error] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
             VERIFY_ARE_EQUAL(error, 2); // ENOENT
             VERIFY_IS_FALSE(process.has_value());
@@ -1610,7 +1780,7 @@ class WSLATests
         {
             WSLAProcessLauncher launcher("/", {});
 
-            auto [hresult, error, process] = launcher.LaunchNoThrow(*m_defaultSession);
+            auto [hresult, process, error] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
             VERIFY_ARE_EQUAL(error, 13); // EACCESS
             VERIFY_IS_FALSE(process.has_value());
@@ -1752,6 +1922,9 @@ class WSLATests
             auto process = container.GetInitProcess();
 
             ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            // Validate that GetInitProcess fails with the process argument is null.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), container.Get().GetInitProcess(nullptr));
         }
 
         // Validate that env is correctly wired.
@@ -1856,6 +2029,17 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "/tmp\n"}});
         }
 
+        // Validate that the current directory is created if it doesn't exist.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-bad-cwd", {"pwd"});
+            launcher.SetWorkingDirectory("/new-dir");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "/new-dir\n"}});
+        }
+
         // Validate that hostname and domainanme are correctly wired.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo $(hostname).$(domainname)"});
@@ -1891,9 +2075,6 @@ class WSLATests
         }
 
         // Validate error handling when the username / group doesn't exist
-
-        // TODO: Uncomment once error messages are wired to WSLAContainer.
-        /*
         {
             WSLAContainerLauncher launcher("debian:latest", "test-no-missing-user", {"groups"});
 
@@ -1902,8 +2083,8 @@ class WSLATests
             auto [result, _] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(result, E_FAIL);
 
-            ValidateCOMErrorMessage(L"The specified user does not exist.");
-        }*/
+            ValidateCOMErrorMessage(L"unable to find user does-not-exist: no matching entries in passwd file");
+        }
 
         // Validate that empty arguments are correctly handled.
         {
@@ -1938,8 +2119,10 @@ class WSLATests
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
             VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            // TODO: Uncomment once error messages are wired to WSLAContainer.
-            // ValidateCOMErrorMessage(L"The specified executable was not found inside the container image.");
+            ValidateCOMErrorMessage(
+                L"failed to create task for container: failed to create shim task: OCI runtime create failed: runc create "
+                L"failed: unable to start container process: error during container init: exec: \"/does-not-exist\": stat "
+                L"/does-not-exist: no such file or directory: unknown");
         }
 
         // Test null image name
@@ -2594,6 +2777,43 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
+        // Validate that launching a non-existing command returns the correct error.
+        // TODO: Uncomment once exec launch errors are handled.
+
+        /*
+        {
+            WSLAProcessLauncher launcher({}, {"/not-found"});
+            auto [result, _] = launcher.LaunchNoThrow(container.Get());
+
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+
+            ValidateCOMErrorMessage(L"TODO");
+        }
+
+        // Validate that setting invalid current directory returns the correct error.
+        {
+            WSLAProcessLauncher launcher({}, {"/bin/cat"});
+            launcher.SetWorkingDirectory("/notfound");
+            auto [result, _] = launcher.LaunchNoThrow(container.Get());
+
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+
+            ValidateCOMErrorMessage(L"TODO");
+        }
+
+        // Validate that invalid usernames are correctly handled.
+        {
+            WSLAProcessLauncher launcher({}, {"/bin/cat"});
+            launcher.SetUser("does-not-exist");
+
+            auto [result, _] = launcher.LaunchNoThrow(container.Get());
+
+            VERIFY_ARE_EQUAL(result, E_FAIL);
+            ValidateCOMErrorMessage(L"Not found");
+        }
+
+        */
+
         // Validate that an exec'd command returns when the container is stopped.
         {
             auto process = WSLAProcessLauncher({}, {"/bin/cat"}, {}, WSLAProcessFlagsStdin).Launch(container.Get());
@@ -2604,10 +2824,9 @@ class WSLATests
             VERIFY_ARE_EQUAL(result.Code, 128 + WSLASignalSIGKILL);
         }
 
-        // Validate error paths
+        // Validate that processes can't be launched in stopped containers.
         {
-            // Validate that processes can't be launched in stopped containers.
-            auto [result, _, __] = WSLAProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
+            auto [result, _] = WSLAProcessLauncher({}, {"/bin/cat"}).LaunchNoThrow(container.Get());
             VERIFY_ARE_EQUAL(result, HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
         }
     }

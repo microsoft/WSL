@@ -83,21 +83,16 @@ public:
     void SetWorkingDirectory(std::string&& WorkingDirectory);
     void SetUser(std::string&& User);
 
-    std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLASession& Session);
-    std::tuple<HRESULT, int, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
+    std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>, int> LaunchNoThrow(IWSLASession& Session);
+    std::tuple<HRESULT, std::optional<ClientRunningWSLAProcess>> LaunchNoThrow(IWSLAContainer& Container);
 
     template <typename T>
     auto Launch(T& Context)
     {
-        auto [hresult, error, process] = LaunchNoThrow(Context);
-        if (FAILED(hresult))
-        {
-            auto commandLine = wsl::shared::string::Join(m_arguments, ' ');
-            THROW_HR_MSG(
-                hresult, "Failed to launch process: %hs (commandline: %hs). Errno = %i", m_executable.c_str(), commandLine.c_str(), error);
-        }
+        auto result = LaunchNoThrow(Context);
+        THROW_IF_FAILED(std::get<0>(result));
 
-        return std::move(process.value());
+        return std::move(std::get<1>(result).value());
     }
 
     std::string FormatResult(const RunningWSLAProcess::ProcessResult& result);

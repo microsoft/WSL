@@ -17,6 +17,8 @@ Abstract:
 #include "WSLAProcess.h"
 #include "WSLAProcessIO.h"
 
+using wsl::windows::common::COMServiceExecutionContext;
+using wsl::windows::common::docker_schema::ErrorResponse;
 using wsl::windows::common::relay::DockerIORelayHandle;
 using wsl::windows::common::relay::HandleWrapper;
 using wsl::windows::common::relay::HTTPChunkBasedReadHandle;
@@ -362,7 +364,13 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
         m_id.c_str(),
         m_state);
 
-    auto ioHandle = m_dockerClient.AttachContainer(m_id);
+    wil::unique_socket ioHandle;
+
+    try
+    {
+        ioHandle = m_dockerClient.AttachContainer(m_id);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
@@ -435,14 +443,9 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
 
     try
     {
-
         m_dockerClient.StartContainer(m_id);
     }
-    catch (const DockerHTTPException& e)
-    {
-        // TODO: wire error back to caller.
-        THROW_HR_MSG(E_FAIL, "Failed to start container '%hs': %hs", m_id.c_str(), e.what());
-    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
     m_state = WslaContainerStateRunning;
     cleanup.release();
@@ -508,13 +511,7 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
         // HTTP 304 is returned when the container is already stopped.
         if (e.StatusCode() != 304)
         {
-            WSL_LOG(
-                "StopContainerFailed",
-                TraceLoggingValue(m_name.c_str(), "Name"),
-                TraceLoggingValue(m_id.c_str(), "Id"),
-                TraceLoggingValue(e.what(), "Error"));
-
-            throw;
+            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to stop container '%hs'", m_id.c_str());
         }
     }
 
@@ -538,7 +535,12 @@ void WSLAContainerImpl::Delete()
         m_name.c_str(),
         m_state);
 
-    m_dockerClient.DeleteContainer(m_id);
+    try
+    {
+        m_dockerClient.DeleteContainer(m_id);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
+
     ReleaseResources();
 
     m_state = WslaContainerStateDeleted;
@@ -569,7 +571,7 @@ void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
     THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
 }
 
-void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
+void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
 
@@ -639,10 +641,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
         THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
     }
-    catch (DockerHTTPException& e)
-    {
-        THROW_HR_MSG(E_FAIL, "Failed to exec process in container %hs: %hs", m_id.c_str(), e.what());
-    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to exec process in container %hs", m_id.c_str());
 }
 
 WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect)
@@ -914,10 +913,7 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
         std::string wslaJson = wsl::shared::ToJson(wslaInspect);
         *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslaJson.c_str()).release();
     }
-    catch (const DockerHTTPException& e)
-    {
-        THROW_HR_MSG(E_FAIL, "Failed to inspect container: %hs ", e.what());
-    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
 void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -929,10 +925,7 @@ void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, 
     {
         socket = m_dockerClient.ContainerLogs(m_id, Flags, Since, Until, Tail);
     }
-    catch (const DockerHTTPException& e)
-    {
-        THROW_HR_MSG(E_FAIL, "Failed to get container logs: %hs ", e.what());
-    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to get logs from '%hs'", m_id.c_str());
 
     if (WI_IsFlagSet(m_initProcessFlags, WSLAProcessFlagsTty))
     {
@@ -1044,6 +1037,8 @@ WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const W
 
 HRESULT WSLAContainer::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
 {
+    COMServiceExecutionContext context;
+
     *Stdin = 0;
     *Stdout = 0;
     *Stderr = 0;
@@ -1053,34 +1048,46 @@ HRESULT WSLAContainer::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
 
 HRESULT WSLAContainer::GetState(WSLA_CONTAINER_STATE* Result)
 {
+    COMServiceExecutionContext context;
+
     *Result = WslaContainerStateInvalid;
     return CallImpl(&WSLAContainerImpl::GetState, Result);
 }
 
 HRESULT WSLAContainer::GetInitProcess(IWSLAProcess** Process)
 {
+    COMServiceExecutionContext context;
+
     *Process = nullptr;
     return CallImpl(&WSLAContainerImpl::GetInitProcess, Process);
 }
 
-HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process, int* Errno)
+HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** Process)
 {
-    *Errno = -1;
-    return CallImpl(&WSLAContainerImpl::Exec, Options, Process, Errno);
+    COMServiceExecutionContext context;
+
+    *Process = nullptr;
+    return CallImpl(&WSLAContainerImpl::Exec, Options, Process);
 }
 
 HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds)
 {
+    COMServiceExecutionContext context;
+
     return CallImpl(&WSLAContainerImpl::Stop, Signal, TimeoutSeconds);
 }
 
 HRESULT WSLAContainer::Start(WSLAContainerStartFlags Flags)
 {
+    COMServiceExecutionContext context;
+
     return CallImpl(&WSLAContainerImpl::Start, Flags);
 }
 
 HRESULT WSLAContainer::Inspect(LPSTR* Output)
 {
+    COMServiceExecutionContext context;
+
     *Output = nullptr;
 
     return CallImpl(&WSLAContainerImpl::Inspect, Output);
@@ -1089,6 +1096,8 @@ HRESULT WSLAContainer::Inspect(LPSTR* Output)
 HRESULT WSLAContainer::Delete()
 try
 {
+    COMServiceExecutionContext context;
+
     // Special case for Delete(): If deletion is successful, notify the WSLASession that the container has been deleted.
     auto [lock, impl] = LockImpl();
 
@@ -1101,6 +1110,8 @@ CATCH_RETURN();
 
 HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
 {
+    COMServiceExecutionContext context;
+
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
 
     *Stdout = 0;
@@ -1112,6 +1123,8 @@ HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, U
 HRESULT WSLAContainer::GetId(WSLAContainerId Id)
 try
 {
+    COMServiceExecutionContext context;
+
     auto [lock, impl] = LockImpl();
     WI_VERIFY(strcpy_s(Id, std::size<char>(WSLAContainerId{}), impl->ID().c_str()) == 0);
 
@@ -1122,6 +1135,8 @@ CATCH_RETURN();
 HRESULT WSLAContainer::GetName(LPSTR* Name)
 try
 {
+    COMServiceExecutionContext context;
+
     *Name = nullptr;
 
     auto [lock, impl] = LockImpl();
@@ -1170,6 +1185,8 @@ void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
 HRESULT WSLAContainer::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
 try
 {
+    COMServiceExecutionContext context;
+
     RETURN_HR_IF(E_POINTER, Labels == nullptr || Count == nullptr);
 
     *Count = 0;
@@ -1177,3 +1194,8 @@ try
     return CallImpl(&WSLAContainerImpl::GetLabels, Labels, Count);
 }
 CATCH_RETURN();
+
+HRESULT WSLAContainer::InterfaceSupportsErrorInfo(REFIID riid)
+{
+    return riid == __uuidof(IWSLAContainer) ? S_OK : S_FALSE;
+}
