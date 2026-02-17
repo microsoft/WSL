@@ -103,7 +103,7 @@ typedef enum WslcSessionTerminationReason
 
 typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
 
-STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
+STDAPI WslcSessionInitSettings(_In_ PCWSTR identifier, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
 STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session);
 
@@ -262,8 +262,6 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings);
 STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable);
 
 STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory);
-
-STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings, _In_ PCWSTR displayName);
 
 STDAPI WslcProcessSettingsSetCmdLineArgs(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc);
 

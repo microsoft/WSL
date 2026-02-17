@@ -106,13 +106,16 @@ void GetErrorInfoFromCOM(PWSTR* errorMessage)
 } // namespace
 
 // SESSION DEFINITIONS
-STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
+STDAPI WslcSessionInitSettings(_In_ PCWSTR identifier, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, identifier);
+
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     *internalType = {};
 
+    internalType->displayName = identifier;
     internalType->storagePath = storagePath;
     internalType->cpuCount = s_DefaultCPUCount;
     internalType->memoryMb = s_DefaultMemoryMB;
@@ -223,18 +226,6 @@ try
     UNREFERENCED_PARAMETER(networkingMode);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
-}
-CATCH_RETURN();
-
-// TODO: DisplayName is required (and is effectively `SessionKey`); it should be promoted to a required Init time parameter.
-STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings, _In_ PCWSTR displayName)
-try
-{
-    auto internalType = CheckAndGetInternalType(sessionSettings);
-
-    internalType->displayName = displayName;
-
-    return S_OK;
 }
 CATCH_RETURN();
 

@@ -13,11 +13,12 @@ WslcSessionRelease
 WslcContainerRelease
 WslcProcessRelease
 
+WslcSessionSettingsSetFeatureFlags
 WslcSessionSettingsSetFlags
 WslcSessionSettingsSetTerminateCallback
-WslcSessionSettingsSetDisplayName
 WslcSessionSettingsSetCpuCount
 WslcSessionSettingsSetMemory
+WslcSessionSettingsSetNetworkingMode
 WslcSessionSettingsSetTimeout
 WslcSessionSettingsSetVHD
  
