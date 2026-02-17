@@ -69,6 +69,17 @@ WSLASignal ConvertSignal(WslcSignal signal)
     }
 }
 
+WSLANetworkingMode Convert(WslcSessionNetworkingMode mode)
+{
+    static_assert(WSLC_SESSION_NETWORKING_MODE_NONE == WSLANetworkingModeNone, "Session networking none values differ.");
+    static_assert(WSLC_SESSION_NETWORKING_MODE_NAT == WSLANetworkingModeNAT, "Session networking NAT values differ.");
+    static_assert(WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY == WSLANetworkingModeVirtioProxy, "Session networking Virt IO values differ.");
+
+    THROW_HR_IF(E_INVALIDARG, !(WSLC_SESSION_NETWORKING_MODE_NONE <= mode && mode <= WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY));
+
+    return static_cast<WSLANetworkingMode>(mode);
+}
+
 void GetErrorInfoFromCOM(PWSTR* errorMessage)
 {
     if (errorMessage)
@@ -158,8 +169,7 @@ try
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
-    // TODO: No user control over networking mode (NAT and VirtIO); should be added to WslcSessionSettings.
-    runtimeSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
+    runtimeSettings.NetworkingMode = internalType->networkingMode;
     auto terminationCallback = TerminationCallback::CreateIf(internalType);
     if (terminationCallback)
     {
@@ -231,6 +241,17 @@ try
     {
         internalType->timeoutMS = s_DefaultBootTimeout;
     }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSessionSettingsSetNetworkingMode(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionNetworkingMode mode)
+try
+{
+    auto internalType = CheckAndGetInternalType(sessionSettings);
+
+    internalType->networkingMode = Convert(mode);
 
     return S_OK;
 }
