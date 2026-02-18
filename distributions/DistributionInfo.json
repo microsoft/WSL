@@ -71,8 +71,8 @@
                 "FriendlyName": "SUSE Linux Enterprise 16.0",
                 "Default": true,
                 "Amd64Url": {
-                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20251201.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.9-Build1.9.wsl",
-                    "Sha256": "0xf0fc07ed3543d3dc24cfb35b4194bbecf98485cefdd720c521034ac1c54bffd3"
+                    "Url": "https://github.com/SUSE/WSL-instarball/releases/download/v20260218.0/SUSE-Linux-Enterprise-16.0-16.0.x86_64-1.29-Build1.29.wsl",
+                    "Sha256": "0xe0bd5e676a30164f43bbe9a7a0e0999ba9cfa396d030abf9c95122a656ed5c49"
                 }
             }
         ],
