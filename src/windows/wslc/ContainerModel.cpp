@@ -65,31 +65,55 @@ PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& 
 
 PublishPort::IPAddress PublishPort::IPAddress::ParseHostIP(const std::string& hostIpPart)
 {
-    PublishPort::IPAddress ipAddress;
-
     // Check if it's an IPv6 address (enclosed in square brackets)
     if (!hostIpPart.empty() && hostIpPart.front() == '[' && hostIpPart.back() == ']')
     {
-        ipAddress.m_value = hostIpPart.substr(1, hostIpPart.size() - 2);
-        ipAddress.m_isIPv6 = true;
-        sockaddr_in6 sa6{};
-        if (inet_pton(AF_INET6, ipAddress.m_value.c_str(), &(sa6.sin6_addr)) != 1)
+        auto address = hostIpPart.substr(1, hostIpPart.size() - 2);
+        IN6_ADDR v6{};
+        if (inet_pton(AF_INET6, address.c_str(), &(v6)) == 1)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv6 address specified in port mapping.");
+            return PublishPort::IPAddress(v6);
         }
+
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv6 address specified in port mapping.");
     }
     else
     {
-        ipAddress.m_value = hostIpPart;
-        ipAddress.m_isIPv6 = false;
-        sockaddr_in sa4{};
-        if (inet_pton(AF_INET, ipAddress.m_value.c_str(), &(sa4.sin_addr)) != 1)
+        IN_ADDR v4{};
+        if (inet_pton(AF_INET, hostIpPart.c_str(), &(v4)) == 1)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv4 address specified in port mapping.");
+            return PublishPort::IPAddress(v4);
+        }
+
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid IPv4 address specified in port mapping.");
+    }
+}
+
+bool PublishPort::IPAddress::IsAllInterfaces() const
+{
+    for (size_t i = 0; i < 16; i++)
+    {
+        if (m_bytes[i] != 0)
+        {
+            return false;
         }
     }
 
-    return ipAddress;
+    return true;
+}
+
+bool PublishPort::IPAddress::IsLoopback() const
+{
+    if (IsIPv6())
+    {
+        // IPv6 loopback is ::1
+        static const std::array<uint8_t, 16> loopbackV6Bytes = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+        return m_bytes == loopbackV6Bytes;
+    }
+
+    // IPv4 loopback is 127.0.0.1
+    static const std::array<uint8_t, 4> loopbackV4Bytes = {127, 0, 0, 1};
+    return std::equal(m_bytes.begin(), m_bytes.begin() + 4, loopbackV4Bytes.begin());
 }
 
 PublishPort PublishPort::Parse(const std::string& value)

@@ -98,12 +98,21 @@ struct PublishPort
 
     struct IPAddress
     {
-        std::string Value() const { return m_value; }
+        explicit IPAddress(const IN_ADDR& v4) : m_isIPv6(false) {
+            std::memcpy(m_bytes.data(), &v4, 4);
+        }
+
+        explicit IPAddress(const IN6_ADDR& v6) : m_isIPv6(true) {
+            std::memcpy(m_bytes.data(), &v6, 16);
+        }
+
         bool IsIPv6() const { return m_isIPv6; }
         static IPAddress ParseHostIP(const std::string& hostIpPart);
+        bool IsLoopback() const;
+        bool IsAllInterfaces() const;
     private:
-        std::string m_value;
         bool m_isIPv6 = false;
+        std::array<uint8_t, 16> m_bytes{};
     };
 
     std::optional<IPAddress> HostIP() const noexcept { return m_hostIP; }
