@@ -30,13 +30,13 @@ constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 #define WLSC_FLAG_VALUE_ASSERT(_wlsc_name_, _wsla_name_) \
     static_assert(_wlsc_name_ == _wsla_name_, "Flag values differ: " #_wlsc_name_ " != " #_wsla_name_);
 
-template<typename Flags>
+template <typename Flags>
 struct FlagsTraits
 {
     static_assert(false, "Flags used without traits defined.");
 };
 
-template<>
+template <>
 struct FlagsTraits<WslcSessionFeatureFlags>
 {
     using WslaType = WSLAFeatureFlags;
@@ -72,7 +72,7 @@ struct FlagsTraits<WslcContainerStartFlags>
     WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
 };
 
-template<typename Flags>
+template <typename Flags>
 FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
 {
     using traits = FlagsTraits<Flags>;
