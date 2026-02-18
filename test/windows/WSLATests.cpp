@@ -2826,11 +2826,7 @@ class WSLATests
             VERIFY_SUCCEEDED(result);
 
             auto process = launcher.Launch(container.Get());
-            ValidateProcessOutput(
-                process,
-                {{1,
-                  "unable to find user does-not-exist: no matching entries in passwd file\r\n"}},
-                126);
+            ValidateProcessOutput(process, {{1, "unable to find user does-not-exist: no matching entries in passwd file\r\n"}}, 126);
         }
 
         // Validate that an exec'd command returns when the container is stopped.
