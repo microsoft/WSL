@@ -11,6 +11,8 @@ Abstract:
     This file contains the ContainerService implementation
 
 --*/
+
+#include <precomp.h>
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "ImageService.h"
@@ -24,6 +26,46 @@ using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
+
+static inline int ResolveOrAllocatePort(PublishPort port, int offset)
+{
+    // If specified, validate and return it.
+    if (!port.HasEphemeralHostPort())
+    {
+        return port.HostPort()->Start() + offset;
+    }
+
+    // Create a socket matching the protocol.
+    const int sockType = (port.PortProtocol() == PublishPort::Protocol::TCP) ? SOCK_STREAM : SOCK_DGRAM;
+    const int ipProto = (port.PortProtocol() == PublishPort::Protocol::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
+    auto socket = ::socket(AF_INET, sockType, ipProto);
+    THROW_LAST_ERROR_IF(socket == INVALID_SOCKET);
+
+    // Bind to port 0 to ask Windows for an ephemeral port
+    auto loopback = port.HostIP().has_value() && port.HostIP()->IsLoopback();
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(loopback ? INADDR_LOOPBACK : INADDR_ANY);
+    addr.sin_port = htons(0);
+    if (::bind(socket, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR)
+    {
+        ::closesocket(socket);
+        THROW_LAST_ERROR();
+    }
+
+    // Read the chosen port back
+    sockaddr_in bound{};
+    int len = sizeof(bound);
+    if (::getsockname(socket, reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR)
+    {
+        ::closesocket(socket);
+        THROW_LAST_ERROR();
+    }
+
+    auto chosen = ntohs(bound.sin_port);
+    ::closesocket(socket);
+    return chosen;
+}
 
 static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
 {
@@ -77,6 +119,21 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, {}, WSLA_CONTAINER_NETWORK_HOST, processFlags);
+
+    // Set port options if provided
+    if (!options.Port.empty())
+    {
+        auto portMapping = PublishPort::Parse(options.Port);
+        auto containerPort = portMapping.ContainerPort();
+        for (unsigned int i = 0; i < containerPort.Count(); ++i)
+        {
+            int family = portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6() ? AF_INET6 : AF_INET;
+            auto currentContainerPort = containerPort.Start() + i;
+            auto currentHostPort = ResolveOrAllocatePort(portMapping, i);
+            containerLauncher.AddPortW(currentHostPort, currentContainerPort, family);
+        }
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {

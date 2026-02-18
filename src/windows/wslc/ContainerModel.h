@@ -25,6 +25,7 @@ struct ContainerCreateOptions
     bool Interactive = false;
     std::vector<std::string> Arguments;
     std::string Name;
+    std::string Port;
 };
 
 struct ContainerRunOptions : public ContainerCreateOptions
@@ -66,4 +67,113 @@ struct ExecContainerOptions
     bool Interactive = false;
     std::vector<std::string> Arguments;
 };
+
+struct PublishPort
+{
+    enum class Protocol
+    {
+        UDP,
+        TCP,
+    };
+
+    struct PortRange
+    {
+        int Start() const
+        {
+            return m_start;
+        }
+        int End() const
+        {
+            return m_end;
+        }
+
+        constexpr unsigned int Count() const noexcept
+        {
+            return (m_end >= m_start) ? (m_end - m_start + 1) : 0;
+        }
+        constexpr bool IsSingle() const noexcept
+        {
+            return Count() == 1;
+        }
+        constexpr bool IsValid() const noexcept
+        {
+            return Count() > 0 && IsValidPort(m_start) && IsValidPort(m_end);
+        }
+        static PublishPort::PortRange ParsePortPart(const std::string& portPart);
+
+    private:
+        int m_start;
+        int m_end;
+    };
+
+    struct IPAddress
+    {
+        explicit IPAddress(const IN_ADDR& v4) : m_isIPv6(false)
+        {
+            std::memcpy(m_bytes.data(), &v4, 4);
+        }
+
+        explicit IPAddress(const IN6_ADDR& v6) : m_isIPv6(true)
+        {
+            std::memcpy(m_bytes.data(), &v6, 16);
+        }
+
+        bool IsIPv6() const
+        {
+            return m_isIPv6;
+        }
+        static IPAddress ParseHostIP(const std::string& hostIpPart);
+        bool IsLoopback() const;
+        bool IsAllInterfaces() const;
+
+    private:
+        bool m_isIPv6 = false;
+        std::array<uint8_t, 16> m_bytes{};
+    };
+
+    std::optional<IPAddress> HostIP() const noexcept
+    {
+        return m_hostIP;
+    }
+    std::optional<PortRange> HostPort() const noexcept
+    {
+        return m_hostPort;
+    }
+    PortRange ContainerPort() const noexcept
+    {
+        return m_containerPort;
+    }
+    Protocol PortProtocol() const noexcept
+    {
+        return m_protocol;
+    }
+    std::string Original() const noexcept
+    {
+        return m_original;
+    }
+
+    static PublishPort Parse(const std::string& value);
+    bool HasEphemeralHostPort() const noexcept
+    {
+        return !m_hostPort.has_value();
+    }
+    bool IsRangeMapping() const noexcept
+    {
+        return !m_containerPort.IsSingle();
+    }
+
+private:
+    std::optional<IPAddress> m_hostIP;
+    std::optional<PortRange> m_hostPort;
+    PortRange m_containerPort;
+    Protocol m_protocol = Protocol::TCP;
+    std::string m_original;
+    void Validate() const;
+    PublishPort() = default;
+    static constexpr bool IsValidPort(int port) noexcept
+    {
+        return port >= 1 && port <= 65535;
+    }
+};
+
 } // namespace wsl::windows::wslc::models
