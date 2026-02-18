@@ -18,7 +18,6 @@ WslcSessionSettingsSetFlags
 WslcSessionSettingsSetTerminateCallback
 WslcSessionSettingsSetCpuCount
 WslcSessionSettingsSetMemory
-WslcSessionSettingsSetNetworkingMode
 WslcSessionSettingsSetTimeout
 WslcSessionSettingsSetVHD
  

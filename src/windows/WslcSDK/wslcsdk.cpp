@@ -27,7 +27,7 @@ constexpr ULONG s_DefaultBootTimeout = 300000;
 // Default to 1 GB
 constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 
-#define WLSC_FLAG_VALUE_ASSERT(_wlsc_name_, _wsla_name_) \
+#define WSLC_FLAG_VALUE_ASSERT(_wlsc_name_, _wsla_name_) \
     static_assert(_wlsc_name_ == _wsla_name_, "Flag values differ: " #_wlsc_name_ " != " #_wsla_name_);
 
 template <typename Flags>
@@ -41,7 +41,7 @@ struct FlagsTraits<WslcSessionFeatureFlags>
 {
     using WslaType = WSLAFeatureFlags;
     constexpr static WslcSessionFeatureFlags Mask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
-    WLSC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WslaFeatureFlagsGPU);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WslaFeatureFlagsGPU);
 };
 
 template <>
@@ -49,8 +49,8 @@ struct FlagsTraits<WslcSessionFlags>
 {
     using WslaType = WSLASessionFlags;
     constexpr static WslcSessionFlags Mask = WSLC_SESSION_FLAG_PERSISTENT | WSLC_SESSION_FLAG_OPEN_EXISTING;
-    WLSC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_PERSISTENT, WSLASessionFlagsPersistent);
-    WLSC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_OPEN_EXISTING, WSLASessionFlagsOpenExisting);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_PERSISTENT, WSLASessionFlagsPersistent);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_OPEN_EXISTING, WSLASessionFlagsOpenExisting);
 };
 
 template <>
@@ -58,10 +58,9 @@ struct FlagsTraits<WslcContainerFlags>
 {
     using WslaType = WSLAContainerFlags;
     constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
-    WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLAContainerFlagsRm);
-    WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLAContainerFlagsGpu);
-    // TODO: Are these the same flags?
-    // WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_PRIVILEGED, WSLAContainerFlagsInit);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLAContainerFlagsRm);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLAContainerFlagsGpu);
+    // TODO: WSLC_CONTAINER_FLAG_PRIVILEGED has no associated runtime value
 };
 
 template <>
@@ -69,14 +68,14 @@ struct FlagsTraits<WslcContainerStartFlags>
 {
     using WslaType = WSLAContainerStartFlags;
     constexpr static WslcContainerStartFlags Mask = WSLC_CONTAINER_START_FLAG_ATTACH;
-    WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
 };
 
 template <typename Flags>
-FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
+typename FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
 {
     using traits = FlagsTraits<Flags>;
-    return static_cast<traits::WslaType>(flags & traits::Mask);
+    return static_cast<typename traits::WslaType>(flags & traits::Mask);
 }
 
 WSLASignal ConvertSignal(WslcSignal signal)
@@ -100,18 +99,6 @@ WSLASignal ConvertSignal(WslcSignal signal)
     }
 }
 
-WSLANetworkingMode Convert(WslcSessionNetworkingMode mode)
-{
-    static_assert(WSLC_SESSION_NETWORKING_MODE_NONE == WSLANetworkingModeNone, "Session networking none values differ.");
-    static_assert(WSLC_SESSION_NETWORKING_MODE_NAT == WSLANetworkingModeNAT, "Session networking NAT values differ.");
-    static_assert(
-        WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY == WSLANetworkingModeVirtioProxy, "Session networking Virt IO values differ.");
-
-    THROW_HR_IF(E_INVALIDARG, !(WSLC_SESSION_NETWORKING_MODE_NONE <= mode && mode <= WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY));
-
-    return static_cast<WSLANetworkingMode>(mode);
-}
-
 void GetErrorInfoFromCOM(PWSTR* errorMessage)
 {
     if (errorMessage)
@@ -127,7 +114,7 @@ void GetErrorInfoFromCOM(PWSTR* errorMessage)
 } // namespace
 
 // SESSION DEFINITIONS
-STDAPI WslcSessionInitSettings(_In_ PCWSTR identifier, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
+STDAPI WslcSessionInitSettings(_In_ PCWSTR identifier, _In_opt_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, identifier);
@@ -204,7 +191,7 @@ try
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
-    runtimeSettings.NetworkingMode = internalType->networkingMode;
+    runtimeSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
     auto terminationCallback = TerminationCallback::CreateIf(internalType);
     if (terminationCallback)
     {
@@ -263,17 +250,6 @@ try
     {
         internalType->timeoutMS = s_DefaultBootTimeout;
     }
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-STDAPI WslcSessionSettingsSetNetworkingMode(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionNetworkingMode mode)
-try
-{
-    auto internalType = CheckAndGetInternalType(sessionSettings);
-
-    internalType->networkingMode = Convert(mode);
 
     return S_OK;
 }

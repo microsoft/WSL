@@ -29,7 +29,6 @@ typedef struct WSLC_SESSION_OPTIONS_INTERNAL
     uint32_t cpuCount;
     uint32_t memoryMb;
     uint32_t timeoutMS;
-    WSLANetworkingMode networkingMode;
 
     WslcVhdRequirements vhdRequirements;
     WslcSessionFeatureFlags featureFlags;

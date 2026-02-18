@@ -52,13 +52,6 @@ typedef struct WslcProcessSettings
 
 DECLARE_HANDLE(WslcProcess);
 
-typedef enum WslcSessionNetworkingMode
-{
-    WSLC_SESSION_NETWORKING_MODE_NONE = 0, // No networking / isolated
-    WSLC_SESSION_NETWORKING_MODE_NAT = 1,
-    WSLC_SESSION_NETWORKING_MODE_VIRT_IO_PROXY = 2
-} WslcSessionNetworkingMode;
-
 typedef enum WslcContainerNetworkingMode
 {
     WSLC_CONTAINER_NETWORKING_MODE_NONE = 0, // No networking / isolated
@@ -103,7 +96,7 @@ typedef enum WslcSessionTerminationReason
 
 typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
 
-STDAPI WslcSessionInitSettings(_In_ PCWSTR identifier, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
+STDAPI WslcSessionInitSettings(_In_ PCWSTR identifier, _In_opt_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
 STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session);
 
@@ -111,7 +104,6 @@ STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSe
 STDAPI WslcSessionSettingsSetCpuCount(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t cpuCount);
 STDAPI WslcSessionSettingsSetMemory(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t memoryMb);
 STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, _In_ uint32_t timeoutMS);
-STDAPI WslcSessionSettingsSetNetworkingMode(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionNetworkingMode mode);
 
 STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
 
