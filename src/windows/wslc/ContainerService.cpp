@@ -27,17 +27,17 @@ using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
 
-
 static inline int ResolveOrAllocatePort(PublishPort port, int offset)
 {
     // If specified, validate and return it.
-    if (!port.HasEphemeralHostPort()) {
+    if (!port.HasEphemeralHostPort())
+    {
         return port.HostPort()->Start() + offset;
     }
 
     // Create a socket matching the protocol.
     const int sockType = (port.PortProtocol() == PublishPort::Protocol::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-    const int ipProto  = (port.PortProtocol() == PublishPort::Protocol::TCP) ? IPPROTO_TCP  : IPPROTO_UDP;
+    const int ipProto = (port.PortProtocol() == PublishPort::Protocol::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
     auto socket = ::socket(AF_INET, sockType, ipProto);
     THROW_LAST_ERROR_IF(socket == INVALID_SOCKET);
 
@@ -56,7 +56,8 @@ static inline int ResolveOrAllocatePort(PublishPort port, int offset)
     // Read the chosen port back
     sockaddr_in bound{};
     int len = sizeof(bound);
-    if (::getsockname(socket, reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR) {
+    if (::getsockname(socket, reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR)
+    {
         ::closesocket(socket);
         THROW_LAST_ERROR();
     }

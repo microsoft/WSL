@@ -120,7 +120,7 @@ PublishPort PublishPort::Parse(const std::string& value)
 {
     PublishPort result{};
     result.m_original = value;
-    
+
     // 1. Strip optional protocol suffix
     std::string portPart = value;
     auto slashPos = value.find('/');
@@ -138,7 +138,8 @@ PublishPort PublishPort::Parse(const std::string& value)
         }
         else
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Invalid protocol specified in port mapping. Only 'tcp' and 'udp' are supported.");
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG, "Invalid protocol specified in port mapping. Only 'tcp' and 'udp' are supported.");
         }
     }
 
@@ -163,7 +164,7 @@ PublishPort PublishPort::Parse(const std::string& value)
         {
             result.m_hostIP = PublishPort::IPAddress::ParseHostIP(hostPortPart->substr(0, colonPos));
             auto hostPort = hostPortPart->substr(colonPos + 1);
-            if(!hostPort.empty())
+            if (!hostPort.empty())
             {
                 result.m_hostPort = PublishPort::PortRange::ParsePortPart(hostPort);
             }
@@ -178,7 +179,8 @@ PublishPort PublishPort::Parse(const std::string& value)
     return result;
 }
 
-void PublishPort::Validate() const {
+void PublishPort::Validate() const
+{
     if (m_containerPort.Count() == 0)
     {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must specify at least one port.");
@@ -192,7 +194,9 @@ void PublishPort::Validate() const {
         }
         else
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port range must be valid port numbers (1-65535) and the start must be less than or equal to the end.");
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG,
+                "Container port range must be valid port numbers (1-65535) and the start must be less than or equal to the end.");
         }
     }
 
@@ -201,4 +205,4 @@ void PublishPort::Validate() const {
         THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port range must match the container port range.");
     }
 }
-}
+} // namespace wsl::windows::wslc::models
