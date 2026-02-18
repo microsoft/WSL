@@ -51,8 +51,7 @@ class WSLCCLIParserUnitTests
     {
         // Build test cases from x-macro
         std::vector<ParserTestCase> testCases = {
-#define WSLC_PARSER_TEST_CASE(argSetValue, expected, cmdLine) \
-            { ArgumentSet::argSetValue, expected, cmdLine },
+#define WSLC_PARSER_TEST_CASE(argSetValue, expected, cmdLine) {ArgumentSet::argSetValue, expected, cmdLine},
             WSLC_PARSER_TEST_CASES
 #undef WSLC_PARSER_TEST_CASE
         };

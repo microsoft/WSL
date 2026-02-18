@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCCLIParserTestCases.h
+    ParserTestCases.h
 
 Abstract:
 
@@ -53,7 +53,7 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
             Argument::Create(ArgType::Remove),
             Argument::Create(ArgType::Publish, false, 3), // Not required, up to 3 values.
         };
-    
+
     case ArgumentSet::List:
         return {
             Argument::Create(ArgType::ContainerId, false, 10), // Optional positional
