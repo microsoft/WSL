@@ -196,11 +196,11 @@ class WSLATests
         if (result.Code != expectedResult)
         {
             LogError(
-                "Comman didn't return expected code (%i). ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
+                "Command didn't return expected code (%i). ExitCode: %i, Stdout: '%hs', Stderr: '%hs'",
                 expectedResult,
                 result.Code,
-                result.Output[1].c_str(),
-                result.Output[2].c_str());
+                EscapeString(result.Output[1]).c_str(),
+                EscapeString(result.Output[2]).c_str());
 
             return;
         }
@@ -216,7 +216,11 @@ class WSLATests
 
             if (it->second != expected)
             {
-                LogError("Unexpected output on fd %i. Expected: '%hs', Actual: '%hs'", fd, expected.c_str(), it->second.c_str());
+                LogError(
+                    "Unexpected output on fd %i. Expected: '%hs', Actual: '%hs'",
+                    fd,
+                    EscapeString(expected).c_str(),
+                    EscapeString(it->second).c_str());
             }
         }
     }
@@ -2778,27 +2782,38 @@ class WSLATests
         }
 
         // Validate that launching a non-existing command returns the correct error.
-        // TODO: Uncomment once exec launch errors are handled.
 
-        /*
         {
             WSLAProcessLauncher launcher({}, {"/not-found"});
             auto [result, _] = launcher.LaunchNoThrow(container.Get());
 
-            VERIFY_ARE_EQUAL(result, E_FAIL);
+            VERIFY_SUCCEEDED(result);
 
-            ValidateCOMErrorMessage(L"TODO");
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(
+                process,
+                {{1,
+                  "OCI runtime exec failed: exec failed: unable to start container process: exec: \"/not-found\": stat "
+                  "/not-found: no such file or directory: unknown\r\n"}},
+                126);
         }
 
         // Validate that setting invalid current directory returns the correct error.
         {
             WSLAProcessLauncher launcher({}, {"/bin/cat"});
             launcher.SetWorkingDirectory("/notfound");
+
             auto [result, _] = launcher.LaunchNoThrow(container.Get());
 
-            VERIFY_ARE_EQUAL(result, E_FAIL);
+            VERIFY_SUCCEEDED(result);
 
-            ValidateCOMErrorMessage(L"TODO");
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(
+                process,
+                {{1,
+                  "OCI runtime exec failed: exec failed: unable to start container process: chdir to cwd (\"/notfound\") set in "
+                  "config.json failed: no such file or directory: unknown\r\n"}},
+                126);
         }
 
         // Validate that invalid usernames are correctly handled.
@@ -2808,11 +2823,15 @@ class WSLATests
 
             auto [result, _] = launcher.LaunchNoThrow(container.Get());
 
-            VERIFY_ARE_EQUAL(result, E_FAIL);
-            ValidateCOMErrorMessage(L"Not found");
-        }
+            VERIFY_SUCCEEDED(result);
 
-        */
+            auto process = launcher.Launch(container.Get());
+            ValidateProcessOutput(
+                process,
+                {{1,
+                  "unable to find user does-not-exist: no matching entries in passwd file\r\n"}},
+                126);
+        }
 
         // Validate that an exec'd command returns when the container is stopped.
         {

@@ -102,6 +102,7 @@ public:
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
     std::string InspectContainer(const std::string& Id);
+    std::string InspectExec(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);

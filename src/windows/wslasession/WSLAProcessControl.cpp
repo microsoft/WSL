@@ -36,9 +36,9 @@ std::pair<WSLA_PROCESS_STATE, int> WSLAProcessControl::GetState() const
     }
 }
 
-HANDLE WSLAProcessControl::GetExitEvent() const
+const wil::unique_event& WSLAProcessControl::GetExitEvent() const
 {
-    return m_exitEvent.get();
+    return m_exitEvent;
 }
 
 DockerContainerProcessControl::DockerContainerProcessControl(WSLAContainerImpl& Container, DockerHTTPClient& DockerClient, ContainerEventTracker& EventTracker) :
@@ -124,8 +124,11 @@ DockerExecProcessControl::~DockerExecProcessControl()
 
 int DockerExecProcessControl::GetPid() const
 {
-    // TODO: implement Inspect() for exec'd processes.
-    THROW_HR(E_NOTIMPL);
+    std::lock_guard lock{m_lock};
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_pid.has_value());
+
+    return m_pid.value();
 }
 
 void DockerExecProcessControl::Signal(int Signal)
@@ -141,13 +144,33 @@ void DockerExecProcessControl::ResizeTty(ULONG Rows, ULONG Columns)
     m_client.ResizeExecTty(m_id, Rows, Columns);
 }
 
+void DockerExecProcessControl::SetPid(int Pid)
+{
+    std::lock_guard lock{m_lock};
+
+    WI_ASSERT(!m_pid.has_value());
+
+    m_pid = Pid;
+}
+
+void DockerExecProcessControl::SetExitCode(int ExitCode)
+{
+    std::lock_guard lock{m_lock};
+
+    if (!m_exitedCode.has_value())
+    {
+        m_exitedCode = ExitCode;
+        m_exitEvent.SetEvent();
+    }
+}
+
 void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> ExitCode)
 {
     if (Event == ContainerEvent::ExecDied && !m_exitEvent.is_signaled())
     {
         WI_ASSERT(ExitCode.has_value());
-        m_exitedCode = ExitCode.value();
-        m_exitEvent.SetEvent();
+
+        SetExitCode(ExitCode.value());
     }
 }
 

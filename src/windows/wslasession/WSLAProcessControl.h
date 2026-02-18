@@ -32,7 +32,7 @@ public:
     virtual void ResizeTty(ULONG Rows, ULONG Columns) = 0;
     virtual int GetPid() const = 0;
     std::pair<WSLA_PROCESS_STATE, int> GetState() const;
-    HANDLE GetExitEvent() const;
+    const wil::unique_event& GetExitEvent() const;
 
 protected:
     wil::unique_event m_exitEvent{wil::EventOptions::ManualReset};
@@ -68,11 +68,15 @@ public:
     int GetPid() const override;
     void OnContainerReleased();
 
+    void SetPid(int Pid);
+    void SetExitCode(int ExitCode);
+
 private:
     void OnEvent(ContainerEvent Event, std::optional<int> ExitCode);
 
-    std::mutex m_lock;
+    mutable std::mutex m_lock;
     std::string m_id;
+    std::optional<int> m_pid{};
     DockerHTTPClient& m_client;
     WSLAContainerImpl* m_container{};
     ContainerEventTracker::ContainerTrackingReference m_trackingReference;
