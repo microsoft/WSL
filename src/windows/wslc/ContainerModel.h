@@ -25,6 +25,7 @@ struct ContainerCreateOptions
     bool Interactive = false;
     std::vector<std::string> Arguments;
     std::string Name;
+    std::string Volume;
 };
 
 struct ContainerRunOptions : public ContainerCreateOptions
@@ -65,5 +66,18 @@ struct ExecContainerOptions
     bool TTY = false;
     bool Interactive = false;
     std::vector<std::string> Arguments;
+};
+
+struct VolumeMount
+{
+    std::string HostPath() const {return m_hostPath;}
+    std::string ContainerPath() const {return m_containerPath; }
+    std::string Mode() const {return m_mode;}
+    constexpr bool IsReadOnly() const { return m_mode == "ro"; }
+    static VolumeMount Parse(const std::string& value);
+private:
+    std::string m_hostPath;
+    std::string m_containerPath;
+    std::string m_mode;
 };
 } // namespace wsl::windows::wslc::models

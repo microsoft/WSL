@@ -77,6 +77,16 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     WI_SetFlagIf(processFlags, WSLAProcessFlagsTty, options.TTY);
     wsl::windows::common::WSLAContainerLauncher containerLauncher(
         image, options.Name, options.Arguments, {}, WSLA_CONTAINER_NETWORK_HOST, processFlags);
+
+    // Add volumes if specified
+    if (!options.Volume.empty())
+    {
+        auto volume = VolumeMount::Parse(options.Volume);
+        auto host = wsl::shared::string::MultiByteToWide(volume.HostPath());
+        auto container = volume.ContainerPath();
+        containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+    }
+
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
     if (result == WSLA_E_IMAGE_NOT_FOUND)
     {
