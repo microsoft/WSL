@@ -24,6 +24,7 @@ target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests
                       common
+                      wslclib
                       ${TAEF_LINK_LIBRARIES}
                       ${COMMON_LINK_LIBRARIES}
                       VirtDisk.lib
@@ -31,5 +32,9 @@ target_link_libraries(wsltests
                       Dbghelp.lib
                       sfc.lib)
 
-add_dependencies(wsltests wslserviceidl)
+add_dependencies(wsltests wslserviceidl wslclib wslc)
 add_subdirectory(testplugin)
+add_subdirectory(wslc)
+
+# For prettier source tree browsing
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})

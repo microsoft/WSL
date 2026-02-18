@@ -1,0 +1,34 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    CommandLineTestCases.h
+
+Abstract:
+
+    Test case data for command-line parsing tests.
+
+--*/
+
+// These cases should be for testing valid command lines against the defined commands.
+// This executes the command line parsing logic and verifies that the command line is valid
+// for the defined commands. It does not actually execute the command.
+
+// X-Macro definition: COMMAND_LINE_TEST_CASE(commandLine, expectedCommand, shouldSucceed)
+
+// Root command tests
+COMMAND_LINE_TEST_CASE(L"", L"root", true)
+COMMAND_LINE_TEST_CASE(L"--help", L"root", true)
+
+// Diag command tests
+COMMAND_LINE_TEST_CASE(L"diag list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"diag list -v", L"list", true)
+COMMAND_LINE_TEST_CASE(L"diag list --verbose", L"list", true)
+COMMAND_LINE_TEST_CASE(L"diag list --verbose --help", L"list", true)
+COMMAND_LINE_TEST_CASE(L"diag list --notanarg", L"list", false)
+COMMAND_LINE_TEST_CASE(L"diag list extraarg", L"list", false)
+
+// Error cases
+COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
