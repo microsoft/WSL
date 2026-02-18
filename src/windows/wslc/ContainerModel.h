@@ -70,11 +70,24 @@ struct ExecContainerOptions
 
 struct VolumeMount
 {
-    std::string HostPath() const {return m_hostPath;}
-    std::string ContainerPath() const {return m_containerPath; }
-    std::string Mode() const {return m_mode;}
-    constexpr bool IsReadOnly() const { return m_mode == "ro"; }
+    std::string HostPath() const
+    {
+        return m_hostPath;
+    }
+    std::string ContainerPath() const
+    {
+        return m_containerPath;
+    }
+    std::string Mode() const
+    {
+        return m_mode;
+    }
+    constexpr bool IsReadOnly() const
+    {
+        return m_mode == "ro";
+    }
     static VolumeMount Parse(const std::string& value);
+
 private:
     std::string m_hostPath;
     std::string m_containerPath;

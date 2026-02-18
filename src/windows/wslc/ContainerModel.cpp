@@ -16,7 +16,8 @@ Abstract:
 #include "ContainerModel.h"
 
 namespace wsl::windows::wslc::models {
-static bool IsWindowsDriveColon(const std::string& s, size_t index, size_t tokenStart) {
+static bool IsWindowsDriveColon(const std::string& s, size_t index, size_t tokenStart)
+{
     if (s[index] != ':' || index != tokenStart + 1 || !std::isalpha((unsigned char)s[tokenStart]) || index + 1 >= s.size())
     {
         return false;
@@ -31,7 +32,8 @@ static std::vector<std::string> SplitVolumeValue(const std::string& value)
     std::string current;
     size_t tokenStart = 0;
 
-    for (size_t i = 0; i < value.size(); ++i) {
+    for (size_t i = 0; i < value.size(); ++i)
+    {
         char c = value[i];
         if (c == ':')
         {
@@ -78,4 +80,4 @@ VolumeMount VolumeMount::Parse(const std::string& value)
 
     return vm;
 }
-}
+} // namespace wsl::windows::wslc::models
