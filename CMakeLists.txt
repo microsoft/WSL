@@ -287,6 +287,10 @@ if (NOT VS_INSTALL_DIR)
     message(FATAL_ERROR "Could not determine Visual Studio 2022 installation directory.")
 endif()
 
+# Pick the first line returned from vswhere, in case multiple versions are returned.
+# TODO: Remove this and require VS 2026 once the CI supports it.
+string(REGEX MATCH "([^\n\r]+)" VS_INSTALL_DIR "${VS_INSTALL_DIR}")
+
 if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
     set(LLVM_INSTALL_DIR "${VS_INSTALL_DIR}/VC/Tools/Llvm/x64/bin")
 else()

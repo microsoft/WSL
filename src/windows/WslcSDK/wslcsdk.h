@@ -21,7 +21,7 @@ Abstract:
 EXTERN_C_START
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 80
+#define WSLC_SESSION_OPTIONS_SIZE 72
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -73,8 +73,10 @@ typedef struct WslcVhdRequirements
 typedef enum WslcSessionFlags
 {
     WSLC_SESSION_FLAG_NONE = 0x00000000,
-    WSLC_SESSION_FLAG_ENABLE_GPU = 0x00000001
+    WSLC_SESSION_FLAG_ENABLE_GPU = 0x00000004
 } WslcSessionFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcSessionFlags);
 
 typedef enum WslcSessionTerminationReason
 {
@@ -134,15 +136,17 @@ typedef struct WslcContainerVolume
 typedef enum WslcContainerFlags
 {
     WSLC_CONTAINER_FLAG_NONE = 0x00000000,
-    WSLC_CONTAINER_FLAG_ENABLE_GPU = 0x00000001,
-    WSLC_CONTAINER_FLAG_PRIVILEGED = 0x00000002,
-    WSLC_CONTAINER_FLAG_AUTO_REMOVE = 0x00000004,
+    WSLC_CONTAINER_FLAG_AUTO_REMOVE = 0x00000001,
+    WSLC_CONTAINER_FLAG_ENABLE_GPU = 0x00000002,
+    WSLC_CONTAINER_FLAG_PRIVILEGED = 0x00000004,
 
 } WslcContainerFlags;
 
+DEFINE_ENUM_FLAG_OPERATORS(WslcContainerFlags);
+
 STDAPI WslcContainerInitSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
-STDAPI WslcContainerCreate(_In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 STDAPI WslcContainerStart(_In_ WslcContainer container);
 
@@ -341,7 +345,7 @@ typedef struct WslcRegistryAuthenticationInformation
 } WslcRegistryAuthenticationInformation;
 
 // pointer-to-function typedef (unambiguous)
-typedef void(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
+typedef HRESULT(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
 // options struct typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
