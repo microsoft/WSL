@@ -27,35 +27,56 @@ constexpr ULONG s_DefaultBootTimeout = 300000;
 // Default to 1 GB
 constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 
-WSLAFeatureFlags ConvertFlags(WslcSessionFeatureFlags flags)
+#define WLSC_FLAG_VALUE_ASSERT(_wlsc_name_, _wsla_name_) \
+    static_assert(_wlsc_name_ == _wsla_name_, "Flag values differ: " #_wlsc_name_ " != " #_wsla_name_);
+
+template<typename Flags>
+struct FlagsTraits
 {
-    static_assert(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU == WslaFeatureFlagsGPU, "Session GPU feature flag values differ.");
+    static_assert(false, "Flags used without traits defined.");
+};
 
-    WslcSessionFeatureFlags allFlagsMask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
-
-    return static_cast<WSLAFeatureFlags>(flags & allFlagsMask);
-}
-
-WSLASessionFlags ConvertFlags(WslcSessionFlags flags)
+template<>
+struct FlagsTraits<WslcSessionFeatureFlags>
 {
-    static_assert(WSLC_SESSION_FLAG_PERSISTENT == WSLASessionFlagsPersistent, "Session persistent flag values differ.");
-    static_assert(WSLC_SESSION_FLAG_OPEN_EXISTING == WSLASessionFlagsOpenExisting, "Session open existing flag values differ.");
+    using WslaType = WSLAFeatureFlags;
+    constexpr static WslcSessionFeatureFlags Mask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
+    WLSC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WslaFeatureFlagsGPU);
+};
 
-    WslcSessionFlags allFlagsMask = WSLC_SESSION_FLAG_PERSISTENT | WSLC_SESSION_FLAG_OPEN_EXISTING;
-
-    return static_cast<WSLASessionFlags>(flags & allFlagsMask);
-}
-
-WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
+template <>
+struct FlagsTraits<WslcSessionFlags>
 {
-    static_assert(WSLC_CONTAINER_FLAG_AUTO_REMOVE == WSLAContainerFlagsRm, "Container auto remove flag values differ.");
-    static_assert(WSLC_CONTAINER_FLAG_ENABLE_GPU == WSLAContainerFlagsGpu, "Container GPU flag values differ.");
+    using WslaType = WSLASessionFlags;
+    constexpr static WslcSessionFlags Mask = WSLC_SESSION_FLAG_PERSISTENT | WSLC_SESSION_FLAG_OPEN_EXISTING;
+    WLSC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_PERSISTENT, WSLASessionFlagsPersistent);
+    WLSC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_OPEN_EXISTING, WSLASessionFlagsOpenExisting);
+};
+
+template <>
+struct FlagsTraits<WslcContainerFlags>
+{
+    using WslaType = WSLAContainerFlags;
+    constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
+    WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLAContainerFlagsRm);
+    WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLAContainerFlagsGpu);
     // TODO: Are these the same flags?
-    // static_assert(WSLC_CONTAINER_FLAG_PRIVILEGED == WSLAContainerFlagsInit, "Container privileged flag values differ.");
+    // WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_PRIVILEGED, WSLAContainerFlagsInit);
+};
 
-    WslcContainerFlags allFlagsMask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
+template <>
+struct FlagsTraits<WslcContainerStartFlags>
+{
+    using WslaType = WSLAContainerStartFlags;
+    constexpr static WslcContainerStartFlags Mask = WSLC_CONTAINER_START_FLAG_ATTACH;
+    WLSC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
+};
 
-    return static_cast<WSLAContainerFlags>(flags & allFlagsMask);
+template<typename Flags>
+FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
+{
+    using traits = FlagsTraits<Flags>;
+    return static_cast<traits::WslaType>(flags & traits::Mask);
 }
 
 WSLASignal ConvertSignal(WslcSignal signal)
@@ -452,14 +473,13 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcContainerStart(_In_ WslcContainer container)
+STDAPI WslcContainerStart(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags)
 try
 {
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: No user choice between None and Attach (where attach is what allows access to init process IO handles)
-    RETURN_HR(internalType->container->Start(WSLAContainerStartFlagsAttach));
+    RETURN_HR(internalType->container->Start(ConvertFlags(flags)));
 }
 CATCH_RETURN();
 

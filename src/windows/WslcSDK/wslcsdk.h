@@ -162,11 +162,20 @@ typedef enum WslcContainerFlags
 
 DEFINE_ENUM_FLAG_OPERATORS(WslcContainerFlags);
 
+typedef enum WslcContainerStartFlags
+{
+    WSLC_CONTAINER_START_FLAG_NONE = 0x00000000,
+    WSLC_CONTAINER_START_FLAG_ATTACH = 0x00000001,
+
+} WslcContainerStartFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcContainerStartFlags);
+
 STDAPI WslcContainerInitSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
 STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-STDAPI WslcContainerStart(_In_ WslcContainer container);
+STDAPI WslcContainerStart(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags);
 
 // OPTIONAL CONTAINER SETTINGS
 STDAPI WslcContainerSettingsSetName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR name);
@@ -251,6 +260,8 @@ typedef enum WslcDeleteContainerFlags
     WSLC_DELETE_CONTAINER_FLAG_NONE = 0,
     WSLC_DELETE_CONTAINER_FLAG_FORCE = 0x01
 } WslcDeleteContainerFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcDeleteContainerFlags);
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags);
 
@@ -443,6 +454,8 @@ typedef enum WslcComponentFlags
     WSLC_COMPONENT_FLAG_WSL_OC = 2,
     WSLC_COMPONENT_FLAG_WSL_PACKAGE = 4,
 } WslcComponentFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcComponentFlags);
 
 STDAPI WslcCanRun(_Out_ BOOL* canRun, _Out_ WslcComponentFlags* missingComponents);
 
