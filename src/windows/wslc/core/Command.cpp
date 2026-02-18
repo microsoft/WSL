@@ -11,7 +11,6 @@ Abstract:
     Implementation of command execution logic.
 
 --*/
-#include "pch.h"
 #include "Argument.h"
 #include "Command.h"
 #include "Invocation.h"

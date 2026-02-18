@@ -11,7 +11,6 @@ Abstract:
     Implementation of diag command related execution logic.
 
 --*/
-#include "pch.h"
 #include "Argument.h"
 #include "CLIExecutionContext.h"
 #include "Task.h"

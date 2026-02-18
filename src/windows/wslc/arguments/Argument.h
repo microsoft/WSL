@@ -15,9 +15,6 @@ Abstract:
 #include "ArgumentTypes.h"
 
 #include <string>
-#include <string_view>
-#include <vector>
-#include <cstdint>
 
 #define WSLC_CLI_ARG_ID_CHAR L'-'
 #define WSLC_CLI_ARG_ID_STRING L"-"
@@ -38,7 +35,14 @@ struct Argument
     static constexpr int DefaultCountLimit = 1;
 
     // Full constructor with all parameters
-    Argument(ArgType argType, std::wstring name, std::wstring alias, std::wstring desc, argument::Kind kind = DefaultKind, bool required = DefaultRequired, int countLimit = DefaultCountLimit) :
+    Argument(
+        ArgType argType,
+        const std::wstring& name,
+        const std::wstring& alias,
+        const std::wstring& desc,
+        argument::Kind kind = DefaultKind,
+        bool required = DefaultRequired,
+        int countLimit = DefaultCountLimit) :
         m_argType(argType), m_name(name), m_alias(alias), m_desc(desc), m_type(kind), m_required(required), m_countLimit(countLimit)
     {
     }
@@ -60,15 +64,15 @@ struct Argument
     std::wstring GetUsageString() const;
 
     // Arguments are not localized, but the description is.
-    std::wstring Name() const
+    const std::wstring& Name() const
     {
         return m_name;
     }
-    std::wstring Alias() const
+    const std::wstring& Alias() const
     {
         return m_alias;
     }
-    const std::wstring Description() const
+    const std::wstring& Description() const
     {
         return m_desc;
     }

@@ -33,6 +33,7 @@ Abstract:
 // Format: ARGUMENT(EnumName, Name, Alias, Kind, Desc)
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
+_(Command,        "command",             NO_ALIAS,          Kind::Positional,  L"The command to run") \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  L"Specify the target container by its ID") \
 _(ForwardArgs,    "forwardargs",         NO_ALIAS,          Kind::Forward,     L"Args to pass along") \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \

@@ -73,8 +73,10 @@ class WSLCCLIArgumentUnitTests
             {
             case Kind::Value:
             case Kind::Positional:
-            case Kind::Forward:
                 args.Add(argType, std::wstring(L"test"));
+                break;
+            case Kind::Forward:
+                args.Add(argType, std::vector<std::wstring>{L"forward1", L"forward2"});
                 break;
             case Kind::Flag:
                 args.Add(argType, true);
@@ -110,12 +112,17 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::Help));
         argsContainer.Add<ArgType::ContainerId>(std::wstring(L"test"));
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ContainerId));
+        argsContainer.Add<ArgType::ForwardArgs>(std::vector<std::wstring>{L"test1", L"test2"});
+        VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ForwardArgs));
 
         // Verify basic retrieval
         auto retrievedBool = argsContainer.Get<ArgType::Help>();
         VERIFY_ARE_EQUAL(retrievedBool, true);
         auto retrievedString = argsContainer.Get<ArgType::ContainerId>();
         VERIFY_ARE_EQUAL(retrievedString, std::wstring(L"test"));
+        auto retrievedStringSet = argsContainer.Get<ArgType::ForwardArgs>();
+        VERIFY_ARE_EQUAL(retrievedStringSet[0], std::wstring(L"test1"));
+        VERIFY_ARE_EQUAL(retrievedStringSet[1], std::wstring(L"test2"));
 
         // Verify multimap functionality and Runtime Add
         argsContainer.Add(ArgType::Publish, std::wstring(L"test1"));
@@ -145,19 +152,22 @@ class WSLCCLIArgumentUnitTests
 
         // Verify Keys
         auto allArgTypes = argsContainer.GetKeys();
-        VERIFY_ARE_EQUAL(allArgTypes.size(), 3);
+        VERIFY_ARE_EQUAL(allArgTypes.size(), 4);
         VERIFY_IS_TRUE(std::find(allArgTypes.begin(), allArgTypes.end(), ArgType::Help) != allArgTypes.end());
         VERIFY_IS_TRUE(std::find(allArgTypes.begin(), allArgTypes.end(), ArgType::ContainerId) != allArgTypes.end());
         VERIFY_IS_TRUE(std::find(allArgTypes.begin(), allArgTypes.end(), ArgType::Publish) != allArgTypes.end());
+        VERIFY_IS_TRUE(std::find(allArgTypes.begin(), allArgTypes.end(), ArgType::ForwardArgs) != allArgTypes.end());
 
         // Verify count
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Help), 1);
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::ContainerId), 1);
         VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::Publish), 3);
-        VERIFY_ARE_EQUAL(argsContainer.GetCount(), 5); // 1 Help + 1 ContainerId + 3 Publish
+        VERIFY_ARE_EQUAL(argsContainer.Count(ArgType::ForwardArgs), 1);
+        VERIFY_ARE_EQUAL(argsContainer.GetCount(), 6); // 1 Help + 1 ContainerId + 3 Publish + 1 ForwardArgs
         argsContainer.Remove(ArgType::Help);
         argsContainer.Remove(ArgType::ContainerId);
         argsContainer.Remove(ArgType::Publish);
+        argsContainer.Remove(ArgType::ForwardArgs);
         VERIFY_ARE_EQUAL(argsContainer.GetCount(), 0);
     }
 };

@@ -38,7 +38,7 @@ inline wsl::windows::wslc::Invocation CreateInvocationFromCommandLine(const std:
         args.push_back(argv[i]);
     }
 
-    return wsl::windows::wslc::Invocation(std::move(args), commandLine.c_str());
+    return wsl::windows::wslc::Invocation(std::move(args));
 }
 
 // Helper function to convert wstring to UTF-8 string for TAEF logging

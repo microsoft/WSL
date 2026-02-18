@@ -12,7 +12,6 @@ Abstract:
 
 --*/
 #pragma once
-#include "pch.h"
 #include "EnumVariantMap.h"
 
 #include <string>

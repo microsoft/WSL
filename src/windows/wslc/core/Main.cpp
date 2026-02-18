@@ -12,8 +12,10 @@ Abstract:
 
 --*/
 #define WIN32_LEAN_AND_MEAN
+#pragma once
 #include <Windows.h>
-#include "pch.h"
+#include "precomp.h"
+#include "wslutil.h"
 #include "Errors.h"
 #include "CLIExecutionContext.h"
 #include "Invocation.h"
@@ -27,7 +29,7 @@ namespace wsl::windows::wslc {
 int CoreMain(int argc, wchar_t const** argv)
 try
 {
-    EnableContextualizedErrors(false);
+    EnableContextualizedErrors(false, true);
     CLIExecutionContext context;
     HRESULT result = S_OK;
 

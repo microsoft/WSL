@@ -6,7 +6,6 @@ include_directories(
 )
 
 set(HEADERS
-    core/pch.h
     core/Exceptions.h
     core/EnumVariantMap.h
     arguments/ArgumentDefinitions.h

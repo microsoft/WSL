@@ -12,7 +12,6 @@ Abstract:
 
 --*/
 #pragma once
-#include "pch.h"
 #include "ArgumentTypes.h"
 #include "ExecutionContextData.h"
 

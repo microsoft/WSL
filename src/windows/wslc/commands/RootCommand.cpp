@@ -11,7 +11,6 @@ Abstract:
     Implementation of the RootCommand, which is the root of all commands in the CLI.
 
 --*/
-#include "pch.h"
 #include "RootCommand.h"
 
 // Include all commands that parent to the root.

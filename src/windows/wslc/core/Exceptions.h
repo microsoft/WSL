@@ -12,7 +12,6 @@ Abstract:
 
 --*/
 #pragma once
-#include "pch.h"
 
 namespace wsl::windows::wslc {
 // Base exception for all command-related errors

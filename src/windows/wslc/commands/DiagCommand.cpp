@@ -11,7 +11,6 @@ Abstract:
     Implementation of DiagCommand command tree.
 
 --*/
-#include "pch.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "DiagCommand.h"

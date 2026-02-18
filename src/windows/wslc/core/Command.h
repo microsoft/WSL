@@ -12,7 +12,6 @@ Abstract:
 
 --*/
 #pragma once
-#include "precomp.h"
 #include "Argument.h"
 #include "Exceptions.h"
 #include "ArgumentTypes.h"
@@ -20,13 +19,10 @@ Abstract:
 #include "Invocation.h"
 #include "ArgumentParser.h"
 
-#include <initializer_list>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <string>
 #include <string_view>
-#include <type_traits>
 #include <vector>
 
 using namespace wsl::windows::wslc::execution;

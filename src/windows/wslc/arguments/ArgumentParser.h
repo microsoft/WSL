@@ -96,8 +96,8 @@ struct ParseArgumentsStateMachine
 
 private:
     State StepInternal();
-    State ProcessFirstPositionalArgument(const std::wstring_view& currArg);
-    State ProcessRemainingPositionals(const std::wstring_view& currArg);
+    State ProcessPositionalArgument(const std::wstring_view& currArg);
+    State ProcessAnchoredPositionals(const std::wstring_view& currArg);
     State ProcessAliasArgument(const std::wstring_view& currArg);
     State ProcessNamedArgument(const std::wstring_view& currArg);
     void ProcessAdjoinedValue(ArgType type, std::wstring_view value);

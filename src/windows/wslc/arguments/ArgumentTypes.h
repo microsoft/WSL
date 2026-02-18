@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 #pragma once
-#include "pch.h"
+#include "ArgumentDefinitions.h"
 #include "EnumVariantMap.h"
 #include <string>
 #include <vector>
@@ -41,8 +41,6 @@ enum class Kind
 enum class ArgType : size_t
 {
 #define WSLC_ARG_ENUM(EnumName, Name, Alias, Kind, Desc) EnumName,
-
-#include "ArgumentDefinitions.h"
     WSLC_ARGUMENTS(WSLC_ARG_ENUM)
 #undef WSLC_ARG_ENUM
 
@@ -76,7 +74,7 @@ namespace details {
     template <>
     struct KindToType<Kind::Forward>
     {
-        using type = std::wstring;
+        using type = std::vector<std::wstring>;
     };
 
     template <ArgType D>

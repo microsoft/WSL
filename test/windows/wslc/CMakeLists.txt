@@ -10,6 +10,7 @@ set(WSLC_TEST_SOURCES
 set(WSLC_TEST_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/WSLCCLITestHelpers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/CommandLineTestCases.h 
+    ${CMAKE_CURRENT_SOURCE_DIR}/ParserTestCases.h
 )
 
 # Add the sources to the parent wsltests target.

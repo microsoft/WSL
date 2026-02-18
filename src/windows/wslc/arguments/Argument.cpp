@@ -28,30 +28,6 @@ using namespace std::literals;
 namespace wsl::windows::wslc {
 using namespace wsl::windows::wslc::execution;
 
-namespace {
-    bool ContainsArgumentFromList(const ArgMap& args, const std::vector<ArgType>& argTypes)
-    {
-        return std::any_of(argTypes.begin(), argTypes.end(), [&](ArgType arg) { return args.Contains(arg); });
-    }
-
-    // Helper to get enum name as string for comparison purposes. This is not for display to users.
-    std::wstring GetArgTypeName(ArgType type)
-    {
-        switch (type)
-        {
-#define WSLC_ARG_NAME_CASE(EnumName, Name, Alias, ArgumentKind, Desc) \
-    case ArgType::EnumName: \
-        return L#EnumName;
-
-            WSLC_ARGUMENTS(WSLC_ARG_NAME_CASE)
-#undef WSLC_ARG_NAME_CASE
-
-        default:
-            return L"Unknown";
-        }
-    }
-} // namespace
-
 // This is the main Argument creation method, allowing overrides of the default properties of arguments.
 // The ArgType has some core characteristic, such as the Kind, Name, and Alias. If these
 // need to be changed, it is recommended to create a new ArgType in ArgumentDefinitions.h. If the argument

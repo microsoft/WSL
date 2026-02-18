@@ -11,12 +11,8 @@ Abstract:
     Implementation of the ArgumentParser class.
 
 --*/
-#include "pch.h"
 #include "ArgumentParser.h"
 #include "Localization.h"
-
-#include <algorithm>
-#include <string>
 
 using namespace wsl::shared;
 
@@ -115,16 +111,17 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
         return {};
     }
 
-    // If an anchor has been found then all remaining args are considered positional or forwarded.
-    if (m_anchorPositional.has_value())
+    // If this command has forwarded args present and we have found a positional argument,
+    // the all remaining args are considered positional or forwarded.
+    if (!m_forwardArgs.empty() && m_anchorPositional.has_value())
     {
-        return ProcessRemainingPositionals(currArg);
+        return ProcessAnchoredPositionals(currArg);
     }
 
     // Arg does not begin with '-' so it is neither an alias nor a named value, must be positional.
     if (currArg.empty() || currArg[0] != WSLC_CLI_ARG_ID_CHAR)
     {
-        return ProcessFirstPositionalArgument(currArg);
+        return ProcessPositionalArgument(currArg);
     }
 
     // The currentArg is non-empty, and starts with a -.
@@ -145,7 +142,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 }
 
 // Assumes non-empty and does not begin with '-'.
-ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessFirstPositionalArgument(const std::wstring_view& currArg)
+ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalArgument(const std::wstring_view& currArg)
 {
     if (currArg.empty() || currArg[0] == WSLC_CLI_ARG_ID_CHAR)
     {
@@ -159,15 +156,19 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessFirstPositi
         return ArgumentException(Localization::WSLCCLI_ExtraPositionalError(currArg));
     }
 
-    // First positional is the anchor positional.
-    m_anchorPositional = Argument(*nextPositional);
+    // First positional found is the anchor positional.
+    if (!m_anchorPositional.has_value())
+    {
+        m_anchorPositional = Argument(*nextPositional);
+    }
+
     m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
     return {};
 }
 
 // Assumes one positional has already been found and therefore there are no remaining Kind Value/Flag arguments.
 // Only Kind::Positional or Kind::Forward arguments should remain.
-ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessRemainingPositionals(const std::wstring_view& currArg)
+ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPositionals(const std::wstring_view& currArg)
 {
     if (!m_anchorPositional.has_value())
     {
@@ -189,7 +190,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessRemainingPo
     }
 
     // There are three possibilities for this argument:
-    // 1) It is another positional argument (likely an unexpected scenario)
+    // 1) It is another positional argument (ex: run <imagename> <command>)
     // 2) It is a forwarded argument set that could be anything (most likely)
     // 3) It is an input error and there should be no such argument.
 
@@ -197,9 +198,17 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessRemainingPo
     const Argument* nextPositional = NextPositional();
     if (nextPositional)
     {
+        // validate that we dont have any invalid argument specifiers.
+        if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
+        {
+            return ArgumentException(Localization::WSLCCLI_InvalidArgumentSpecifierError(currArg));
+        }
+
         m_executionArgs.Add(nextPositional->Type(), std::wstring{currArg});
         return {};
     }
+
+    // Handle case where we expect a positional but
 
     // Check for forwarded arg existence.
     if (m_forwardArgs.empty())
@@ -208,16 +217,16 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessRemainingPo
     }
 
     // currArg is the first forwarded argument
-    // m_invocationItr has already been incremented past currArg in StepInternal
-    // So m_invocationItr.index() - 1 gives us the index of currArg
-    size_t firstForwardedArgIndex = m_invocationItr.index() - 1;
-    auto forwardedArgs = std::wstring{m_invocation.GetRemainingRawCommandLineFromIndex(firstForwardedArgIndex)};
-    m_executionArgs.Add(m_forwardArgs.front().Type(), std::move(forwardedArgs));
+    // All the rest of the args are forward args.
+    std::vector<std::wstring> forwardedArgs;
+    forwardedArgs.push_back(std::wstring{currArg});
     while (m_invocationItr != m_invocation.end())
     {
+        forwardedArgs.push_back(std::wstring{*m_invocationItr});
         ++m_invocationItr;
     }
 
+    m_executionArgs.Add(m_forwardArgs.front().Type(), std::move(forwardedArgs));
     return {};
 }
 
@@ -265,16 +274,17 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
     // Check if this argument expects a value
     if (firstArg->Kind() == Kind::Value)
     {
-        // Non-boolean alias must have a value
+        // Kind::Value is only allowed if it's the last flag (no more characters after it, or '=' follows)
         if (currentPos >= currArg.length())
         {
+            // No more characters - value should be in next argument
             return {firstArg->Type(), currArg};
         }
 
         if (currArg[currentPos] != WSLC_CLI_ARG_SPLIT_CHAR)
         {
-            // Invalid syntax after alias
-            return ArgumentException(Localization::WSLCCLI_SingleCharAfterDashError(currArg));
+            // There are more characters but it's not '=' - this is invalid
+            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
         }
 
         // Value is adjoined after '='
@@ -295,13 +305,31 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
             return ArgumentException(Localization::WSLCCLI_AdjoinedNotFoundError(currArg));
         }
 
+        // Update position before checking Kind
+        size_t nextPos = currentPos + aliasLength;
+
         if (nextArg->Kind() == Kind::Value)
         {
-            return ArgumentException(Localization::WSLCCLI_AdjoinedNotFlagError(currArg));
+            // Kind::Value is only allowed if it's the last flag
+            if (nextPos >= currArg.length())
+            {
+                // No more characters - value should be in next argument
+                return {nextArg->Type(), currArg};
+            }
+
+            if (currArg[nextPos] != WSLC_CLI_ARG_SPLIT_CHAR)
+            {
+                // There are more characters but it's not '=' - this is invalid
+                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg));
+            }
+
+            // Value is adjoined after '='
+            ProcessAdjoinedValue(nextArg->Type(), currArg.substr(nextPos + 1));
+            return {};
         }
 
         m_executionArgs.Add(nextArg->Type(), true);
-        currentPos += aliasLength;
+        currentPos = nextPos;
     }
 
     return {};
@@ -310,12 +338,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
 // Assumes the arg value begins with -- and is at least 2 characters long.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgument(const std::wstring_view& currArg)
 {
-    if (currArg.length() < 2 || currArg[0] != WSLC_CLI_ARG_ID_CHAR || currArg[1] != WSLC_CLI_ARG_ID_CHAR)
-    {
-        // Assumption invalid, this is a programmer error.
-        THROW_HR(E_UNEXPECTED);
-    }
-
+    THROW_HR_IF(E_UNEXPECTED, !currArg.starts_with(L"--"));
     if (currArg.length() == 2)
     {
         // Missing argument name after double dash, this is an error.
