@@ -4096,19 +4096,17 @@ class WSLATests
             launcher.SetContainerFlags(WSLAContainerFlagsRm);
 
             auto container = launcher.Launch(*m_defaultSession);
-            auto process = container.GetInitProcess();
 
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
-            // verifyContainerDeleted("test-auto-remove");
             VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         }
 
-        // Test that a container with the Rm flag is automatically deleted when the init process exits.
+        // Test that a container with the Rm flag is automatically deleted when the init process is killed.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
             launcher.SetContainerFlags(WSLAContainerFlagsRm);
@@ -4125,6 +4123,23 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that the container autoremove flag is applied when the container exits on its own.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo foo"});
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            process.Wait();
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            LogInfo("Iteration %i", i);
         }
 
         // Test that the Rm flag is persisted across wsla sessions.
