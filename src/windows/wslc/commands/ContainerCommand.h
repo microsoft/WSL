@@ -19,7 +19,7 @@ namespace wsl::windows::wslc {
 struct ContainerCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"container";
-    ContainerCommand(std::wstring parent) : Command(CommandName, parent)
+    ContainerCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -36,7 +36,7 @@ protected:
 struct ContainerListCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"list";
-    ContainerListCommand(std::wstring parent) : Command(CommandName, {L"ls", L"ps"}, parent)
+    ContainerListCommand(const std::wstring& parent) : Command(CommandName, {L"ls", L"ps"}, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
