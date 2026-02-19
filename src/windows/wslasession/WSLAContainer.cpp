@@ -773,11 +773,23 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     if (containerOptions.DnsServers.Count > 0)
     {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsServers.Values,
+            "DnsServers.Values is null with Count=%lu",
+            containerOptions.DnsServers.Count);
+
         request.HostConfig.Dns = StringArrayToVector(containerOptions.DnsServers);
     }
 
     if (containerOptions.DnsSearchDomains.Count > 0)
     {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsSearchDomains.Values,
+            "DnsSearchDomains.Values is null with Count=%lu",
+            containerOptions.DnsSearchDomains.Count);
+
         request.HostConfig.DnsSearch = StringArrayToVector(containerOptions.DnsSearchDomains);
     }
 

@@ -2058,9 +2058,31 @@ class WSLATests
 
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
 
-            auto result = process.WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(0, result.Code);
+        // Validate that custom DNS servers are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-dns-custom", {"/bin/grep", "-iF", "nameserver 1.2.3.4", "/etc/resolv.conf"});
+
+            launcher.SetDnsServers({"1.2.3.4"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
+        // Validate that custom DNS search domains are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-dns-search", {"/bin/grep", "-iF", "test.local", "/etc/resolv.conf"});
+
+            launcher.SetDnsSearchDomains({"test.local"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
         }
 
         // Validate that the username is correctly wired.
