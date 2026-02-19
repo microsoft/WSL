@@ -28,6 +28,7 @@ struct ErrorStrings
 {
     std::wstring Message;
     std::wstring Code;
+    std::optional<std::wstring> Source;
 };
 } // namespace wsl::windows::common
 
@@ -65,15 +66,10 @@ struct GitHubRelease
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GitHubRelease, name, assets, created_at);
 };
 
-struct WSLAErrorDetails
+struct COMErrorInfo
 {
-    ~WSLAErrorDetails();
-
-    void Reset();
-
-    void ThrowIfFailed(HRESULT Result);
-
-    WSLA_ERROR_INFO Error{};
+    wil::unique_bstr Message;
+    wil::unique_bstr Source;
 };
 
 template <typename T>
@@ -126,6 +122,8 @@ std::wstring ErrorCodeToString(HRESULT Error);
 ErrorStrings ErrorToString(const Error& error);
 
 std::filesystem::path GetBasePath();
+
+std::optional<COMErrorInfo> GetCOMErrorInfo();
 
 DWORD GetDefaultVersion(void);
 

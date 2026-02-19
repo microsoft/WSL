@@ -890,6 +890,22 @@ struct std::formatter<std::source_location, char>
 };
 
 template <>
+struct std::formatter<std::source_location, wchar_t>
+{
+    template <typename TCtx>
+    static constexpr auto parse(TCtx& ctx)
+    {
+        return ctx.begin();
+    }
+
+    template <typename TCtx>
+    auto format(const std::source_location& location, TCtx& ctx) const
+    {
+        return std::format_to(ctx.out(), L"{}[{}:{}]", location.function_name(), location.file_name(), location.line());
+    }
+};
+
+template <>
 struct std::formatter<char*, wchar_t>
 {
     template <typename TCtx>

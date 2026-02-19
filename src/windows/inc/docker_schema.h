@@ -96,19 +96,52 @@ struct CreateContainer
     std::vector<std::string> Entrypoint; // TODO: Find a way to omit if the caller wants the default entrypoint.
     std::vector<std::string> Env;
     std::map<std::string, EmptyObject> ExposedPorts;
+    std::map<std::string, std::string> Labels;
     HostConfig HostConfig;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(
-        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname);
+        CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname, Labels);
+};
+
+struct ContainerInspectState
+{
+    std::string Status;
+    bool Running{};
+    int ExitCode{};
+    std::string StartedAt;
+    std::string FinishedAt;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt);
+};
+
+struct ContainerConfig
+{
+    std::string Image;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image);
+};
+
+struct InspectMount
+{
+    std::string Type;
+    std::string Source;
+    std::string Destination;
+    bool RW{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, RW);
 };
 
 struct InspectContainer
 {
     std::string Id;
     std::string Name;
+    std::string Created;
+    std::string Image;
+    ContainerInspectState State;
+    ContainerConfig Config;
     HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, HostConfig);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig);
 };
 
 struct Image
@@ -229,6 +262,14 @@ struct CreateImageProgress
     CreateImageProgressDetails progressDetail;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateImageProgress, status, id, progressDetail);
+};
+
+struct BuildProgress
+{
+    std::string stream;
+    std::string error;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildProgress, stream, error);
 };
 
 } // namespace wsl::windows::common::docker_schema

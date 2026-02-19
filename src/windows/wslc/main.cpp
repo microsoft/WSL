@@ -15,17 +15,78 @@ Abstract:
 #include "precomp.h"
 #include "CommandLine.h"
 #include "wslutil.h"
+#include "wslaservice.h"
+#include "WslSecurity.h"
 #include "ExecutionContext.h"
+#include "ShellCommand.h"
+#include "ImageCommand.h"
+#include "ContainerCommand.h"
+#include <thread>
+#include <format>
 
 using namespace wsl::shared;
 namespace wslutil = wsl::windows::common::wslutil;
 using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
-static void PrintUsage()
+namespace wsl::windows::wslc::commands {
+// wslc image
+class RootCommand : public ICommand
 {
-    wslutil::PrintMessage(Localization::MessageWslcUsage(), stderr);
-}
+public:
+    std::string Name() const override
+    {
+        return "";
+    }
+    std::string Description() const override
+    {
+        return "wslc root command";
+    }
+    std::vector<std::string> Options() const override
+    {
+        return {
+            m_image.GetShortDescription(),
+            m_container.GetShortDescription(),
+            m_shell.GetShortDescription(),
+        };
+    }
+    void LoadArguments(wsl::shared::ArgumentParser& parser) override
+    {
+        parser.AddPositionalArgument(wsl::shared::Utf8String{m_subverb}, 0);
+    }
+
+protected:
+    int ExecuteInternal(std::wstring_view commandLine, int parserOffset = 0) override
+    {
+        if (m_subverb == m_image.Name())
+        {
+            return m_image.Execute(commandLine, parserOffset + 1);
+        }
+
+        if (m_subverb == m_container.Name())
+        {
+            return m_container.Execute(commandLine, parserOffset + 1);
+        }
+
+        if (m_subverb == m_shell.Name())
+        {
+            return m_shell.Execute(commandLine, parserOffset + 1);
+        }
+
+        CMD_IF_HELP_PRINT_HELP();
+        CMD_ARG_REQUIRED(m_subverb, L"Error: Missing subcommand.");
+        wslutil::PrintMessage(L"Error: Invalid subcommand specified", stderr);
+        PrintHelp();
+        return 1;
+    }
+
+private:
+    std::string m_subverb;
+    ImageCommand m_image;
+    ContainerCommand m_container;
+    ShellCommand m_shell;
+};
+} // namespace wsl::windows::wslc::commands
 
 int wslc_main(std::wstring_view commandLine)
 {
@@ -45,26 +106,8 @@ int wslc_main(std::wstring_view commandLine)
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
     auto wsaCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WSACleanup(); });
 
-    bool help = false;
-    std::wstring verb;
-    ArgumentParser parser(std::wstring{commandLine}, L"wslc", 1, true);
-    parser.AddPositionalArgument(verb, 0);
-    parser.AddArgument(help, L"--help", L'h');
-    parser.Parse();
-
-    if (help || verb.empty())
-    {
-        PrintUsage();
-        return 0;
-    }
-    else
-    {
-        wslutil::PrintMessage(Localization::MessageWslaUnknownCommand(verb.c_str()), stderr);
-        PrintUsage();
-
-        // Unknown verb - show usage and fail.
-        return 1;
-    }
+    wsl::windows::wslc::commands::RootCommand rootCommand;
+    return rootCommand.Execute(commandLine, 1);
 }
 
 int wmain(int, wchar_t**)

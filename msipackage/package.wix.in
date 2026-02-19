@@ -42,6 +42,16 @@
                 <File Id="system.vhd" Source="${WSLG_SOURCE_DIR}/${TARGET_PLATFORM}/system.vhd"/>
                 <?endif?>
 
+                <!-- Add INSTALLDIR to system PATH to make wslc.exe and other CLI tools accessible. -->
+                <!-- NOTE:
+                    - Permanent="no" ensures this PATH entry is removed when the MSI is uninstalled.
+                    - If INSTALLDIR is manually moved or deleted after installation (outside of MSI),
+                    the PATH entry will become stale until uninstall or manual correction.
+                    - This behavior is intentional and currently implemented as a convenience until
+                    we can deploy these CLI tools (e.g. wslc.exe) to a stable system location
+                    such as System32, or offer an installer option to skip PATH modification. -->
+                <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]" Permanent="no" Part="last" Action="set" System="yes" />
+
                 <!-- Installation folder -->
                 <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss\MSI">
                     <RegistryValue Name="InstallLocation" Value="[INSTALLDIR]" Type="string" />
@@ -263,10 +273,12 @@
                     <RegistryValue Value="WSLASessionManager" Type="string" />
                 </RegistryKey>
 
-                <!-- WSLASession -->
-                <RegistryKey Root="HKCR" Key="CLSID\{4877FEFC-4977-4929-A958-9F36AA1892A4}">
-                    <RegistryValue Name="AppId" Value="{E9B79997-57E3-4201-AECC-6A464E530DD2}" Type="string" />
-                    <RegistryValue Value="WSLASession" Type="string" />
+                <!-- WSLASessionFactory - COM server in per-user process -->
+                <RegistryKey Root="HKCR" Key="CLSID\{9FCD2067-9FC6-4EFA-9EB0-698169EBF7D3}">
+                    <RegistryValue Value="WSLASessionFactory" Type="string" />
+                    <RegistryKey Key="LocalServer32">
+                        <RegistryValue Value='"[INSTALLDIR]wslasession.exe"' Type="string" />
+                    </RegistryKey>
                 </RegistryKey>
 
                 <!-- IWSLASessionManager-->
@@ -317,7 +329,32 @@
                     </RegistryKey>
                 </RegistryKey>
 
+                <!-- IWSLASessionReference-->
+                <RegistryKey Root="HKCR" Key="Interface\{B3A72F48-9D15-4E8A-A621-7C3E84F09B52}">
+                    <RegistryValue Value="IWSLASessionReference" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLASessionFactory-->
+                <RegistryKey Root="HKCR" Key="Interface\{C4E8F291-3B5D-4A7C-9E12-8F6A4D2B7C91}">
+                    <RegistryValue Value="IWSLASessionFactory" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
+                <!-- IWSLAVirtualMachine-->
+                <RegistryKey Root="HKCR" Key="Interface\{B5E2D8F1-9A3C-4E6B-8D1F-7C4A2E9B6D3A}">
+                    <RegistryValue Value="IWSLAVirtualMachine" Type="string" />
+                    <RegistryKey Key="ProxyStubClsid32">
+                        <RegistryValue Value="{4EA0C6DD-E9FF-48E7-994E-13A31D10DC61}" Type="string" />
+                    </RegistryKey>
+                </RegistryKey>
+
                 <File Id="wslaservice.exe" Source="${BIN}/wslaservice.exe"  KeyPath="yes" />
+                <File Id="wslasession.exe" Source="${BIN}/wslasession.exe" />
                 <File Id="wslaserviceproxystub.dll" Name="wslaserviceproxystub.dll" Source="${BIN}/wslaserviceproxystub.dll" />
 
                 <ServiceInstall Name="WSLAService" DisplayName="WSLA Service" Description="WSLA Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
@@ -361,7 +398,6 @@
         <DirectoryRef Id="TOOLSFOLDER">
             <Component Id="tools" Guid="F0C8D6BA-1502-41E7-BF72-D93DFA134733" Bitness="always64" UninstallWhenSuperseded="yes">
                 <File Id="init" Source="${BIN}/init" Checksum="yes" />
-                <File Id="initrd.img" Source="${BIN}/initrd.img"/>
                 <File Id="bsdtar" Source="${BSDTARD_SOURCE_DIR}/${TARGET_PLATFORM}/bsdtar"/>
 
                 <?if "${WSL_DEV_BINARY_PATH}" = "" ?>
@@ -563,20 +599,36 @@
             Execute="deferred"
          />
 
+        <CustomAction Id="CreateInitrd"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="CreateInitrd"
+            Return="check"
+            Execute="deferred"
+         />
+
+        <CustomAction Id="RemoveInitrd"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="RemoveInitrd"
+            Return="check"
+            Execute="deferred"
+         />
+
         <CustomAction Id="RemoveRegistryKeyProtections"
-           Impersonate="no"
-           BinaryRef="wslinstall.dll"
-           DllEntry="RemoveRegistryKeyProtections"
-           Return="check"
-           Execute="deferred"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="RemoveRegistryKeyProtections"
+            Return="check"
+            Execute="deferred"
          />
 
         <CustomAction Id="UnregisterLspCategories"
-           Impersonate="no"
-           BinaryRef="wslinstall.dll"
-           DllEntry="UnregisterLspCategories"
-           Return="check"
-           Execute="deferred"
+            Impersonate="no"
+            BinaryRef="wslinstall.dll"
+            DllEntry="UnregisterLspCategories"
+            Return="check"
+            Execute="deferred"
          />
 
         <CustomAction Id="InstallMsix.SetProperty" Return="check" Property="InstallMsix" Value='[DATABASE]' Execute='immediate' />
@@ -626,9 +678,16 @@
             <!-- This needs to run after the registry is written because this action needs to read the install path -->
             <Custom Action="RegisterLspCategories" After="WriteRegistryValues" Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED)  and (not UPGRADINGPRODUCTCODE) and (not SKIPLSP = 1)' />
 
+            <!-- Generate initrd.img from the init binary during installation.
+                 Only run when the tools component is being installed ($tools=3), not during same-version reinstalls -->
+            <Custom Action="CreateInitrd" After="RegisterLspCategories" Condition='$tools=3' />
+
             <!-- This needs to run before the registry is cleared because this action needs to read the install path.
                  This actions runs on uninstallation and upgrade. -->
             <Custom Action="UnregisterLspCategories" Before="RemoveRegistryValues" Condition='(REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE) and (not SKIPLSP = 1)' />
+
+            <!-- Remove initrd.img during uninstallation. Must run after StopServices so the file isn't locked -->
+            <Custom Action="RemoveInitrd" Before="UnregisterLspCategories" Condition='(REMOVE~="ALL") and (not UPGRADINGPRODUCTCODE)' />
 
             <?if "${WSL_BUILD_WSL_SETTINGS}" = "true" ?>
                 <!-- This needs to run before the registry is written because this action calculates registry key names and values -->
