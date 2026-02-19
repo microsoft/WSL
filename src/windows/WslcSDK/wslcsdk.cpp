@@ -45,15 +45,6 @@ struct FlagsTraits<WslcSessionFeatureFlags>
 };
 
 template <>
-struct FlagsTraits<WslcSessionFlags>
-{
-    using WslaType = WSLASessionFlags;
-    constexpr static WslcSessionFlags Mask = WSLC_SESSION_FLAG_PERSISTENT | WSLC_SESSION_FLAG_OPEN_EXISTING;
-    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_PERSISTENT, WSLASessionFlagsPersistent);
-    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FLAG_OPEN_EXISTING, WSLASessionFlagsOpenExisting);
-};
-
-template <>
 struct FlagsTraits<WslcContainerFlags>
 {
     using WslaType = WSLAContainerFlags;
@@ -210,7 +201,7 @@ try
     //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
     // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
-    RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, ConvertFlags(internalType->flags), &result->session));
+    RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
 
     *session = reinterpret_cast<WslcSession>(result.release());
@@ -306,17 +297,6 @@ try
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     internalType->featureFlags = flags;
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags)
-try
-{
-    auto internalType = CheckAndGetInternalType(sessionSettings);
-
-    internalType->flags = flags;
 
     return S_OK;
 }

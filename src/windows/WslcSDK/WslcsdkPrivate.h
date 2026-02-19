@@ -32,7 +32,6 @@ typedef struct WSLC_SESSION_OPTIONS_INTERNAL
 
     WslcVhdRequirements vhdRequirements;
     WslcSessionFeatureFlags featureFlags;
-    WslcSessionFlags flags;
     WslcSessionTerminationCallback terminationCallback;
     PVOID terminationCallbackContext;
 } WSLC_SESSION_OPTIONS_INTERNAL;
