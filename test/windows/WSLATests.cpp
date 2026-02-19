@@ -2079,6 +2079,14 @@ class WSLATests
             WSLAContainerLauncher launcher("debian:latest", "test-init-ref", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
 
             auto container = launcher.Launch(*m_defaultSession);
+            auto containerId = container.Id();
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                wil::com_ptr<IWSLAContainer> openedContainer;
+                VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &openedContainer));
+                VERIFY_SUCCEEDED(openedContainer->Delete());
+            });
+
             auto process = container.GetInitProcess();
 
             VERIFY_ARE_EQUAL(process.State(), WslaProcessStateRunning);

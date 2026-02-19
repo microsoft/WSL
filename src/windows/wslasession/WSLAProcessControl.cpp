@@ -92,11 +92,16 @@ int DockerContainerProcessControl::GetPid() const
 
 void DockerContainerProcessControl::OnContainerReleased()
 {
-    std::lock_guard lock{m_lock};
-    m_container = nullptr;
+    {
+        std::lock_guard lock{m_lock};
+
+        WI_ASSERT(m_container != nullptr);
+        m_container = nullptr;
+    }
 
     // N.B. The caller might keep a reference to the process even after the container is released.
     // If that happens, make sure that the state tracking can't outlive the session.
+    // This is safe to call without the lock because removing the tracking reference is protected by the event tracker lock.
     m_trackingReference.Reset();
 
     // Signal the exit event to prevent callers from being blocked on it.
@@ -157,13 +162,17 @@ void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> 
 
 void DockerExecProcessControl::OnContainerReleased()
 {
-    std::lock_guard lock{m_lock};
+    {
+        std::lock_guard lock{m_lock};
 
-    WI_ASSERT(m_container != nullptr);
-    m_container = nullptr;
+        WI_ASSERT(m_container != nullptr);
+        m_container = nullptr;
+    }
 
     // N.B. The caller might keep a reference to the process even after the container is released.
     // If that happens, make sure that the state tracking can't outlive the session.
+    // This is safe to call without the lock because removing the tracking reference is protected by the event tracker lock.
+
     m_trackingReference.Reset();
 
     // Signal the exit event to prevent callers being blocked on it.
