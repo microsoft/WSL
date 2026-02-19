@@ -1069,6 +1069,7 @@ class WSLATests
     TEST_METHOD(ExportContainer)
     {
         WSL2_TEST_ONLY();
+
         // Load an image and launch a container to verify image is valid.
         {
             std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldSaved.tar";
@@ -1087,50 +1088,53 @@ class WSLATests
             VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
 
             // Export the container to a tar file.
+
             std::filesystem::path containerTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
             wil::unique_handle containerTarFileHandle{CreateFileW(
                 containerTar.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
-            VERIFY_SUCCEEDED(m_defaultSession->ExportContainer(HandleToULong(containerTarFileHandle.get()), container.Id().c_str(), nullptr));
+            VERIFY_SUCCEEDED(container.Get().Export(HandleToULong(containerTarFileHandle.get())));
             VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
             VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, true);
         }
 
         // Load the exported container to verify it's valid.
-        {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
-            wil::unique_handle imageTarFileHandle{
-                CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-            VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
-            VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
-            // Verify that the image is in the list of images.
-            ExpectImagePresent(*m_defaultSession, "hello-world:latest");
-            WSLAContainerLauncher launcher("hello-world:latest", "wsla-hello-world-container");
-            auto container = launcher.Launch(*m_defaultSession);
-            auto result = container.GetInitProcess().WaitAndCaptureOutput();
-            VERIFY_ARE_EQUAL(0, result.Code);
-            VERIFY_IS_TRUE(result.Output[1].find("Hello from Docker!") != std::string::npos);
-        }
 
-        // Try to export a non-existing container.
+        std::filesystem::path imageTarFile = std::filesystem::path{g_testDataPath} / L"HelloWorldExported.tar";
+        wil::unique_handle imageTarFileHandle2{
+            CreateFileW(imageTarFile.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == imageTarFileHandle2.get());
+        LARGE_INTEGER fileSize2{};
+        VERIFY_IS_TRUE(GetFileSizeEx(imageTarFileHandle2.get(), &fileSize2));
+        VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle2.get()), nullptr, fileSize2.QuadPart));
+        // Verify that the image is in the list of images.
+        ExpectImagePresent(*m_defaultSession, "hello-world:latest");
+        WSLAContainerLauncher launcher2("hello-world:latest", "wsla-hello-world-container");
+        auto container2 = launcher2.Launch(*m_defaultSession);
+        auto result2 = container2.GetInitProcess().WaitAndCaptureOutput();
+        VERIFY_ARE_EQUAL(0, result2.Code);
+        VERIFY_IS_TRUE(result2.Output[1].find("Hello from Docker!") != std::string::npos);
+
+        // Try to export a deleted container.
         {
-            std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / L"HelloWorldExportError.tar";
+            std::filesystem::path imageTarFile3 = std::filesystem::path{g_testDataPath} / L"HelloWorldExportError.tar";
             wil::unique_handle contTarFileHandle{CreateFileW(
-                imageTar.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                imageTarFile3.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
             VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == contTarFileHandle.get());
-            LARGE_INTEGER fileSize{};
-            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+            LARGE_INTEGER fileSize3{};
+            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize3));
+            VERIFY_ARE_EQUAL(fileSize3.QuadPart > 0, false);
 
-            VERIFY_ARE_EQUAL(m_defaultSession->ExportContainer(HandleToULong(contTarFileHandle.get()), "dummy", nullptr), WSLA_E_CONTAINER_NOT_FOUND);
-            ValidateCOMErrorMessage(L"No such container: dummy");
+            ULONG outFile2 = HandleToULong(contTarFileHandle.get());
 
-            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
-            VERIFY_ARE_EQUAL(fileSize.QuadPart > 0, false);
+            container2.Get().Stop(WSLASignalSIGILL, 10);
+            container2.Get().Delete();
+            VERIFY_ARE_EQUAL(container2.Get().Export(outFile2), RPC_E_DISCONNECTED);
+
+            VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize3));
+            VERIFY_ARE_EQUAL(fileSize3.QuadPart > 0, false);
         }
     }
 
