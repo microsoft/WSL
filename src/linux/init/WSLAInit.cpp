@@ -458,7 +458,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Mes
             {
                 // If this is a thread, detach from the process' fd table.
                 // This prevents other threads from creating child processes that could inherit fds that this thread could create.
-                THROW_LAST_ERROR_IF(unshare(CLONE_FILES));
+                THROW_LAST_ERROR_IF(unshare(CLONE_FILES) < 0);
             }
 
             childPid.set_value(getpid());
