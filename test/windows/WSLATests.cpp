@@ -4138,8 +4138,6 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
-
-            LogInfo("Iteration %i", i);
         }
 
         // Test that the Rm flag is persisted across wsla sessions.
