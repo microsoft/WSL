@@ -454,6 +454,13 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Mes
                 Channel.Close();
             }
 
+            if (Message.ForkType == WSLA_FORK::Thread)
+            {
+                // If this is a thread, detach from the process' fd table.
+                // This prevents other threads from creating child processes that could inherit fds that this thread could create.
+                THROW_LAST_ERROR_IF(unshare(CLONE_FILES));
+            }
+
             childPid.set_value(getpid());
 
             wil::unique_fd ProcessSocket{UtilAcceptVsock(ListenSocket.get(), SocketAddress, SESSION_LEADER_ACCEPT_TIMEOUT_MS)};
