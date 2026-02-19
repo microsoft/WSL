@@ -350,7 +350,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::BuildImage(LPCWSTR ContextPath, LPCSTR DockerfilePath, LPCSTR ImageTag, IProgressCallback* ProgressCallback)
+HRESULT WSLASession::BuildImage(LPCWSTR ContextPath, ULONG DockerfileHandle, LPCSTR ImageTag, IProgressCallback* ProgressCallback)
 try
 {
     COMServiceExecutionContext context;
@@ -358,13 +358,21 @@ try
     RETURN_HR_IF_NULL(E_POINTER, ContextPath);
     RETURN_HR_IF(E_INVALIDARG, *ContextPath == L'\0');
 
+    wil::unique_handle dockerfileFileHandle;
+    if (DockerfileHandle != 0 && DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
+    {
+        dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(DockerfileHandle)));
+    }
+
     std::lock_guard lock{m_lock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    static constexpr char mountPath[] = "/tmp/wsla-build-context";
-    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(ContextPath, mountPath, TRUE));
-    auto unmountGuard = wil::scope_exit([&]() { m_virtualMachine->UnmountWindowsFolder(mountPath); });
+    GUID volumeId{};
+    THROW_IF_FAILED(CoCreateGuid(&volumeId));
+    auto mountPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
+    THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(ContextPath, mountPath.c_str(), TRUE));
+    auto unmountGuard = wil::scope_exit([&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
     if (ImageTag != nullptr && *ImageTag != '\0')
@@ -372,19 +380,27 @@ try
         buildArgs.push_back("-t");
         buildArgs.push_back(ImageTag);
     }
-    if (DockerfilePath != nullptr && *DockerfilePath != '\0')
+    if (dockerfileFileHandle)
     {
         buildArgs.push_back("-f");
-        buildArgs.push_back(std::string(mountPath) + "/" + std::string(DockerfilePath));
+        buildArgs.push_back("-");
     }
     buildArgs.push_back(mountPath);
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
-    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs);
+    ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, dockerfileFileHandle ? WSLAProcessFlagsStdin : WSLAProcessFlagsNone);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
     relay::MultiHandleWait io;
+
+    if (dockerfileFileHandle)
+    {
+        io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
+            common::relay::HandleWrapper{std::move(dockerfileFileHandle)},
+            common::relay::HandleWrapper{buildProcess.GetStdHandle(WSLAFDStdin)}));
+    }
+
     std::string allOutput;
     std::string pendingJson;
     std::set<std::string> reportedSteps;
@@ -423,17 +439,19 @@ try
 
         for (const auto& vertex : status.vertexes)
         {
+            bool isInternal = vertex.name.find("[internal]") != std::string::npos;
+
             if (!vertex.started.empty() && reportedSteps.insert(vertex.digest).second)
             {
                 allOutput.append(vertex.name).append("\n");
 
-                if (!vertex.name.empty() && vertex.name[0] == '[' && vertex.name.find("[internal]") == std::string::npos)
+                if (!isInternal && !vertex.name.empty() && vertex.name[0] == '[')
                 {
                     reportProgress(vertex.name + "\n");
                 }
             }
 
-            if (!vertex.error.empty() && reportedErrors.insert(vertex.digest).second)
+            if (!vertex.error.empty() && !isInternal && reportedErrors.insert(vertex.digest).second)
             {
                 allOutput.append(vertex.error).append("\n");
                 reportProgress(vertex.error + "\n");
@@ -441,18 +459,20 @@ try
         }
     };
 
-    // Drain stdout to prevent blocking; --progress=rawjson writes progress to stderr.
-    io.AddHandle(std::make_unique<relay::ReadHandle>(
-        buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }));
+    // With --progress=rawjson, docker writes progress to stderr and the final image ID to stdout on success (empty on
+    // failure). Stdout is drained into allOutput (shown only on error) and its EOF signals build completion.
+    io.AddHandle(
+        std::make_unique<relay::ReadHandle>(
+            buildProcess.GetStdHandle(1), [&](const auto& content) { allOutput.append(content.begin(), content.end()); }),
+        relay::MultiHandleWait::CancelOnCompleted);
 
     io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(buildProcess.GetExitEvent(), [&]() { io.Cancel(); }));
-
     io.Run({});
 
+    buildProcess.GetExitEvent().wait();
     int exitCode = buildProcess.GetExitCode();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);

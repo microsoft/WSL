@@ -453,10 +453,27 @@ static int Build(std::wstring_view commandLine)
 
     wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", inputPath.wstring()), stdout);
 
+    wil::unique_hfile dockerfileHandle;
+    if (dockerfilePath == "-")
+    {
+        HANDLE stdinDup;
+        THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
+            GetCurrentProcess(), GetStdHandle(STD_INPUT_HANDLE), GetCurrentProcess(), &stdinDup, 0, TRUE, DUPLICATE_SAME_ACCESS));
+        dockerfileHandle.reset(stdinDup);
+    }
+    else if (!dockerfilePath.empty())
+    {
+        SECURITY_ATTRIBUTES attributes{.nLength = sizeof(attributes), .bInheritHandle = TRUE};
+        auto dockerfileFullPath = std::filesystem::absolute(inputPath / wsl::shared::string::MultiByteToWide(dockerfilePath));
+        dockerfileHandle.reset(CreateFileW(
+            dockerfileFullPath.c_str(), GENERIC_READ, FILE_SHARE_READ, &attributes, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF_MSG(!dockerfileHandle, "Failed to open Dockerfile: %ls", dockerfileFullPath.c_str());
+    }
+
     Callback callback;
 
     THROW_IF_FAILED(session->BuildImage(
-        inputPath.wstring().c_str(), dockerfilePath.empty() ? nullptr : dockerfilePath.c_str(), tag.empty() ? nullptr : tag.c_str(), &callback));
+        inputPath.wstring().c_str(), HandleToULong(dockerfileHandle.get()), tag.empty() ? nullptr : tag.c_str(), &callback));
 
     wprintf(L"\n");
 

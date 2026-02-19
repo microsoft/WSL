@@ -509,7 +509,21 @@ class WSLATests
 
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
     {
-        auto buildResult = m_defaultSession->BuildImage(contextDir.wstring().c_str(), dockerfilePath, imageTag, nullptr);
+        wil::unique_hfile dockerfileHandle;
+        if (dockerfilePath != nullptr)
+        {
+            SECURITY_ATTRIBUTES attributes{.nLength = sizeof(attributes), .bInheritHandle = TRUE};
+            dockerfileHandle.reset(CreateFileW(
+                (contextDir / dockerfilePath).c_str(), GENERIC_READ, FILE_SHARE_READ, &attributes, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(!dockerfileHandle);
+        }
+
+        return BuildImageFromContext(contextDir, imageTag, dockerfileHandle.get());
+    }
+
+    HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, HANDLE dockerfileHandle)
+    {
+        auto buildResult = m_defaultSession->BuildImage(contextDir.wstring().c_str(), HandleToULong(dockerfileHandle), imageTag, nullptr);
 
         if (FAILED(buildResult))
         {
@@ -821,6 +835,39 @@ class WSLATests
 
         VERIFY_ARE_EQUAL(0, result.Code);
         VERIFY_IS_TRUE(result.Output[1].find("custom-dockerfile-ok") != std::string::npos);
+    }
+
+    TEST_METHOD(BuildImageStdinDockerfile)
+    {
+        WSL2_TEST_ONLY();
+
+        auto contextDir = std::filesystem::current_path() / "build-context-stdin";
+        std::filesystem::create_directories(contextDir);
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        auto dockerfileContent = "FROM alpine\nCMD [\"echo\", \"stdin-dockerfile-ok\"]\n";
+
+        wil::unique_hfile readHandle;
+        wil::unique_hfile writeHandle;
+        THROW_IF_WIN32_BOOL_FALSE(CreatePipe(readHandle.addressof(), writeHandle.addressof(), nullptr, 0));
+
+        DWORD bytesWritten;
+        THROW_IF_WIN32_BOOL_FALSE(
+            WriteFile(writeHandle.get(), dockerfileContent, static_cast<DWORD>(strlen(dockerfileContent)), &bytesWritten, nullptr));
+        writeHandle.reset();
+
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, "wsla-test-build-stdin:latest", readHandle.get()));
+        ExpectImagePresent(*m_defaultSession, "wsla-test-build-stdin:latest");
+
+        WSLAContainerLauncher launcher("wsla-test-build-stdin:latest", "wsla-build-stdin-container");
+        auto container = launcher.Launch(*m_defaultSession);
+        auto result = container.GetInitProcess().WaitAndCaptureOutput();
+
+        VERIFY_ARE_EQUAL(0, result.Code);
+        VERIFY_IS_TRUE(result.Output[1].find("stdin-dockerfile-ok") != std::string::npos);
     }
 
     TEST_METHOD(TagImage)
