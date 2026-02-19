@@ -23,7 +23,7 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 constexpr std::wstring_view s_ExecutableName = L"wslc";
 
-Command::Command(std::wstring_view name, std::vector<std::wstring_view> aliases, std::wstring parent) :
+Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
     m_name(name), m_aliases(std::move(aliases))
 {
     if (!parent.empty())
@@ -297,7 +297,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 
     for (auto& command : commands)
     {
-        if (string::IsEqual(*itr, command->Name(), true))
+        if (string::IsEqual(*itr, command->Name()))
         {
             inv.consume(itr);
             return std::move(command);
@@ -305,7 +305,7 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 
         for (const auto& alias : command->Aliases())
         {
-            if (string::IsEqual(*itr, alias, true))
+            if (string::IsEqual(*itr, alias))
             {
                 inv.consume(itr);
                 return std::move(command);

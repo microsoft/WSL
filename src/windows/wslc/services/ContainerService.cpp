@@ -111,7 +111,7 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
         return L"exited";
     case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
     default:
-        return L"invalid";
+        THROW_HR(E_UNEXPECTED);
     }
 }
 

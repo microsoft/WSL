@@ -90,7 +90,7 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
     // so they are validated prior to reaching command execution. We should check the format types during
     // ArgumentValidation in the command and error if the user put in an invalid format type, then the
     // command can safely assume the format type is valid here and doesn't need to check for it again.
-    else if (context.Args.Contains(ArgType::Format) && (string::IsEqual(context.Args.Get<ArgType::Format>(), L"json", true)))
+    else if (context.Args.Contains(ArgType::Format) && (string::IsEqual(context.Args.Get<ArgType::Format>(), L"json")))
     {
         auto json = ToJson(containers);
         PrintMessage(string::MultiByteToWide(json));

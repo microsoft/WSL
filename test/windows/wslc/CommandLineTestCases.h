@@ -45,3 +45,7 @@ COMMAND_LINE_TEST_CASE(L"container list --format json cont1 cont2 --quiet cont3"
 
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
+COMMAND_LINE_TEST_CASE(L"CONTAINER list", L"list", false)               // We are intentionally case-sensitive
+COMMAND_LINE_TEST_CASE(L"container LS", L"list", false)                 // commands and aliases are case-sensitive
+COMMAND_LINE_TEST_CASE(L"container list --FORMAT json", L"list", false) // Args also case-sensitive
+COMMAND_LINE_TEST_CASE(L"container list -A", L"list", false)            // So are arg aliases

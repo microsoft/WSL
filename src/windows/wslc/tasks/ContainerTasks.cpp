@@ -40,7 +40,7 @@ void CreateSession(CLIExecutionContext& context)
 
 void GetContainers(CLIExecutionContext& context)
 {
-    THROW_HR_IF(E_NOT_SET, !context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     context.Data.Add<Data::Containers>(ContainerService::List(session));
 }

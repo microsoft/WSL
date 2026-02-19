@@ -34,10 +34,10 @@ struct Command
     // The character used to split between commands and their parents in FullName.
     constexpr static wchar_t ParentSplitChar = L':';
 
-    Command(std::wstring_view name, std::wstring parent) : Command(name, {}, parent)
+    Command(std::wstring_view name, const std::wstring& parent) : Command(name, {}, parent)
     {
     }
-    Command(std::wstring_view name, std::vector<std::wstring_view> aliases, std::wstring parent);
+    Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent);
 
     virtual ~Command() = default;
 
