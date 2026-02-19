@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    DiagTasks.h
+    ContainerTasks.h
 
 Abstract:
 
-    Declaration of diag command execution tasks.
+    Declaration of container command execution tasks.
 
 --*/
 #pragma once

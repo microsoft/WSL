@@ -4,11 +4,11 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    DiagTasks.cpp
+    ContainerTasks.cpp
 
 Abstract:
 
-    Implementation of diag command related execution logic.
+    Implementation of container command related execution logic.
 
 --*/
 #include "Argument.h"
@@ -32,7 +32,7 @@ void CreateSession(CLIExecutionContext& context)
     std::optional<SessionOptions> options = std::nullopt;
     if (context.Args.Contains(ArgType::SessionId))
     {
-        // TODO: Add session ID to the session options to open the specifed session.
+        // TODO: Add session ID to the session options to open the specified session.
     }
 
     context.Data.Add<Data::Session>(SessionService::CreateSession(options));

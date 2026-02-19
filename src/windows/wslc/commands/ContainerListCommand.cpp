@@ -34,7 +34,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, std::nullopt, 25, L"Container names to list. Can specify multiple."),
+        Argument::Create(ArgType::ContainerId, std::nullopt, 25, L"Include only the container names specified."),
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Quiet),
@@ -49,7 +49,7 @@ std::wstring ContainerListCommand::ShortDescription() const
 
 std::wstring ContainerListCommand::LongDescription() const
 {
-    return {L"Lists specified container(s). Use --all to list all the running containers. "};
+    return {L"Lists specified container(s). By default, only running containers are shown; use --all to include all containers."};
 }
 
 void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
@@ -86,7 +86,11 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
             PrintMessage(string::MultiByteToWide(container.Id));
         }
     }
-    else if (context.Args.Contains(ArgType::Format) && (string::IsEqual(context.Args.Get<ArgType::Format>(), L"json"), true))
+    // TODO: When we have more arguments that have CLI-specific validation, centralize the validation logic
+    // so they are validated prior to reaching command execution. We should check the format types during
+    // ArgumentValidation in the command and error if the user put in an invalid format type, then the
+    // command can safely assume the format type is valid here and doesn't need to check for it again.
+    else if (context.Args.Contains(ArgType::Format) && (string::IsEqual(context.Args.Get<ArgType::Format>(), L"json", true)))
     {
         auto json = ToJson(containers);
         PrintMessage(string::MultiByteToWide(json));
