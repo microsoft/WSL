@@ -95,6 +95,10 @@ void DockerContainerProcessControl::OnContainerReleased()
     std::lock_guard lock{m_lock};
     m_container = nullptr;
 
+    // N.B. The caller might keep a reference to the process even after the container is released.
+    // If that happens, make sure that the state tracking can't outlive the session.
+    m_trackingReference.Reset();
+
     // Signal the exit event to prevent callers from being blocked on it.
     if (!m_exitEvent.is_signaled())
     {
@@ -157,6 +161,10 @@ void DockerExecProcessControl::OnContainerReleased()
 
     WI_ASSERT(m_container != nullptr);
     m_container = nullptr;
+
+    // N.B. The caller might keep a reference to the process even after the container is released.
+    // If that happens, make sure that the state tracking can't outlive the session.
+    m_trackingReference.Reset();
 
     // Signal the exit event to prevent callers being blocked on it.
     if (!m_exitEvent.is_signaled())
