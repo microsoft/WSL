@@ -496,9 +496,11 @@ CATCH_RETURN();
 
 // GENERAL CONTAINER MANAGEMENT
 
-STDAPI WslcContainerGetID(WslcContainer container, PCHAR (*containerId)[WSLC_CONTAINER_ID_LENGTH])
+STDAPI WslcContainerGetID(WslcContainer container, CHAR containerId[WSLC_CONTAINER_ID_LENGTH])
 try
 {
+    static_assert(WSLC_CONTAINER_ID_LENGTH == sizeof(WSLAContainerId), "Container ID lengths differ.");
+
     UNREFERENCED_PARAMETER(container);
     UNREFERENCED_PARAMETER(containerId);
     return E_NOTIMPL;
