@@ -2785,9 +2785,6 @@ class WSLATests
 
         {
             WSLAProcessLauncher launcher({}, {"/not-found"});
-            auto [result, _] = launcher.LaunchNoThrow(container.Get());
-
-            VERIFY_SUCCEEDED(result);
 
             auto process = launcher.Launch(container.Get());
             ValidateProcessOutput(
@@ -2803,10 +2800,6 @@ class WSLATests
             WSLAProcessLauncher launcher({}, {"/bin/cat"});
             launcher.SetWorkingDirectory("/notfound");
 
-            auto [result, _] = launcher.LaunchNoThrow(container.Get());
-
-            VERIFY_SUCCEEDED(result);
-
             auto process = launcher.Launch(container.Get());
             ValidateProcessOutput(
                 process,
@@ -2820,10 +2813,6 @@ class WSLATests
         {
             WSLAProcessLauncher launcher({}, {"/bin/cat"});
             launcher.SetUser("does-not-exist");
-
-            auto [result, _] = launcher.LaunchNoThrow(container.Get());
-
-            VERIFY_SUCCEEDED(result);
 
             auto process = launcher.Launch(container.Get());
             ValidateProcessOutput(process, {{1, "unable to find user does-not-exist: no matching entries in passwd file\r\n"}}, 126);
