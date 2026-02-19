@@ -478,21 +478,25 @@ try
         grantDiskAccess();
     }
 
-    *Lun = m_nextLun++;
+    const ULONG lun = m_nextLun;
 
-    auto result = wil::ResultFromException([&]() { hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly); });
+    auto result = wil::ResultFromException([&]() { hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly); });
 
     if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && !disk.AccessGranted)
     {
         grantDiskAccess();
-        hcs::AddVhd(m_computeSystem.get(), Path, *Lun, ReadOnly);
+        hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly);
     }
     else
     {
         THROW_IF_FAILED(result);
     }
 
-    m_attachedDisks.emplace(*Lun, std::move(disk));
+    m_attachedDisks.emplace(lun, std::move(disk));
+
+    // Only increment after AddVhd succeeds to avoid leaking LUN numbers on failure.
+    m_nextLun++;
+    *Lun = lun;
 
     return S_OK;
 }
