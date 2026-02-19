@@ -92,7 +92,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone, ULONG timeout = -1)
+static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone, LONGLONG timeout = -1)
 {
     THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
 }
