@@ -182,9 +182,9 @@ ContainerOutput RunContainerAndCapture(
 
 } // namespace
 
-class WslcTests
+class WslcSdkTests
 {
-    WSL_TEST_CLASS(WslcTests)
+    WSL_TEST_CLASS(WslcSdkTests)
 
     wil::unique_couninitialize_call m_coinit = wil::CoInitializeEx();
     WSADATA m_wsadata;

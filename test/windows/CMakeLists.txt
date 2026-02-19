@@ -10,7 +10,7 @@ set(SOURCES
     PolicyTests.cpp
     InstallerTests.cpp
     WSLATests.cpp
-    WslcTests.cpp)
+    WslcSdkTests.cpp)
 
 set(HEADERS
     Common.h
