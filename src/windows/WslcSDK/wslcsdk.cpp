@@ -105,16 +105,17 @@ void GetErrorInfoFromCOM(PWSTR* errorMessage)
 } // namespace
 
 // SESSION DEFINITIONS
-STDAPI WslcSessionInitSettings(_In_ PCWSTR identifier, _In_opt_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
+STDAPI WslcSessionInitSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 try
 {
-    RETURN_HR_IF_NULL(E_POINTER, identifier);
+    RETURN_HR_IF_NULL(E_POINTER, name);
+    RETURN_HR_IF_NULL(E_POINTER, storagePath);
 
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     *internalType = {};
 
-    internalType->displayName = identifier;
+    internalType->displayName = name;
     internalType->storagePath = storagePath;
     internalType->cpuCount = s_DefaultCPUCount;
     internalType->memoryMb = s_DefaultMemoryMB;
