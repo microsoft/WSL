@@ -30,5 +30,18 @@ COMMAND_LINE_TEST_CASE(L"diag list --verbose --help", L"list", true)
 COMMAND_LINE_TEST_CASE(L"diag list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"diag list extraarg", L"list", false)
 
+// Container command tests
+COMMAND_LINE_TEST_CASE(L"container list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container ls", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container ps", L"list", true)
+COMMAND_LINE_TEST_CASE(L"list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"ls", L"list", true)
+COMMAND_LINE_TEST_CASE(L"ps", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --format json cont1 cont2 cont3", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --format json cont1 cont2 --quiet cont3", L"list", true)
+
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)

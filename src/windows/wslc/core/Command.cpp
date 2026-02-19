@@ -23,7 +23,8 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 constexpr std::wstring_view s_ExecutableName = L"wslc";
 
-Command::Command(std::wstring_view name, std::wstring parent) : m_name(name)
+Command::Command(std::wstring_view name, std::vector<std::wstring_view> aliases, std::wstring parent) :
+    m_name(name), m_aliases(std::move(aliases))
 {
     if (!parent.empty())
     {
@@ -93,6 +94,7 @@ void Command::OutputHelp(const CommandException* exception) const
     // Output the command preamble and command chain
     infoOut << Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
 
+    auto commandAliases = Aliases();
     auto commands = GetCommands();
     auto arguments = GetAllArguments();
 
@@ -186,6 +188,17 @@ void Command::OutputHelp(const CommandException* exception) const
     }
 
     infoOut << std::endl << std::endl;
+
+    if (!commandAliases.empty())
+    {
+        infoOut << Localization::WSLCCLI_AvailableCommandAliases();
+
+        for (const auto& commandAlias : commandAliases)
+        {
+            infoOut << L"  " << commandAlias;
+        }
+        infoOut << std::endl << std::endl;
+    }
 
     if (!commands.empty())
     {
@@ -284,10 +297,19 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
 
     for (auto& command : commands)
     {
-        if (string::IsEqual(*itr, command->Name()))
+        if (string::IsEqual(*itr, command->Name(), true))
         {
             inv.consume(itr);
             return std::move(command);
+        }
+
+        for (const auto& alias : command->Aliases())
+        {
+            if (string::IsEqual(*itr, alias, true))
+            {
+                inv.consume(itr);
+                return std::move(command);
+            }
         }
     }
 

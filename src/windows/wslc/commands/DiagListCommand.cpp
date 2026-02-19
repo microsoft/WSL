@@ -42,6 +42,6 @@ std::wstring DiagListCommand::LongDescription() const
 
 void DiagListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << task::ListContainers;
+    context << task::ListSessions;
 }
 } // namespace wsl::windows::wslc

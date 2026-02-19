@@ -97,6 +97,24 @@ static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone,
     THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
 }
 
+std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state)
+{
+    switch (state)
+    {
+    case WSLA_CONTAINER_STATE::WslaContainerStateCreated:
+        return L"created";
+    case WSLA_CONTAINER_STATE::WslaContainerStateRunning:
+        return L"running";
+    case WSLA_CONTAINER_STATE::WslaContainerStateDeleted:
+        return L"stopped";
+    case WSLA_CONTAINER_STATE::WslaContainerStateExited:
+        return L"exited";
+    case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
+    default:
+        return L"invalid";
+    }
+}
+
 int ContainerService::Run(Session& session, const std::string& image, ContainerRunOptions runOptions, IProgressCallback* callback)
 {
     // Create the container
