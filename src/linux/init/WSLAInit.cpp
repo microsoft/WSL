@@ -447,7 +447,7 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Mes
     std::promise<pid_t> childPid;
 
     {
-        auto childLogic = [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel, &Message, &childPid]() mutable {
+        auto childLogic = [ListenSocket = wil::unique_fd{ListenSocket.get()}, &SocketAddress, &Channel, &Message, &childPid]() mutable {
             // Close parent channel
             if (Message.ForkType == WSLA_FORK::Process || Message.ForkType == WSLA_FORK::Pty)
             {
