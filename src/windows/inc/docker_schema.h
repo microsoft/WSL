@@ -144,6 +144,15 @@ struct InspectContainer
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig);
 };
 
+struct InspectExec
+{
+    std::optional<int> Pid{};
+    std::optional<int> ExitCode{};
+    bool Running{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectExec, Pid, ExitCode, Running);
+};
+
 struct Image
 {
     std::string Id;
