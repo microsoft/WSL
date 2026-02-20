@@ -135,7 +135,7 @@ cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLAProcessFlags);")
 
 typedef struct _WSLAStringArray
 {
-    [unique, size_is(Count)] LPCSTR* Values;
+    [unique, size_is(Count)] LPCSTR const* Values;
     ULONG Count;
 } WSLAStringArray;
 
@@ -435,7 +435,7 @@ interface IWSLASession : IUnknown
 
     // Image management.
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT BuildImage([in] ULONG ContextHandle, [in] ULONGLONG ContentLength, [in, unique] LPCSTR DockerfilePath, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT BuildImage([in] LPCWSTR ContextPath, [in] ULONG DockerfileHandle, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);

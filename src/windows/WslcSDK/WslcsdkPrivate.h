@@ -27,11 +27,11 @@ typedef struct WSLC_SESSION_OPTIONS_INTERNAL
     PCWSTR storagePath;
 
     uint32_t cpuCount;
-    uint64_t memoryMb;
+    uint32_t memoryMb;
     uint32_t timeoutMS;
 
     WslcVhdRequirements vhdRequirements;
-    WslcSessionFlags flags;
+    WslcSessionFeatureFlags featureFlags;
     WslcSessionTerminationCallback terminationCallback;
     PVOID terminationCallbackContext;
 } WSLC_SESSION_OPTIONS_INTERNAL;
@@ -42,13 +42,16 @@ static_assert(
     __alignof(WSLC_SESSION_OPTIONS_INTERNAL) == WSLC_SESSION_OPTIONS_ALIGNMENT,
     "WSLC_SESSION_OPTIONS_INTERNAL alignment mismatch");
 
+static_assert(std::is_trivial_v<WSLC_SESSION_OPTIONS_INTERNAL>, "WSLC_SESSION_OPTIONS_INTERNAL must be trivial");
+
+WSLC_SESSION_OPTIONS_INTERNAL* GetInternalType(WslcSessionSettings* settings);
+
 // PROCESS DEFINITIONS
 typedef struct WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL
 {
-    PCSTR executable; // path to executable inside container
-    PCSTR* commandLine;
+    PCSTR const* commandLine;
     uint32_t commandLineCount;
-    PCSTR* environment;
+    PCSTR const* environment;
     uint32_t environmentCount;
     PCSTR currentDirectory;
 } WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL;
@@ -59,6 +62,11 @@ static_assert(
 static_assert(
     __alignof(WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL) == WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be 8-byte aligned");
+
+static_assert(
+    std::is_trivial_v<WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL>, "WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL must be trivial");
+
+WSLC_CONTAINER_PROCESS_OPTIONS_INTERNAL* GetInternalType(WslcProcessSettings* settings);
 
 // CONTAINER DEFINITIONS
 typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
@@ -76,24 +84,52 @@ typedef struct WSLC_CONTAINER_OPTIONS_INTERNAL
     WslcContainerFlags containerFlags;
 
 } WSLC_CONTAINER_OPTIONS_INTERNAL;
+
 static_assert(
     sizeof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_SIZE, "WSLC_CONTAINER_OPTIONS_INTERNAL must be 80 bytes");
 static_assert(
     __alignof(WSLC_CONTAINER_OPTIONS_INTERNAL) == WSLC_CONTAINER_OPTIONS_ALIGNMENT,
     "WSLC_CONTAINER_OPTIONS_INTERNAL must be 8-byte aligned");
 
+static_assert(std::is_trivial_v<WSLC_CONTAINER_OPTIONS_INTERNAL>, "WSLC_CONTAINER_OPTIONS_INTERNAL must be trivial");
+
+WSLC_CONTAINER_OPTIONS_INTERNAL* GetInternalType(WslcContainerSettings* settings);
+
 // Use to allocate the actual objects on the heap to keep it alive.
 struct WslcSessionImpl
 {
-    wil::com_ptr<IWSLASessionManager> sessionManager;
+    wil::com_ptr<IWSLASession> session;
+    wil::com_ptr<ITerminationCallback> terminationCallback;
 };
+
+WslcSessionImpl* GetInternalType(WslcSession handle);
 
 struct WslcContainerImpl
 {
     wil::com_ptr<IWSLAContainer> container;
 };
 
+WslcContainerImpl* GetInternalType(WslcContainer handle);
+
 struct WslcProcessImpl
 {
     wil::com_ptr<IWSLAProcess> process;
 };
+
+WslcProcessImpl* GetInternalType(WslcProcess handle);
+
+// Converts to the internal type and throws an error on null input.
+template <typename T>
+auto CheckAndGetInternalType(T* value)
+{
+    THROW_HR_IF_NULL(E_POINTER, value);
+    return GetInternalType(value);
+}
+
+// Converts to the internal type and throws an error on null input.
+template <typename T>
+auto CheckAndGetInternalTypeUniquePointer(T* value)
+{
+    THROW_HR_IF_NULL(E_POINTER, value);
+    return std::unique_ptr<std::remove_pointer_t<decltype(GetInternalType(value))>>{GetInternalType(value)};
+}

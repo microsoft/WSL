@@ -21,7 +21,7 @@ Abstract:
 EXTERN_C_START
 
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 80
+#define WSLC_SESSION_OPTIONS_SIZE 72
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -43,7 +43,7 @@ typedef struct WslcContainerSettings
 DECLARE_HANDLE(WslcContainer);
 
 // Process values
-#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 48
+#define WSLC_CONTAINER_PROCESS_OPTIONS_SIZE 40
 #define WSLC_CONTAINER_PROCESS_OPTIONS_ALIGNMENT 8
 typedef struct WslcProcessSettings
 {
@@ -70,11 +70,13 @@ typedef struct WslcVhdRequirements
     _In_ WslcVhdType type;
 } WslcVhdRequirements;
 
-typedef enum WslcSessionFlags
+typedef enum WslcSessionFeatureFlags
 {
-    WSLC_SESSION_FLAG_NONE = 0x00000000,
-    WSLC_SESSION_FLAG_ENABLE_GPU = 0x00000001
-} WslcSessionFlags;
+    WSLC_SESSION_FEATURE_FLAG_NONE = 0x00000000,
+    WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU = 0x00000004
+} WslcSessionFeatureFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcSessionFeatureFlags);
 
 typedef enum WslcSessionTerminationReason
 {
@@ -85,7 +87,7 @@ typedef enum WslcSessionTerminationReason
 
 typedef __callback void(CALLBACK* WslcSessionTerminationCallback)(_In_ WslcSessionTerminationReason reason, _In_opt_ PVOID context);
 
-STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
+STDAPI WslcSessionInitSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings);
 
 STDAPI WslcSessionCreate(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSession* session);
 
@@ -96,7 +98,7 @@ STDAPI WslcSessionSettingsSetTimeout(_In_ WslcSessionSettings* sessionSettings, 
 
 STDAPI WslcSessionSettingsSetVHD(_In_ WslcSessionSettings* sessionSettings, _In_ const WslcVhdRequirements* vhdRequirements);
 
-STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags);
+STDAPI WslcSessionSettingsSetFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
 // Pass in Null for callback to clear the termination callback
 STDAPI WslcSessionSettingsSetTerminateCallback(
@@ -134,17 +136,28 @@ typedef struct WslcContainerVolume
 typedef enum WslcContainerFlags
 {
     WSLC_CONTAINER_FLAG_NONE = 0x00000000,
-    WSLC_CONTAINER_FLAG_ENABLE_GPU = 0x00000001,
-    WSLC_CONTAINER_FLAG_PRIVILEGED = 0x00000002,
-    WSLC_CONTAINER_FLAG_AUTO_REMOVE = 0x00000004,
+    WSLC_CONTAINER_FLAG_AUTO_REMOVE = 0x00000001,
+    WSLC_CONTAINER_FLAG_ENABLE_GPU = 0x00000002,
+    WSLC_CONTAINER_FLAG_PRIVILEGED = 0x00000004,
 
 } WslcContainerFlags;
 
+DEFINE_ENUM_FLAG_OPERATORS(WslcContainerFlags);
+
+typedef enum WslcContainerStartFlags
+{
+    WSLC_CONTAINER_START_FLAG_NONE = 0x00000000,
+    WSLC_CONTAINER_START_FLAG_ATTACH = 0x00000001,
+
+} WslcContainerStartFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcContainerStartFlags);
+
 STDAPI WslcContainerInitSettings(_In_ PCSTR imageName, _Out_ WslcContainerSettings* containerSettings);
 
-STDAPI WslcContainerCreate(_In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcContainerCreate(_In_ WslcSession session, _In_ WslcContainerSettings* containerSettings, _Out_ WslcContainer* container, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
-STDAPI WslcContainerStart(_In_ WslcContainer container);
+STDAPI WslcContainerStart(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags);
 
 // OPTIONAL CONTAINER SETTINGS
 STDAPI WslcContainerSettingsSetName(_In_ WslcContainerSettings* containerSettings, _In_ PCSTR name);
@@ -222,13 +235,15 @@ typedef enum WslcSignal
     WSLC_SIGNAL_SIGTERM = 15, // SIGTERM: graceful shutdown
 } WslcSignal;
 
-STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutMS);
+STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds);
 
 typedef enum WslcDeleteContainerFlags
 {
     WSLC_DELETE_CONTAINER_FLAG_NONE = 0,
     WSLC_DELETE_CONTAINER_FLAG_FORCE = 0x01
 } WslcDeleteContainerFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcDeleteContainerFlags);
 
 STDAPI WslcContainerDelete(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags);
 
@@ -237,11 +252,7 @@ STDAPI WslcProcessInitSettings(_Out_ WslcProcessSettings* processSettings);
 
 // OPTIONAL PROCESS SETTINGS
 
-STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable);
-
 STDAPI WslcProcessSettingsSetCurrentDirectory(_In_ WslcProcessSettings* processSettings, _In_ PCSTR currentDirectory);
-
-STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings, _In_ PCWSTR displayName);
 
 STDAPI WslcProcessSettingsSetCmdLineArgs(_In_ WslcProcessSettings* processSettings, _In_reads_(argc) PCSTR const* argv, size_t argc);
 
@@ -341,7 +352,7 @@ typedef struct WslcRegistryAuthenticationInformation
 } WslcRegistryAuthenticationInformation;
 
 // pointer-to-function typedef (unambiguous)
-typedef void(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
+typedef HRESULT(CALLBACK* WslcContainerImageProgressCallback)(const WslcImageProgressMessage* progress, PVOID context);
 
 // options struct typedef is a pointer type and _In_opt_ is valid
 typedef struct WslcPullImageOptions
@@ -425,6 +436,8 @@ typedef enum WslcComponentFlags
     WSLC_COMPONENT_FLAG_WSL_OC = 2,
     WSLC_COMPONENT_FLAG_WSL_PACKAGE = 4,
 } WslcComponentFlags;
+
+DEFINE_ENUM_FLAG_OPERATORS(WslcComponentFlags);
 
 STDAPI WslcCanRun(_Out_ BOOL* canRun, _Out_ WslcComponentFlags* missingComponents);
 
