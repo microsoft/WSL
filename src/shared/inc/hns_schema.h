@@ -415,8 +415,9 @@ struct HNSNetwork
     std::vector<Subnet> Subnets;
     NetworkFlags Flags{};
     InterfaceConstraint InterfaceConstraint{};
+    bool IsLoopback{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HNSNetwork, ID, Name, SourceMac, DNSSuffix, DNSServerList, DNSDomain, Subnets, Flags, InterfaceConstraint);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HNSNetwork, ID, Name, SourceMac, DNSSuffix, DNSServerList, DNSDomain, Subnets, Flags, InterfaceConstraint, IsLoopback);
 };
 
 enum class NetworkMode
