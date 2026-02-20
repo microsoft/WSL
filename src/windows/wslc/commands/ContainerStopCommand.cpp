@@ -50,13 +50,13 @@ std::vector<Argument> ContainerStopCommand::GetArguments() const
 
 std::wstring ContainerStopCommand::ShortDescription() const
 {
-    return {L"Stop a container."};
+    return {L"Stop containers"};
 }
 
 std::wstring ContainerStopCommand::LongDescription() const
 {
     return {
-        L"Stops a container. By default, the container is stopped in the background; use --detach to stop in the foreground."};
+        L"Stops containers. Use --all to stop all running containers."};
 }
 
 void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const

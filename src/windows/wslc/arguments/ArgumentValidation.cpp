@@ -48,7 +48,7 @@ void ValidateUInteger(const std::vector<std::wstring>& values, const std::wstrin
         {
             [[maybe_unused]] auto intValue = std::stoul(value);
         }
-        catch (const std::exception&)
+        catch (...)
         {
             throw ArgumentException(L"Invalid " + argName + L" argument value: " + value);
         }
