@@ -583,67 +583,6 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     }
 }
 
-HRESULT WSLASession::ExportContainer(ULONG OutHandle, LPCSTR ContainerID, IProgressCallback* ProgressCallback)
-try
-{
-    UNREFERENCED_PARAMETER(ProgressCallback);
-
-    COMServiceExecutionContext context;
-
-    RETURN_HR_IF_NULL(E_POINTER, ContainerID);
-    std::lock_guard lock{m_lock};
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    auto retVal = m_dockerClient->ExportContainer(ContainerID);
-    ExportContainerImpl(retVal, OutHandle);
-    return S_OK;
-}
-CATCH_RETURN();
-
-void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle)
-{
-    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    relay::MultiHandleWait io;
-
-    auto onCompleted = [&]() {
-        io.Cancel();
-        WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
-    };
-
-    std::string errorJson;
-    auto accumulateError = [&](const gsl::span<char>& buffer) {
-        // If the export failed, accumulate the error message.
-        errorJson.append(buffer.data(), buffer.size());
-    };
-
-    if (SocketCodePair.first != 200)
-    {
-        io.AddHandle(std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
-    }
-    else
-    {
-        io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
-            common::relay::HandleWrapper{std::move(containerFileHandle), std::move(onCompleted)}));
-        io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
-    }
-
-    io.Run({});
-
-    if (SocketCodePair.first != 200)
-    {
-        // Export failed, parse the error message.
-        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-
-        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
-    }
-}
-
 HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback)
 try
 {

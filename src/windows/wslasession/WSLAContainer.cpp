@@ -559,6 +559,7 @@ void WSLAContainerImpl::Delete()
         m_name.c_str(),
         m_state);
 
+    std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     try
     {
         m_dockerClient.DeleteContainer(m_id);
@@ -568,6 +569,62 @@ void WSLAContainerImpl::Delete()
     UnmountVolumes(m_mountedVolumes, *m_parentVM);
 
     m_state = WslaContainerStateDeleted;
+}
+
+void WSLAContainerImpl::Export(ULONG OutHandle)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    // Validate that the container is in the exited state.
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        State() == WslaContainerStateRunning,
+        "Cannot export container '%hs', state: %i",
+        m_name.c_str(),
+        m_state);
+
+    std::pair<uint32_t, wil::unique_socket> SocketCodePair;
+    try
+    {
+        SocketCodePair = m_dockerClient.ExportContainer(m_id);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to export container '%hs'", m_id.c_str());
+
+    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutHandle))};
+
+    wsl::windows::common::relay::MultiHandleWait io;
+
+    auto onCompleted = [&]() {
+        io.Cancel();
+        WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
+    };
+
+    std::string errorJson;
+    auto accumulateError = [&](const gsl::span<char>& buffer) {
+        // If the export failed, accumulate the error message.
+        errorJson.append(buffer.data(), buffer.size());
+    };
+
+    if (SocketCodePair.first != 200)
+    {
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+    }
+    else
+    {
+        io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
+            HandleWrapper{std::move(SocketCodePair.second)}, HandleWrapper{std::move(containerFileHandle)}));
+    }
+
+    io.Run({});
+
+    if (SocketCodePair.first != 200)
+    {
+        // Export failed, parse the error message.
+        auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
+
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+    }
 }
 
 WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
@@ -1125,10 +1182,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+HRESULT WSLAContainer::Export(ULONG OutHandle)
 {
     COMServiceExecutionContext context;
 
+    return CallImpl(&WSLAContainerImpl::Export, OutHandle);
+}
+
+HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+{
+    COMServiceExecutionContext context;
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
 
     *Stdout = 0;

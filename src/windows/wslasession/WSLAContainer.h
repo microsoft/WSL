@@ -57,6 +57,7 @@ public:
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
     void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
     void Delete();
+    void Export(ULONG TarHandle);
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process);
@@ -129,6 +130,7 @@ public:
     IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
+    IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process) override;
