@@ -163,6 +163,8 @@ template <typename T>
 class RegistryKeyChange
 {
 public:
+    RegistryKeyChange() = default;
+
     RegistryKeyChange(HKEY Hive, LPCWSTR Key, LPCWSTR Name, const T& Value) : m_value(Name)
     {
         m_key = wsl::windows::common::registry::CreateKey(Hive, Key, KEY_ALL_ACCESS);
