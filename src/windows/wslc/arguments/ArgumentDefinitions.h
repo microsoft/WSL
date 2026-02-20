@@ -33,13 +33,17 @@ Abstract:
 // Format: ARGUMENT(EnumName, Name, Alias, Kind, Desc)
 // clang-format off
 #define WSLC_ARGUMENTS(_) \
+_(All,            "all",                 L"a",              Kind::Flag,        L"Show all regardless of state.") \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L"The command to run") \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  L"Specify the target container by its ID") \
+_(Format,         "format",              NO_ALIAS,          Kind::Value,       L"Output formatting (json or table) (Default:table)") \
 _(ForwardArgs,    "forwardargs",         NO_ALIAS,          Kind::Forward,     L"Args to pass along") \
 _(Help,           "help",                WSLC_CLI_HELP_ARG, Kind::Flag,        Localization::WSLCCLI_HelpArgDescription()) \
 _(Info,           "info",                NO_ALIAS,          Kind::Flag,        Localization::WSLCCLI_InfoArgDescription()) \
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Publish,        "publish",             L"p",              Kind::Value,       L"Publish port") \
+_(Quiet,          "quiet",               L"q",              Kind::Flag,        L"Outputs the container IDs only") \
 _(Remove,         "remove",              L"rm",             Kind::Flag,        L"Remove the container after execution") \
+_(SessionId,      "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details")
 // clang-format on

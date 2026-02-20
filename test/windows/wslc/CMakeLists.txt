@@ -30,5 +30,6 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/core
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/commands
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments
+    ${CMAKE_SOURCE_DIR}/src/windows/wslc/services
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/tasks
 )
