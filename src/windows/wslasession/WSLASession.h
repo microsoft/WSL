@@ -91,6 +91,8 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
 
+    common::relay::MultiHandleWait CreateIOContext();
+
 private:
     ULONG m_id = 0;
 

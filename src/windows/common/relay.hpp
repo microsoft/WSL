@@ -492,6 +492,9 @@ private:
 class MultiHandleWait
 {
 public:
+    NON_COPYABLE(MultiHandleWait);
+    DEFAULT_MOVABLE(MultiHandleWait);
+
     enum Flags
     {
         None = 0,
