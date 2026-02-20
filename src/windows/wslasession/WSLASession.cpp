@@ -393,8 +393,7 @@ try
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, dockerfileFileHandle ? WSLAProcessFlagsStdin : WSLAProcessFlagsNone);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
-    // Not touching this since a change is in progress on BuildImage().
-    relay::MultiHandleWait io;
+    auto io = CreateIOContext();
 
     if (dockerfileFileHandle)
     {
@@ -469,8 +468,6 @@ try
         relay::MultiHandleWait::CancelOnCompleted);
 
     io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
-
-    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
 
     io.Run({});
 
