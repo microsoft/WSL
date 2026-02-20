@@ -25,11 +25,11 @@ void Argument::Validate(const ArgMap& execArgs) const
     switch (m_argType)
     {
     case ArgType::Signal:
-        validation::ValidateUInteger(execArgs.Get<ArgType::Signal>(), m_name);
+        validation::ValidateUInteger(execArgs.GetAll<ArgType::Signal>(), m_name);
         break;
 
     case ArgType::Time:
-        validation::ValidateUInteger(execArgs.Get<ArgType::Time>(), m_name);
+        validation::ValidateUInteger(execArgs.GetAll<ArgType::Time>(), m_name);
         break;
 
     default:
@@ -40,15 +40,18 @@ void Argument::Validate(const ArgMap& execArgs) const
 
 namespace wsl::windows::wslc::validation {
 
-void ValidateUInteger(const std::wstring& value, const std::wstring& argName)
+void ValidateUInteger(const std::vector<std::wstring>& values, const std::wstring& argName)
 {
-    try
+    for (const auto& value : values)
     {
-        [[maybe_unused]] auto intValue = std::stoul(value);
-    }
-    catch (const std::exception&)
-    {
-        throw ArgumentException(L"Invalid " + argName + L" argument value: " + value);
+        try
+        {
+            [[maybe_unused]] auto intValue = std::stoul(value);
+        }
+        catch (const std::exception&)
+        {
+            throw ArgumentException(L"Invalid " + argName + L" argument value: " + value);
+        }
     }
 }
 } // namespace wsl::windows::wslc::validation
