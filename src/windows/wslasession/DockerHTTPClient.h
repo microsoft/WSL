@@ -67,7 +67,7 @@ public:
     bool HasErrorMessage() const
     {
         auto it = m_response.find(boost::beast::http::field::content_type);
-        return it != m_response.end() && it->value() == "application/json";
+        return it != m_response.end() && it->value().starts_with("application/json");
     }
 
     uint16_t StatusCode() const noexcept
@@ -216,7 +216,7 @@ private:
 
         if (response.result_int() < 200 || response.result_int() >= 300)
         {
-            throw DockerHTTPException(std::move(response), std::move(Method), Url.Get(), std::move(requestString), std::move(body));
+            throw DockerHTTPException(std::move(response), Method, Url.Get(), std::move(requestString), std::move(body));
         }
 
         if constexpr (!std::is_same_v<TResponse, void>)
