@@ -55,8 +55,7 @@ std::wstring ContainerStopCommand::ShortDescription() const
 
 std::wstring ContainerStopCommand::LongDescription() const
 {
-    return {
-        L"Stops containers. Use --all to stop all running containers."};
+    return {L"Stops containers. Use --all to stop all running containers."};
 }
 
 void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
