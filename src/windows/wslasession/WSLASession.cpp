@@ -372,7 +372,8 @@ try
     THROW_IF_FAILED(CoCreateGuid(&volumeId));
     auto mountPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
     THROW_IF_FAILED(m_virtualMachine->MountWindowsFolder(ContextPath, mountPath.c_str(), TRUE));
-    auto unmountGuard = wil::scope_exit([&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
+    auto unmountFolder =
+        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_virtualMachine->UnmountWindowsFolder(mountPath.c_str()); });
 
     std::vector<std::string> buildArgs{"/usr/bin/docker", "build", "--progress=rawjson"};
     if (ImageTag != nullptr && *ImageTag != '\0')
