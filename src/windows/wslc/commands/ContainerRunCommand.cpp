@@ -37,6 +37,7 @@ namespace wsl::windows::wslc {
 // Container Run Command
 std::vector<Argument> ContainerRunCommand::GetArguments() const
 {
+    // clang-format off
     return {
         Argument::Create(ArgType::ImageId, true),
         Argument::Create(ArgType::Command),
@@ -65,6 +66,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Volume),
         Argument::Create(ArgType::Virtual),
     };
+    // clang-format on
 }
 
 std::wstring ContainerRunCommand::ShortDescription() const

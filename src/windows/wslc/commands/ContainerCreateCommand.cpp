@@ -33,6 +33,7 @@ namespace wsl::windows::wslc {
 // Container Create Command
 std::vector<Argument> ContainerCreateCommand::GetArguments() const
 {
+    //clang-format off
     return {
         Argument::Create(ArgType::ImageId, true),  Argument::Create(ArgType::Command),   Argument::Create(ArgType::ForwardArgs),
         Argument::Create(ArgType::CIDFile),        Argument::Create(ArgType::DNS),       Argument::Create(ArgType::DNSDomain),
@@ -43,6 +44,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::SessionId),      Argument::Create(ArgType::TMPFS),     Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),           Argument::Create(ArgType::Volume),    Argument::Create(ArgType::Virtual),
     };
+    // clang-format on
 }
 
 std::wstring ContainerCreateCommand::ShortDescription() const
@@ -57,8 +59,10 @@ std::wstring ContainerCreateCommand::LongDescription() const
         L"foreground."};
 }
 
+//clang-format off
 void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context << CreateSession << SetCreateContainerOptionsFromArgs << CreateContainer;
 }
+// clang-format on
 } // namespace wsl::windows::wslc
