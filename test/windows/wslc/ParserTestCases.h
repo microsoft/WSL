@@ -73,7 +73,7 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
 // clang-format off
 #define WSLC_PARSER_TEST_CASES \
 /* Simple case with required arg and simple other args */ \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -?)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -h)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose cont1)") \
 \

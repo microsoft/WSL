@@ -2,6 +2,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/arguments
+    ${CMAKE_CURRENT_SOURCE_DIR}/services
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
 )
 
@@ -16,10 +17,19 @@ set(HEADERS
     core/CLIExecutionContext.h
     core/ExecutionContextData.h
     core/Invocation.h
+    core/TablePrinter.h
     commands/RootCommand.h
+    commands/ContainerCommand.h
     commands/DiagCommand.h
+    services/ConsoleService.h
+    services/ContainerModel.h
+    services/ContainerService.h
+    services/ImageService.h
+    services/SessionModel.h
+    services/SessionService.h
     tasks/Task.h
     tasks/DiagTasks.h
+    tasks/ContainerTasks.h
 )
 
 set(SOURCES
@@ -28,9 +38,17 @@ set(SOURCES
     arguments/Argument.cpp
     arguments/ArgumentParser.cpp
     commands/RootCommand.cpp
+    commands/ContainerCommand.cpp
+    commands/ContainerListCommand.cpp
     commands/DiagCommand.cpp
     commands/DiagListCommand.cpp
+    services/ConsoleService.cpp
+    services/ContainerService.cpp
+    services/ImageService.cpp
+    services/SessionModel.cpp
+    services/SessionService.cpp
     tasks/DiagTasks.cpp
+    tasks/ContainerTasks.cpp
 )
 
 # Object library for WSLC components.
@@ -42,6 +60,7 @@ target_include_directories(wslclib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR}/commands
     ${CMAKE_CURRENT_SOURCE_DIR}/arguments
+    ${CMAKE_CURRENT_SOURCE_DIR}/services
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
 )
 target_precompile_headers(wslclib REUSE_FROM common)

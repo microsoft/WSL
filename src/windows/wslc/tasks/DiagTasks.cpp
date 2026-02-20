@@ -22,7 +22,7 @@ using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc::task {
 // Sample execution task using wsladiag's List implementation.
-void ListContainers(CLIExecutionContext& context)
+void ListSessions(CLIExecutionContext& context)
 {
     // This would probably be in another task or wrapper, as working with sessions is common code, and
     // there is a common --session argument to reuse sessions. But including it here for simplicity of the sample.

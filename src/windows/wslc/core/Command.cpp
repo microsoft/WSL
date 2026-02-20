@@ -23,7 +23,8 @@ using namespace wsl::windows::wslc::execution;
 namespace wsl::windows::wslc {
 constexpr std::wstring_view s_ExecutableName = L"wslc";
 
-Command::Command(std::wstring_view name, std::wstring parent) : m_name(name)
+Command::Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent) :
+    m_name(name), m_aliases(std::move(aliases))
 {
     if (!parent.empty())
     {
@@ -93,6 +94,7 @@ void Command::OutputHelp(const CommandException* exception) const
     // Output the command preamble and command chain
     infoOut << Localization::WSLCCLI_Usage(s_ExecutableName, std::wstring_view{commandChain});
 
+    auto commandAliases = Aliases();
     auto commands = GetCommands();
     auto arguments = GetAllArguments();
 
@@ -186,6 +188,13 @@ void Command::OutputHelp(const CommandException* exception) const
     }
 
     infoOut << std::endl << std::endl;
+
+    if (!commandAliases.empty())
+    {
+        infoOut << Localization::WSLCCLI_AvailableCommandAliases() << L' ';
+        infoOut << string::Join(commandAliases, L' ');
+        infoOut << std::endl << std::endl;
+    }
 
     if (!commands.empty())
     {
@@ -289,6 +298,15 @@ std::unique_ptr<Command> Command::FindSubCommand(Invocation& inv) const
             inv.consume(itr);
             return std::move(command);
         }
+
+        for (const auto& alias : command->Aliases())
+        {
+            if (string::IsEqual(*itr, alias))
+            {
+                inv.consume(itr);
+                return std::move(command);
+            }
+        }
     }
 
     throw CommandException(Localization::WSLCCLI_UnrecognizedCommandError(std::wstring_view{*itr}));
@@ -336,6 +354,8 @@ void Command::ValidateArguments(ArgMap& execArgs) const
             throw CommandException(Localization::WSLCCLI_TooManyArgumentsError(arg.Name()));
         }
     }
+
+    ValidateArgumentsInternal(execArgs);
 }
 
 void Command::Execute(CLIExecutionContext& context) const
@@ -356,5 +376,10 @@ void Command::Execute(CLIExecutionContext& context) const
 void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
 {
     command->Execute(context);
+}
+
+void Command::ValidateArgumentsInternal(const ArgMap&) const
+{
+    // Commands may not need any extra validation; they'll override if they do.
 }
 } // namespace wsl::windows::wslc
