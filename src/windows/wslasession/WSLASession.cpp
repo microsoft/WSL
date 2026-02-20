@@ -315,7 +315,6 @@ try
 
     auto onCompleted = [&]() { io.Cancel(); };
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
         *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
 
