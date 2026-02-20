@@ -907,7 +907,7 @@ try
 
         try
         {
-            inspectResult = wsl::shared::FromJson<docker_schema::InspectContainer>(m_dockerClient->InspectContainer(Id).c_str());
+            inspectResult = m_dockerClient->InspectContainer(Id);
         }
         catch (DockerHTTPException& e)
         {
