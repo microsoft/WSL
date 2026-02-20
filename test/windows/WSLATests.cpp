@@ -512,9 +512,8 @@ class WSLATests
         wil::unique_hfile dockerfileHandle;
         if (dockerfilePath != nullptr)
         {
-            SECURITY_ATTRIBUTES attributes{.nLength = sizeof(attributes), .bInheritHandle = TRUE};
             dockerfileHandle.reset(CreateFileW(
-                (contextDir / dockerfilePath).c_str(), GENERIC_READ, FILE_SHARE_READ, &attributes, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+                (contextDir / dockerfilePath).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
             THROW_LAST_ERROR_IF(!dockerfileHandle);
         }
 

@@ -473,8 +473,7 @@ try
 
     io.Run({});
 
-    buildProcess.GetExitEvent().wait();
-    int exitCode = buildProcess.GetExitCode();
+    int exitCode = buildProcess.Wait();
     WSL_LOG("BuildImageComplete", TraceLoggingValue(exitCode, "ExitCode"));
     THROW_HR_WITH_USER_ERROR_IF(E_FAIL, allOutput, exitCode != 0);
 

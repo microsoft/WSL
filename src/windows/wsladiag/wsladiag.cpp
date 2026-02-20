@@ -414,11 +414,11 @@ static int Build(std::wstring_view commandLine)
 
     std::filesystem::path inputPath;
     std::string tag;
-    std::string dockerfilePath;
+    std::wstring dockerfilePath;
 
     parser.AddPositionalArgument(AbsolutePath(inputPath), 0);
     parser.AddArgument(Utf8String{tag}, L"--tag", 't');
-    parser.AddArgument(Utf8String{dockerfilePath}, L"--file", 'f');
+    parser.AddArgument(dockerfilePath, L"--file", 'f');
 
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, inputPath.empty());
@@ -454,20 +454,16 @@ static int Build(std::wstring_view commandLine)
     wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", inputPath.wstring()), stdout);
 
     wil::unique_hfile dockerfileHandle;
-    if (dockerfilePath == "-")
+    if (dockerfilePath == L"-")
     {
-        HANDLE stdinDup;
         THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
-            GetCurrentProcess(), GetStdHandle(STD_INPUT_HANDLE), GetCurrentProcess(), &stdinDup, 0, TRUE, DUPLICATE_SAME_ACCESS));
-        dockerfileHandle.reset(stdinDup);
+            GetCurrentProcess(), GetStdHandle(STD_INPUT_HANDLE), GetCurrentProcess(), &dockerfileHandle, 0, FALSE, DUPLICATE_SAME_ACCESS));
     }
     else if (!dockerfilePath.empty())
     {
-        SECURITY_ATTRIBUTES attributes{.nLength = sizeof(attributes), .bInheritHandle = TRUE};
-        auto dockerfileFullPath = std::filesystem::absolute(inputPath / wsl::shared::string::MultiByteToWide(dockerfilePath));
-        dockerfileHandle.reset(CreateFileW(
-            dockerfileFullPath.c_str(), GENERIC_READ, FILE_SHARE_READ, &attributes, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF_MSG(!dockerfileHandle, "Failed to open Dockerfile: %ls", dockerfileFullPath.c_str());
+        dockerfileHandle.reset(
+            CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF_MSG(!dockerfileHandle, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
     }
 
     Callback callback;
