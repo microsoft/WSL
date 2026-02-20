@@ -646,6 +646,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
             (HANDLE)m_dockerClient
                 .StartExec(result.Id, common::docker_schema::StartExec{.Tty = request.Tty, .ConsoleSize = request.ConsoleSize})
                 .release()};
+
         std::unique_ptr<WSLAProcessIO> io;
         if (request.Tty)
         {
@@ -661,8 +662,39 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
         // Store a non owning reference to the process.
         m_processes.push_back(control.get());
 
-        auto process = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
+        // Poll for the exec'd process to either be running, or failed.
+        // This is required because StartExec() returns before the process is actually created, and if exec() fails, we'll never
+        // get an exec_die notification, so this case needs to be caught before returning the process to the caller.
 
+        // TODO: Configurable timeout.
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+
+        do
+        {
+            auto inspectJson = m_dockerClient.InspectExec(result.Id);
+            auto state = wsl::shared::FromJson<common::docker_schema::InspectExec>(inspectJson.c_str());
+            if (state.Running && state.Pid.has_value())
+            {
+                control->SetPid(state.Pid.value());
+                break; // Exec is running, exit.
+            }
+            else if (state.ExitCode.has_value())
+            {
+                control->SetExitCode(state.ExitCode.value());
+                break; // Exec has exited, exit.
+            }
+            else if (std::chrono::steady_clock::now() > deadline)
+            {
+                THROW_HR_MSG(
+                    HRESULT_FROM_WIN32(ERROR_TIMEOUT),
+                    "Timed out waiting for exec state for '%hs'. Last state: %hs",
+                    result.Id.c_str(),
+                    inspectJson.c_str());
+            }
+
+        } while (!control->GetExitEvent().wait(100));
+
+        auto process = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
         THROW_IF_FAILED(process.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to exec process in container %hs", m_id.c_str());

@@ -273,6 +273,19 @@ std::string DockerHTTPClient::InspectContainer(const std::string& Id)
     return response;
 }
 
+std::string DockerHTTPClient::InspectExec(const std::string& Id)
+{
+    auto url = URL::Create("/exec/{}/json", Id);
+    auto [code, response] = SendRequestAndReadResponse(verb::get, url);
+
+    if (code < 200 || code >= 300)
+    {
+        throw DockerHTTPException(code, verb::get, url.Get(), "", response);
+    }
+
+    return response;
+}
+
 wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
 {
     std::map<boost::beast::http::field, std::string> headers{
