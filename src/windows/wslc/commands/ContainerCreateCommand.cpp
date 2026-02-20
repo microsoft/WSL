@@ -44,7 +44,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::DNSOption),
         Argument::Create(ArgType::DNSSearch),
         Argument::Create(ArgType::Entrypoint),
-        Argument::Create(ArgType::Env, false, -1),
+        Argument::Create(ArgType::Env, false, NO_LIMIT),
         Argument::Create(ArgType::EnvFile),
         Argument::Create(ArgType::GroupId),
         Argument::Create(ArgType::Interactive),
@@ -70,9 +70,7 @@ std::wstring ContainerCreateCommand::ShortDescription() const
 
 std::wstring ContainerCreateCommand::LongDescription() const
 {
-    return {
-        L"Creates a container. By default, the container is created in the background; use --detach to create in the "
-        L"foreground."};
+    return {L"Creates a container."};
 }
 
 // clang-format off

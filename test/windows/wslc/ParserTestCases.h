@@ -53,12 +53,12 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
             Argument::Create(ArgType::Remove),
             Argument::Create(ArgType::Signal),
             Argument::Create(ArgType::Time),
-            Argument::Create(ArgType::Publish, false, -1), // Not required, up to 3 values.
+            Argument::Create(ArgType::Publish, false, NO_LIMIT), // Not required, unlimited.
         };
 
     case ArgumentSet::List:
         return {
-            Argument::Create(ArgType::ContainerId, false, -1), // Optional positional
+            Argument::Create(ArgType::ContainerId, false, NO_LIMIT), // Optional positional
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Verbose),
         };

@@ -22,6 +22,7 @@ Abstract:
 #define WSLC_CLI_HELP_ARG L"h"
 #define WSLC_CLI_HELP_ARG_STRING WSLC_CLI_ARG_ID_STRING WSLC_CLI_HELP_ARG
 #define NO_ALIAS L""
+#define NO_LIMIT -1
 
 using namespace wsl::windows::wslc::argument;
 

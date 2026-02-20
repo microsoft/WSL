@@ -144,11 +144,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::StepInternal()
 // Assumes non-empty and does not begin with '-'.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalArgument(const std::wstring_view& currArg)
 {
-    if (currArg.empty() || currArg[0] == WSLC_CLI_ARG_ID_CHAR)
-    {
-        // Assumption invalid, there is a bug in the logic.
-        THROW_HR(E_UNEXPECTED);
-    }
+    WI_ASSERT(!currArg.empty() && currArg[0] != WSLC_CLI_ARG_ID_CHAR);
 
     const Argument* nextPositional = NextPositional();
     if (!nextPositional)
@@ -170,16 +166,12 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessPositionalA
 // Only Kind::Positional or Kind::Forward arguments should remain.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPositionals(const std::wstring_view& currArg)
 {
-    if (!m_anchorPositional.has_value())
-    {
-        // Invalid state, this is a programmer error.
-        THROW_HR(E_UNEXPECTED);
-    }
+    WI_ASSERT(m_anchorPositional.has_value());
 
     // If we haven't reached the limit for the anchor positional, treat this as another anchor positional.
-    // Anchors with a -1 limit will never be full and therefore will always treat subsequent positionals as anchors.
+    // Anchors with NO_LIMIT will never be full and therefore will always treat subsequent positionals as anchors.
     if ((m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit()) ||
-        (m_anchorPositional.value().Limit() < 0))
+        (m_anchorPositional.value().Limit() == NO_LIMIT))
     {
         // validate that we dont have any invalid argument specifiers.
         if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
@@ -235,11 +227,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
 // Assumes argument begins with '-' and is at least 2 characters.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgument(const std::wstring_view& currArg)
 {
-    if (currArg.length() < 2 || currArg[0] != WSLC_CLI_ARG_ID_CHAR || currArg[1] == WSLC_CLI_ARG_ID_CHAR)
-    {
-        // Assumption invalid, this is a programmer error.
-        THROW_HR(E_UNEXPECTED);
-    }
+    WI_ASSERT(currArg.length() >= 2 && currArg[0] == WSLC_CLI_ARG_ID_CHAR && currArg[1] != WSLC_CLI_ARG_ID_CHAR);
 
     // This may be a collection of boolean alias flags.
     // Helper to find an argument by alias starting at a specific position.
@@ -340,7 +328,8 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
 // Assumes the arg value begins with -- and is at least 2 characters long.
 ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessNamedArgument(const std::wstring_view& currArg)
 {
-    THROW_HR_IF(E_UNEXPECTED, !currArg.starts_with(L"--"));
+    WI_ASSERT(currArg.starts_with(L"--"));
+
     if (currArg.length() == 2)
     {
         // Missing argument name after double dash, this is an error.
