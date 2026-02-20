@@ -49,9 +49,19 @@ namespace {
             options.Interactive = true;
         }
 
+        if (context.Args.Contains(ArgType::Command))
+        {
+            options.Arguments.push_back(string::WideToMultiByte(context.Args.Get<ArgType::Command>()));
+        }
+
         if (context.Args.Contains(ArgType::ForwardArgs))
         {
-            options.Arguments = context.Args.Get<ArgType::ForwardArgs>();
+            auto const& forwardArgs = context.Args.Get<ArgType::ForwardArgs>();
+            options.Arguments.reserve(options.Arguments.size() + forwardArgs.size());
+            for (const auto& arg : forwardArgs)
+            {
+                options.Arguments.push_back(string::WideToMultiByte(arg));
+            }
         }
     }
 } // anonymous namespace

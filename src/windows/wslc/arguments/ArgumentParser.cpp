@@ -220,11 +220,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
 
     // currArg is the first forwarded argument
     // All the rest of the args are forward args.
-    std::vector<std::string> forwardedArgs;
-    forwardedArgs.emplace_back(string::WideToMultiByte(std::wstring{currArg}));
+    std::vector<std::wstring> forwardedArgs;
+    forwardedArgs.emplace_back(std::wstring{currArg});
     while (m_invocationItr != m_invocation.end())
     {
-        forwardedArgs.emplace_back(string::WideToMultiByte(*m_invocationItr));
+        forwardedArgs.emplace_back(std::wstring{*m_invocationItr});
         ++m_invocationItr;
     }
 
