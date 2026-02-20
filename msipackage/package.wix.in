@@ -58,6 +58,11 @@
                     <RegistryValue Name="ProductCode" Value="[ProductCode]" Type="string" />
                     <RegistryValue Name="Version" Value="${PACKAGE_VERSION}" Type="string" />
                 </RegistryKey>
+
+                <!-- DCAT registration -->
+                <RegistryKey Root="HKLM" Key="${DCAT_REGISTRATION_KEY}">
+                    <RegistryValue Name="Version" Value="${PACKAGE_VERSION}" Type="string" />
+                </RegistryKey>
             </Component>
 
             <Component Id="explorerplan9shortcut" Guid="{93CBFF23-A04C-4344-A332-238CE5B97AED}" UninstallWhenSuperseded="yes" DisableRegistryReflection="yes" Bitness="always64">
