@@ -358,6 +358,8 @@ void Command::ValidateArguments(ArgMap& execArgs) const
             throw CommandException(Localization::WSLCCLI_TooManyArgumentsError(arg.Name()));
         }
     }
+
+    ValidateArgumentsInternal(execArgs);
 }
 
 void Command::Execute(CLIExecutionContext& context) const
@@ -378,5 +380,10 @@ void Command::Execute(CLIExecutionContext& context) const
 void Execute(CLIExecutionContext& context, std::unique_ptr<Command>& command)
 {
     command->Execute(context);
+}
+
+void Command::ValidateArgumentsInternal(const ArgMap&) const
+{
+    // Commands may not need any extra validation; they'll override if they do.
 }
 } // namespace wsl::windows::wslc

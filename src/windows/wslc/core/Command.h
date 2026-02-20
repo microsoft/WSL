@@ -55,7 +55,7 @@ struct Command
     {
         return m_fullName;
     }
-    const std::vector<std::wstring_view>& Aliases() const&
+    const std::vector<std::wstring_view>& Aliases() const
     {
         return m_aliases;
     }
@@ -89,6 +89,7 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
+    virtual void ValidateArgumentsInternal(const ArgMap& execArgs) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 
 private:

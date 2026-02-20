@@ -52,6 +52,18 @@ std::wstring ContainerListCommand::LongDescription() const
     return {L"Lists specified container(s). By default, only running containers are shown; use --all to include all containers."};
 }
 
+void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
+{
+    if (execArgs.Contains(ArgType::Format))
+    {
+        auto format = execArgs.Get<ArgType::Format>();
+        if (!string::IsEqual(format, L"json") && !string::IsEqual(format, L"table"))
+        {
+            throw CommandException(L"Invalid format type specified. Supported format types are: json, table");
+        }
+    }
+}
+
 void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context << CreateSession << GetContainers;
@@ -85,30 +97,33 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
         {
             PrintMessage(string::MultiByteToWide(container.Id));
         }
+
+        return;
     }
-    // TODO: When we have more arguments that have CLI-specific validation, centralize the validation logic
-    // so they are validated prior to reaching command execution. We should check the format types during
-    // ArgumentValidation in the command and error if the user put in an invalid format type, then the
-    // command can safely assume the format type is valid here and doesn't need to check for it again.
-    else if (context.Args.Contains(ArgType::Format) && (string::IsEqual(context.Args.Get<ArgType::Format>(), L"json")))
+
+    if (context.Args.Contains(ArgType::Format))
     {
-        auto json = ToJson(containers);
-        PrintMessage(string::MultiByteToWide(json));
-    }
-    else
-    {
-        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
-        for (const auto& container : containers)
+        if (string::IsEqual(context.Args.Get<ArgType::Format>(), L"json"))
         {
-            tablePrinter.AddRow({
-                string::MultiByteToWide(container.Id),
-                string::MultiByteToWide(container.Name),
-                string::MultiByteToWide(container.Image),
-                ContainerService::ContainerStateToString(container.State),
-            });
+            auto json = ToJson(containers);
+            PrintMessage(string::MultiByteToWide(json));
+            return;
         }
 
-        tablePrinter.Print();
+        // Default is table, which is below.
     }
+
+    utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
+    for (const auto& container : containers)
+    {
+        tablePrinter.AddRow({
+            string::MultiByteToWide(container.Id),
+            string::MultiByteToWide(container.Name),
+            string::MultiByteToWide(container.Image),
+            ContainerService::ContainerStateToString(container.State),
+        });
+    }
+
+    tablePrinter.Print();
 }
 } // namespace wsl::windows::wslc
