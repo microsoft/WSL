@@ -42,7 +42,7 @@ void CloseContainer(WslcContainer container)
 {
     if (container)
     {
-        WslcContainerStop(container, WSLC_SIGNAL_SIGKILL, 30 * 1000);
+        WslcContainerStop(container, WSLC_SIGNAL_SIGKILL, 30);
         WslcContainerDelete(container, WSLC_DELETE_CONTAINER_FLAG_NONE);
         WslcContainerRelease(container);
     }
@@ -99,7 +99,7 @@ ContainerOutput RunContainerAndCapture(
     // Create and start the container.
     UniqueContainer container;
     THROW_IF_FAILED(WslcContainerCreate(session, &containerSettings, &container, nullptr));
-    THROW_IF_FAILED(WslcContainerStart(container.get()));
+    THROW_IF_FAILED(WslcContainerStart(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH));
 
     // Acquire the init process handle.
     UniqueProcess process;
@@ -166,8 +166,7 @@ class WslcSdkTests
 
         // Build session settings using the WSLC SDK.
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(m_storagePath.c_str(), &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetDisplayName(&sessionSettings, c_testSessionName));
+        VERIFY_SUCCEEDED(WslcSessionInitSettings(c_testSessionName, m_storagePath.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetCpuCount(&sessionSettings, 4));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetMemory(&sessionSettings, 2024));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
@@ -228,9 +227,10 @@ class WslcSdkTests
     {
         WSL2_TEST_ONLY();
 
+        std::filesystem::path extraStorage = m_storagePath / "wslc-extra-session-storage";
+
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(nullptr, &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetDisplayName(&sessionSettings, L"wslc-extra-session"));
+        VERIFY_SUCCEEDED(WslcSessionInitSettings(L"wslc-extra-session", extraStorage.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetCpuCount(&sessionSettings, 2));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetMemory(&sessionSettings, 1024));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
@@ -263,9 +263,10 @@ class WslcSdkTests
             p->set_value(reason);
         };
 
+        std::filesystem::path extraStorage = m_storagePath / "wslc-termcb-term-storage";
+
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(nullptr, &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetDisplayName(&sessionSettings, L"wslc-termcb-term-test"));
+        VERIFY_SUCCEEDED(WslcSessionInitSettings(L"wslc-termcb-term-test", extraStorage.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetTerminateCallback(&sessionSettings, callback, &promise));
 
@@ -291,9 +292,10 @@ class WslcSdkTests
             p->set_value(reason);
         };
 
+        std::filesystem::path extraStorage = m_storagePath / "wslc-termcb-release-storage";
+
         WslcSessionSettings sessionSettings;
-        VERIFY_SUCCEEDED(WslcSessionInitSettings(nullptr, &sessionSettings));
-        VERIFY_SUCCEEDED(WslcSessionSettingsSetDisplayName(&sessionSettings, L"wslc-termcb-release-test"));
+        VERIFY_SUCCEEDED(WslcSessionInitSettings(L"wslc-termcb-release-test", extraStorage.c_str(), &sessionSettings));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetTimeout(&sessionSettings, 30 * 1000));
         VERIFY_SUCCEEDED(WslcSessionSettingsSetTerminateCallback(&sessionSettings, callback, &promise));
 
@@ -418,7 +420,7 @@ class WslcSdkTests
         // Build a long-running container.
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcProcessInitSettings(&procSettings));
-        const char* argv[] = {"/bin/sleep", "99999"};
+        const char* argv[] = {"/bin/sleep", "999"};
         VERIFY_SUCCEEDED(WslcProcessSettingsSetCmdLineArgs(&procSettings, argv, ARRAYSIZE(argv)));
 
         WslcContainerSettings containerSettings;
@@ -428,7 +430,7 @@ class WslcSdkTests
 
         UniqueContainer container;
         VERIFY_SUCCEEDED(WslcContainerCreate(m_defaultSession, &containerSettings, &container, nullptr));
-        VERIFY_SUCCEEDED(WslcContainerStart(container.get()));
+        VERIFY_SUCCEEDED(WslcContainerStart(container.get(), WSLC_CONTAINER_START_FLAG_NONE));
 
         // Acquire and release the init process handle — we won't read its I/O.
         {
@@ -437,7 +439,7 @@ class WslcSdkTests
         }
 
         // Stop the container gracefully (after the timeout).
-        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGTERM, 10 * 1000));
+        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGTERM, 10));
 
         // Delete the stopped container.
         VERIFY_SUCCEEDED(WslcContainerDelete(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
@@ -460,7 +462,7 @@ class WslcSdkTests
 
         UniqueContainer container;
         VERIFY_SUCCEEDED(WslcContainerCreate(m_defaultSession, &containerSettings, &container, nullptr));
-        VERIFY_SUCCEEDED(WslcContainerStart(container.get()));
+        VERIFY_SUCCEEDED(WslcContainerStart(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH));
 
         UniqueProcess process;
         VERIFY_SUCCEEDED(WslcContainerGetInitProcess(container.get(), &process));
@@ -672,7 +674,7 @@ class WslcSdkTests
 
         WslcProcessSettings procSettings;
         VERIFY_SUCCEEDED(WslcProcessInitSettings(&procSettings));
-        const char* argv[] = {"/bin/sleep", "99999"};
+        const char* argv[] = {"/bin/sleep", "999"};
         VERIFY_SUCCEEDED(WslcProcessSettingsSetCmdLineArgs(&procSettings, argv, ARRAYSIZE(argv)));
 
         WslcContainerSettings containerSettings;
@@ -681,7 +683,7 @@ class WslcSdkTests
 
         UniqueContainer container;
         VERIFY_SUCCEEDED(WslcContainerCreate(m_defaultSession, &containerSettings, &container, nullptr));
-        VERIFY_SUCCEEDED(WslcContainerStart(container.get()));
+        VERIFY_SUCCEEDED(WslcContainerStart(container.get(), WSLC_CONTAINER_START_FLAG_NONE));
 
         UniqueProcess process;
         VERIFY_SUCCEEDED(WslcContainerGetInitProcess(container.get(), &process));
@@ -689,7 +691,7 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcProcessSignal(process.get(), WSLC_SIGNAL_SIGKILL), E_NOTIMPL);
 
         // Clean up via the container-level stop (which is implemented).
-        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 30 * 1000));
+        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 30));
         VERIFY_SUCCEEDED(WslcContainerDelete(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
     }
 
