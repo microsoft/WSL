@@ -33,16 +33,32 @@ namespace wsl::windows::wslc {
 // Container Create Command
 std::vector<Argument> ContainerCreateCommand::GetArguments() const
 {
-    //clang-format off
+    // clang-format off
     return {
-        Argument::Create(ArgType::ImageId, true),  Argument::Create(ArgType::Command),   Argument::Create(ArgType::ForwardArgs),
-        Argument::Create(ArgType::CIDFile),        Argument::Create(ArgType::DNS),       Argument::Create(ArgType::DNSDomain),
-        Argument::Create(ArgType::DNSOption),      Argument::Create(ArgType::DNSSearch), Argument::Create(ArgType::Entrypoint),
-        Argument::Create(ArgType::Env, false, -1), Argument::Create(ArgType::EnvFile),   Argument::Create(ArgType::GroupId),
-        Argument::Create(ArgType::Interactive),    Argument::Create(ArgType::Name),      Argument::Create(ArgType::NoDNS),
-        Argument::Create(ArgType::Progress),       Argument::Create(ArgType::Remove),    Argument::Create(ArgType::Scheme),
-        Argument::Create(ArgType::SessionId),      Argument::Create(ArgType::TMPFS),     Argument::Create(ArgType::TTY),
-        Argument::Create(ArgType::User),           Argument::Create(ArgType::Volume),    Argument::Create(ArgType::Virtual),
+        Argument::Create(ArgType::ImageId, true),
+        Argument::Create(ArgType::Command),
+        Argument::Create(ArgType::ForwardArgs),
+        Argument::Create(ArgType::CIDFile),
+        Argument::Create(ArgType::DNS),
+        Argument::Create(ArgType::DNSDomain),
+        Argument::Create(ArgType::DNSOption),
+        Argument::Create(ArgType::DNSSearch),
+        Argument::Create(ArgType::Entrypoint),
+        Argument::Create(ArgType::Env, false, -1),
+        Argument::Create(ArgType::EnvFile),
+        Argument::Create(ArgType::GroupId),
+        Argument::Create(ArgType::Interactive),
+        Argument::Create(ArgType::Name),
+        Argument::Create(ArgType::NoDNS),
+        Argument::Create(ArgType::Progress),
+        Argument::Create(ArgType::Remove),
+        Argument::Create(ArgType::Scheme),
+        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::TMPFS),
+        Argument::Create(ArgType::TTY),
+        Argument::Create(ArgType::User),
+        Argument::Create(ArgType::Volume),
+        Argument::Create(ArgType::Virtual),
     };
     // clang-format on
 }
@@ -59,10 +75,13 @@ std::wstring ContainerCreateCommand::LongDescription() const
         L"foreground."};
 }
 
-//clang-format off
+// clang-format off
 void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession << SetCreateContainerOptionsFromArgs << CreateContainer;
+    context
+        << CreateSession
+        << SetCreateContainerOptionsFromArgs
+        << CreateContainer;
 }
 // clang-format on
 } // namespace wsl::windows::wslc
