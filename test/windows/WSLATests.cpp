@@ -2117,6 +2117,34 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "www-data\n"}});
         }
 
+        // Validate that the container behaves correctly if the caller keeps a reference to an init process during termination.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-init-ref", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto containerId = container.Id();
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                wil::com_ptr<IWSLAContainer> openedContainer;
+                VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &openedContainer));
+                VERIFY_SUCCEEDED(openedContainer->Delete());
+            });
+
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(process.State(), WslaProcessStateRunning);
+
+            // Terminate the session.
+            ResetTestSession();
+
+            WSLA_PROCESS_STATE processState{};
+            int exitCode{};
+            VERIFY_ARE_EQUAL(process.Get().GetState(&processState, &exitCode), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+        }
+
         // Validate error handling when the username / group doesn't exist
         {
             WSLAContainerLauncher launcher("debian:latest", "test-no-missing-user", {"groups"});
