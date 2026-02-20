@@ -77,8 +77,13 @@ std::wstring ContainerRunCommand::LongDescription() const
     return {L"Runs a container. By default, the container is started in the background; use --detach to run in the foreground."};
 }
 
+// clang-format off
 void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession << SetRunContainerOptionsFromArgs << RunContainer;
+    context 
+        << CreateSession
+        << SetRunContainerOptionsFromArgs
+        << RunContainer;
 }
+// clang-format on
 } // namespace wsl::windows::wslc

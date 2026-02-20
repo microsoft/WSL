@@ -25,7 +25,7 @@ void Argument::Validate(const ArgMap& execArgs) const
     switch (m_argType)
     {
     case ArgType::Signal:
-        validation::ValidateWSLASignal(execArgs.Get<ArgType::Signal>(), m_name);
+        validation::ValidateUInteger(execArgs.Get<ArgType::Signal>(), m_name);
         break;
 
     case ArgType::Time:
@@ -39,14 +39,6 @@ void Argument::Validate(const ArgMap& execArgs) const
 } // namespace wsl::windows::wslc
 
 namespace wsl::windows::wslc::validation {
-
-void ValidateWSLASignal(const std::wstring& value, const std::wstring& argName)
-{
-    if (!models::SignalMap.contains(value))
-    {
-        throw ArgumentException(L"Invalid " + argName + L" argument value: " + value);
-    }
-}
 
 void ValidateUInteger(const std::wstring& value, const std::wstring& argName)
 {

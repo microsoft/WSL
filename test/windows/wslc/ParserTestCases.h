@@ -105,7 +105,7 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -rmivp=80:80 cont1)") \
 \
 /* Validation tests */ \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO cont1)") \
-WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal SIGTERM cont1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal 9 cont1)") \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -t blah)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -t 5)") \
 \

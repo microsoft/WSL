@@ -47,7 +47,7 @@ COMMAND_LINE_TEST_CASE(L"container run ubuntu bash -c 'echo Hello World'", L"run
 COMMAND_LINE_TEST_CASE(L"container run ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"container run -it --name foo ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"stop --all", L"stop", true)
-COMMAND_LINE_TEST_CASE(L"container stop -a --signal SIGKILL", L"stop", true)
+COMMAND_LINE_TEST_CASE(L"container stop -a --signal 9", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop -a --signal sigkill", L"stop", false)
 COMMAND_LINE_TEST_CASE(L"start cont", L"start", true)
 COMMAND_LINE_TEST_CASE(L"container start cont", L"start", true)

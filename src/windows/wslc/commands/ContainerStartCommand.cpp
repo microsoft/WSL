@@ -53,9 +53,12 @@ std::wstring ContainerStartCommand::LongDescription() const
         L"Starts a container. Provides options to attach to the container's stdout and stderr streams and could be interactive "
         L"to keep stdin open."};
 }
-
+// clang-format off
 void ContainerStartCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << CreateSession << StartContainer;
+    context 
+        << CreateSession
+        << StartContainer;
 }
+// clang-format on
 } // namespace wsl::windows::wslc

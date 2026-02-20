@@ -82,7 +82,7 @@ void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
-        options.Signal = SignalMap.at(context.Args.Get<ArgType::Signal>());
+        options.Signal = std::stoul(context.Args.Get<ArgType::Signal>());
     }
 
     if (context.Args.Contains(ArgType::Time))

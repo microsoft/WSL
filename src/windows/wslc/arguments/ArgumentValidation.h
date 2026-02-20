@@ -20,7 +20,6 @@ using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc::validation {
 
-void ValidateWSLASignal(const std::wstring& value, const std::wstring& argName);
 void ValidateUInteger(const std::wstring& value, const std::wstring& argName);
 
 } // namespace wsl::windows::wslc::validation
