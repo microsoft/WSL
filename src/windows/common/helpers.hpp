@@ -201,8 +201,4 @@ void SetHandleInheritable(_In_ HANDLE Handle, _In_ bool Inheritable = true);
 
 bool TryAttachConsole();
 
-std::vector<std::wstring> ParseDockerIgnoreFile(_In_ const std::filesystem::path& sourceDir);
-
-wil::unique_hfile CreateDockerContextTarArchive(_In_ const std::filesystem::path& sourceDir);
-
 } // namespace wsl::windows::common::helpers

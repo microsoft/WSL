@@ -27,25 +27,46 @@ constexpr ULONG s_DefaultBootTimeout = 300000;
 // Default to 1 GB
 constexpr UINT64 s_DefaultStorageSize = 1000 * 1000 * 1000;
 
-WSLAFeatureFlags ConvertFlags(WslcSessionFlags flags)
+#define WSLC_FLAG_VALUE_ASSERT(_wlsc_name_, _wsla_name_) \
+    static_assert(_wlsc_name_ == _wsla_name_, "Flag values differ: " #_wlsc_name_ " != " #_wsla_name_);
+
+template <typename Flags>
+struct FlagsTraits
 {
-    static_assert(WSLC_SESSION_FLAG_ENABLE_GPU == WslaFeatureFlagsGPU, "Session GPU flag values differ.");
+    static_assert(false, "Flags used without traits defined.");
+};
 
-    WslcSessionFlags allFlagsMask = WSLC_SESSION_FLAG_ENABLE_GPU;
-
-    return static_cast<WSLAFeatureFlags>(flags & allFlagsMask);
-}
-
-WSLAContainerFlags ConvertFlags(WslcContainerFlags flags)
+template <>
+struct FlagsTraits<WslcSessionFeatureFlags>
 {
-    static_assert(WSLC_CONTAINER_FLAG_AUTO_REMOVE == WSLAContainerFlagsRm, "Container auto remove flag values differ.");
-    static_assert(WSLC_CONTAINER_FLAG_ENABLE_GPU == WSLAContainerFlagsGpu, "Container GPU flag values differ.");
-    // TODO: Are these the same flags?
-    // static_assert(WSLC_CONTAINER_FLAG_PRIVILEGED == WSLAContainerFlagsInit, "Container privileged flag values differ.");
+    using WslaType = WSLAFeatureFlags;
+    constexpr static WslcSessionFeatureFlags Mask = WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_SESSION_FEATURE_FLAG_ENABLE_GPU, WslaFeatureFlagsGPU);
+};
 
-    WslcContainerFlags allFlagsMask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
+template <>
+struct FlagsTraits<WslcContainerFlags>
+{
+    using WslaType = WSLAContainerFlags;
+    constexpr static WslcContainerFlags Mask = WSLC_CONTAINER_FLAG_AUTO_REMOVE | WSLC_CONTAINER_FLAG_ENABLE_GPU;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_AUTO_REMOVE, WSLAContainerFlagsRm);
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_FLAG_ENABLE_GPU, WSLAContainerFlagsGpu);
+    // TODO: WSLC_CONTAINER_FLAG_PRIVILEGED has no associated runtime value
+};
 
-    return static_cast<WSLAContainerFlags>(flags & allFlagsMask);
+template <>
+struct FlagsTraits<WslcContainerStartFlags>
+{
+    using WslaType = WSLAContainerStartFlags;
+    constexpr static WslcContainerStartFlags Mask = WSLC_CONTAINER_START_FLAG_ATTACH;
+    WSLC_FLAG_VALUE_ASSERT(WSLC_CONTAINER_START_FLAG_ATTACH, WSLAContainerStartFlagsAttach);
+};
+
+template <typename Flags>
+typename FlagsTraits<Flags>::WslaType ConvertFlags(Flags flags)
+{
+    using traits = FlagsTraits<Flags>;
+    return static_cast<typename traits::WslaType>(flags & traits::Mask);
 }
 
 WSLASignal ConvertSignal(WslcSignal signal)
@@ -84,13 +105,17 @@ void GetErrorInfoFromCOM(PWSTR* errorMessage)
 } // namespace
 
 // SESSION DEFINITIONS
-STDAPI WslcSessionInitSettings(_In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
+STDAPI WslcSessionInitSettings(_In_ PCWSTR name, _In_ PCWSTR storagePath, _Out_ WslcSessionSettings* sessionSettings)
 try
 {
+    RETURN_HR_IF_NULL(E_POINTER, name);
+    RETURN_HR_IF_NULL(E_POINTER, storagePath);
+
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     *internalType = {};
 
+    internalType->displayName = name;
     internalType->storagePath = storagePath;
     internalType->cpuCount = s_DefaultCPUCount;
     internalType->memoryMb = s_DefaultMemoryMB;
@@ -158,7 +183,6 @@ try
     runtimeSettings.CpuCount = internalType->cpuCount;
     runtimeSettings.MemoryMb = internalType->memoryMb;
     runtimeSettings.BootTimeoutMs = internalType->timeoutMS;
-    // TODO: No user control over networking mode (NAT and VirtIO); should be added to WslcSessionSettings.
     runtimeSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
     auto terminationCallback = TerminationCallback::CreateIf(internalType);
     if (terminationCallback)
@@ -166,7 +190,7 @@ try
         result->terminationCallback.attach(terminationCallback.as<ITerminationCallback>().detach());
         runtimeSettings.TerminationCallback = terminationCallback.get();
     }
-    runtimeSettings.FeatureFlags = ConvertFlags(internalType->flags);
+    runtimeSettings.FeatureFlags = ConvertFlags(internalType->featureFlags);
 
     // TODO: Debug message output? No user control? Expects a handle value as a ULONG (to write debug info to?)
     // runtimeSettings.DmesgOutput;
@@ -178,7 +202,6 @@ try
     //       Not clear how to map dynamic and fixed to values like `ext4` and `tmpfs`.
     // runtimeSettings.RootVhdTypeOverride = ConvertType(internalType->vhdRequirements.type);
 
-    // TODO: No user control over flags (Persistent and OpenExisting)?
     RETURN_IF_FAILED(sessionManager->CreateSession(&runtimeSettings, WSLASessionFlagsNone, &result->session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(result->session.get());
 
@@ -203,18 +226,6 @@ try
     UNREFERENCED_PARAMETER(networkingMode);
     UNREFERENCED_PARAMETER(containerSettings);
     return E_NOTIMPL;
-}
-CATCH_RETURN();
-
-// TODO: DisplayName is required (and is effectively `SessionKey`); it should be promoted to a required Init time parameter.
-STDAPI WslcSessionSettingsSetDisplayName(_In_ WslcSessionSettings* sessionSettings, _In_ PCWSTR displayName)
-try
-{
-    auto internalType = CheckAndGetInternalType(sessionSettings);
-
-    internalType->displayName = displayName;
-
-    return S_OK;
 }
 CATCH_RETURN();
 
@@ -281,12 +292,12 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcSessionSettingsSetFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFlags flags)
+STDAPI WslcSessionSettingsSetFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags)
 try
 {
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
-    internalType->flags = flags;
+    internalType->featureFlags = flags;
 
     return S_OK;
 }
@@ -419,14 +430,13 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcContainerStart(_In_ WslcContainer container)
+STDAPI WslcContainerStart(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags)
 try
 {
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: No user choice between None and Attach (where attach is what allows access to init process IO handles)
-    RETURN_HR(internalType->container->Start(WSLAContainerStartFlagsAttach));
+    RETURN_HR(internalType->container->Start(ConvertFlags(flags)));
 }
 CATCH_RETURN();
 
@@ -542,14 +552,13 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutMS)
+STDAPI WslcContainerStop(_In_ WslcContainer container, _In_ WslcSignal signal, _In_ uint32_t timeoutSeconds)
 try
 {
     auto internalType = CheckAndGetInternalType(container);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
-    // TODO: Resolve massive disparity between 32-bit unsigned millisecond input and 64-bit signed second target timeouts
-    RETURN_HR(internalType->container->Stop(ConvertSignal(signal), timeoutMS / 1000));
+    RETURN_HR(internalType->container->Stop(ConvertSignal(signal), timeoutSeconds));
 }
 CATCH_RETURN();
 
@@ -574,18 +583,6 @@ try
     auto internalType = CheckAndGetInternalType(processSettings);
 
     *internalType = {};
-
-    return S_OK;
-}
-CATCH_RETURN();
-
-// TODO: Executable has no place in runtime settings; it should be removed in favor of placement as the first item in CmdLineArgs.
-STDAPI WslcProcessSettingsSetExecutable(_In_ WslcProcessSettings* processSettings, _In_ PCSTR executable)
-try
-{
-    auto internalType = CheckAndGetInternalType(processSettings);
-
-    internalType->executable = executable;
 
     return S_OK;
 }
