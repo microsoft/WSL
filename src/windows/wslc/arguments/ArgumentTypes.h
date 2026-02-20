@@ -74,7 +74,7 @@ namespace details {
     template <>
     struct KindToType<Kind::Forward>
     {
-        using type = std::vector<std::wstring>;
+        using type = std::vector<std::string>;
     };
 
     template <ArgType D>

@@ -177,7 +177,9 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
     }
 
     // If we haven't reached the limit for the anchor positional, treat this as another anchor positional.
-    if (m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit())
+    // Anchors with a -1 limit will never be full and therefore will always treat subsequent positionals as anchors.
+    if ((m_executionArgs.Count(m_anchorPositional.value().Type()) < m_anchorPositional.value().Limit()) ||
+        (m_anchorPositional.value().Limit() < 0))
     {
         // validate that we dont have any invalid argument specifiers.
         if (!currArg.empty() && currArg[0] == WSLC_CLI_ARG_ID_CHAR)
@@ -218,11 +220,11 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAnchoredPos
 
     // currArg is the first forwarded argument
     // All the rest of the args are forward args.
-    std::vector<std::wstring> forwardedArgs;
-    forwardedArgs.push_back(std::wstring{currArg});
+    std::vector<std::string> forwardedArgs;
+    forwardedArgs.emplace_back(string::WideToMultiByte(std::wstring{currArg}));
     while (m_invocationItr != m_invocation.end())
     {
-        forwardedArgs.push_back(std::wstring{*m_invocationItr});
+        forwardedArgs.emplace_back(string::WideToMultiByte(*m_invocationItr));
         ++m_invocationItr;
     }
 

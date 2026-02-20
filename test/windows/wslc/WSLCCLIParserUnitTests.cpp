@@ -97,19 +97,11 @@ class WSLCCLIParserUnitTests
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ForwardArgs));
                     auto forwardArgs = args.Get<ArgType::ForwardArgs>();
-                    std::wstring forwardArgsConcat;
-                    for (const auto& arg : forwardArgs)
-                    {
-                        if (!forwardArgsConcat.empty())
-                        {
-                            forwardArgsConcat += L" ";
-                        }
-                        forwardArgsConcat += arg;
-                    }
-                    VERIFY_IS_TRUE(forwardArgsConcat.find(L"hello world") != std::wstring::npos); // Forward args should contain hello world
-                    VERIFY_IS_TRUE(forwardArgsConcat.find(L"cont1") == std::wstring::npos); // Forward args should not contain the containerId
-                    VERIFY_IS_TRUE(forwardArgsConcat.find(L"command") == std::wstring::npos); // Forward args should not contain the command
-                    LogComment(L"Forwarded Args: " + forwardArgsConcat);
+                    std::string forwardArgsConcat = wsl::shared::string::Join(forwardArgs, ' ');
+                    VERIFY_IS_TRUE(forwardArgsConcat.find("hello world") != std::string::npos); // Forward args should contain hello world
+                    VERIFY_IS_TRUE(forwardArgsConcat.find("cont1") == std::string::npos); // Forward args should not contain the containerId
+                    VERIFY_IS_TRUE(forwardArgsConcat.find("command") == std::string::npos); // Forward args should not contain the command
+                    LogComment(L"Forwarded Args: " + std::wstring(forwardArgsConcat.begin(), forwardArgsConcat.end()));
                 }
 
                 if (testCase.commandLine.find(L"443") != std::wstring::npos)

@@ -76,7 +76,7 @@ class WSLCCLIArgumentUnitTests
                 args.Add(argType, std::wstring(L"test"));
                 break;
             case Kind::Forward:
-                args.Add(argType, std::vector<std::wstring>{L"forward1", L"forward2"});
+                args.Add(argType, std::vector<std::string>{"forward1", "forward2"});
                 break;
             case Kind::Flag:
                 args.Add(argType, true);
@@ -112,7 +112,7 @@ class WSLCCLIArgumentUnitTests
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::Help));
         argsContainer.Add<ArgType::ContainerId>(std::wstring(L"test"));
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ContainerId));
-        argsContainer.Add<ArgType::ForwardArgs>(std::vector<std::wstring>{L"test1", L"test2"});
+        argsContainer.Add<ArgType::ForwardArgs>(std::vector<std::string>{"test1", "test2"});
         VERIFY_IS_TRUE(argsContainer.Contains(ArgType::ForwardArgs));
 
         // Verify basic retrieval
@@ -121,8 +121,8 @@ class WSLCCLIArgumentUnitTests
         auto retrievedString = argsContainer.Get<ArgType::ContainerId>();
         VERIFY_ARE_EQUAL(retrievedString, std::wstring(L"test"));
         auto retrievedStringSet = argsContainer.Get<ArgType::ForwardArgs>();
-        VERIFY_ARE_EQUAL(retrievedStringSet[0], std::wstring(L"test1"));
-        VERIFY_ARE_EQUAL(retrievedStringSet[1], std::wstring(L"test2"));
+        VERIFY_ARE_EQUAL(retrievedStringSet[0], std::string("test1"));
+        VERIFY_ARE_EQUAL(retrievedStringSet[1], std::string("test2"));
 
         // Verify multimap functionality and Runtime Add
         argsContainer.Add(ArgType::Publish, std::wstring(L"test1"));

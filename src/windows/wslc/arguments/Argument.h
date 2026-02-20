@@ -93,6 +93,9 @@ struct Argument
         return m_countLimit;
     }
 
+    // Validates this argument's value in the provided args
+    void Validate(const ArgMap& execArgs) const;
+
 private:
     ArgType m_argType;
     std::wstring m_name;

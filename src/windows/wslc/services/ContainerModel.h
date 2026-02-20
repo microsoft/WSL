@@ -17,8 +17,26 @@ Abstract:
 #include <wslservice.h>
 #include <wslaservice.h>
 #include <docker_schema.h>
+#include <unordered_map>
+#include <string>
 
 namespace wsl::windows::wslc::models {
+
+// Map of signal names to WSLASignal enum values
+inline static const std::unordered_map<std::wstring, WSLASignal> SignalMap = {
+    {L"SIGHUP", WSLASignalSIGHUP},   {L"SIGINT", WSLASignalSIGINT},     {L"SIGQUIT", WSLASignalSIGQUIT},
+    {L"SIGILL", WSLASignalSIGILL},   {L"SIGTRAP", WSLASignalSIGTRAP},   {L"SIGABRT", WSLASignalSIGABRT},
+    {L"SIGIOT", WSLASignalSIGIOT},   {L"SIGBUS", WSLASignalSIGBUS},     {L"SIGFPE", WSLASignalSIGFPE},
+    {L"SIGKILL", WSLASignalSIGKILL}, {L"SIGUSR1", WSLASignalSIGUSR1},   {L"SIGSEGV", WSLASignalSIGSEGV},
+    {L"SIGUSR2", WSLASignalSIGUSR2}, {L"SIGPIPE", WSLASignalSIGPIPE},   {L"SIGALRM", WSLASignalSIGALRM},
+    {L"SIGTERM", WSLASignalSIGTERM}, {L"SIGTKFLT", WSLASignalSIGTKFLT}, {L"SIGCHLD", WSLASignalSIGCHLD},
+    {L"SIGCONT", WSLASignalSIGCONT}, {L"SIGSTOP", WSLASignalSIGSTOP},   {L"SIGTSTP", WSLASignalSIGTSTP},
+    {L"SIGTTIN", WSLASignalSIGTTIN}, {L"SIGTTOU", WSLASignalSIGTTOU},   {L"SIGURG", WSLASignalSIGURG},
+    {L"SIGXCPU", WSLASignalSIGXCPU}, {L"SIGXFSZ", WSLASignalSIGXFSZ},   {L"SIGVTALRM", WSLASignalSIGVTALRM},
+    {L"SIGPROF", WSLASignalSIGPROF}, {L"SIGWINCH", WSLASignalSIGWINCH}, {L"SIGIO", WSLASignalSIGIO},
+    {L"SIGPOLL", WSLASignalSIGPOLL}, {L"SIGPWR", WSLASignalSIGPWR},     {L"SIGSYS", WSLASignalSIGSYS},
+};
+
 struct ContainerCreateOptions
 {
     bool TTY = false;

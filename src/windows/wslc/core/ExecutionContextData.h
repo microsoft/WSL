@@ -33,6 +33,8 @@ enum class Data : size_t
 {
     Session,
     Containers,
+    CreateContainerOptions,
+    RunContainerOptions,
 
     Max
 };
@@ -45,6 +47,8 @@ namespace details {
 
     DEFINE_DATA_MAPPING(Session, wsl::windows::wslc::models::Session);
     DEFINE_DATA_MAPPING(Containers, std::vector<wsl::windows::wslc::models::ContainerInformation>);
+    DEFINE_DATA_MAPPING(CreateContainerOptions, wsl::windows::wslc::models::ContainerCreateOptions);
+    DEFINE_DATA_MAPPING(RunContainerOptions, wsl::windows::wslc::models::ContainerRunOptions);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>
