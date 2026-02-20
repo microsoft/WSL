@@ -30,7 +30,6 @@ Abstract:
 
 namespace http = boost::beast::http;
 using boost::beast::http::verb;
-using wsl::windows::common::docker_schema::EmptyRequest;
 using wsl::windows::common::relay::HandleWrapper;
 using wsl::windows::common::relay::MultiHandleWait;
 using wsl::windows::service::wsla::DockerHTTPClient;
@@ -176,9 +175,7 @@ std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTP
 
 std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SaveImage(const std::string& NameOrId)
 {
-    auto [response, socket] = SendRequest(verb::get, URL::Create("/images/{}/get", NameOrId), {}, {});
-
-    return {response.result_int(), std::move(socket)};
+    return SendRequest(verb::get, URL::Create("/images/{}/get", NameOrId), {}, {});
 }
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(bool all)
@@ -243,14 +240,30 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id)
     Transaction(verb::delete_, URL::Create("/containers/{}", Id));
 }
 
-docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
+std::string DockerHTTPClient::InspectContainer(const std::string& Id)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
+    auto url = URL::Create("/containers/{}/json", Id);
+    auto [code, response] = SendRequestAndReadResponse(verb::get, url);
+
+    if (code < 200 || code >= 300)
+    {
+        throw DockerHTTPException(code, verb::get, url.Get(), "", response);
+    }
+
+    return response;
 }
 
-docker_schema::InspectExec DockerHTTPClient::InspectExec(const std::string& Id)
+std::string DockerHTTPClient::InspectExec(const std::string& Id)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectExec>(verb::get, URL::Create("/exec/{}/json", Id));
+    auto url = URL::Create("/exec/{}/json", Id);
+    auto [code, response] = SendRequestAndReadResponse(verb::get, url);
+
+    if (code < 200 || code >= 300)
+    {
+        throw DockerHTTPException(code, verb::get, url.Get(), "", response);
+    }
+
+    return response;
 }
 
 wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
@@ -264,11 +277,11 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
 
-    auto [response, socket] = SendRequest(verb::post, url, {}, headers);
+    auto [status, socket] = SendRequest(verb::post, url, {}, headers);
 
-    if (response.result_int() != 101)
+    if (status != 101)
     {
-        throw DockerHTTPException(std::move(response), verb::post, url.Get(), "", "");
+        throw DockerHTTPException(status, verb::post, url.Get(), "", "");
     }
 
     return std::move(socket);
@@ -276,9 +289,7 @@ wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id)
 
 std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::ExportContainer(const std::string& ContainerNameOrId)
 {
-    auto [response, socket] = SendRequest(verb::get, URL::Create("/containers/{}/export", ContainerNameOrId), {}, {});
-
-    return {response.result_int(), std::move(socket)};
+    return SendRequest(verb::get, URL::Create("/containers/{}/export", ContainerNameOrId), {}, {});
 }
 
 wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
@@ -304,10 +315,10 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLALo
         url.SetParameter("since", std::to_string(Since));
     }
 
-    auto [response, socket] = SendRequest(verb::get, url, {}, {});
-    if (response.result_int() != 200)
+    auto [status, socket] = SendRequest(verb::get, url, {}, {});
+    if (status != 200)
     {
-        throw DockerHTTPException(std::move(response), verb::get, url.Get(), "", "");
+        throw DockerHTTPException(status, verb::get, url.Get(), "", "");
     }
 
     return std::move(socket);
@@ -326,10 +337,10 @@ wil::unique_socket DockerHTTPClient::StartExec(const std::string& Id, const comm
     auto url = URL::Create("/exec/{}/start", Id);
 
     auto body = wsl::shared::ToJson(Request);
-    auto [response, socket] = SendRequest(verb::post, url, body, headers);
-    if (response.result_int() != 101)
+    auto [status, socket] = SendRequest(verb::post, url, body, headers);
+    if (status != 101)
     {
-        throw DockerHTTPException(std::move(response), verb::post, url.Get(), std::move(body), "");
+        throw DockerHTTPException(status, verb::post, url.Get(), body, "");
     }
     return std::move(socket);
 }
@@ -346,11 +357,11 @@ void DockerHTTPClient::ResizeExecTty(const std::string& Id, ULONG Rows, ULONG Co
 wil::unique_socket DockerHTTPClient::MonitorEvents()
 {
     auto url = URL::Create("/events");
-    auto [response, socket] = SendRequest(verb::get, url, {});
+    auto [status, socket] = SendRequest(verb::get, url, {});
 
-    if (response.result_int() != 200)
+    if (status != 200)
     {
-        throw DockerHTTPException(std::move(response), verb::get, url.Get(), "", "");
+        throw DockerHTTPException(status, verb::get, url.Get(), "", "");
     }
 
     return std::move(socket);
@@ -382,17 +393,17 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     return newChannel.Release();
 }
 
-std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendRequestAndReadResponse(verb Method, const URL& Url, const std::string& Body)
+std::pair<uint32_t, std::string> DockerHTTPClient::SendRequestAndReadResponse(verb Method, const URL& Url, const std::string& Body)
 {
     // Send the request.
     auto context = SendRequestImpl(Method, Url, Body, {});
 
     // Read the response header and body.
-    std::optional<HTTPResponse> responseHeader;
+    std::optional<boost::beast::http::status> status;
     std::string responseBody;
     auto OnResponse = [&responseBody](const gsl::span<char>& span) { responseBody.append(span.data(), span.size()); };
 
-    auto onHttpResponse = [&](const auto& response) { responseHeader = response; };
+    auto onHttpResponse = [&](const auto& response) { status = response.result(); };
     MultiHandleWait io;
 
     io.AddHandle(std::make_unique<relay::EventHandle>(m_exitingEvent, [&]() { THROW_HR(E_ABORT); }));
@@ -400,14 +411,12 @@ std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendReq
 
     io.Run({});
 
-    THROW_HR_IF(E_UNEXPECTED, !responseHeader.has_value());
-
-    return {std::move(responseHeader.value()), responseBody};
+    return {static_cast<uint32_t>(status.value()), responseBody};
 }
 
 DockerHTTPClient::DockerHttpResponseHandle::DockerHttpResponseHandle(
     HTTPRequestContext& context,
-    std::function<void(const HTTPResponse&)>&& onResponseHeader,
+    std::function<void(const http::message<false, http::buffer_body>&)>&& onResponseHeader,
     std::function<void(const gsl::span<char>&)>&& onResponseBytes,
     std::function<void()>&& onCompleted) :
     common::relay::ReadHandle(
@@ -553,7 +562,7 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::SendRequ
     return std::move(context);
 }
 
-std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::SendRequest(
+std::pair<uint32_t, wil::unique_socket> DockerHTTPClient::SendRequest(
     verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers)
 {
     // Write the request
@@ -623,5 +632,5 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
         }
     }
 
-    return {parser.get(), wil::unique_socket{context->stream.release()}};
+    return {parser.get().result_int(), wil::unique_socket{context->stream.release()}};
 }
