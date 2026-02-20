@@ -41,8 +41,6 @@ COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
-COMMAND_LINE_TEST_CASE(L"container list --format json cont1 cont2 cont3", L"list", true)
-COMMAND_LINE_TEST_CASE(L"container list --format json cont1 cont2 --quiet cont3", L"list", true)
 COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
 
 // Error cases

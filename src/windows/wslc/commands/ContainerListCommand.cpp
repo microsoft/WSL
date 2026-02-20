@@ -34,7 +34,6 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, std::nullopt, 25, L"Include only the container names specified."),
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Quiet),
@@ -49,7 +48,7 @@ std::wstring ContainerListCommand::ShortDescription() const
 
 std::wstring ContainerListCommand::LongDescription() const
 {
-    return {L"Lists specified container(s). By default, only running containers are shown; use --all to include all containers."};
+    return {L"Lists containers. By default, only running containers are shown; use --all to include all containers."};
 }
 
 void ContainerListCommand::ValidateArgumentsInternal(const ArgMap& execArgs) const
@@ -75,17 +74,6 @@ void ContainerListCommand::ExecuteInternal(CLIExecutionContext& context) const
     {
         auto shouldRemove = [](const ContainerInformation& container) {
             return container.State != WSLA_CONTAINER_STATE::WslaContainerStateRunning;
-        };
-        containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
-    }
-
-    // Filter by name if provided
-    if (context.Args.Contains(ArgType::ContainerId))
-    {
-        auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-        auto shouldRemove = [&containerIds](const ContainerInformation& container) {
-            auto wideContainerName = string::MultiByteToWide(container.Name);
-            return std::find(containerIds.begin(), containerIds.end(), wideContainerName) == containerIds.end();
         };
         containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
     }

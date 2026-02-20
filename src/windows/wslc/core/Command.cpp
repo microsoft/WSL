@@ -191,12 +191,8 @@ void Command::OutputHelp(const CommandException* exception) const
 
     if (!commandAliases.empty())
     {
-        infoOut << Localization::WSLCCLI_AvailableCommandAliases();
-
-        for (const auto& commandAlias : commandAliases)
-        {
-            infoOut << L"  " << commandAlias;
-        }
+        infoOut << Localization::WSLCCLI_AvailableCommandAliases() << L' ';
+        infoOut << string::Join(commandAliases, L' ');
         infoOut << std::endl << std::endl;
     }
 
