@@ -51,7 +51,7 @@ namespace {
 
         if (context.Args.Contains(ArgType::Command))
         {
-            options.Arguments.push_back(string::WideToMultiByte(context.Args.Get<ArgType::Command>()));
+            options.Arguments.emplace_back(string::WideToMultiByte(context.Args.Get<ArgType::Command>()));
         }
 
         if (context.Args.Contains(ArgType::ForwardArgs))
@@ -60,7 +60,7 @@ namespace {
             options.Arguments.reserve(options.Arguments.size() + forwardArgs.size());
             for (const auto& arg : forwardArgs)
             {
-                options.Arguments.push_back(string::WideToMultiByte(arg));
+                options.Arguments.emplace_back(string::WideToMultiByte(arg));
             }
         }
     }
