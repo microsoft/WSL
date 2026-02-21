@@ -9,7 +9,8 @@ set(SOURCES
     PluginTests.cpp
     PolicyTests.cpp
     InstallerTests.cpp
-    WSLATests.cpp)
+    WSLATests.cpp
+    WslcSdkTests.cpp)
 
 set(HEADERS
     Common.h
@@ -20,11 +21,13 @@ add_compile_definitions(INLINE_TEST_METHOD_MARKUP)
 
 add_library(wsltests SHARED ${SOURCES} ${HEADERS})
 
+target_include_directories(wsltests PRIVATE ${CMAKE_SOURCE_DIR}/src/windows/WslcSDK)
 target_link_directories(wsltests PRIVATE ${BIN})
 target_precompile_headers(wsltests REUSE_FROM common)
 target_link_libraries(wsltests
                       common
                       wslclib
+                      wslcsdk
                       ${TAEF_LINK_LIBRARIES}
                       ${COMMON_LINK_LIBRARIES}
                       VirtDisk.lib
@@ -32,7 +35,7 @@ target_link_libraries(wsltests
                       Dbghelp.lib
                       sfc.lib)
 
-add_dependencies(wsltests wslserviceidl wslclib wslc)
+add_dependencies(wsltests wslserviceidl wslclib wslc wslcsdk)
 add_subdirectory(testplugin)
 add_subdirectory(wslc)
 
