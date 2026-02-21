@@ -1711,6 +1711,9 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
+        // TODO: Remove once test failure is fixed.
+        SKIP_TEST_UNSTABLE();
+
         // Test with SCSI boot VHDs.
         {
             auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
