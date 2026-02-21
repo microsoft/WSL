@@ -758,6 +758,8 @@ int wsladiag_main(std::wstring_view commandLine)
     WslTraceLoggingInitialize(WslaTelemetryProvider, !wsl::shared::OfficialBuild);
     auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
 
+    wsl::windows::common::wslutil::ConfigureCrashHandler();
+
     wslutil::SetCrtEncoding(_O_U8TEXT);
 
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
