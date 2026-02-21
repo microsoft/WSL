@@ -41,7 +41,6 @@ std::vector<Argument> ContainerStopCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
-        Argument::Create(ArgType::All),
         Argument::Create(ArgType::SessionId),
         Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGTERM)"),
         Argument::Create(ArgType::Time),
@@ -55,7 +54,7 @@ std::wstring ContainerStopCommand::ShortDescription() const
 
 std::wstring ContainerStopCommand::LongDescription() const
 {
-    return {L"Stops containers. Use --all to stop all running containers."};
+    return {L"Stops containers."};
 }
 
 void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
@@ -63,21 +62,6 @@ void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
     context << CreateSession;
 
     auto containersToStop = context.Args.GetAll<ArgType::ContainerId>();
-    if (context.Args.Contains(ArgType::All))
-    {
-        // All overwrites any specified container IDs.
-        containersToStop.clear();
-        context << GetContainers;
-        const auto& allContainers = context.Data.Get<Data::Containers>();
-        for (const auto& container : allContainers)
-        {
-            if (container.State == WSLA_CONTAINER_STATE::WslaContainerStateRunning)
-            {
-                containersToStop.emplace_back(string::MultiByteToWide(container.Name));
-            }
-        }
-    }
-
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
