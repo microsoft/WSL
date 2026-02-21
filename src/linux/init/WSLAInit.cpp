@@ -446,11 +446,18 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_FORK& Mes
     std::promise<pid_t> childPid;
 
     {
-        auto childLogic = [ListenSocket = std::move(ListenSocket), &SocketAddress, &Channel, &Message, &childPid]() mutable {
+        auto childLogic = [ListenSocket = wil::unique_fd{ListenSocket.get()}, &SocketAddress, &Channel, &Message, &childPid]() mutable {
             // Close parent channel
             if (Message.ForkType == WSLA_FORK::Process || Message.ForkType == WSLA_FORK::Pty)
             {
                 Channel.Close();
+            }
+
+            if (Message.ForkType == WSLA_FORK::Thread)
+            {
+                // If this is a thread, detach from the process' fd table.
+                // This prevents other threads from creating child processes that could inherit fds that this thread could create.
+                THROW_LAST_ERROR_IF(unshare(CLONE_FILES) < 0);
             }
 
             childPid.set_value(getpid());
