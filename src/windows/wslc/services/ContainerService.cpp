@@ -187,8 +187,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
-    ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, &count));
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
     for (const auto& current : containers)
     {
         ContainerInformation entry;
