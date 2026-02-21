@@ -189,23 +189,14 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
     wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
     ULONG count = 0;
     THROW_IF_FAILED(session.Get()->ListContainers(&containers, &count));
-    for (auto ptr = containers.get(), end = containers.get() + count; ptr != end; ++ptr)
+    for (const auto& current : containers)
     {
-        const WSLA_CONTAINER& current = *ptr;
-
-        wil::com_ptr<IWSLAContainer> container;
-        THROW_IF_FAILED(session.Get()->OpenContainer(current.Name, &container));
-
-        wil::unique_cotaskmem_ansistring output;
-        THROW_IF_FAILED(container->Inspect(&output));
-        auto inspect = wsl::shared::FromJson<InspectContainer>(output.get());
-
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
         entry.State = current.State;
-        entry.Id = inspect.Id;
-        result.push_back(entry);
+        entry.Id = current.Id;
+        result.emplace_back(std::move(entry));
     }
 
     return result;

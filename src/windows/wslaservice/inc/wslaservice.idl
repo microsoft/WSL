@@ -115,7 +115,6 @@ struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
     // TODO: Details TBD.
 };
 
-
 struct WSLA_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
@@ -240,10 +239,13 @@ enum WSLA_CONTAINER_STATE
     WslaContainerStateDeleted = 4,
 };
 
+typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
+
 struct WSLA_CONTAINER
 {
     char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
+    WSLAContainerId Id;
     enum WSLA_CONTAINER_STATE State;
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
@@ -360,7 +362,6 @@ typedef enum _WSLALogsFlags
     WSLALogsFlagsTimestamps = 2,
 } WSLALogsFlags;
 
-typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
 
 [
     uuid(7577FE8D-DE85-471E-B870-11669986F332),
