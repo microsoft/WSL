@@ -83,6 +83,19 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Containers>(std::move(containers));
                 handled = true;
             }
+            else if (dataType == Data::CreateContainerOptions)
+            {
+                wsl::windows::wslc::models::ContainerCreateOptions options;
+                dataMap.Add<Data::CreateContainerOptions>(std::move(options));
+                handled = true;
+            }
+            else if (dataType == Data::RunContainerOptions)
+            {
+                wsl::windows::wslc::models::ContainerRunOptions options;
+                dataMap.Add<Data::RunContainerOptions>(std::move(options));
+                handled = true;
+            }
+
             if (!handled)
             {
                 VERIFY_FAIL(L"Unhandled Data type in test");

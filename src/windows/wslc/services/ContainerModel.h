@@ -17,8 +17,11 @@ Abstract:
 #include <wslservice.h>
 #include <wslaservice.h>
 #include <docker_schema.h>
+#include <unordered_map>
+#include <string>
 
 namespace wsl::windows::wslc::models {
+
 struct ContainerCreateOptions
 {
     bool TTY = false;
