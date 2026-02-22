@@ -22,7 +22,7 @@ Abstract:
 #include "docker_schema.h"
 
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
-    if ((_Ex).StatusCode() >= 400 && (_Ex).StatusCode() <= 500) \
+    if ((_Ex).HasErrorMessage()) \
     { \
         THROW_HR_WITH_USER_ERROR_MSG(E_FAIL, (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, __VA_ARGS__); \
     } \
@@ -42,32 +42,44 @@ namespace wsl::windows::service::wsla {
 class DockerHTTPException : public std::runtime_error
 {
 public:
-    DockerHTTPException(uint16_t StatusCode, boost::beast::http::verb Method, const std::string& Url, const std::string& RequestContent, const std::string& ResponseContent) :
+    DockerHTTPException(
+        boost::beast::http::message<false, boost::beast::http::buffer_body>&& Response,
+        boost::beast::http::verb Method,
+        std::string&& Url,
+        std::string&& RequestContent,
+        std::string&& ResponseContent) :
         std::runtime_error(std::format(
-            "HTTP request failed: {} {} -> {} (Request: {}, Response: {})", boost::beast::http::to_string(Method), Url, StatusCode, RequestContent, ResponseContent)),
-        m_statusCode(StatusCode),
-        m_url(Url),
-        m_request(RequestContent),
-        m_response(ResponseContent)
+            "HTTP request failed: {} {} -> {} (Request: {}, Response: {})", boost::beast::http::to_string(Method), Url, Response.result_int(), RequestContent, ResponseContent)),
+        m_response(std::move(Response)),
+        m_url(std::move(Url)),
+        m_request(std::move(RequestContent)),
+        m_responseBody(std::move(ResponseContent))
     {
     }
 
     template <typename T = docker_schema::ErrorResponse>
     T DockerMessage() const
     {
-        return wsl::shared::FromJson<T>(m_response.c_str());
+        return wsl::shared::FromJson<T>(m_responseBody.c_str());
+    }
+
+    // Only try to decode the error message if it's actually json.
+    bool HasErrorMessage() const
+    {
+        auto it = m_response.find(boost::beast::http::field::content_type);
+        return it != m_response.end() && it->value().starts_with("application/json");
     }
 
     uint16_t StatusCode() const noexcept
     {
-        return m_statusCode;
+        return static_cast<uint16_t>(m_response.result());
     }
 
 private:
-    uint16_t m_statusCode{};
+    boost::beast::http::message<false, boost::beast::http::buffer_body> m_response{};
     std::string m_url;
     std::string m_request;
-    std::string m_response;
+    std::string m_responseBody;
 };
 
 class DockerHTTPClient
@@ -92,6 +104,8 @@ public:
         boost::asio::generic::stream_protocol::socket stream;
     };
 
+    using HTTPResponse = boost::beast::http::message<false, boost::beast::http::buffer_body>;
+
     DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
 
     // Container management.
@@ -101,8 +115,8 @@ public:
     void StopContainer(const std::string& Id, std::optional<WSLASignal> Signal, std::optional<ULONG> TimeoutSeconds);
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
-    std::string InspectContainer(const std::string& Id);
-    std::string InspectExec(const std::string& Id);
+    common::docker_schema::InspectContainer InspectContainer(const std::string& Id);
+    common::docker_schema::InspectExec InspectExec(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
@@ -131,7 +145,7 @@ public:
 
         DockerHttpResponseHandle(
             HTTPRequestContext& context,
-            std::function<void(const boost::beast::http::message<false, boost::beast::http::buffer_body>&)>&& OnResponseHeader,
+            std::function<void(const HTTPResponse&)>&& OnResponseHeader,
             std::function<void(const gsl::span<char>&)>&& OnResponseBytes,
             std::function<void()>&& OnCompleted = []() {});
 
@@ -183,10 +197,10 @@ private:
     std::unique_ptr<HTTPRequestContext> SendRequestImpl(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers);
 
-    std::pair<uint32_t, std::string> SendRequestAndReadResponse(
+    std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");
 
-    std::pair<uint32_t, wil::unique_socket> SendRequest(
+    std::pair<HTTPResponse, wil::unique_socket> SendRequest(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<boost::beast::http::field, std::string>& Headers = {});
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
@@ -198,16 +212,16 @@ private:
             requestString = wsl::shared::ToJson(RequestObject);
         }
 
-        auto [statusCode, responseString] = SendRequestAndReadResponse(Method, Url, requestString);
+        auto [response, body] = SendRequestAndReadResponse(Method, Url, requestString);
 
-        if (statusCode < 200 || statusCode >= 300)
+        if (response.result_int() < 200 || response.result_int() >= 300)
         {
-            throw DockerHTTPException(statusCode, Method, Url.Get(), requestString, responseString);
+            throw DockerHTTPException(std::move(response), Method, Url.Get(), std::move(requestString), std::move(body));
         }
 
         if constexpr (!std::is_same_v<TResponse, void>)
         {
-            return wsl::shared::FromJson<TResponse>(responseString.c_str());
+            return wsl::shared::FromJson<TResponse>(body.c_str());
         }
     }
 

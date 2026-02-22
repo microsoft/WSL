@@ -682,8 +682,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
         do
         {
-            auto inspectJson = m_dockerClient.InspectExec(result.Id);
-            auto state = wsl::shared::FromJson<common::docker_schema::InspectExec>(inspectJson.c_str());
+            auto state = m_dockerClient.InspectExec(result.Id);
             if (state.Running && state.Pid.has_value())
             {
                 control->SetPid(state.Pid.value());
@@ -700,7 +699,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
                     HRESULT_FROM_WIN32(ERROR_TIMEOUT),
                     "Timed out waiting for exec state for '%hs'. Last state: %hs",
                     result.Id.c_str(),
-                    inspectJson.c_str());
+                    wsl::shared::ToJson(state).c_str());
             }
 
         } while (!control->GetExitEvent().wait(100));
@@ -991,8 +990,7 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     try
     {
         // Get Docker inspect data
-        auto dockerJson = m_dockerClient.InspectContainer(m_id);
-        auto dockerInspect = wsl::shared::FromJson<DockerInspectContainer>(dockerJson.c_str());
+        auto dockerInspect = m_dockerClient.InspectContainer(m_id);
 
         // Convert to WSLA schema
         auto wslaInspect = BuildInspectContainer(dockerInspect);
