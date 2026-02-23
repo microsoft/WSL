@@ -230,7 +230,6 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
     pollDescriptors[1].events = POLLIN;
 
     std::vector<gsl::byte> relayBuffer;
-
     while (true)
     {
         auto result = poll(pollDescriptors, COUNT_OF(pollDescriptors), -1);
@@ -666,7 +665,13 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_SIGNAL& M
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNMOUNT& Message, const gsl::span<gsl::byte>& Buffer)
 {
-    Channel.SendResultMessage<int32_t>(umount(Message.Buffer) == 0 ? 0 : errno);
+    auto result = umount(Message.Buffer) < 0 ? errno : 0;
+    if (result == 0)
+    {
+        result = rmdir(Message.Buffer) < 0 ? errno : 0;
+    }
+
+    Channel.SendResultMessage<int32_t>(result);
 }
 
 void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_DETACH& Message, const gsl::span<gsl::byte>& Buffer)

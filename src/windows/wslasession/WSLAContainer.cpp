@@ -311,19 +311,30 @@ WSLAContainerImpl::~WSLAContainerImpl()
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
 
+    // Copy processes references so their callback can be removed without holding m_lock.
+    auto* initProcessControl = m_initProcessControl;
+    auto processes = m_processes;
+
     // Remove container callback from any outstanding processes.
     {
         std::lock_guard lock(m_lock);
 
         if (m_initProcessControl)
         {
-            m_initProcessControl->OnContainerReleased();
+            m_initProcessControl = nullptr;
         }
 
-        for (auto& process : m_processes)
-        {
-            process->OnContainerReleased();
-        }
+        m_processes.clear();
+    }
+
+    if (initProcessControl)
+    {
+        initProcessControl->OnContainerReleased();
+    }
+
+    for (auto& process : m_processes)
+    {
+        process->OnContainerReleased();
     }
 
     m_containerEvents.Reset();
@@ -801,6 +812,28 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     if (containerOptions.DomainName != nullptr)
     {
         request.Domainname = containerOptions.DomainName;
+    }
+
+    if (containerOptions.DnsServers.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsServers.Values,
+            "DnsServers.Values is null with Count=%lu",
+            containerOptions.DnsServers.Count);
+
+        request.HostConfig.Dns = StringArrayToVector(containerOptions.DnsServers);
+    }
+
+    if (containerOptions.DnsSearchDomains.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsSearchDomains.Values,
+            "DnsSearchDomains.Values is null with Count=%lu",
+            containerOptions.DnsSearchDomains.Count);
+
+        request.HostConfig.DnsSearch = StringArrayToVector(containerOptions.DnsSearchDomains);
     }
 
     if (containerOptions.InitProcessOptions.User != nullptr)
