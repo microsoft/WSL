@@ -747,6 +747,7 @@ try
 CATCH_RETURN();
 
 HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
+try
 {
     std::lock_guard lock(m_lock);
 
@@ -767,6 +768,7 @@ HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 
     return S_OK;
 }
+CATCH_RETURN();
 
 void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {

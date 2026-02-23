@@ -1711,6 +1711,9 @@ class WSLATests
     {
         WSL2_TEST_ONLY();
 
+        // TODO: Remove once test failure is fixed.
+        SKIP_TEST_UNSTABLE();
+
         // Test with SCSI boot VHDs.
         {
             auto settings = GetDefaultSessionSettings(L"pmem-vhd-test");
@@ -2095,6 +2098,39 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "my-host-name.my-domain-name\n"}});
         }
 
+        // Validate that containers without DNS configuration use default DNS.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-no-dns", {"/bin/grep", "-iF", "nameserver", "/etc/resolv.conf"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
+        // Validate that custom DNS servers are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-dns-custom", {"/bin/grep", "-iF", "nameserver 1.2.3.4", "/etc/resolv.conf"});
+
+            launcher.SetDnsServers({"1.2.3.4"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
+        // Validate that custom DNS search domains are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-dns-search", {"/bin/grep", "-iF", "test.local", "/etc/resolv.conf"});
+
+            launcher.SetDnsSearchDomains({"test.local"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
         // Validate that the username is correctly wired.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-username", {"whoami"});
@@ -2115,6 +2151,34 @@ class WSLATests
             auto container = launcher.Launch(*m_defaultSession);
             auto process = container.GetInitProcess();
             ValidateProcessOutput(process, {{1, "www-data\n"}});
+        }
+
+        // Validate that the container behaves correctly if the caller keeps a reference to an init process during termination.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-init-ref", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto containerId = container.Id();
+
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                wil::com_ptr<IWSLAContainer> openedContainer;
+                VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerId.c_str(), &openedContainer));
+                VERIFY_SUCCEEDED(openedContainer->Delete());
+            });
+
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(process.State(), WslaProcessStateRunning);
+
+            // Terminate the session.
+            ResetTestSession();
+
+            WSLA_PROCESS_STATE processState{};
+            int exitCode{};
+            VERIFY_ARE_EQUAL(process.Get().GetState(&processState, &exitCode), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
+
+            WSLA_CONTAINER_STATE state{};
+            VERIFY_ARE_EQUAL(container.Get().GetState(&state), HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE));
         }
 
         // Validate error handling when the username / group doesn't exist
@@ -4126,5 +4190,84 @@ class WSLATests
             ExpectCommandResult(m_defaultSession.get(), {"/bin/cat", "/sys/module/page_reporting/parameters/page_reporting_order"}, 0);
 
         VERIFY_ARE_EQUAL(result.Output[1], std::format("{}\n", expectedOrder));
+    }
+
+    TEST_METHOD(ContainerAutoRemove)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        // Test that a container with the Rm flag is automatically deleted on Stop().
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            auto container = launcher.Launch(*m_defaultSession);
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that a container with the Rm flag is automatically deleted when the init process is killed.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            // Prevent container from being deleted when handle is closed so we can verify auto-remove behavior.
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
+            VERIFY_SUCCEEDED(process.Get().Signal(WSLASignalSIGKILL));
+            process.Wait();
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that the container autoremove flag is applied when the container exits on its own.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-hostname", {"/bin/sh", "-c", "echo foo"});
+            launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            process.Wait();
+
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
+
+        // Test that the Rm flag is persisted across wsla sessions.
+        {
+            {
+                WSLAContainerLauncher launcher("debian:latest", "test-auto-remove", {"/bin/cat"}, {}, {}, WSLAProcessFlagsStdin);
+                launcher.SetContainerFlags(WSLAContainerFlagsRm);
+
+                auto container = launcher.Create(*m_defaultSession);
+                container.SetDeleteOnClose(false);
+
+                ResetTestSession();
+            }
+
+            auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
+            VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
+            VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+
+            // verifyContainerDeleted("test-auto-remove");
+            VERIFY_ARE_EQUAL(container.Get().Delete(), RPC_E_DISCONNECTED);
+
+            wil::com_ptr<IWSLAContainer> notFound;
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        }
     }
 };

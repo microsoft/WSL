@@ -72,8 +72,10 @@ struct HostConfig
     std::map<std::string, std::vector<PortMapping>> PortBindings;
     std::string NetworkMode;
     bool Init{};
+    std::optional<std::vector<std::string>> Dns;
+    std::optional<std::vector<std::string>> DnsSearch;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch);
 };
 
 struct CreateContainer
