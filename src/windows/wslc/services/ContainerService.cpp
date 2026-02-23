@@ -18,6 +18,7 @@ Abstract:
 #include <WSLAProcessLauncher.h>
 #include <docker_schema.h>
 #include <CommandLine.h>
+#include <unordered_map>
 
 namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
