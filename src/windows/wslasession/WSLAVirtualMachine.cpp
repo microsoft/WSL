@@ -39,6 +39,11 @@ WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const 
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4")
 {
+    // N.B. The constructor should not run any operation that could throw, so the destructor runs on failure.
+}
+
+void WSLAVirtualMachine::Initialize()
+{
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
     // Establish a socket channel with mini_init in the VM.
