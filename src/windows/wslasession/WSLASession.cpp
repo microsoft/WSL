@@ -95,10 +95,11 @@ try
 
     // Create the VM.
     m_virtualMachine.emplace(Vm, Settings);
-    m_virtualMachine->Initialize();
 
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
+
+    m_virtualMachine->Initialize();
 
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
