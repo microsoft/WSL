@@ -6,49 +6,20 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
 )
 
-set(HEADERS
-    core/Exceptions.h
-    core/EnumVariantMap.h
-    arguments/ArgumentDefinitions.h
-    arguments/ArgumentTypes.h
-    arguments/Argument.h
-    arguments/ArgumentParser.h
-    core/Command.h
-    core/CLIExecutionContext.h
-    core/ExecutionContextData.h
-    core/Invocation.h
-    core/TablePrinter.h
-    commands/RootCommand.h
-    commands/ContainerCommand.h
-    commands/DiagCommand.h
-    services/ConsoleService.h
-    services/ContainerModel.h
-    services/ContainerService.h
-    services/ImageService.h
-    services/SessionModel.h
-    services/SessionService.h
-    tasks/Task.h
-    tasks/DiagTasks.h
-    tasks/ContainerTasks.h
+file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks/*.h
 )
 
-set(SOURCES
-    core/Command.cpp
-    core/Main.cpp
-    arguments/Argument.cpp
-    arguments/ArgumentParser.cpp
-    commands/RootCommand.cpp
-    commands/ContainerCommand.cpp
-    commands/ContainerListCommand.cpp
-    commands/DiagCommand.cpp
-    commands/DiagListCommand.cpp
-    services/ConsoleService.cpp
-    services/ContainerService.cpp
-    services/ImageService.cpp
-    services/SessionModel.cpp
-    services/SessionService.cpp
-    tasks/DiagTasks.cpp
-    tasks/ContainerTasks.cpp
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks/*.cpp
 )
 
 # Object library for WSLC components.
