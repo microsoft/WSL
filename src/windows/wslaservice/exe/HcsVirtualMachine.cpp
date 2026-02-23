@@ -464,7 +464,7 @@ try
     std::lock_guard lock(m_lock);
 
     DiskInfo disk{Path};
-    const ULONG lun = AllocateLun();
+    const ULONG allocatedLun = AllocateLun();
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
         if (disk.AccessGranted)
@@ -472,7 +472,7 @@ try
             hcs::RevokeVmAccess(m_vmIdString.c_str(), disk.Path.c_str());
         }
 
-        FreeLun(lun);
+        FreeLun(allocatedLun);
     });
 
     auto grantDiskAccess = [&]() {
@@ -486,23 +486,23 @@ try
         grantDiskAccess();
     }
 
-    auto result = wil::ResultFromException([&]() { hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly); });
+    auto result = wil::ResultFromException([&]() { hcs::AddVhd(m_computeSystem.get(), Path, allocatedLun, ReadOnly); });
 
     if (result == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) && !disk.AccessGranted)
     {
         grantDiskAccess();
-        hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly);
+        hcs::AddVhd(m_computeSystem.get(), Path, allocatedLun, ReadOnly);
     }
     else
     {
         THROW_IF_FAILED(result);
     }
 
-    m_attachedDisks.emplace(lun, std::move(disk));
+    m_attachedDisks.emplace(allocatedLun, std::move(disk));
 
     cleanup.release();
 
-    *Lun = lun;
+    *Lun = allocatedLun;
     return S_OK;
 }
 CATCH_RETURN()
@@ -517,12 +517,12 @@ try
 
     hcs::RemoveScsiDisk(m_computeSystem.get(), Lun);
 
+    FreeLun(Lun);
+
     if (it->second.AccessGranted)
     {
         hcs::RevokeVmAccess(m_vmIdString.c_str(), it->second.Path.c_str());
     }
-
-    FreeLun(Lun);
 
     m_attachedDisks.erase(it);
 
