@@ -193,8 +193,8 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLA_SESSION_SETTINGS* Settings)
     hcs::Scsi scsiController{};
     if (!FeatureEnabled(WslaFeatureFlagsPmemVhds))
     {
-        auto attachScsiDisk = [&](PCWSTR path, ULONG& lun) {
-            lun = m_nextLun++;
+        auto attachScsiDisk = [&](PCWSTR path) {
+            const ULONG lun = AllocateLun();
             hcs::Attachment disk{};
             disk.Type = hcs::AttachmentType::VirtualDisk;
             disk.Path = path;
@@ -205,12 +205,10 @@ HcsVirtualMachine::HcsVirtualMachine(_In_ const WSLA_SESSION_SETTINGS* Settings)
             scsiController.Attachments[std::to_string(lun)] = std::move(disk);
             DiskInfo diskInfo{path};
             m_attachedDisks.emplace(lun, std::move(diskInfo));
-            return lun;
         };
 
-        ULONG rootLun, modulesLun;
-        attachScsiDisk(rootVhdPath.c_str(), rootLun);
-        attachScsiDisk(kernelModulesPath.c_str(), modulesLun);
+        attachScsiDisk(rootVhdPath.c_str());
+        attachScsiDisk(kernelModulesPath.c_str());
     }
     else
     {
@@ -466,6 +464,16 @@ try
     std::lock_guard lock(m_lock);
 
     DiskInfo disk{Path};
+    const ULONG lun = AllocateLun();
+
+    auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+        if (disk.AccessGranted)
+        {
+            hcs::RevokeVmAccess(m_vmIdString.c_str(), disk.Path.c_str());
+        }
+
+        FreeLun(lun);
+    });
 
     auto grantDiskAccess = [&]() {
         auto runAsUser = wil::impersonate_token(m_userToken.get());
@@ -477,8 +485,6 @@ try
     {
         grantDiskAccess();
     }
-
-    const ULONG lun = m_nextLun;
 
     auto result = wil::ResultFromException([&]() { hcs::AddVhd(m_computeSystem.get(), Path, lun, ReadOnly); });
 
@@ -494,10 +500,9 @@ try
 
     m_attachedDisks.emplace(lun, std::move(disk));
 
-    // Only increment after AddVhd succeeds to avoid leaking LUN numbers on failure.
-    m_nextLun++;
-    *Lun = lun;
+    cleanup.release();
 
+    *Lun = lun;
     return S_OK;
 }
 CATCH_RETURN()
@@ -516,6 +521,8 @@ try
     {
         hcs::RevokeVmAccess(m_vmIdString.c_str(), it->second.Path.c_str());
     }
+
+    FreeLun(Lun);
 
     m_attachedDisks.erase(it);
 
@@ -783,4 +790,26 @@ void HcsVirtualMachine::WriteCrashLog(const std::wstring& crashLog)
 
     THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(filePath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
     m_crashLogCaptured = true;
+}
+
+ULONG HcsVirtualMachine::AllocateLun()
+{
+    for (ULONG index = 0; index < gsl::narrow_cast<ULONG>(m_lunBitmap.size()); index += 1)
+    {
+        if (!m_lunBitmap[index])
+        {
+            m_lunBitmap[index] = true;
+            return index;
+        }
+    }
+
+    THROW_HR(WSL_E_TOO_MANY_DISKS_ATTACHED);
+}
+
+void HcsVirtualMachine::FreeLun(ULONG Lun)
+{
+    THROW_HR_IF(E_BOUNDS, Lun >= m_lunBitmap.size());
+    THROW_HR_IF(E_INVALIDARG, !m_lunBitmap[Lun]);
+
+    m_lunBitmap[Lun] = false;
 }
