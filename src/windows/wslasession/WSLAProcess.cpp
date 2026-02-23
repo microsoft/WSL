@@ -34,7 +34,7 @@ CATCH_RETURN();
 HRESULT WSLAProcess::GetExitEvent(ULONG* Event)
 try
 {
-    *Event = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(m_control->GetExitEvent(), SYNCHRONIZE));
+    *Event = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(m_control->GetExitEvent().get(), SYNCHRONIZE));
     return S_OK;
 }
 CATCH_RETURN();
@@ -69,7 +69,7 @@ wil::unique_handle WSLAProcess::GetStdHandle(int Index)
 
 HANDLE WSLAProcess::GetExitEvent()
 {
-    return m_control->GetExitEvent();
+    return m_control->GetExitEvent().get();
 }
 
 HRESULT WSLAProcess::GetPid(int* Pid)

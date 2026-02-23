@@ -102,6 +102,7 @@ public:
     void DeleteContainer(const std::string& Id);
     void SignalContainer(const std::string& Id, int Signal);
     std::string InspectContainer(const std::string& Id);
+    std::string InspectExec(const std::string& Id);
     wil::unique_socket AttachContainer(const std::string& Id);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLALogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
@@ -109,8 +110,6 @@ public:
 
     // Image management.
     std::unique_ptr<HTTPRequestContext> PullImage(const std::string& Repo, const std::optional<std::string>& Tag);
-    std::unique_ptr<HTTPRequestContext> BuildImage(
-        uint64_t ContentLength, const std::optional<std::string>& DockerfilePath, const std::optional<std::string>& Tag);
     std::unique_ptr<HTTPRequestContext> ImportImage(const std::string& Repo, const std::string& Tag, uint64_t ContentLength);
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);

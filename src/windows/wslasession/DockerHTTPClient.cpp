@@ -130,26 +130,6 @@ std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::PullImag
     return SendRequestImpl(verb::post, url, {}, {});
 }
 
-std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::BuildImage(
-    uint64_t ContentLength, const std::optional<std::string>& DockerfilePath, const std::optional<std::string>& Tag)
-{
-    auto url = URL::Create("/build");
-    url.SetParameter("rm", "1");
-    url.SetParameter("forcerm", "1");
-
-    if (Tag.has_value())
-    {
-        url.SetParameter("t", Tag.value());
-    }
-    if (DockerfilePath.has_value())
-    {
-        url.SetParameter("dockerfile", DockerfilePath.value());
-    }
-
-    return SendRequestImpl(
-        verb::post, url, {}, {{http::field::content_type, "application/x-tar"}, {http::field::content_length, std::to_string(ContentLength)}});
-}
-
 std::unique_ptr<DockerHTTPClient::HTTPRequestContext> DockerHTTPClient::LoadImage(uint64_t ContentLength)
 {
     return SendRequestImpl(
@@ -263,6 +243,19 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id)
 std::string DockerHTTPClient::InspectContainer(const std::string& Id)
 {
     auto url = URL::Create("/containers/{}/json", Id);
+    auto [code, response] = SendRequestAndReadResponse(verb::get, url);
+
+    if (code < 200 || code >= 300)
+    {
+        throw DockerHTTPException(code, verb::get, url.Get(), "", response);
+    }
+
+    return response;
+}
+
+std::string DockerHTTPClient::InspectExec(const std::string& Id)
+{
+    auto url = URL::Create("/exec/{}/json", Id);
     auto [code, response] = SendRequestAndReadResponse(verb::get, url);
 
     if (code < 200 || code >= 300)

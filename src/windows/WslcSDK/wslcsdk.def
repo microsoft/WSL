@@ -13,9 +13,8 @@ WslcSessionRelease
 WslcContainerRelease
 WslcProcessRelease
 
-WslcSessionSettingsSetFlags
+WslcSessionSettingsSetFeatureFlags
 WslcSessionSettingsSetTerminateCallback
-WslcSessionSettingsSetDisplayName
 WslcSessionSettingsSetCpuCount
 WslcSessionSettingsSetMemory
 WslcSessionSettingsSetTimeout
@@ -47,7 +46,6 @@ WslcContainerDelete
 WslcContainerGetID
 WslcContainerGetInitProcess
 
-WslcProcessSettingsSetExecutable
 WslcProcessSettingsSetIoCallback
 WslcProcessSettingsSetCurrentDirectory
 WslcProcessSettingsSetCmdLineArgs

@@ -414,11 +414,11 @@ static int Build(std::wstring_view commandLine)
 
     std::filesystem::path inputPath;
     std::string tag;
-    std::string dockerfilePath;
+    std::wstring dockerfilePath;
 
     parser.AddPositionalArgument(AbsolutePath(inputPath), 0);
     parser.AddArgument(Utf8String{tag}, L"--tag", 't');
-    parser.AddArgument(Utf8String{dockerfilePath}, L"--file", 'f');
+    parser.AddArgument(dockerfilePath, L"--file", 'f');
 
     parser.Parse();
     THROW_HR_IF(E_INVALIDARG, inputPath.empty());
@@ -453,22 +453,23 @@ static int Build(std::wstring_view commandLine)
 
     wslutil::PrintMessage(std::format(L"Building image from directory: {}\n", inputPath.wstring()), stdout);
 
-    wprintf(L"Creating build context...\n");
-    auto tarFile = wsl::windows::common::helpers::CreateDockerContextTarArchive(inputPath);
-
-    LARGE_INTEGER fileSize{};
-    THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(tarFile.get(), &fileSize));
-
-    wslutil::PrintMessage(std::format(L"Sending build context ({} bytes)...\n", fileSize.QuadPart), stdout);
+    wil::unique_hfile dockerfileHandle;
+    if (dockerfilePath == L"-")
+    {
+        THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(
+            GetCurrentProcess(), GetStdHandle(STD_INPUT_HANDLE), GetCurrentProcess(), &dockerfileHandle, 0, FALSE, DUPLICATE_SAME_ACCESS));
+    }
+    else if (!dockerfilePath.empty())
+    {
+        dockerfileHandle.reset(
+            CreateFileW(dockerfilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF_MSG(!dockerfileHandle, "Failed to open Dockerfile: %ls", dockerfilePath.c_str());
+    }
 
     Callback callback;
 
     THROW_IF_FAILED(session->BuildImage(
-        HandleToULong(tarFile.get()),
-        static_cast<ULONGLONG>(fileSize.QuadPart),
-        dockerfilePath.empty() ? nullptr : dockerfilePath.c_str(),
-        tag.empty() ? nullptr : tag.c_str(),
-        &callback));
+        inputPath.wstring().c_str(), HandleToULong(dockerfileHandle.get()), tag.empty() ? nullptr : tag.c_str(), &callback));
 
     wprintf(L"\n");
 
