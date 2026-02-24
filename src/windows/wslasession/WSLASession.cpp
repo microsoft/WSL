@@ -99,6 +99,8 @@ try
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
 
+    m_virtualMachine->Initialize();
+
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
@@ -280,7 +282,7 @@ try
 
     auto requestContext = m_dockerClient->PullImage(repo, tag);
 
-    relay::MultiHandleWait io;
+    auto io = CreateIOContext();
 
     std::optional<boost::beast::http::status> pullResult;
 
@@ -315,7 +317,6 @@ try
 
     auto onCompleted = [&]() { io.Cancel(); };
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
     io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
         *requestContext, std::move(onHttpResponse), std::move(onChunk), std::move(onCompleted)));
 
@@ -393,7 +394,7 @@ try
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, {}, dockerfileFileHandle ? WSLAProcessFlagsStdin : WSLAProcessFlagsNone);
     auto buildProcess = buildLauncher.Launch(*m_virtualMachine);
 
-    relay::MultiHandleWait io;
+    auto io = CreateIOContext();
 
     if (dockerfileFileHandle)
     {
@@ -469,8 +470,6 @@ try
 
     io.AddHandle(std::make_unique<relay::LineBasedReadHandle>(buildProcess.GetStdHandle(2), captureOutput, false));
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
-
     io.Run({});
 
     int exitCode = buildProcess.Wait();
@@ -532,7 +531,7 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    relay::MultiHandleWait io;
+    auto io = CreateIOContext();
 
     std::optional<boost::beast::http::status> importResult;
 
@@ -559,15 +558,12 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
         }
     };
 
-    auto onCompleted = [&]() { io.Cancel(); };
-
     io.AddHandle(std::make_unique<relay::RelayHandle<relay::ReadHandle>>(
         common::relay::HandleWrapper{std::move(imageFileHandle)}, common::relay::HandleWrapper{Request.stream.native_handle()}));
 
-    io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
-
-    io.AddHandle(std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(
-        Request, std::move(onHttpResponse), std::move(onProgress), std::move(onCompleted)));
+    io.AddHandle(
+        std::make_unique<DockerHTTPClient::DockerHttpResponseHandle>(Request, std::move(onHttpResponse), std::move(onProgress)),
+        MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
 
@@ -607,29 +603,27 @@ void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& S
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    relay::MultiHandleWait io;
-
-    auto onCompleted = [&]() {
-        io.Cancel();
-        WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
-    };
+    auto io = CreateIOContext();
 
     std::string errorJson;
-    auto accumulateError = [&](const gsl::span<char>& buffer) {
-        // If the export failed, accumulate the error message.
-        errorJson.append(buffer.data(), buffer.size());
-    };
 
     if (SocketCodePair.first != 200)
     {
-        io.AddHandle(std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+        auto accumulateError = [&](const gsl::span<char>& buffer) {
+            // If the export failed, accumulate the error message.
+            errorJson.append(buffer.data(), buffer.size());
+        };
+
+        io.AddHandle(
+            std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
+            MultiHandleWait::CancelOnCompleted);
     }
     else
     {
-        io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
-            common::relay::HandleWrapper{std::move(containerFileHandle), std::move(onCompleted)}));
-        io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+        io.AddHandle(
+            std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
+                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, common::relay::HandleWrapper{std::move(containerFileHandle)}),
+            MultiHandleWait::CancelOnCompleted);
     }
 
     io.Run({});
@@ -668,25 +662,27 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
-    relay::MultiHandleWait io;
+    auto io = CreateIOContext();
 
-    auto onCompleted = [&]() { io.Cancel(); };
     std::string errorJson;
-    auto accumulateError = [&](const gsl::span<char>& buffer) {
-        // If the save failed, accumulate the error message.
-        errorJson.append(buffer.data(), buffer.size());
-    };
 
     if (SocketCodePair.first != 200)
     {
-        io.AddHandle(std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+        auto accumulateError = [&](const gsl::span<char>& buffer) {
+            // If the save failed, accumulate the error message.
+            errorJson.append(buffer.data(), buffer.size());
+        };
+
+        io.AddHandle(
+            std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
+            MultiHandleWait::CancelOnCompleted);
     }
     else
     {
-        io.AddHandle(std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-            common::relay::HandleWrapper{std::move(SocketCodePair.second)},
-            common::relay::HandleWrapper{std::move(imageFileHandle), std::move(onCompleted)}));
-        io.AddHandle(std::make_unique<relay::EventHandle>(m_sessionTerminatingEvent.get(), [&]() { THROW_HR(E_ABORT); }));
+        io.AddHandle(
+            std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
+                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, common::relay::HandleWrapper{std::move(imageFileHandle)}),
+            MultiHandleWait::CancelOnCompleted);
     }
 
     io.Run({});
@@ -902,6 +898,9 @@ try
 
     // Look for an exact ID match first.
     std::lock_guard lock{m_lock};
+
+    // Purge containers that were auto-deleted via OnEvent (--rm).
+    std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
     auto it = std::ranges::find_if(m_containers, [Id](const auto& e) { return e->ID() == Id; });
 
     // If no match is found, call Inspect() so that partial IDs and names are matched.
@@ -912,7 +911,7 @@ try
 
         try
         {
-            inspectResult = wsl::shared::FromJson<docker_schema::InspectContainer>(m_dockerClient->InspectContainer(Id).c_str());
+            inspectResult = m_dockerClient->InspectContainer(Id);
         }
         catch (DockerHTTPException& e)
         {
@@ -941,6 +940,9 @@ try
     *Containers = nullptr;
 
     std::lock_guard lock{m_lock};
+
+    // Purge containers that were auto-deleted via OnEvent (--rm).
+    std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
 
     auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
 
@@ -1125,6 +1127,22 @@ CATCH_RETURN();
 HRESULT WSLASession::InterfaceSupportsErrorInfo(REFIID riid)
 {
     return riid == __uuidof(IWSLASession) ? S_OK : S_FALSE;
+}
+
+// TODO consider allowing callers to pass cancellation handles.
+MultiHandleWait WSLASession::CreateIOContext()
+{
+    relay::MultiHandleWait io;
+
+    // Cancel with E_ABORT if the session is terminating.
+    io.AddHandle(std::make_unique<relay::EventHandle>(
+        m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }));
+
+    // Cancel with E_ABORT if the client process exits.
+    io.AddHandle(std::make_unique<relay::EventHandle>(
+        wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }));
+
+    return io;
 }
 
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
