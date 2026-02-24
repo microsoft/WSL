@@ -59,7 +59,7 @@ T GetIntegerFromString(const std::wstring& value, const std::wstring& argName)
 
     T convertedValue{};
     auto result = std::from_chars(narrowValue.c_str(), narrowValue.c_str() + narrowValue.size(), convertedValue);
-    if (result.ec == std::errc::invalid_argument)
+    if (result.ec != std::errc())
     {
         throw ArgumentException(L"Invalid " + argName + L" argument value: " + value);
     }
