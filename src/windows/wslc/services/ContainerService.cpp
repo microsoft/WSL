@@ -28,81 +28,6 @@ using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
 
-static inline int ResolveOrAllocatePort(PublishPort port, int offset)
-{
-    // If specified, validate and return it.
-    if (!port.HasEphemeralHostPort())
-    {
-        return port.HostPort()->Start() + offset;
-    }
-
-    const auto hostIp = port.HostIP();
-    const bool isIPv6 = hostIp.has_value() && hostIp->IsIPv6();
-
-    // Create a socket matching the protocol.
-    const int sockType = (port.PortProtocol() == PublishPort::Protocol::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-    const int ipProto = (port.PortProtocol() == PublishPort::Protocol::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
-    wil::unique_socket socket(::socket(isIPv6 ? AF_INET6 : AF_INET, sockType, ipProto));
-    THROW_LAST_ERROR_IF(socket.get() == INVALID_SOCKET);
-
-    // Bind to port 0 to ask Windows for an ephemeral port
-    sockaddr_storage addr{};
-    int addrLen = 0;
-    if (isIPv6)
-    {
-        auto* addr6 = reinterpret_cast<sockaddr_in6*>(&addr);
-        addr6->sin6_family = AF_INET6;
-        addr6->sin6_port = htons(0);
-        if (hostIp.has_value())
-        {
-            std::memcpy(&addr6->sin6_addr, hostIp->GetBytes().data(), sizeof(addr6->sin6_addr));
-        }
-        else
-        {
-            addr6->sin6_addr = in6addr_any;
-        }
-        addrLen = sizeof(sockaddr_in6);
-    }
-    else
-    {
-        auto* addr4 = reinterpret_cast<sockaddr_in*>(&addr);
-        addr4->sin_family = AF_INET;
-        addr4->sin_port = htons(0);
-        if (hostIp.has_value())
-        {
-            IN_ADDR v4{};
-            std::memcpy(&v4, hostIp->GetBytes().data(), sizeof(v4));
-            addr4->sin_addr = v4;
-        }
-        else
-        {
-            addr4->sin_addr.s_addr = htonl(INADDR_ANY);
-        }
-        addrLen = sizeof(sockaddr_in);
-    }
-
-    THROW_LAST_ERROR_IF(::bind(socket.get(), reinterpret_cast<const sockaddr*>(&addr), addrLen) == SOCKET_ERROR);
-
-    // Read the chosen port back
-    sockaddr_storage bound{};
-    int len = sizeof(bound);
-    THROW_LAST_ERROR_IF(::getsockname(socket.get(), reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR);
-
-    int chosen = 0;
-    if (isIPv6)
-    {
-        auto* bound6 = reinterpret_cast<sockaddr_in6*>(&bound);
-        chosen = ntohs(bound6->sin6_port);
-    }
-    else
-    {
-        auto* bound4 = reinterpret_cast<sockaddr_in*>(&bound);
-        chosen = ntohs(bound4->sin_port);
-    }
-
-    return chosen;
-}
-
 static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
 {
     if (!WI_IsFlagSet(options.Flags, WSLAProcessFlagsTty))
@@ -165,7 +90,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         {
             int family = portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6() ? AF_INET6 : AF_INET;
             auto currentContainerPort = containerPort.Start() + i;
-            auto currentHostPort = ResolveOrAllocatePort(portMapping, i);
+            auto currentHostPort = portMapping.HasEphemeralHostPort() ? 0 : portMapping.HostPort()->Start() + i;
             containerLauncher.AddPortW(currentHostPort, currentContainerPort, family);
         }
     }
