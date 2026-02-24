@@ -20,8 +20,7 @@ struct ContainerService
 {
     static std::wstring ContainerStateToString(WSLA_CONTAINER_STATE state);
     static int Run(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
-    static models::CreateContainerResult Create(
-        models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
+    static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static void Start(models::Session& session, const std::string& id);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
     static void Kill(models::Session& session, const std::string& id, int signal = WSLASignalSIGKILL);

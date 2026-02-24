@@ -55,7 +55,7 @@ COMMAND_LINE_TEST_CASE(L"container start cont1", L"start", true)
 COMMAND_LINE_TEST_CASE(L"create ubuntu:latest", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
-COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false) // Missing required command argument
+COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
 
 // Error cases

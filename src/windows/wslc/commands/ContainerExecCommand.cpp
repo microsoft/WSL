@@ -28,7 +28,11 @@ std::vector<Argument> ContainerExecCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, true),
         Argument::Create(ArgType::Command, true),
-        Argument::Create(ArgType::ForwardArgs, std::nullopt, std::nullopt, L"Arguments to pass to the command being executed inside the container"),
+        Argument::Create(
+            ArgType::ForwardArgs,
+            std::nullopt,
+            std::nullopt,
+            L"Arguments to pass to the command being executed inside the container"),
         Argument::Create(ArgType::Detach),
         Argument::Create(ArgType::Env, std::nullopt, NO_LIMIT),
         Argument::Create(ArgType::EnvFile),
@@ -46,8 +50,7 @@ std::wstring ContainerExecCommand::ShortDescription() const
 
 std::wstring ContainerExecCommand::LongDescription() const
 {
-    return {
-        L"Executes a command in a running container."};
+    return {L"Executes a command in a running container."};
 }
 // clang-format off
 void ContainerExecCommand::ExecuteInternal(CLIExecutionContext& context) const
