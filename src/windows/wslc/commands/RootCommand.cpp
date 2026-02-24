@@ -14,19 +14,19 @@ Abstract:
 #include "RootCommand.h"
 
 // Include all commands that parent to the root.
+#include "ContainerCommand.h"
 #include "DiagCommand.h"
 
-using namespace wsl::shared;
-using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 
 namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
-    commands.reserve(2);
+    commands.reserve(3);
+    commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<DiagCommand>(FullName()));
-    commands.push_back(std::make_unique<DiagListCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
     return commands;
 }
 

@@ -16,6 +16,8 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 
+#include "SessionModel.h"
+
 #include "Command.h"
 #include "RootCommand.h"
 
@@ -66,12 +68,23 @@ class WSLCCLIExecutionUnitTests
             // Add the data to the DataMap with a test value based on its type.
             // Each data type needs to be added here as each enum may have its own value.
             VERIFY_IS_FALSE(dataMap.Contains(dataType));
-            switch (dataType)
+            bool handled = false;
+            if (dataType == Data::Session)
             {
-            case Data::SessionId:
-                dataMap.Add(dataType, std::wstring(L"Session1234"));
-                break;
-            default:
+                // Create a null session for testing - Session requires a COM pointer
+                wil::com_ptr<IWSLASession> nullSession; // Creates null COM pointer
+                wsl::windows::wslc::models::Session session{nullSession};
+                dataMap.Add<Data::Session>(std::move(session));
+                handled = true;
+            }
+            else if (dataType == Data::Containers)
+            {
+                std::vector<wsl::windows::wslc::models::ContainerInformation> containers;
+                dataMap.Add<Data::Containers>(std::move(containers));
+                handled = true;
+            }
+            if (!handled)
+            {
                 VERIFY_FAIL(L"Unhandled Data type in test");
             }
 
@@ -80,8 +93,11 @@ class WSLCCLIExecutionUnitTests
         }
 
         // Verify basic retrieval.
-        auto sessionId = dataMap.Get<Data::SessionId>();
-        VERIFY_ARE_EQUAL(L"Session1234", sessionId);
+        auto& session = dataMap.Get<Data::Session>();
+        VERIFY_IS_NULL(session.Get()); // A null ptr was added.
+
+        auto& containers = dataMap.Get<Data::Containers>();
+        VERIFY_ARE_EQUAL(0u, containers.size());
 
         // Other more complex EnumVariantMap tests are in the Args unit tests.
         // This one will just verify all the data types in the Data Map work as expected.

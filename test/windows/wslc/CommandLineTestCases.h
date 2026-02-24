@@ -30,5 +30,22 @@ COMMAND_LINE_TEST_CASE(L"diag list --verbose --help", L"list", true)
 COMMAND_LINE_TEST_CASE(L"diag list --notanarg", L"list", false)
 COMMAND_LINE_TEST_CASE(L"diag list extraarg", L"list", false)
 
+// Container command tests
+COMMAND_LINE_TEST_CASE(L"container list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container ls", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container ps", L"list", true)
+COMMAND_LINE_TEST_CASE(L"list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"ls", L"list", true)
+COMMAND_LINE_TEST_CASE(L"ps", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --session foo", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list -qa", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --format json", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --format table", L"list", true)
+COMMAND_LINE_TEST_CASE(L"container list --format badformat", L"list", false)
+
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
+COMMAND_LINE_TEST_CASE(L"CONTAINER list", L"list", false)               // We are intentionally case-sensitive
+COMMAND_LINE_TEST_CASE(L"container LS", L"list", false)                 // commands and aliases are case-sensitive
+COMMAND_LINE_TEST_CASE(L"container list --FORMAT json", L"list", false) // Args also case-sensitive
+COMMAND_LINE_TEST_CASE(L"container list -A", L"list", false)            // So are arg aliases
