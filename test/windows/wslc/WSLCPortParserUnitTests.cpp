@@ -149,12 +149,7 @@ class WSLCPortParserUnitTests
             auto result = PublishPort::Parse("[::1]:8080:80");
 
             VerifyParseState(result, "[::1]:8080:80", false, false);
-            VerifyHostIPv6(
-                result,
-                "::1",
-                true,
-                false,
-                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+            VerifyHostIPv6(result, "::1", true, false, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
             VerifyHostPort(result, 8080, 8080);
             VerifyContainerPort(result, 80, 80);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
@@ -164,12 +159,7 @@ class WSLCPortParserUnitTests
             auto result = PublishPort::Parse("[::]:8080:80");
 
             VerifyParseState(result, "[::]:8080:80", false, false);
-            VerifyHostIPv6(
-                result,
-                "::",
-                false,
-                true,
-                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+            VerifyHostIPv6(result, "::", false, true, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
             VerifyHostPort(result, 8080, 8080);
             VerifyContainerPort(result, 80, 80);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
@@ -179,12 +169,7 @@ class WSLCPortParserUnitTests
             auto result = PublishPort::Parse("[2001:db8::10]:8080:80");
 
             VerifyParseState(result, "[2001:db8::10]:8080:80", false, false);
-            VerifyHostIPv6(
-                result,
-                "2001:db8::10",
-                false,
-                false,
-                {0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10});
+            VerifyHostIPv6(result, "2001:db8::10", false, false, {0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10});
             VerifyHostPort(result, 8080, 8080);
             VerifyContainerPort(result, 80, 80);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
@@ -194,12 +179,7 @@ class WSLCPortParserUnitTests
             auto result = PublishPort::Parse("[::1]:5353:5353/udp");
 
             VerifyParseState(result, "[::1]:5353:5353/udp", false, false);
-            VerifyHostIPv6(
-                result,
-                "::1",
-                true,
-                false,
-                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+            VerifyHostIPv6(result, "::1", true, false, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
             VerifyHostPort(result, 5353, 5353);
             VerifyContainerPort(result, 5353, 5353);
             VerifyProtocol(result, PublishPort::Protocol::UDP);
@@ -209,12 +189,7 @@ class WSLCPortParserUnitTests
             auto result = PublishPort::Parse("[::1]::80");
 
             VerifyParseState(result, "[::1]::80", true, false);
-            VerifyHostIPv6(
-                result,
-                "::1",
-                true,
-                false,
-                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+            VerifyHostIPv6(result, "::1", true, false, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
             VerifyNoHostPort(result);
             VerifyContainerPort(result, 80, 80);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
@@ -224,12 +199,7 @@ class WSLCPortParserUnitTests
             auto result = PublishPort::Parse("[::]::53/udp");
 
             VerifyParseState(result, "[::]::53/udp", true, false);
-            VerifyHostIPv6(
-                result,
-                "::",
-                false,
-                true,
-                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+            VerifyHostIPv6(result, "::", false, true, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
             VerifyNoHostPort(result);
             VerifyContainerPort(result, 53, 53);
             VerifyProtocol(result, PublishPort::Protocol::UDP);
@@ -262,12 +232,7 @@ class WSLCPortParserUnitTests
             auto result = PublishPort::Parse("[::1]:7000-7002:7000-7002");
 
             VerifyParseState(result, "[::1]:7000-7002:7000-7002", false, true);
-            VerifyHostIPv6(
-                result,
-                "::1",
-                true,
-                false,
-                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+            VerifyHostIPv6(result, "::1", true, false, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
             VerifyHostPort(result, 7000, 7002);
             VerifyContainerPort(result, 7000, 7002);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
@@ -302,11 +267,7 @@ private:
         VERIFY_ARE_EQUAL(start == end, range.IsSingle());
     }
 
-    static void VerifyParseState(
-        const PublishPort& result,
-        const std::string& original,
-        bool hasEphemeralHostPort,
-        bool isRangeMapping)
+    static void VerifyParseState(const PublishPort& result, const std::string& original, bool hasEphemeralHostPort, bool isRangeMapping)
     {
         VERIFY_ARE_EQUAL(original, result.Original());
         VERIFY_ARE_EQUAL(hasEphemeralHostPort, result.HasEphemeralHostPort());
@@ -340,11 +301,7 @@ private:
     }
 
     static void VerifyHostIPv4(
-        const PublishPort& result,
-        const std::string& expectedString,
-        bool isLoopback,
-        bool isAllInterfaces,
-        const std::array<uint8_t, 4>& expectedBytes)
+        const PublishPort& result, const std::string& expectedString, bool isLoopback, bool isAllInterfaces, const std::array<uint8_t, 4>& expectedBytes)
     {
         VERIFY_IS_TRUE(result.HostIP().has_value());
         VERIFY_IS_FALSE(result.HostIP()->IsIPv6());
@@ -360,11 +317,7 @@ private:
     }
 
     static void VerifyHostIPv6(
-        const PublishPort& result,
-        const std::string& expectedString,
-        bool isLoopback,
-        bool isAllInterfaces,
-        const std::array<uint8_t, 16>& expectedBytes)
+        const PublishPort& result, const std::string& expectedString, bool isLoopback, bool isAllInterfaces, const std::array<uint8_t, 16>& expectedBytes)
     {
         VERIFY_IS_TRUE(result.HostIP().has_value());
         VERIFY_IS_TRUE(result.HostIP()->IsIPv6());
@@ -379,4 +332,4 @@ private:
         }
     }
 };
-}
+} // namespace WSLCPortParserUnitTests
