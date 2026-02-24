@@ -93,9 +93,9 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLAContainer& container, ULONG signal = WSLASignalNone, LONGLONG timeout = -1)
+static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONGLONG timeout = -1)
 {
-    THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
+    THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
 std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state)
@@ -165,7 +165,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
     StopInternal(*container, options.Signal, options.Timeout);
 }
 
-void ContainerService::Kill(Session& session, const std::string& id, int signal)
+void ContainerService::Kill(Session& session, const std::string& id, WSLASignal signal)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
