@@ -350,8 +350,7 @@ class WSLATests
                 auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
                 if (comError.has_value())
                 {
-                    std::wstring tooManyRequests = L"toomanyrequests";
-                    if (wcsstr(comError->Message.get(), tooManyRequests.c_str()) != nullptr)
+                    if (wcsstr(comError->Message.get(), L"toomanyrequests") != nullptr)
                     {
                         LogWarning("Skipping PullImage test due to rate limiting.");
                         return;
