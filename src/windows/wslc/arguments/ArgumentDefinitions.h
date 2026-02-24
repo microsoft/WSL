@@ -38,6 +38,7 @@ _(Attach,         "attach",              L"a",              Kind::Flag,        L
 _(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       L"Write the container ID to the provided path.") \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L"The command to run") \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
+_(Force,          "force",               L"f",              Kind::Flag,        L"Delete containers even if they are running") \
 _(Detach,         "detach",              L"d",              Kind::Flag,        L"Run container in detached mode") \
 _(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       L"IP address of the DNS nameserver in resolv.conf") \
 _(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       L"Set the default DNS Domain") \
@@ -55,6 +56,7 @@ _(Info,           "info",                NO_ALIAS,          Kind::Flag,        L
 _(Interactive,    "interactive",         L"i",              Kind::Flag,        Localization::WSLCCLI_InteractiveArgDescription()) \
 _(Name,           "name",                NO_ALIAS,          Kind::Value,       L"Name of the container") \
 _(NoDNS,          "no-dns",              NO_ALIAS,          Kind::Flag,        L"No configuration of DNS in the container") \
+_(ProcessArgs,    "process arguments",   NO_ALIAS,          Kind::Forward,     L"Arguments to pass to command to be run inside the container") \
 _(Progress,       "progress",            NO_ALIAS,          Kind::Value,       L"Progress type (format: none|ansi) (default: ansi)") \
 _(Publish,        "publish",             L"p",              Kind::Value,       L"Publish a port from a container to host") \
 _(Pull,           "pull",                NO_ALIAS,          Kind::Value,       L"Image pull policy (always|missing|never) (default:never)") \

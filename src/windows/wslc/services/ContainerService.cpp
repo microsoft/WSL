@@ -71,7 +71,7 @@ static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, std::vector<con
 }
 
 static wsl::windows::common::RunningWSLAContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerCreateOptions& options, IProgressCallback* callback)
+    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
 {
     auto processFlags = WSLAProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
@@ -116,7 +116,7 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
     }
 }
 
-int ContainerService::Run(Session& session, const std::string& image, ContainerRunOptions runOptions, IProgressCallback* callback)
+int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
 {
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions, callback);
@@ -141,7 +141,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerR
     return 0;
 }
 
-CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerCreateOptions runOptions, IProgressCallback* callback)
+CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
 {
     auto runningContainer = CreateInternal(session, image, runOptions, callback);
     runningContainer.SetDeleteOnClose(false);
@@ -212,7 +212,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
     return result;
 }
 
-int ContainerService::Exec(Session& session, const std::string& id, ExecContainerOptions options)
+int ContainerService::Exec(Session& session, const std::string& id, ContainerOptions options)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));

@@ -43,6 +43,10 @@ set(SOURCES
     commands/RootCommand.cpp
     commands/ContainerCommand.cpp
     commands/ContainerCreateCommand.cpp
+    commands/ContainerDeleteCommand.cpp
+    commands/ContainerExecCommand.cpp
+    commands/ContainerInspectCommand.cpp
+    commands/ContainerKillCommand.cpp
     commands/ContainerListCommand.cpp
     commands/ContainerRunCommand.cpp
     commands/ContainerStartCommand.cpp
