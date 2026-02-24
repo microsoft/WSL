@@ -84,7 +84,7 @@ void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context 
         << CreateSession
-        << SetRunContainerOptionsFromArgs
+        << SetContainerOptionsFromArgs
         << RunContainer;
 }
 // clang-format on

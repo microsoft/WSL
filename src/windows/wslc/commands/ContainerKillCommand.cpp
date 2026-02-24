@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ContainerStopCommand.cpp
+    ContainerKillCommand.cpp
 
 Abstract:
 
@@ -13,11 +13,9 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
-#include "TablePrinter.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "ContainerTasks.h"
@@ -37,33 +35,32 @@ using namespace wsl::windows::wslc::models;
 using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc {
-// Container Stop Command
-std::vector<Argument> ContainerStopCommand::GetArguments() const
+// Container Kill Command
+std::vector<Argument> ContainerKillCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
         Argument::Create(ArgType::SessionId),
-        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGTERM)"),
-        Argument::Create(ArgType::Time),
+        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGKILL)"),
     };
 }
 
-std::wstring ContainerStopCommand::ShortDescription() const
+std::wstring ContainerKillCommand::ShortDescription() const
 {
-    return {L"Stop containers"};
+    return {L"Kill containers"};
 }
 
-std::wstring ContainerStopCommand::LongDescription() const
+std::wstring ContainerKillCommand::LongDescription() const
 {
-    return {L"Stops containers."};
+    return {L"Kills containers."};
 }
 
 // clang-format off
-void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ContainerKillCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
         << CreateSession
-        << StopContainers;
+        << KillContainers;
 }
 // clang-format on
 } // namespace wsl::windows::wslc

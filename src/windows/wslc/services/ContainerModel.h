@@ -21,17 +21,13 @@ Abstract:
 
 namespace wsl::windows::wslc::models {
 
-struct ContainerCreateOptions
+struct ContainerOptions
 {
-    bool TTY = false;
-    bool Interactive = false;
     std::vector<std::string> Arguments;
-    std::string Name;
-};
-
-struct ContainerRunOptions : public ContainerCreateOptions
-{
     bool Detach = false;
+    bool Interactive = false;
+    std::string Name;
+    bool TTY = false;
 };
 
 struct CreateContainerResult
@@ -60,12 +56,5 @@ struct ContainerInformation
     WSLA_CONTAINER_STATE State;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
-};
-
-struct ExecContainerOptions
-{
-    bool TTY = false;
-    bool Interactive = false;
-    std::vector<std::string> Arguments;
 };
 } // namespace wsl::windows::wslc::models

@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ContainerStopCommand.cpp
+    ContainerInspectCommand.cpp
 
 Abstract:
 
@@ -13,19 +13,13 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
-#include "TablePrinter.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "ContainerTasks.h"
 #include "Task.h"
-
-#include <wslservice.h>
-#include <wslaservice.h>
-#include <docker_schema.h>
 
 using wsl::windows::common::wslutil::PrintMessage;
 using wsl::windows::wslc::models::ContainerInformation;
@@ -33,37 +27,33 @@ using wsl::windows::wslc::services::ContainerService;
 using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
-using namespace wsl::windows::wslc::models;
-using namespace wsl::windows::wslc::services;
 
 namespace wsl::windows::wslc {
-// Container Stop Command
-std::vector<Argument> ContainerStopCommand::GetArguments() const
+// Container Inspect Command
+std::vector<Argument> ContainerInspectCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
+        Argument::Create(ArgType::ContainerId, true, NO_LIMIT),
         Argument::Create(ArgType::SessionId),
-        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGTERM)"),
-        Argument::Create(ArgType::Time),
     };
 }
 
-std::wstring ContainerStopCommand::ShortDescription() const
+std::wstring ContainerInspectCommand::ShortDescription() const
 {
-    return {L"Stop containers"};
+    return {L"Inspect a container."};
 }
 
-std::wstring ContainerStopCommand::LongDescription() const
+std::wstring ContainerInspectCommand::LongDescription() const
 {
-    return {L"Stops containers."};
+    return {L"Display detailed information about a container."};
 }
 
 // clang-format off
-void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ContainerInspectCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
         << CreateSession
-        << StopContainers;
+        << InspectContainers;
 }
 // clang-format on
 } // namespace wsl::windows::wslc
