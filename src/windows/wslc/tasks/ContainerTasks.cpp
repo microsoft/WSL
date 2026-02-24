@@ -18,17 +18,19 @@ Abstract:
 #include "ContainerService.h"
 #include "SessionModel.h"
 #include "SessionService.h"
+#include "TablePrinter.h"
 #include "Task.h"
 #include "ContainerTasks.h"
 #include "PullImageCallback.h"
 #include <optional>
 #include <wil/result_macros.h>
 
+using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::services;
 using namespace wsl::windows::wslc::models;
-using namespace wsl::windows::common;
 using wsl::windows::common::docker_schema::InspectContainer;
+using wsl::windows::common::wslutil::PrintMessage;
 
 namespace wsl::windows::wslc::task {
 void CreateContainer(CLIExecutionContext& context)
@@ -42,7 +44,7 @@ void CreateContainer(CLIExecutionContext& context)
         string::WideToMultiByte(context.Args.Get<ArgType::ImageId>()),
         context.Data.Get<Data::ContainerOptions>(),
         &callback);
-    wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(result.Id));
+    PrintMessage(wsl::shared::string::MultiByteToWide(result.Id));
 }
 
 void CreateSession(CLIExecutionContext& context)
@@ -99,7 +101,7 @@ void InspectContainers(CLIExecutionContext& context)
     }
 
     auto json = wsl::shared::ToJson(result);
-    wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(json));
+    PrintMessage(wsl::shared::string::MultiByteToWide(json));
 }
 
 void KillContainers(CLIExecutionContext& context)
@@ -117,6 +119,59 @@ void KillContainers(CLIExecutionContext& context)
     {
         ContainerService::Kill(session, string::WideToMultiByte(id), signal);
     }
+}
+
+void ListContainers(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    WI_ASSERT(context.Data.Contains(Data::Containers));
+    auto& session = context.Data.Get<Data::Session>();
+    auto& containers = context.Data.Get<Data::Containers>();
+
+    // Filter by running state if --all is not specified
+    if (!context.Args.Contains(ArgType::All))
+    {
+        auto shouldRemove = [](const ContainerInformation& container) {
+            return container.State != WSLA_CONTAINER_STATE::WslaContainerStateRunning;
+        };
+        containers.erase(std::remove_if(containers.begin(), containers.end(), shouldRemove), containers.end());
+    }
+
+    if (context.Args.Contains(ArgType::Quiet))
+    {
+        // Print only the container ids
+        for (const auto& container : containers)
+        {
+            PrintMessage(string::MultiByteToWide(container.Id));
+        }
+
+        return;
+    }
+
+    if (context.Args.Contains(ArgType::Format))
+    {
+        if (string::IsEqual(context.Args.Get<ArgType::Format>(), L"json"))
+        {
+            auto json = ToJson(containers);
+            PrintMessage(string::MultiByteToWide(json));
+            return;
+        }
+
+        // Default is table, which is below.
+    }
+
+    utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
+    for (const auto& container : containers)
+    {
+        tablePrinter.AddRow({
+            string::MultiByteToWide(container.Id),
+            string::MultiByteToWide(container.Name),
+            string::MultiByteToWide(container.Image),
+            ContainerService::ContainerStateToString(container.State),
+        });
+    }
+
+    tablePrinter.Print();
 }
 
 void RunContainer(CLIExecutionContext& context)
