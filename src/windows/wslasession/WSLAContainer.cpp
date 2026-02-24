@@ -573,7 +573,7 @@ void WSLAContainerImpl::Delete()
 
 void WSLAContainerImpl::Export(ULONG OutHandle)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    std::lock_guard lock(m_lock);
 
     // Validate that the container is in the exited state.
     THROW_HR_IF_MSG(
@@ -584,20 +584,11 @@ void WSLAContainerImpl::Export(ULONG OutHandle)
         m_state);
 
     std::pair<uint32_t, wil::unique_socket> SocketCodePair;
-    try
-    {
-        SocketCodePair = m_dockerClient.ExportContainer(m_id);
-    }
-    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to export container '%hs'", m_id.c_str());
+    SocketCodePair = m_dockerClient.ExportContainer(m_id);
 
     wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutHandle))};
 
-    wsl::windows::common::relay::MultiHandleWait io;
-
-    auto onCompleted = [&]() {
-        io.Cancel();
-        WSL_LOG("OnCompletedCalledForExport", TraceLoggingValue("OnCompletedCalledForExport", "Content"));
-    };
+    wsl::windows::common::relay::MultiHandleWait io = CreateIOContext();
 
     std::string errorJson;
     auto accumulateError = [&](const gsl::span<char>& buffer) {
@@ -612,7 +603,9 @@ void WSLAContainerImpl::Export(ULONG OutHandle)
     else
     {
         io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
-            HandleWrapper{std::move(SocketCodePair.second)}, HandleWrapper{std::move(containerFileHandle)}));
+            HandleWrapper{std::move(SocketCodePair.second)},
+            HandleWrapper{std::move(containerFileHandle)},
+            wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted));
     }
 
     io.Run({});
