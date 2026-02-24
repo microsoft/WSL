@@ -13,6 +13,8 @@ Abstract:
 --*/
 #pragma once
 #include "EnumVariantMap.h"
+#include "ContainerModel.h"
+#include "SessionModel.h"
 
 #include <string>
 
@@ -29,7 +31,8 @@ namespace wsl::windows::wslc::execution {
 // Max must be last and unused.
 enum class Data : size_t
 {
-    SessionId,
+    Session,
+    Containers,
 
     Max
 };
@@ -40,7 +43,8 @@ namespace details {
     {
     };
 
-    DEFINE_DATA_MAPPING(SessionId, std::wstring);
+    DEFINE_DATA_MAPPING(Session, wsl::windows::wslc::models::Session);
+    DEFINE_DATA_MAPPING(Containers, std::vector<wsl::windows::wslc::models::ContainerInformation>);
 } // namespace details
 
 struct DataMap : wsl::windows::wslc::EnumBasedVariantMap<Data, wsl::windows::wslc::execution::details::DataMapping>

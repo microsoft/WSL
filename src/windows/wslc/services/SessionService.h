@@ -17,9 +17,8 @@ Abstract:
 #include <wslaservice.h>
 
 namespace wsl::windows::wslc::services {
-class SessionService
+struct SessionService
 {
-public:
-    wsl::windows::wslc::models::Session CreateSession(const std::optional<wsl::windows::wslc::models::SessionOptions>& options = std::nullopt);
+    static wsl::windows::wslc::models::Session CreateSession(const std::optional<wsl::windows::wslc::models::SessionOptions>& options = std::nullopt);
 };
 } // namespace wsl::windows::wslc::services
