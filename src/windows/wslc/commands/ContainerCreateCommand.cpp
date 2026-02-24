@@ -16,7 +16,6 @@ Abstract:
 #include "ContainerModel.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
-#include "TablePrinter.h"
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "ContainerTasks.h"
@@ -78,7 +77,7 @@ void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
         << CreateSession
-        << SetCreateContainerOptionsFromArgs
+        << SetContainerOptionsFromArgs
         << CreateContainer;
 }
 // clang-format on
