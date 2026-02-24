@@ -34,7 +34,10 @@ struct Command
     // The character used to split between commands and their parents in FullName.
     constexpr static wchar_t ParentSplitChar = L':';
 
-    Command(std::wstring_view name, std::wstring parent);
+    Command(std::wstring_view name, const std::wstring& parent) : Command(name, {}, parent)
+    {
+    }
+    Command(std::wstring_view name, std::vector<std::wstring_view>&& aliases, const std::wstring& parent);
 
     virtual ~Command() = default;
 
@@ -51,6 +54,10 @@ struct Command
     const std::wstring& FullName() const
     {
         return m_fullName;
+    }
+    const std::vector<std::wstring_view>& Aliases() const
+    {
+        return m_aliases;
     }
 
     virtual std::vector<std::unique_ptr<Command>> GetCommands() const
@@ -82,10 +89,12 @@ struct Command
     virtual void Execute(CLIExecutionContext& context) const;
 
 protected:
+    virtual void ValidateArgumentsInternal(const ArgMap& execArgs) const;
     virtual void ExecuteInternal(CLIExecutionContext& context) const = 0;
 
 private:
     std::wstring_view m_name;
+    std::vector<std::wstring_view> m_aliases;
     std::wstring m_fullName;
 };
 

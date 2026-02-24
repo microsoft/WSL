@@ -92,9 +92,27 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone, ULONG timeout = -1)
+static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone, LONGLONG timeout = -1)
 {
     THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
+}
+
+std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state)
+{
+    switch (state)
+    {
+    case WSLA_CONTAINER_STATE::WslaContainerStateCreated:
+        return L"created";
+    case WSLA_CONTAINER_STATE::WslaContainerStateRunning:
+        return L"running";
+    case WSLA_CONTAINER_STATE::WslaContainerStateDeleted:
+        return L"stopped";
+    case WSLA_CONTAINER_STATE::WslaContainerStateExited:
+        return L"exited";
+    case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
 }
 
 int ContainerService::Run(Session& session, const std::string& image, ContainerRunOptions runOptions, IProgressCallback* callback)
@@ -169,25 +187,15 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
-    ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, &count));
-    for (auto ptr = containers.get(), end = containers.get() + count; ptr != end; ++ptr)
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
+    for (const auto& current : containers)
     {
-        const WSLA_CONTAINER& current = *ptr;
-
-        wil::com_ptr<IWSLAContainer> container;
-        THROW_IF_FAILED(session.Get()->OpenContainer(current.Name, &container));
-
-        wil::unique_cotaskmem_ansistring output;
-        THROW_IF_FAILED(container->Inspect(&output));
-        auto inspect = wsl::shared::FromJson<InspectContainer>(output.get());
-
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
         entry.State = current.State;
-        entry.Id = inspect.Id;
-        result.push_back(entry);
+        entry.Id = current.Id;
+        result.emplace_back(std::move(entry));
     }
 
     return result;

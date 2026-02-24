@@ -4,22 +4,22 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    DiagCommand.h
+    ContainerCommand.h
 
 Abstract:
 
-    Declaration of DiagCommand command tree.
+    Declaration of command classes and interfaces.
 
 --*/
 #pragma once
 #include "Command.h"
 
 namespace wsl::windows::wslc {
-// Root Diag Command
-struct DiagCommand final : public Command
+// Root Container Command
+struct ContainerCommand final : public Command
 {
-    constexpr static std::wstring_view CommandName = L"diag";
-    DiagCommand(const std::wstring& parent) : Command(CommandName, parent)
+    constexpr static std::wstring_view CommandName = L"container";
+    ContainerCommand(const std::wstring& parent) : Command(CommandName, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -33,10 +33,10 @@ protected:
 };
 
 // List Command
-struct DiagListCommand final : public Command
+struct ContainerListCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"list";
-    DiagListCommand(const std::wstring& parent) : Command(CommandName, parent)
+    ContainerListCommand(const std::wstring& parent) : Command(CommandName, {L"ls", L"ps"}, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
@@ -44,6 +44,7 @@ struct DiagListCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(const ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 } // namespace wsl::windows::wslc
