@@ -22,13 +22,14 @@ Abstract:
 COMMAND_LINE_TEST_CASE(L"", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--help", L"root", true)
 
-// Diag command tests
-COMMAND_LINE_TEST_CASE(L"diag list", L"list", true)
-COMMAND_LINE_TEST_CASE(L"diag list -v", L"list", true)
-COMMAND_LINE_TEST_CASE(L"diag list --verbose", L"list", true)
-COMMAND_LINE_TEST_CASE(L"diag list --verbose --help", L"list", true)
-COMMAND_LINE_TEST_CASE(L"diag list --notanarg", L"list", false)
-COMMAND_LINE_TEST_CASE(L"diag list extraarg", L"list", false)
+// Session command tests
+COMMAND_LINE_TEST_CASE(L"session list", L"list", true)
+COMMAND_LINE_TEST_CASE(L"session list -v", L"list", true)
+COMMAND_LINE_TEST_CASE(L"session list --verbose", L"list", true)
+COMMAND_LINE_TEST_CASE(L"session list --verbose --help", L"list", true)
+COMMAND_LINE_TEST_CASE(L"session list --notanarg", L"list", false)
+COMMAND_LINE_TEST_CASE(L"session list extraarg", L"list", false)
+COMMAND_LINE_TEST_CASE(L"session shell session1", L"shell", true)
 
 // Container command tests
 COMMAND_LINE_TEST_CASE(L"container list", L"list", true)
@@ -49,10 +50,13 @@ COMMAND_LINE_TEST_CASE(L"container run -it --name foo ubuntu", L"run", true)
 COMMAND_LINE_TEST_CASE(L"stop", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal 9", L"stop", true)
 COMMAND_LINE_TEST_CASE(L"container stop cont1 --signal sigkill", L"stop", false)
-COMMAND_LINE_TEST_CASE(L"start cont", L"start", true)
-COMMAND_LINE_TEST_CASE(L"container start cont", L"start", true)
+COMMAND_LINE_TEST_CASE(L"start cont1", L"start", true)
+COMMAND_LINE_TEST_CASE(L"container start cont1", L"start", true)
 COMMAND_LINE_TEST_CASE(L"create ubuntu:latest", L"create", true)
 COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
+COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
+COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false) // Missing required command argument
+COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
 
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)

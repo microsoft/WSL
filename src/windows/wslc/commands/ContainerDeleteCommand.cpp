@@ -41,7 +41,7 @@ std::vector<Argument> ContainerDeleteCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
         Argument::Create(ArgType::Force),
-        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::Session),
     };
 }
 

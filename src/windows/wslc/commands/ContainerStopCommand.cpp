@@ -42,7 +42,7 @@ std::vector<Argument> ContainerStopCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
-        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGTERM)"),
         Argument::Create(ArgType::Time),
     };

@@ -36,12 +36,12 @@ std::vector<Argument> ContainerExecCommand::GetArguments() const
     return {
         Argument::Create(ArgType::ContainerId, true),
         Argument::Create(ArgType::Command, true),
-        Argument::Create(ArgType::ProcessArgs),
+        Argument::Create(ArgType::ForwardArgs, std::nullopt, std::nullopt, L"Arguments to pass to the command being executed inside the container"),
         Argument::Create(ArgType::Detach),
         Argument::Create(ArgType::Env, std::nullopt, NO_LIMIT),
         Argument::Create(ArgType::EnvFile),
         Argument::Create(ArgType::Interactive),
-        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
     };
