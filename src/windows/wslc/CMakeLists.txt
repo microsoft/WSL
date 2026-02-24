@@ -1,86 +1,54 @@
-set(SOURCES
-    main.cpp
-
-    # Commands
-    ShellCommand.cpp
-    ImageCommand.cpp
-    ContainerCommand.cpp
-    ICommand.cpp
-
-    # Services
-    ContainerService.cpp
-    ImageService.cpp
-    ShellService.cpp
-    SessionService.cpp
-    ConsoleService.cpp
-
-    # Models
-    SessionModel.cpp
-    ContainerModel.cpp
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments
+    ${CMAKE_CURRENT_SOURCE_DIR}/services
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks
 )
 
-set(HEADERS
-    # Commands
-    ShellCommand.h
-    ImageCommand.h
-    ContainerCommand.h
-    ICommand.h
-
-    # Others
-    TablePrinter.h
-
-    # Services
-    ContainerService.h
-    ImageService.h
-    ShellService.h
-    SessionService.h
-    ConsoleService.h
-
-    # Models
-    ImageModel.h
-    ContainerModel.h
-    SessionModel.h
+file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks/*.h
 )
 
-source_group("Services" FILES
-    ContainerService.h
-    ContainerService.cpp
-    ImageService.h
-    ImageService.cpp
-    ShellService.h
-    ShellService.cpp
-    SessionService.h
-    SessionService.cpp
-    ConsoleService.h
-    ConsoleService.cpp
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks/*.cpp
 )
 
-source_group("Commands" FILES
-    ShellCommand.h
-    ShellCommand.cpp
-    ImageCommand.h
-    ImageCommand.cpp
-    ContainerCommand.h
-    ContainerCommand.cpp
-    ICommand.h
-    ICommand.cpp
+# Object library for WSLC components.
+# Used to build the executable and also unit testing components.
+add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
+set_target_properties(wslclib PROPERTIES FOLDER windows)
+target_include_directories(wslclib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/commands
+    ${CMAKE_CURRENT_SOURCE_DIR}/arguments
+    ${CMAKE_CURRENT_SOURCE_DIR}/services
+    ${CMAKE_CURRENT_SOURCE_DIR}/tasks
 )
-
-source_group("Models" FILES
-    ImageModel.h
-    ContainerModel.h
-    ContainerModel.cpp
-    SessionModel.h
-    SessionModel.cpp
-)
-
-add_executable(wslc ${SOURCES} ${HEADERS})
-
-target_link_libraries(wslc
+target_precompile_headers(wslclib REUSE_FROM common)
+target_link_libraries(wslclib
+    PRIVATE
     ${COMMON_LINK_LIBRARIES}
     common
 )
 
-target_precompile_headers(wslc REUSE_FROM common)
-
+# Create wslc.exe
+add_executable(wslc $<TARGET_OBJECTS:wslclib>)
+target_link_libraries(wslc
+    PRIVATE
+    ${COMMON_LINK_LIBRARIES}
+    common
+)
 set_target_properties(wslc PROPERTIES FOLDER windows)
+
+# For prettier source tree browsing
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})
