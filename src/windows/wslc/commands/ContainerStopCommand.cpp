@@ -66,8 +66,7 @@ void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
-        // TODO: This can be either an enum value or a string name. Validate against both.
-        options.Signal = validation::GetIntegerFromString<ULONG>(context.Args.Get<ArgType::Signal>());
+        options.Signal = validation::GetWSLASignalFromString(context.Args.Get<ArgType::Signal>());
     }
 
     if (context.Args.Contains(ArgType::Time))

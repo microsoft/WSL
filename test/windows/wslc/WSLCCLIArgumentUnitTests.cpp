@@ -20,6 +20,7 @@ Abstract:
 #include "ArgumentTypes.h"
 #include "ArgumentValidation.h"
 #include "Exceptions.h"
+#include <wslaservice.h>
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::argument;
@@ -107,26 +108,28 @@ class WSLCCLIArgumentUnitTests
     TEST_METHOD(ArgumentValidation_ValueValidation)
     {
         // Verify integer conversion for supported types.
-        auto ulong = validation::GetIntegerFromString<ULONG>(L"123");
-        VERIFY_ARE_EQUAL(ulong, 123UL);
-        VERIFY_THROWS(validation::GetIntegerFromString<ULONG>(L"abc"), ArgumentException);  // Not a number
-        VERIFY_THROWS(validation::GetIntegerFromString<ULONG>(L"-123"), ArgumentException); // Negative number
-
         auto longlong = validation::GetIntegerFromString<LONGLONG>(L"1234567890123");
         VERIFY_ARE_EQUAL(longlong, 1234567890123LL);
         VERIFY_THROWS(validation::GetIntegerFromString<LONGLONG>(L"abc"), ArgumentException);                      // Not a number
         VERIFY_THROWS(validation::GetIntegerFromString<LONGLONG>(L"-92233720369999854775808"), ArgumentException); // Out of range
+        VERIFY_NO_THROW(validation::ValidateIntegerFromString<LONGLONG>({L"1234", L"-1234567890123"}, L"testArg"));
+        VERIFY_THROWS(validation::ValidateIntegerFromString<LONGLONG>({L"1234", L"-92233720369999854775808"}, L"testArg"), ArgumentException);
 
-        // Verify Array loop for validation works.
-        std::vector<std::wstring> validUlongValues = {L"1234", L"12345"};
-        VERIFY_NO_THROW(validation::ValidateIntegerFromString<ULONG>(validUlongValues, L"testArg"));
-        std::vector<std::wstring> invalidUlongValues = {L"1234", L"abc"};
-        VERIFY_THROWS(validation::ValidateIntegerFromString<ULONG>(invalidUlongValues, L"testArg"), ArgumentException);
-
-        std::vector<std::wstring> validLonglongValues = {L"1234", L"-1234567890123"};
-        VERIFY_NO_THROW(validation::ValidateIntegerFromString<LONGLONG>(validLonglongValues, L"testArg"));
-        std::vector<std::wstring> invalidLonglongValues = {L"1234", L"-92233720369999854775808"};
-        VERIFY_THROWS(validation::ValidateIntegerFromString<LONGLONG>(invalidLonglongValues, L"testArg"), ArgumentException);
+        // Verify WSLASignal conversion
+        auto validSignal = validation::GetWSLASignalFromString(L"SIGTERM");
+        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
+        validSignal = validation::GetWSLASignalFromString(L"TERM"); // No prefix
+        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
+        validSignal = validation::GetWSLASignalFromString(L"sIgTerm"); // Case-insensitive
+        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
+        validSignal = validation::GetWSLASignalFromString(L"term"); // Case-insensitive no prefix
+        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
+        VERIFY_THROWS(validation::GetWSLASignalFromString(L"INVALID_SIGNAL"), ArgumentException);
+        validSignal = validation::GetWSLASignalFromString(L"15"); // SIGTERM is 15
+        VERIFY_ARE_EQUAL(validSignal, WSLASignalSIGTERM);
+        VERIFY_THROWS(validation::GetWSLASignalFromString(L"999"), ArgumentException); // Out of range
+        VERIFY_NO_THROW(validation::ValidateWSLASignalFromString({L"HUP", L"9", L"SIGKILL", L"stop"}, L"signalArg"));
+        VERIFY_THROWS(validation::ValidateWSLASignalFromString({L"SIGHUP", L"999"}, L"signalArg"), ArgumentException); // 999 is out of range
     }
 
     // Test: Verify EnumVariantMap behavior with ArgTypes.
