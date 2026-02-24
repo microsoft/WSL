@@ -559,7 +559,6 @@ void WSLAContainerImpl::Delete()
         m_name.c_str(),
         m_state);
 
-    std::pair<uint32_t, wil::unique_socket> SocketCodePair;
     try
     {
         m_dockerClient.DeleteContainer(m_id);
