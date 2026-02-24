@@ -59,7 +59,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
         Argument::Create(ArgType::Scheme),
-        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),

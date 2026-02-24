@@ -38,7 +38,7 @@ std::vector<Argument> ContainerStartCommand::GetArguments() const
         Argument::Create(ArgType::ContainerId, true),
         Argument::Create(ArgType::Attach),      // NYI
         Argument::Create(ArgType::Interactive), // NYI
-        Argument::Create(ArgType::SessionId),   // NYI
+        Argument::Create(ArgType::Session),   // NYI
     };
 }
 

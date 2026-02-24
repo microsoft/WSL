@@ -37,7 +37,7 @@ std::vector<Argument> ContainerListCommand::GetArguments() const
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::Quiet),
-        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::Session),
     };
 }
 
