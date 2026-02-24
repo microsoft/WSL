@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "ArgumentValidation.h"
 #include "ContainerModel.h"
 #include "ContainerCommand.h"
 #include "ContainerService.h"
@@ -65,12 +66,13 @@ void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
-        options.Signal = std::stoul(context.Args.Get<ArgType::Signal>());
+        // TODO: This can be either an enum value or a string name. Validate against both.
+        options.Signal = validation::GetIntegerFromString<ULONG>(context.Args.Get<ArgType::Signal>());
     }
 
     if (context.Args.Contains(ArgType::Time))
     {
-        options.Timeout = std::stoul(context.Args.Get<ArgType::Time>());
+        options.Timeout = validation::GetIntegerFromString<LONGLONG>(context.Args.Get<ArgType::Time>());
     }
 
     for (const auto& id : containersToStop)

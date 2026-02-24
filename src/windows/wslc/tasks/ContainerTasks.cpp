@@ -12,6 +12,7 @@ Abstract:
 
 --*/
 #include "Argument.h"
+#include "ArgumentValidation.h"
 #include "CLIExecutionContext.h"
 #include "ContainerModel.h"
 #include "ImageModel.h"

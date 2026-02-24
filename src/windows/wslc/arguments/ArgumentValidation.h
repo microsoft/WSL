@@ -20,6 +20,10 @@ using namespace wsl::windows::wslc::argument;
 
 namespace wsl::windows::wslc::validation {
 
-void ValidateUInteger(const std::vector<std::wstring>& values, const std::wstring& argName);
+template <typename T>
+void ValidateIntegerFromString(const std::vector<std::wstring>& values, const std::wstring& argName);
+
+template <typename T>
+T GetIntegerFromString(const std::wstring& value, const std::wstring& argName = {});
 
 } // namespace wsl::windows::wslc::validation
