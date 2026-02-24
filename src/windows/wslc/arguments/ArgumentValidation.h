@@ -17,6 +17,7 @@ Abstract:
 #include <string>
 #include <vector>
 #include <charconv>
+#include <format>
 #include <wslaservice.h>
 #include <string.hpp>
 
@@ -40,7 +41,7 @@ T GetIntegerFromString(const std::wstring& value, const std::wstring& argName = 
     auto result = std::from_chars(narrowValue.c_str(), narrowValue.c_str() + narrowValue.size(), convertedValue);
     if (result.ec != std::errc())
     {
-        throw ArgumentException(L"Invalid " + argName + L" argument value: " + value);
+        throw ArgumentException(std::format(L"Invalid {} argument value: {}", argName, value));
     }
 
     return convertedValue;
