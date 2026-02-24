@@ -229,6 +229,7 @@ struct WSLA_CONTAINER_OPTIONS
 
     WSLAStringArray DnsServers;
     WSLAStringArray DnsSearchDomains;
+    WSLAStringArray DnsOptions;
 
     ULONGLONG ShmSize;
     struct WSLA_CONTAINER_NETWORK ContainerNetwork;
