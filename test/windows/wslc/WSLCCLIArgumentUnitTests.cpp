@@ -18,6 +18,8 @@ Abstract:
 
 #include "Argument.h"
 #include "ArgumentTypes.h"
+#include "ArgumentValidation.h"
+#include "Exceptions.h"
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::argument;
@@ -99,6 +101,32 @@ class WSLCCLIArgumentUnitTests
         {
             VERIFY_IS_TRUE(std::find(argMapKeys.begin(), argMapKeys.end(), argType) != argMapKeys.end());
         }
+    }
+
+    // Test: Verify Argument::Create() successfully creates arguments for all ArgType enum values
+    TEST_METHOD(ArgumentValidation_ValueValidation)
+    {
+        // Verify integer conversion for supported types.
+        auto ulong = validation::GetIntegerFromString<ULONG>(L"123");
+        VERIFY_ARE_EQUAL(ulong, 123UL);
+        VERIFY_THROWS(validation::GetIntegerFromString<ULONG>(L"abc"), ArgumentException);  // Not a number
+        VERIFY_THROWS(validation::GetIntegerFromString<ULONG>(L"-123"), ArgumentException); // Negative number
+
+        auto longlong = validation::GetIntegerFromString<LONGLONG>(L"1234567890123");
+        VERIFY_ARE_EQUAL(longlong, 1234567890123LL);
+        VERIFY_THROWS(validation::GetIntegerFromString<LONGLONG>(L"abc"), ArgumentException);                      // Not a number
+        VERIFY_THROWS(validation::GetIntegerFromString<LONGLONG>(L"-92233720369999854775808"), ArgumentException); // Out of range
+
+        // Verify Array loop for validation works.
+        std::vector<std::wstring> validUlongValues = {L"1234", L"12345"};
+        VERIFY_NO_THROW(validation::ValidateIntegerFromString<ULONG>(validUlongValues, L"testArg"));
+        std::vector<std::wstring> invalidUlongValues = {L"1234", L"abc"};
+        VERIFY_THROWS(validation::ValidateIntegerFromString<ULONG>(invalidUlongValues, L"testArg"), ArgumentException);
+
+        std::vector<std::wstring> validLonglongValues = {L"1234", L"-1234567890123"};
+        VERIFY_NO_THROW(validation::ValidateIntegerFromString<LONGLONG>(validLonglongValues, L"testArg"));
+        std::vector<std::wstring> invalidLonglongValues = {L"1234", L"-92233720369999854775808"};
+        VERIFY_THROWS(validation::ValidateIntegerFromString<LONGLONG>(invalidLonglongValues, L"testArg"), ArgumentException);
     }
 
     // Test: Verify EnumVariantMap behavior with ArgTypes.

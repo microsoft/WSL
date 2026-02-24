@@ -349,9 +349,14 @@ void Command::ValidateArguments(ArgMap& execArgs) const
             throw CommandException(Localization::WSLCCLI_RequiredArgumentError(arg.Name()));
         }
 
-        if (arg.Limit() < execArgs.Count(arg.Type()))
+        if ((arg.Limit() > 0) && (arg.Limit() < execArgs.Count(arg.Type())))
         {
             throw CommandException(Localization::WSLCCLI_TooManyArgumentsError(arg.Name()));
+        }
+
+        if (execArgs.Contains(arg.Type()))
+        {
+            arg.Validate(execArgs);
         }
     }
 

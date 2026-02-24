@@ -21,8 +21,12 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> ContainerCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
-    commands.reserve(1);
+    commands.reserve(5);
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
     return commands;
 }
 
