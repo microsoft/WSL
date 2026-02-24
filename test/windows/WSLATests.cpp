@@ -73,12 +73,12 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            LoadTestImage(L"debian:latest");
+            LoadTestImage(L"debian-latest.tar");
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            LoadTestImage(L"python:3.12-alpine");
+            LoadTestImage(L"python-3_12-alpine.tar");
         }
 
         // Hacky way to delete all containers.
@@ -476,7 +476,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Prepare alpine image to delete.
-        LoadTestImage(L"alpine:latest");
+        LoadTestImage(L"alpine-latest.tar");
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");
