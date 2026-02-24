@@ -611,7 +611,7 @@ void WSLAContainerImpl::Export(ULONG OutHandle)
     else
     {
         io.AddHandle(std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
-            HandleWrapper{std::move(SocketCodePair.second)}, HandleWrapper{std::move(containerFileHandle)}));
+            HandleWrapper{std::move(SocketCodePair.second)}, HandleWrapper{std::move(containerFileHandle), onCompleted}));
     }
 
     io.Run({});
