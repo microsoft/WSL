@@ -682,8 +682,8 @@ class InstallerTests
         //
         // N.B. The file handle will be closed before the cleanup lambda runs.
         std::filesystem::create_directories(m_installedPath);
-        wil::unique_hfile fileHandle(
-            ::CreateFileW((m_installedPath / WSL_BINARY_NAME).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+        wil::unique_hfile fileHandle(::CreateFileW(
+            (m_installedPath / WSL_BINARY_NAME).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 
         // Install the installer MSIX
         InstallMsix();
@@ -1059,9 +1059,8 @@ class InstallerTests
 
     void VerifyWslSettingsProtocolAssociationExistsWithRetry()
     {
-        VERIFY_NO_THROW(
-            wsl::shared::retry::RetryWithTimeout<void>(
-                [&]() { THROW_HR_IF(E_UNEXPECTED, !WslSettingsProtocolAssociationExists()); }, std::chrono::seconds(1), std::chrono::minutes(2)));
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_UNEXPECTED, !WslSettingsProtocolAssociationExists()); }, std::chrono::seconds(1), std::chrono::minutes(2)));
     }
 
     TEST_METHOD(WslValidateWslSettingsProtocol)
