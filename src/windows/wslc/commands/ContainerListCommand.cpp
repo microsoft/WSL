@@ -20,6 +20,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "ContainerTasks.h"
+#include "SessionTasks.h"
 #include "Task.h"
 
 using wsl::windows::common::wslutil::PrintMessage;

@@ -58,6 +58,13 @@ COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false) // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
 
+// Logs commnad
+COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --follow cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs cont1 -f", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs", L"logs", false)
+
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
 COMMAND_LINE_TEST_CASE(L"CONTAINER list", L"list", false)               // We are intentionally case-sensitive

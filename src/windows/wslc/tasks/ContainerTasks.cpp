@@ -45,17 +45,6 @@ void CreateContainer(CLIExecutionContext& context)
     wslutil::PrintMessage(wsl::shared::string::MultiByteToWide(result.Id));
 }
 
-void CreateSession(CLIExecutionContext& context)
-{
-    std::optional<SessionOptions> options = std::nullopt;
-    if (context.Args.Contains(ArgType::SessionId))
-    {
-        // TODO: Add session ID to the session options to open the specified session.
-    }
-
-    context.Data.Add<Data::Session>(SessionService::CreateSession(options));
-}
-
 void DeleteContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -202,5 +191,14 @@ void StopContainers(CLIExecutionContext& context)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), string::WideToMultiByte(id), options);
     }
+}
+
+void ViewContainerLogs(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerId = context.Args.Get<ArgType::ContainerId>();
+    bool follow = context.Args.Contains(ArgType::Follow);
+    ContainerService::Logs(session, string::WideToMultiByte(containerId), follow);
 }
 } // namespace wsl::windows::wslc::task

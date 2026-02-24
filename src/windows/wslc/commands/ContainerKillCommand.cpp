@@ -19,6 +19,7 @@ Abstract:
 #include "CLIExecutionContext.h"
 #include "ExecutionContextData.h"
 #include "ContainerTasks.h"
+#include "SessionTasks.h"
 #include "Task.h"
 
 #include <wslservice.h>
