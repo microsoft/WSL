@@ -438,9 +438,9 @@ static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
             GetCurrentProcess(),
             GetCurrentProcessId(),
             dumpFile.get(),
-            MiniDumpWithDataSegs | MiniDumpWithProcessThreadData | MiniDumpWithHandleData | MiniDumpWithPrivateReadWriteMemory |
-                MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo | MiniDumpWithThreadInfo | MiniDumpWithTokenInformation |
-                MiniDumpWithPrivateWriteCopyMemory | MiniDumpWithCodeSegs,
+            MiniDumpWithDataSegs | MiniDumpWithFullMemory | MiniDumpWithProcessThreadData | MiniDumpWithHandleData |
+                MiniDumpWithPrivateReadWriteMemory | MiniDumpWithUnloadedModules | MiniDumpWithFullMemoryInfo |
+                MiniDumpWithThreadInfo | MiniDumpWithTokenInformation | MiniDumpWithPrivateWriteCopyMemory | MiniDumpWithCodeSegs,
             &exceptionInfo,
             nullptr,
             nullptr));
