@@ -12,12 +12,10 @@ Abstract:
 
 --*/
 #include "CLIExecutionContext.h"
-#include "ExecutionContextData.h"
 #include "SessionCommand.h"
 #include "SessionTasks.h"
 #include "Task.h"
 
-using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
