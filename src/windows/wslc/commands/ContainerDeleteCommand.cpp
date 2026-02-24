@@ -18,10 +18,6 @@ Abstract:
 #include "SessionTasks.h"
 #include "Task.h"
 
-#include <wslservice.h>
-#include <wslaservice.h>
-#include <docker_schema.h>
-
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
