@@ -926,6 +926,7 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     //
     // Enable dump collection when processes crash.
     //
+
     WSLAEnableCrashDumpCollection();
 
     //
@@ -933,11 +934,6 @@ int WSLAEntryPoint(int Argc, char* Argv[])
     //
 
     if (WriteToFile("/proc/sys/kernel/print-fatal-signals", "1\n") < 0)
-    {
-        return -1;
-    }
-
-    if (WriteToFile("/proc/sys/kernel/print-fatal-signals", "0\n") < 0)
     {
         return -1;
     }

@@ -57,6 +57,8 @@ public:
     WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const WSLA_SESSION_INIT_SETTINGS* Settings);
     ~WSLAVirtualMachine();
 
+    void Initialize();
+
     void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
     void UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
     void Unmount(_In_ const char* Path);

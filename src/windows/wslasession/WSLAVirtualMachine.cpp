@@ -39,6 +39,11 @@ WSLAVirtualMachine::WSLAVirtualMachine(_In_ IWSLAVirtualMachine* Vm, _In_ const 
     m_bootTimeoutMs(Settings->BootTimeoutMs),
     m_rootVhdType(Settings->RootVhdTypeOverride ? Settings->RootVhdTypeOverride : "ext4")
 {
+    // N.B. The constructor should not run any operation that could throw, so the destructor runs even if the VM fails to boot.
+}
+
+void WSLAVirtualMachine::Initialize()
+{
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
     // Establish a socket channel with mini_init in the VM.
@@ -747,6 +752,7 @@ try
 CATCH_RETURN();
 
 HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
+try
 {
     std::lock_guard lock(m_lock);
 
@@ -767,6 +773,7 @@ HRESULT WSLAVirtualMachine::UnmountWindowsFolder(_In_ LPCSTR LinuxPath)
 
     return S_OK;
 }
+CATCH_RETURN();
 
 void WSLAVirtualMachine::MountGpuLibraries(_In_ LPCSTR LibrariesMountPoint, _In_ LPCSTR DriversMountpoint)
 {

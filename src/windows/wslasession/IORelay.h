@@ -39,7 +39,7 @@ private:
     std::vector<std::unique_ptr<common::relay::OverlappedIOHandle>> m_pendingHandles;
 
     std::thread m_thread;
-    bool m_exit = false;
+    std::atomic<bool> m_exit = false;
 };
 
 } // namespace wsl::windows::service::wsla
