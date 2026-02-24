@@ -58,6 +58,7 @@ class WSLATests
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
 
+        // The WSLC SDK tests use this same storage to reduce pull overhead.
         m_storagePath = std::filesystem::current_path() / "test-storage";
         m_defaultSessionSettings = GetDefaultSessionSettings(c_testSessionName, true, WSLANetworkingModeVirtioProxy);
         m_defaultSession = CreateSession(m_defaultSessionSettings);
@@ -2419,6 +2420,7 @@ class WSLATests
                 VERIFY_ARE_EQUAL(expectedName, containers[i].Name);
                 VERIFY_ARE_EQUAL(expectedImage, containers[i].Image);
                 VERIFY_ARE_EQUAL(expectedState, containers[i].State);
+                VERIFY_ARE_EQUAL(strlen(containers[i].Id), WSLA_CONTAINER_ID_LENGTH);
             }
         };
 
