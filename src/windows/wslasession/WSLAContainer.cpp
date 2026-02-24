@@ -267,8 +267,6 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
 
 } // namespace
 
-static constexpr DWORD stopTimeout = 60000; // 60 seconds
-
 WSLAContainerImpl::WSLAContainerImpl(
     WSLAVirtualMachine* parentVM,
     std::string&& Id,
@@ -338,36 +336,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
     }
 
     m_containerEvents.Reset();
-
-    // Disconnect from the COM instance. After this returns, no COM calls can be made to this instance.
-    m_comWrapper->Disconnect();
-
-    // Stop running containers.
-    if (m_state == WslaContainerStateRunning)
-    {
-        try
-        {
-            Stop(WSLASignalSIGKILL, stopTimeout);
-        }
-        CATCH_LOG();
-    }
-
-    // Release port mappings.
-    std::set<uint16_t> allocatedGuestPorts;
-    for (const auto& e : m_mappedPorts)
-    {
-        WI_ASSERT(e.MappedToHost);
-
-        try
-        {
-            m_parentVM->UnmapPort(e.Family, e.HostPort, e.VmPort);
-        }
-        CATCH_LOG();
-
-        allocatedGuestPorts.insert(e.VmPort);
-    }
-
-    m_parentVM->ReleasePorts(allocatedGuestPorts);
+    ReleaseResources();
 }
 
 void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process)
@@ -498,7 +467,6 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
-
         std::lock_guard<std::recursive_mutex> lock(m_lock);
         m_state = WslaContainerStateExited;
 
@@ -510,6 +478,11 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         }
 
         m_processes.clear();
+
+        if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+        {
+            Delete();
+        }
     }
 
     WSL_LOG(
@@ -547,15 +520,18 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
     catch (const DockerHTTPException& e)
     {
         // HTTP 304 is returned when the container is already stopped.
-        if (e.StatusCode() == 304)
+        if (e.StatusCode() != 304)
         {
-            return;
+            THROW_DOCKER_USER_ERROR_MSG(e, "Failed to stop container '%hs'", m_id.c_str());
         }
-
-        THROW_DOCKER_USER_ERROR_MSG(e, "Failed to stop container '%hs'", m_id.c_str());
     }
 
     m_state = WslaContainerStateExited;
+
+    if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+    {
+        Delete();
+    }
 }
 
 void WSLAContainerImpl::Delete()
@@ -576,7 +552,7 @@ void WSLAContainerImpl::Delete()
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
-    UnmountVolumes(m_mountedVolumes, *m_parentVM);
+    ReleaseResources();
 
     m_state = WslaContainerStateDeleted;
 }
@@ -682,8 +658,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
         do
         {
-            auto inspectJson = m_dockerClient.InspectExec(result.Id);
-            auto state = wsl::shared::FromJson<common::docker_schema::InspectExec>(inspectJson.c_str());
+            auto state = m_dockerClient.InspectExec(result.Id);
             if (state.Running && state.Pid.has_value())
             {
                 control->SetPid(state.Pid.value());
@@ -700,7 +675,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
                     HRESULT_FROM_WIN32(ERROR_TIMEOUT),
                     "Timed out waiting for exec state for '%hs'. Last state: %hs",
                     result.Id.c_str(),
-                    inspectJson.c_str());
+                    wsl::shared::ToJson(state).c_str());
             }
 
         } while (!control->GetExitEvent().wait(100));
@@ -814,6 +789,39 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         request.Domainname = containerOptions.DomainName;
     }
 
+    if (containerOptions.DnsServers.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsServers.Values,
+            "DnsServers.Values is null with Count=%lu",
+            containerOptions.DnsServers.Count);
+
+        request.HostConfig.Dns = StringArrayToVector(containerOptions.DnsServers);
+    }
+
+    if (containerOptions.DnsSearchDomains.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsSearchDomains.Values,
+            "DnsSearchDomains.Values is null with Count=%lu",
+            containerOptions.DnsSearchDomains.Count);
+
+        request.HostConfig.DnsSearch = StringArrayToVector(containerOptions.DnsSearchDomains);
+    }
+
+    if (containerOptions.DnsOptions.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsOptions.Values,
+            "DnsOptions.Values is null with Count=%lu",
+            containerOptions.DnsOptions.Count);
+
+        request.HostConfig.DnsOptions = StringArrayToVector(containerOptions.DnsOptions);
+    }
+
     if (containerOptions.InitProcessOptions.User != nullptr)
     {
         request.User = containerOptions.InitProcessOptions.User;
@@ -874,6 +882,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // Build WSLA metadata to store in a label for recovery on Open().
     WSLAContainerMetadataV1 metadata;
+    metadata.Flags = containerOptions.Flags;
     metadata.InitProcessFlags = containerOptions.InitProcessOptions.Flags;
     metadata.Volumes = volumes;
     metadata.Ports = ports;
@@ -949,7 +958,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
         ioRelay,
         DockerStateToWSLAState(dockerContainer.State),
         metadata.InitProcessFlags,
-        WSLAContainerFlagsNone);
+        metadata.Flags);
 
     errorCleanup.release();
     volumeErrorCleanup.release();
@@ -969,8 +978,7 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     try
     {
         // Get Docker inspect data
-        auto dockerJson = m_dockerClient.InspectContainer(m_id);
-        auto dockerInspect = wsl::shared::FromJson<DockerInspectContainer>(dockerJson.c_str());
+        auto dockerInspect = m_dockerClient.InspectContainer(m_id);
 
         // Convert to WSLA schema
         auto wslaInspect = BuildInspectContainer(dockerInspect);
@@ -1056,6 +1064,44 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     m_ioRelay.AddHandles(std::move(ioHandles));
 
     return std::make_unique<RelayedProcessIO>(std::move(fds));
+}
+
+void WSLAContainerImpl::ReleaseResources()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    // Disconnect the COM wrapper so no new RPC calls can reach this container.
+    if (m_comWrapper)
+    {
+        m_comWrapper->Disconnect();
+        m_comWrapper.Reset();
+    }
+
+    // Unmount volumes.
+    UnmountVolumes(m_mountedVolumes, *m_parentVM);
+    m_mountedVolumes.clear();
+
+    // Unmap and release ports.
+    std::set<uint16_t> allocatedGuestPorts;
+    for (const auto& e : m_mappedPorts)
+    {
+        WI_ASSERT(e.MappedToHost);
+
+        try
+        {
+            m_parentVM->UnmapPort(e.Family, e.HostPort, e.VmPort);
+        }
+        CATCH_LOG();
+
+        allocatedGuestPorts.insert(e.VmPort);
+    }
+
+    if (!allocatedGuestPorts.empty())
+    {
+        m_parentVM->ReleasePorts(allocatedGuestPorts);
+    }
+
+    m_mappedPorts.clear();
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :

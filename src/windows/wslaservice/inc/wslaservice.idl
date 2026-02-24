@@ -227,6 +227,10 @@ struct WSLA_CONTAINER_OPTIONS
     [unique] LPCSTR HostName;
     [unique] LPCSTR DomainName;
 
+    WSLAStringArray DnsServers;
+    WSLAStringArray DnsSearchDomains;
+    WSLAStringArray DnsOptions;
+
     ULONGLONG ShmSize;
     struct WSLA_CONTAINER_NETWORK ContainerNetwork;
 };
