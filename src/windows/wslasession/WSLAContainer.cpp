@@ -658,8 +658,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
         do
         {
-            auto inspectJson = m_dockerClient.InspectExec(result.Id);
-            auto state = wsl::shared::FromJson<common::docker_schema::InspectExec>(inspectJson.c_str());
+            auto state = m_dockerClient.InspectExec(result.Id);
             if (state.Running && state.Pid.has_value())
             {
                 control->SetPid(state.Pid.value());
@@ -676,7 +675,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
                     HRESULT_FROM_WIN32(ERROR_TIMEOUT),
                     "Timed out waiting for exec state for '%hs'. Last state: %hs",
                     result.Id.c_str(),
-                    inspectJson.c_str());
+                    wsl::shared::ToJson(state).c_str());
             }
 
         } while (!control->GetExitEvent().wait(100));
@@ -810,6 +809,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
             containerOptions.DnsSearchDomains.Count);
 
         request.HostConfig.DnsSearch = StringArrayToVector(containerOptions.DnsSearchDomains);
+    }
+
+    if (containerOptions.DnsOptions.Count > 0)
+    {
+        THROW_HR_IF_NULL_MSG(
+            E_INVALIDARG,
+            containerOptions.DnsOptions.Values,
+            "DnsOptions.Values is null with Count=%lu",
+            containerOptions.DnsOptions.Count);
+
+        request.HostConfig.DnsOptions = StringArrayToVector(containerOptions.DnsOptions);
     }
 
     if (containerOptions.InitProcessOptions.User != nullptr)
@@ -968,8 +978,7 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     try
     {
         // Get Docker inspect data
-        auto dockerJson = m_dockerClient.InspectContainer(m_id);
-        auto dockerInspect = wsl::shared::FromJson<DockerInspectContainer>(dockerJson.c_str());
+        auto dockerInspect = m_dockerClient.InspectContainer(m_id);
 
         // Convert to WSLA schema
         auto wslaInspect = BuildInspectContainer(dockerInspect);

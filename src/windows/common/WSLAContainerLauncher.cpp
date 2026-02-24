@@ -131,6 +131,11 @@ void WSLAContainerLauncher::SetDnsSearchDomains(std::vector<std::string>&& DnsSe
     m_dnsSearchDomains = std::move(DnsSearchDomains);
 }
 
+void WSLAContainerLauncher::SetDnsOptions(std::vector<std::string>&& DnsOptions)
+{
+    m_dnsOptions = std::move(DnsOptions);
+}
+
 void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
@@ -231,6 +236,17 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
     if (!dnsSearchDomainsStorage.empty())
     {
         options.DnsSearchDomains = {dnsSearchDomainsStorage.data(), static_cast<ULONG>(dnsSearchDomainsStorage.size())};
+    }
+
+    std::vector<const char*> dnsOptionsStorage;
+    for (const auto& e : m_dnsOptions)
+    {
+        dnsOptionsStorage.push_back(e.c_str());
+    }
+
+    if (!dnsOptionsStorage.empty())
+    {
+        options.DnsOptions = {dnsOptionsStorage.data(), static_cast<ULONG>(dnsOptionsStorage.size())};
     }
 
     if (!m_workingDirectory.empty())

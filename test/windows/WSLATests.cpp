@@ -2131,6 +2131,30 @@ class WSLATests
             ValidateProcessOutput(process, {}, 0);
         }
 
+        // Validate that custom DNS options are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-dns-options", {"/bin/grep", "-iF", "timeout:1", "/etc/resolv.conf"});
+
+            launcher.SetDnsOptions({"timeout:1"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
+        // Validate that multiple DNS options are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest", "test-dns-options-multiple", {"/bin/grep", "-iF", "timeout:2", "/etc/resolv.conf"});
+
+            launcher.SetDnsOptions({"timeout:1", "timeout:2"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
         // Validate that the username is correctly wired.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-username", {"whoami"});
