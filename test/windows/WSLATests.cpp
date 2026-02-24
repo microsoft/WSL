@@ -43,15 +43,15 @@ class WSLATests
 
     void LoadTestImage(PCWSTR imageName)
     {
-        std::filesystem::path imageTar = std::filesystem::path{g_testDataPath} / imageName;
-        wil::unique_handle imageTarFileHandle{
-            CreateFileW(imageTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
-        THROW_LAST_ERROR_IF(INVALID_HANDLE_VALUE == imageTarFileHandle.get());
+        std::filesystem::path imagePath = std::filesystem::path{g_testDataPath} / imageName;
+        wil::unique_hfile imageFile{
+            CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!imageFile);
 
         LARGE_INTEGER fileSize{};
-        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageTarFileHandle.get(), &fileSize));
+        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
 
-        THROW_IF_FAILED(m_defaultSession->LoadImage(HandleToULong(imageTarFileHandle.get()), nullptr, fileSize.QuadPart));
+        THROW_IF_FAILED(m_defaultSession->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
     }
 
     TEST_CLASS_SETUP(TestClassSetup)
@@ -350,8 +350,8 @@ class WSLATests
                 auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
                 if (comError.has_value())
                 {
-                    auto tooManyRequests = wil::make_cotaskmem_string(L"toomanyrequests");
-                    if (wcsstr(comError->Message.get(), tooManyRequests.get()) != nullptr)
+                    std::wstring tooManyRequests = L"toomanyrequests";
+                    if (wcsstr(comError->Message.get(), tooManyRequests.c_str()) != nullptr)
                     {
                         LogWarning("Skipping PullImage test due to rate limiting.");
                         return;
