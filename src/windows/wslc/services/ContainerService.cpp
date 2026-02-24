@@ -42,8 +42,8 @@ static inline int ResolveOrAllocatePort(PublishPort port, int offset)
     // Create a socket matching the protocol.
     const int sockType = (port.PortProtocol() == PublishPort::Protocol::TCP) ? SOCK_STREAM : SOCK_DGRAM;
     const int ipProto = (port.PortProtocol() == PublishPort::Protocol::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
-    auto socket = ::socket(isIPv6 ? AF_INET6 : AF_INET, sockType, ipProto);
-    THROW_LAST_ERROR_IF(socket == INVALID_SOCKET);
+    wil::unique_socket socket(::socket(isIPv6 ? AF_INET6 : AF_INET, sockType, ipProto));
+    THROW_LAST_ERROR_IF(socket.get() == INVALID_SOCKET);
 
     // Bind to port 0 to ask Windows for an ephemeral port
     sockaddr_storage addr{};
@@ -81,20 +81,12 @@ static inline int ResolveOrAllocatePort(PublishPort port, int offset)
         addrLen = sizeof(sockaddr_in);
     }
 
-    if (::bind(socket, reinterpret_cast<const sockaddr*>(&addr), addrLen) == SOCKET_ERROR)
-    {
-        ::closesocket(socket);
-        THROW_LAST_ERROR();
-    }
+    THROW_LAST_ERROR_IF(::bind(socket.get(), reinterpret_cast<const sockaddr*>(&addr), addrLen) == SOCKET_ERROR);
 
     // Read the chosen port back
     sockaddr_storage bound{};
     int len = sizeof(bound);
-    if (::getsockname(socket, reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR)
-    {
-        ::closesocket(socket);
-        THROW_LAST_ERROR();
-    }
+    THROW_LAST_ERROR_IF(::getsockname(socket.get(), reinterpret_cast<sockaddr*>(&bound), &len) == SOCKET_ERROR);
 
     int chosen = 0;
     if (isIPv6)
@@ -108,7 +100,6 @@ static inline int ResolveOrAllocatePort(PublishPort port, int offset)
         chosen = ntohs(bound4->sin_port);
     }
 
-    ::closesocket(socket);
     return chosen;
 }
 
