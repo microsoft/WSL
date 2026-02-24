@@ -19,12 +19,15 @@ Abstract:
 #include <docker_schema.h>
 #include <CommandLine.h>
 #include <unordered_map>
+#include <wslaservice.h>
 
 namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
+
+DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
 static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
 {
@@ -223,5 +226,29 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(container->Inspect(&output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
+}
+
+void ContainerService::Logs(Session& session, const std::string& id, bool follow)
+{
+    wil::com_ptr<IWSLAContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+    wil::unique_handle stdoutLogs;
+    wil::unique_handle stderrLogs;
+    WSLALogsFlags flags = WSLALogsFlagsNone;
+    WI_SetFlagIf(flags, WSLALogsFlagsFollow, follow);
+
+    THROW_IF_FAILED(container->Logs(flags, reinterpret_cast<ULONG*>(&stdoutLogs), reinterpret_cast<ULONG*>(&stderrLogs), 0, 0, 0));
+
+    wsl::windows::common::relay::MultiHandleWait io;
+    io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+        std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
+    if (stderrLogs) // This handle is only used for non-tty processes.
+    {
+        io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+            std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+    }
+
+    // TODO: Handle ctrl-c.
+    io.Run({});
 }
 } // namespace wsl::windows::wslc::services

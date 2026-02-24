@@ -42,12 +42,6 @@ void CreateContainer(CLIExecutionContext& context)
     PrintMessage(MultiByteToWide(result.Id));
 }
 
-void CreateSession(CLIExecutionContext& context)
-{
-    std::optional<SessionOptions> options = std::nullopt;
-    context.Data.Add<Data::Session>(SessionService::CreateSession(options));
-}
-
 void DeleteContainers(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Data.Contains(Data::Session));
@@ -249,5 +243,14 @@ void StopContainers(CLIExecutionContext& context)
     {
         ContainerService::Stop(context.Data.Get<Data::Session>(), WideToMultiByte(id), options);
     }
+}
+
+void ViewContainerLogs(CLIExecutionContext& context)
+{
+    WI_ASSERT(context.Data.Contains(Data::Session));
+    auto& session = context.Data.Get<Data::Session>();
+    auto containerId = context.Args.Get<ArgType::ContainerId>();
+    bool follow = context.Args.Contains(ArgType::Follow);
+    ContainerService::Logs(session, string::WideToMultiByte(containerId), follow);
 }
 } // namespace wsl::windows::wslc::task
