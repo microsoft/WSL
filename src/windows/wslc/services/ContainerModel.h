@@ -122,9 +122,16 @@ struct PublishPort
         {
             return m_isIPv6;
         }
+
+        const std::array<uint8_t, 16> GetBytes() const
+        {
+            return m_bytes;
+        }
+
         static IPAddress ParseHostIP(const std::string& hostIpPart);
         bool IsLoopback() const;
         bool IsAllInterfaces() const;
+        std::string ToString() const;
 
     private:
         bool m_isIPv6 = false;

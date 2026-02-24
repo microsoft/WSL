@@ -102,6 +102,20 @@ bool PublishPort::IPAddress::IsAllInterfaces() const
     return true;
 }
 
+std::string PublishPort::IPAddress::ToString() const
+{
+    char strBuffer[INET6_ADDRSTRLEN] = {};
+    if (IsIPv6())
+    {
+        inet_ntop(AF_INET6, m_bytes.data(), strBuffer, INET6_ADDRSTRLEN);
+    }
+    else
+    {
+        inet_ntop(AF_INET, m_bytes.data(), strBuffer, INET_ADDRSTRLEN);
+    }
+    return std::string(strBuffer);
+}
+
 bool PublishPort::IPAddress::IsLoopback() const
 {
     if (IsIPv6())
