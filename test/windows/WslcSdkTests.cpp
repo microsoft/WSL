@@ -183,9 +183,8 @@ class WslcSdkTests
         {
             WslcPullImageOptions pullOptions{};
             pullOptions.uri = image;
-            PWSTR rawErrorMsg = nullptr;
-            const auto hr = WslcSessionImagePull(m_defaultSession, &pullOptions, &rawErrorMsg);
-            wil::unique_cotaskmem_string errorMsg{rawErrorMsg};
+            wil::unique_cotaskmem_string errorMsg;
+            const auto hr = WslcSessionImagePull(m_defaultSession, &pullOptions, &errorMsg);
             if (FAILED(hr))
             {
                 LogError("Failed to pull image '%hs': 0x%08x, %ls", image, hr, errorMsg ? errorMsg.get() : L"(no message)");
@@ -439,7 +438,7 @@ class WslcSdkTests
         }
 
         // Stop the container gracefully (after the timeout).
-        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGTERM, 10));
+        VERIFY_SUCCEEDED(WslcContainerStop(container.get(), WSLC_SIGNAL_SIGKILL, 10));
 
         // Delete the stopped container.
         VERIFY_SUCCEEDED(WslcContainerDelete(container.get(), WSLC_DELETE_CONTAINER_FLAG_NONE));
