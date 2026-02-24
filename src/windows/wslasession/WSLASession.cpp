@@ -99,6 +99,8 @@ try
     // Make sure that everything is destroyed correctly if an exception is thrown.
     auto errorCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(Terminate()); });
 
+    m_virtualMachine->Initialize();
+
     // Configure storage.
     ConfigureStorage(*Settings, tokenInfo->User.Sid);
 
@@ -902,6 +904,9 @@ try
 
     // Look for an exact ID match first.
     std::lock_guard lock{m_lock};
+
+    // Purge containers that were auto-deleted via OnEvent (--rm).
+    std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
     auto it = std::ranges::find_if(m_containers, [Id](const auto& e) { return e->ID() == Id; });
 
     // If no match is found, call Inspect() so that partial IDs and names are matched.
@@ -941,6 +946,9 @@ try
     *Containers = nullptr;
 
     std::lock_guard lock{m_lock};
+
+    // Purge containers that were auto-deleted via OnEvent (--rm).
+    std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
 
     auto output = wil::make_unique_cotaskmem<WSLA_CONTAINER[]>(m_containers.size());
 
