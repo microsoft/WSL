@@ -2004,6 +2004,8 @@ int wsl::windows::common::WslClient::Main(_In_ LPCWSTR commandLine)
     // Note WslTraceLoggingUninitialize() is a no-op if WslTraceLoggingInitialize was not called.
     auto cleanupTelemetry = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { WslTraceLoggingUninitialize(); });
 
+    int* dummy = nullptr;
+    *dummy = 1;
     std::optional<wsl::windows::common::ExecutionContext> context;
     auto entryPoint = Entrypoint::Wsl;
     DWORD exitCode;
