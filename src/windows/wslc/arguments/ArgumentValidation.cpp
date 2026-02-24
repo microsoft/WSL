@@ -70,8 +70,8 @@ void ValidateWSLASignalFromString(const std::vector<std::wstring>& values, const
 // Convert string to WSLASignal enum - accepts either signal name (e.g., "SIGKILL") or number (e.g., "9")
 WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring& argName)
 {
-    constexpr int MIN_SIGNAL = 1;  // WSLASignalSIGHUP
-    constexpr int MAX_SIGNAL = 31; // WSLASignalSIGSYS
+    constexpr int MIN_SIGNAL = WSLASignalSIGHUP;
+    constexpr int MAX_SIGNAL = WSLASignalSIGSYS;
     constexpr std::wstring_view sigPrefix = L"SIG";
 
     // Normalize input: ensure it has "SIG" prefix for map lookup
@@ -94,10 +94,25 @@ WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring
     }
 
     // User may have input an integer representation instead.
-    int signalValue = GetIntegerFromString<int>(input, argName);
+    int signalValue;
+    try
+    {
+        signalValue = GetIntegerFromString<int>(input, argName);
+    }
+    // If it fails to be converted give a better user message than just the integer conversion
+    // failure since we also know it failed to be found in the map.
+    catch (ArgumentException)
+    {
+        throw ArgumentException(
+            L"Invalid " + argName + L" value: " + input +
+            L" is not a recognized signal name or number (Example: SIGKILL, kill, or 9).");
+    }
+
     if (signalValue < MIN_SIGNAL || signalValue > MAX_SIGNAL)
     {
-        throw ArgumentException(L"Invalid " + argName + L" value: " + input + L" is out of valid range (1-31)");
+        throw ArgumentException(
+            L"Invalid " + argName + L" value: " + input + L" is out of valid range (" + std::to_wstring(MIN_SIGNAL) + L"-" +
+            std::to_wstring(MAX_SIGNAL) + L")");
     }
 
     return static_cast<WSLASignal>(signalValue);

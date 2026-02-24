@@ -17,7 +17,6 @@ Abstract:
 #include <string>
 #include <vector>
 #include <charconv>
-#include <unordered_map>
 #include <wslaservice.h>
 #include <string.hpp>
 
