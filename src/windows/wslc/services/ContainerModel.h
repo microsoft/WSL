@@ -43,7 +43,7 @@ struct StopContainerOptions
 {
     static constexpr ULONG DefaultTimeout = -1;
 
-    int Signal = WSLASignalSIGTERM;
+    ULONG Signal = WSLASignalSIGTERM;
     ULONG Timeout = DefaultTimeout;
 };
 
