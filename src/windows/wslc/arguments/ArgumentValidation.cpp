@@ -16,6 +16,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "Exceptions.h"
 #include <charconv>
+#include <format>
 #include <unordered_map>
 #include <wslaservice.h>
 
@@ -94,7 +95,7 @@ WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring
     }
 
     // User may have input an integer representation instead.
-    int signalValue;
+    int signalValue{};
     try
     {
         signalValue = GetIntegerFromString<int>(input, argName);
@@ -103,16 +104,13 @@ WSLASignal GetWSLASignalFromString(const std::wstring& input, const std::wstring
     // failure since we also know it failed to be found in the map.
     catch (ArgumentException)
     {
-        throw ArgumentException(
-            L"Invalid " + argName + L" value: " + input +
-            L" is not a recognized signal name or number (Example: SIGKILL, kill, or 9).");
+        throw ArgumentException(std::format(
+            L"Invalid {} value: {} is not a recognized signal name or number (Example: SIGKILL, kill, or 9).", argName, input));
     }
 
     if (signalValue < MIN_SIGNAL || signalValue > MAX_SIGNAL)
     {
-        throw ArgumentException(
-            L"Invalid " + argName + L" value: " + input + L" is out of valid range (" + std::to_wstring(MIN_SIGNAL) + L"-" +
-            std::to_wstring(MAX_SIGNAL) + L")");
+        throw ArgumentException(std::format(L"Invalid {} value: {} is out of valid range ({}-{}).", argName, input, MIN_SIGNAL, MAX_SIGNAL));
     }
 
     return static_cast<WSLASignal>(signalValue);
