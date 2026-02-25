@@ -4367,6 +4367,9 @@ class WSLATests
                 {
                     exportStarted.SetEvent();
                 }
+
+                // Block until the test completes.
+                testComplete.wait(60 * 1000);
             }
         });
 
@@ -4376,8 +4379,14 @@ class WSLATests
             pipeWrite.reset();
             if (!testComplete.is_signaled()) // Sanity check.
             {
-                LogError("Export completed before test complete");
+                LogError("Export completed before test completed");
             }
+        });
+
+        auto cleanup = wil::scope_exit([&]() {
+            testComplete.SetEvent();
+            exportIoThread.join();
+            exportThread.join();
         });
 
         // Wait for the export to be in progress
@@ -4406,9 +4415,5 @@ class WSLATests
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
         }
-
-        testComplete.SetEvent();
-        exportIoThread.join();
-        exportThread.join();
     }
 };
