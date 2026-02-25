@@ -31,6 +31,7 @@ public:
     {
     public:
         NON_COPYABLE(LockInstance);
+        DEFAULT_MOVABLE(LockInstance);
 
         LockInstance(SharedMutex<TMutex>& mutex, std::unique_lock<TMutex>&& shared) : m_mutex(mutex), m_shared(std::move(shared))
         {
