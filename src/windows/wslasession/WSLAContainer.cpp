@@ -473,7 +473,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-        auto previousState = Transition(WslaContainerStateExited);
+        auto previousState = m_state;
 
         // Notify all processes that the container has exited.
         // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
@@ -488,6 +488,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         // This can happen if Delete() is called by the user.
         if (previousState == WslaContainerStateRunning)
         {
+            Transition(WslaContainerStateExited);
             if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
             {
                 Delete();
@@ -1116,19 +1117,18 @@ void WSLAContainerImpl::ReleaseResources()
     m_mappedPorts.clear();
 }
 
-__requires_lock_held(m_lock) WSLA_CONTAINER_STATE WSLAContainerImpl::Transition(WSLA_CONTAINER_STATE State) noexcept
+__requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLA_CONTAINER_STATE State) noexcept
 {
-    auto previousState = m_state;
+    // N.B. A deleted container cannot transition back to any other state.
+    WI_ASSERT(m_state != WslaContainerStateDeleted);
 
     WSL_LOG(
         "ContainerStateChange",
-        TraceLoggingValue(static_cast<int>(previousState), "PreviousState"),
+        TraceLoggingValue(static_cast<int>(m_state), "PreviousState"),
         TraceLoggingValue(static_cast<int>(State), "NewState"),
         TraceLoggingValue(m_id.c_str(), "ID"));
 
     m_state = State;
-
-    return previousState;
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
