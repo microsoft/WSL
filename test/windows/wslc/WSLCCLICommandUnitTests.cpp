@@ -68,7 +68,7 @@ class WSLCCLICommandUnitTests
         auto cmd = SessionCommand(L"session");
         auto subcommands = cmd.GetCommands();
 
-        // Verify it has subcommands (create, list, run, etc.)
+        // Verify it has subcommands
         VERIFY_IS_TRUE(subcommands.size() > 0);
         LogComment(L"SessionCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
 
@@ -85,7 +85,7 @@ class WSLCCLICommandUnitTests
         auto cmd = ContainerCommand(L"container");
         auto subcommands = cmd.GetCommands();
 
-        // Verify it has subcommands (create, list, run, etc.)
+        // Verify it has subcommands
         VERIFY_IS_TRUE(subcommands.size() > 0);
         LogComment(L"ContainerCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
 
