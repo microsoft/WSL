@@ -59,6 +59,12 @@ COMMAND_LINE_TEST_CASE(L"container create --name foo ubuntu", L"create", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1 echo Hello", L"exec", true)
 COMMAND_LINE_TEST_CASE(L"exec cont1", L"exec", false)                                         // Missing required command argument
 COMMAND_LINE_TEST_CASE(L"container exec -it cont1 sh -c \"echo a && echo b\"", L"exec", true) // docker exec example
+COMMAND_LINE_TEST_CASE(L"kill cont1 --signal sigkill", L"kill", true)
+COMMAND_LINE_TEST_CASE(L"container kill cont1 -s KILL", L"kill", true)
+COMMAND_LINE_TEST_CASE(L"inspect cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"container inspect cont1", L"inspect", true)
+COMMAND_LINE_TEST_CASE(L"delete cont1", L"delete", true)
+COMMAND_LINE_TEST_CASE(L"container delete cont1 cont2", L"delete", true)
 
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
