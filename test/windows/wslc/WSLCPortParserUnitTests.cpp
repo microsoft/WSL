@@ -259,6 +259,28 @@ class WSLCPortParserUnitTests
         }
     }
 
+    TEST_METHOD(PortParserTest_InvalidMappings)
+    {
+        static const std::vector<std::string> invalidCases = {
+            "127.0.0.1:80",         // Missing container port
+            "[::1]:8080",           // Missing container port
+            "8000-8005:8000-8006",  // Mismatched port ranges
+            "8000-8005:8000",       // Mismatched port ranges
+            "8000:8000-8005",       // Mismatched port ranges
+            "8080:80/icmp",         // Invalid protocol
+            "8080:80/udpp",         // Invalid protocol
+            "::1:8080:80",          // Missing brackets for IPv6
+            "8000-7000",            // Invalid port range
+            "0",                    // Invalid port number
+            "65536",                // Invalid port number
+        };
+
+        for (const auto& value : invalidCases)
+        {
+            VERIFY_THROWS(PublishPort::Parse(value), wil::ResultException);
+        }
+    }
+
 private:
     static void VerifyRange(const PublishPort::PortRange& range, int start, int end)
     {

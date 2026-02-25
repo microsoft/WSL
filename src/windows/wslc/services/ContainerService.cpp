@@ -91,7 +91,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
             int family = portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6() ? AF_INET6 : AF_INET;
             auto currentContainerPort = containerPort.Start() + i;
             auto currentHostPort = portMapping.HasEphemeralHostPort() ? 0 : portMapping.HostPort()->Start() + i;
-            containerLauncher.AddPortW(currentHostPort, currentContainerPort, family);
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, family);
         }
     }
 
