@@ -23,7 +23,7 @@ struct ContainerService
     static models::CreateContainerResult Create(models::Session& session, const std::string& image, models::ContainerOptions options, IProgressCallback* callback);
     static void Start(models::Session& session, const std::string& id);
     static void Stop(models::Session& session, const std::string& id, models::StopContainerOptions options);
-    static void Kill(models::Session& session, const std::string& id, int signal = WSLASignalSIGKILL);
+    static void Kill(models::Session& session, const std::string& id, WSLASignal signal = WSLASignalSIGKILL);
     static void Delete(models::Session& session, const std::string& id, bool force);
     static std::vector<models::ContainerInformation> List(models::Session& session);
     static int Exec(models::Session& session, const std::string& id, models::ContainerOptions options);

@@ -102,10 +102,10 @@ void KillContainers(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     auto& session = context.Data.Get<Data::Session>();
     auto containerIds = context.Args.GetAll<ArgType::ContainerId>();
-    ULONG signal = WSLASignalSIGKILL;
+    WSLASignal signal = WSLASignalSIGKILL;
     if (context.Args.Contains(ArgType::Signal))
     {
-        signal = std::stoul(context.Args.Get<ArgType::Signal>());
+        signal = validation::GetWSLASignalFromString(context.Args.Get<ArgType::Signal>());
     }
 
     for (const auto& id : containerIds)
@@ -141,30 +141,39 @@ void ListContainers(CLIExecutionContext& context)
         return;
     }
 
+    FormatType format = FormatType::Table; // Default is table
     if (context.Args.Contains(ArgType::Format))
     {
-        if (IsEqual(context.Args.Get<ArgType::Format>(), L"json"))
+        format = validation::GetFormatTypeFromString(context.Args.Get<ArgType::Format>());
+    }
+
+    switch (format)
+    {
+    case FormatType::Json:
+    {
+        auto json = ToJson(containers);
+        PrintMessage(MultiByteToWide(json));
+        break;
+    }
+    case FormatType::Table:
+    {
+        utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
+        for (const auto& container : containers)
         {
-            auto json = ToJson(containers);
-            PrintMessage(MultiByteToWide(json));
-            return;
+            tablePrinter.AddRow({
+                MultiByteToWide(container.Id),
+                MultiByteToWide(container.Name),
+                MultiByteToWide(container.Image),
+                ContainerService::ContainerStateToString(container.State),
+            });
         }
 
-        // Default is table, which is below.
+        tablePrinter.Print();
+        break;
     }
-
-    utils::TablePrinter tablePrinter({L"ID", L"NAME", L"IMAGE", L"STATE"});
-    for (const auto& container : containers)
-    {
-        tablePrinter.AddRow({
-            MultiByteToWide(container.Id),
-            MultiByteToWide(container.Name),
-            MultiByteToWide(container.Image),
-            ContainerService::ContainerStateToString(container.State),
-        });
+    default:
+        THROW_HR(E_UNEXPECTED);
     }
-
-    tablePrinter.Print();
 }
 
 void RunContainer(CLIExecutionContext& context)
@@ -235,12 +244,12 @@ void StopContainers(CLIExecutionContext& context)
     StopContainerOptions options;
     if (context.Args.Contains(ArgType::Signal))
     {
-        options.Signal = std::stoul(context.Args.Get<ArgType::Signal>());
+        options.Signal = validation::GetWSLASignalFromString(context.Args.Get<ArgType::Signal>());
     }
 
     if (context.Args.Contains(ArgType::Time))
     {
-        options.Timeout = std::stoul(context.Args.Get<ArgType::Time>());
+        options.Timeout = validation::GetIntegerFromString<LONGLONG>(context.Args.Get<ArgType::Time>());
     }
 
     for (const auto& id : containersToStop)

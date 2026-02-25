@@ -84,8 +84,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
         ImageService imageService;
         imageService.Pull(session, image, callback);
-        auto [retryResult, _] = containerLauncher.CreateNoThrow(*session.Get());
-        result = retryResult;
+        return containerLauncher.Create(*session.Get());
     }
 
     THROW_IF_FAILED(result);
@@ -93,9 +92,9 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLAContainer& container, ULONG signal = WSLASignalNone, LONGLONG timeout = -1)
+static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONGLONG timeout = -1)
 {
-    THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
+    THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
 std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state)
@@ -111,6 +110,7 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
     case WSLA_CONTAINER_STATE::WslaContainerStateExited:
         return L"exited";
     case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
+        return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
@@ -165,7 +165,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
     StopInternal(*container, options.Signal, options.Timeout);
 }
 
-void ContainerService::Kill(Session& session, const std::string& id, int signal)
+void ContainerService::Kill(Session& session, const std::string& id, WSLASignal signal)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
