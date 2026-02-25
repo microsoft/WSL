@@ -34,10 +34,11 @@ private:
 struct SessionOptions
 {
     static SessionOptions Default();
-    const WSLA_SESSION_SETTINGS* Get() const;
+    const WSLA_SESSION_SETTINGS* Get();
 
 private:
     WSLA_SESSION_SETTINGS m_sessionSettings{};
+    std::filesystem::path m_storagePath;
     inline static std::filesystem::path m_defaultPath = {wsl::windows::common::filesystem::GetLocalAppDataPath(nullptr) / "wsla"};
 };
 } // namespace wsl::windows::wslc::models

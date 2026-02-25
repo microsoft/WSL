@@ -4,6 +4,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/arguments
     ${CMAKE_CURRENT_SOURCE_DIR}/services
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
+    ${CMAKE_CURRENT_SOURCE_DIR}/settings
 )
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
@@ -12,6 +13,7 @@ file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/commands/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/services/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/settings/*.h
 )
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
@@ -20,6 +22,7 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/commands/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/services/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/settings/*.cpp
 )
 
 # Object library for WSLC components.
@@ -40,6 +43,7 @@ target_include_directories(wslclib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/arguments
     ${CMAKE_CURRENT_SOURCE_DIR}/services
     ${CMAKE_CURRENT_SOURCE_DIR}/tasks
+    ${CMAKE_CURRENT_SOURCE_DIR}/settings
 )
 target_precompile_headers(wslclib REUSE_FROM common)
 target_link_libraries(wslclib

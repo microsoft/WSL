@@ -5,6 +5,7 @@ set(WSLC_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/WSLCCLIArgumentUnitTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WSLCCLICommandUnitTests.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WSLCCLIExecutionUnitTests.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/WSLCSettingsUnitTests.cpp
 )
 
 set(WSLC_TEST_HEADERS
@@ -32,4 +33,5 @@ target_include_directories(wsltests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/arguments
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/services
     ${CMAKE_SOURCE_DIR}/src/windows/wslc/tasks
+    ${CMAKE_SOURCE_DIR}/src/windows/wslc/settings
 )
