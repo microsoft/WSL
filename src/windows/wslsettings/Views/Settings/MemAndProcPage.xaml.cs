@@ -3,6 +3,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
 using WslSettings.Contracts.Services;
 using WslSettings.ViewModels.Settings;
@@ -33,6 +34,7 @@ public sealed partial class MemAndProcPage : Page
 
     private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+        MemAndProcPageRoot.Focus(FocusState.Programmatic);
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "ProcCountExpander", "ProcCountTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "MemorySizeExpander", "MemorySizeTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "SwapSizeExpander", "SwapSizeTextBox");

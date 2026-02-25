@@ -3,6 +3,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
 using WslSettings.Contracts.Services;
 using WslSettings.ViewModels.Settings;
@@ -33,6 +34,7 @@ public sealed partial class DeveloperPage : Page
 
     private void OnPageLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+        DeveloperPageRoot.Focus(FocusState.Programmatic);
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomKernelPathExpander", "CustomKernelPathTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomKernelModulesPathExpander", "CustomKernelModulesPathTextBox");
         RuntimeHelper.SetupExpanderFocusManagementByName(this, "CustomSystemDistroPathExpander", "CustomSystemDistroPathTextBox");
