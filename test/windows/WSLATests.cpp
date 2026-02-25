@@ -2993,6 +2993,29 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(ExecContainerDelete)
+    {
+        WSL2_TEST_ONLY();
+        SKIP_TEST_ARM64();
+
+        WSLAContainerLauncher launcher(
+            "debian:latest", "test-exec-dtor", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_NONE);
+
+        auto container = launcher.Launch(*m_defaultSession);
+
+        auto process = WSLAProcessLauncher({}, {"sleep", "99999"}).Launch(container.Get());
+        auto exitEvent = process.GetExitEvent();
+
+        // Destroy the container (Stop + Delete + release COM reference).
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(container.Get().Delete());
+        container.Reset();
+
+        // The exec process exit event must be signaled within a reasonable timeout.
+        VERIFY_IS_TRUE(exitEvent.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(process.GetExitCode(), 128 + WSLASignalSIGKILL);
+    }
+
     void ExpectHttpResponse(LPCWSTR Url, std::optional<int> expectedCode)
     {
         const winrt::Windows::Web::Http::Filters::HttpBaseProtocolFilter filter;

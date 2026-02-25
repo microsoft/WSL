@@ -309,20 +309,15 @@ WSLAContainerImpl::~WSLAContainerImpl()
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
 
-    // Copy processes references so their callback can be removed without holding m_lock.
-    auto* initProcessControl = m_initProcessControl;
-    auto processes = m_processes;
+    // Snapshot and clear process references under the lock.
+    // Callbacks are then invoked without holding m_lock.
+    decltype(m_processes) processes;
+    decltype(m_initProcessControl) initProcessControl = nullptr;
 
-    // Remove container callback from any outstanding processes.
     {
         std::lock_guard lock(m_lock);
-
-        if (m_initProcessControl)
-        {
-            m_initProcessControl = nullptr;
-        }
-
-        m_processes.clear();
+        initProcessControl = std::exchange(m_initProcessControl, nullptr);
+        processes = std::exchange(m_processes, {});
     }
 
     if (initProcessControl)
