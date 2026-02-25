@@ -70,6 +70,9 @@ public:
     const std::string& Name() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
 
+    __requires_lock_held(m_lock)
+    WSLA_CONTAINER_STATE Transition(WSLA_CONTAINER_STATE State) noexcept;
+
     void OnProcessReleased(DockerExecProcessControl* process);
 
     const std::string& ID() const noexcept;
