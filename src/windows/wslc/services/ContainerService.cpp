@@ -86,11 +86,11 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     {
         auto portMapping = PublishPort::Parse(options.Port);
         auto containerPort = portMapping.ContainerPort();
-        for (unsigned int i = 0; i < containerPort.Count(); ++i)
+        for (auto i = 0; i < containerPort.Count(); ++i)
         {
             int family = portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6() ? AF_INET6 : AF_INET;
             auto currentContainerPort = containerPort.Start() + i;
-            auto currentHostPort = portMapping.HasEphemeralHostPort() ? 0 : portMapping.HostPort()->Start() + i;
+            auto currentHostPort = portMapping.HostPort().IsEphemeral() ? portMapping.HostPort().Start() : portMapping.HostPort().Start() + i;
             containerLauncher.AddPort(currentHostPort, currentContainerPort, family);
         }
     }

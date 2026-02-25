@@ -80,32 +80,49 @@ struct PublishPort
 
     struct PortRange
     {
-        int Start() const
+        PortRange(uint16_t start, uint16_t end) : m_start(start), m_end(end)
+        {
+        }
+
+        uint16_t Start() const
         {
             return m_start;
         }
-        int End() const
+
+        uint16_t End() const
         {
             return m_end;
         }
 
-        constexpr unsigned int Count() const noexcept
+        constexpr uint16_t Count() const noexcept
         {
             return (m_end >= m_start) ? (m_end - m_start + 1) : 0;
         }
+
         constexpr bool IsSingle() const noexcept
         {
             return Count() == 1;
         }
+
         constexpr bool IsValid() const noexcept
         {
             return Count() > 0 && IsValidPort(m_start) && IsValidPort(m_end);
         }
+
+        constexpr bool IsEphemeral() const noexcept
+        {
+            return m_start == EPHEMERAL_PORT && m_end == EPHEMERAL_PORT;
+        }
+
         static PublishPort::PortRange ParsePortPart(const std::string& portPart);
+        static PublishPort::PortRange Ephemeral() noexcept
+        {
+            return {EPHEMERAL_PORT, EPHEMERAL_PORT};
+        }
 
     private:
-        int m_start;
-        int m_end;
+        uint16_t m_start{};
+        uint16_t m_end{};
     };
 
     struct IPAddress
@@ -140,49 +157,53 @@ struct PublishPort
         std::array<uint8_t, 16> m_bytes{};
     };
 
+    static constexpr uint16_t MAX_PORT = std::numeric_limits<uint16_t>::max();
+    static constexpr uint16_t MIN_PORT = 1;
+    static constexpr uint16_t EPHEMERAL_PORT = 0;
+
     std::optional<IPAddress> HostIP() const noexcept
     {
         return m_hostIP;
     }
-    std::optional<PortRange> HostPort() const noexcept
+
+    PortRange HostPort() const noexcept
     {
         return m_hostPort;
     }
+
     PortRange ContainerPort() const noexcept
     {
         return m_containerPort;
     }
+
     Protocol PortProtocol() const noexcept
     {
         return m_protocol;
     }
+
     std::string Original() const noexcept
     {
         return m_original;
     }
 
-    static PublishPort Parse(const std::string& value);
-    bool HasEphemeralHostPort() const noexcept
-    {
-        return !m_hostPort.has_value();
-    }
     bool IsRangeMapping() const noexcept
     {
         return !m_containerPort.IsSingle();
     }
 
+    static PublishPort Parse(const std::string& value);
+
 private:
     std::optional<IPAddress> m_hostIP;
-    std::optional<PortRange> m_hostPort;
-    PortRange m_containerPort;
+    PortRange m_hostPort = PortRange::Ephemeral();
+    PortRange m_containerPort = PortRange::Ephemeral();
     Protocol m_protocol = Protocol::TCP;
     std::string m_original;
     void Validate() const;
     PublishPort() = default;
-    static constexpr bool IsValidPort(int port) noexcept
+    static constexpr bool IsValidPort(unsigned long port) noexcept
     {
-        return port >= 1 && port <= 65535;
+        return port >= MIN_PORT && port <= MAX_PORT;
     }
 };
-
 } // namespace wsl::windows::wslc::models

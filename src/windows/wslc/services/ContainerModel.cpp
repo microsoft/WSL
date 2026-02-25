@@ -19,16 +19,22 @@ namespace wsl::windows::wslc::models {
 
 PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& portPart)
 {
-    static auto parsePort = [](const std::string& value, const char* errorMessage) -> int {
+    static auto parsePort = [](const std::string& value, const char* errorMessage) -> uint16_t {
         try
         {
-            size_t idx = 0;
-            int port = std::stoi(value, &idx, 10);
-            if (idx != value.size())
+            // Ensure the value is not empty and contains only digits before parsing
+            if (value.empty() || !std::all_of(value.begin(), value.end(), ::isdigit))
             {
                 THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
             }
-            return port;
+
+            // Parse the port number and validate the range
+            auto port = std::stoul(value, nullptr, 10);
+            if (!PublishPort::IsValidPort(port))
+            {
+                THROW_HR_WITH_USER_ERROR(E_INVALIDARG, errorMessage);
+            }
+            return static_cast<uint16_t>(port);
         }
         catch (const std::exception&)
         {
@@ -43,24 +49,14 @@ PublishPort::PortRange PublishPort::PortRange::ParsePortPart(const std::string& 
         // Port range specified
         auto startPortStr = portPart.substr(0, dashPos);
         auto endPortStr = portPart.substr(dashPos + 1);
-        int startPort = parsePort(startPortStr, "Invalid port range specified in port mapping.");
-        int endPort = parsePort(endPortStr, "Invalid port range specified in port mapping.");
-
-        PublishPort::PortRange result{};
-        result.m_start = startPort;
-        result.m_end = endPort;
-        return result;
+        auto startPort = parsePort(startPortStr, "Invalid port range specified in port mapping.");
+        auto endPort = parsePort(endPortStr, "Invalid port range specified in port mapping.");
+        return {startPort, endPort};
     }
-    else
-    {
-        // Single port specified
-        int port = parsePort(portPart, "Invalid port specified in port mapping.");
 
-        PublishPort::PortRange result{};
-        result.m_start = port;
-        result.m_end = port;
-        return result;
-    }
+    // Single port specified
+    auto port = parsePort(portPart, "Invalid port specified in port mapping.");
+    return {port, port};
 }
 
 PublishPort::IPAddress PublishPort::IPAddress::ParseHostIP(const std::string& hostIpPart)
@@ -125,9 +121,8 @@ bool PublishPort::IPAddress::IsLoopback() const
         return m_bytes == loopbackV6Bytes;
     }
 
-    // IPv4 loopback is 127.0.0.1
-    static const std::array<uint8_t, 4> loopbackV4Bytes = {127, 0, 0, 1};
-    return std::equal(m_bytes.begin(), m_bytes.begin() + 4, loopbackV4Bytes.begin());
+    // IPv4 loopback is 127.0.0.0/8
+    return m_bytes[0] == 127;
 }
 
 PublishPort PublishPort::Parse(const std::string& value)
@@ -202,21 +197,20 @@ void PublishPort::Validate() const
 
     if (!m_containerPort.IsValid())
     {
-        if (m_containerPort.IsSingle())
-        {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must be a valid port number (1-65535).");
-        }
-        else
-        {
-            THROW_HR_WITH_USER_ERROR(
-                E_INVALIDARG,
-                "Container port range must be valid port numbers (1-65535) and the start must be less than or equal to the end.");
-        }
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Container port must be a valid port number (1-65535).");
     }
 
-    if (m_hostPort.has_value() && m_hostPort->Count() != m_containerPort.Count())
+    if (!m_hostPort.IsEphemeral())
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port range must match the container port range.");
+        if (!m_hostPort.IsValid())
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port must be a valid port number (1-65535).");
+        }
+
+        if(m_hostPort.Count() != m_containerPort.Count())
+        {
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, "Host port range must match the container port range.");
+        }
     }
 }
 } // namespace wsl::windows::wslc::models
