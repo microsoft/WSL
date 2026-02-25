@@ -33,6 +33,7 @@ DISCOURAGED_SYSTEM_UNITS = ['systemd-resolved.service',
                             'systemd-tmpfiles-setup-dev.service',
                             'tmp.mount',
                             'NetworkManager.service',
+                            'NetworkManager-wait-online.service',
                             'networking.service',
                             'hypervkvpd.service']
 
