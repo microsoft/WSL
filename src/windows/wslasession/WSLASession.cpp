@@ -930,7 +930,7 @@ try
 
     // Return ERROR_NOT_FOUND if the container was found, but is being deleted for consistency.
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == RPC_E_DISCONNECTED);
-    
+
     return result;
 }
 CATCH_RETURN();
