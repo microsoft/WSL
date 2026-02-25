@@ -248,12 +248,9 @@ Please use '{} --help' to get a list of supported arguments.</value>
     <value>Cannot launch because another instance is running elevated.  Elevated and un-elevated instances are not permitted to run simultaneously.</value>
   </data>
   <data name="MessageNoDefaultDistro" xml:space="preserve">
-    <value>Windows Subsystem for Linux has no installed distributions.
-You can resolve this by installing a distribution with the instructions below:
-
-Use 'wsl.exe --list --online' to list available distributions
-and 'wsl.exe --install &lt;Distro&gt;' to install.</value>
-    <comment>{Locked="--list "}{Locked="--online'"}{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>No Linux distribution is installed.
+Run 'wsl.exe --install &lt;Distro&gt;' to install one (for example, 'wsl.exe --install Ubuntu'), or install a distribution from the Microsoft Store.</value>
+    <comment>{Locked="--install "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageNoRunningDistro" xml:space="preserve">
     <value>There are no running distributions.</value>
@@ -305,8 +302,9 @@ For information please visit https://aka.ms/enablevirtualization</value>
     <value>Too many virtual hard disks or physical disks are attached.</value>
   </data>
   <data name="MessageUserVhdAlreadyAttached" xml:space="preserve">
-    <value>VHD already mounted via wsl.exe --mount, please unmount the disk before launching.</value>
-    <comment>{Locked="--mount,"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>The virtual disk is already attached.
+Unmount it with 'wsl.exe --unmount &lt;DiskPath&gt;' before attaching again.</value>
+    <comment>{Locked="--unmount "}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWsl1NotSupported" xml:space="preserve">
     <value>WSL1 is not supported with your current machine configuration.
@@ -1013,7 +1011,30 @@ Falling back to NAT networking.</value>
     <value>Sparse VHD is supported on WSL2 only.</value>
   </data>
   <data name="MessageLocalSystemNotSupported" xml:space="preserve">
-    <value>Running WSL as local system is not supported.</value>
+    <value>WSL cannot run under the LocalSystem account.
+Use a standard user account instead, or launch PowerShell as administrator.</value>
+  </data>
+  <data name="MessageClassNotRegistered" xml:space="preserve">
+    <value>WSL component registration failed ('Class Not Registered').
+Repair or reinstall WSL from Settings &gt; Programs &gt; System Components &gt; WSL &gt; Repair.</value>
+  </data>
+  <data name="MessageUnexpectedError" xml:space="preserve">
+    <value>An unexpected error occurred while starting WSL.
+Restart WSL with 'wsl.exe --shutdown' or update it with 'wsl.exe --update', then try again.</value>
+    <comment>{Locked="--shutdown'"}{Locked="--update'"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageServiceConnectionFailed" xml:space="preserve">
+    <value>WSL couldn't connect to its service (network or service error 0x8007274c).
+Reset your network and restart the Hyper-V/WSL service, then try again.</value>
+  </data>
+  <data name="MessageDetachDiskNotFound" xml:space="preserve">
+    <value>WSL could not find the specified disk to detach.
+Check that the file path is correct and that the virtual disk exists.</value>
+  </data>
+  <data name="MessageServiceDisabled" xml:space="preserve">
+    <value>WSL service 'WSLService' is disabled.
+Start it with 'sc.exe config WSLService start= auto' and 'net.exe start WSLService', then try again.</value>
+    <comment>{Locked="sc.exe config WSLService start= auto"}{Locked="net.exe start WSLService"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessagePerformanceTip" xml:space="preserve">
     <value>Performance Tip:</value>

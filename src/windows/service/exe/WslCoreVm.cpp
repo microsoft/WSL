@@ -1034,7 +1034,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             if (found != m_attachedDisks.end())
             {
                 // Prevent user from launching a distro vhd after manually mounting it; otherwise, return the LUN of the mounted disk.
-                THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, found->first.User);
+                THROW_HR_WITH_USER_ERROR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, Localization::MessageUserVhdAlreadyAttached(), found->first.User);
 
                 return found->second.Lun;
             }
@@ -1333,7 +1333,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
         }
     }
 
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !deleted);
+    THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), Localization::MessageDetachDiskNotFound(), !deleted);
 
     return std::make_pair(0, LxMiniInitMountStepNone);
 }
