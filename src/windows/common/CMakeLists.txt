@@ -109,6 +109,7 @@ set(HEADERS
     registry.hpp
     relay.hpp
     RingBuffer.h
+    SharedMutex.h
     socket.hpp
     string.hpp
     Stringify.h

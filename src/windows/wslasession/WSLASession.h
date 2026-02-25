@@ -20,6 +20,7 @@ Abstract:
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
+#include "SharedMutex.h"
 
 namespace wsl::windows::service::wsla {
 
@@ -111,7 +112,7 @@ private:
     std::filesystem::path m_storageVhdPath;
     std::vector<std::unique_ptr<WSLAContainerImpl>> m_containers;
     wil::unique_event m_sessionTerminatingEvent{wil::EventOptions::ManualReset};
-    std::recursive_mutex m_lock;
+    common::SharedMutex<std::mutex> m_lock;
     IORelay m_ioRelay;
     std::optional<ServiceRunningProcess> m_dockerdProcess;
     WSLAFeatureFlags m_featureFlags{};

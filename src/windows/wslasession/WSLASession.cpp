@@ -278,7 +278,7 @@ try
 
     auto [repo, tag] = ParseImage(ImageUri);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     auto requestContext = m_dockerClient->PullImage(repo, tag);
 
@@ -365,7 +365,7 @@ try
         dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(DockerfileHandle)));
     }
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -490,7 +490,7 @@ try
 
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -514,7 +514,7 @@ try
 
     THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -587,7 +587,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ContainerID);
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -646,7 +646,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -703,7 +703,7 @@ try
     *Count = 0;
     *Images = nullptr;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -749,7 +749,7 @@ try
     *DeletedImages = nullptr;
     *Count = 0;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -811,7 +811,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Repo);
     RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -847,7 +847,8 @@ try
     // Validate that Image is not null.
     RETURN_HR_IF(E_INVALIDARG, containerOptions->Image == nullptr);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
+
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Validate that name & images are valid.
@@ -862,13 +863,17 @@ try
 
     try
     {
-        auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
+        auto createdContainer = WSLAContainerImpl::Create(
             *containerOptions,
             *m_virtualMachine,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
-            m_ioRelay));
+            m_ioRelay);
+
+        lock.UpgradeToExclusive();
+
+        auto& it = m_containers.emplace_back(std::move(createdContainer));
 
         THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
 
@@ -897,7 +902,7 @@ try
     ValidateContainerName(Id);
 
     // Look for an exact ID match first.
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
@@ -939,7 +944,7 @@ try
     *Count = 0;
     *Containers = nullptr;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
@@ -972,7 +977,7 @@ try
         *Errno = -1; // Make sure not to return 0 if something fails.
     }
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, Errno);
@@ -998,7 +1003,7 @@ try
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Path), !std::filesystem::path(Path).is_absolute());
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
@@ -1021,7 +1026,7 @@ try
     // This allows a session to be unblocked if a stuck operation is holding the lock.
     m_sessionTerminatingEvent.SetEvent();
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockExclusive();
 
     // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
@@ -1080,7 +1085,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->MountWindowsFolder(WindowsPath, LinuxPath, ReadOnly);
@@ -1092,7 +1097,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->UnmountWindowsFolder(LinuxPath);
@@ -1104,7 +1109,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort);
@@ -1117,7 +1122,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockShared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     m_virtualMachine->UnmapPort(Family, WindowsPort, LinuxPort);
@@ -1148,7 +1153,7 @@ MultiHandleWait WSLASession::CreateIOContext()
 
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.LockExclusive();
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.get() == Container; }) == 1);
 }
 
