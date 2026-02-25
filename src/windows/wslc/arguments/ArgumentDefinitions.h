@@ -38,6 +38,7 @@ _(Attach,         "attach",              L"a",              Kind::Flag,        L
 _(CIDFile,        "cidfile",             NO_ALIAS,          Kind::Value,       L"Write the container ID to the provided path.") \
 _(Command,        "command",             NO_ALIAS,          Kind::Positional,  L"The command to run") \
 _(ContainerId,    "container-id",        NO_ALIAS,          Kind::Positional,  Localization::WSLCCLI_ContainerIdArgDescription()) \
+_(Force,          "force",               L"f",              Kind::Flag,        L"Delete containers even if they are running") \
 _(Detach,         "detach",              L"d",              Kind::Flag,        L"Run container in detached mode") \
 _(DNS,            "dns",                 NO_ALIAS,          Kind::Value,       L"IP address of the DNS nameserver in resolv.conf") \
 _(DNSDomain,      "dns-domain",          NO_ALIAS,          Kind::Value,       L"Set the default DNS Domain") \
@@ -61,7 +62,8 @@ _(Pull,           "pull",                NO_ALIAS,          Kind::Value,       L
 _(Quiet,          "quiet",               L"q",              Kind::Flag,        L"Outputs the container IDs only") \
 _(Remove,         "remove",              L"rm",             Kind::Flag,        L"Remove the container after it stops") \
 _(Scheme,         "scheme",              NO_ALIAS,          Kind::Value,       L"Use this scheme for registry connection") \
-_(SessionId,      "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
+_(Session,        "session",             NO_ALIAS,          Kind::Value,       Localization::WSLCCLI_SessionIdArgDescription()) \
+_(SessionId,      "session-id",          NO_ALIAS,          Kind::Positional,  L"Session ID") \
 _(Signal,         "signal",              L"s",              Kind::Value,       L"Signal to send (default: SIGKILL)") \
 _(Time,           "time",                L"t",              Kind::Value,       L"Time in seconds to wait before executing (default 5)") \
 _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       L"Mount tmpfs to the container at the given path") \

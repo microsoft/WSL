@@ -271,7 +271,7 @@ enum WSLA_PROCESS_STATE
 interface IWSLAProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
-    HRESULT GetExitEvent([out] ULONG* EventHandle);
+    HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
     HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);

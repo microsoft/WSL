@@ -12,20 +12,12 @@ Abstract:
 
 --*/
 
-#include "precomp.h"
-#include "ContainerModel.h"
 #include "ContainerCommand.h"
-#include "ContainerService.h"
-#include "TablePrinter.h"
 #include "CLIExecutionContext.h"
-#include "ExecutionContextData.h"
 #include "ContainerTasks.h"
+#include "SessionTasks.h"
 #include "Task.h"
 
-using wsl::windows::common::wslutil::PrintMessage;
-using wsl::windows::wslc::models::ContainerInformation;
-using wsl::windows::wslc::services::ContainerService;
-using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
@@ -53,7 +45,7 @@ std::vector<Argument> ContainerCreateCommand::GetArguments() const
         Argument::Create(ArgType::Progress),
         Argument::Create(ArgType::Remove),
         Argument::Create(ArgType::Scheme),
-        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
@@ -78,7 +70,7 @@ void ContainerCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context
         << CreateSession
-        << SetCreateContainerOptionsFromArgs
+        << SetContainerOptionsFromArgs
         << CreateContainer;
 }
 // clang-format on

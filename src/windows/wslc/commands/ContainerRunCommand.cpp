@@ -12,24 +12,12 @@ Abstract:
 
 --*/
 
-#include "precomp.h"
-#include "ContainerModel.h"
 #include "ContainerCommand.h"
-#include "ContainerService.h"
-#include "TablePrinter.h"
 #include "CLIExecutionContext.h"
-#include "ExecutionContextData.h"
 #include "ContainerTasks.h"
+#include "SessionTasks.h"
 #include "Task.h"
 
-#include <wslutil.h>
-#include <WSLAProcessLauncher.h>
-#include <docker_schema.h>
-
-using wsl::windows::common::wslutil::PrintMessage;
-using wsl::windows::wslc::models::ContainerInformation;
-using wsl::windows::wslc::services::ContainerService;
-using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
@@ -59,7 +47,7 @@ std::vector<Argument> ContainerRunCommand::GetArguments() const
         Argument::Create(ArgType::Pull),
         Argument::Create(ArgType::Remove),
         Argument::Create(ArgType::Scheme),
-        Argument::Create(ArgType::SessionId),
+        Argument::Create(ArgType::Session),
         Argument::Create(ArgType::TMPFS),
         Argument::Create(ArgType::TTY),
         Argument::Create(ArgType::User),
@@ -84,7 +72,7 @@ void ContainerRunCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     context 
         << CreateSession
-        << SetRunContainerOptionsFromArgs
+        << SetContainerOptionsFromArgs
         << RunContainer;
 }
 // clang-format on

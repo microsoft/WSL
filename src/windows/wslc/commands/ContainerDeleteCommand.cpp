@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    ContainerStopCommand.cpp
+    ContainerDeleteCommand.cpp
 
 Abstract:
 
@@ -22,33 +22,32 @@ using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
 namespace wsl::windows::wslc {
-// Container Stop Command
-std::vector<Argument> ContainerStopCommand::GetArguments() const
+// Container Delete Command
+std::vector<Argument> ContainerDeleteCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::ContainerId, std::nullopt, NO_LIMIT),
+        Argument::Create(ArgType::Force),
         Argument::Create(ArgType::Session),
-        Argument::Create(ArgType::Signal, std::nullopt, std::nullopt, L"Signal to send (default: SIGTERM)"),
-        Argument::Create(ArgType::Time),
     };
 }
 
-std::wstring ContainerStopCommand::ShortDescription() const
+std::wstring ContainerDeleteCommand::ShortDescription() const
 {
-    return {L"Stop containers"};
+    return {L"Delete containers"};
 }
 
-std::wstring ContainerStopCommand::LongDescription() const
+std::wstring ContainerDeleteCommand::LongDescription() const
 {
-    return {L"Stops containers."};
+    return {L"Deletes containers."};
 }
 
 // clang-format off
-void ContainerStopCommand::ExecuteInternal(CLIExecutionContext& context) const
+void ContainerDeleteCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context
+    context 
         << CreateSession
-        << StopContainers;
+        << DeleteContainers;
 }
 // clang-format on
 } // namespace wsl::windows::wslc

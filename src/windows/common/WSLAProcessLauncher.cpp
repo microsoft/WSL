@@ -216,16 +216,16 @@ ClientRunningWSLAProcess::ClientRunningWSLAProcess(wil::com_ptr<IWSLAProcess>&& 
 
 wil::unique_handle ClientRunningWSLAProcess::GetStdHandle(int Index)
 {
-    wil::unique_handle handle;
-    THROW_IF_FAILED_MSG(m_process->GetStdHandle(Index, reinterpret_cast<ULONG*>(&handle)), "Failed to get handle: %i", Index);
+    ULONG handle{};
+    THROW_IF_FAILED_MSG(m_process->GetStdHandle(Index, &handle), "Failed to get handle: %i", Index);
 
-    return handle;
+    return wil::unique_handle{ULongToHandle(handle)};
 }
 
 wil::unique_event ClientRunningWSLAProcess::GetExitEvent()
 {
-    wil::unique_event event;
-    THROW_IF_FAILED(m_process->GetExitEvent(reinterpret_cast<ULONG*>(&event)));
+    wil::unique_event event{};
+    THROW_IF_FAILED(m_process->GetExitEvent(&event));
 
     return event;
 }

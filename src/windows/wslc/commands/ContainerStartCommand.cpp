@@ -12,21 +12,12 @@ Abstract:
 
 --*/
 
-#include "precomp.h"
-#include "ContainerModel.h"
 #include "ContainerCommand.h"
-#include "ContainerService.h"
-#include "TablePrinter.h"
 #include "CLIExecutionContext.h"
-#include "ExecutionContextData.h"
 #include "ContainerTasks.h"
+#include "SessionTasks.h"
 #include "Task.h"
 
-using wsl::windows::common::string::WideToMultiByte;
-using wsl::windows::common::wslutil::PrintMessage;
-using wsl::windows::wslc::models::ContainerInformation;
-using wsl::windows::wslc::services::ContainerService;
-using namespace wsl::shared;
 using namespace wsl::windows::wslc::execution;
 using namespace wsl::windows::wslc::task;
 
@@ -38,7 +29,7 @@ std::vector<Argument> ContainerStartCommand::GetArguments() const
         Argument::Create(ArgType::ContainerId, true),
         Argument::Create(ArgType::Attach),      // NYI
         Argument::Create(ArgType::Interactive), // NYI
-        Argument::Create(ArgType::SessionId),   // NYI
+        Argument::Create(ArgType::Session),     // NYI
     };
 }
 

@@ -73,7 +73,7 @@ static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, std::vector<con
 }
 
 static wsl::windows::common::RunningWSLAContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerCreateOptions& options, IProgressCallback* callback)
+    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
 {
     auto processFlags = WSLAProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
@@ -82,9 +82,9 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         image, options.Name, options.Arguments, {}, WSLA_CONTAINER_NETWORK_HOST, processFlags);
 
     // Set port options if provided
-    if (!options.Port.empty())
+    for (const auto& port : options.Ports)
     {
-        auto portMapping = PublishPort::Parse(options.Port);
+        auto portMapping = PublishPort::Parse(port);
         auto containerPort = portMapping.ContainerPort();
         for (auto i = 0; i < containerPort.Count(); ++i)
         {
@@ -101,8 +101,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
         ImageService imageService;
         imageService.Pull(session, image, callback);
-        auto [retryResult, _] = containerLauncher.CreateNoThrow(*session.Get());
-        result = retryResult;
+        return containerLauncher.Create(*session.Get());
     }
 
     THROW_IF_FAILED(result);
@@ -110,9 +109,9 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLAContainer& container, ULONG signal = WSLASignalNone, LONGLONG timeout = -1)
+static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONGLONG timeout = -1)
 {
-    THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
+    THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
 std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state)
@@ -128,12 +127,13 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
     case WSLA_CONTAINER_STATE::WslaContainerStateExited:
         return L"exited";
     case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
+        return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
 }
 
-int ContainerService::Run(Session& session, const std::string& image, ContainerRunOptions runOptions, IProgressCallback* callback)
+int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
 {
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions, callback);
@@ -158,7 +158,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerR
     return 0;
 }
 
-CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerCreateOptions runOptions, IProgressCallback* callback)
+CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
 {
     auto runningContainer = CreateInternal(session, image, runOptions, callback);
     runningContainer.SetDeleteOnClose(false);
@@ -182,7 +182,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
     StopInternal(*container, options.Signal, options.Timeout);
 }
 
-void ContainerService::Kill(Session& session, const std::string& id, int signal)
+void ContainerService::Kill(Session& session, const std::string& id, WSLASignal signal)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -219,7 +219,7 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
     return result;
 }
 
-int ContainerService::Exec(Session& session, const std::string& id, ExecContainerOptions options)
+int ContainerService::Exec(Session& session, const std::string& id, ContainerOptions options)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
