@@ -45,11 +45,6 @@ void CreateContainer(CLIExecutionContext& context)
 void CreateSession(CLIExecutionContext& context)
 {
     std::optional<SessionOptions> options = std::nullopt;
-    if (context.Args.Contains(ArgType::SessionId))
-    {
-        // TODO: Add session ID to the session options to open the specified session.
-    }
-
     context.Data.Add<Data::Session>(SessionService::CreateSession(options));
 }
 
@@ -116,9 +111,7 @@ void KillContainers(CLIExecutionContext& context)
 
 void ListContainers(CLIExecutionContext& context)
 {
-    WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Data.Contains(Data::Containers));
-    auto& session = context.Data.Get<Data::Session>();
     auto& containers = context.Data.Get<Data::Containers>();
 
     // Filter by running state if --all is not specified
