@@ -330,7 +330,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
         initProcessControl->OnContainerReleased();
     }
 
-    for (auto& process : m_processes)
+    for (auto& process : processes)
     {
         process->OnContainerReleased();
     }
