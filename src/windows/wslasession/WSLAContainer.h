@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 
 #include "ServiceProcessLauncher.h"
-#include "WSLAVirtualMachine.h"
+#include "WSLASession.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLAProcessControl.h"
@@ -27,6 +27,7 @@ Abstract:
 namespace wsl::windows::service::wsla {
 
 class WSLAContainer;
+class WSLASession;
 
 class WSLAContainerImpl
 {
@@ -35,7 +36,7 @@ public:
     NON_MOVABLE(WSLAContainerImpl);
 
     WSLAContainerImpl(
-        WSLAVirtualMachine* parentVM,
+        WSLASession* wslaSession,
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
@@ -89,7 +90,7 @@ public:
 
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
-        WSLAVirtualMachine& parentVM,
+        WSLASession& wslaSession,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -97,7 +98,7 @@ public:
 
     static std::unique_ptr<WSLAContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
-        WSLAVirtualMachine& parentVM,
+        WSLASession& wslaSession,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -120,7 +121,7 @@ private:
     std::vector<DockerExecProcessControl*> m_processes;
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
-    WSLAVirtualMachine* m_parentVM = nullptr;
+    WSLASession* m_wslaSession = nullptr;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;

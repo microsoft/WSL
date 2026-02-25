@@ -805,7 +805,7 @@ try
     {
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
-            *m_virtualMachine,
+            *this,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
@@ -1087,6 +1087,13 @@ MultiHandleWait WSLASession::CreateIOContext()
     return io;
 }
 
+WSLAVirtualMachine& WSLASession::GetVirtualMachine()
+{
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    return *m_virtualMachine;
+}
+
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
     std::lock_guard lock{m_lock};
@@ -1113,7 +1120,7 @@ void WSLASession::RecoverExistingContainers()
         {
             auto container = WSLAContainerImpl::Open(
                 dockerContainer,
-                *m_virtualMachine,
+                *this,
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),
