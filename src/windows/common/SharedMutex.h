@@ -69,16 +69,6 @@ public:
     }
 
 private:
-    void Unlock(bool exclusive)
-    {
-        if (exclusive)
-        {
-            m_exclusive.unlock();
-        }
-
-        m_shared.unlock();
-    }
-
     TMutex m_shared;
     TMutex m_exclusive;
 };
