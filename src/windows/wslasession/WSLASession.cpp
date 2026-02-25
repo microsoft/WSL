@@ -80,7 +80,7 @@ try
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
 
-    //N.B. No locking is required because Initialize() is always called before the session is returned to the caller.
+    // N.B. No locking is required because Initialize() is always called before the session is returned to the caller.
     m_id = Settings->SessionId;
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
     m_featureFlags = Settings->FeatureFlags;
