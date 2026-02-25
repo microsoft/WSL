@@ -66,7 +66,7 @@ COMMAND_LINE_TEST_CASE(L"container inspect cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"delete cont1", L"delete", true)
 COMMAND_LINE_TEST_CASE(L"container delete cont1 cont2", L"delete", true)
 
-// Logs commnad
+// Logs command
 COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs cont1", L"logs", true)
 COMMAND_LINE_TEST_CASE(L"container logs --follow cont1", L"logs", true)
