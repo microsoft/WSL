@@ -52,7 +52,7 @@ class WSLCPortParserUnitTests
 
         VerifyParseState(result, "80", true, false);
         VerifyNoHostIP(result);
-        VerifyNoHostPort(result);
+        VerifyEphemeralHostPort(result);
         VerifyContainerPort(result, 80, 80);
         VerifyProtocol(result, PublishPort::Protocol::TCP);
     }
@@ -64,7 +64,7 @@ class WSLCPortParserUnitTests
 
             VerifyParseState(result, "80/tcp", true, false);
             VerifyNoHostIP(result);
-            VerifyNoHostPort(result);
+            VerifyEphemeralHostPort(result);
             VerifyContainerPort(result, 80, 80);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
         }
@@ -74,7 +74,7 @@ class WSLCPortParserUnitTests
 
             VerifyParseState(result, "54/udp", true, false);
             VerifyNoHostIP(result);
-            VerifyNoHostPort(result);
+            VerifyEphemeralHostPort(result);
             VerifyContainerPort(result, 54, 54);
             VerifyProtocol(result, PublishPort::Protocol::UDP);
         }
@@ -127,7 +127,7 @@ class WSLCPortParserUnitTests
 
             VerifyParseState(result, "127.0.0.1::80", true, false);
             VerifyHostIPv4(result, "127.0.0.1", true, false, {127, 0, 0, 1});
-            VerifyNoHostPort(result);
+            VerifyEphemeralHostPort(result);
             VerifyContainerPort(result, 80, 80);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
         }
@@ -137,7 +137,7 @@ class WSLCPortParserUnitTests
 
             VerifyParseState(result, "127.0.0.1::53/udp", true, false);
             VerifyHostIPv4(result, "127.0.0.1", true, false, {127, 0, 0, 1});
-            VerifyNoHostPort(result);
+            VerifyEphemeralHostPort(result);
             VerifyContainerPort(result, 53, 53);
             VerifyProtocol(result, PublishPort::Protocol::UDP);
         }
@@ -190,7 +190,7 @@ class WSLCPortParserUnitTests
 
             VerifyParseState(result, "[::1]::80", true, false);
             VerifyHostIPv6(result, "::1", true, false, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
-            VerifyNoHostPort(result);
+            VerifyEphemeralHostPort(result);
             VerifyContainerPort(result, 80, 80);
             VerifyProtocol(result, PublishPort::Protocol::TCP);
         }
@@ -200,7 +200,7 @@ class WSLCPortParserUnitTests
 
             VerifyParseState(result, "[::]::53/udp", true, false);
             VerifyHostIPv6(result, "::", false, true, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-            VerifyNoHostPort(result);
+            VerifyEphemeralHostPort(result);
             VerifyContainerPort(result, 53, 53);
             VerifyProtocol(result, PublishPort::Protocol::UDP);
         }
@@ -292,7 +292,7 @@ private:
     static void VerifyParseState(const PublishPort& result, const std::string& original, bool hasEphemeralHostPort, bool isRangeMapping)
     {
         VERIFY_ARE_EQUAL(original, result.Original());
-        VERIFY_ARE_EQUAL(hasEphemeralHostPort, result.HasEphemeralHostPort());
+        VERIFY_ARE_EQUAL(hasEphemeralHostPort, result.HostPort().IsEphemeral());
         VERIFY_ARE_EQUAL(isRangeMapping, result.IsRangeMapping());
     }
 
@@ -306,15 +306,14 @@ private:
         VERIFY_IS_FALSE(result.HostIP().has_value());
     }
 
-    static void VerifyNoHostPort(const PublishPort& result)
+    static void VerifyEphemeralHostPort(const PublishPort& result)
     {
-        VERIFY_IS_FALSE(result.HostPort().has_value());
+        VERIFY_IS_TRUE(result.HostPort().IsEphemeral());
     }
 
     static void VerifyHostPort(const PublishPort& result, int start, int end)
     {
-        VERIFY_IS_TRUE(result.HostPort().has_value());
-        VerifyRange(*result.HostPort(), start, end);
+        VerifyRange(result.HostPort(), start, end);
     }
 
     static void VerifyContainerPort(const PublishPort& result, int start, int end)
