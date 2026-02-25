@@ -34,7 +34,7 @@ CATCH_RETURN();
 HRESULT WSLAProcess::GetExitEvent(HANDLE* Event)
 try
 {
-    *Event = wsl::windows::common::helpers::DuplicateHandle(m_control->GetExitEvent().get(), 0, FALSE, SYNCHRONIZE);
+    *Event = wsl::windows::common::helpers::DuplicateHandle(m_control->GetExitEvent().get(), SYNCHRONIZE, FALSE, 0);
     return S_OK;
 }
 CATCH_RETURN();
