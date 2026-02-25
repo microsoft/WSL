@@ -33,7 +33,8 @@ public:
         NON_COPYABLE(LockInstance);
         DEFAULT_MOVABLE(LockInstance);
 
-        LockInstance(SharedMutex<TMutex>& mutex, std::unique_lock<TMutex>&& shared) : m_mutex(mutex), m_shared(std::move(shared))
+        LockInstance(SharedMutex<TMutex>& mutex, std::shared_lock<std::shared_mutex>&& shared) :
+            m_mutex(mutex), m_shared(std::move(shared))
         {
         }
 
@@ -51,13 +52,13 @@ public:
 
     private:
         SharedMutex<TMutex>& m_mutex;
-        std::unique_lock<TMutex> m_shared;
+        std::shared_lock<std::shared_mutex> m_shared;
         std::unique_lock<TMutex> m_exclusive;
     };
 
     LockInstance LockShared()
     {
-        return LockInstance{*this, std::unique_lock<TMutex>(m_shared)};
+        return LockInstance{*this, std::shared_lock<std::shared_mutex>(m_shared)};
     }
 
     LockInstance LockExclusive()
@@ -69,7 +70,7 @@ public:
     }
 
 private:
-    TMutex m_shared;
+    std::shared_mutex m_shared;
     TMutex m_exclusive;
 };
 
