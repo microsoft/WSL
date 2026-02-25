@@ -359,9 +359,13 @@ const std::string& WSLAContainerImpl::Name() const noexcept
     return m_name;
 }
 
-IWSLAContainer& WSLAContainerImpl::ComWrapper()
+void WSLAContainerImpl::CopyTo(IWSLAContainer** Container)
 {
-    return *m_comWrapper.Get();
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    THROW_HR_IF_MSG(RPC_E_DISCONNECTED, m_comWrapper == nullptr, "Container '%hs' is being released", m_id.c_str());
+
+    THROW_IF_FAILED(m_comWrapper.CopyTo(Container));
 }
 
 void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
@@ -468,6 +472,13 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         std::lock_guard<std::recursive_mutex> lock(m_lock);
+        if (m_state != WslaContainerStateRunning)
+        {
+            // Don't run the deletion logic if the container is already in a stopped / deleted state.
+            // This can happen if Delete() is called by the user.
+            return;
+        }
+
         m_state = WslaContainerStateExited;
 
         // Notify all processes that the container has exited.
@@ -1068,6 +1079,8 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
 
 void WSLAContainerImpl::ReleaseResources()
 {
+    WSL_LOG("ReleaseContainerResources", TraceLoggingValue(m_id.c_str(), "ID"));
+
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // Disconnect the COM wrapper so no new RPC calls can reach this container.
