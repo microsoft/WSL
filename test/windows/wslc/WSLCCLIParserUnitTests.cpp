@@ -97,15 +97,7 @@ class WSLCCLIParserUnitTests
                 {
                     VERIFY_IS_TRUE(args.Contains(ArgType::ForwardArgs));
                     auto forwardArgs = args.Get<ArgType::ForwardArgs>();
-                    std::wstring forwardArgsConcat;
-                    for (const auto& arg : forwardArgs)
-                    {
-                        if (!forwardArgsConcat.empty())
-                        {
-                            forwardArgsConcat += L" ";
-                        }
-                        forwardArgsConcat += arg;
-                    }
+                    std::wstring forwardArgsConcat = wsl::shared::string::Join(forwardArgs, L' ');
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"hello world") != std::wstring::npos); // Forward args should contain hello world
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"cont1") == std::wstring::npos); // Forward args should not contain the containerId
                     VERIFY_IS_TRUE(forwardArgsConcat.find(L"command") == std::wstring::npos); // Forward args should not contain the command

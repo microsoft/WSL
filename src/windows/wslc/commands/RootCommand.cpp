@@ -15,7 +15,7 @@ Abstract:
 
 // Include all commands that parent to the root.
 #include "ContainerCommand.h"
-#include "DiagCommand.h"
+#include "SessionCommand.h"
 
 using namespace wsl::windows::wslc::execution;
 
@@ -23,10 +23,18 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
-    commands.reserve(3);
+    commands.reserve(11);
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
-    commands.push_back(std::make_unique<DiagCommand>(FullName()));
+    commands.push_back(std::make_unique<SessionCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerDeleteCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerInspectCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerKillCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerListCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerRunCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerStartCommand>(FullName()));
+    commands.push_back(std::make_unique<ContainerStopCommand>(FullName()));
     return commands;
 }
 

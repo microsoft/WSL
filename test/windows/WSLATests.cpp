@@ -41,6 +41,19 @@ class WSLATests
     wil::com_ptr<IWSLASession> m_defaultSession;
     static inline auto c_testSessionName = L"wsla-test";
 
+    void LoadTestImage(PCWSTR imageName)
+    {
+        std::filesystem::path imagePath = std::filesystem::path{g_testDataPath} / imageName;
+        wil::unique_hfile imageFile{
+            CreateFileW(imagePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!imageFile);
+
+        LARGE_INTEGER fileSize{};
+        THROW_LAST_ERROR_IF(!GetFileSizeEx(imageFile.get(), &fileSize));
+
+        THROW_IF_FAILED(m_defaultSession->LoadImage(HandleToULong(imageFile.get()), nullptr, fileSize.QuadPart));
+    }
+
     TEST_CLASS_SETUP(TestClassSetup)
     {
         THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &m_wsadata));
@@ -60,12 +73,12 @@ class WSLATests
 
         if (!hasImage("debian:latest"))
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("debian:latest", nullptr, nullptr));
+            LoadTestImage(L"debian-latest.tar");
         }
 
         if (!hasImage("python:3.12-alpine"))
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("python:3.12-alpine", nullptr, nullptr));
+            LoadTestImage(L"python-3_12-alpine.tar");
         }
 
         // Hacky way to delete all containers.
@@ -329,7 +342,23 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         {
-            VERIFY_SUCCEEDED(m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr));
+            HRESULT pullResult = m_defaultSession->PullImage("hello-world:linux", nullptr, nullptr);
+
+            // Skip test if error is due to rate limit.
+            if (pullResult == E_FAIL)
+            {
+                auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+                if (comError.has_value())
+                {
+                    if (wcsstr(comError->Message.get(), L"toomanyrequests") != nullptr)
+                    {
+                        LogWarning("Skipping PullImage test due to rate limiting.");
+                        return;
+                    }
+                }
+            }
+
+            VERIFY_SUCCEEDED(pullResult);
 
             // Verify that the image is in the list of images.
             ExpectImagePresent(*m_defaultSession, "hello-world:linux");
@@ -446,7 +475,7 @@ class WSLATests
         WSL2_TEST_ONLY();
 
         // Prepare alpine image to delete.
-        VERIFY_SUCCEEDED(m_defaultSession->PullImage("alpine:latest", nullptr, nullptr));
+        LoadTestImage(L"alpine-latest.tar");
 
         // Verify that the image is in the list of images.
         ExpectImagePresent(*m_defaultSession, "alpine:latest");

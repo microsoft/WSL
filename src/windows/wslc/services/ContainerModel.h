@@ -17,19 +17,24 @@ Abstract:
 #include <wslservice.h>
 #include <wslaservice.h>
 #include <docker_schema.h>
+#include <string>
 
 namespace wsl::windows::wslc::models {
-struct ContainerCreateOptions
+
+// Valid formats for container list output.
+enum class FormatType
 {
-    bool TTY = false;
-    bool Interactive = false;
-    std::vector<std::string> Arguments;
-    std::string Name;
+    Table,
+    Json,
 };
 
-struct ContainerRunOptions : public ContainerCreateOptions
+struct ContainerOptions
 {
+    std::vector<std::string> Arguments;
     bool Detach = false;
+    bool Interactive = false;
+    std::string Name;
+    bool TTY = false;
 };
 
 struct CreateContainerResult
@@ -41,7 +46,7 @@ struct StopContainerOptions
 {
     static constexpr LONGLONG DefaultTimeout = -1;
 
-    int Signal = WSLASignalSIGTERM;
+    WSLASignal Signal = WSLASignalSIGTERM;
     LONGLONG Timeout = DefaultTimeout;
 };
 
@@ -58,12 +63,5 @@ struct ContainerInformation
     WSLA_CONTAINER_STATE State;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(ContainerInformation, Id, Name, Image, State);
-};
-
-struct ExecContainerOptions
-{
-    bool TTY = false;
-    bool Interactive = false;
-    std::vector<std::string> Arguments;
 };
 } // namespace wsl::windows::wslc::models
