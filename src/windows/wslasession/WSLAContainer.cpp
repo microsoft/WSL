@@ -472,14 +472,6 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         std::lock_guard<std::recursive_mutex> lock(m_lock);
-        if (m_state != WslaContainerStateRunning)
-        {
-            // Don't run the deletion logic if the container is already in a stopped / deleted state.
-            // This can happen if Delete() is called by the user.
-            return;
-        }
-
-        m_state = WslaContainerStateExited;
 
         // Notify all processes that the container has exited.
         // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
@@ -489,6 +481,15 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         }
 
         m_processes.clear();
+
+        // Don't run the deletion logic if the container is already in a stopped / deleted state.
+        // This can happen if Delete() is called by the user.
+        if (m_state != WslaContainerStateRunning)
+        {
+            return;
+        }
+
+        m_state = WslaContainerStateExited;
 
         if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
         {
