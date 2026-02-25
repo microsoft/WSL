@@ -1160,6 +1160,8 @@ class WSLATests
                 wil::unique_handle containerTarFileHandle{CreateFileW(
                     containerTar.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == containerTarFileHandle.get());
+                auto cleanup =
+                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(containerTar.c_str())); });
                 LARGE_INTEGER fileSize{};
                 VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(containerTarFileHandle.get()), nullptr, fileSize.QuadPart));
                 // Verify that the image is in the list of images.
@@ -1176,6 +1178,8 @@ class WSLATests
                 wil::unique_handle contTarFileHandle{CreateFileW(
                     imageTarFile.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr)};
                 VERIFY_IS_FALSE(INVALID_HANDLE_VALUE == contTarFileHandle.get());
+                auto cleanfile =
+                    wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(imageTarFile.c_str())); });
                 VERIFY_IS_TRUE(GetFileSizeEx(contTarFileHandle.get(), &fileSize));
                 VERIFY_ARE_EQUAL(fileSize.QuadPart, 0);
 
