@@ -64,7 +64,7 @@ public:
     void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count);
 
-    IWSLAContainer& ComWrapper();
+    void CopyTo(IWSLAContainer** Container);
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;

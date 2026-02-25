@@ -870,7 +870,7 @@ try
             m_dockerClient.value(),
             m_ioRelay));
 
-        THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
+        it->CopyTo(Container);
 
         return S_OK;
     }
@@ -926,7 +926,7 @@ try
             E_UNEXPECTED, it == m_containers.end(), "Resolved container ID (%hs -> %hs) not found", Id, inspectResult.Id.c_str());
     }
 
-    THROW_IF_FAILED((*it)->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
+    (*it)->CopyTo(Container);
     return S_OK;
 }
 CATCH_RETURN();

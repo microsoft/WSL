@@ -4315,6 +4315,8 @@ class WSLATests
             }
 
             auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
+            auto id = container.Id();
+
             VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
@@ -4323,6 +4325,11 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 0);
         }
     }
 };
