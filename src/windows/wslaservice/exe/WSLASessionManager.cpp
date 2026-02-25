@@ -149,9 +149,15 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 
 void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessions, _Out_ ULONG* SessionsCount)
 {
+    auto tokenInfo = GetCallingProcessTokenInfo();
     std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
 
     ForEachSession<void>([&](auto& entry, const auto&) {
+        if (FAILED(CheckTokenAccess(entry, tokenInfo)))
+        {
+            return;
+        }
+
         wil::unique_hlocal_string sidString;
         THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString));
 
