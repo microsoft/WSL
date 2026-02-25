@@ -219,7 +219,7 @@ class UnitTests
         VERIFY_ARE_EQUAL(out, L"     Loaded: masked (Reason: Unit systemd-networkd-wait-online.service is masked.)\n");
 
         // Validate that NetworkManager-wait-online.service is masked.
-        auto [outNm, _] =
+        auto [outNm, __] =
             LxsstuLaunchWslAndCaptureOutput(L"systemctl status NetworkManager-wait-online.service  | grep -iF Loaded:");
 
         VERIFY_ARE_EQUAL(outNm, L"     Loaded: masked (Reason: Unit NetworkManager-wait-online.service is masked.)\n");
