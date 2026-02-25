@@ -80,6 +80,28 @@ class WSLCPortParserUnitTests
         }
     }
 
+    TEST_METHOD(PortParserTest_ContainerPortRange_Only_Valid)
+    {
+        auto result = PublishPort::Parse("8000-8005");
+
+        VerifyParseState(result, "8000-8005", true, true);
+        VerifyNoHostIP(result);
+        VerifyEphemeralHostPort(result);
+        VerifyContainerPort(result, 8000, 8005);
+        VerifyProtocol(result, PublishPort::Protocol::TCP);
+    }
+
+    TEST_METHOD(PortParserTest_ContainerPortRange_WithProtocol_NoIP)
+    {
+        auto result = PublishPort::Parse("8000-8005/udp");
+
+        VerifyParseState(result, "8000-8005/udp", true, true);
+        VerifyNoHostIP(result);
+        VerifyEphemeralHostPort(result);
+        VerifyContainerPort(result, 8000, 8005);
+        VerifyProtocol(result, PublishPort::Protocol::UDP);
+    }
+
     TEST_METHOD(PortParserTest_IPv4Mappings_Valid)
     {
         {
@@ -259,9 +281,36 @@ class WSLCPortParserUnitTests
         }
     }
 
+    TEST_METHOD(PortParserTest_EphemeralHostPort_WithRange_AndIP_Valid)
+    {
+        {
+            auto result = PublishPort::Parse("127.0.0.1::8000-8005");
+
+            VerifyParseState(result, "127.0.0.1::8000-8005", true, true);
+            VerifyHostIPv4(result, "127.0.0.1", true, false, {127, 0, 0, 1});
+            VerifyEphemeralHostPort(result);
+            VerifyContainerPort(result, 8000, 8005);
+            VerifyProtocol(result, PublishPort::Protocol::TCP);
+        }
+
+        {
+            auto result = PublishPort::Parse("[::1]::8000-8005");
+
+            VerifyParseState(result, "[::1]::8000-8005", true, true);
+            VerifyHostIPv6(result, "::1", true, false, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
+            VerifyEphemeralHostPort(result);
+            VerifyContainerPort(result, 8000, 8005);
+            VerifyProtocol(result, PublishPort::Protocol::TCP);
+        }
+    }
+
     TEST_METHOD(PortParserTest_InvalidMappings)
     {
         static const std::vector<std::string> invalidCases = {
+            "",                    // Empty input
+            " ",                   // Whitespace only
+            "80 ",                 // Trailing whitespace
+            ":80",                 // Empty host port
             "127.0.0.1:80",        // Missing container port
             "[::1]:8080",          // Missing container port
             "8000-8005:8000-8006", // Mismatched port ranges
@@ -269,7 +318,15 @@ class WSLCPortParserUnitTests
             "8000:8000-8005",      // Mismatched port ranges
             "8080:80/icmp",        // Invalid protocol
             "8080:80/udpp",        // Invalid protocol
+            "80/TCP",              // Protocol is case sensitive
+            "80/tcp:90",           // Protocol suffix must be final
             "::1:8080:80",         // Missing brackets for IPv6
+            "[::1:8080:80",        // Unterminated IPv6 literal
+            "999.1.1.1:80:80",     // Invalid IPv4 literal
+            "[::gg]:80:80",        // Invalid IPv6 literal
+            "80-",                 // Malformed port range
+            "-80",                 // Malformed port range
+            "80--81",              // Malformed port range
             "8000-7000",           // Invalid port range
             "0",                   // Invalid port number
             "65536",               // Invalid port number
