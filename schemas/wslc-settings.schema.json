@@ -1,0 +1,52 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://aka.ms/wslc-settings.schema.json",
+    "title": "WSLC Settings",
+    "type": "object",
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "session": {
+            "type": "object",
+            "properties": {
+                "cpuCount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 4,
+                    "description": "Number of CPUs for the session VM."
+                },
+                "memoryMb": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "default": 2048,
+                    "description": "Memory in MB for the session VM."
+                },
+                "bootTimeoutMs": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 30000,
+                    "description": "Boot timeout in milliseconds."
+                },
+                "maximumStorageSizeMb": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 10000,
+                    "description": "Maximum storage size in MB."
+                },
+                "networkingMode": {
+                    "type": "string",
+                    "enum": ["nat", "none"],
+                    "default": "nat",
+                    "description": "Networking mode for the session."
+                },
+                "storagePath": {
+                    "type": "string",
+                    "description": "Absolute path for container storage. Default: %LOCALAPPDATA%\\wsla"
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}
