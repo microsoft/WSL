@@ -1,3 +1,18 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    SharedMutex.h
+
+Abstract:
+
+    Contains the SharedMutex class implementation, which offers a read-write mutex implementation using two separate mutexes.
+    This allows for shared -> exclusive lock upgrades without dropping the shared lock, which is not possible with std::shared_mutex.
+
+--*/
+
 #pragma once
 
 #include <mutex>
@@ -16,8 +31,6 @@ public:
     {
     public:
         NON_COPYABLE(LockInstance);
-
-        DEFAULT_MOVABLE(LockInstance);
 
         LockInstance(SharedMutex<TMutex>& mutex, std::unique_lock<TMutex>&& shared) : m_mutex(mutex), m_shared(std::move(shared))
         {
