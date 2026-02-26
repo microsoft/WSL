@@ -203,7 +203,7 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         options.Interactive = true;
     }
 
-      if(context.Args.Contains(ArgType::Volume))
+    if (context.Args.Contains(ArgType::Volume))
     {
         auto volumes = context.Args.GetAll<ArgType::Volume>();
         options.Volumes.reserve(options.Volumes.size() + volumes.size());
