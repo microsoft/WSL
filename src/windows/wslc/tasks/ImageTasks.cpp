@@ -44,7 +44,7 @@ void ListImages(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Quiet))
     {
-        // Print only the image ids
+        // Print only the image names.
         for (const auto& image : images)
         {
             PrintMessage(MultiByteToWide(image.Name));
@@ -72,8 +72,7 @@ void ListImages(CLIExecutionContext& context)
         utils::TablePrinter tablePrinter({L"NAME", L"SIZE (MB)"});
         for (const auto& image : images)
         {
-            tablePrinter.AddRow(
-                {MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
+            tablePrinter.AddRow({MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
         }
 
         tablePrinter.Print();

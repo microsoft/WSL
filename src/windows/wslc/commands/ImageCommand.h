@@ -36,6 +36,11 @@ protected:
 struct ImageListCommand final : public Command
 {
     constexpr static std::wstring_view CommandName = L"list";
+
+    // When parented directly to the root, ImageListCommand uses a different name
+    // to avoid colliding with the container list command.
+    constexpr static std::wstring_view RootCommandName = L"images";
+
     ImageListCommand(const std::wstring& parent) : Command(CommandName, {L"ls"}, parent)
     {
     }
@@ -44,7 +49,8 @@ struct ImageListCommand final : public Command
     // container list command and its alias off the root. To avoid this, we will use
     // an override constructor that changes the name and alias of the command for when
     // it is parented directly to the root.
-    ImageListCommand(const std::wstring& parent, const std::wstring_view name) : Command(name, {}, parent)
+    // The bool parameter is used as a tag to select the root-specific name.
+    ImageListCommand(const std::wstring& parent, bool /*rootScoped*/) : Command(RootCommandName, {}, parent)
     {
     }
     std::vector<Argument> GetArguments() const override;
