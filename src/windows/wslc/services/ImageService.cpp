@@ -29,7 +29,7 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
     {
         const WSLA_IMAGE_INFORMATION& image = *ptr;
-        ImageInformation info;
+        ImageInformation info{};
         info.Name = image.Image;
         info.Size = image.Size;
         result.push_back(info);
