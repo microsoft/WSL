@@ -728,10 +728,9 @@ try
     }
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
-    auto entries = std::accumulate<decltype(images.begin()), size_t>(
-        images.begin(), images.end(), 0, [](auto sum, const auto& e) {
-            return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
-        });
+    auto entries = std::accumulate<decltype(images.begin()), size_t>(images.begin(), images.end(), 0, [](auto sum, const auto& e) {
+        return sum + (e.RepoTags.empty() ? 1 : e.RepoTags.size());
+    });
 
     auto output = wil::make_unique_cotaskmem<WSLA_IMAGE_INFORMATION[]>(entries);
 
@@ -832,7 +831,8 @@ try
     std::vector<docker_schema::DeletedImage> deletedImages;
     try
     {
-        deletedImages = m_dockerClient->DeleteImage(Options->Image, WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsForce), WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsNoPrune));
+        deletedImages = m_dockerClient->DeleteImage(
+            Options->Image, WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsForce), WI_IsFlagSet(Options->Flags, WSLADeleteImageFlagsNoPrune));
     }
     catch (const DockerHTTPException& e)
     {

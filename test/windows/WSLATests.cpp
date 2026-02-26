@@ -417,9 +417,18 @@ class WSLATests
             for (const auto& image : images)
             {
                 std::string imageName = image.Image;
-                if (imageName == "debian:latest") foundLatest = true;
-                if (imageName == "debian:test-tag1") foundTag1 = true;
-                if (imageName == "debian:test-tag2") foundTag2 = true;
+                if (imageName == "debian:latest")
+                {
+                    foundLatest = true;
+                }
+                if (imageName == "debian:test-tag1")
+                {
+                    foundTag1 = true;
+                }
+                if (imageName == "debian:test-tag2")
+                {
+                    foundTag2 = true;
+                }
             }
 
             VERIFY_IS_TRUE(foundLatest);
@@ -465,8 +474,7 @@ class WSLATests
                     LogInfo("Image %hs - Created: %lld", imageName.c_str(), image.Created);
 
                     // ParentId may be empty for base images, but should be a valid field
-                    LogInfo("Image %hs - ParentId: %hs", imageName.c_str(),
-                            strlen(image.ParentId) > 0 ? image.ParentId : "(empty - base image)");
+                    LogInfo("Image %hs - ParentId: %hs", imageName.c_str(), strlen(image.ParentId) > 0 ? image.ParentId : "(empty - base image)");
                 }
             }
 
@@ -599,7 +607,7 @@ class WSLATests
                     options.Before = nullptr;
                     options.Since = debianId.c_str();
                     options.Labels = nullptr;
-            options.LabelsCount = 0;
+                    options.LabelsCount = 0;
 
                     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
                     VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
@@ -614,7 +622,7 @@ class WSLATests
                     options.Before = alpineId.c_str();
                     options.Since = nullptr;
                     options.Labels = nullptr;
-            options.LabelsCount = 0;
+                    options.LabelsCount = 0;
 
                     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
                     VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
@@ -742,10 +750,7 @@ class WSLATests
 
             // Test with multiple label filters (labels are AND'ed together)
             {
-                WSLA_LABEL labels[] = {
-                    {.Key = "test.label1", .Value = nullptr},
-                    {.Key = "test.label2", .Value = "value"}
-                };
+                WSLA_LABEL labels[] = {{.Key = "test.label1", .Value = nullptr}, {.Key = "test.label2", .Value = "value"}};
                 options.Labels = labels;
                 options.LabelsCount = 2;
 
