@@ -752,6 +752,8 @@ void HcsVirtualMachine::CreateVmSavedStateFile(HANDLE InUserToken)
 
 void HcsVirtualMachine::EnforceVmSavedStateFileLimit()
 {
+    auto runAsUser = wil::impersonate_token(m_userToken.get());
+
     auto pred = [](const auto& e) {
         return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
                e.path().extension() == SAVED_STATE_FILE_EXTENSION && e.path().has_filename() &&
