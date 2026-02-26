@@ -22,6 +22,7 @@ namespace wsl::windows::common::docker_schema {
 struct CreatedContainer
 {
     std::string Id;
+    std::string Name;
     std::vector<std::string> Warnings;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(CreatedContainer, Id, Warnings);
