@@ -73,7 +73,7 @@ void ListImages(CLIExecutionContext& context)
         for (const auto& image : images)
         {
             tablePrinter.AddRow(
-                {wsl::shared::string::MultiByteToWide(image.Name), std::format(L"{:.2f} MB", static_cast<double>(image.Size) / (1024 * 1024))});
+                {MultiByteToWide(image.Name), std::format(L"{:.2f}", static_cast<double>(image.Size) / (1024 * 1024))});
         }
 
         tablePrinter.Print();
