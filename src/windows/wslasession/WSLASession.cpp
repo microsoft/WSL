@@ -583,65 +583,6 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     }
 }
 
-HRESULT WSLASession::ExportContainer(ULONG OutHandle, LPCSTR ContainerID, IProgressCallback* ProgressCallback)
-try
-{
-    UNREFERENCED_PARAMETER(ProgressCallback);
-
-    COMServiceExecutionContext context;
-
-    RETURN_HR_IF_NULL(E_POINTER, ContainerID);
-    std::lock_guard lock{m_lock};
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    auto retVal = m_dockerClient->ExportContainer(ContainerID);
-    ExportContainerImpl(retVal, OutHandle);
-    return S_OK;
-}
-CATCH_RETURN();
-
-void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle)
-{
-    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    auto io = CreateIOContext();
-
-    std::string errorJson;
-
-    if (SocketCodePair.first != 200)
-    {
-        auto accumulateError = [&](const gsl::span<char>& buffer) {
-            // If the export failed, accumulate the error message.
-            errorJson.append(buffer.data(), buffer.size());
-        };
-
-        io.AddHandle(
-            std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
-            MultiHandleWait::CancelOnCompleted);
-    }
-    else
-    {
-        io.AddHandle(
-            std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, common::relay::HandleWrapper{std::move(containerFileHandle)}),
-            MultiHandleWait::CancelOnCompleted);
-    }
-
-    io.Run({});
-
-    if (SocketCodePair.first != 200)
-    {
-        // Export failed, parse the error message.
-        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-
-        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
-    }
-}
-
 HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback)
 try
 {
@@ -868,13 +809,13 @@ try
     {
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
-            *m_virtualMachine,
+            *this,
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
             m_ioRelay));
 
-        THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
+        it->CopyTo(Container);
 
         return S_OK;
     }
@@ -930,8 +871,12 @@ try
             E_UNEXPECTED, it == m_containers.end(), "Resolved container ID (%hs -> %hs) not found", Id, inspectResult.Id.c_str());
     }
 
-    THROW_IF_FAILED((*it)->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
-    return S_OK;
+    auto result = wil::ResultFromException([&]() { (*it)->CopyTo(Container); });
+
+    // Return ERROR_NOT_FOUND if the container was found, but is being deleted for consistency.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == RPC_E_DISCONNECTED);
+
+    return result;
 }
 CATCH_RETURN();
 
@@ -955,6 +900,7 @@ try
     {
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Image, e->Image().c_str()) != 0);
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Name, e->Name().c_str()) != 0);
+        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Id, e->ID().c_str()) != 0);
         e->GetState(&output[index].State);
         index++;
     }
@@ -1149,6 +1095,13 @@ MultiHandleWait WSLASession::CreateIOContext()
     return io;
 }
 
+WSLAVirtualMachine& WSLASession::GetVirtualMachine()
+{
+    std::lock_guard lock{m_lock};
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
+    return *m_virtualMachine;
+}
+
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
     std::lock_guard lock{m_lock};
@@ -1175,7 +1128,7 @@ void WSLASession::RecoverExistingContainers()
         {
             auto container = WSLAContainerImpl::Open(
                 dockerContainer,
-                *m_virtualMachine,
+                *this,
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),

@@ -51,12 +51,14 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
             Argument::Create(ArgType::Interactive),
             Argument::Create(ArgType::Verbose),
             Argument::Create(ArgType::Remove),
-            Argument::Create(ArgType::Publish, false, 3), // Not required, up to 3 values.
+            Argument::Create(ArgType::Signal),
+            Argument::Create(ArgType::Time),
+            Argument::Create(ArgType::Publish, false, NO_LIMIT), // Not required, unlimited.
         };
 
     case ArgumentSet::List:
         return {
-            Argument::Create(ArgType::ContainerId, false, 10), // Optional positional
+            Argument::Create(ArgType::ContainerId, false, NO_LIMIT), // Optional positional
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Verbose),
         };
@@ -84,6 +86,7 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 cont1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 cont1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p 80:80 -p 443:443 cont1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p=80:80 -p=443:443 cont1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --verbose --verbose cont1)") \
 \
 /* Flag parse tests */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -v cont1)") \
@@ -99,6 +102,12 @@ WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -prmiv=80:80 cont1)") \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -prmiv 80:80 cont1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -rmivp 80:80 cont1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -rmivp=80:80 cont1)") \
+\
+/* Validation tests */ \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO cont1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal 9 cont1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -t blah)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -t 5)") \
 \
 /* Multi-positional tests */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc cont1 command)") \

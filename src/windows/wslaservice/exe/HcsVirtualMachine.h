@@ -24,6 +24,8 @@ Abstract:
 #include <map>
 #include <thread>
 
+#define MAX_VHD_COUNT 254
+
 namespace wsl::windows::service::wsla {
 
 class HcsVirtualMachine
@@ -46,7 +48,6 @@ private:
     struct DiskInfo
     {
         std::wstring Path;
-        std::string Device;
         bool AccessGranted = false;
     };
 
@@ -60,6 +61,9 @@ private:
     void EnforceVmSavedStateFileLimit();
     void WriteCrashLog(const std::wstring& crashLog);
     void CollectCrashDumps(wil::unique_socket&& listenSocket) const;
+
+    ULONG AllocateLun();
+    void FreeLun(ULONG Lun);
 
     std::recursive_mutex m_lock;
 
@@ -82,7 +86,7 @@ private:
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
 
     std::map<ULONG, DiskInfo> m_attachedDisks;
-    ULONG m_nextLun = 0;
+    std::bitset<MAX_VHD_COUNT> m_lunBitmap;
 
     // Shares: key is ShareId, value is nullopt for Plan9 or DeviceInstanceId for VirtioFS
     std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;

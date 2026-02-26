@@ -18,12 +18,16 @@ Abstract:
 #include <WSLAProcessLauncher.h>
 #include <docker_schema.h>
 #include <CommandLine.h>
+#include <unordered_map>
+#include <wslaservice.h>
 
 namespace wsl::windows::wslc::services {
 using wsl::windows::common::ClientRunningWSLAProcess;
 using wsl::windows::common::docker_schema::InspectContainer;
 using wsl::windows::common::wslutil::PrintMessage;
 using namespace wsl::windows::wslc::models;
+
+DEFINE_ENUM_FLAG_OPERATORS(WSLALogsFlags);
 
 static void SetContainerTTYOptions(WSLA_PROCESS_OPTIONS& options)
 {
@@ -70,7 +74,7 @@ static void SetContainerArguments(WSLA_PROCESS_OPTIONS& options, std::vector<con
 }
 
 static wsl::windows::common::RunningWSLAContainer CreateInternal(
-    Session& session, const std::string& image, const ContainerCreateOptions& options, IProgressCallback* callback)
+    Session& session, const std::string& image, const ContainerOptions& options, IProgressCallback* callback)
 {
     auto processFlags = WSLAProcessFlagsNone;
     WI_SetFlagIf(processFlags, WSLAProcessFlagsStdin, options.Interactive);
@@ -83,8 +87,7 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         PrintMessage(L"Image '%hs' not found, pulling", stderr, image.c_str());
         ImageService imageService;
         imageService.Pull(session, image, callback);
-        auto [retryResult, _] = containerLauncher.CreateNoThrow(*session.Get());
-        result = retryResult;
+        return containerLauncher.Create(*session.Get());
     }
 
     THROW_IF_FAILED(result);
@@ -92,9 +95,9 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
     return std::move(*runningContainer);
 }
 
-static void StopInternal(IWSLAContainer& container, int signal = WSLASignalNone, ULONG timeout = -1)
+static void StopInternal(IWSLAContainer& container, WSLASignal signal = WSLASignalNone, LONGLONG timeout = -1)
 {
-    THROW_IF_FAILED(container.Stop(static_cast<WSLASignal>(signal), timeout)); // TODO: Error message
+    THROW_IF_FAILED(container.Stop(signal, timeout)); // TODO: Error message
 }
 
 std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state)
@@ -110,12 +113,13 @@ std::wstring ContainerService::ContainerStateToString(WSLA_CONTAINER_STATE state
     case WSLA_CONTAINER_STATE::WslaContainerStateExited:
         return L"exited";
     case WSLA_CONTAINER_STATE::WslaContainerStateInvalid:
+        return L"invalid";
     default:
         THROW_HR(E_UNEXPECTED);
     }
 }
 
-int ContainerService::Run(Session& session, const std::string& image, ContainerRunOptions runOptions, IProgressCallback* callback)
+int ContainerService::Run(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
 {
     // Create the container
     auto runningContainer = CreateInternal(session, image, runOptions, callback);
@@ -140,7 +144,7 @@ int ContainerService::Run(Session& session, const std::string& image, ContainerR
     return 0;
 }
 
-CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerCreateOptions runOptions, IProgressCallback* callback)
+CreateContainerResult ContainerService::Create(Session& session, const std::string& image, ContainerOptions runOptions, IProgressCallback* callback)
 {
     auto runningContainer = CreateInternal(session, image, runOptions, callback);
     runningContainer.SetDeleteOnClose(false);
@@ -164,7 +168,7 @@ void ContainerService::Stop(Session& session, const std::string& id, StopContain
     StopInternal(*container, options.Signal, options.Timeout);
 }
 
-void ContainerService::Kill(Session& session, const std::string& id, int signal)
+void ContainerService::Kill(Session& session, const std::string& id, WSLASignal signal)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -187,31 +191,21 @@ std::vector<ContainerInformation> ContainerService::List(Session& session)
 {
     std::vector<ContainerInformation> result;
     wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
-    ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListContainers(&containers, &count));
-    for (auto ptr = containers.get(), end = containers.get() + count; ptr != end; ++ptr)
+    THROW_IF_FAILED(session.Get()->ListContainers(&containers, containers.size_address<ULONG>()));
+    for (const auto& current : containers)
     {
-        const WSLA_CONTAINER& current = *ptr;
-
-        wil::com_ptr<IWSLAContainer> container;
-        THROW_IF_FAILED(session.Get()->OpenContainer(current.Name, &container));
-
-        wil::unique_cotaskmem_ansistring output;
-        THROW_IF_FAILED(container->Inspect(&output));
-        auto inspect = wsl::shared::FromJson<InspectContainer>(output.get());
-
         ContainerInformation entry;
         entry.Name = current.Name;
         entry.Image = current.Image;
         entry.State = current.State;
-        entry.Id = inspect.Id;
-        result.push_back(entry);
+        entry.Id = current.Id;
+        result.emplace_back(std::move(entry));
     }
 
     return result;
 }
 
-int ContainerService::Exec(Session& session, const std::string& id, ExecContainerOptions options)
+int ContainerService::Exec(Session& session, const std::string& id, ContainerOptions options)
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
@@ -232,5 +226,32 @@ InspectContainer ContainerService::Inspect(Session& session, const std::string& 
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(container->Inspect(&output));
     return wsl::shared::FromJson<InspectContainer>(output.get());
+}
+
+void ContainerService::Logs(Session& session, const std::string& id, bool follow)
+{
+    wil::com_ptr<IWSLAContainer> container;
+    THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
+
+    ULONG stdoutLogsHandle = 0;
+    ULONG stderrLogsHandle = 0;
+    WSLALogsFlags flags = WSLALogsFlagsNone;
+    WI_SetFlagIf(flags, WSLALogsFlagsFollow, follow);
+
+    THROW_IF_FAILED(container->Logs(flags, &stdoutLogsHandle, &stderrLogsHandle, 0, 0, 0));
+    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
+    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
+
+    wsl::windows::common::relay::MultiHandleWait io;
+    io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+        std::move(stdoutLogs), GetStdHandle(STD_OUTPUT_HANDLE)));
+    if (stderrLogs) // This handle is only used for non-tty processes.
+    {
+        io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(
+            std::move(stderrLogs), GetStdHandle(STD_ERROR_HANDLE)));
+    }
+
+    // TODO: Handle ctrl-c.
+    io.Run({});
 }
 } // namespace wsl::windows::wslc::services
