@@ -75,7 +75,7 @@ COMMAND_LINE_TEST_CASE(L"container logs", L"logs", false)
 
 // Image command
 COMMAND_LINE_TEST_CASE(L"image list", L"list", true)
-COMMAND_LINE_TEST_CASE(L"images", L"images", true)                      // Aliased off the root changes the name
+COMMAND_LINE_TEST_CASE(L"images", L"images", true) // Aliased off the root changes the name
 COMMAND_LINE_TEST_CASE(L"image ls", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list --format json", L"list", true)
 COMMAND_LINE_TEST_CASE(L"image list --format badformat", L"list", false)

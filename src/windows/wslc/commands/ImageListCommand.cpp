@@ -26,12 +26,7 @@ namespace wsl::windows::wslc {
 // Image List Command
 std::vector<Argument> ImageListCommand::GetArguments() const
 {
-    return {
-        Argument::Create(ArgType::Format),
-        Argument::Create(ArgType::Quiet),
-        Argument::Create(ArgType::Session),
-        Argument::Create(ArgType::Verbose)
-    };
+    return {Argument::Create(ArgType::Format), Argument::Create(ArgType::Quiet), Argument::Create(ArgType::Session), Argument::Create(ArgType::Verbose)};
 }
 
 std::wstring ImageListCommand::ShortDescription() const
