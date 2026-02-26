@@ -213,6 +213,16 @@ void SetContainerOptionsFromArgs(CLIExecutionContext& context)
         }
     }
 
+    if(context.Args.Contains(ArgType::Publish))
+    {
+        auto ports = context.Args.GetAll<ArgType::Publish>();
+        options.Ports.reserve(options.Ports.size() + ports.size());
+        for (const auto& port : ports)
+        {
+            options.Ports.emplace_back(WideToMultiByte(port));
+        }
+    }
+
     if (context.Args.Contains(ArgType::Command))
     {
         options.Arguments.emplace_back(WideToMultiByte(context.Args.Get<ArgType::Command>()));

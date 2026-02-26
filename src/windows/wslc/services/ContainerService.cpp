@@ -11,6 +11,8 @@ Abstract:
     This file contains the ContainerService implementation
 
 --*/
+
+#include <precomp.h>
 #include "ContainerService.h"
 #include "ConsoleService.h"
 #include "ImageService.h"
@@ -86,6 +88,20 @@ static wsl::windows::common::RunningWSLAContainer CreateInternal(
         auto host = wsl::shared::string::MultiByteToWide(volume.HostPath());
         auto container = volume.ContainerPath();
         containerLauncher.AddVolume(host, container, volume.IsReadOnly());
+    }
+
+    // Set port options if provided
+    for (const auto& port : options.Ports)
+    {
+        auto portMapping = PublishPort::Parse(port);
+        auto containerPort = portMapping.ContainerPort();
+        for (auto i = 0; i < containerPort.Count(); ++i)
+        {
+            int family = portMapping.HostIP().has_value() && portMapping.HostIP()->IsIPv6() ? AF_INET6 : AF_INET;
+            auto currentContainerPort = containerPort.Start() + i;
+            auto currentHostPort = portMapping.HostPort().IsEphemeral() ? portMapping.HostPort().Start() : portMapping.HostPort().Start() + i;
+            containerLauncher.AddPort(currentHostPort, currentContainerPort, family);
+        }
     }
 
     auto [result, runningContainer] = containerLauncher.CreateNoThrow(*session.Get());
