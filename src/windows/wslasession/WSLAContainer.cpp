@@ -233,6 +233,17 @@ WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
     }
 }
 
+std::string CleanContainerName(const std::string& name)
+{
+    // Docker container names have a leading '/', strip it.
+    if (!name.empty() && name[0] == '/')
+    {
+        return name.substr(1);
+    }
+
+    return name;
+}
+
 std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
 {
     if (names.empty())
@@ -240,14 +251,7 @@ std::string ExtractContainerName(const std::vector<std::string>& names, const st
         return id;
     }
 
-    // Docker container names have a leading '/', strip it.
-    std::string name = names[0];
-    if (!name.empty() && name[0] == '/')
-    {
-        name = name.substr(1);
-    }
-
-    return name;
+    return CleanContainerName(names[0]);
 }
 
 WSLAContainerMetadataV1 ParseContainerMetadata(const std::string& json)
@@ -747,14 +751,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     WslaInspectContainer wslaInspect{};
 
     wslaInspect.Id = dockerInspect.Id;
-    wslaInspect.Name = dockerInspect.Name;
-
-    // Remove leading '/' from Docker container names.
-    if (!wslaInspect.Name.empty() && wslaInspect.Name[0] == '/')
-    {
-        wslaInspect.Name = wslaInspect.Name.substr(1);
-    }
-
+    wslaInspect.Name = CleanContainerName(dockerInspect.Name);
     wslaInspect.Created = dockerInspect.Created;
     wslaInspect.Image = m_image;
 
@@ -950,10 +947,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     auto result =
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
+    // If no name was passed, inspect the container to fetch its generated name.
+    common::docker_schema::InspectContainer inspectData;
+    if (containerOptions.Name == nullptr)
+    {
+        inspectData = DockerClient.InspectContainer(result.Id);
+    }
+
     auto container = std::make_unique<WSLAContainerImpl>(
         &wslaSession,
         std::move(result.Id),
-        std::move(std::string(containerOptions.Name == nullptr ? "" : containerOptions.Name)),
+        std::move(containerOptions.Name == nullptr ? CleanContainerName(inspectData.Name) : std::string(containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::move(ports),

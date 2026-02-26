@@ -4373,4 +4373,25 @@ class WSLATests
             VERIFY_ARE_EQUAL(containers.size(), 0);
         }
     }
+
+    TEST_METHOD(ContainerNameGeneration)
+    {
+        WSL2_TEST_ONLY();
+
+        {
+            // Create a container with a specific name
+            auto container = WSLAContainerLauncher("debian:latest", "test-container-name").Create(*m_defaultSession.get());
+
+            // Validate that the container name is correct.
+            VERIFY_ARE_EQUAL(container.Name(), "test-container-name");
+        }
+
+        {
+            // Create a container without name.
+            auto container = WSLAContainerLauncher("debian:latest").Create(*m_defaultSession.get());
+
+            // Validate that the service generates a name for the container.
+            VERIFY_ARE_NOT_EQUAL(container.Name(), "");
+        }
+    }
 };
