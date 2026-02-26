@@ -3883,6 +3883,7 @@ class WSLATests
             WSLAContainerLauncher launcher("debian:latest", "logs-test-4", {"/bin/bash", "-c", "echo -n OK"});
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK"}});
 
             // Testing would with more granularity would be difficult, but these flags are just forwarded to docker,
             // so validate that they're wired correctly.
