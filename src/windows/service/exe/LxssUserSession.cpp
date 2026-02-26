@@ -1737,11 +1737,15 @@ try
     RETURN_HR_IF(WSL_E_DISTRO_NOT_STOPPED, m_runningInstances.contains(*DistroGuid));
 
     const wil::unique_hfile vhd{::CreateFileW(configuration.VhdFilePath.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr)};
-    if (const DWORD err = GetLastError(); err == ERROR_SHARING_VIOLATION)
+    if (!vhd)
     {
-        THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(err), wsl::shared::Localization::MessageVhdInUse());
+        const DWORD err = GetLastError();
+        if (err == ERROR_SHARING_VIOLATION)
+        {
+            THROW_HR_WITH_USER_ERROR(HRESULT_FROM_WIN32(err), wsl::shared::Localization::MessageVhdInUse());
+        }
+        THROW_WIN32(err);
     }
-    THROW_LAST_ERROR_IF(!vhd);
 
     FILE_SET_SPARSE_BUFFER buffer{
         .SetSparse = Sparse,
@@ -1949,7 +1953,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
             wsl::windows::common::relay::ScopedMultiRelay stdErrRelay(
-                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE*>(vmContext.errorSocket.get())}, onTarOutput);
+                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE>(vmContext.errorSocket.get())}, onTarOutput);
 
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
@@ -2014,7 +2018,7 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
             auto wsl1Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
             wsl::windows::common::relay::ScopedMultiRelay stdErrRelay(
-                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE*>(vmContext.errorSocket.get())}, onTarOutput);
+                std::vector<HANDLE>{wsl1Pipe.first.get(), reinterpret_cast<HANDLE>(vmContext.errorSocket.get())}, onTarOutput);
 
             // Add mounts for the rootfs and tools.
             auto mounts = _CreateSetupMounts(configuration);
