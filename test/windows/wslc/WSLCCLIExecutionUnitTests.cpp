@@ -83,16 +83,10 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Containers>(std::move(containers));
                 handled = true;
             }
-            else if (dataType == Data::CreateContainerOptions)
+            else if (dataType == Data::ContainerOptions)
             {
-                wsl::windows::wslc::models::ContainerCreateOptions options;
-                dataMap.Add<Data::CreateContainerOptions>(std::move(options));
-                handled = true;
-            }
-            else if (dataType == Data::RunContainerOptions)
-            {
-                wsl::windows::wslc::models::ContainerRunOptions options;
-                dataMap.Add<Data::RunContainerOptions>(std::move(options));
+                wsl::windows::wslc::models::ContainerOptions options;
+                dataMap.Add<Data::ContainerOptions>(std::move(options));
                 handled = true;
             }
 

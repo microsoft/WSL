@@ -18,4 +18,5 @@ using wsl::windows::wslc::execution::CLIExecutionContext;
 
 namespace wsl::windows::wslc::task {
 void ListSessions(CLIExecutionContext& context);
+void AttachToSession(CLIExecutionContext& context);
 } // namespace wsl::windows::wslc::task

@@ -271,7 +271,7 @@ enum WSLA_PROCESS_STATE
 interface IWSLAProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
-    HRESULT GetExitEvent([out] ULONG* EventHandle);
+    HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
     HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
@@ -378,6 +378,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Stop([in] WSLASignal Signal, [in] LONGLONG TimeoutSeconds);
     HRESULT Start([in] WSLAContainerStartFlags Flags);
     HRESULT Delete(); // TODO: Look into lifetime logic.
+    HRESULT Export([in] ULONG TarHandle);
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
@@ -449,7 +450,6 @@ interface IWSLASession : IUnknown
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
     HRESULT OpenContainer([in] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
-    HRESULT ExportContainer([in] ULONG OutputHandle, [in] LPCSTR ContainerID, [in, unique] IProgressCallback * ProgressCallback);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in] LPCSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);

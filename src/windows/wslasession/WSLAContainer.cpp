@@ -31,6 +31,7 @@ using wsl::windows::service::wsla::WSLAContainerImpl;
 using wsl::windows::service::wsla::WSLAContainerMetadata;
 using wsl::windows::service::wsla::WSLAContainerMetadataV1;
 using wsl::windows::service::wsla::WSLAPortMapping;
+using wsl::windows::service::wsla::WSLASession;
 using wsl::windows::service::wsla::WSLAVirtualMachine;
 using wsl::windows::service::wsla::WSLAVolumeMount;
 
@@ -268,7 +269,7 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
 } // namespace
 
 WSLAContainerImpl::WSLAContainerImpl(
-    WSLAVirtualMachine* parentVM,
+    WSLASession* wslaSession,
     std::string&& Id,
     std::string&& Name,
     std::string&& Image,
@@ -282,7 +283,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     WSLA_CONTAINER_STATE InitialState,
     WSLAProcessFlags InitProcessFlags,
     WSLAContainerFlags ContainerFlags) :
-    m_parentVM(parentVM),
+    m_wslaSession(wslaSession),
     m_name(std::move(Name)),
     m_image(std::move(Image)),
     m_id(std::move(Id)),
@@ -309,20 +310,15 @@ WSLAContainerImpl::~WSLAContainerImpl()
         TraceLoggingValue(m_id.c_str(), "Id"),
         TraceLoggingValue((int)m_state, "State"));
 
-    // Copy processes references so their callback can be removed without holding m_lock.
-    auto* initProcessControl = m_initProcessControl;
-    auto processes = m_processes;
+    // Snapshot and clear process references under the lock.
+    // Callbacks are then invoked without holding m_lock.
+    decltype(m_processes) processes;
+    decltype(m_initProcessControl) initProcessControl = nullptr;
 
-    // Remove container callback from any outstanding processes.
     {
         std::lock_guard lock(m_lock);
-
-        if (m_initProcessControl)
-        {
-            m_initProcessControl = nullptr;
-        }
-
-        m_processes.clear();
+        initProcessControl = std::exchange(m_initProcessControl, nullptr);
+        processes = std::exchange(m_processes, {});
     }
 
     if (initProcessControl)
@@ -330,7 +326,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
         initProcessControl->OnContainerReleased();
     }
 
-    for (auto& process : m_processes)
+    for (auto& process : processes)
     {
         process->OnContainerReleased();
     }
@@ -462,7 +458,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
-    m_state = WslaContainerStateRunning;
+    Transition(WslaContainerStateRunning);
     cleanup.release();
 }
 
@@ -472,14 +468,8 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         std::lock_guard<std::recursive_mutex> lock(m_lock);
-        if (m_state != WslaContainerStateRunning)
-        {
-            // Don't run the deletion logic if the container is already in a stopped / deleted state.
-            // This can happen if Delete() is called by the user.
-            return;
-        }
 
-        m_state = WslaContainerStateExited;
+        auto previousState = m_state;
 
         // Notify all processes that the container has exited.
         // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
@@ -490,9 +480,15 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
         m_processes.clear();
 
-        if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+        // Don't run the deletion logic if the container is already in a stopped / deleted state.
+        // This can happen if Delete() is called by the user.
+        if (previousState == WslaContainerStateRunning)
         {
-            Delete();
+            Transition(WslaContainerStateExited);
+            if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+            {
+                Delete();
+            }
         }
     }
 
@@ -537,7 +533,7 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
         }
     }
 
-    m_state = WslaContainerStateExited;
+    Transition(WslaContainerStateExited);
 
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
@@ -565,7 +561,56 @@ void WSLAContainerImpl::Delete()
 
     ReleaseResources();
 
-    m_state = WslaContainerStateDeleted;
+    Transition(WslaContainerStateDeleted);
+}
+
+void WSLAContainerImpl::Export(ULONG OutHandle)
+{
+    std::lock_guard lock(m_lock);
+
+    // Validate that the container is in the exited state.
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+        State() == WslaContainerStateRunning,
+        "Cannot export container '%hs', state: %i",
+        m_name.c_str(),
+        m_state);
+
+    std::pair<uint32_t, wil::unique_socket> SocketCodePair;
+    SocketCodePair = m_dockerClient.ExportContainer(m_id);
+
+    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutHandle))};
+
+    wsl::windows::common::relay::MultiHandleWait io = m_wslaSession->CreateIOContext();
+
+    std::string errorJson;
+    auto accumulateError = [&](const gsl::span<char>& buffer) {
+        // If the export failed, accumulate the error message.
+        errorJson.append(buffer.data(), buffer.size());
+    };
+
+    if (SocketCodePair.first != 200)
+    {
+        io.AddHandle(std::make_unique<ReadHandle>(HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)));
+    }
+    else
+    {
+        io.AddHandle(
+            std::make_unique<RelayHandle<HTTPChunkBasedReadHandle>>(
+                HandleWrapper{std::move(SocketCodePair.second)}, HandleWrapper{std::move(containerFileHandle)}),
+            wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted);
+    }
+
+    io.Run({});
+
+    if (SocketCodePair.first != 200)
+    {
+        // Export failed, parse the error message.
+        auto error = wsl::shared::FromJson<common::docker_schema::ErrorResponse>(errorJson.c_str());
+
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
+    }
 }
 
 WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
@@ -754,7 +799,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
 
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
-    WSLAVirtualMachine& parentVM,
+    WSLASession& wslaSession,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -859,13 +904,13 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Mount volumes.
-    auto volumeErrorCleanup = MountVolumes(volumes, parentVM);
+    auto volumeErrorCleanup = MountVolumes(volumes, wslaSession.GetVirtualMachine());
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
     request.HostConfig.NetworkMode = networkMode;
 
-    auto [vmPorts, errorCleanup] = MapPorts(ports, parentVM);
+    auto [vmPorts, errorCleanup] = MapPorts(ports, wslaSession.GetVirtualMachine());
 
     for (const auto& e : ports)
     {
@@ -906,7 +951,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
     auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM,
+        &wslaSession,
         std::move(result.Id),
         std::move(std::string(containerOptions.Name == nullptr ? "" : containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
@@ -929,7 +974,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
-    WSLAVirtualMachine& parentVM,
+    WSLASession& wslaSession,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -952,11 +997,11 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 
     // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
     // to open containers that are not running.
-    auto volumeErrorCleanup = MountVolumes(metadata.Volumes, parentVM);
-    auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, parentVM);
+    auto volumeErrorCleanup = MountVolumes(metadata.Volumes, wslaSession.GetVirtualMachine());
+    auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, wslaSession.GetVirtualMachine());
 
     auto container = std::make_unique<WSLAContainerImpl>(
-        &parentVM,
+        &wslaSession,
         std::string(dockerContainer.Id),
         std::move(name),
         std::string(dockerContainer.Image),
@@ -1091,7 +1136,7 @@ void WSLAContainerImpl::ReleaseResources()
     }
 
     // Unmount volumes.
-    UnmountVolumes(m_mountedVolumes, *m_parentVM);
+    UnmountVolumes(m_mountedVolumes, m_wslaSession->GetVirtualMachine());
     m_mountedVolumes.clear();
 
     // Unmap and release ports.
@@ -1102,7 +1147,7 @@ void WSLAContainerImpl::ReleaseResources()
 
         try
         {
-            m_parentVM->UnmapPort(e.Family, e.HostPort, e.VmPort);
+            m_wslaSession->GetVirtualMachine().UnmapPort(e.Family, e.HostPort, e.VmPort);
         }
         CATCH_LOG();
 
@@ -1111,10 +1156,24 @@ void WSLAContainerImpl::ReleaseResources()
 
     if (!allocatedGuestPorts.empty())
     {
-        m_parentVM->ReleasePorts(allocatedGuestPorts);
+        m_wslaSession->GetVirtualMachine().ReleasePorts(allocatedGuestPorts);
     }
 
     m_mappedPorts.clear();
+}
+
+__requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLA_CONTAINER_STATE State) noexcept
+{
+    // N.B. A deleted container cannot transition back to any other state.
+    WI_ASSERT(m_state != WslaContainerStateDeleted);
+
+    WSL_LOG(
+        "ContainerStateChange",
+        TraceLoggingValue(static_cast<int>(m_state), "PreviousState"),
+        TraceLoggingValue(static_cast<int>(State), "NewState"),
+        TraceLoggingValue(m_id.c_str(), "ID"));
+
+    m_state = State;
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :
@@ -1195,10 +1254,16 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+HRESULT WSLAContainer::Export(ULONG OutHandle)
 {
     COMServiceExecutionContext context;
 
+    return CallImpl(&WSLAContainerImpl::Export, OutHandle);
+}
+
+HRESULT WSLAContainer::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+{
+    COMServiceExecutionContext context;
     RETURN_HR_IF(E_POINTER, Stdout == nullptr || Stderr == nullptr);
 
     *Stdout = 0;
