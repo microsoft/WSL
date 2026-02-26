@@ -1,86 +1,29 @@
-set(SOURCES
-    main.cpp
+set(WSLC_SUBDIRS arguments commands core services tasks)
+list(TRANSFORM WSLC_SUBDIRS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/ OUTPUT_VARIABLE WSLC_SUBDIR_PATHS)
 
-    # Commands
-    ShellCommand.cpp
-    ImageCommand.cpp
-    ContainerCommand.cpp
-    ICommand.cpp
+list(TRANSFORM WSLC_SUBDIR_PATHS APPEND /*.h OUTPUT_VARIABLE HEADER_PATTERNS)
+list(TRANSFORM WSLC_SUBDIR_PATHS APPEND /*.cpp OUTPUT_VARIABLE SOURCE_PATTERNS)
+file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS ${HEADER_PATTERNS})
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${SOURCE_PATTERNS})
 
-    # Services
-    ContainerService.cpp
-    ImageService.cpp
-    ShellService.cpp
-    SessionService.cpp
-    ConsoleService.cpp
+# Object library for WSLC components.
+# Used to build the executable and also unit testing components.
+add_library(wslclib OBJECT ${SOURCES} ${HEADERS})
+target_include_directories(wslclib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${WSLC_SUBDIR_PATHS})
 
-    # Models
-    SessionModel.cpp
-    ContainerModel.cpp
-)
+target_link_libraries(wslclib
+                      ${COMMON_LINK_LIBRARIES}
+                      common)
 
-set(HEADERS
-    # Commands
-    ShellCommand.h
-    ImageCommand.h
-    ContainerCommand.h
-    ICommand.h
+target_precompile_headers(wslclib REUSE_FROM common)
+set_target_properties(wslclib PROPERTIES FOLDER windows)
 
-    # Others
-    TablePrinter.h
+# Create wslc.exe
+add_executable(wslc $<TARGET_OBJECTS:wslclib>)
 
-    # Services
-    ContainerService.h
-    ImageService.h
-    ShellService.h
-    SessionService.h
-    ConsoleService.h
-
-    # Models
-    ImageModel.h
-    ContainerModel.h
-    SessionModel.h
-)
-
-source_group("Services" FILES
-    ContainerService.h
-    ContainerService.cpp
-    ImageService.h
-    ImageService.cpp
-    ShellService.h
-    ShellService.cpp
-    SessionService.h
-    SessionService.cpp
-    ConsoleService.h
-    ConsoleService.cpp
-)
-
-source_group("Commands" FILES
-    ShellCommand.h
-    ShellCommand.cpp
-    ImageCommand.h
-    ImageCommand.cpp
-    ContainerCommand.h
-    ContainerCommand.cpp
-    ICommand.h
-    ICommand.cpp
-)
-
-source_group("Models" FILES
-    ImageModel.h
-    ContainerModel.h
-    ContainerModel.cpp
-    SessionModel.h
-    SessionModel.cpp
-)
-
-add_executable(wslc ${SOURCES} ${HEADERS})
-
-target_link_libraries(wslc
-    ${COMMON_LINK_LIBRARIES}
-    common
-)
-
-target_precompile_headers(wslc REUSE_FROM common)
+target_link_libraries(wslc wslclib)
 
 set_target_properties(wslc PROPERTIES FOLDER windows)
+
+# For prettier source tree browsing
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})

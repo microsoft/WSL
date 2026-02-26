@@ -54,12 +54,7 @@ public:
         _In_ LPCSTR ImageUri,
         _In_opt_ const WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation,
         _In_opt_ IProgressCallback* ProgressCallback) override;
-    IFACEMETHOD(BuildImage)(
-        _In_ ULONG ContextHandle,
-        _In_ ULONGLONG ContentLength,
-        _In_opt_ LPCSTR DockerfilePath,
-        _In_opt_ LPCSTR ImageTag,
-        _In_opt_ IProgressCallback* ProgressCallback) override;
+    IFACEMETHOD(BuildImage)(_In_ LPCWSTR ContextPath, _In_ ULONG DockerfileHandle, _In_opt_ LPCSTR ImageTag, _In_opt_ IProgressCallback* ProgressCallback) override;
     IFACEMETHOD(LoadImage)(_In_ ULONG ImageHandle, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(ImportImage)(_In_ ULONG ImageHandle, _In_ LPCSTR ImageName, _In_ IProgressCallback* ProgressCallback, _In_ ULONGLONG ContentLength) override;
     IFACEMETHOD(SaveImage)(_In_ ULONG OutputHandle, _In_ LPCSTR ImageNameOrID, _In_ IProgressCallback* ProgressCallback) override;
@@ -71,7 +66,6 @@ public:
     IFACEMETHOD(CreateContainer)(_In_ const WSLA_CONTAINER_OPTIONS* Options, _Out_ IWSLAContainer** Container) override;
     IFACEMETHOD(OpenContainer)(_In_ LPCSTR Id, _In_ IWSLAContainer** Container) override;
     IFACEMETHOD(ListContainers)(_Out_ WSLA_CONTAINER** Images, _Out_ ULONG* Count) override;
-    IFACEMETHOD(ExportContainer)(_In_ ULONG OutputHandle, _In_ LPCSTR ContainerID, _In_ IProgressCallback* ProgressCallback) override;
 
     // VM management.
     IFACEMETHOD(CreateRootNamespaceProcess)(
@@ -91,6 +85,9 @@ public:
     IFACEMETHOD(MapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
 
+    common::relay::MultiHandleWait CreateIOContext();
+    WSLAVirtualMachine& GetVirtualMachine();
+
 private:
     ULONG m_id = 0;
 
@@ -104,7 +101,6 @@ private:
     void RecoverExistingContainers();
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle);
-    void ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, ULONG OutputHandle);
 
     std::optional<DockerHTTPClient> m_dockerClient;
     std::optional<WSLAVirtualMachine> m_virtualMachine;

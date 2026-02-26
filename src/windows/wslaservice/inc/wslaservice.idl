@@ -115,7 +115,6 @@ struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION
     // TODO: Details TBD.
 };
 
-
 struct WSLA_IMAGE_INFORMATION
 {
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
@@ -227,6 +226,10 @@ struct WSLA_CONTAINER_OPTIONS
     [unique] LPCSTR HostName;
     [unique] LPCSTR DomainName;
 
+    WSLAStringArray DnsServers;
+    WSLAStringArray DnsSearchDomains;
+    WSLAStringArray DnsOptions;
+
     ULONGLONG ShmSize;
     struct WSLA_CONTAINER_NETWORK ContainerNetwork;
 };
@@ -240,10 +243,13 @@ enum WSLA_CONTAINER_STATE
     WslaContainerStateDeleted = 4,
 };
 
+typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
+
 struct WSLA_CONTAINER
 {
     char Name[WSLA_MAX_CONTAINER_NAME_LENGTH + 1];
     char Image[WSLA_MAX_IMAGE_NAME_LENGTH + 1];
+    WSLAContainerId Id;
     enum WSLA_CONTAINER_STATE State;
 
     // TODO: Add creation timestamp and other fields that the command line tool might want to display.
@@ -265,7 +271,7 @@ enum WSLA_PROCESS_STATE
 interface IWSLAProcess : IUnknown
 {
     HRESULT Signal([in] int Signal);
-    HRESULT GetExitEvent([out] ULONG* EventHandle);
+    HRESULT GetExitEvent([out, system_handle(sh_event)] HANDLE* EventHandle);
     HRESULT GetStdHandle([in] ULONG Index, [out] ULONG* Handle);
     HRESULT GetPid([out] int* Pid);
     HRESULT GetState([out] enum WSLA_PROCESS_STATE* State, [out] int* Code);
@@ -360,7 +366,6 @@ typedef enum _WSLALogsFlags
     WSLALogsFlagsTimestamps = 2,
 } WSLALogsFlags;
 
-typedef char WSLAContainerId[WSLA_CONTAINER_ID_LENGTH + 1] ;
 
 [
     uuid(7577FE8D-DE85-471E-B870-11669986F332),
@@ -373,6 +378,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Stop([in] WSLASignal Signal, [in] LONGLONG TimeoutSeconds);
     HRESULT Start([in] WSLAContainerStartFlags Flags);
     HRESULT Delete(); // TODO: Look into lifetime logic.
+    HRESULT Export([in] ULONG TarHandle);
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
     HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
@@ -432,7 +438,7 @@ interface IWSLASession : IUnknown
 
     // Image management.
     HRESULT PullImage([in] LPCSTR ImageUri, [in, unique] const struct WSLA_REGISTRY_AUTHENTICATION_INFORMATION* RegistryAuthenticationInformation, [in, unique] IProgressCallback* ProgressCallback);
-    HRESULT BuildImage([in] ULONG ContextHandle, [in] ULONGLONG ContentLength, [in, unique] LPCSTR DockerfilePath, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
+    HRESULT BuildImage([in] LPCWSTR ContextPath, [in] ULONG DockerfileHandle, [in, unique] LPCSTR ImageTag, [in, unique] IProgressCallback* ProgressCallback);
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
@@ -444,7 +450,6 @@ interface IWSLASession : IUnknown
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
     HRESULT OpenContainer([in] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
-    HRESULT ExportContainer([in] ULONG OutputHandle, [in] LPCSTR ContainerID, [in, unique] IProgressCallback * ProgressCallback);
 
     // Create a process at the VM level. This is meant for debugging.
     HRESULT CreateRootNamespaceProcess([in] LPCSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);

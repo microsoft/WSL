@@ -826,7 +826,17 @@ void CreateProcessCrashReport(DWORD Pid, LPCWSTR ImageName, LPCWSTR EventName)
 void CreateWerReports()
 {
     static const std::set<std::wstring, wsl::shared::string::CaseInsensitiveCompare> WslProcesses{
-        L"wsl.exe", L"wslhost.exe", L"wslrelay.exe", L"wslservice.exe", L"wslg.exe", L"vmcompute.exe", L"vmwp.exe"};
+        L"wsl.exe",
+        L"wslhost.exe",
+        L"wslrelay.exe",
+        L"wslservice.exe",
+        L"wslg.exe",
+        L"vmcompute.exe",
+        L"vmwp.exe",
+        L"wslasession.exe",
+        L"wslaservice.exe",
+        L"wsladiag.exe", // TODO: Remove once wsladiag.exe is fully merged into wslc.exe
+        L"wslc.exe"};
 
     auto PrivilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
     const std::wstring EventName = L"WslTestHang-" + g_pipelineBuildId;

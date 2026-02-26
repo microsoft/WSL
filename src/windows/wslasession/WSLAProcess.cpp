@@ -31,10 +31,10 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLAProcess::GetExitEvent(ULONG* Event)
+HRESULT WSLAProcess::GetExitEvent(HANDLE* Event)
 try
 {
-    *Event = HandleToUlong(common::wslutil::DuplicateHandleToCallingProcess(m_control->GetExitEvent(), SYNCHRONIZE));
+    *Event = wsl::windows::common::helpers::DuplicateHandle(m_control->GetExitEvent().get(), SYNCHRONIZE, FALSE, 0);
     return S_OK;
 }
 CATCH_RETURN();
@@ -69,7 +69,7 @@ wil::unique_handle WSLAProcess::GetStdHandle(int Index)
 
 HANDLE WSLAProcess::GetExitEvent()
 {
-    return m_control->GetExitEvent();
+    return m_control->GetExitEvent().get();
 }
 
 HRESULT WSLAProcess::GetPid(int* Pid)
