@@ -64,7 +64,7 @@ class WSLATests
         m_defaultSession = CreateSession(m_defaultSessionSettings);
 
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>(), nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
 
         auto hasImage = [&](const std::string& imageName) {
             return std::ranges::any_of(
@@ -321,7 +321,7 @@ class WSLATests
     void ExpectImagePresent(IWSLASession& Session, const char* Image, bool Present = true)
     {
         wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-        THROW_IF_FAILED(Session.ListImages(nullptr, images.addressof(), images.size_address<ULONG>(), nullptr));
+        THROW_IF_FAILED(Session.ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
         std::vector<std::string> tags;
         for (const auto& e : images)
@@ -398,16 +398,16 @@ class WSLATests
         auto cleanup = wil::scope_exit([&]() {
             WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-tag1", .Flags = WSLADeleteImageFlagsNone};
             wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
 
             options.Image = "debian:test-tag2";
-            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+            LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
         });
 
         LogInfo("Test: Basic listing with nullptr options");
         {
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             VERIFY_IS_TRUE(images.size() > 0);
             LogInfo("Total images returned: %zu", images.size());
@@ -430,7 +430,7 @@ class WSLATests
         LogInfo("Test: Verify all new fields are populated");
         {
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             std::string commonHash;
             int debianTagCount = 0;
@@ -485,7 +485,7 @@ class WSLATests
             options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
             // Should find at least our 3 debian tags
             VERIFY_IS_TRUE(images.size() >= 3);
@@ -513,7 +513,7 @@ class WSLATests
             options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
             // When filtering by exact tag, Docker returns all tags for that image
             // So we should get debian:latest, debian:test-tag1, debian:test-tag2
@@ -541,7 +541,7 @@ class WSLATests
             options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
             // Check if digests are available (they may not be for all images)
             bool hasDigest = false;
@@ -562,17 +562,17 @@ class WSLATests
         LogInfo("Test: Before/Since filters");
         {
             // Pull a second image to test before/since filters
-            if (m_defaultSession->PullImage("alpine:latest", nullptr, nullptr, nullptr) == S_OK)
+            if (m_defaultSession->PullImage("alpine:latest", nullptr, nullptr) == S_OK)
             {
                 auto alpineCleanup = wil::scope_exit([&]() {
                     WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsForce};
                     wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-                    LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>(), nullptr));
+                    LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
                 });
 
                 // Get all images to find their IDs
                 wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> allImages;
-                VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>(), nullptr));
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
 
                 std::string debianId, alpineId;
                 for (const auto& image : allImages)
@@ -602,7 +602,7 @@ class WSLATests
             options.LabelsCount = 0;
 
                     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                     LogInfo("Images since debian: %zu", images.size());
                 }
 
@@ -617,7 +617,7 @@ class WSLATests
             options.LabelsCount = 0;
 
                     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                     LogInfo("Images before alpine: %zu", images.size());
                 }
 
@@ -640,7 +640,7 @@ class WSLATests
             options1.Labels = nullptr;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> imagesWithoutAll;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options1, imagesWithoutAll.addressof(), imagesWithoutAll.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options1, imagesWithoutAll.addressof(), imagesWithoutAll.size_address<ULONG>()));
 
             // List with All flag
             WSLA_LIST_IMAGES_OPTIONS options2{};
@@ -651,7 +651,7 @@ class WSLATests
             options2.Labels = nullptr;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> imagesWithAll;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options2, imagesWithAll.addressof(), imagesWithAll.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options2, imagesWithAll.addressof(), imagesWithAll.size_address<ULONG>()));
 
             // With All flag should return same or more images (includes intermediates)
             VERIFY_IS_TRUE(imagesWithAll.size() >= imagesWithoutAll.size());
@@ -670,7 +670,7 @@ class WSLATests
             options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> danglingImages;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, danglingImages.addressof(), danglingImages.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, danglingImages.addressof(), danglingImages.size_address<ULONG>()));
 
             LogInfo("Dangling images found: %zu", danglingImages.size());
 
@@ -685,7 +685,7 @@ class WSLATests
             // List non-dangling images
             options.Flags = WSLAListImagesFlagsDanglingFalse;
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> nonDanglingImages;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, nonDanglingImages.addressof(), nonDanglingImages.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, nonDanglingImages.addressof(), nonDanglingImages.size_address<ULONG>()));
 
             // None of these should be <none>:<none>
             for (const auto& image : nonDanglingImages)
@@ -706,7 +706,7 @@ class WSLATests
             options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
             LogInfo("Images with All+Digests flags: %zu", images.size());
             VERIFY_IS_TRUE(images.size() > 0);
@@ -725,7 +725,7 @@ class WSLATests
             options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
             size_t imageCountWithoutLabel = images.size();
             LogInfo("Images without label filter: %zu", imageCountWithoutLabel);
@@ -736,7 +736,7 @@ class WSLATests
                 options.Labels = labels;
                 options.LabelsCount = 1;
 
-                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 LogInfo("Images with single label filter: %zu", images.size());
             }
 
@@ -749,7 +749,7 @@ class WSLATests
                 options.Labels = labels;
                 options.LabelsCount = 2;
 
-                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>(), nullptr));
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 LogInfo("Images with multiple label filters: %zu", images.size());
             }
 
@@ -1275,8 +1275,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "debian:test-tag";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(
@@ -1294,7 +1293,7 @@ class WSLATests
 
             // Verify they have the same image hash.
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             std::string latestHash;
             std::string testTagHash;
@@ -1322,8 +1321,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "myrepo/myimage:v1.0.0";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(
@@ -1344,8 +1342,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "debian:test-by-id";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(
@@ -1355,7 +1352,7 @@ class WSLATests
             });
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(images.addressof(), images.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             std::string imageId;
             for (const auto& image : images)
@@ -1378,8 +1375,7 @@ class WSLATests
             auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 WSLA_DELETE_IMAGE_OPTIONS deleteOptions{};
                 deleteOptions.Image = "test:duplicate-tag";
-                deleteOptions.Force = FALSE;
-                deleteOptions.NoPrune = TRUE;
+                deleteOptions.Flags = WSLADeleteImageFlagsNoPrune;
 
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
                 VERIFY_SUCCEEDED(

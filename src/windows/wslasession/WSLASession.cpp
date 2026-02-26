@@ -638,7 +638,7 @@ void WSLASession::SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& SocketC
 
 DEFINE_ENUM_FLAG_OPERATORS(WSLAListImagesFlags);
 
-HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count, WSLA_ERROR_INFO* Error)
+HRESULT WSLASession::ListImages(const WSLA_LIST_IMAGES_OPTIONS* Options, WSLA_IMAGE_INFORMATION** Images, ULONG* Count)
 try
 {
     COMServiceExecutionContext context;
@@ -722,10 +722,6 @@ try
         if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
         {
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
-            if (Error != nullptr)
-            {
-                Error->UserErrorMessage = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(errorMessage.c_str()).release();
-            }
         }
 
         THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
@@ -786,19 +782,12 @@ try
 
                 // Extract repo name from tag (format: "repo:tag")
                 // and lookup corresponding digest from the map
+                auto repoName = ParseImage(tag).first;
                 size_t colonPos = tag.find(':');
-                if (colonPos != std::string::npos && colonPos > 0)
+                auto it = repoToDigest.find(repoName);
+                if (it != repoToDigest.end())
                 {
-                    std::string repoName = tag.substr(0, colonPos);
-                    auto it = repoToDigest.find(repoName);
-                    if (it != repoToDigest.end())
-                    {
-                        THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, it->second.c_str()) != 0);
-                    }
-                    else
-                    {
-                        output[index].Digest[0] = '\0';
-                    }
+                    THROW_HR_IF(E_UNEXPECTED, strcpy_s(output[index].Digest, it->second.c_str()) != 0);
                 }
                 else
                 {

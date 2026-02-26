@@ -470,7 +470,7 @@ interface IWSLASession : IUnknown
     HRESULT LoadImage([in] ULONG ImageHandle, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT ImportImage([in] ULONG ImageHandle, [in] LPCSTR ImageName, [in, unique] IProgressCallback* ProgressCallback, [in] ULONGLONG ContentLength);
     HRESULT SaveImage([in] ULONG OutputHandle, [in] LPCSTR ImageNameOrID, [in, unique] IProgressCallback * ProgressCallback);
-    HRESULT ListImages([in, unique] const struct WSLA_LIST_IMAGES_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count, [in, out, unique] WSLA_ERROR_INFO* ErrorInfo);
+    HRESULT ListImages([in, unique] const struct WSLA_LIST_IMAGES_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_IMAGE_INFORMATION** Images, [out] ULONG* Count);
     HRESULT DeleteImage([in] const struct WSLA_DELETE_IMAGE_OPTIONS* Options, [out, size_is(, *Count)] struct WSLA_DELETED_IMAGE_INFORMATION** DeletedImages, [out] ULONG* Count);
     HRESULT TagImage([in] const struct WSLA_TAG_IMAGE_OPTIONS* Options);
 
