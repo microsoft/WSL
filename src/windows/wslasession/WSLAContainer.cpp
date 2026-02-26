@@ -745,14 +745,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     WslaInspectContainer wslaInspect{};
 
     wslaInspect.Id = dockerInspect.Id;
-    wslaInspect.Name = dockerInspect.Name;
-
-    // Remove leading '/' from Docker container names.
-    if (!wslaInspect.Name.empty() && wslaInspect.Name[0] == '/')
-    {
-        wslaInspect.Name = wslaInspect.Name.substr(1);
-    }
-
+    wslaInspect.Name = CleanContainerName(dockerInspect.Name);
     wslaInspect.Created = dockerInspect.Created;
     wslaInspect.Image = m_image;
 
