@@ -1407,13 +1407,13 @@ class UnitTests
 
             ValidateErrorMessage(
                 L"--install -d ubuntu",
-                L"Failed to fetch the list distribution from 'http://127.0.0.1:6666'. " +
+                L"Failed to fetch the distribution list from 'http://127.0.0.1:6666'. " +
                     GetSystemErrorString(HRESULT_FROM_WIN32(WININET_E_CANNOT_CONNECT)),
                 L"Wsl/InstallDistro/WININET_E_CANNOT_CONNECT");
 
             ValidateErrorMessage(
                 L"--list --online",
-                L"Failed to fetch the list distribution from 'http://127.0.0.1:6666'. " +
+                L"Failed to fetch the distribution list from 'http://127.0.0.1:6666'. " +
                     GetSystemErrorString(HRESULT_FROM_WIN32(WININET_E_CANNOT_CONNECT)),
                 L"Wsl/WININET_E_CANNOT_CONNECT");
         }
