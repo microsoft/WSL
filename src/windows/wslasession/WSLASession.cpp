@@ -968,16 +968,14 @@ try
 
     std::lock_guard lock{m_lock};
 
+    // Stop the IO relay first to prevent new container event callbacks from firing.
+    // This avoids a deadlock: Terminate holds m_lock and container destruction acquires
+    // the event tracker lock, while an event callback holds the event tracker lock and
+    // ReleaseResources -> GetVirtualMachine tries to acquire m_lock (ABBA).
+    m_ioRelay.Stop();
+
     // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
-
-    // Stop the IO relay.
-    // This stops:
-    // - container state monitoring.
-    // - container init process relays
-    // - execs relays
-    // - container logs relays
-    m_ioRelay.Stop();
 
     m_eventTracker.reset();
     m_dockerClient.reset();
