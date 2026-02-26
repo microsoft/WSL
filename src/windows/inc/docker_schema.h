@@ -22,6 +22,7 @@ namespace wsl::windows::common::docker_schema {
 struct CreatedContainer
 {
     std::string Id;
+    std::string Name;
     std::vector<std::string> Warnings;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(CreatedContainer, Id, Warnings);
@@ -72,8 +73,11 @@ struct HostConfig
     std::map<std::string, std::vector<PortMapping>> PortBindings;
     std::string NetworkMode;
     bool Init{};
+    std::optional<std::vector<std::string>> Dns;
+    std::optional<std::vector<std::string>> DnsSearch;
+    std::optional<std::vector<std::string>> DnsOptions;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(HostConfig, Mounts, PortBindings, NetworkMode, Init, Dns, DnsSearch, DnsOptions);
 };
 
 struct CreateContainer
@@ -103,13 +107,54 @@ struct CreateContainer
         CreateContainer, Image, Cmd, Tty, OpenStdin, StdinOnce, Entrypoint, Env, ExposedPorts, HostConfig, StopSignal, WorkingDir, User, Hostname, Domainname, Labels);
 };
 
+struct ContainerInspectState
+{
+    std::string Status;
+    bool Running{};
+    int ExitCode{};
+    std::string StartedAt;
+    std::string FinishedAt;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInspectState, Status, Running, ExitCode, StartedAt, FinishedAt);
+};
+
+struct ContainerConfig
+{
+    std::string Image;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerConfig, Image);
+};
+
+struct InspectMount
+{
+    std::string Type;
+    std::string Source;
+    std::string Destination;
+    bool RW{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectMount, Type, Source, Destination, RW);
+};
+
 struct InspectContainer
 {
     std::string Id;
     std::string Name;
+    std::string Created;
+    std::string Image;
+    ContainerInspectState State;
+    ContainerConfig Config;
     HostConfig HostConfig;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, HostConfig);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectContainer, Id, Name, Created, Image, State, Config, HostConfig);
+};
+
+struct InspectExec
+{
+    std::optional<int> Pid{};
+    std::optional<int> ExitCode{};
+    bool Running{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectExec, Pid, ExitCode, Running);
 };
 
 struct Image
@@ -214,6 +259,23 @@ struct ContainerInfo
     ContainerState State{ContainerState::Unknown};
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ContainerInfo, Id, Names, Image, Labels, Ports, State);
+};
+
+struct BuildKitVertex
+{
+    std::string digest;
+    std::string name;
+    std::string started;
+    std::string error;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitVertex, digest, name, started, error);
+};
+
+struct BuildKitSolveStatus
+{
+    std::vector<BuildKitVertex> vertexes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildKitSolveStatus, vertexes);
 };
 
 struct CreateImageProgressDetails

@@ -121,6 +121,21 @@ void WSLAContainerLauncher::SetDomainname(std::string&& Domainame)
     m_domainname = std::move(Domainame);
 }
 
+void WSLAContainerLauncher::SetDnsServers(std::vector<std::string>&& DnsServers)
+{
+    m_dnsServers = std::move(DnsServers);
+}
+
+void WSLAContainerLauncher::SetDnsSearchDomains(std::vector<std::string>&& DnsSearchDomains)
+{
+    m_dnsSearchDomains = std::move(DnsSearchDomains);
+}
+
+void WSLAContainerLauncher::SetDnsOptions(std::vector<std::string>&& DnsOptions)
+{
+    m_dnsOptions = std::move(DnsOptions);
+}
+
 void wsl::windows::common::WSLAContainerLauncher::AddVolume(const std::wstring& HostPath, const std::string& ContainerPath, bool ReadOnly)
 {
     // Store a copy of the path strings to the launcher to ensure the pointers in WSLA_VOLUME remain valid.
@@ -201,6 +216,39 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
         options.DomainName = m_domainname.c_str();
     }
 
+    std::vector<const char*> dnsServersStorage;
+    for (const auto& e : m_dnsServers)
+    {
+        dnsServersStorage.push_back(e.c_str());
+    }
+
+    if (!dnsServersStorage.empty())
+    {
+        options.DnsServers = {dnsServersStorage.data(), static_cast<ULONG>(dnsServersStorage.size())};
+    }
+
+    std::vector<const char*> dnsSearchDomainsStorage;
+    for (const auto& e : m_dnsSearchDomains)
+    {
+        dnsSearchDomainsStorage.push_back(e.c_str());
+    }
+
+    if (!dnsSearchDomainsStorage.empty())
+    {
+        options.DnsSearchDomains = {dnsSearchDomainsStorage.data(), static_cast<ULONG>(dnsSearchDomainsStorage.size())};
+    }
+
+    std::vector<const char*> dnsOptionsStorage;
+    for (const auto& e : m_dnsOptions)
+    {
+        dnsOptionsStorage.push_back(e.c_str());
+    }
+
+    if (!dnsOptionsStorage.empty())
+    {
+        options.DnsOptions = {dnsOptionsStorage.data(), static_cast<ULONG>(dnsOptionsStorage.size())};
+    }
+
     if (!m_workingDirectory.empty())
     {
         options.InitProcessOptions.CurrentDirectory = m_workingDirectory.c_str();
@@ -214,7 +262,7 @@ std::pair<HRESULT, std::optional<RunningWSLAContainer>> WSLAContainerLauncher::C
 
     // TODO: Support volumes, ports, flags, shm size, container networking mode, etc.
     wil::com_ptr<IWSLAContainer> container;
-    auto result = Session.CreateContainer(&options, &container, nullptr);
+    auto result = Session.CreateContainer(&options, &container);
     if (FAILED(result))
     {
         return std::pair<HRESULT, std::optional<RunningWSLAContainer>>(result, std::optional<RunningWSLAContainer>{});
@@ -239,12 +287,12 @@ RunningWSLAContainer WSLAContainerLauncher::Launch(IWSLASession& Session, WSLACo
     return std::move(container.value());
 }
 
-wsl::windows::common::docker_schema::InspectContainer RunningWSLAContainer::Inspect()
+wsl::windows::common::wsla_schema::InspectContainer RunningWSLAContainer::Inspect()
 {
     wil::unique_cotaskmem_ansistring output;
     THROW_IF_FAILED(m_container->Inspect(&output));
 
-    return wsl::shared::FromJson<docker_schema::InspectContainer>(output.get());
+    return wsl::shared::FromJson<wsla_schema::InspectContainer>(output.get());
 }
 
 std::map<std::string, std::string> RunningWSLAContainer::Labels()

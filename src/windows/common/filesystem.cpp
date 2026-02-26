@@ -1143,6 +1143,7 @@ void wsl::windows::common::filesystem::CreateCpioInitrd(_In_ const std::filesyst
         constexpr size_t headerSize = 110;
         const auto nameLen = strlen(name) + 1;
         const auto headerPadding = (4 - ((headerSize + nameLen) % 4)) % 4;
+        const bool isTrailer = strcmp(name, "TRAILER!!!") == 0;
 
         // Get current time for mtime. CPIO newc format only supports 32-bit fields.
         const auto mtime = static_cast<DWORD>(time(nullptr));
@@ -1165,10 +1166,10 @@ void wsl::windows::common::filesystem::CreateCpioInitrd(_In_ const std::filesyst
             "%08X"   // namesize
             "%08X",  // check
             0,
-            (fileSize > 0) ? 0100755 : 0,
+            isTrailer ? 0 : 0100755,
             0,
             0,
-            (fileSize > 0) ? 1 : 0,
+            isTrailer ? 0 : 1,
             mtime,
             fileSize,
             0,
@@ -1214,7 +1215,8 @@ void wsl::windows::common::filesystem::CreateCpioInitrd(_In_ const std::filesyst
     LARGE_INTEGER currentPos{};
     THROW_IF_WIN32_BOOL_FALSE(SetFilePointerEx(destFile.get(), {}, &currentPos, FILE_CURRENT));
 
-    const auto archivePadding = (archiveBlockSize - (currentPos.LowPart % archiveBlockSize)) % archiveBlockSize;
+    const auto currentSize = static_cast<ULONGLONG>(currentPos.QuadPart);
+    const auto archivePadding = static_cast<DWORD>((archiveBlockSize - (currentSize % archiveBlockSize)) % archiveBlockSize);
     if (archivePadding > 0)
     {
         char paddingBuffer[archiveBlockSize] = {0};

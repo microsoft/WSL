@@ -140,6 +140,7 @@ Abstract:
 #include <lxbusapi.h>
 
 // Utility/helper functions
+#include "COMImplClass.h"
 #include "conncheckshared.h"
 #include "helpers.hpp"
 #include "string.hpp"

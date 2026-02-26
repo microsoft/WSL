@@ -178,33 +178,6 @@ class NetworkTests
     friend class BridgedTests;
     friend class VirtioProxyTests;
 
-    static std::wstring SockaddrToString(const SOCKADDR_INET* sockAddr)
-    {
-        constexpr auto ipv4AddressStringLength = 16;
-        constexpr auto ipv6AddressStringLength = 48;
-
-        std::wstring address(std::max(ipv4AddressStringLength, ipv6AddressStringLength), L'\0');
-
-        switch (sockAddr->si_family)
-        {
-        case AF_INET:
-        {
-            RtlIpv4AddressToStringW(&sockAddr->Ipv4.sin_addr, address.data());
-            break;
-        }
-        case AF_INET6:
-        {
-            RtlIpv6AddressToStringW(&sockAddr->Ipv6.sin6_addr, address.data());
-            break;
-        }
-        default:
-            break;
-        }
-
-        address.resize(std::wcslen(address.data()));
-        return address;
-    }
-
     struct IpAddress
     {
         std::wstring Address;
@@ -243,7 +216,7 @@ class NetworkTests
                 }
             }
 
-            return SockaddrToString(address) + L"/" + std::to_wstring(PrefixLength);
+            return wsl::windows::common::string::SockAddrInetToWstring(*address) + L"/" + std::to_wstring(PrefixLength);
         }
     };
 
@@ -812,7 +785,7 @@ class NetworkTests
         }
         else
         {
-            LogSkipped("Host does not have IPv4 internet connectivity. Skipping IPv4 DNS tests.");
+            LogInfo("Host does not have IPv4 internet connectivity. Skipping IPv4 DNS tests.");
         }
 
         if (HostHasInternetConnectivity(AF_INET6))
@@ -823,7 +796,7 @@ class NetworkTests
         }
         else
         {
-            LogSkipped("Host does not have IPv6 internet connectivity. Skipping IPv6 DNS tests.");
+            LogInfo("Host does not have IPv6 internet connectivity. Skipping IPv6 DNS tests.");
         }
     }
 

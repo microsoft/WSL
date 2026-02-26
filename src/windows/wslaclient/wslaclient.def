@@ -1,6 +1,0 @@
-LIBRARY wslaclient
-
-EXPORTS
-    WslQueryMissingComponents
-    WslInstallComponents
-    WslSetPackageUrl

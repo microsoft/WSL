@@ -1,0 +1,25 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    ConsoleService.h
+
+Abstract:
+
+    This file contains the ConsoleService definition
+
+--*/
+#pragma once
+
+#include <wslaservice.h>
+#include <WSLAContainerLauncher.h>
+
+namespace wsl::windows::wslc::services {
+class ConsoleService
+{
+public:
+    int AttachToCurrentConsole(wsl::windows::common::ClientRunningWSLAProcess&& process);
+};
+} // namespace wsl::windows::wslc::services

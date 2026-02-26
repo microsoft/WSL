@@ -275,8 +275,9 @@ endif()
 
 # Determine the Visual Studio installation directory which contains LLVM tools
 # N.B. The version is set to VS2022 to ensure local runs match pipeline behavior
+# Require that Clang be installed in the product to potentially de-deduplicate
 execute_process(
-    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,18.0)" -products * -property installationPath
+    COMMAND "${VSWHERE_SOURCE_DIR}/vswhere.exe" -version "[17.0,19.0)" -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath -prerelease
     OUTPUT_VARIABLE VS_INSTALL_DIR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     COMMAND_ERROR_IS_FATAL ANY
@@ -286,6 +287,10 @@ if (NOT VS_INSTALL_DIR)
     message(FATAL_ERROR "Could not determine Visual Studio 2022 installation directory.")
 endif()
 
+# Pick the first line returned from vswhere, in case multiple versions are returned.
+# TODO: Remove this and require VS 2026 once the CI supports it.
+string(REGEX MATCH "([^\n\r]+)" VS_INSTALL_DIR "${VS_INSTALL_DIR}")
+
 if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
     set(LLVM_INSTALL_DIR "${VS_INSTALL_DIR}/VC/Tools/Llvm/x64/bin")
 else()
@@ -293,7 +298,7 @@ else()
 endif()
 
 if (NOT EXISTS ${LLVM_INSTALL_DIR})
-    message(FATAL_ERROR "C++ Clang Compiler for Windows is not installed. Please install it from the Visual Studio Installer.")
+    message(FATAL_ERROR "C++ Clang Compiler for Windows is not installed at ${LLVM_INSTALL_DIR}. Please install it from the Visual Studio Installer.")
 endif()
 
 # Generate the clang-format script which contains a path to clang-format.exe
@@ -424,6 +429,7 @@ add_subdirectory(msixinstaller)
 add_subdirectory(src/windows/common)
 add_subdirectory(src/windows/service)
 add_subdirectory(src/windows/wslaservice)
+add_subdirectory(src/windows/wslasession)
 add_subdirectory(src/windows/wslinstaller/inc)
 add_subdirectory(src/windows/wslinstaller/stub)
 add_subdirectory(src/windows/wslinstaller/exe)
@@ -433,9 +439,9 @@ add_subdirectory(src/windows/wslg)
 add_subdirectory(src/windows/wslhost)
 add_subdirectory(src/windows/wslrelay)
 add_subdirectory(src/windows/wslinstall)
-add_subdirectory(src/windows/wslaclient)
 add_subdirectory(src/windows/wsladiag)
 add_subdirectory(src/windows/wslc)
+add_subdirectory(src/windows/WslcSDK)
 
 if (WSL_BUILD_WSL_SETTINGS)
     add_subdirectory(src/windows/libwsl)
