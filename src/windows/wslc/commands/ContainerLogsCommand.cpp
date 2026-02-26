@@ -44,7 +44,7 @@ std::wstring ContainerLogsCommand::LongDescription() const
 
 void ContainerLogsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context //
+    context              //
         << CreateSession //
         << ViewContainerLogs;
 }
