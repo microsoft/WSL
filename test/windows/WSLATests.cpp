@@ -4359,7 +4359,6 @@ class WSLATests
             // Create a container without name.
             auto container = WSLAContainerLauncher("debian:latest").Create(*m_defaultSession.get());
 
-            LogInfo("Name: %hs", container.Name().c_str());
             // Validate that the service generates a name for the container.
             VERIFY_ARE_NOT_EQUAL(container.Name(), "");
         }
