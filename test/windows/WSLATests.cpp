@@ -4395,8 +4395,7 @@ class WSLATests
         }
     }
 
-    // This test case validate that multiple operations can happen in parallel in the same session.
-
+    // This test case validates that multiple operations can happen in parallel in the same session.
     TEST_METHOD(ParallelSessionOperations)
     {
         WSL2_TEST_ONLY();
