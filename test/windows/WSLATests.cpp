@@ -4458,7 +4458,7 @@ class WSLATests
         });
 
         // Wait for the export to be in progress
-        exportStarted.wait(60 * 100);
+        exportStarted.wait(60 * 1000);
 
         // Validate that various operations can be done while the export is in progress.
 
