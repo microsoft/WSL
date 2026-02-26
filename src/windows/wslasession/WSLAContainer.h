@@ -66,11 +66,13 @@ public:
     void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count);
 
-    IWSLAContainer& ComWrapper();
+    void CopyTo(IWSLAContainer** Container);
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
+
+    __requires_lock_held(m_lock) void Transition(WSLA_CONTAINER_STATE State) noexcept;
 
     void OnProcessReleased(DockerExecProcessControl* process);
 

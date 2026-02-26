@@ -3923,6 +3923,7 @@ class WSLATests
             WSLAContainerLauncher launcher("debian:latest", "logs-test-4", {"/bin/bash", "-c", "echo -n OK"});
             auto container = launcher.Launch(*m_defaultSession);
             auto initProcess = container.GetInitProcess();
+            ValidateProcessOutput(initProcess, {{1, "OK"}});
 
             // Testing would with more granularity would be difficult, but these flags are just forwarded to docker,
             // so validate that they're wired correctly.
@@ -4355,6 +4356,8 @@ class WSLATests
             }
 
             auto container = OpenContainer(m_defaultSession.get(), "test-auto-remove");
+            auto id = container.Id();
+
             VERIFY_SUCCEEDED(container.Get().Start(WSLAContainerStartFlagsNone));
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
 
@@ -4363,6 +4366,11 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> notFound;
             VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer("test-auto-remove", &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+            VERIFY_ARE_EQUAL(m_defaultSession->OpenContainer(id.c_str(), &notFound), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+            VERIFY_ARE_EQUAL(containers.size(), 0);
         }
     }
 };
