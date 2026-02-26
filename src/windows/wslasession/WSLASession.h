@@ -86,7 +86,6 @@ public:
     IFACEMETHOD(UnmapVmPort)(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort) override;
 
     common::relay::MultiHandleWait CreateIOContext();
-    WSLAVirtualMachine& GetVirtualMachine();
 
 private:
     ULONG m_id = 0;

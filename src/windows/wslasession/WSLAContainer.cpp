@@ -269,7 +269,8 @@ std::string SerializeContainerMetadata(const WSLAContainerMetadataV1& metadata)
 } // namespace
 
 WSLAContainerImpl::WSLAContainerImpl(
-    WSLASession* wslaSession,
+    WSLASession& wslaSession,
+    WSLAVirtualMachine& virtualMachine,
     std::string&& Id,
     std::string&& Name,
     std::string&& Image,
@@ -284,6 +285,7 @@ WSLAContainerImpl::WSLAContainerImpl(
     WSLAProcessFlags InitProcessFlags,
     WSLAContainerFlags ContainerFlags) :
     m_wslaSession(wslaSession),
+    m_virtualMachine(virtualMachine),
     m_name(std::move(Name)),
     m_image(std::move(Image)),
     m_id(std::move(Id)),
@@ -581,7 +583,7 @@ void WSLAContainerImpl::Export(ULONG OutHandle)
 
     wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutHandle))};
 
-    wsl::windows::common::relay::MultiHandleWait io = m_wslaSession->CreateIOContext();
+    wsl::windows::common::relay::MultiHandleWait io = m_wslaSession.CreateIOContext();
 
     std::string errorJson;
     auto accumulateError = [&](const gsl::span<char>& buffer) {
@@ -800,6 +802,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     const WSLA_CONTAINER_OPTIONS& containerOptions,
     WSLASession& wslaSession,
+    WSLAVirtualMachine& virtualMachine,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -904,13 +907,13 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     }
 
     // Mount volumes.
-    auto volumeErrorCleanup = MountVolumes(volumes, wslaSession.GetVirtualMachine());
+    auto volumeErrorCleanup = MountVolumes(volumes, virtualMachine);
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
     request.HostConfig.NetworkMode = networkMode;
 
-    auto [vmPorts, errorCleanup] = MapPorts(ports, wslaSession.GetVirtualMachine());
+    auto [vmPorts, errorCleanup] = MapPorts(ports, virtualMachine);
 
     for (const auto& e : ports)
     {
@@ -951,7 +954,8 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
     auto container = std::make_unique<WSLAContainerImpl>(
-        &wslaSession,
+        wslaSession,
+        virtualMachine,
         std::move(result.Id),
         std::move(std::string(containerOptions.Name == nullptr ? "" : containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
@@ -975,6 +979,7 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
     const common::docker_schema::ContainerInfo& dockerContainer,
     WSLASession& wslaSession,
+    WSLAVirtualMachine& virtualMachine,
     std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
     ContainerEventTracker& EventTracker,
     DockerHTTPClient& DockerClient,
@@ -997,11 +1002,12 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Open(
 
     // TODO: Offload volume mounting and port mapping to the Start() method so that its still possible
     // to open containers that are not running.
-    auto volumeErrorCleanup = MountVolumes(metadata.Volumes, wslaSession.GetVirtualMachine());
-    auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, wslaSession.GetVirtualMachine());
+    auto volumeErrorCleanup = MountVolumes(metadata.Volumes, virtualMachine);
+    auto [vmPorts, errorCleanup] = MapPorts(metadata.Ports, virtualMachine);
 
     auto container = std::make_unique<WSLAContainerImpl>(
-        &wslaSession,
+        wslaSession,
+        virtualMachine,
         std::string(dockerContainer.Id),
         std::move(name),
         std::string(dockerContainer.Image),
@@ -1136,7 +1142,7 @@ void WSLAContainerImpl::ReleaseResources()
     }
 
     // Unmount volumes.
-    UnmountVolumes(m_mountedVolumes, m_wslaSession->GetVirtualMachine());
+    UnmountVolumes(m_mountedVolumes, m_virtualMachine);
     m_mountedVolumes.clear();
 
     // Unmap and release ports.
@@ -1147,7 +1153,7 @@ void WSLAContainerImpl::ReleaseResources()
 
         try
         {
-            m_wslaSession->GetVirtualMachine().UnmapPort(e.Family, e.HostPort, e.VmPort);
+            m_virtualMachine.UnmapPort(e.Family, e.HostPort, e.VmPort);
         }
         CATCH_LOG();
 
@@ -1156,7 +1162,7 @@ void WSLAContainerImpl::ReleaseResources()
 
     if (!allocatedGuestPorts.empty())
     {
-        m_wslaSession->GetVirtualMachine().ReleasePorts(allocatedGuestPorts);
+        m_virtualMachine.ReleasePorts(allocatedGuestPorts);
     }
 
     m_mappedPorts.clear();
