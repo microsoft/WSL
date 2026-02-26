@@ -395,38 +395,37 @@ constexpr GUID EndianSwap(GUID value)
 
 static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
 {
-    static bool handlingException = false;
-    if (handlingException)
-    {
-        return EXCEPTION_CONTINUE_SEARCH; // Don't keep trying if we crash during exception handling.
-    }
-
-    handlingException = true;
-
-    // Collect a crash dump if enabled.
-    auto image = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>()).filename();
-
-    auto lxssKey = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
-    auto crashFolder = wsl::windows::common::registry::ReadOptionalString(lxssKey.get(), nullptr, c_crashFolderKeyName);
-
-    std::optional<std::filesystem::path> dumpPath;
-    if (crashFolder.has_value())
-    {
-        dumpPath = std::filesystem::path(crashFolder.value()) / std::format(L"{}.{}.dmp", image.native(), GetCurrentProcessId());
-    }
-
-    WSL_LOG(
-        "ProcessCrash",
-        TraceLoggingValue(image.c_str(), "Process"),
-        TraceLoggingValue(dumpPath.has_value() ? dumpPath->native().c_str() : L"<none>", "DumpPath"));
-
-    if (!dumpPath.has_value())
-    {
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-
     try
     {
+
+        static std::atomic<bool> handlingException = false;
+        if (handlingException.exchange(true))
+        {
+            return EXCEPTION_CONTINUE_SEARCH; // Don't keep trying if we crash during exception handling.
+        }
+
+        // Collect a crash dump if enabled.
+        auto image = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>()).filename();
+
+        auto lxssKey = wsl::windows::common::registry::OpenLxssMachineKey(KEY_READ);
+        auto crashFolder = wsl::windows::common::registry::ReadOptionalString(lxssKey.get(), nullptr, c_crashFolderKeyName);
+
+        std::optional<std::filesystem::path> dumpPath;
+        if (crashFolder.has_value())
+        {
+            dumpPath = std::filesystem::path(crashFolder.value()) / std::format(L"{}.{}.dmp", image.native(), GetCurrentProcessId());
+        }
+
+        WSL_LOG(
+            "ProcessCrash",
+            TraceLoggingValue(image.c_str(), "Process"),
+            TraceLoggingValue(dumpPath.has_value() ? dumpPath->native().c_str() : L"<none>", "DumpPath"));
+
+        if (!dumpPath.has_value())
+        {
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+
         auto dumpFile = wil::create_new_file(dumpPath->c_str(), GENERIC_WRITE, FILE_SHARE_READ);
         THROW_LAST_ERROR_IF(!dumpFile);
 
