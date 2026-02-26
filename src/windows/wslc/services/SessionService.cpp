@@ -48,24 +48,17 @@ int SessionService::Attach(const std::wstring& sessionName)
 
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
-    // Console size for TTY.
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_LAST_ERROR_IF(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
-    const ULONG rows = static_cast<ULONG>(info.srWindow.Bottom - info.srWindow.Top + 1);
-    const ULONG cols = static_cast<ULONG>(info.srWindow.Right - info.srWindow.Left + 1);
+    // Configure console for interactive usage.
+    wsl::windows::common::ConsoleState console{};
+    const auto windowSize = console.GetWindowSize();
 
     const std::string shell = "/bin/sh";
 
     // Launch with terminal fds (PTY).
     wsl::windows::common::WSLAProcessLauncher launcher{shell, {shell, "--login"}, {"TERM=xterm-256color"}, WSLAProcessFlagsTty | WSLAProcessFlagsStdin};
-    launcher.SetTtySize(rows, cols);
-
+    launcher.SetTtySize(windowSize.X, windowSize.Y);
     auto process = launcher.Launch(*session);
-
     auto tty = process.GetStdHandle(WSLAFDTty);
-
-    // Configure console for interactive usage.
-    wsl::windows::common::ConsoleState console;
     auto updateTerminalSize = [&]() {
         const auto windowSize = console.GetWindowSize();
         LOG_IF_FAILED(process.Get().ResizeTty(windowSize.Y, windowSize.X));
@@ -101,8 +94,7 @@ int SessionService::Attach(const std::wstring& sessionName)
 
     auto exitCode = process.GetExitCode();
 
-    std::wstring shellWide(shell.begin(), shell.end());
-    wslutil::PrintMessage(wsl::shared::Localization::MessageWslaShellExited(shellWide.c_str(), static_cast<int>(exitCode)), stdout);
+    wslutil::PrintMessage(wsl::shared::Localization::MessageWslaShellExited(string::MultiByteToWide(shell), static_cast<int>(exitCode)), stdout);
 
     return static_cast<int>(exitCode);
 }
@@ -133,7 +125,7 @@ std::vector<SessionInformation> SessionService::List()
     for (size_t i = 0; i < sessions.size(); ++i)
     {
         const auto& current = sessions[i];
-        SessionInformation info;
+        SessionInformation info{};
         info.CreatorPid = current.CreatorPid;
         info.SessionId = current.SessionId;
         info.DisplayName = current.DisplayName;

@@ -42,12 +42,10 @@ std::wstring ContainerLogsCommand::LongDescription() const
     return {L"View logs for a container."};
 }
 
-// clang-format off
 void ContainerLogsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context
-        << CreateSession
+    context //
+        << CreateSession //
         << ViewContainerLogs;
 }
-// clang-format on
 } // namespace wsl::windows::wslc

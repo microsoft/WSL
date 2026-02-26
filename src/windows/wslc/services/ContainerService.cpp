@@ -232,12 +232,15 @@ void ContainerService::Logs(Session& session, const std::string& id, bool follow
 {
     wil::com_ptr<IWSLAContainer> container;
     THROW_IF_FAILED(session.Get()->OpenContainer(id.c_str(), &container));
-    wil::unique_handle stdoutLogs;
-    wil::unique_handle stderrLogs;
+
+    ULONG stdoutLogsHandle = 0;
+    ULONG stderrLogsHandle = 0;
     WSLALogsFlags flags = WSLALogsFlagsNone;
     WI_SetFlagIf(flags, WSLALogsFlagsFollow, follow);
 
-    THROW_IF_FAILED(container->Logs(flags, reinterpret_cast<ULONG*>(&stdoutLogs), reinterpret_cast<ULONG*>(&stderrLogs), 0, 0, 0));
+    THROW_IF_FAILED(container->Logs(flags, &stdoutLogsHandle, &stderrLogsHandle, 0, 0, 0));
+    wil::unique_handle stdoutLogs(ULongToHandle(stdoutLogsHandle));
+    wil::unique_handle stderrLogs(ULongToHandle(stderrLogsHandle));
 
     wsl::windows::common::relay::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::relay::RelayHandle<wsl::windows::common::relay::ReadHandle>>(

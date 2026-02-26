@@ -251,6 +251,6 @@ void ViewContainerLogs(CLIExecutionContext& context)
     auto& session = context.Data.Get<Data::Session>();
     auto containerId = context.Args.Get<ArgType::ContainerId>();
     bool follow = context.Args.Contains(ArgType::Follow);
-    ContainerService::Logs(session, string::WideToMultiByte(containerId), follow);
+    ContainerService::Logs(session, WideToMultiByte(containerId), follow);
 }
 } // namespace wsl::windows::wslc::task

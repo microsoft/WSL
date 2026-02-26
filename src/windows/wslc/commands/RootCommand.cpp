@@ -23,7 +23,6 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> RootCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
-    commands.reserve(12);
     commands.push_back(std::make_unique<ContainerCommand>(FullName()));
     commands.push_back(std::make_unique<SessionCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));

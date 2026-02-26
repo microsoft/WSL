@@ -21,7 +21,6 @@ namespace wsl::windows::wslc {
 std::vector<std::unique_ptr<Command>> ContainerCommand::GetCommands() const
 {
     std::vector<std::unique_ptr<Command>> commands;
-    commands.reserve(10);
     commands.push_back(std::make_unique<ContainerCreateCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerDeleteCommand>(FullName()));
     commands.push_back(std::make_unique<ContainerExecCommand>(FullName()));
