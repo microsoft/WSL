@@ -23,7 +23,7 @@ struct WSLCExecutionResult
 {
     std::wstring Stdout{};
     std::wstring Stderr{};
-    DWORD ExitCode{0};
+    HRESULT ExitCode{S_OK};
     void Dump() const
     {
         Log::Comment((L"Exit Code: " + std::to_wstring(ExitCode)).c_str());
@@ -50,7 +50,7 @@ class WSLCE2ETests
     {
         auto result = ExecuteWSLC(L"--help");
         auto expectedOutput = L"Copyright (c) Microsoft Corporation. All rights reserved.";
-        WSLCExecutionResult expectedResult{.Stdout = expectedOutput, .ExitCode = 0};
+        WSLCExecutionResult expectedResult{.Stdout = expectedOutput};
         VerifyOutput(result, expectedResult);
     }
 
@@ -71,7 +71,33 @@ class WSLCE2ETests
                        << L"  start      Start a container.\r\n"
                        << L"  stop       Stop containers\r\n";
 
-        WSLCExecutionResult expectedResult{.Stdout = expectedOutput.str(), .ExitCode = 0};
+        WSLCExecutionResult expectedResult{.Stdout = expectedOutput.str()};
+        VerifyOutput(result, expectedResult);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_HelpCommand_DisplaysAvailableSubCommands)
+    {
+        auto result = ExecuteWSLC(L"container --help");
+        std::wstringstream expectedOutput;
+        expectedOutput << L"The following sub-commands are available:\r\n"
+                       << L"  create   Create a container.\r\n"
+                       << L"  delete   Delete containers\r\n"
+                       << L"  exec     Execute a command in a running container.\r\n"
+                       << L"  inspect  Inspect a container.\r\n"
+                       << L"  kill     Kill containers\r\n"
+                       << L"  list     List containers.\r\n"
+                       << L"  run      Run a container.\r\n"
+                       << L"  start    Start a container.\r\n"
+                       << L"  stop     Stop containers\r\n";
+        WSLCExecutionResult expectedResult{.Stdout = expectedOutput.str()};
+        VerifyOutput(result, expectedResult);
+    }
+
+    TEST_METHOD(WSLCE2E_InvalidCommand_DisplaysErrorMessage)
+    {
+        auto result = ExecuteWSLC(L"invalidcmd");
+        auto expectedError = L"Unrecognized command: 'invalidcmd'";
+        WSLCExecutionResult expectedResult{.Stderr = expectedError, .ExitCode = E_INVALIDARG};
         VerifyOutput(result, expectedResult);
     }
 
@@ -85,7 +111,7 @@ private:
         wsl::windows::common::SubProcess process(nullptr, fullCmd.c_str());
         process.SetStdHandles(read.get(), nullptr, nullptr);
         const auto output = process.RunAndCaptureOutput();
-        return {.Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = output.ExitCode};
+        return {.Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = HRESULT_FROM_WIN32(output.ExitCode)};
     }
 
     void VerifyOutput(const WSLCExecutionResult& result, const WSLCExecutionResult& expected) const
