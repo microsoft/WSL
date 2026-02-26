@@ -397,7 +397,6 @@ static LONG WINAPI OnException(_EXCEPTION_POINTERS* exception)
 {
     try
     {
-
         static std::atomic<bool> handlingException = false;
         if (handlingException.exchange(true))
         {
