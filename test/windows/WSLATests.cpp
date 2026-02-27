@@ -4772,7 +4772,7 @@ class WSLATests
 
         {
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, &images, images.size_address<ULONG>()));
         }
     }
 };
