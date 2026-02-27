@@ -30,7 +30,6 @@ int CoreMain(int argc, wchar_t const** argv)
 try
 {
     EnableContextualizedErrors(false, true);
-    CLIExecutionContext context;
     HRESULT result = S_OK;
 
     // Initialize runtime and COM.
@@ -43,6 +42,10 @@ try
     wslutil::SetCrtEncoding(_O_U8TEXT);
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wslutil::CoInitializeSecurity();
+
+    // The execution context must be declared after COM is initialized because it stores internal
+    // COM references.
+    CLIExecutionContext context;
 
     WSADATA data{};
     THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
