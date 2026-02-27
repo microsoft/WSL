@@ -191,19 +191,25 @@ public:
 
     wil::unique_hkey OpenKey()
     {
-        return;
+        return wsl::windows::common::registry::CreateKey(m_hive, m_key, KEY_ALL_ACCESS);
     }
 
     RegistryKeyChange(const RegistryKeyChange&) = delete;
     RegistryKeyChange(RegistryKeyChange&& other) = default;
-    const RegistryKeyChange& operator=(RegistryKeyChange&& other)
+    RegistryKeyChange& operator=(RegistryKeyChange&& other)
     {
-        m_hive = std::move(other.m_hive);
-        m_key = std::move(other.m_key);
-        m_value = std::move(other.m_value);
+        if (this != &other)
+        {
+            m_hive = std::move(other.m_hive);
+            m_key = std::move(other.m_key);
+            m_value = std::move(other.m_value);
+            m_originalValue = std::move(other.m_originalValue);
 
-        other.m_hive = nullptr;
-        other.m_key = nullptr;
+            other.m_hive = nullptr;
+            other.m_key = nullptr;
+        }
+
+        return *this;
     }
 
     const RegistryKeyChange& operator=(RegistryKeyChange&) = delete;
