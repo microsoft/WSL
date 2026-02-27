@@ -92,9 +92,18 @@ public:
         }
     };
 
+    struct DeferredPortLookup
+    {
+        pid_t Pid;
+        int SocketFd;
+        int Family;
+        int Protocol;
+    };
+
     struct BindCall
     {
         std::optional<PortAllocation> Request;
+        std::optional<DeferredPortLookup> PortZeroBind;
         std::uint64_t CallId;
     };
 
@@ -125,6 +134,8 @@ private:
     void CompleteRequest(uint64_t Id, int Result);
 
     static int GetSocketProtocol(int Pid, int Fd);
+
+    void ResolvePortZeroBind(const DeferredPortLookup& lookup);
 
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
