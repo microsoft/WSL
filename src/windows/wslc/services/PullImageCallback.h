@@ -27,6 +27,7 @@ public:
 private:
     HANDLE m_console{};
     CONSOLE_CURSOR_INFO m_originalCursorInfo{};
+    bool m_enabled{false};
 };
 
 // TODO: Handle terminal resizes.
@@ -34,6 +35,7 @@ class DECLSPEC_UUID("7A1D3376-835A-471A-8DC9-23653D9962D0") PullImageCallback
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IProgressCallback, IFastRundown>
 {
 public:
+    PullImageCallback();
     auto MoveToLine(SHORT line);
     HRESULT OnProgress(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total) override;
 
@@ -42,6 +44,7 @@ private:
     std::wstring GenerateStatusLine(LPCSTR status, LPCSTR id, ULONGLONG current, ULONGLONG total, const CONSOLE_SCREEN_BUFFER_INFO& info);
     std::map<std::string, SHORT> m_statuses;
     SHORT m_currentLine = 0;
+    bool m_useConsole{false};
     ChangeTerminalMode m_terminalMode{GetStdHandle(STD_OUTPUT_HANDLE), false};
 };
 } // namespace wsl::windows::wslc::services

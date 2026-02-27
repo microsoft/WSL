@@ -24,15 +24,40 @@ using namespace wsl::shared;
 ChangeTerminalMode::ChangeTerminalMode(HANDLE console, bool cursorVisible)
 {
     m_console = console;
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleCursorInfo(console, &m_originalCursorInfo));
+
+    if ((m_console == nullptr) || (m_console == INVALID_HANDLE_VALUE))
+    {
+        return;
+    }
+
+    if (!GetConsoleCursorInfo(console, &m_originalCursorInfo))
+    {
+        return;
+    }
+
     CONSOLE_CURSOR_INFO newCursorInfo = m_originalCursorInfo;
     newCursorInfo.bVisible = cursorVisible;
-    THROW_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(console, &newCursorInfo));
+    if (!SetConsoleCursorInfo(console, &newCursorInfo))
+    {
+        return;
+    }
+
+    m_enabled = true;
 }
 
 ChangeTerminalMode::~ChangeTerminalMode()
 {
-    LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    if (m_enabled)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCursorInfo(m_console, &m_originalCursorInfo));
+    }
+}
+
+PullImageCallback::PullImageCallback()
+{
+    DWORD mode = 0;
+    HANDLE outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    m_useConsole = (outputHandle != nullptr) && (outputHandle != INVALID_HANDLE_VALUE) && GetConsoleMode(outputHandle, &mode);
 }
 
 auto PullImageCallback::MoveToLine(SHORT line)
@@ -54,6 +79,16 @@ HRESULT PullImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG curren
 {
     try
     {
+        if (!m_useConsole)
+        {
+            if (id == nullptr || *id == '\0')
+            {
+                wprintf(L"%hs\n", status);
+            }
+
+            return S_OK;
+        }
+
         if (id == nullptr || *id == '\0') // Print all 'global' statuses on their own line
         {
             wprintf(L"%hs\n", status);
@@ -85,7 +120,7 @@ HRESULT PullImageCallback::OnProgress(LPCSTR status, LPCSTR id, ULONGLONG curren
 CONSOLE_SCREEN_BUFFER_INFO PullImageCallback::Info()
 {
     CONSOLE_SCREEN_BUFFER_INFO info{};
-    THROW_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
+    LOG_IF_WIN32_BOOL_FALSE(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info));
     return info;
 }
 

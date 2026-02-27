@@ -21,11 +21,13 @@ using namespace WEX::Logging;
 
 struct WSLCExecutionResult
 {
+    std::wstring CommandLine{};
     std::wstring Stdout{};
     std::wstring Stderr{};
     HRESULT ExitCode{S_OK};
     void Dump() const
     {
+        Log::Comment((L"Command Line: " + CommandLine).c_str());
         Log::Comment((L"Exit Code: " + std::to_wstring(ExitCode)).c_str());
         Log::Comment((L"Stdout: " + Stdout).c_str());
         Log::Comment((L"Stderr: " + Stderr).c_str());
@@ -101,17 +103,34 @@ class WSLCE2ETests
         VerifyOutput(result, expectedResult);
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
+    {
+        auto result = ExecuteWSLC(L"container create --name " + WslContainerName);
+        auto expectedError = L"Required argument not provided: 'image'";
+        WSLCExecutionResult expectedResult{.Stderr = expectedError, .ExitCode = E_INVALIDARG};
+        VerifyOutput(result, expectedResult);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
+    {
+        auto result = ExecuteWSLC(L"container create --name " + WslContainerName + L" " + WslInvalidImageName);
+        auto expectedError = L"Image '" + WslInvalidImageName + L"' not found, pulling";
+
+        // FIXME
+        WSLCExecutionResult expectedResult{.Stderr = expectedError, .ExitCode = HRESULT_FROM_WIN32(STATUS_ACCESS_VIOLATION)};
+        VerifyOutput(result, expectedResult);
+    }
+
 private:
+    const std::wstring WslContainerName = L"wslc-test-container";
+    const std::wstring WslInvalidImageName = L"mcr.microsoft.com/invalid-image:latest";
+
     WSLCExecutionResult ExecuteWSLC(const std::wstring& cmd)
     {
-        auto [read, write] = CreateSubprocessPipe(true, false);
-        write.reset();
-
         auto fullCmd = L"C:\\src\\wsl\\bin\\x64\\Debug\\wslc.exe " + cmd;
         wsl::windows::common::SubProcess process(nullptr, fullCmd.c_str());
-        process.SetStdHandles(read.get(), nullptr, nullptr);
         const auto output = process.RunAndCaptureOutput();
-        return {.Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = HRESULT_FROM_WIN32(output.ExitCode)};
+        return {.CommandLine = cmd, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = HRESULT_FROM_WIN32(output.ExitCode)};
     }
 
     void VerifyOutput(const WSLCExecutionResult& result, const WSLCExecutionResult& expected) const
