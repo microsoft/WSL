@@ -132,7 +132,7 @@ typedef enum _WSLAListImagesFlags
     WSLAListImagesFlagsDigests = 2,       // Include digest information
     WSLAListImagesFlagsDanglingTrue = 4,  // Show only dangling images (untagged)
     WSLAListImagesFlagsDanglingFalse = 8, // Show only non-dangling images (tagged)
-    // Note: If neither dangling flag is set, show all images (both tagged and untagged)
+    // Note: If neither dangling flag is set, no dangling filter is passed (default: both).
 } WSLAListImagesFlags;
 
 struct WSLA_LIST_IMAGES_OPTIONS

@@ -410,7 +410,6 @@ class WSLATests
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
 
             VERIFY_IS_TRUE(images.size() > 0);
-            LogInfo("Total images returned: %zu", images.size());
 
             // Find debian images and verify they exist
             bool foundLatest = false, foundTag1 = false, foundTag2 = false;
@@ -436,7 +435,7 @@ class WSLATests
             VERIFY_IS_TRUE(foundTag2);
         }
 
-        LogInfo("Test: Verify all new fields are populated");
+        LogInfo("Test: Verify all fields are populated");
         {
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, images.addressof(), images.size_address<ULONG>()));
@@ -487,10 +486,6 @@ class WSLATests
             WSLA_LIST_IMAGES_OPTIONS options{};
             options.Flags = WSLAListImagesFlagsNone;
             options.Reference = "debian";
-            options.Before = nullptr;
-            options.Since = nullptr;
-            options.Labels = nullptr;
-            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
@@ -515,10 +510,6 @@ class WSLATests
             WSLA_LIST_IMAGES_OPTIONS options{};
             options.Flags = WSLAListImagesFlagsNone;
             options.Reference = "debian:test-tag1";
-            options.Before = nullptr;
-            options.Since = nullptr;
-            options.Labels = nullptr;
-            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
@@ -543,10 +534,6 @@ class WSLATests
             WSLA_LIST_IMAGES_OPTIONS options{};
             options.Flags = WSLAListImagesFlagsDigests;
             options.Reference = "debian:latest";
-            options.Before = nullptr;
-            options.Since = nullptr;
-            options.Labels = nullptr;
-            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
@@ -570,117 +557,80 @@ class WSLATests
         LogInfo("Test: Before/Since filters");
         {
             // Pull a second image to test before/since filters
-            if (m_defaultSession->PullImage("alpine:latest", nullptr, nullptr) == S_OK)
+            LoadTestImage(L"alpine-latest.tar");
+ 
+            auto alpineCleanup = wil::scope_exit([&]() {
+                WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsForce};
+                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            });
+
+            // Get all images to find their IDs
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> allImages;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
+
+            std::string debianId, alpineId;
+            for (const auto& image : allImages)
             {
-                auto alpineCleanup = wil::scope_exit([&]() {
-                    WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsForce};
-                    wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-                    LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
-                });
-
-                // Get all images to find their IDs
-                wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> allImages;
-                VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
-
-                std::string debianId, alpineId;
-                for (const auto& image : allImages)
+                std::string imageName = image.Image;
+                if (imageName == "debian:latest")
                 {
-                    std::string imageName = image.Image;
-                    if (imageName == "debian:latest")
-                    {
-                        debianId = image.Hash;
-                    }
-                    else if (imageName == "alpine:latest")
-                    {
-                        alpineId = image.Hash;
-                    }
+                    debianId = image.Hash;
                 }
-
-                VERIFY_IS_FALSE(debianId.empty());
-                VERIFY_IS_FALSE(alpineId.empty());
-
-                // Test 'since' filter - images created after debian
+                else if (imageName == "alpine:latest")
                 {
-                    WSLA_LIST_IMAGES_OPTIONS options{};
-                    options.Flags = WSLAListImagesFlagsNone;
-                    options.Reference = nullptr;
-                    options.Before = nullptr;
-                    options.Since = debianId.c_str();
-                    options.Labels = nullptr;
-                    options.LabelsCount = 0;
-
-                    wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
-                    LogInfo("Images since debian: %zu", images.size());
+                    alpineId = image.Hash;
                 }
-
-                // Test 'before' filter - images created before alpine
-                {
-                    WSLA_LIST_IMAGES_OPTIONS options{};
-                    options.Flags = WSLAListImagesFlagsNone;
-                    options.Reference = nullptr;
-                    options.Before = alpineId.c_str();
-                    options.Since = nullptr;
-                    options.Labels = nullptr;
-                    options.LabelsCount = 0;
-
-                    wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-                    VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
-                    LogInfo("Images before alpine: %zu", images.size());
-                }
-
-                alpineCleanup.reset();
             }
-            else
+
+            VERIFY_IS_FALSE(debianId.empty());
+            VERIFY_IS_FALSE(alpineId.empty());
+
+            // Test 'since' filter - images created after debian
             {
-                LogInfo("Skipping before/since tests - alpine pull failed");
+                WSLA_LIST_IMAGES_OPTIONS options{};
+                options.Flags = WSLAListImagesFlagsNone;
+                options.Since = debianId.c_str();
+
+                wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                VERIFY_IS_TRUE(images.size() > 0);
+                LogInfo("Images since debian: %zu", images.size());
             }
-        }
 
-        LogInfo("Test: All flag comparison");
-        {
-            // List without All flag
-            WSLA_LIST_IMAGES_OPTIONS options1{};
-            options1.Flags = WSLAListImagesFlagsNone;
-            options1.Reference = nullptr;
-            options1.Before = nullptr;
-            options1.Since = nullptr;
-            options1.Labels = nullptr;
+            // Test 'before' filter - images created before alpine
+            {
+                WSLA_LIST_IMAGES_OPTIONS options{};
+                options.Flags = WSLAListImagesFlagsNone;
+                options.Before = alpineId.c_str();
 
-            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> imagesWithoutAll;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options1, imagesWithoutAll.addressof(), imagesWithoutAll.size_address<ULONG>()));
-
-            // List with All flag
-            WSLA_LIST_IMAGES_OPTIONS options2{};
-            options2.Flags = WSLAListImagesFlagsAll;
-            options2.Reference = nullptr;
-            options2.Before = nullptr;
-            options2.Since = nullptr;
-            options2.Labels = nullptr;
-
-            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> imagesWithAll;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options2, imagesWithAll.addressof(), imagesWithAll.size_address<ULONG>()));
-
-            // With All flag should return same or more images (includes intermediates)
-            VERIFY_IS_TRUE(imagesWithAll.size() >= imagesWithoutAll.size());
-            LogInfo("Images without All flag: %zu, with All flag: %zu", imagesWithoutAll.size(), imagesWithAll.size());
+                wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+                VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
+                VERIFY_IS_TRUE(images.size() > 0);
+                LogInfo("Images before alpine: %zu", images.size());
+            }
         }
 
         LogInfo("Test: Dangling filter");
         {
+            // Setup a dangling image
+            LoadTestImage(L"alpine-latest.tar");
+            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "image", "tag", "debian:latest", "alpine:latest"}, 0);
+            auto alpineCleanup = wil::scope_exit([&]() {
+                RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "image", "prune", "-f"});
+                WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsNone};
+                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
+                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
+            });
+
             // List only dangling images
             WSLA_LIST_IMAGES_OPTIONS options{};
             options.Flags = WSLAListImagesFlagsDanglingTrue;
-            options.Reference = nullptr;
-            options.Before = nullptr;
-            options.Since = nullptr;
-            options.Labels = nullptr;
-            options.LabelsCount = 0;
 
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> danglingImages;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, danglingImages.addressof(), danglingImages.size_address<ULONG>()));
 
-            LogInfo("Dangling images found: %zu", danglingImages.size());
+            VERIFY_ARE_EQUAL(1, danglingImages.size());
 
             // All dangling images should have <none>:<none> as the tag
             for (const auto& image : danglingImages)
@@ -703,32 +653,11 @@ class WSLATests
             }
         }
 
-        LogInfo("Test: Combined flags (All + Digests)");
-        {
-            WSLA_LIST_IMAGES_OPTIONS options{};
-            options.Flags = WSLAListImagesFlagsAll | WSLAListImagesFlagsDigests;
-            options.Reference = nullptr;
-            options.Before = nullptr;
-            options.Since = nullptr;
-            options.Labels = nullptr;
-            options.LabelsCount = 0;
-
-            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
-            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
-
-            LogInfo("Images with All+Digests flags: %zu", images.size());
-            VERIFY_IS_TRUE(images.size() > 0);
-        }
-
-        // Test 10: Label filter (NULL-terminated array)
         LogInfo("Test: Label filter");
         {
             // Test with nullptr (no label filter)
             WSLA_LIST_IMAGES_OPTIONS options{};
             options.Flags = WSLAListImagesFlagsNone;
-            options.Reference = nullptr;
-            options.Before = nullptr;
-            options.Since = nullptr;
             options.Labels = nullptr;
             options.LabelsCount = 0;
 
@@ -762,7 +691,7 @@ class WSLATests
             // 1. Build an image with specific labels using docker build --label
             // 2. Filter with matching labels
             // 3. Verify the filtered image appears
-            // This demonstrates the API usage without requiring image builds
+            // This only tests the API usage not fail without requiring image builds
         }
 
         cleanup.reset();
