@@ -233,6 +233,17 @@ WSLA_CONTAINER_STATE DockerStateToWSLAState(ContainerState state)
     }
 }
 
+std::string CleanContainerName(const std::string& name)
+{
+    // Docker container names have a leading '/', strip it.
+    if (!name.empty() && name[0] == '/')
+    {
+        return name.substr(1);
+    }
+
+    return name;
+}
+
 std::string ExtractContainerName(const std::vector<std::string>& names, const std::string& id)
 {
     if (names.empty())
@@ -240,14 +251,7 @@ std::string ExtractContainerName(const std::vector<std::string>& names, const st
         return id;
     }
 
-    // Docker container names have a leading '/', strip it.
-    std::string name = names[0];
-    if (!name.empty() && name[0] == '/')
-    {
-        name = name.substr(1);
-    }
-
-    return name;
+    return CleanContainerName(names[0]);
 }
 
 WSLAContainerMetadataV1 ParseContainerMetadata(const std::string& json)
@@ -355,9 +359,13 @@ const std::string& WSLAContainerImpl::Name() const noexcept
     return m_name;
 }
 
-IWSLAContainer& WSLAContainerImpl::ComWrapper()
+void WSLAContainerImpl::CopyTo(IWSLAContainer** Container)
 {
-    return *m_comWrapper.Get();
+    std::lock_guard<std::recursive_mutex> lock(m_lock);
+
+    THROW_HR_IF_MSG(RPC_E_DISCONNECTED, m_comWrapper == nullptr, "Container '%hs' is being released", m_id.c_str());
+
+    THROW_IF_FAILED(m_comWrapper.CopyTo(Container));
 }
 
 void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
@@ -454,7 +462,7 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to start container '%hs'", m_id.c_str());
 
-    m_state = WslaContainerStateRunning;
+    Transition(WslaContainerStateRunning);
     cleanup.release();
 }
 
@@ -464,7 +472,8 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
         std::lock_guard<std::recursive_mutex> lock(m_lock);
-        m_state = WslaContainerStateExited;
+
+        auto previousState = m_state;
 
         // Notify all processes that the container has exited.
         // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
@@ -475,9 +484,15 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
         m_processes.clear();
 
-        if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+        // Don't run the deletion logic if the container is already in a stopped / deleted state.
+        // This can happen if Delete() is called by the user.
+        if (previousState == WslaContainerStateRunning)
         {
-            Delete();
+            Transition(WslaContainerStateExited);
+            if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
+            {
+                Delete();
+            }
         }
     }
 
@@ -522,7 +537,7 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
         }
     }
 
-    m_state = WslaContainerStateExited;
+    Transition(WslaContainerStateExited);
 
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
@@ -550,7 +565,7 @@ void WSLAContainerImpl::Delete()
 
     ReleaseResources();
 
-    m_state = WslaContainerStateDeleted;
+    Transition(WslaContainerStateDeleted);
 }
 
 void WSLAContainerImpl::Export(ULONG OutHandle)
@@ -736,14 +751,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     WslaInspectContainer wslaInspect{};
 
     wslaInspect.Id = dockerInspect.Id;
-    wslaInspect.Name = dockerInspect.Name;
-
-    // Remove leading '/' from Docker container names.
-    if (!wslaInspect.Name.empty() && wslaInspect.Name[0] == '/')
-    {
-        wslaInspect.Name = wslaInspect.Name.substr(1);
-    }
-
+    wslaInspect.Name = CleanContainerName(dockerInspect.Name);
     wslaInspect.Created = dockerInspect.Created;
     wslaInspect.Image = m_image;
 
@@ -939,10 +947,17 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     auto result =
         DockerClient.CreateContainer(request, containerOptions.Name != nullptr ? containerOptions.Name : std::optional<std::string>{});
 
+    // If no name was passed, inspect the container to fetch its generated name.
+    common::docker_schema::InspectContainer inspectData;
+    if (containerOptions.Name == nullptr)
+    {
+        inspectData = DockerClient.InspectContainer(result.Id);
+    }
+
     auto container = std::make_unique<WSLAContainerImpl>(
         &wslaSession,
         std::move(result.Id),
-        std::move(std::string(containerOptions.Name == nullptr ? "" : containerOptions.Name)),
+        std::move(containerOptions.Name == nullptr ? CleanContainerName(inspectData.Name) : std::string(containerOptions.Name)),
         std::move(std::string(containerOptions.Image)),
         std::move(volumes),
         std::move(ports),
@@ -1113,6 +1128,8 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
 
 void WSLAContainerImpl::ReleaseResources()
 {
+    WSL_LOG("ReleaseContainerResources", TraceLoggingValue(m_id.c_str(), "ID"));
+
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // Disconnect the COM wrapper so no new RPC calls can reach this container.
@@ -1147,6 +1164,20 @@ void WSLAContainerImpl::ReleaseResources()
     }
 
     m_mappedPorts.clear();
+}
+
+__requires_lock_held(m_lock) void WSLAContainerImpl::Transition(WSLA_CONTAINER_STATE State) noexcept
+{
+    // N.B. A deleted container cannot transition back to any other state.
+    WI_ASSERT(m_state != WslaContainerStateDeleted);
+
+    WSL_LOG(
+        "ContainerStateChange",
+        TraceLoggingValue(static_cast<int>(m_state), "PreviousState"),
+        TraceLoggingValue(static_cast<int>(State), "NewState"),
+        TraceLoggingValue(m_id.c_str(), "ID"));
+
+    m_state = State;
 }
 
 WSLAContainer::WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted) :

@@ -811,7 +811,7 @@ try
             m_dockerClient.value(),
             m_ioRelay));
 
-        THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
+        it->CopyTo(Container);
 
         return S_OK;
     }
@@ -867,8 +867,12 @@ try
             E_UNEXPECTED, it == m_containers.end(), "Resolved container ID (%hs -> %hs) not found", Id, inspectResult.Id.c_str());
     }
 
-    THROW_IF_FAILED((*it)->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
-    return S_OK;
+    auto result = wil::ResultFromException([&]() { (*it)->CopyTo(Container); });
+
+    // Return ERROR_NOT_FOUND if the container was found, but is being deleted for consistency.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == RPC_E_DISCONNECTED);
+
+    return result;
 }
 CATCH_RETURN();
 

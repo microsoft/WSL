@@ -123,6 +123,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Logs Command
+struct ContainerLogsCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"logs";
+    ContainerLogsCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Run Command
 struct ContainerRunCommand final : public Command
 {
