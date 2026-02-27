@@ -1320,27 +1320,27 @@ void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
         return;
     }
 
-    auto count = m_labels.size();
-    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(count);
+    // Build labels locally using RAII strings. If an allocation throws mid-loop,
+    // the vector destructor frees everything already built.
+    std::vector<std::pair<wil::unique_cotaskmem_ansistring, wil::unique_cotaskmem_ansistring>> localLabels;
+    localLabels.reserve(m_labels.size());
 
-    auto cleanup = wil::scope_exit([&]() {
-        for (size_t j = 0; j < count; ++j)
-        {
-            CoTaskMemFree(labelsArray[j].Key);
-            CoTaskMemFree(labelsArray[j].Value);
-        }
-    });
-
-    for (size_t i = 0; i < count; ++i)
+    for (const auto& [key, value] : m_labels)
     {
-        const auto& label = std::next(m_labels.begin(), i);
-        labelsArray[i].Key = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->first.c_str()).release();
-        labelsArray[i].Value = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->second.c_str()).release();
+        localLabels.emplace_back(
+            wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(key.c_str()),
+            wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()));
     }
 
-    cleanup.release();
+    // All strings built successfully — allocate output array and transfer ownership.
+    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(localLabels.size());
+    for (size_t i = 0; i < localLabels.size(); ++i)
+    {
+        labelsArray[i].Key = localLabels[i].first.release();
+        labelsArray[i].Value = localLabels[i].second.release();
+    }
 
-    *Count = static_cast<ULONG>(count);
+    *Count = static_cast<ULONG>(localLabels.size());
     *Labels = labelsArray.release();
 }
 
