@@ -59,7 +59,7 @@ void ExecContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Data.Contains(Data::Session));
     WI_ASSERT(context.Args.Contains(ArgType::ContainerId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
-    auto result = ContainerService::Exec(
+    context.ExitCode = ContainerService::Exec(
         context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ContainerId>()), context.Data.Get<Data::ContainerOptions>());
 }
 
@@ -169,7 +169,7 @@ void RunContainer(CLIExecutionContext& context)
     WI_ASSERT(context.Args.Contains(ArgType::ImageId));
     WI_ASSERT(context.Data.Contains(Data::ContainerOptions));
     PullImageCallback callback;
-    ContainerService::Run(
+    context.ExitCode = ContainerService::Run(
         context.Data.Get<Data::Session>(), WideToMultiByte(context.Args.Get<ArgType::ImageId>()), context.Data.Get<Data::ContainerOptions>(), &callback);
 }
 
