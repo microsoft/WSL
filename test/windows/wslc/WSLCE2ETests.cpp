@@ -121,9 +121,36 @@ class WSLCE2ETests
         VerifyOutput(result, expectedResult);
     }
 
+    TEST_METHOD(WSLCE2E_Container_Create_Valid)
+    {
+        std::wstring containerId{};
+
+        // Create container
+        {
+            auto result = ExecuteWSLC(L"container create --name " + WslContainerName + L" " + WslUbuntuImageName);
+            result.Dump();
+
+            // FIXME
+            WSLCExecutionResult expectedResult{.ExitCode = HRESULT_FROM_WIN32(STATUS_ACCESS_VIOLATION)};
+            VerifyOutput(result, expectedResult);
+            containerId = result.Stdout;
+        }
+
+        // List container
+        {
+            auto result = ExecuteWSLC(L"container list");
+            result.Dump();
+
+            // FIXME
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(STATUS_ACCESS_VIOLATION), result.ExitCode);
+            VerifyDoesNotContain(result.Stdout, containerId);
+        }
+    }
+
 private:
     const std::wstring WslContainerName = L"wslc-test-container";
     const std::wstring WslInvalidImageName = L"mcr.microsoft.com/invalid-image:latest";
+    const std::wstring WslUbuntuImageName = L"ubuntu:latest";
 
     WSLCExecutionResult ExecuteWSLC(const std::wstring& cmd)
     {
@@ -138,6 +165,11 @@ private:
         VERIFY_IS_TRUE(result.Stdout.find(expected.Stdout) != std::wstring::npos);
         VERIFY_IS_TRUE(result.Stderr.find(expected.Stderr) != std::wstring::npos);
         VERIFY_ARE_EQUAL(expected.ExitCode, result.ExitCode);
+    }
+
+    void VerifyDoesNotContain(const std::wstring& output, const std::wstring& unexpected) const
+    {
+        VERIFY_IS_TRUE(output.find(unexpected) == std::wstring::npos);
     }
 };
 } // namespace WSLCE2ETests
