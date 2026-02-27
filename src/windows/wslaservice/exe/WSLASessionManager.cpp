@@ -150,15 +150,16 @@ void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessi
     std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
 
     ForEachSession<void>([&](auto& entry, const auto&) noexcept {
-        wil::unique_hlocal_string sidString;
-        if (!LOG_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString)))
+        try
         {
-            return;
-        }
+            wil::unique_hlocal_string sidString;
+            THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString));
 
-        auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
-        wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
-        wcscpy_s(it.DisplayName, _countof(it.DisplayName), entry.DisplayName.c_str());
+            auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
+            wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
+            wcscpy_s(it.DisplayName, _countof(it.DisplayName), entry.DisplayName.c_str());
+        }
+        CATCH_LOG()
     });
 
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());
