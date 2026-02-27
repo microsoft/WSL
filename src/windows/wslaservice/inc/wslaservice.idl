@@ -381,7 +381,7 @@ interface IWSLAContainer : IUnknown
     HRESULT Export([in] ULONG TarHandle);
     HRESULT GetState([out] enum WSLA_CONTAINER_STATE* State);
     HRESULT GetInitProcess([out] IWSLAProcess** Process);
-    HRESULT Exec([in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
+    HRESULT Exec([in, ref] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process);
     HRESULT Inspect([out] LPSTR* Output);
     HRESULT Logs([in] WSLALogsFlags Flags, [out] ULONG* Stdout, [out] ULONG* Stderr, [in] ULONGLONG Since, [in] ULONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLAContainerId Id);
@@ -448,23 +448,23 @@ interface IWSLASession : IUnknown
 
     // Container management.
     HRESULT CreateContainer([in] const struct WSLA_CONTAINER_OPTIONS* Options, [out] IWSLAContainer** Container);
-    HRESULT OpenContainer([in] LPCSTR Id, [out] IWSLAContainer** Container);
+    HRESULT OpenContainer([in, ref] LPCSTR Id, [out] IWSLAContainer** Container);
     HRESULT ListContainers([out, size_is(, *Count)] struct WSLA_CONTAINER** Images, [out] ULONG* Count);
 
     // Create a process at the VM level. This is meant for debugging.
-    HRESULT CreateRootNamespaceProcess([in] LPCSTR Executable, [in] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
+    HRESULT CreateRootNamespaceProcess([in, ref] LPCSTR Executable, [in, ref] const struct WSLA_PROCESS_OPTIONS* Options, [out] IWSLAProcess** Process, [out] int* Errno);
 
     // TODO: an OpenProcess() method can be added later if needed.
 
     // Disk management.
-    HRESULT FormatVirtualDisk([in] LPCWSTR Path);
+    HRESULT FormatVirtualDisk([in, ref] LPCWSTR Path);
 
     // Terminate the VM and containers.
     HRESULT Terminate();
 
     // Used only for testing. TODO: Think about moving them to a dedicated testing-only interface.
-    HRESULT MountWindowsFolder([in] LPCWSTR WindowsPath, [in] LPCSTR LinuxPath, [in] BOOL ReadOnly);
-    HRESULT UnmountWindowsFolder([in] LPCSTR LinuxPath);
+    HRESULT MountWindowsFolder([in, ref] LPCWSTR WindowsPath, [in, ref] LPCSTR LinuxPath, [in] BOOL ReadOnly);
+    HRESULT UnmountWindowsFolder([in, ref] LPCSTR LinuxPath);
     HRESULT MapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
     HRESULT UnmapVmPort([in] int Family, [in] short WindowsPort, [in] short LinuxPort);
 
@@ -562,7 +562,7 @@ interface IWSLASessionManager : IUnknown
     HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLASession** Session);
-    HRESULT OpenSessionByName([in] LPCWSTR DisplayName, [out] IWSLASession** Session);
+    HRESULT OpenSessionByName([in, ref] LPCWSTR DisplayName, [out] IWSLASession** Session);
 }
 
 cpp_quote("#define WSLA_E_BASE (0x0600)")

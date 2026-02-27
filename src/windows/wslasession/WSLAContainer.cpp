@@ -49,10 +49,10 @@ std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
     {
         return {};
     }
-    else
-    {
-        return {&array.Values[0], &array.Values[array.Count]};
-    }
+
+    THROW_HR_IF_NULL_MSG(E_INVALIDARG, array.Values, "StringArray.Values is null with Count=%lu", array.Count);
+
+    return {&array.Values[0], &array.Values[array.Count]};
 }
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
@@ -889,6 +889,11 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     std::vector<WSLAVolumeMount> volumes;
     volumes.reserve(containerOptions.VolumesCount);
 
+    if (containerOptions.VolumesCount > 0)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
+    }
+
     for (ULONG i = 0; i < containerOptions.VolumesCount; i++)
     {
         GUID volumeId;
@@ -896,6 +901,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
         auto volume = containerOptions.Volumes[i];
+
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.HostPath, "Volumes[%lu].HostPath is null", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 

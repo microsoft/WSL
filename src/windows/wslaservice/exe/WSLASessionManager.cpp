@@ -51,6 +51,10 @@ WSLASessionManagerImpl::~WSLASessionManagerImpl()
 
 void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, IWSLASession** WslaSession)
 {
+    // Ensure that the session display name is non-null and not too long.
+    THROW_HR_IF(E_INVALIDARG, Settings->DisplayName == nullptr);
+    THROW_HR_IF(E_INVALIDARG, wcslen(Settings->DisplayName) >= std::size(WSLA_SESSION_INFORMATION{}.DisplayName));
+
     auto tokenInfo = GetCallingProcessTokenInfo();
 
     std::lock_guard lock(m_wslaSessionsLock);
