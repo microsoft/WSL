@@ -16,6 +16,7 @@ Abstract:
 #include "Distribution.h"
 #include "ConsoleProgressBar.h"
 #include "registry.hpp"
+#include "wslpolicies.h"
 
 constexpr auto c_defaultDistroListUrl =
     L"https://raw.githubusercontent.com/microsoft/WSL/master/distributions/DistributionInfo.json";
@@ -88,6 +89,48 @@ std::wstring GetFamilyName(const Distribution& distro, bool directDownload)
     return GetFamilyNameFromStorePackage(GetStorePackage(distro.StoreAppId.c_str()));
 }
 
+DistributionList FilterAndFinalizeManifest(DistributionList distros)
+{
+    if (distros.Distributions.has_value())
+    {
+        std::erase_if(*distros.Distributions, [](const auto& e) {
+            if constexpr (wsl::shared::Arm64)
+            {
+                return !e.Arm64;
+            }
+            else
+            {
+                return !e.Amd64;
+            }
+        });
+    }
+
+    if (distros.ModernDistributions.has_value())
+    {
+        for (auto& [_, versions] : *distros.ModernDistributions)
+        {
+            std::erase_if(versions, [](const auto& e) {
+                if constexpr (wsl::shared::Arm64)
+                {
+                    return !e.Arm64Url.has_value();
+                }
+                else
+                {
+                    return !e.Amd64Url.has_value();
+                }
+            });
+        }
+    }
+
+    // The "Default" string takes precedence. If not present, use the first legacy distro entry.
+    if (!distros.Default.has_value() && distros.Distributions.has_value() && distros.Distributions->size() > 0)
+    {
+        distros.Default = (*distros.Distributions)[0].Name;
+    }
+
+    return distros;
+}
+
 DistributionList ReadFromManifest(const std::wstring& url)
 {
     using namespace wsl::windows::common::distribution;
@@ -113,45 +156,7 @@ DistributionList ReadFromManifest(const std::wstring& url)
         }
 
         auto distros = wsl::shared::FromJson<DistributionList, nlohmann::ordered_json>(content.c_str());
-
-        if (distros.Distributions.has_value())
-        {
-            std::erase_if(*distros.Distributions, [](const auto& e) {
-                if constexpr (wsl::shared::Arm64)
-                {
-                    return !e.Arm64;
-                }
-                else
-                {
-                    return !e.Amd64;
-                }
-            });
-        }
-
-        if (distros.ModernDistributions.has_value())
-        {
-            for (auto& [_, versions] : *distros.ModernDistributions)
-            {
-                std::erase_if(versions, [](const auto& e) {
-                    if constexpr (wsl::shared::Arm64)
-                    {
-                        return !e.Arm64Url.has_value();
-                    }
-                    else
-                    {
-                        return !e.Amd64Url.has_value();
-                    }
-                });
-            }
-        }
-
-        // The "Default" string takes precedence. If not present, use the first legacy distro entry.
-        if (!distros.Default.has_value() && distros.Distributions.has_value() && distros.Distributions->size() > 0)
-        {
-            distros.Default = (*distros.Distributions)[0].Name;
-        }
-
-        return distros;
+        return FilterAndFinalizeManifest(std::move(distros));
     }
     catch (...)
     {
@@ -159,6 +164,24 @@ DistributionList ReadFromManifest(const std::wstring& url)
         THROW_HR_WITH_USER_ERROR(
             hr, wsl::shared::Localization::MessageCouldFetchDistributionList(url.c_str(), wsl::windows::common::wslutil::GetSystemErrorString(hr)));
     }
+}
+
+DistributionList ReadFromJsonContent(const std::wstring& content)
+{
+    auto distros = wsl::shared::FromJson<DistributionList, nlohmann::ordered_json>(content.c_str());
+    return FilterAndFinalizeManifest(std::move(distros));
+}
+
+DistributionList ReadFromJsonOrUrl(const std::wstring& value)
+{
+    // Detect if the value is direct JSON (starts with '{') or a URL
+    const auto trimmed = value.substr(value.find_first_not_of(L" \t\r\n"));
+    if (!trimmed.empty() && trimmed.front() == L'{')
+    {
+        return ReadFromJsonContent(value);
+    }
+
+    return ReadFromManifest(value);
 }
 
 std::optional<TDistribution> LookupDistributionInManifest(const DistributionList& manifest, LPCWSTR name, bool legacy)
@@ -215,6 +238,19 @@ std::optional<TDistribution> LookupDistributionInManifest(const DistributionList
 AvailableDistributions wsl::windows::common::distribution::GetAvailable()
 {
     AvailableDistributions distributions{};
+
+    // Check if the distribution list is overridden by policy
+    const auto policyKey = wsl::windows::policies::OpenPoliciesKey();
+    const auto policyValue = wsl::windows::policies::GetStringPolicyValue(policyKey.get(), wsl::windows::policies::c_customDistributionManifest);
+
+    if (policyValue.has_value())
+    {
+        WSL_LOG("Distribution list overridden by policy", TraceLoggingValue(policyValue->c_str(), "value"));
+
+        distributions.Manifest = ReadFromJsonOrUrl(*policyValue);
+        distributions.PolicyOverridden = true;
+        return distributions;
+    }
 
     std::wstring url = c_defaultDistroListUrl;
     std::optional<std::wstring> appendUrl;
