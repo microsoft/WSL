@@ -82,6 +82,46 @@ catch (...)
     return true;
 }
 
+inline std::optional<std::wstring> GetStringPolicyValue(HKEY key, LPCWSTR name)
+try
+{
+    if (key == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    DWORD size = 0;
+    LONG result = RegGetValueW(key, nullptr, name, RRF_RT_REG_SZ, nullptr, nullptr, &size);
+    if (result == ERROR_PATH_NOT_FOUND || result == ERROR_FILE_NOT_FOUND)
+    {
+        return std::nullopt;
+    }
+
+    THROW_IF_WIN32_ERROR(result);
+
+    std::wstring value(size / sizeof(wchar_t), L'\0');
+    result = RegGetValueW(key, nullptr, name, RRF_RT_REG_SZ, nullptr, value.data(), &size);
+    THROW_IF_WIN32_ERROR(result);
+
+    // Remove trailing null characters
+    while (!value.empty() && value.back() == L'\0')
+    {
+        value.pop_back();
+    }
+
+    if (value.empty())
+    {
+        return std::nullopt;
+    }
+
+    return value;
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION_MSG("Error reading the string policy value: %ls", name);
+    return std::nullopt;
+}
+
 inline wil::unique_hkey OpenPoliciesKey()
 {
     wil::unique_hkey key;

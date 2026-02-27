@@ -92,6 +92,7 @@ struct AvailableDistributions
 {
     DistributionList Manifest;
     std::optional<DistributionList> OverrideManifest;
+    bool PolicyOverridden = false;
 };
 
 AvailableDistributions GetAvailable();
