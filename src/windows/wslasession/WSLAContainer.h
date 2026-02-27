@@ -36,7 +36,8 @@ public:
     NON_MOVABLE(WSLAContainerImpl);
 
     WSLAContainerImpl(
-        WSLASession* wslaSession,
+        WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
@@ -93,6 +94,7 @@ public:
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
         WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -101,6 +103,7 @@ public:
     static std::unique_ptr<WSLAContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -123,7 +126,8 @@ private:
     std::vector<DockerExecProcessControl*> m_processes;
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
-    WSLASession* m_wslaSession = nullptr;
+    WSLASession& m_wslaSession;
+    WSLAVirtualMachine& m_virtualMachine;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;

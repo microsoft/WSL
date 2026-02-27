@@ -4680,4 +4680,99 @@ class WSLATests
             VERIFY_ARE_NOT_EQUAL(container.Name(), "");
         }
     }
+
+    // This test case validates that multiple operations can happen in parallel in the same session.
+    TEST_METHOD(ParallelSessionOperations)
+    {
+        WSL2_TEST_ONLY();
+
+        wil::unique_handle pipeRead;
+        wil::unique_handle pipeWrite;
+
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&pipeRead, &pipeWrite, nullptr, 100000));
+
+        wil::unique_event exportStarted{wil::EventOptions::ManualReset};
+        wil::unique_event testComplete{wil::EventOptions::ManualReset};
+
+        auto exportIoThread = std::thread([&]() {
+            std::vector<char> buffer(1024 * 1024);
+            DWORD total{};
+            while (true)
+            {
+                DWORD bytesRead{};
+                if (!ReadFile(pipeRead.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr))
+                {
+                    if (GetLastError() != ERROR_BROKEN_PIPE)
+                    {
+                        LogError("Unexpected ReadFile() error: %u", GetLastError());
+                    }
+
+                    break;
+                }
+
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                total += bytesRead;
+
+                if (!exportStarted.is_signaled())
+                {
+                    exportStarted.SetEvent();
+                }
+
+                // Block until the test completes.
+                testComplete.wait(60 * 1000);
+            }
+        });
+
+        auto exportThread = std::thread([&]() {
+            VERIFY_SUCCEEDED(m_defaultSession->SaveImage(HandleToULong(pipeWrite.get()), "debian:latest", nullptr));
+
+            pipeWrite.reset();
+            if (!testComplete.is_signaled()) // Sanity check.
+            {
+                LogError("Export completed before test completed");
+            }
+        });
+
+        auto cleanup = wil::scope_exit([&]() {
+            testComplete.SetEvent();
+            exportIoThread.join();
+            exportThread.join();
+        });
+
+        // Wait for the export to be in progress
+        exportStarted.wait(60 * 1000);
+
+        // Validate that various operations can be done while the export is in progress.
+
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_CONTAINER> containers;
+            VERIFY_SUCCEEDED(m_defaultSession->ListContainers(&containers, containers.size_address<ULONG>()));
+
+            if (containers.size() > 0)
+            {
+                LogError("Unexpected container found: %hs", containers[0].Name);
+                VERIFY_FAIL();
+            }
+        }
+
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-parallel-operation", {"echo", "OK"});
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+
+            ValidateProcessOutput(process, {{1, "OK\n"}});
+
+            auto containerRef = OpenContainer(m_defaultSession.get(), "test-parallel-operation");
+        }
+
+        {
+            wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
+            VERIFY_SUCCEEDED(m_defaultSession->ListImages(&images, images.size_address<ULONG>()));
+        }
+    }
 };
