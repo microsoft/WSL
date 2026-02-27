@@ -195,7 +195,13 @@ public:
     }
 
     RegistryKeyChange(const RegistryKeyChange&) = delete;
-    RegistryKeyChange(RegistryKeyChange&& other) = default;
+    RegistryKeyChange(RegistryKeyChange&& other) noexcept :
+        m_hive(other.m_hive), m_key(other.m_key), m_value(std::move(other.m_value)), m_originalValue(std::move(other.m_originalValue))
+    {
+        other.m_hive = nullptr;
+        other.m_key = nullptr;
+    }
+
     RegistryKeyChange& operator=(RegistryKeyChange&& other)
     {
         if (this != &other)
