@@ -43,6 +43,8 @@ try
     auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     wslutil::CoInitializeSecurity();
 
+    // The execution context must be declared after COM is initialized because it stores internal
+    // COM references.
     CLIExecutionContext context;
 
     WSADATA data{};
