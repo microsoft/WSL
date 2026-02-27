@@ -962,9 +962,9 @@ bool MultiHandleWait::Run(std::optional<std::chrono::milliseconds> Timeout)
     while (!m_handles.empty() && !m_cancel)
     {
         // Schedule IO on each handle until all are either pending, or completed.
-        for (size_t i = 0; i < m_handles.size(); i++)
+        for (size_t i = 0; i < m_handles.size() && !m_cancel; i++)
         {
-            while (m_handles[i].second->GetState() == IOHandleStatus::Standby)
+            while (m_handles[i].second->GetState() == IOHandleStatus::Standby && !m_cancel)
             {
                 try
                 {
