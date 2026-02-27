@@ -44,10 +44,10 @@ struct CreateContainerResult
 
 struct StopContainerOptions
 {
-    static constexpr LONGLONG DefaultTimeout = -1;
+    static constexpr LONG DefaultTimeout = -1;
 
     WSLASignal Signal = WSLASignalSIGTERM;
-    LONGLONG Timeout = DefaultTimeout;
+    LONG Timeout = DefaultTimeout;
 };
 
 struct KillContainerOptions
