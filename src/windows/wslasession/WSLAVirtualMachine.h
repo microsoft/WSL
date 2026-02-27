@@ -19,6 +19,8 @@ Abstract:
 #include "wslaservice.h"
 #include "hcs.hpp"
 #include "WSLAProcess.h"
+#include <thread>
+#include <filesystem>
 
 namespace wsl::windows::service::wsla {
 
@@ -131,6 +133,8 @@ private:
 
     void WatchForExitedProcesses(wsl::shared::SocketChannel& Channel);
 
+    void CollectCrashDumps(wil::unique_socket&& listenSocket);
+
     struct AttachedDisk
     {
         std::filesystem::path Path;
@@ -147,6 +151,7 @@ private:
     std::string m_rootVhdType;
 
     std::thread m_processExitThread;
+    std::thread m_crashDumpThread;
 
     std::set<uint16_t> m_allocatedPorts;
 

@@ -15,7 +15,7 @@ Abstract:
 #pragma once
 
 #include "ServiceProcessLauncher.h"
-#include "WSLAVirtualMachine.h"
+#include "WSLASession.h"
 #include "ContainerEventTracker.h"
 #include "DockerHTTPClient.h"
 #include "WSLAProcessControl.h"
@@ -27,6 +27,7 @@ Abstract:
 namespace wsl::windows::service::wsla {
 
 class WSLAContainer;
+class WSLASession;
 
 class WSLAContainerImpl
 {
@@ -35,7 +36,8 @@ public:
     NON_MOVABLE(WSLAContainerImpl);
 
     WSLAContainerImpl(
-        WSLAVirtualMachine* parentVM,
+        WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
@@ -58,6 +60,7 @@ public:
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
     void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
     void Delete();
+    void Export(ULONG TarHandle);
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
     void GetInitProcess(_Out_ IWSLAProcess** process);
     void Exec(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process);
@@ -65,11 +68,13 @@ public:
     void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count);
 
-    IWSLAContainer& ComWrapper();
+    void CopyTo(IWSLAContainer** Container);
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
+
+    __requires_lock_held(m_lock) void Transition(WSLA_CONTAINER_STATE State) noexcept;
 
     void OnProcessReleased(DockerExecProcessControl* process);
 
@@ -89,7 +94,8 @@ public:
 
     static std::unique_ptr<WSLAContainerImpl> Create(
         const WSLA_CONTAINER_OPTIONS& Options,
-        WSLAVirtualMachine& parentVM,
+        WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -97,7 +103,8 @@ public:
 
     static std::unique_ptr<WSLAContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
-        WSLAVirtualMachine& parentVM,
+        WSLASession& wslaSession,
+        WSLAVirtualMachine& virtualMachine,
         std::function<void(const WSLAContainerImpl*)>&& OnDeleted,
         ContainerEventTracker& EventTracker,
         DockerHTTPClient& DockerClient,
@@ -106,6 +113,7 @@ public:
 private:
     void OnEvent(ContainerEvent event, std::optional<int> exitCode);
     void WaitForContainerEvent();
+    void DisconnectComWrapper();
     void ReleaseResources();
     std::unique_ptr<RelayedProcessIO> CreateRelayedProcessIO(wil::unique_handle&& stream, WSLAProcessFlags flags);
 
@@ -120,7 +128,8 @@ private:
     std::vector<DockerExecProcessControl*> m_processes;
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
-    WSLAVirtualMachine* m_parentVM = nullptr;
+    WSLASession& m_wslaSession;
+    WSLAVirtualMachine& m_virtualMachine;
     std::string m_networkMode;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
@@ -144,6 +153,7 @@ public:
     IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
+    IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLAProcess** process) override;
     IFACEMETHOD(Exec)(_In_ const WSLA_PROCESS_OPTIONS* Options, _Out_ IWSLAProcess** Process) override;

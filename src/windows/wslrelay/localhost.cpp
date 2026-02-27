@@ -339,6 +339,7 @@ struct PortRelay
     bool Pending = false;
     wil::unique_socket PendingSocket;
     int Family;
+    CHAR AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
 
     PortRelay(wil::unique_socket&& ListenSocket, uint32_t LinuxPort, uint32_t RelayPort, int Family) :
         ListenSocket(std::move(ListenSocket)), LinuxPort(LinuxPort), RelayPort(RelayPort), Family(Family)
@@ -413,7 +414,7 @@ struct PortRelay
         WI_VERIFY(!Pending);
 
         PendingSocket.reset(WSASocket(Family, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED));
-        CHAR AcceptBuffer[2 * sizeof(SOCKADDR_STORAGE)]{};
+        memset(AcceptBuffer, 0, sizeof(AcceptBuffer));
         DWORD BytesReturned{};
         if (!AcceptEx(ListenSocket.get(), PendingSocket.get(), AcceptBuffer, 0, sizeof(SOCKADDR_STORAGE), sizeof(SOCKADDR_STORAGE), &BytesReturned, &Overlapped))
         {

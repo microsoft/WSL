@@ -80,6 +80,7 @@ try
     RETURN_HR_IF(E_POINTER, Settings == nullptr || Vm == nullptr);
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_virtualMachine.has_value());
 
+    // N.B. No locking is required because Initialize() is always called before the session is returned to the caller.
     m_id = Settings->SessionId;
     m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
     m_featureFlags = Settings->FeatureFlags;
@@ -278,7 +279,7 @@ try
 
     auto [repo, tag] = ParseImage(ImageUri);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     auto requestContext = m_dockerClient->PullImage(repo, tag);
 
@@ -365,7 +366,7 @@ try
         dockerfileFileHandle.reset(wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(DockerfileHandle)));
     }
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
@@ -490,7 +491,7 @@ try
 
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -514,7 +515,7 @@ try
 
     THROW_HR_IF_MSG(E_INVALIDARG, !tag.has_value(), "Expected tag for image import: %hs", ImageName);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -579,65 +580,6 @@ void WSLASession::ImportImageImpl(DockerHTTPClient::HTTPRequestContext& Request,
     }
 }
 
-HRESULT WSLASession::ExportContainer(ULONG OutHandle, LPCSTR ContainerID, IProgressCallback* ProgressCallback)
-try
-{
-    UNREFERENCED_PARAMETER(ProgressCallback);
-
-    COMServiceExecutionContext context;
-
-    RETURN_HR_IF_NULL(E_POINTER, ContainerID);
-    std::lock_guard lock{m_lock};
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    auto retVal = m_dockerClient->ExportContainer(ContainerID);
-    ExportContainerImpl(retVal, OutHandle);
-    return S_OK;
-}
-CATCH_RETURN();
-
-void WSLASession::ExportContainerImpl(std::pair<uint32_t, wil::unique_socket>& SocketCodePair, ULONG OutputHandle)
-{
-    wil::unique_handle containerFileHandle{wsl::windows::common::wslutil::DuplicateHandleFromCallingProcess(ULongToHandle(OutputHandle))};
-
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
-
-    auto io = CreateIOContext();
-
-    std::string errorJson;
-
-    if (SocketCodePair.first != 200)
-    {
-        auto accumulateError = [&](const gsl::span<char>& buffer) {
-            // If the export failed, accumulate the error message.
-            errorJson.append(buffer.data(), buffer.size());
-        };
-
-        io.AddHandle(
-            std::make_unique<relay::ReadHandle>(common::relay::HandleWrapper{std::move(SocketCodePair.second)}, std::move(accumulateError)),
-            MultiHandleWait::CancelOnCompleted);
-    }
-    else
-    {
-        io.AddHandle(
-            std::make_unique<relay::RelayHandle<relay::HTTPChunkBasedReadHandle>>(
-                common::relay::HandleWrapper{std::move(SocketCodePair.second)}, common::relay::HandleWrapper{std::move(containerFileHandle)}),
-            MultiHandleWait::CancelOnCompleted);
-    }
-
-    io.Run({});
-
-    if (SocketCodePair.first != 200)
-    {
-        // Export failed, parse the error message.
-        auto error = wsl::shared::FromJson<docker_schema::ErrorResponse>(errorJson.c_str());
-
-        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_CONTAINER_NOT_FOUND, error.message, SocketCodePair.first == 404);
-        THROW_HR_WITH_USER_ERROR(E_FAIL, error.message);
-    }
-}
-
 HRESULT WSLASession::SaveImage(ULONG OutHandle, LPCSTR ImageNameOrID, IProgressCallback* ProgressCallback)
 try
 {
@@ -646,7 +588,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -703,7 +645,7 @@ try
     *Count = 0;
     *Images = nullptr;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -749,7 +691,7 @@ try
     *DeletedImages = nullptr;
     *Count = 0;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -811,7 +753,7 @@ try
     RETURN_HR_IF_NULL(E_POINTER, Options->Repo);
     RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
 
@@ -847,7 +789,8 @@ try
     // Validate that Image is not null.
     RETURN_HR_IF(E_INVALIDARG, containerOptions->Image == nullptr);
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Validate that name & images are valid.
@@ -864,13 +807,14 @@ try
     {
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
-            *m_virtualMachine,
+            *this,
+            m_virtualMachine.value(),
             std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
             m_eventTracker.value(),
             m_dockerClient.value(),
             m_ioRelay));
 
-        THROW_IF_FAILED(it->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
+        it->CopyTo(Container);
 
         return S_OK;
     }
@@ -897,7 +841,8 @@ try
     ValidateContainerName(Id);
 
     // Look for an exact ID match first.
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+    std::lock_guard containersLock{m_containersLock};
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
@@ -926,8 +871,12 @@ try
             E_UNEXPECTED, it == m_containers.end(), "Resolved container ID (%hs -> %hs) not found", Id, inspectResult.Id.c_str());
     }
 
-    THROW_IF_FAILED((*it)->ComWrapper().QueryInterface(__uuidof(IWSLAContainer), (void**)Container));
-    return S_OK;
+    auto result = wil::ResultFromException([&]() { (*it)->CopyTo(Container); });
+
+    // Return ERROR_NOT_FOUND if the container was found, but is being deleted for consistency.
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), result == RPC_E_DISCONNECTED);
+
+    return result;
 }
 CATCH_RETURN();
 
@@ -939,7 +888,8 @@ try
     *Count = 0;
     *Containers = nullptr;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+    std::lock_guard containersLock{m_containersLock};
 
     // Purge containers that were auto-deleted via OnEvent (--rm).
     std::erase_if(m_containers, [](const auto& e) { return e->State() == WslaContainerStateDeleted; });
@@ -972,7 +922,7 @@ try
         *Errno = -1; // Make sure not to return 0 if something fails.
     }
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     auto process = m_virtualMachine->CreateLinuxProcess(Executable, *Options, Errno);
@@ -998,7 +948,7 @@ try
 
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessagePathNotAbsolute(Path), !std::filesystem::path(Path).is_absolute());
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     // Attach the disk to the VM (AttachDisk() performs the access check for the VHD file).
@@ -1021,7 +971,9 @@ try
     // This allows a session to be unblocked if a stuck operation is holding the lock.
     m_sessionTerminatingEvent.SetEvent();
 
-    std::lock_guard lock{m_lock};
+    // Acquire an exclusive lock to ensure that no operation is running.
+    auto lock = m_lock.lock_exclusive();
+    std::lock_guard containersLock(m_containersLock);
 
     // This will delete all containers. Needs to be done before the VM is terminated.
     m_containers.clear();
@@ -1080,7 +1032,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->MountWindowsFolder(WindowsPath, LinuxPath, ReadOnly);
@@ -1092,7 +1044,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     return m_virtualMachine->UnmountWindowsFolder(LinuxPath);
@@ -1104,7 +1056,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     m_virtualMachine->MapPort(Family, WindowsPort, LinuxPort);
@@ -1117,7 +1069,7 @@ try
 {
     COMServiceExecutionContext context;
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
     m_virtualMachine->UnmapPort(Family, WindowsPort);
@@ -1148,7 +1100,9 @@ MultiHandleWait WSLASession::CreateIOContext()
 
 void WSLASession::OnContainerDeleted(const WSLAContainerImpl* Container)
 {
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
+    std::lock_guard containersLock(m_containersLock);
+
     WI_VERIFY(std::erase_if(m_containers, [Container](const auto& e) { return e.get() == Container; }) == 1);
 }
 
@@ -1172,7 +1126,8 @@ void WSLASession::RecoverExistingContainers()
         {
             auto container = WSLAContainerImpl::Open(
                 dockerContainer,
-                *m_virtualMachine,
+                *this,
+                m_virtualMachine.value(),
                 std::bind(&WSLASession::OnContainerDeleted, this, std::placeholders::_1),
                 m_eventTracker.value(),
                 m_dockerClient.value(),

@@ -66,6 +66,13 @@ COMMAND_LINE_TEST_CASE(L"container inspect cont1", L"inspect", true)
 COMMAND_LINE_TEST_CASE(L"delete cont1", L"delete", true)
 COMMAND_LINE_TEST_CASE(L"container delete cont1 cont2", L"delete", true)
 
+// Logs command
+COMMAND_LINE_TEST_CASE(L"logs cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs --follow cont1", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs cont1 -f", L"logs", true)
+COMMAND_LINE_TEST_CASE(L"container logs", L"logs", false)
+
 // Error cases
 COMMAND_LINE_TEST_CASE(L"invalid command", L"", false)
 COMMAND_LINE_TEST_CASE(L"CONTAINER list", L"list", false)               // We are intentionally case-sensitive
