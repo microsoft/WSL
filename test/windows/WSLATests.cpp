@@ -558,7 +558,7 @@ class WSLATests
         {
             // Pull a second image to test before/since filters
             LoadTestImage(L"alpine-latest.tar");
- 
+
             auto alpineCleanup = wil::scope_exit([&]() {
                 WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsForce};
                 wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
