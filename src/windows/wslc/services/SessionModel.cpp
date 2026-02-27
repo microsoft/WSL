@@ -26,7 +26,7 @@ SessionOptions SessionOptions::Default()
     options.m_sessionSettings.BootTimeoutMs = 30 * 1000;
     options.m_sessionSettings.StoragePath = m_defaultPath.c_str();
     options.m_sessionSettings.MaximumStorageSizeMb = 10000; // 10GB.
-    options.m_sessionSettings.NetworkingMode = WSLANetworkingModeNAT;
+    options.m_sessionSettings.NetworkingMode = WSLANetworkingModeVirtioProxy;
     return options;
 }
 
