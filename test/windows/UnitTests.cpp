@@ -1537,7 +1537,11 @@ Arguments for managing Windows Subsystem for Linux:
                 Create a fixed-size disk to store the distribution.
 
             --from-file <Path>
-                Install a distribution from a local file.
+                Install a distribution from a local file. Supports tar and .vhd/.vhdx files.
+
+            --in-place
+                When used with --from-file for a .vhd or .vhdx file, installs the distribution
+                using the VHD where it is located without copying it.
 
             --legacy
                 Use the legacy distribution manifest.
