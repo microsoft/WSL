@@ -300,7 +300,7 @@ try
 CATCH_RETURN()
 
 HRESULT STDMETHODCALLTYPE LxssUserSession::ImportDistributionInplace(
-    _In_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid)
+    _In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid)
 try
 {
     ServiceExecutionContext context(Error);
@@ -1268,7 +1268,7 @@ PSID LxssUserSessionImpl::GetUserSid()
 }
 
 HRESULT
-LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ GUID* pDistroGuid)
+LxssUserSessionImpl::ImportDistributionInplace(_In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ GUID* pDistroGuid)
 {
     ExecutionContext context(Context::RegisterDistro);
 
