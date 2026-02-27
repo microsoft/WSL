@@ -512,7 +512,7 @@ int Install(_In_ std::wstring_view commandLine)
         // --in-place is only valid for VHD files.
         if (inPlace && !isVhd)
         {
-            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageArgumentNotValidWithout(WSL_INSTALL_ARG_IN_PLACE, WSL_INSTALL_ARG_FROM_FILE_LONG));
+            THROW_HR_MSG(E_INVALIDARG, L"%ls", L"--in-place is only valid with a .vhd/.vhdx path (and not with '-' / stdin).");
         }
 
         // --fixed-vhd is not valid when importing an existing VHD file.
