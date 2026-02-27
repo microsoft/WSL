@@ -48,10 +48,10 @@ private:
     std::wstring GetOutput() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()
-               << GetDescription()
-               << GetUsage()
-               << GetAvailableCommands()
+        output << GetWslcHeader()        //
+               << GetDescription()       //
+               << GetUsage()             //
+               << GetAvailableCommands() //
                << GetAvailableOptions();
         return output.str();
     }
@@ -59,7 +59,6 @@ private:
     std::wstring GetDescription() const
     {
         return L"Container command for demonstration purposes.\r\n\r\n";
-
     }
 
     std::wstring GetUsage() const
@@ -88,7 +87,7 @@ private:
     std::wstring GetAvailableOptions() const
     {
         std::wstringstream options;
-        options << L"The following options are available:\r\n"
+        options << L"The following options are available:\r\n" //
                 << L"  -h,--help  Shows help about the selected command\r\n\r\n";
         return options.str();
     }

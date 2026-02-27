@@ -48,17 +48,18 @@ private:
     std::wstring GetOutput() const
     {
         std::wstringstream output;
-        output << GetWslcHeader()
-               << GetDescription()
-               << GetUsage()
-               << GetAvailableCommands()
+        output << GetWslcHeader()        //
+               << GetDescription()       //
+               << GetUsage()             //
+               << GetAvailableCommands() //
                << GetAvailableOptions();
         return output.str();
     }
 
     std::wstring GetDescription() const
     {
-        return L"WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL containers from the command line.\r\n\r\n";
+        return L"WSLC is the Windows Subsystem for Linux Container CLI tool. It enables management and interaction with WSL "
+               L"containers from the command line.\r\n\r\n";
     }
 
     std::wstring GetUsage() const

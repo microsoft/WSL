@@ -30,7 +30,8 @@ struct WSLCExecutionResult
 struct WSLCExecutor
 {
     static WSLCExecutionResult Execute(const std::wstring& commandLine);
-    static void ExecuteAndVerify(const std::wstring& cmd, const std::wstring& expectedStdout, const std::wstring& expectedStderr = L"", HRESULT expectedExitCode = S_OK);
+    static void ExecuteAndVerify(
+        const std::wstring& cmd, const std::wstring& expectedStdout, const std::wstring& expectedStderr = L"", HRESULT expectedExitCode = S_OK);
     static void ExecuteAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected);
 };
 
