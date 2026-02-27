@@ -333,6 +333,14 @@ class WSLATests
             VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
         }
 
+        // Reject DisplayName at exact boundary (no room for null terminator).
+        {
+            std::wstring boundaryName(std::size(WSLA_SESSION_INFORMATION{}.DisplayName), L'x');
+            auto settings = GetDefaultSessionSettings(boundaryName.c_str());
+            wil::com_ptr<IWSLASession> session;
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLASessionFlagsNone, &session), E_INVALIDARG);
+        }
+
         // Reject too long DisplayName.
         {
             std::wstring longName(std::size(WSLA_SESSION_INFORMATION{}.DisplayName) + 1, L'x');

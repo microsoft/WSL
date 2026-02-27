@@ -52,7 +52,15 @@ std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
 
     THROW_HR_IF_NULL_MSG(E_INVALIDARG, array.Values, "StringArray.Values is null with Count=%lu", array.Count);
 
-    return {&array.Values[0], &array.Values[array.Count]};
+    std::vector<std::string> result;
+    result.reserve(array.Count);
+    for (ULONG i = 0; i < array.Count; i += 1)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, array.Values[i], "StringArray.Values[%lu] is null", i);
+        result.emplace_back(array.Values[i]);
+    }
+
+    return result;
 }
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).

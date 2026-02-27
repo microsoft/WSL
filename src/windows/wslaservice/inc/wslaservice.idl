@@ -559,7 +559,7 @@ interface IWSLASessionManager : IUnknown
     HRESULT GetVersion([out] WSLA_VERSION* Version);
 
     // Session management.
-    HRESULT CreateSession([in] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
+    HRESULT CreateSession([in, ref] const struct WSLA_SESSION_SETTINGS* Settings, WSLASessionFlags Flags, [out] IWSLASession** Session);
     HRESULT ListSessions([out, size_is(, *SessionsCount)] struct WSLA_SESSION_INFORMATION** Sessions, [out] ULONG* SessionsCount);
     HRESULT OpenSession([in] ULONG Id, [out] IWSLASession** Session);
     HRESULT OpenSessionByName([in, ref] LPCWSTR DisplayName, [out] IWSLASession** Session);
