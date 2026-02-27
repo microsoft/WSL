@@ -1112,7 +1112,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort, short LinuxPort)
+HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort)
 try
 {
     COMServiceExecutionContext context;
@@ -1120,7 +1120,7 @@ try
     std::lock_guard lock{m_lock};
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_virtualMachine);
 
-    m_virtualMachine->UnmapPort(Family, WindowsPort, LinuxPort);
+    m_virtualMachine->UnmapPort(Family, WindowsPort);
     return S_OK;
 }
 CATCH_RETURN();

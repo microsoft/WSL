@@ -59,8 +59,9 @@ public:
 
     void Initialize();
 
+    void ReserveHostPort(_In_ int Family, _In_ short WindowsPort);
     void MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
-    void UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort);
+    void UnmapPort(_In_ int Family, _In_ short WindowsPort);
     void Unmount(_In_ const char* Path);
 
     HRESULT MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly);

@@ -39,6 +39,7 @@ public:
         std::string&& Id,
         std::string&& Name,
         std::string&& Image,
+        std::string&& NetworkMode,
         std::vector<WSLAVolumeMount>&& volumes,
         std::vector<WSLAPortMapping>&& ports,
         std::map<std::string, std::string>&& labels,
@@ -120,6 +121,7 @@ private:
     DockerHTTPClient& m_dockerClient;
     WSLA_CONTAINER_STATE m_state = WslaContainerStateInvalid;
     WSLAVirtualMachine* m_parentVM = nullptr;
+    std::string m_networkMode;
     std::vector<WSLAPortMapping> m_mappedPorts;
     std::vector<WSLAVolumeMount> m_mountedVolumes;
     std::map<std::string, std::string> m_labels;

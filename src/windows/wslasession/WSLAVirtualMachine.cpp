@@ -670,14 +670,19 @@ void WSLAVirtualMachine::MapPortImpl(_In_ int Family, _In_ short WindowsPort, _I
     THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
 
+void WSLAVirtualMachine::ReserveHostPort(_In_ int Family, _In_ short WindowsPort)
+{
+    MapPortImpl(Family, WindowsPort, 0, false);
+}
+
 void WSLAVirtualMachine::MapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
 {
     MapPortImpl(Family, WindowsPort, LinuxPort, false);
 }
 
-void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort, _In_ short LinuxPort)
+void WSLAVirtualMachine::UnmapPort(_In_ int Family, _In_ short WindowsPort)
 {
-    MapPortImpl(Family, WindowsPort, LinuxPort, true);
+    MapPortImpl(Family, WindowsPort, 0, true);
 }
 
 HRESULT WSLAVirtualMachine::MountWindowsFolder(_In_ LPCWSTR WindowsPath, _In_ LPCSTR LinuxPath, _In_ BOOL ReadOnly)

@@ -403,6 +403,11 @@ struct PortRelay
         }
     }
 
+    bool isActive() const
+    {
+        return LinuxPort != 0;
+    }
+
     bool ScheduleAccept()
     {
         WI_VERIFY(!Pending);
@@ -467,7 +472,7 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
         std::vector<HANDLE> events{ExitEvent};
         for (auto& e : ports)
         {
-            if (!e->Pending)
+            if (!e->Pending && e->isActive())
             {
                 while (e->ScheduleAccept())
                 {
@@ -579,8 +584,16 @@ void wsl::windows::wslrelay::localhost::RunWSLAPortRelay(const GUID& VmId, uint3
         {
             if (it != ports.end())
             {
-                result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
-                continue;
+                if (it->second->LinuxPort == 0 && message->LinuxPort != 0)
+                {
+                    it->second->LinuxPort = message->LinuxPort;
+                    update = true;
+                }
+                else
+                {
+                    result = HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS);
+                    continue;
+                }
             }
             else
             {
