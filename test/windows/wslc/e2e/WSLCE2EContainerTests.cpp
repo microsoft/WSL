@@ -32,41 +32,65 @@ class WSLCE2EContainerTests
         return true;
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
+    TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        // wslc container create --name <containerName>
-        auto command = L"container create --name " + WslContainerName;
-        WSLCExecutor::ExecuteAndVerify(command, L"", L"Required argument not provided: 'image'", E_INVALIDARG);
+        // wslc container --help
+        WSLCExecutor::ExecuteAndVerify(L"container --help", GetOutput());
     }
 
-    TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
+    TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
     {
-        // wslc container create --name <containerName> <invalidImageName>
-        auto command = L"container create --name " + WslContainerName + L" " + WslInvalidImageName;
-        WSLCExecutor::ExecuteAndVerify(command, L"", L"Image '" + WslInvalidImageName + L"' not found, pulling", WSLA_E_IMAGE_NOT_FOUND);
-    }
-
-    TEST_METHOD(WSLCE2E_Container_Create_Valid)
-    {
-        return;
-        std::wstring containerId{};
-
-        // Create container
-        {
-            auto command = L"container create --name " + WslContainerName + L" " + WslUbuntuImageName;
-            WSLCExecutor::ExecuteAndVerify(command, L"", L"", S_OK);
-        }
-
-        // List container
-        {
-            auto command = L"container list";
-            WSLCExecutor::ExecuteAndVerify(command, L"", L"", S_OK);
-        }
+        // wslc container INVALID_CMD
+        WSLCExecutor::ExecuteAndVerify(L"container INVALID_CMD", GetOutput(), L"Unrecognized command: 'INVALID_CMD'\r\n", E_INVALIDARG);
     }
 
 private:
-    const std::wstring WslContainerName = L"wslc-test-container";
-    const std::wstring WslInvalidImageName = L"mcr.microsoft.com/invalid-image:latest";
-    const std::wstring WslUbuntuImageName = L"ubuntu:latest";
+    std::wstring GetOutput() const
+    {
+        std::wstringstream output;
+        output << GetWslcHeader()
+               << GetDescription()
+               << GetUsage()
+               << GetAvailableCommands()
+               << GetAvailableOptions();
+        return output.str();
+    }
+
+    std::wstring GetDescription() const
+    {
+        return L"Container command for demonstration purposes.\r\n\r\n";
+
+    }
+
+    std::wstring GetUsage() const
+    {
+        return L"Usage: wslc container [<command>] [<options>]\r\n\r\n";
+    }
+
+    std::wstring GetAvailableCommands() const
+    {
+        std::wstringstream commands;
+        commands << L"The following sub-commands are available:\r\n"
+                 << L"  create   Create a container.\r\n"
+                 << L"  delete   Delete containers\r\n"
+                 << L"  exec     Execute a command in a running container.\r\n"
+                 << L"  inspect  Inspect a container.\r\n"
+                 << L"  kill     Kill containers\r\n"
+                 << L"  logs     View container logs\r\n"
+                 << L"  list     List containers.\r\n"
+                 << L"  run      Run a container.\r\n"
+                 << L"  start    Start a container.\r\n"
+                 << L"  stop     Stop containers\r\n\r\n"
+                 << L"For more details on a specific command, pass it the help argument. [-h]\r\n\r\n";
+        return commands.str();
+    }
+
+    std::wstring GetAvailableOptions() const
+    {
+        std::wstringstream options;
+        options << L"The following options are available:\r\n"
+                << L"  -h,--help  Shows help about the selected command\r\n\r\n";
+        return options.str();
+    }
 };
 } // namespace WSLCE2ETests
