@@ -644,6 +644,9 @@ try
 {
     COMServiceExecutionContext context;
 
+    RETURN_HR_IF_NULL(E_POINTER, Images);
+    RETURN_HR_IF_NULL(E_POINTER, Count);
+
     *Count = 0;
     *Images = nullptr;
 
@@ -692,7 +695,7 @@ try
         }
         // If neither flag is set, filters.dangling remains std::nullopt (show all)
 
-        // Parse labels
+        // Construct labels
         if (Options->Labels != nullptr && Options->LabelsCount > 0)
         {
             for (ULONG i = 0; i < Options->LabelsCount; ++i)
