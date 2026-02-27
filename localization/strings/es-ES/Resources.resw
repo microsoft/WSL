@@ -1223,13 +1223,13 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Una ruta de acceso absoluta de Windows a un VHD de módulos de kernel de Linux personalizados.</value>
   </data>
   <data name="Settings_CustomSystemDistroPath.Header" xml:space="preserve">
-    <value>Pulsación del sistema personalizada</value>
+    <value>Distribución del sistema personalizada</value>
   </data>
   <data name="Settings_CustomSystemDistroPathBrowseButton.Content" xml:space="preserve">
     <value>Examinar distribuciones</value>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.Text" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una pulsación del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
+    <value>Especifique una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para ejecutar aplicaciones GUI en WSL. [Obtenga más información sobre las distribuciones del sistema aquí].</value>
     <comment>{Locked="["}{Locked="]"}The text in between the delimiters [ ] is made into a hyperlink in code, and the delimiters are removed</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathDescription.NavigateUri" xml:space="preserve">
@@ -1237,10 +1237,10 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <comment>{Locked}Uri to the Microsoft WSLg architecture devblog</comment>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.Name" xml:space="preserve">
-    <value>Pulsación del sistema personalizada</value>
+    <value>Distribución del sistema personalizada</value>
   </data>
   <data name="Settings_CustomSystemDistroPathTextBox.AutomationProperties.HelpText" xml:space="preserve">
-    <value>Especifique una ruta de acceso a un VHD que se cargará como una pulsación del sistema personalizada, que se usa principalmente para encender aplicaciones GUI en WSL.</value>
+    <value>Especifique una ruta de acceso a un VHD que se cargará como una distribución del sistema personalizada, que se usa principalmente para ejecutar aplicaciones GUI en WSL.</value>
   </data>
   <data name="Settings_DebugConsole.Header" xml:space="preserve">
     <value>Habilitar consola de depuración</value>
@@ -1270,7 +1270,7 @@ Consulte las instrucciones de recuperación en: https://aka.ms/wsldiskmountrecov
     <value>Tamaño máximo predeterminado, especificado en megabytes, para el disco duro virtual (VHD) WSL ampliable solo para distribuciones recién creadas.</value>
   </data>
   <data name="Settings_DeveloperPageTitle.Text" xml:space="preserve">
-    <value>Programador</value>
+    <value>Desarrollador</value>
   </data>
   <data name="Settings_DocumentationLink.Content" xml:space="preserve">
     <value>Documentación</value>
@@ -1753,7 +1753,7 @@ También puedes acceder a más opciones remotas de VS Code mediante la paleta d
     <value>Acerca de</value>
   </data>
   <data name="Settings_Shell_Developer.Content" xml:space="preserve">
-    <value>Programador</value>
+    <value>Desarrollador</value>
   </data>
   <data name="Settings_Shell_DistroManagement.Content" xml:space="preserve">
     <value>Administración de distribuciones</value>
