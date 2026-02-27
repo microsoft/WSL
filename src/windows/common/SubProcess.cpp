@@ -46,8 +46,8 @@ std::wstring ReadFileContent(wil::unique_hfile& Handle)
 }
 } // namespace
 
-SubProcess::SubProcess(LPCWSTR ApplicationName, LPCWSTR CommandLine, DWORD Flags) :
-    m_applicationName(ApplicationName), m_commandLine(CommandLine), m_flags(Flags)
+SubProcess::SubProcess(LPCWSTR ApplicationName, LPCWSTR CommandLine, DWORD Flags, DWORD StartupFlags) :
+    m_applicationName(ApplicationName), m_commandLine(CommandLine), m_flags(Flags), m_startupFlags(StartupFlags)
 {
 }
 
@@ -159,7 +159,7 @@ wil::unique_handle SubProcess::Start()
 
     STARTUPINFOEX StartupInfo{};
     StartupInfo.StartupInfo.cb = sizeof(StartupInfo);
-    StartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    StartupInfo.StartupInfo.dwFlags = STARTF_USESTDHANDLES | m_startupFlags;
 
     // N.B. Passing a pseudoconsole requires all standard handles to be null
     if (m_pseudoConsole == nullptr)

@@ -18,7 +18,7 @@ Abstract:
 DmesgCollector::DmesgCollector(GUID VmId, const wil::unique_event& ExitEvent, bool EnableTelemetry, bool EnableDebugConsole, const std::wstring& Com1PipeName) :
     m_com1PipeName(Com1PipeName), m_runtimeId(VmId), m_debugConsole(EnableDebugConsole), m_telemetry(EnableTelemetry)
 {
-    m_exitEvent.reset(wsl::windows::common::helpers::DuplicateHandle(ExitEvent.get()));
+    m_exitEvent.reset(wsl::windows::common::wslutil::DuplicateHandle(ExitEvent.get()));
     m_overlappedEvent.create(wil::EventOptions::ManualReset);
     m_overlapped.hEvent = m_overlappedEvent.get();
     m_threadExit.create(wil::EventOptions::ManualReset);

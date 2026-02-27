@@ -176,7 +176,7 @@ void InitializeInterop(_In_ HANDLE ServerPort, _In_ const GUID& DistroId)
     // Create a thread to handle interop requests.
     //
 
-    wil::unique_handle WorkerThreadSeverPort{wsl::windows::common::helpers::DuplicateHandle(ServerPort)};
+    wil::unique_handle WorkerThreadSeverPort{wsl::windows::common::wslutil::DuplicateHandle(ServerPort)};
     std::thread([WorkerThreadSeverPort = std::move(WorkerThreadSeverPort)]() mutable {
         wsl::windows::common::wslutil::SetThreadDescription(L"Interop");
         wsl::windows::common::interop::WorkerThread(std::move(WorkerThreadSeverPort));
@@ -194,7 +194,7 @@ void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ LP
 {
     wsl::windows::common::helpers::SetHandleInheritable(ServerPort);
     const auto RegistrationComplete = wil::unique_event(wil::EventOptions::None);
-    const wil::unique_handle ParentProcess{wsl::windows::common::helpers::DuplicateHandle(GetCurrentProcess(), 0, TRUE)};
+    const wil::unique_handle ParentProcess{wsl::windows::common::wslutil::DuplicateHandle(GetCurrentProcess(), std::nullopt, TRUE)};
     THROW_LAST_ERROR_IF(!ParentProcess);
 
     const wil::unique_handle Process{wsl::windows::common::helpers::LaunchInteropServer(
