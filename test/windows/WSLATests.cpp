@@ -392,8 +392,13 @@ class WSLATests
         ExpectImagePresent(*m_defaultSession, "debian:latest");
 
         // Create additional tags for testing
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-tag1"}, 0);
-        ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "tag", "debian:latest", "debian:test-tag2"}, 0);
+        WSLA_TAG_IMAGE_OPTIONS tagOptions{};
+        tagOptions.Image = "debian:latest";
+        tagOptions.Repo = "debian";
+        tagOptions.Tag = "test-tag1";
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+        tagOptions.Tag = "test-tag2";
+        VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
         auto cleanup = wil::scope_exit([&]() {
             WSLA_DELETE_IMAGE_OPTIONS options{.Image = "debian:test-tag1", .Flags = WSLADeleteImageFlagsNone};
@@ -466,19 +471,13 @@ class WSLATests
 
                     // Verify Size field
                     VERIFY_IS_TRUE(image.Size > 0);
-                    LogInfo("Image %hs - Size: %llu bytes", imageName.c_str(), image.Size);
 
                     // Verify Created timestamp
                     VERIFY_IS_TRUE(image.Created > 0);
-                    LogInfo("Image %hs - Created: %lld", imageName.c_str(), image.Created);
-
-                    // ParentId may be empty for base images, but should be a valid field
-                    LogInfo("Image %hs - ParentId: %hs", imageName.c_str(), strlen(image.ParentId) > 0 ? image.ParentId : "(empty - base image)");
                 }
             }
 
             VERIFY_IS_TRUE(debianTagCount >= 3); // At least debian:latest, test-tag1, test-tag2
-            LogInfo("Found %d debian tags with matching hash: %hs", debianTagCount, commonHash.c_str());
         }
 
         LogInfo("Test: Multiple tags for same image return separate entries");
@@ -520,7 +519,6 @@ class WSLATests
             for (const auto& image : images)
             {
                 std::string imageName = image.Image;
-                LogInfo("Filtered image: %hs", imageName.c_str());
                 if (imageName == "debian:test-tag1")
                 {
                     foundTag1 = true;
@@ -545,13 +543,11 @@ class WSLATests
                 if (strlen(image.Digest) > 0)
                 {
                     hasDigest = true;
-                    LogInfo("Image %hs has digest: %hs", image.Image, image.Digest);
                     // Digest should be in format repo@sha256:...
                     VERIFY_IS_TRUE(std::string(image.Digest).find("@sha256:") != std::string::npos);
                 }
             }
             // Note: Pulled images from registry should have digests, locally built may not
-            LogInfo("Digests found: %hs", hasDigest ? "yes" : "no");
         }
 
         LogInfo("Test: Before/Since filters");
@@ -595,7 +591,17 @@ class WSLATests
                 wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
-                LogInfo("Images since debian: %zu", images.size());
+
+                bool foundAlpine = false;
+                for (const auto& image : images)
+                {
+                    if (std::string{image.Image} == "alpine:latest")
+                    {
+                        foundAlpine = true;
+                    }
+                }
+
+                VERIFY_IS_TRUE(foundAlpine);
             }
 
             // Test 'before' filter - images created before alpine
@@ -607,7 +613,17 @@ class WSLATests
                 wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
-                LogInfo("Images before alpine: %zu", images.size());
+
+                bool foundDebian = false;
+                for (const auto& image : images)
+                {
+                    if (std::string{image.Image} == "debian:latest")
+                    {
+                        foundDebian = true;
+                    }
+                }
+
+                VERIFY_IS_TRUE(foundDebian);
             }
         }
 
@@ -615,7 +631,12 @@ class WSLATests
         {
             // Setup a dangling image
             LoadTestImage(L"alpine-latest.tar");
-            ExpectCommandResult(m_defaultSession.get(), {"/usr/bin/docker", "image", "tag", "debian:latest", "alpine:latest"}, 0);
+            WSLA_TAG_IMAGE_OPTIONS tagOptions{};
+            tagOptions.Image = "debian:latest";
+            tagOptions.Repo = "alpine";
+            tagOptions.Tag = "latest";
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+
             auto alpineCleanup = wil::scope_exit([&]() {
                 RunCommand(m_defaultSession.get(), {"/usr/bin/docker", "image", "prune", "-f"});
                 WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsNone};
@@ -637,13 +658,13 @@ class WSLATests
             {
                 std::string imageName = image.Image;
                 VERIFY_ARE_EQUAL(imageName, std::string("<none>:<none>"));
-                LogInfo("Dangling image: %hs (hash: %hs)", imageName.c_str(), image.Hash);
             }
 
             // List non-dangling images
             options.Flags = WSLAListImagesFlagsDanglingFalse;
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> nonDanglingImages;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, nonDanglingImages.addressof(), nonDanglingImages.size_address<ULONG>()));
+            VERIFY_IS_TRUE(nonDanglingImages.size() > 0);
 
             // None of these should be <none>:<none>
             for (const auto& image : nonDanglingImages)
@@ -664,9 +685,6 @@ class WSLATests
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
 
-            size_t imageCountWithoutLabel = images.size();
-            LogInfo("Images without label filter: %zu", imageCountWithoutLabel);
-
             // Test with single label filter
             {
                 WSLA_LABEL labels[] = {{.Key = "test.label", .Value = nullptr}};
@@ -674,7 +692,6 @@ class WSLATests
                 options.LabelsCount = 1;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
-                LogInfo("Images with single label filter: %zu", images.size());
             }
 
             // Test with multiple label filters (labels are AND'ed together)
@@ -684,7 +701,6 @@ class WSLATests
                 options.LabelsCount = 2;
 
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
-                LogInfo("Images with multiple label filters: %zu", images.size());
             }
 
             // Note: To fully test label filtering with actual matches, would need to:

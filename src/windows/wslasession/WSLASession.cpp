@@ -720,16 +720,7 @@ try
     {
         images = m_dockerClient->ListImages(all, digests, filters);
     }
-    catch (const DockerHTTPException& e)
-    {
-        std::string errorMessage;
-        if ((e.StatusCode() >= 400 && e.StatusCode() < 500))
-        {
-            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
-        }
-
-        THROW_HR_MSG(E_FAIL, "%hs", errorMessage.c_str());
-    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list images");
 
     // Compute the number of entries - one entry per tag, or one per image if no tags
     auto entries = std::accumulate<decltype(images.begin()), size_t>(images.begin(), images.end(), 0, [](auto sum, const auto& e) {
@@ -747,11 +738,9 @@ try
         for (const auto& repoDigest : e.RepoDigests)
         {
             size_t atPos = repoDigest.find('@');
-            if (atPos != std::string::npos && atPos > 0)
-            {
-                std::string repoName = repoDigest.substr(0, atPos);
-                repoToDigest[repoName] = repoDigest;
-            }
+            THROW_HR_IF(E_UNEXPECTED, atPos == std::string::npos || atPos == 0);
+            std::string repoName = repoDigest.substr(0, atPos);
+            repoToDigest[repoName] = repoDigest;
         }
 
         if (e.RepoTags.empty())

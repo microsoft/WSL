@@ -24,17 +24,17 @@ Abstract:
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
     if ((_Ex).HasErrorMessage()) \
     { \
-        THROW_HR_WITH_USER_ERROR_MSG(E_FAIL, (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, __VA_ARGS__); \
+        THROW_HR_WITH_USER_ERROR_MSG(E_FAIL, (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
     } \
     else \
     { \
-        THROW_HR_MSG(E_FAIL, _Msg ". Error: %hs", __VA_ARGS__, (_Ex).what()); \
+        THROW_HR_MSG(E_FAIL, "Error: %hs. " _Msg, (_Ex).what(), ##__VA_ARGS__); \
     }
 
 #define CATCH_AND_THROW_DOCKER_USER_ERROR(_Msg, ...) \
     catch (const DockerHTTPException& e) \
     { \
-        THROW_DOCKER_USER_ERROR_MSG(e, _Msg, __VA_ARGS__) \
+        THROW_DOCKER_USER_ERROR_MSG(e, _Msg, ##__VA_ARGS__) \
     }
 
 namespace wsl::windows::service::wsla {
