@@ -66,7 +66,8 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 
         RETURN_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
 
-        session.copy_to(WslaSession);
+        RETURN_IF_FAILED(wil::com_copy_to_nothrow(session, WslaSession));
+
         return S_OK;
     });
 
@@ -119,7 +120,8 @@ void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
 
         RETURN_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
 
-        session.copy_to(Session);
+        RETURN_IF_FAILED(wil::com_copy_to_nothrow(session, Session));
+
         return S_OK;
     });
 
@@ -138,7 +140,8 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 
         RETURN_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
 
-        session.copy_to(Session);
+        RETURN_IF_FAILED(wil::com_copy_to_nothrow(session, Session));
+
         return S_OK;
     });
 
