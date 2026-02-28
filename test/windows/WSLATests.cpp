@@ -111,7 +111,7 @@ class WSLATests
         WSLA_SESSION_SETTINGS settings{};
         settings.DisplayName = Name;
         settings.CpuCount = 4;
-        settings.MemoryMb = 2024;
+        settings.MemoryMb = 2048;
         settings.BootTimeoutMs = 30 * 1000;
         settings.StoragePath = enableStorage ? m_storagePath.c_str() : nullptr;
         settings.MaximumStorageSizeMb = 4096; // 4GB.
@@ -184,7 +184,7 @@ class WSLATests
     }
 
     static RunningWSLAProcess::ProcessResult ExpectCommandResult(
-        IWSLASession* session, const std::vector<std::string>& command, int expectResult, bool expectSignal = false, int timeout = 600000)
+        IWSLASession* session, const std::vector<std::string>& command, int expectResult, int timeout = 600000)
     {
         auto result = RunCommand(session, command, timeout);
 
@@ -235,6 +235,8 @@ class WSLATests
                     fd,
                     EscapeString(expected).c_str(),
                     EscapeString(it->second).c_str());
+
+                return;
             }
         }
     }
@@ -1192,6 +1194,7 @@ class WSLATests
                 auto cleanup =
                     wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(containerTar.c_str())); });
                 LARGE_INTEGER fileSize{};
+                VERIFY_IS_TRUE(GetFileSizeEx(containerTarFileHandle.get(), &fileSize));
                 VERIFY_SUCCEEDED(m_defaultSession->LoadImage(HandleToULong(containerTarFileHandle.get()), nullptr, fileSize.QuadPart));
                 // Verify that the image is in the list of images.
                 ExpectImagePresent(*m_defaultSession, "hello-world:latest");
@@ -4048,7 +4051,7 @@ class WSLATests
 
         // Test duplicate keys
         {
-            std::vector<WSLA_LABEL> labels(2);
+            std::vector<WSLA_LABEL> labels;
             labels.push_back({.Key = "key", .Value = "value"});
             labels.push_back({.Key = "key", .Value = "value2"});
 
@@ -4060,7 +4063,7 @@ class WSLATests
 
             wil::com_ptr<IWSLAContainer> container;
             auto hr = m_defaultSession->CreateContainer(&options, &container);
-            VERIFY_ARE_EQUAL(hr, E_INVALIDARG);
+            VERIFY_ARE_EQUAL(hr, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
         }
 
         // Test wsla metadata key conflict
