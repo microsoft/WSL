@@ -4410,7 +4410,7 @@ class WSLATests
             m_ioThread = std::thread(&BlockingOperation::RunIO, this, std::move(pipeRead));
 
             // Wait for the operation to be running before continuing.
-            m_startedEvent.wait(60 * 1000);
+            VERIFY_IS_TRUE(m_startedEvent.wait(60 * 1000));
         }
 
         ~BlockingOperation()
@@ -4462,7 +4462,11 @@ class WSLATests
                 }
 
                 // Block until the test completes.
-                m_testCompleteEvent.wait(60 * 1000);
+                if (!m_testCompleteEvent.wait(60 * 1000))
+                {
+                    LogError("Timed out waiting for test completion");
+                    break;
+                }
             }
         }
 

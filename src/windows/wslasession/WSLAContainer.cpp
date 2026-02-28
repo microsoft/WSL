@@ -9,10 +9,11 @@ Module Name:
 Abstract:
 
     Contains the implementation of WSLAContainer.
-    N.B. This class is designed to allow multiple container operations to run in parrallel.
+    N.B. This class is designed to allow multiple container operations to run in parallel.
     Operations that don't change the state of the container must be const qualified, and acquire a shared lock on m_lock.
     Operations that do change the container's state must acquire m_lock exclusively.
     Operations that interact with processes inside the container or the init process must acquire m_processesLock.
+    m_lock must always be acquired before m_processesLock
 
 --*/
 
@@ -326,6 +327,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
     decltype(m_initProcessControl) initProcessControl = nullptr;
 
     {
+        auto lock = m_lock.lock_exclusive();
         std::lock_guard processesLock{m_processesLock};
         initProcessControl = std::exchange(m_initProcessControl, nullptr);
         processes = std::exchange(m_processes, {});
@@ -593,7 +595,7 @@ void WSLAContainerImpl::Export(ULONG OutHandle) const
 {
     auto lock = m_lock.lock_shared();
 
-    // Validate that the container is in the running state.
+    // Validate that the container is not in the running state.
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
         m_state == WslaContainerStateRunning,
