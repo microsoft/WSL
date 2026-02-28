@@ -4568,7 +4568,7 @@ class WSLATests
         }
 
         {
-            // Validate than another export can run.
+            // Validate that another export can run.
             BlockingOperation secondExport([&](HANDLE handle) { return container.Get().Export(HandleToULong(handle)); });
             secondExport.Complete();
         }
