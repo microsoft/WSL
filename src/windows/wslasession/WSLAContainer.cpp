@@ -54,10 +54,18 @@ std::vector<std::string> StringArrayToVector(const WSLAStringArray& array)
     {
         return {};
     }
-    else
+
+    THROW_HR_IF_NULL_MSG(E_INVALIDARG, array.Values, "StringArray.Values is null with Count=%lu", array.Count);
+
+    std::vector<std::string> result;
+    result.reserve(array.Count);
+    for (ULONG i = 0; i < array.Count; i += 1)
     {
-        return {&array.Values[0], &array.Values[array.Count]};
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, array.Values[i], "StringArray.Values[%lu] is null", i);
+        result.emplace_back(array.Values[i]);
     }
+
+    return result;
 }
 
 // TODO: Determine when ports should be mapped and unmapped (at container creation, start, stop or delete).
@@ -519,7 +527,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
-void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
+void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
 {
     // Acquire an exclusive lock since this method modifies m_state.
     auto lock = m_lock.lock_exclusive();
@@ -906,6 +914,11 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
     std::vector<WSLAVolumeMount> volumes;
     volumes.reserve(containerOptions.VolumesCount);
 
+    if (containerOptions.VolumesCount > 0)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Volumes, "Volumes is null with VolumesCount=%lu", containerOptions.VolumesCount);
+    }
+
     for (ULONG i = 0; i < containerOptions.VolumesCount; i++)
     {
         GUID volumeId;
@@ -913,6 +926,9 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
         auto parentVMPath = std::format("/mnt/{}", wsl::shared::string::GuidToString<char>(volumeId));
         auto volume = containerOptions.Volumes[i];
+
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.HostPath, "Volumes[%lu].HostPath is null", i);
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, volume.ContainerPath, "Volumes[%lu].ContainerPath is null", i);
 
         volumes.push_back(WSLAVolumeMount{volume.HostPath, parentVMPath, volume.ContainerPath, static_cast<bool>(volume.ReadOnly)});
 
@@ -1241,7 +1257,7 @@ HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** 
     return CallImpl(&WSLAContainerImpl::Exec, Options, Process);
 }
 
-HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds)
+HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds)
 {
     COMServiceExecutionContext context;
 
@@ -1335,27 +1351,27 @@ void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
         return;
     }
 
-    auto count = m_labels.size();
-    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(count);
+    // Build labels locally using RAII strings. If an allocation throws mid-loop,
+    // the vector destructor frees everything already built.
+    std::vector<std::pair<wil::unique_cotaskmem_ansistring, wil::unique_cotaskmem_ansistring>> localLabels;
+    localLabels.reserve(m_labels.size());
 
-    auto cleanup = wil::scope_exit([&]() {
-        for (size_t j = 0; j < count; ++j)
-        {
-            CoTaskMemFree(labelsArray[j].Key);
-            CoTaskMemFree(labelsArray[j].Value);
-        }
-    });
-
-    for (size_t i = 0; i < count; ++i)
+    for (const auto& [key, value] : m_labels)
     {
-        const auto& label = std::next(m_labels.begin(), i);
-        labelsArray[i].Key = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->first.c_str()).release();
-        labelsArray[i].Value = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(label->second.c_str()).release();
+        localLabels.emplace_back(
+            wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(key.c_str()),
+            wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(value.c_str()));
     }
 
-    cleanup.release();
+    // All strings built successfully — allocate output array and transfer ownership.
+    auto labelsArray = wil::make_unique_cotaskmem<WSLA_LABEL_INFORMATION[]>(localLabels.size());
+    for (size_t i = 0; i < localLabels.size(); ++i)
+    {
+        labelsArray[i].Key = localLabels[i].first.release();
+        labelsArray[i].Value = localLabels[i].second.release();
+    }
 
-    *Count = static_cast<ULONG>(count);
+    *Count = static_cast<ULONG>(localLabels.size());
     *Labels = labelsArray.release();
 }
 

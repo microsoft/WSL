@@ -55,9 +55,8 @@ public:
     ~WSLAContainerImpl();
 
     void Start(WSLAContainerStartFlags Flags);
-
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const;
-    void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
+    void Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds);
     void Delete();
     void Export(ULONG TarHandle) const;
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
@@ -151,7 +150,7 @@ public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
-    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
+    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;
