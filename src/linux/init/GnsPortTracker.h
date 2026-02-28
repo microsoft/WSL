@@ -1,7 +1,9 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
+#include <deque>
 #include <map>
+#include <mutex>
 #include <set>
 #include <utility>
 #include <optional>
@@ -95,9 +97,19 @@ public:
     struct DeferredPortLookup
     {
         pid_t Pid;
-        int SocketFd;
+        wil::unique_fd DuplicatedSocketFd; // Duplicated via pidfd_getfd while process was stopped
         int Family;
         int Protocol;
+
+        DeferredPortLookup(pid_t Pid, wil::unique_fd DuplicatedSocketFd, int Family, int Protocol) :
+            Pid(Pid), DuplicatedSocketFd(std::move(DuplicatedSocketFd)), Family(Family), Protocol(Protocol)
+        {
+        }
+
+        DeferredPortLookup(DeferredPortLookup&&) = default;
+        DeferredPortLookup& operator=(DeferredPortLookup&&) = default;
+        DeferredPortLookup(const DeferredPortLookup&) = delete;
+        DeferredPortLookup& operator=(const DeferredPortLookup&) = delete;
     };
 
     struct BindCall
@@ -135,8 +147,17 @@ private:
 
     static int GetSocketProtocol(int Pid, int Fd);
 
-    void ResolvePortZeroBind(const DeferredPortLookup& lookup);
+    static wil::unique_fd DuplicateSocketFd(pid_t Pid, int SocketFd);
 
+    void ResolvePortZeroBind(DeferredPortLookup lookup);
+
+    void RunDeferredResolve();
+
+    void TrackPort(PortAllocation allocation);
+
+    // Protects m_allocatedPorts which is accessed from both the main Run() loop
+    // and the background RunDeferredResolve() thread.
+    std::mutex m_portsMutex;
     std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
@@ -148,6 +169,10 @@ private:
     std::shared_ptr<SecCompDispatcher> m_seccompDispatcher;
 
     std::string m_networkNamespace;
+
+    std::mutex m_deferredMutex;
+    std::condition_variable m_deferredCv;
+    std::deque<DeferredPortLookup> m_deferredQueue;
 };
 
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& portAllocation);
