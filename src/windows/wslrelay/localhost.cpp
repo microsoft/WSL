@@ -404,7 +404,7 @@ struct PortRelay
         }
     }
 
-    bool isActive() const
+    bool IsActive() const
     {
         return LinuxPort != 0;
     }
@@ -473,7 +473,7 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
         std::vector<HANDLE> events{ExitEvent};
         for (auto& e : ports)
         {
-            if (!e->Pending && e->isActive())
+            if (!e->Pending && e->IsActive())
             {
                 while (e->ScheduleAccept())
                 {

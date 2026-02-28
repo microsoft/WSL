@@ -131,7 +131,7 @@ void ResolveVmPorts(std::vector<WSLAPortMapping>& ports, const DockerInspectCont
             "Docker did not assign a VM port for container port %u",
             e.ContainerPort);
 
-        e.VmPort = static_cast<uint16_t>(std::stoi(it->second[0].HostPort));
+        e.VmPort = it->second[0].HostPort;
         THROW_HR_IF_MSG(E_UNEXPECTED, e.VmPort == 0, "Docker assigned VM port 0 for container port %u", e.ContainerPort);
     }
 }
@@ -592,7 +592,9 @@ void WSLAContainerImpl::Delete()
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to delete container '%hs'", m_id.c_str());
 
+    ReleaseResources();
     DisconnectComWrapper();
+
     Transition(WslaContainerStateDeleted);
 }
 
