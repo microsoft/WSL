@@ -126,8 +126,11 @@ void ResolveVmPorts(std::vector<WSLAPortMapping>& ports, const DockerInspectCont
         // while NetworkSettings.Ports contains the actual assigned port.
         auto portKey = std::format("{}/tcp", e.ContainerPort);
         auto it = inspect.NetworkSettings.Ports.find(portKey);
-        THROW_HR_IF_MSG(E_UNEXPECTED, it == inspect.NetworkSettings.Ports.end() || it->second.empty(),
-            "Docker did not assign a VM port for container port %u", e.ContainerPort);
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED,
+            it == inspect.NetworkSettings.Ports.end() || it->second.empty(),
+            "Docker did not assign a VM port for container port %u",
+            e.ContainerPort);
 
         e.VmPort = static_cast<uint16_t>(std::stoi(it->second[0].HostPort));
         THROW_HR_IF_MSG(E_UNEXPECTED, e.VmPort == 0, "Docker assigned VM port 0 for container port %u", e.ContainerPort);
@@ -508,7 +511,6 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         std::lock_guard<std::recursive_mutex> lock(m_lock);
 
         auto previousState = m_state;
-
 
         // Notify all processes that the container has exited.
         // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.

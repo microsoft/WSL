@@ -4400,11 +4400,10 @@ class WSLATests
         WSL2_TEST_ONLY();
         SKIP_TEST_ARM64();
 
-        // Verify port mapping. 
+        // Verify port mapping.
         // Two containers created with the same host port, only the first Start() succeeds.
         {
-            WSLAContainerLauncher launcher(
-                "debian:latest", "deferred-port", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_BRIDGE);
+            WSLAContainerLauncher launcher("debian:latest", "deferred-port", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_BRIDGE);
             launcher.AddPort(1240, 8000, AF_INET);
 
             // Both Create() calls should succeed because ports are not reserved until Start().
@@ -4434,8 +4433,7 @@ class WSLATests
                 std::filesystem::remove_all(hostFolder, ec);
             });
 
-            WSLAContainerLauncher launcher(
-                "debian:latest", "deferred-volume", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_HOST);
+            WSLAContainerLauncher launcher("debian:latest", "deferred-volume", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_HOST);
             launcher.AddVolume(hostFolder.wstring(), "/deferred-volume", false);
 
             // Create the container — volume should NOT be mounted yet.
@@ -4452,7 +4450,6 @@ class WSLATests
             // Verify the volume is unmounted after container is stopped.
             VERIFY_SUCCEEDED(container->Get().Stop(WSLASignalSIGKILL, 0));
             ExpectCommandResult(m_defaultSession.get(), {"/bin/sh", "-c", "findmnt -o TARGET -l | grep '^/mnt/'"}, 1);
-
         }
     }
 
