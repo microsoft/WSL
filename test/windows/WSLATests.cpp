@@ -2273,6 +2273,21 @@ class WSLATests
             ValidateProcessOutput(process, {{1, "foo  bar\n"}}); // Expect two spaces for the empty argument.
         }
 
+        // Validate that tmpfs mounts are correctly wired.
+        {
+            WSLAContainerLauncher launcher(
+                "debian:latest",
+                "test-tmpfs",
+                {"/bin/sh", "-c", "mount | grep 'tmpfs on /mnt/wsla-tmpfs1' && mount | grep 'tmpfs on /mnt/wsla-tmpfs2'"});
+
+            launcher.AddTmpfs("/mnt/wsla-tmpfs1", "rw,noexec,nosuid,size=65536k");
+            launcher.AddTmpfs("/mnt/wsla-tmpfs2", "");
+
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            ValidateProcessOutput(process, {}, 0);
+        }
+
         // Validate error paths
         {
             WSLAContainerLauncher launcher("debian:latest", std::string(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});
@@ -2777,9 +2792,12 @@ class WSLATests
                 }
 
                 VERIFY_IS_FALSE(it->Type.empty());
-                VERIFY_IS_FALSE(it->Source.empty());
-
                 VERIFY_ARE_EQUAL(it->Type, expectedType);
+
+                if (expectedType != "tmpfs")
+                {
+                    VERIFY_IS_FALSE(it->Source.empty());
+                }
                 VERIFY_ARE_EQUAL(it->ReadWrite, expectedReadWrite);
             }
         };
@@ -2806,6 +2824,7 @@ class WSLATests
             launcher.AddPort(1236, 8001, AF_INET);
             launcher.AddVolume(testFolder.wstring(), "/test-volume", false);
             launcher.AddVolume(testFolderReadOnly.wstring(), "/test-volume-ro", true);
+            launcher.AddTmpfs("/mnt/wsla-tmpfs-inspect", "");
 
             auto container = launcher.Launch(*m_defaultSession);
             auto details = container.Inspect();
@@ -2825,8 +2844,10 @@ class WSLATests
             // Verify port mappings match what we configured.
             expectPorts(details.Ports, {{"8000/tcp", {"1234", "1235"}}, {"8001/tcp", {"1236"}}});
 
-            // Verify volume mounts match what we configured.
-            expectMounts(details.Mounts, {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}});
+            // Verify mounts match what we configured.
+            expectMounts(
+                details.Mounts,
+                {{"/test-volume", "bind", true}, {"/test-volume-ro", "bind", false}, {"/mnt/wsla-tmpfs-inspect", "tmpfs", true}});
 
             VERIFY_SUCCEEDED(container.Get().Stop(WSLASignalSIGKILL, 0));
             VERIFY_SUCCEEDED(container.Get().Delete());

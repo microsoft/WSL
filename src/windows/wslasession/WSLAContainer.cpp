@@ -793,6 +793,18 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
         wslaInspect.Mounts.push_back(std::move(mountInfo));
     }
 
+    // Map tmpfs mounts from Docker inspect data.
+    for (const auto& [destination, options] : dockerInspect.HostConfig.Tmpfs)
+    {
+        wsla_schema::InspectMount mountInfo{};
+        mountInfo.Type = "tmpfs";
+        mountInfo.Destination = destination;
+        // Tmpfs mounts are read-write by default. We currently do not parse tmpfs options
+        // (e.g. "ro") for inspect output; Docker enforces actual mount behavior.
+        mountInfo.ReadWrite = true;
+        wslaInspect.Mounts.push_back(std::move(mountInfo));
+    }
+
     return wslaInspect;
 }
 
@@ -905,6 +917,21 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
     // Mount volumes.
     auto volumeErrorCleanup = MountVolumes(volumes, virtualMachine);
+
+    // Process tmpfs mounts from container options.
+    if (containerOptions.TmpfsCount > 0)
+    {
+        THROW_HR_IF_NULL_MSG(E_INVALIDARG, containerOptions.Tmpfs, "Tmpfs is null with TmpfsCount=%lu", containerOptions.TmpfsCount);
+
+        for (ULONG i = 0; i < containerOptions.TmpfsCount; i++)
+        {
+            const auto& tmpfs = containerOptions.Tmpfs[i];
+
+            THROW_HR_IF_NULL_MSG(E_INVALIDARG, tmpfs.Destination, "Tmpfs mount at index %lu has null destination", i);
+
+            request.HostConfig.Tmpfs[tmpfs.Destination] = tmpfs.Options != nullptr ? tmpfs.Options : "";
+        }
+    }
 
     // Process port mappings from container options.
     auto [ports, networkMode] = ProcessPortMappings(containerOptions);
