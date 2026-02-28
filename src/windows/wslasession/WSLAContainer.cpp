@@ -505,7 +505,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
         TraceLoggingValue((int)event, "Event"));
 }
 
-void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
+void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
 {
     std::lock_guard lock(m_lock);
 
@@ -1226,7 +1226,7 @@ HRESULT WSLAContainer::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess** 
     return CallImpl(&WSLAContainerImpl::Exec, Options, Process);
 }
 
-HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds)
+HRESULT WSLAContainer::Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds)
 {
     COMServiceExecutionContext context;
 

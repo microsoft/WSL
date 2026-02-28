@@ -236,7 +236,7 @@ void StopContainers(CLIExecutionContext& context)
 
     if (context.Args.Contains(ArgType::Time))
     {
-        options.Timeout = validation::GetIntegerFromString<LONGLONG>(context.Args.Get<ArgType::Time>());
+        options.Timeout = validation::GetIntegerFromString<LONG>(context.Args.Get<ArgType::Time>());
     }
 
     for (const auto& id : containersToStop)
