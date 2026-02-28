@@ -8,19 +8,12 @@
 #include <linux/sock_diag.h>
 #include <linux/inet_diag.h>
 #include <linux/net.h>
+#include <sys/syscall.h>
 #include <sys/xattr.h>
 #include "common.h" // Needs to be included before sal.h before of __reserved macro
 #include "NetlinkTransactionError.h"
 #include "GnsPortTracker.h"
 #include "lxinitshared.h"
-
-// pidfd_open (Linux 5.3) and pidfd_getfd (Linux 5.6) may not be defined in older headers.
-#ifndef SYS_pidfd_open
-#define SYS_pidfd_open 434
-#endif
-#ifndef SYS_pidfd_getfd
-#define SYS_pidfd_getfd 438
-#endif
 
 constexpr size_t c_bind_timeout_seconds = 60;
 constexpr auto c_sock_diag_refresh_delay = std::chrono::milliseconds(500);
@@ -81,6 +74,7 @@ void GnsPortTracker::Run()
     // for port deallocation
 
     std::thread{std::bind(&GnsPortTracker::RunPortRefresh, this)}.detach();
+    std::thread{std::bind(&GnsPortTracker::RunDeferredResolve, this)}.detach();
 
     auto future = std::make_optional(m_allocatedPortsRefresh.get_future());
     std::optional<PortRefreshResult> refreshResult;
@@ -106,7 +100,7 @@ void GnsPortTracker::Run()
                 result = HandleRequest(allocationRequest);
                 if (result == 0)
                 {
-                    m_allocatedPorts.emplace(std::make_pair(allocationRequest, std::make_optional(time(nullptr) + c_bind_timeout_seconds)));
+                    TrackPort(allocationRequest);
                     GNS_LOG_INFO(
                         "Tracking bind call: family ({}) port ({}) protocol ({})",
                         allocationRequest.Family,
@@ -124,19 +118,11 @@ void GnsPortTracker::Run()
                 GNS_LOG_ERROR("Failed to complete bind request, {}", e.what());
             }
 
-            // If this was a port-0 bind, the kernel should have assigned an ephemeral port.
-            // This check might be susceptible to races, but it's a best effort to resolve the 
-            // actual port in the case of port-0 binds so that it can be tracked properly.
             if (bindCall->PortZeroBind.has_value())
             {
-                try
-                {
-                    ResolvePortZeroBind(bindCall->PortZeroBind.value());
-                }
-                catch (const std::exception& e)
-                {
-                    GNS_LOG_ERROR("Failed to resolve port-0 bind for pid {}, {}", bindCall->PortZeroBind->Pid, e.what());
-                }
+                std::lock_guard lock(m_deferredMutex);
+                m_deferredQueue.push_back(std::move(bindCall->PortZeroBind.value()));
+                m_deferredCv.notify_one();
             }
         }
 
@@ -157,11 +143,13 @@ void GnsPortTracker::Run()
         }
 
         // Only look at bound ports if there's something to deallocate to avoid wasting cycles
-        if (refreshResult.has_value() && !m_allocatedPorts.empty())
-        {
-            future = m_allocatedPortsRefresh.get_future();
-            refreshResult->Resume(); // This will resume the sock_diag thread
-            refreshResult.reset();
+        if (refreshResult.has_value()) {
+            std::lock_guard lock(m_portsMutex);
+            if (!m_allocatedPorts.empty()) {
+                future = m_allocatedPortsRefresh.get_future();
+                refreshResult->Resume(); // This will resume the sock_diag thread
+                refreshResult.reset();
+            }
         }
     }
 }
@@ -233,33 +221,41 @@ void GnsPortTracker::OnRefreshAllocatedPorts(const std::set<PortAllocation>& Por
     // - The port has been seen to be allocated (if so, then the timeout is empty)
     // - The timeout has expired
 
-    for (auto it = m_allocatedPorts.begin(); it != m_allocatedPorts.end();)
+    std::vector<PortAllocation> toDeallocate;
     {
-        if (Ports.find(it->first) == Ports.end())
+        std::lock_guard lock(m_portsMutex);
+        for (auto it = m_allocatedPorts.begin(); it != m_allocatedPorts.end();)
         {
-            if (!it->second.has_value() || it->second.value() < Timestamp)
+            if (Ports.find(it->first) == Ports.end())
             {
-                auto result = RequestPort(it->first, false);
-                if (result != 0)
+                if (!it->second.has_value() || it->second.value() < Timestamp)
                 {
-                    std::cerr << "GnsPortTracker: Failed to deallocate port " << it->first << ", " << result << std::endl;
+                    toDeallocate.push_back(it->first);
+                    GNS_LOG_INFO(
+                        "No longer tracking bind call: family ({}) port ({}) protocol ({})",
+                        it->first.Family,
+                        it->first.Port,
+                        it->first.Protocol);
+                    it = m_allocatedPorts.erase(it);
+                    continue;
                 }
-
-                GNS_LOG_INFO(
-                    "No longer tracking bind call: family ({}) port ({}) protocol ({})",
-                    it->first.Family,
-                    it->first.Port,
-                    it->first.Protocol);
-                it = m_allocatedPorts.erase(it);
-                continue;
             }
-        }
-        else
-        {
-            it->second.reset(); // The port is known to be allocated, remove the timeout
-        }
+            else
+            {
+                it->second.reset(); // The port is known to be allocated, remove the timeout
+            }
 
-        it++;
+            it++;
+        }
+    }
+
+    for (const auto& port : toDeallocate)
+    {
+        auto result = RequestPort(port, false);
+        if (result != 0)
+        {
+            std::cerr << "GnsPortTracker: Failed to deallocate port " << port << ", " << result << std::endl;
+        }
     }
 }
 
@@ -287,10 +283,13 @@ int GnsPortTracker::HandleRequest(const PortAllocation& Port)
     // decide if bind() should succeed or not
     // Note: Returning 0 will also cause the port's timeout to be updated
 
-    if (m_allocatedPorts.contains(Port))
     {
-        GNS_LOG_INFO("Request for a port that's already reserved (family {}, port {}, protocol {})", Port.Family, Port.Port, Port.Protocol);
-        return 0;
+        std::lock_guard lock(m_portsMutex);
+        if (m_allocatedPorts.contains(Port))
+        {
+            GNS_LOG_INFO("Request for a port that's already reserved (family {}, port {}, protocol {})", Port.Family, Port.Port, Port.Protocol);
+            return 0;
+        }
     }
 
     // Ask the host for this port otherwise
@@ -367,16 +366,22 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::GetCallInfo(
         if (port == 0)
         {
             // Port 0 means the kernel will assign an ephemeral port. We can't know
-            // the port until after the bind() completes, so capture the socket info
-            // for a deferred lookup after the syscall is allowed through.
+            // the port until after the bind() completes, so duplicate the socket fd
+            // now (while the process is still stopped by seccomp) and defer the
+            // getsockname() lookup to after CompleteRequest() unblocks it.
             try
             {
                 const int protocol = GetSocketProtocol(Pid, Socket);
+                auto dupFd = DuplicateSocketFd(Pid, Socket);
+                if (!dupFd)
+                {
+                    return {{{}, {}, CallId}};
+                }
                 if (!m_seccompDispatcher->ValidateCookie(CallId))
                 {
                     return {{{}, {}, CallId}};
                 }
-                return {{{}, DeferredPortLookup{Pid, Socket, static_cast<int>(address.sa_family), protocol}, CallId}};
+                return {{{}, DeferredPortLookup{Pid, std::move(dupFd), static_cast<int>(address.sa_family), protocol}, CallId}};
             }
             catch (const std::exception&)
             {
@@ -480,24 +485,65 @@ int GnsPortTracker::GetSocketProtocol(int pid, int fd)
     throw RuntimeErrorWithSourceLocation(std::format("Unexpected IP socket protocol: {}", protocol));
 }
 
-void GnsPortTracker::ResolvePortZeroBind(const DeferredPortLookup& lookup)
+wil::unique_fd GnsPortTracker::DuplicateSocketFd(pid_t Pid, int SocketFd)
 {
     // Duplicate the socket fd from the target process into our address space.
     // We cannot use open("/proc/pid/fd/N") for sockets because the symlink target
     // (socket:[inode]) is not a valid filesystem path. Use pidfd_getfd() instead.
-    wil::unique_fd pidFd(static_cast<int>(syscall(SYS_pidfd_open, lookup.Pid, 0u)));
+    wil::unique_fd pidFd(static_cast<int>(syscall(SYS_pidfd_open, Pid, 0u)));
     if (!pidFd)
     {
-        GNS_LOG_INFO("Port-0 bind: pidfd_open failed for pid {} (errno {})", lookup.Pid, errno);
-        return;
+        GNS_LOG_INFO("Port-0 bind: pidfd_open failed for pid {} (errno {})", Pid, errno);
+        return {};
     }
 
-    wil::unique_fd sockFd(static_cast<int>(syscall(SYS_pidfd_getfd, pidFd.get(), lookup.SocketFd, 0u)));
-    if (!sockFd)
+    wil::unique_fd dupFd(static_cast<int>(syscall(SYS_pidfd_getfd, pidFd.get(), SocketFd, 0u)));
+    if (!dupFd)
     {
-        GNS_LOG_INFO("Port-0 bind: pidfd_getfd failed for pid {} fd {} (errno {})", lookup.Pid, lookup.SocketFd, errno);
-        return;
+        GNS_LOG_INFO("Port-0 bind: pidfd_getfd failed for pid {} fd {} (errno {})", Pid, SocketFd, errno);
     }
+
+    return dupFd;
+}
+
+void GnsPortTracker::TrackPort(PortAllocation allocation)
+{
+    // Use insert_or_assign so the deallocation timeout is refreshed if the same
+    // port key is already present (emplace would silently keep the old entry).
+    std::lock_guard lock(m_portsMutex);
+    m_allocatedPorts.insert_or_assign(std::move(allocation), std::make_optional(time(nullptr) + c_bind_timeout_seconds));
+}
+
+void GnsPortTracker::RunDeferredResolve()
+{
+    UtilSetThreadName("GnsPortZero");
+
+    for (;;)
+    {
+        DeferredPortLookup lookup{0, {}, 0, 0};
+        {
+            std::unique_lock lock(m_deferredMutex);
+            m_deferredCv.wait(lock, [&] { return !m_deferredQueue.empty(); });
+            lookup = std::move(m_deferredQueue.front());
+            m_deferredQueue.pop_front();
+        }
+
+        try
+        {
+            ResolvePortZeroBind(std::move(lookup));
+        }
+        catch (const std::exception& e)
+        {
+            GNS_LOG_ERROR("Failed to resolve port-0 bind for pid {}, {}", lookup.Pid, e.what());
+        }
+    }
+}
+
+void GnsPortTracker::ResolvePortZeroBind(DeferredPortLookup lookup)
+{
+    // The socket fd was already duplicated (via pidfd_getfd) while the target process
+    // was stopped by seccomp, so it remains valid even if the process has closed or
+    // reused the original fd number.
 
     // The bind() syscall is being completed asynchronously on the seccomp dispatcher
     // thread after CompleteRequest() unblocks it. Poll getsockname() briefly until
@@ -507,6 +553,7 @@ void GnsPortTracker::ResolvePortZeroBind(const DeferredPortLookup& lookup)
 
     in_port_t port = 0;
     in6_addr address = {};
+    int resolvedFamily = 0;
 
     for (int attempt = 0; attempt < maxRetries; ++attempt)
     {
@@ -517,11 +564,13 @@ void GnsPortTracker::ResolvePortZeroBind(const DeferredPortLookup& lookup)
 
         sockaddr_storage storage{};
         socklen_t addrLen = sizeof(storage);
-        if (getsockname(sockFd.get(), reinterpret_cast<sockaddr*>(&storage), &addrLen) != 0)
+        if (getsockname(lookup.DuplicatedSocketFd.get(), reinterpret_cast<sockaddr*>(&storage), &addrLen) != 0)
         {
-            GNS_LOG_ERROR("Port-0 bind: getsockname failed for pid {} fd {} (errno {})", lookup.Pid, lookup.SocketFd, errno);
+            GNS_LOG_ERROR("Port-0 bind: getsockname failed for pid {} (errno {})", lookup.Pid, errno);
             return;
         }
+
+        resolvedFamily = static_cast<int>(storage.ss_family);
 
         if (storage.ss_family == AF_INET)
         {
@@ -548,18 +597,18 @@ void GnsPortTracker::ResolvePortZeroBind(const DeferredPortLookup& lookup)
 
     if (port == 0)
     {
-        GNS_LOG_INFO("Port-0 bind: kernel did not assign a port for pid {} fd {} after retries", lookup.Pid, lookup.SocketFd);
+        GNS_LOG_INFO("Port-0 bind: kernel did not assign a port for pid {} after retries", lookup.Pid);
         return;
     }
 
-    PortAllocation allocation(port, lookup.Family, lookup.Protocol, address);
+    PortAllocation allocation(port, resolvedFamily, lookup.Protocol, address);
     const auto result = HandleRequest(allocation);
     if (result == 0)
     {
-        m_allocatedPorts.emplace(std::make_pair(std::move(allocation), std::make_optional(time(nullptr) + c_bind_timeout_seconds)));
+        TrackPort(std::move(allocation));
         GNS_LOG_INFO(
             "Port-0 bind resolved: family ({}) port ({}) protocol ({}) for pid {}",
-            lookup.Family,
+            resolvedFamily,
             port,
             lookup.Protocol,
             lookup.Pid);
