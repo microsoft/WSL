@@ -131,8 +131,11 @@ void ResolveVmPorts(std::vector<WSLAPortMapping>& ports, const DockerInspectCont
             "Docker did not assign a VM port for container port %u",
             e.ContainerPort);
 
-        e.VmPort = it->second[0].HostPort;
-        THROW_HR_IF_MSG(E_UNEXPECTED, e.VmPort == 0, "Docker assigned VM port 0 for container port %u", e.ContainerPort);
+        auto vmPort = std::stoul(it->second[0].HostPort);
+        THROW_HR_IF_MSG(
+            E_UNEXPECTED, vmPort == 0 || vmPort > UINT16_MAX, "Docker assigned invalid VM port %lu for container port %u", vmPort, e.ContainerPort);
+
+        e.VmPort = static_cast<uint16_t>(vmPort);
     }
 }
 

@@ -62,7 +62,7 @@ struct Mount
 struct PortMapping
 {
     std::string HostIp;
-    uint16_t HostPort{};
+    std::string HostPort;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(PortMapping, HostIp, HostPort);
 };
