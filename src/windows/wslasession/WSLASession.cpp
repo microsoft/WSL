@@ -1064,7 +1064,7 @@ try
 }
 CATCH_RETURN();
 
-HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort)
+HRESULT WSLASession::UnmapVmPort(int Family, short WindowsPort, short LinuxPort)
 try
 {
     COMServiceExecutionContext context;

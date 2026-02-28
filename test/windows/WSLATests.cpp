@@ -1540,13 +1540,13 @@ class WSLATests
         expectContent(1234, AF_INET6, "port80ipv6");
 
         // Unmap the ipv4 port
-        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
 
         // Verify that a proper error is returned if the mapping doesn't exist
-        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET, 1234), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET, 1234, 80), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
 
         // Unmap the v6 port
-        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1234));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1234, 80));
 
         // Map another port as v6 only
         VERIFY_SUCCEEDED(session->MapVmPort(AF_INET6, 1235, 81));
@@ -1555,8 +1555,8 @@ class WSLATests
         expectContent(1235, AF_INET6, "port81ipv6");
         expectNotBound(1235, AF_INET);
 
-        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1235));
-        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET6, 1235), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET6, 1235, 81));
+        VERIFY_ARE_EQUAL(session->UnmapVmPort(AF_INET6, 1235, 81), HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
         expectNotBound(1235, AF_INET6);
 
         // Create a forking relay and stress test
@@ -1573,7 +1573,7 @@ class WSLATests
             expectContent(1234, AF_INET, "OK");
         }
 
-        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234));
+        VERIFY_SUCCEEDED(session->UnmapVmPort(AF_INET, 1234, 80));
     }
 
     TEST_METHOD(PortMappingNat)
