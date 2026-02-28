@@ -24,7 +24,8 @@ Abstract:
 #define THROW_DOCKER_USER_ERROR_MSG(_Ex, _Msg, ...) \
     if ((_Ex).HasErrorMessage()) \
     { \
-        THROW_HR_WITH_USER_ERROR_MSG(E_FAIL, (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
+        THROW_HR_WITH_USER_ERROR_MSG( \
+            E_FAIL, (_Ex).DockerMessage<wsl::windows::common::docker_schema::ErrorResponse>().message, _Msg, ##__VA_ARGS__); \
     } \
     else \
     { \
