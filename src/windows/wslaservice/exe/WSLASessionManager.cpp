@@ -56,18 +56,19 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
     std::lock_guard lock(m_wslaSessionsLock);
 
     // Check for an existing session first.
-    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) -> std::optional<HRESULT> {
-        if (wsl::shared::string::IsEqual(entry.DisplayName.c_str(), Settings->DisplayName))
+    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) noexcept -> std::optional<HRESULT> {
+        if (!wsl::shared::string::IsEqual(entry.DisplayName.c_str(), Settings->DisplayName))
         {
-            RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
-
-            THROW_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
-
-            session.copy_to(WslaSession);
-            return S_OK;
+            return {};
         }
 
-        return std::optional<HRESULT>{};
+        RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), WI_IsFlagClear(Flags, WSLASessionFlagsOpenExisting));
+
+        RETURN_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
+
+        RETURN_IF_FAILED(wil::com_copy_to_nothrow(session, WslaSession));
+
+        return S_OK;
     });
 
     if (result.has_value())
@@ -111,17 +112,17 @@ void WSLASessionManagerImpl::CreateSession(const WSLA_SESSION_SETTINGS* Settings
 void WSLASessionManagerImpl::OpenSession(ULONG Id, IWSLASession** Session)
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
-    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) {
-        if (entry.SessionId == Id)
+    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) noexcept -> std::optional<HRESULT> {
+        if (entry.SessionId != Id)
         {
-            THROW_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
-            session.copy_to(Session);
-            return std::make_optional(S_OK);
+            return {};
         }
-        else
-        {
-            return std::optional<HRESULT>{};
-        }
+
+        RETURN_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
+
+        RETURN_IF_FAILED(wil::com_copy_to_nothrow(session, Session));
+
+        return S_OK;
     });
 
     THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%lu' not found", Id);
@@ -131,17 +132,17 @@ void WSLASessionManagerImpl::OpenSessionByName(LPCWSTR DisplayName, IWSLASession
 {
     auto tokenInfo = GetCallingProcessTokenInfo();
 
-    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) {
-        if (wsl::shared::string::IsEqual(entry.DisplayName.c_str(), DisplayName))
+    auto result = ForEachSession<HRESULT>([&](auto& entry, const wil::com_ptr<IWSLASession>& session) noexcept -> std::optional<HRESULT> {
+        if (!wsl::shared::string::IsEqual(entry.DisplayName.c_str(), DisplayName))
         {
-            THROW_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
-            session.copy_to(Session);
-            return std::make_optional(S_OK);
+            return {};
         }
-        else
-        {
-            return std::optional<HRESULT>{};
-        }
+
+        RETURN_IF_FAILED(CheckTokenAccess(entry, tokenInfo));
+
+        RETURN_IF_FAILED(wil::com_copy_to_nothrow(session, Session));
+
+        return S_OK;
     });
 
     THROW_IF_FAILED_MSG(result.value_or(HRESULT_FROM_WIN32(ERROR_NOT_FOUND)), "Session '%ls' not found", DisplayName);
@@ -151,13 +152,17 @@ void WSLASessionManagerImpl::ListSessions(_Out_ WSLA_SESSION_INFORMATION** Sessi
 {
     std::vector<WSLA_SESSION_INFORMATION> sessionInfo;
 
-    ForEachSession<void>([&](auto& entry, const auto&) {
-        wil::unique_hlocal_string sidString;
-        THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString));
+    ForEachSession<void>([&](auto& entry, const auto&) noexcept {
+        try
+        {
+            wil::unique_hlocal_string sidString;
+            THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(entry.Owner.TokenInfo->User.Sid, &sidString));
 
-        auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
-        wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
-        wcscpy_s(it.DisplayName, _countof(it.DisplayName), entry.DisplayName.c_str());
+            auto& it = sessionInfo.emplace_back(WSLA_SESSION_INFORMATION{.SessionId = entry.SessionId, .CreatorPid = entry.CreatorPid});
+            wcscpy_s(it.Sid, _countof(it.Sid), sidString.get());
+            wcscpy_s(it.DisplayName, _countof(it.DisplayName), entry.DisplayName.c_str());
+        }
+        CATCH_LOG()
     });
 
     auto output = wil::make_unique_cotaskmem<WSLA_SESSION_INFORMATION[]>(sessionInfo.size());

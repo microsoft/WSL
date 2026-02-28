@@ -39,6 +39,7 @@ Abstract:
 #include <string>
 #include <vector>
 #include <mutex>
+#include <type_traits>
 
 namespace wslutil = wsl::windows::common::wslutil;
 
@@ -83,6 +84,13 @@ private:
     inline auto ForEachSession(const auto& Routine)
     {
         std::lock_guard lock(m_wslaSessionsLock);
+
+        // Enforce noexcept: remove_if leaves the container in an unspecified
+        // (partially-moved) state if the predicate throws. Callers must handle
+        // errors via return values, not exceptions.
+        static_assert(
+            std::is_nothrow_invocable_v<decltype(Routine), SessionEntry&, wil::com_ptr<IWSLASession>&>,
+            "ForEachSession routine must be noexcept to preserve container invariants during remove_if");
 
         using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
         TResult result{};

@@ -397,7 +397,7 @@ typedef enum _WSLALogsFlags
 interface IWSLAContainer : IUnknown
 {
     HRESULT Attach([out] ULONG* StdIn, [out] ULONG* StdOut, [out] ULONG* StdErr);
-    HRESULT Stop([in] WSLASignal Signal, [in] LONGLONG TimeoutSeconds);
+    HRESULT Stop([in] WSLASignal Signal, [in] LONG TimeoutSeconds);
     HRESULT Start([in] WSLAContainerStartFlags Flags);
     HRESULT Delete(); // TODO: Look into lifetime logic.
     HRESULT Export([in] ULONG TarHandle);
