@@ -964,6 +964,12 @@ try
 }
 CATCH_RETURN();
 
+WSLA_CONTAINER_STATE WSLAContainerImpl::State() const noexcept
+{
+    auto lock = m_lock.lock_shared();
+    return m_state;
+}
+
 HRESULT WSLASession::Terminate()
 try
 {

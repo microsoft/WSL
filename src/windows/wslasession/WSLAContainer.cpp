@@ -9,6 +9,10 @@ Module Name:
 Abstract:
 
     Contains the implementation of WSLAContainer.
+    N.B. This class is designed to allow multiple container operations to run in parrallel.
+    Operations that don't change the state of the container must be const qualified, and acquire a shared lock on m_lock.
+    Operations that do change the container's state must acquire m_lock exclusively.
+    Operations that interact with processes inside the container or the init process must acquire m_processesLock.
 
 --*/
 
@@ -322,7 +326,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
     decltype(m_initProcessControl) initProcessControl = nullptr;
 
     {
-        std::lock_guard lock(m_lock);
+        std::lock_guard processesLock{m_processesLock};
         initProcessControl = std::exchange(m_initProcessControl, nullptr);
         processes = std::exchange(m_processes, {});
     }
@@ -338,12 +342,14 @@ WSLAContainerImpl::~WSLAContainerImpl()
     }
 
     m_containerEvents.Reset();
+
+    auto lock = m_lock.lock_exclusive();
     ReleaseResources();
 }
 
 void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process)
 {
-    std::lock_guard lock(m_lock);
+    std::lock_guard processesLock{m_processesLock};
 
     auto remove = std::ranges::remove_if(m_processes, [process](const auto* e) { return e == process; });
     WI_ASSERT(remove.size() == 1);
@@ -361,18 +367,18 @@ const std::string& WSLAContainerImpl::Name() const noexcept
     return m_name;
 }
 
-void WSLAContainerImpl::CopyTo(IWSLAContainer** Container)
+void WSLAContainerImpl::CopyTo(IWSLAContainer** Container) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF_MSG(RPC_E_DISCONNECTED, m_comWrapper == nullptr, "Container '%hs' is being released", m_id.c_str());
 
     THROW_IF_FAILED(m_comWrapper.CopyTo(Container));
 }
 
-void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
+void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
@@ -423,7 +429,8 @@ void WSLAContainerImpl::Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr)
 
 void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    // Acquire an exclusive lock since this method modifies m_initProcessControl, m_initProcess and m_state.
+    auto lock = m_lock.lock_exclusive();
 
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
@@ -449,6 +456,8 @@ void WSLAContainerImpl::Start(WSLAContainerStartFlags Flags)
     }
 
     auto control = std::make_unique<DockerContainerProcessControl>(*this, m_dockerClient, m_eventTracker);
+
+    std::lock_guard processesLock{m_processesLock};
     m_initProcessControl = control.get();
 
     m_initProcess = wil::MakeOrThrow<WSLAProcess>(std::move(control), std::move(io));
@@ -473,18 +482,21 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
     if (event == ContainerEvent::Stop)
     {
         THROW_HR_IF(E_UNEXPECTED, !exitCode.has_value());
-        std::lock_guard<std::recursive_mutex> lock(m_lock);
-
+        auto lock = m_lock.lock_exclusive();
         auto previousState = m_state;
 
-        // Notify all processes that the container has exited.
-        // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
-        for (auto& process : m_processes)
         {
-            process->OnContainerReleased();
-        }
+            std::lock_guard processesLock{m_processesLock};
 
-        m_processes.clear();
+            // Notify all processes that the container has exited.
+            // N.B. The exec callback isn't always sent to execed processes, so do this to avoid 'stuck' processes.
+            for (auto& process : m_processes)
+            {
+                process->OnContainerReleased();
+            }
+
+            m_processes.clear();
+        }
 
         // Don't run the deletion logic if the container is already in a stopped / deleted state.
         // This can happen if Delete() is called by the user.
@@ -493,7 +505,7 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
             Transition(WslaContainerStateExited);
             if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
             {
-                Delete();
+                DeleteExclusiveLockHeld();
             }
         }
     }
@@ -507,9 +519,10 @@ void WSLAContainerImpl::OnEvent(ContainerEvent event, std::optional<int> exitCod
 
 void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
 {
-    std::lock_guard lock(m_lock);
+    // Acquire an exclusive lock since this method modifies m_state.
+    auto lock = m_lock.lock_exclusive();
 
-    if (State() == WslaContainerStateExited)
+    if (m_state == WslaContainerStateExited)
     {
         return;
     }
@@ -543,18 +556,24 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONGLONG TimeoutSeconds)
 
     if (WI_IsFlagSet(m_containerFlags, WSLAContainerFlagsRm))
     {
-        Delete();
+        DeleteExclusiveLockHeld();
     }
 }
 
 void WSLAContainerImpl::Delete()
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    // Acquire an exclusive lock since this method modifies m_state.
+    auto lock = m_lock.lock_exclusive();
 
-    // Validate that the container is in the exited state.
+    DeleteExclusiveLockHeld();
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::DeleteExclusiveLockHeld()
+{
+    // Validate that the container is not running or already deleted.
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        State() == WslaContainerStateRunning,
+        m_state != WslaContainerStateCreated && m_state != WslaContainerStateExited,
         "Cannot delete container '%hs', state: %i",
         m_name.c_str(),
         m_state);
@@ -570,14 +589,14 @@ void WSLAContainerImpl::Delete()
     Transition(WslaContainerStateDeleted);
 }
 
-void WSLAContainerImpl::Export(ULONG OutHandle)
+void WSLAContainerImpl::Export(ULONG OutHandle) const
 {
-    std::lock_guard lock(m_lock);
+    auto lock = m_lock.lock_shared();
 
-    // Validate that the container is in the exited state.
+    // Validate that the container is in the running state.
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        State() == WslaContainerStateRunning,
+        m_state == WslaContainerStateRunning,
         "Cannot export container '%hs', state: %i",
         m_name.c_str(),
         m_state);
@@ -607,6 +626,10 @@ void WSLAContainerImpl::Export(ULONG OutHandle)
             wsl::windows::common::relay::MultiHandleWait::CancelOnCompleted);
     }
 
+    // Release the lock so the container can still be interacted with while the export is in progress.
+    // Passed this point, no member variables can be accessed.
+    lock.reset();
+
     io.Run({});
 
     if (SocketCodePair.first != 200)
@@ -619,26 +642,15 @@ void WSLAContainerImpl::Export(ULONG OutHandle)
     }
 }
 
-WSLA_CONTAINER_STATE WSLAContainerImpl::State() noexcept
-{
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
-
-    if (m_state == WslaContainerStateRunning && m_initProcessControl && m_initProcessControl->GetState().first != WslaProcessStateRunning)
-    {
-        m_state = WslaContainerStateExited;
-    }
-
-    return m_state;
-}
-
 void WSLAContainerImpl::GetState(WSLA_CONTAINER_STATE* Result)
 {
-    *Result = State();
+    auto lock = m_lock.lock_shared();
+    *Result = m_state;
 }
 
-void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process)
+void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_initProcess);
     THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
@@ -648,15 +660,14 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 {
     THROW_HR_IF_MSG(E_INVALIDARG, Options->CommandLine.Count == 0, "Exec command line cannot be empty");
 
-    std::lock_guard lock{m_lock};
+    auto lock = m_lock.lock_shared();
 
-    auto state = State();
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
-        state != WslaContainerStateRunning,
+        m_state != WslaContainerStateRunning,
         "Container %hs is not running. State: %i",
         m_name.c_str(),
-        state);
+        m_state);
 
     common::docker_schema::CreateExec request{};
     request.AttachStdout = true;
@@ -708,8 +719,12 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
 
         auto control = std::make_unique<DockerExecProcessControl>(*this, result.Id, m_dockerClient, m_eventTracker);
 
-        // Store a non owning reference to the process.
-        m_processes.push_back(control.get());
+        {
+            std::lock_guard processesLock{m_processesLock};
+
+            // Store a non owning reference to the process.
+            m_processes.push_back(control.get());
+        }
 
         // Poll for the exec'd process to either be running, or failed.
         // This is required because StartExec() returns before the process is actually created, and if exec() fails, we'll never
@@ -748,7 +763,7 @@ void WSLAContainerImpl::Exec(const WSLA_PROCESS_OPTIONS* Options, IWSLAProcess**
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to exec process in container %hs", m_id.c_str());
 }
 
-WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect)
+WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspectContainer& dockerInspect) const
 {
     WslaInspectContainer wslaInspect{};
 
@@ -1037,9 +1052,9 @@ const std::string& WSLAContainerImpl::ID() const noexcept
     return m_id;
 }
 
-void WSLAContainerImpl::Inspect(LPSTR* Output)
+void WSLAContainerImpl::Inspect(LPSTR* Output) const
 {
-    std::lock_guard lock(m_lock);
+    auto lock = m_lock.lock_shared();
 
     try
     {
@@ -1056,9 +1071,9 @@ void WSLAContainerImpl::Inspect(LPSTR* Output)
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to inspect container '%hs'", m_id.c_str());
 }
 
-void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+void WSLAContainerImpl::Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail) const
 {
-    std::lock_guard lock(m_lock);
+    auto lock = m_lock.lock_shared();
 
     wil::unique_socket socket;
     try
@@ -1132,11 +1147,9 @@ std::unique_ptr<RelayedProcessIO> WSLAContainerImpl::CreateRelayedProcessIO(wil:
     return std::make_unique<RelayedProcessIO>(std::move(fds));
 }
 
-void WSLAContainerImpl::ReleaseResources()
+__requires_exclusive_lock_held(m_lock) void WSLAContainerImpl::ReleaseResources()
 {
     WSL_LOG("ReleaseContainerResources", TraceLoggingValue(m_id.c_str(), "ID"));
-
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
 
     // Disconnect the COM wrapper so no new RPC calls can reach this container.
     if (m_comWrapper)
@@ -1309,9 +1322,9 @@ try
 }
 CATCH_RETURN();
 
-void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count)
+void WSLAContainerImpl::GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count) const
 {
-    std::lock_guard lock(m_lock);
+    auto lock = m_lock.lock_shared();
 
     if (m_labels.empty())
     {
