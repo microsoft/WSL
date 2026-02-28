@@ -552,20 +552,11 @@ class WSLATests
 
         LogInfo("Test: Before/Since filters");
         {
-            // Pull a second image to test before/since filters
-            LoadTestImage(L"alpine-latest.tar");
-
-            auto alpineCleanup = wil::scope_exit([&]() {
-                WSLA_DELETE_IMAGE_OPTIONS options{.Image = "alpine:latest", .Flags = WSLADeleteImageFlagsForce};
-                wil::unique_cotaskmem_array_ptr<WSLA_DELETED_IMAGE_INFORMATION> deletedImages;
-                LOG_IF_FAILED(m_defaultSession->DeleteImage(&options, &deletedImages, deletedImages.size_address<ULONG>()));
-            });
-
             // Get all images to find their IDs
             wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> allImages;
             VERIFY_SUCCEEDED(m_defaultSession->ListImages(nullptr, allImages.addressof(), allImages.size_address<ULONG>()));
 
-            std::string debianId, alpineId;
+            std::string debianId, pythonId;
             for (const auto& image : allImages)
             {
                 std::string imageName = image.Image;
@@ -573,14 +564,14 @@ class WSLATests
                 {
                     debianId = image.Hash;
                 }
-                else if (imageName == "alpine:latest")
+                else if (imageName == "python:3.12-alpine")
                 {
-                    alpineId = image.Hash;
+                    pythonId = image.Hash;
                 }
             }
 
             VERIFY_IS_FALSE(debianId.empty());
-            VERIFY_IS_FALSE(alpineId.empty());
+            VERIFY_IS_FALSE(pythonId.empty());
 
             // Test 'since' filter - images created after debian
             {
@@ -592,24 +583,24 @@ class WSLATests
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
 
-                bool foundAlpine = false;
+                bool foundPython = false;
                 for (const auto& image : images)
                 {
-                    if (std::string{image.Image} == "alpine:latest")
+                    LogInfo("Image: %hs, Hash: %hs, Created: %lld", image.Image, image.Hash, image.Created);
+                    if (std::string{image.Image} == "python:3.12-alpine")
                     {
-                        foundAlpine = true;
+                        foundPython = true;
                     }
                 }
 
-                VERIFY_IS_TRUE(foundAlpine);
+                VERIFY_IS_TRUE(foundPython);
             }
 
-            // Test 'before' filter - images created before alpine
+            // Test 'before' filter - images created before python
             {
                 WSLA_LIST_IMAGES_OPTIONS options{};
                 options.Flags = WSLAListImagesFlagsNone;
-                options.Before = alpineId.c_str();
-
+                options.Before = pythonId.c_str();
                 wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
                 VERIFY_SUCCEEDED(m_defaultSession->ListImages(&options, images.addressof(), images.size_address<ULONG>()));
                 VERIFY_IS_TRUE(images.size() > 0);
