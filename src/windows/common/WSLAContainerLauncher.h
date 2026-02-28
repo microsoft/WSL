@@ -67,6 +67,7 @@ public:
     RunningWSLAContainer Launch(IWSLASession& Session, WSLAContainerStartFlags Flags = WSLAContainerStartFlagsAttach);
     std::pair<HRESULT, std::optional<RunningWSLAContainer>> LaunchNoThrow(IWSLASession& Session, WSLAContainerStartFlags Flags = WSLAContainerStartFlagsAttach);
 
+    void SetName(std::string&& Name);
     void SetEntrypoint(std::vector<std::string>&& entrypoint);
     void SetDefaultStopSignal(WSLASignal Signal);
     void SetContainerFlags(WSLAContainerFlags Flags);

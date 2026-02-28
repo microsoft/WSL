@@ -96,6 +96,11 @@ void WSLAContainerLauncher::AddPort(uint16_t WindowsPort, uint16_t ContainerPort
     m_ports.emplace_back(WSLA_PORT_MAPPING{.HostPort = WindowsPort, .ContainerPort = ContainerPort, .Family = Family});
 }
 
+void WSLAContainerLauncher::SetName(std::string&& Name)
+{
+    m_name = std::move(Name);
+}
+
 void WSLAContainerLauncher::SetDefaultStopSignal(WSLASignal Signal)
 {
     m_stopSignal = Signal;
