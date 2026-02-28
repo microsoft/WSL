@@ -13,7 +13,6 @@ Abstract:
 
 #include "precomp.h"
 #include "windows/Common.h"
-#include "WSLCCLITestHelpers.h"
 
 namespace WSLCE2ETests {
 
@@ -25,6 +24,7 @@ struct WSLCExecutionResult
     HRESULT ExitCode{S_OK};
     void Dump() const;
     void Verify(const WSLCExecutionResult& expected) const;
+    std::vector<std::wstring> GetStdoutLines() const;
 };
 
 struct WSLCExecutor

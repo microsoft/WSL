@@ -34,6 +34,24 @@ void WSLCExecutionResult::Verify(const WSLCExecutionResult& expected) const
     VERIFY_ARE_EQUAL(expected.ExitCode, ExitCode, std::format(L"ExitCode does not match expected for command '{}'", CommandLine).c_str());
 }
 
+std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
+{
+    std::vector<std::wstring> lines;
+    std::wstringstream ss(Stdout);
+    std::wstring line;
+    while (std::getline(ss, line))
+    {
+        // Remove carriage return if present
+        if (!line.empty() && line.back() == L'\r')
+        {
+            line.pop_back();
+        }
+
+        lines.push_back(line);
+    }
+    return lines;
+}
+
 WSLCExecutionResult WSLCExecutor::Execute(const std::wstring& commandLine)
 {
     auto fullCmd = L"C:\\src\\wsl\\bin\\x64\\Debug\\wslc.exe " + commandLine;
