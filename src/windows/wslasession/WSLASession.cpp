@@ -1003,8 +1003,12 @@ try
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-            m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
-            exitCode = m_dockerdProcess->Wait(10 * 1000);
+            try
+            {
+                m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
+                exitCode = m_dockerdProcess->Wait(10 * 1000);
+            }
+            CATCH_LOG();
         }
 
         WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));
