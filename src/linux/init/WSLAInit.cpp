@@ -245,8 +245,15 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, const WSLA_UNIX_CONN
             }
             else if (bytesRead == 0)
             {
-                // Unix socket has been closed.
+                // Unix socket has been closed. Gracefully half-close the
+                // hvsocket so the Windows side receives a clean EOF instead
+                // of ERROR_BROKEN_PIPE.
                 pollDescriptors[0].fd = -1;
+                if (shutdown(Channel.Socket(), SHUT_WR) < 0)
+                {
+                    LOG_ERROR("shutdown({}, SHUT_WR) failed {}", Channel.Socket(), errno);
+                }
+
                 break;
             }
             else if (UtilWriteBuffer(Channel.Socket(), relayBuffer.data(), bytesRead) < 0)
