@@ -805,6 +805,7 @@ try
 
     try
     {
+        std::lock_guard containersLock{m_containersLock};
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
             *this,
