@@ -1516,6 +1516,25 @@ void DockerIORelayHandle::Schedule()
     // If we have an active handle and a buffer, try to flush that first.
     if (ActiveHandle != nullptr)
     {
+        if (PendingBuffer.empty())
+        {
+            // No data available to continue writing this stream.
+            // Need to read more data from the input.
+            if (Read->GetState() == IOHandleStatus::Completed)
+            {
+                State = IOHandleStatus::Completed;
+                return;
+            }
+
+            Read->Schedule();
+            if (Read->GetState() == IOHandleStatus::Pending)
+            {
+                State = IOHandleStatus::Pending;
+            }
+
+            return;
+        }
+
         // Push the data to the selected handle.
         DWORD bytesToWrite = std::min(static_cast<DWORD>(RemainingBytes), static_cast<DWORD>(PendingBuffer.size()));
 
@@ -1535,10 +1554,14 @@ void DockerIORelayHandle::Schedule()
         }
         else if (ActiveHandle->GetState() == IOHandleStatus::Completed)
         {
-            // Switch back to reading if we've written all bytes for this chunk.
-            ActiveHandle = nullptr;
-
-            ProcessNextHeader();
+            // Only move to next header when all bytes for this multiplexed
+            // stream have been written. Otherwise keep ActiveHandle set so
+            // OnRead() knows incoming data is payload, not a new header.
+            if (RemainingBytes == 0)
+            {
+                ActiveHandle = nullptr;
+                ProcessNextHeader();
+            }
         }
     }
     else
@@ -1565,18 +1588,27 @@ void DockerIORelayHandle::Collect()
 
     if (ActiveHandle != nullptr)
     {
-        // Complete the write.
-        ActiveHandle->Collect();
-
-        // If the write is completed, switch back to reading.
-        if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+        if (ActiveHandle->GetState() == IOHandleStatus::Pending)
         {
-            ActiveHandle = nullptr;
+            // Complete the pending write.
+            ActiveHandle->Collect();
+
+            // Only clear ActiveHandle when all bytes for this stream are written.
+            if (ActiveHandle->GetState() == IOHandleStatus::Completed && RemainingBytes == 0)
+            {
+                ActiveHandle = nullptr;
+            }
+        }
+        else
+        {
+            // We were reading more data for the current stream (ActiveHandle
+            // is set but the pending IO was a read, not a write).
+            Read->Collect();
         }
 
         // Transition back to standby if there's still data to read.
         // Otherwise switch to Completed since everything is done.
-        if (Read->GetState() == IOHandleStatus::Completed)
+        if (Read->GetState() == IOHandleStatus::Completed && PendingBuffer.empty() && ActiveHandle == nullptr)
         {
             State = IOHandleStatus::Completed;
         }
@@ -1597,7 +1629,7 @@ void DockerIORelayHandle::Collect()
 
 HANDLE DockerIORelayHandle::GetHandle() const
 {
-    if (ActiveHandle != nullptr)
+    if (ActiveHandle != nullptr && ActiveHandle->GetState() == IOHandleStatus::Pending)
     {
         return ActiveHandle->GetHandle();
     }
