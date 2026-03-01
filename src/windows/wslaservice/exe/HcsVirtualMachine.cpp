@@ -524,10 +524,14 @@ try
 
     std::lock_guard lock(m_lock);
 
-    THROW_IF_FAILED(CoCreateGuid(ShareId));
-    auto shareName = wsl::shared::string::GuidToString<wchar_t>(*ShareId, wsl::shared::string::None);
+    GUID shareIdLocal;
+    THROW_IF_FAILED(CoCreateGuid(&shareIdLocal));
+    auto shareName = wsl::shared::string::GuidToString<wchar_t>(shareIdLocal, wsl::shared::string::None);
 
-    std::optional<GUID> deviceInstanceId;
+    // Add the share entry upfront so the emplace cannot fail after the device is created.
+    auto it = m_shares.emplace(shareIdLocal, std::nullopt).first;
+    auto cleanup = wil::scope_exit([&]() { m_shares.erase(it); });
+
     if (!FeatureEnabled(WslaFeatureFlagsVirtioFs))
     {
         auto flags = hcs::Plan9ShareFlags::AllowOptions;
@@ -543,12 +547,13 @@ try
     }
     else
     {
-        deviceInstanceId = m_guestDeviceManager->AddGuestDevice(
+        it->second = m_guestDeviceManager->AddGuestDevice(
             VIRTIO_FS_DEVICE_ID, m_virtioFsClassId, shareName.c_str(), L"", WindowsPath, VIRTIO_FS_FLAGS_TYPE_FILES, m_userToken.get());
     }
 
-    m_shares.emplace(*ShareId, deviceInstanceId);
+    cleanup.release();
 
+    *ShareId = shareIdLocal;
     return S_OK;
 }
 CATCH_RETURN()
