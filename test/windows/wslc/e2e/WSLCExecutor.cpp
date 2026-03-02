@@ -22,22 +22,54 @@ using namespace WEX::Logging;
 void WSLCExecutionResult::Dump() const
 {
     Log::Comment((L"Command Line: " + CommandLine).c_str());
-    Log::Comment((L"Exit Code: " + std::to_wstring(ExitCode)).c_str());
-    Log::Comment((L"Stdout: " + Stdout).c_str());
-    Log::Comment((L"Stderr: " + Stderr).c_str());
+    if (ExitCode)
+    {
+        Log::Comment((L"Exit Code: " + std::to_wstring(*ExitCode)).c_str());
+    }
+
+    if (Stdout)
+    {
+        Log::Comment((L"Stdout: " + *Stdout).c_str());
+    }
+
+    if (Stderr)
+    {
+        Log::Comment((L"Stderr: " + *Stderr).c_str());
+    }
 }
 
 void WSLCExecutionResult::Verify(const WSLCExecutionResult& expected) const
 {
-    VERIFY_ARE_EQUAL(expected.Stdout, Stdout, std::format(L"Stdout does not match expected for command '{}'", CommandLine).c_str());
-    VERIFY_ARE_EQUAL(expected.Stderr, Stderr, std::format(L"Stderr does not match expected for command '{}'", CommandLine).c_str());
-    VERIFY_ARE_EQUAL(expected.ExitCode, ExitCode, std::format(L"ExitCode does not match expected for command '{}'", CommandLine).c_str());
+    if (expected.Stdout)
+    {
+        VERIFY_ARE_EQUAL(*expected.Stdout, *Stdout);
+    }
+
+    if (expected.Stderr)
+    {
+        VERIFY_ARE_EQUAL(*expected.Stderr, *Stderr);
+    }
+
+    if (expected.ExitCode)
+    {
+        VERIFY_ARE_EQUAL(*expected.ExitCode, *ExitCode);
+    }
+}
+
+void WSLCExecutionResult::VerifyNoErrors(std::optional<std::wstring> expectedOutput) const
+{
+    VERIFY_ARE_EQUAL(L"", *Stderr);
+    VERIFY_ARE_EQUAL(S_OK, *ExitCode);
+    if (expectedOutput)
+    {
+        VERIFY_ARE_EQUAL(*expectedOutput, *Stdout);
+    }
 }
 
 std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
 {
     std::vector<std::wstring> lines;
-    std::wstringstream ss(Stdout);
+    std::wstringstream ss(*Stdout);
     std::wstring line;
     while (std::getline(ss, line))
     {
@@ -60,10 +92,9 @@ WSLCExecutionResult WSLCExecutor::Execute(const std::wstring& commandLine)
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = HRESULT_FROM_WIN32(output.ExitCode)};
 }
 
-void WSLCExecutor::ExecuteAndVerify(const std::wstring& cmd, const std::wstring& expectedStdout, const std::wstring& expectedStderr, HRESULT expectedExitCode)
+void WSLCExecutor::ExecuteAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput)
 {
-    WSLCExecutionResult expected{.Stdout = expectedStdout, .Stderr = expectedStderr, .ExitCode = expectedExitCode};
-    ExecuteAndVerify(cmd, expected);
+    Execute(cmd).VerifyNoErrors(expectedOutput);
 }
 
 void WSLCExecutor::ExecuteAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)

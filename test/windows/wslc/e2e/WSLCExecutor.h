@@ -4,12 +4,14 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCE2ETests.cpp
+    WSLCExecutor.h
 
 Abstract:
 
     This file contains end-to-end tests for WSLC.
 --*/
+
+#pragma once
 
 #include "precomp.h"
 #include "windows/Common.h"
@@ -19,20 +21,20 @@ namespace WSLCE2ETests {
 struct WSLCExecutionResult
 {
     std::wstring CommandLine{};
-    std::wstring Stdout{};
-    std::wstring Stderr{};
-    HRESULT ExitCode{S_OK};
+    std::optional<std::wstring> Stdout{};
+    std::optional<std::wstring> Stderr{};
+    std::optional<HRESULT> ExitCode{};
     void Dump() const;
     void Verify(const WSLCExecutionResult& expected) const;
+    void VerifyNoErrors(std::optional<std::wstring> expectedOutput = std::nullopt) const;
     std::vector<std::wstring> GetStdoutLines() const;
 };
 
 struct WSLCExecutor
 {
     static WSLCExecutionResult Execute(const std::wstring& commandLine);
-    static void ExecuteAndVerify(
-        const std::wstring& cmd, const std::wstring& expectedStdout, const std::wstring& expectedStderr = L"", HRESULT expectedExitCode = S_OK);
     static void ExecuteAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected);
+    static void ExecuteAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput = std::nullopt);
 };
 
 std::wstring GetWslcHeader();

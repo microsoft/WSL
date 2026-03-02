@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCCLITestHelpers.h"
 #include "WSLCExecutor.h"
+#include "WSLCCommand.h"
 
 namespace WSLCE2ETests {
 
@@ -34,14 +35,12 @@ class WSLCE2EContainerTests
 
     TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        // wslc container --help
-        WSLCExecutor::ExecuteAndVerify(L"container --help", GetOutput());
+        WSLCCommand::Container("--help").VerifyNoErrors(GetOutput());
     }
 
     TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
     {
-        // wslc container INVALID_CMD
-        WSLCExecutor::ExecuteAndVerify(L"container INVALID_CMD", GetOutput(), L"Unrecognized command: 'INVALID_CMD'\r\n", E_INVALIDARG);
+        WSLCCommand::Container("INVALID_CMD").Verify({.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = E_INVALIDARG});
     }
 
 private:

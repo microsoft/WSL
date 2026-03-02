@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCExecutorHelpers.h"
+#include "WSLCCommand.h"
 
 namespace WSLCE2ETests {
 
@@ -34,27 +35,24 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
-        // wslc container create --help
-        auto command = L"container create --help";
-        WSLCExecutor::ExecuteAndVerify(command, GetOutput());
+        auto result = WSLCCommand::ContainerCreate("--help");
+        result.VerifyNoErrors(GetOutput());
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
     {
-        // wslc container create --name <containerName>
-        auto command = L"container create --name " + WslcContainerName;
-        WSLCExecutor::ExecuteAndVerify(command, GetOutput(), L"Required argument not provided: 'image'\r\n", E_INVALIDARG);
+        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName);
+        result.Verify({.Stdout = GetOutput(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = E_INVALIDARG});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
-        // wslc container create --name <containerName> <invalidImageName>
-        auto command = L"container create --name " + WslcContainerName + L" " + WslcInvalidImageName;
-        auto result = WSLCExecutor::Execute(command);
+        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcInvalidImageName);
+
         auto expectedError = L"Image '" + WslcInvalidImageName + L"' not found, pulling";
-        VERIFY_IS_TRUE(result.Stderr.find(expectedError) != std::wstring::npos);
-        VERIFY_ARE_EQUAL(L"", result.Stdout);
-        VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, result.ExitCode);
+        VERIFY_IS_TRUE(result.Stderr->find(expectedError) != std::wstring::npos);
+        VERIFY_ARE_EQUAL(L"", *result.Stdout);
+        VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, *result.ExitCode);
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_Valid)
@@ -62,22 +60,20 @@ class WSLCE2EContainerCreateTests
         // Ensure the container does not already exist
         EnsureContainerDoesNotExist(WslcContainerName);
 
-        // wslc container create --name <containerName> <ubuntuImageName>
-        auto command = L"container create --name " + WslcContainerName + L" " + WslcUbuntuImageName;
-        auto result = WSLCExecutor::Execute(command);
-        VERIFY_ARE_EQUAL(L"", result.Stderr);
-        VERIFY_ARE_EQUAL(S_OK, result.ExitCode);
+        // Create the container with a valid image
+        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcUbuntuImageName);
+        result.VerifyNoErrors();
         std::wstring containerId = GetStdoutOneLine(result);
 
         // Verify the container is running by listing containers
-        EnsureContainerIsListed(containerId, L"created");
+        VerifyContainerIsListed(containerId, L"created");
 
         // wslc container delete <containerName> --force
-        auto deleteCommand = L"container delete " + WslcContainerName + L" --force";
-        WSLCExecutor::ExecuteAndVerify(deleteCommand, L"", L"", S_OK);
+        result = WSLCCommand::ContainerDelete(WslcContainerName, "--force");
+        result.VerifyNoErrors();
 
         // Verify the container is deleted
-        EnsureContainerIsNotListed(containerId);
+        VerifyContainerIsNotListed(containerId);
     }
 
 private:

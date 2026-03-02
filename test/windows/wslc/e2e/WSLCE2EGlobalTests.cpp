@@ -34,14 +34,12 @@ class WSLCE2EGlobalTests
 
     TEST_METHOD(WSLCE2E_HelpCommand)
     {
-        // wslc --help
-        WSLCExecutor::ExecuteAndVerify(L"--help", GetOutput());
+        WSLCExecutor::ExecuteAndVerifyNoErrors(L"--help", GetOutput());
     }
 
     TEST_METHOD(WSLCE2E_InvalidCommand_DisplaysErrorMessage)
     {
-        // wslc INVALID_CMD
-        WSLCExecutor::ExecuteAndVerify(L"INVALID_CMD", GetOutput(), L"Unrecognized command: 'INVALID_CMD'\r\n", E_INVALIDARG);
+        WSLCExecutor::ExecuteAndVerify(L"INVALID_CMD", {.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = E_INVALIDARG});
     }
 
 private:

@@ -15,6 +15,7 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCExecutorHelpers.h"
+#include "WSLCCommand.h"
 
 namespace WSLCE2ETests {
 
@@ -27,11 +28,11 @@ std::wstring GetStdoutOneLine(const WSLCExecutionResult& result)
     return stdoutLines[0];
 }
 
-void EnsureContainerIsNotListed(const std::wstring& containerNameOrId)
+void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
-    auto result = WSLCExecutor::Execute(L"container list --all");
-    VERIFY_ARE_EQUAL(L"", result.Stderr);
-    VERIFY_ARE_EQUAL(S_OK, result.ExitCode);
+    auto result = WSLCCommand::ContainerList("--all");
+    result.VerifyNoErrors();
+
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
     {
@@ -43,13 +44,12 @@ void EnsureContainerIsNotListed(const std::wstring& containerNameOrId)
     }
 }
 
-void EnsureContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
+void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
-    auto result = WSLCExecutor::Execute(L"container list --all");
-    VERIFY_ARE_EQUAL(L"", result.Stderr);
-    VERIFY_ARE_EQUAL(S_OK, result.ExitCode);
-    auto outputLines = result.GetStdoutLines();
+    auto result = WSLCCommand::ContainerList("--all");
+    result.VerifyNoErrors();
 
+    auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
     {
         if (line.find(containerNameOrId) != std::wstring::npos)
@@ -68,16 +68,16 @@ void EnsureContainerIsListed(const std::wstring& containerNameOrId, const std::w
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
-    auto listResult = WSLCExecutor::Execute(L"container list --all");
-    VERIFY_ARE_EQUAL(L"", listResult.Stderr);
-    VERIFY_ARE_EQUAL(S_OK, listResult.ExitCode);
+    auto listResult = WSLCCommand::ContainerList("--all");
+    listResult.VerifyNoErrors();
+
     auto stdoutLines = listResult.GetStdoutLines();
     for (const auto& line : stdoutLines)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
-            auto deleteCommand = L"container delete " + containerName + L" --force";
-            WSLCExecutor::ExecuteAndVerify(deleteCommand, L"", L"", S_OK);
+            auto result = WSLCCommand::ContainerDelete(containerName, L"--force");
+            result.VerifyNoErrors();
             break;
         }
     }
