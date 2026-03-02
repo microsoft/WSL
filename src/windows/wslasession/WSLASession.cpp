@@ -395,6 +395,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, ContextPath);
     RETURN_HR_IF(E_INVALIDARG, *ContextPath == L'\0');
+    RETURN_HR_IF(E_INVALIDARG, ImageTag != nullptr && strlen(ImageTag) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     wil::unique_handle dockerfileFileHandle;
     if (DockerfileHandle != 0 && DockerfileHandle != HandleToULong(INVALID_HANDLE_VALUE))
@@ -546,6 +547,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageName);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageName) > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     auto [repo, tag] = ParseImage(ImageName);
 
@@ -624,6 +626,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrID);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrID) > WSLA_MAX_IMAGE_NAME_LENGTH);
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
@@ -721,6 +724,7 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
     RETURN_HR_IF_NULL(E_POINTER, DeletedImages);
     RETURN_HR_IF_NULL(E_POINTER, Count);
 
@@ -786,8 +790,10 @@ try
 
     RETURN_HR_IF_NULL(E_POINTER, Options);
     RETURN_HR_IF_NULL(E_POINTER, Options->Image);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Image) > WSLA_MAX_IMAGE_NAME_LENGTH);
     RETURN_HR_IF_NULL(E_POINTER, Options->Repo);
     RETURN_HR_IF_NULL(E_POINTER, Options->Tag);
+    RETURN_HR_IF(E_INVALIDARG, strlen(Options->Repo) + strlen(Options->Tag) + 1 > WSLA_MAX_IMAGE_NAME_LENGTH);
 
     auto lock = m_lock.lock_shared();
 
@@ -821,6 +827,7 @@ try
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrId);
+    RETURN_HR_IF(E_INVALIDARG, strlen(ImageNameOrId) > WSLA_MAX_IMAGE_NAME_LENGTH);
     RETURN_HR_IF_NULL(E_POINTER, Output);
 
     *Output = nullptr;
