@@ -20,6 +20,7 @@ Abstract:
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
+using namespace wsl::windows::common;
 
 void WSLCExecutionResult::Dump() const
 {
@@ -88,8 +89,9 @@ std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
 
 WSLCExecutionResult WSLCExecutor::Execute(const std::wstring& commandLine)
 {
-    auto fullCmd = L"C:\\src\\wsl\\bin\\x64\\Debug\\wslc.exe " + commandLine;
-    wsl::windows::common::SubProcess process(nullptr, fullCmd.c_str());
+    auto wslcPath = std::filesystem::path(wslutil::GetMsiPackagePath().value()) / L"wslc.exe";
+    auto cmd = wslcPath.wstring() + L" " + commandLine;
+    wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
     const auto output = process.RunAndCaptureOutput();
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = HRESULT_FROM_WIN32(output.ExitCode)};
 }
