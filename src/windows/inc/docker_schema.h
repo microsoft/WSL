@@ -188,37 +188,35 @@ struct ImportStatus
 
 struct ImageConfig
 {
-    std::string Hostname;
-    std::string Domainname;
     std::string User;
-    std::map<std::string, EmptyObject> ExposedPorts;
-    std::vector<std::string> Env;
-    std::vector<std::string> Cmd;
-    std::vector<std::string> Entrypoint;
-    std::string Image;
-    std::map<std::string, EmptyObject> Volumes;
+    std::optional<std::map<std::string, EmptyObject>> ExposedPorts;
+    std::optional<std::vector<std::string>> Env;
+    std::optional<std::vector<std::string>> Cmd;
+    std::optional<std::vector<std::string>> Entrypoint;
+    std::optional<std::map<std::string, EmptyObject>> Volumes;
     std::string WorkingDir;
-    std::map<std::string, std::string> Labels;
+    std::optional<std::map<std::string, std::string>> Labels;
+    std::string StopSignal;
+    std::optional<std::vector<std::string>> Shell;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
         ImageConfig,
-        Hostname,
-        Domainname,
         User,
         ExposedPorts,
         Env,
         Cmd,
         Entrypoint,
-        Image,
         Volumes,
         WorkingDir,
-        Labels);
+        Labels,
+        StopSignal,
+        Shell);
 };
 
 struct RootFS
 {
     std::string Type;
-    std::vector<std::string> Layers;
+    std::optional<std::vector<std::string>> Layers;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RootFS, Type, Layers);
 };
@@ -226,7 +224,7 @@ struct RootFS
 struct GraphDriverData
 {
     std::string Name;
-    std::map<std::string, std::string> Data;
+    std::optional<std::map<std::string, std::string>> Data;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GraphDriverData, Name, Data);
 };
@@ -234,23 +232,21 @@ struct GraphDriverData
 struct InspectImage
 {
     std::string Id;
-    std::vector<std::string> RepoTags;
-    std::vector<std::string> RepoDigests;
+    std::optional<std::vector<std::string>> RepoTags;
+    std::optional<std::vector<std::string>> RepoDigests;
     std::string Parent;
     std::string Comment;
     std::string Created;
-    std::string Container;
-    ImageConfig Config;
-    std::string DockerVersion;
+    std::optional<ImageConfig> Config;
     std::string Author;
     std::string Architecture;
+    std::string Variant;
     std::string Os;
     std::string OsVersion;
     uint64_t Size{};
-    uint64_t VirtualSize{};
-    GraphDriverData GraphDriver;
-    RootFS RootFS;
-    std::map<std::string, std::string> Metadata;
+    std::optional<GraphDriverData> GraphDriver;
+    std::optional<RootFS> RootFS;
+    std::optional<std::map<std::string, std::string>> Metadata;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
         InspectImage,
@@ -260,15 +256,13 @@ struct InspectImage
         Parent,
         Comment,
         Created,
-        Container,
         Config,
-        DockerVersion,
         Author,
         Architecture,
+        Variant,
         Os,
         OsVersion,
         Size,
-        VirtualSize,
         GraphDriver,
         RootFS,
         Metadata);

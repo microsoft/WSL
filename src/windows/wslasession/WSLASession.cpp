@@ -17,6 +17,7 @@ Abstract:
 #include "WSLAContainer.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
+#include "DebugApi.h"
 
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
@@ -69,7 +70,12 @@ wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
     wslaInspect.Os = dockerInspect.Os;
     wslaInspect.Size = dockerInspect.Size;
     wslaInspect.Author = dockerInspect.Author;
-    wslaInspect.Labels = dockerInspect.Config.Labels;
+
+    // Extract labels from Config if present
+    if (dockerInspect.Config.has_value() && dockerInspect.Config->Labels.has_value())
+    {
+        wslaInspect.Labels = dockerInspect.Config->Labels.value();
+    }
 
     return wslaInspect;
 }
@@ -799,6 +805,7 @@ CATCH_RETURN();
 HRESULT WSLASession::InspectImage(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output)
 try
 {
+    DebugBreak();
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrId);
