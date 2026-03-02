@@ -23,7 +23,7 @@ std::vector<ImageInformation> ImageService::List(wsl::windows::wslc::models::Ses
 {
     wil::unique_cotaskmem_array_ptr<WSLA_IMAGE_INFORMATION> images;
     ULONG count = 0;
-    THROW_IF_FAILED(session.Get()->ListImages(&images, &count));
+    THROW_IF_FAILED(session.Get()->ListImages(nullptr, &images, &count));
 
     std::vector<ImageInformation> result;
     for (auto ptr = images.get(), end = images.get() + count; ptr != end; ++ptr)
