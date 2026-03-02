@@ -1,8 +1,19 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCCommand.h
+
+Abstract:
+
+    This file contains helper functions for executing WSLC commands in end-to-end tests.
+--*/
+
 #pragma once
 
 #include "WSLCExecutorHelpers.h"
-
-namespace WSLCE2ETests {
 
 #define WSLC_COMMAND(Name, Command) \
     template <typename... Args> \
@@ -11,6 +22,7 @@ namespace WSLCE2ETests {
         return ExecuteInternal(Command, args...); \
     }
 
+namespace WSLCE2ETests {
 struct WSLCCommand
 {
     WSLC_COMMAND(Container, L"container")
@@ -29,3 +41,5 @@ private:
     }
 };
 } // namespace WSLCE2ETests
+
+#undef WSLC_COMMAND

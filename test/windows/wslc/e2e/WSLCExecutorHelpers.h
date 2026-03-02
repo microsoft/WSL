@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    This file contains helper functions for end-to-end tests of WSLC.
+    This file contains helper functions for WSLCExecutor tests.
 --*/
 
 #pragma once

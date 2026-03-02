@@ -8,7 +8,9 @@ Module Name:
 
 Abstract:
 
-    This file contains end-to-end tests for WSLC.
+    This file contains the implementation of the WSLCExecutor class, which is
+    responsible for executing wslc commands and verifying their results in
+    end-to-end tests.
 --*/
 
 #include "precomp.h"

@@ -8,7 +8,9 @@ Module Name:
 
 Abstract:
 
-    This file contains end-to-end tests for WSLC.
+    This file contains the declaration of the WSLCExecutor class, which
+    provides functionality to execute wslc commands and verify their results in
+    end-to-end tests.
 --*/
 
 #pragma once
