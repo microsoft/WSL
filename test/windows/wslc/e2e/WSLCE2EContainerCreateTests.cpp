@@ -68,12 +68,35 @@ class WSLCE2EContainerCreateTests
         // Verify the container is listed with the correct status
         VerifyContainerIsListed(containerId, L"created");
 
-        // wslc container delete <containerName> --force
+        // Delete the container
         result = WSLCCommand::ContainerDelete(WslcContainerName, "--force");
         result.VerifyNoErrors();
 
         // Verify the container is deleted
         VerifyContainerIsNotListed(containerId);
+    }
+
+    TEST_METHOD(WSLCE2E_Container_Create_DuplicateContainerName)
+    {
+        // Ensure the container does not already exist
+        EnsureContainerDoesNotExist(WslcContainerName);
+
+        // Create the container with a valid image
+        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcUbuntuImageName);
+        result.VerifyNoErrors();
+        auto containerId = GetStdoutOneLine(result);
+
+        // Attempt to create another container with the same name
+        result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcUbuntuImageName);
+        result.Dump();
+        result.Verify(
+            {.Stderr = L"Conflict. The container name \"/" + WslcContainerName + L"\" is already in use by container \"" +
+                       containerId + L"\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n",
+             .ExitCode = 0x800700B7});
+
+        // Clean up by deleting the container
+        result = WSLCCommand::ContainerDelete(WslcContainerName, "--force");
+        result.VerifyNoErrors();
     }
 
 private:

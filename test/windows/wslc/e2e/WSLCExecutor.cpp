@@ -24,20 +24,20 @@ using namespace wsl::windows::common;
 
 void WSLCExecutionResult::Dump() const
 {
-    Log::Comment((L"Command Line: " + CommandLine).c_str());
-    if (ExitCode)
-    {
-        Log::Comment((L"Exit Code: " + std::to_wstring(*ExitCode)).c_str());
-    }
-
+    Log::Comment((L"Command Line: \"" + CommandLine + L"\"").c_str());
     if (Stdout)
     {
-        Log::Comment((L"Stdout: " + *Stdout).c_str());
+        Log::Comment((L"Stdout: \"" + *Stdout + L"\"").c_str());
     }
 
     if (Stderr)
     {
-        Log::Comment((L"Stderr: " + *Stderr).c_str());
+        Log::Comment((L"Stderr: \"" + *Stderr + L"\"").c_str());
+    }
+
+    if (ExitCode)
+    {
+        Log::Comment((L"Exit Code: " + std::to_wstring(*ExitCode)).c_str());
     }
 }
 
