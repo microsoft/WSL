@@ -56,7 +56,7 @@ public:
     void Start(WSLAContainerStartFlags Flags);
 
     void Attach(ULONG* Stdin, ULONG* Stdout, ULONG* Stderr);
-    void Stop(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds);
+    void Stop(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds);
     void Delete();
     void Export(ULONG TarHandle);
     void GetState(_Out_ WSLA_CONTAINER_STATE* State);
@@ -66,11 +66,13 @@ public:
     void Logs(WSLALogsFlags Flags, ULONG* Stdout, ULONG* Stderr, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail);
     void GetLabels(WSLA_LABEL_INFORMATION** Labels, ULONG* Count);
 
-    IWSLAContainer& ComWrapper();
+    void CopyTo(IWSLAContainer** Container);
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
     WSLA_CONTAINER_STATE State() noexcept;
+
+    __requires_lock_held(m_lock) void Transition(WSLA_CONTAINER_STATE State) noexcept;
 
     void OnProcessReleased(DockerExecProcessControl* process);
 
@@ -142,7 +144,7 @@ public:
     WSLAContainer(WSLAContainerImpl* impl, std::function<void(const WSLAContainerImpl*)>&& OnDeleted);
 
     IFACEMETHOD(Attach)(_Out_ ULONG* Stdin, _Out_ ULONG* Stdout, _Out_ ULONG* Stderr) override;
-    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONGLONG TimeoutSeconds) override;
+    IFACEMETHOD(Stop)(_In_ WSLASignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Delete)() override;
     IFACEMETHOD(Export)(_In_ ULONG TarHandle) override;
     IFACEMETHOD(GetState)(_Out_ WSLA_CONTAINER_STATE* State) override;

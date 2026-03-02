@@ -48,6 +48,13 @@ void ContainerEventTracker::ContainerTrackingReference::Reset()
     }
 }
 
+ContainerEventTracker::ContainerTrackingReference::ContainerTrackingReference(ContainerTrackingReference&& other) noexcept :
+    m_id(other.m_id), m_tracker(other.m_tracker)
+{
+    other.m_tracker = nullptr;
+    other.m_id = {};
+}
+
 ContainerEventTracker::ContainerTrackingReference::~ContainerTrackingReference()
 {
     Reset();

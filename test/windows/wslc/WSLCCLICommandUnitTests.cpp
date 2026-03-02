@@ -17,8 +17,9 @@ Abstract:
 #include "WSLCCLITestHelpers.h"
 
 #include "Command.h"
-#include "DiagCommand.h"
 #include "RootCommand.h"
+#include "ContainerCommand.h"
+#include "SessionCommand.h"
 
 using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
@@ -61,15 +62,32 @@ class WSLCCLICommandUnitTests
         }
     }
 
-    // Test: Verify ContainerCommand has subcommands
-    TEST_METHOD(DiagCommand_HasSubcommands)
+    // Test: Verify SessionCommand has subcommands
+    TEST_METHOD(SessionCommand_HasSubcommands)
     {
-        auto cmd = DiagCommand(L"diag");
+        auto cmd = SessionCommand(L"session");
         auto subcommands = cmd.GetCommands();
 
-        // Verify it has subcommands (create, list, run, etc.)
+        // Verify it has subcommands
         VERIFY_IS_TRUE(subcommands.size() > 0);
-        LogComment(L"DiagCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
+        LogComment(L"SessionCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
+
+        // Log subcommand types
+        for (const auto& subcmd : subcommands)
+        {
+            VERIFY_IS_NOT_NULL(subcmd.get());
+        }
+    }
+
+    // Test: Verify ContainerCommand has subcommands
+    TEST_METHOD(ContainerCommand_HasSubcommands)
+    {
+        auto cmd = ContainerCommand(L"container");
+        auto subcommands = cmd.GetCommands();
+
+        // Verify it has subcommands
+        VERIFY_IS_TRUE(subcommands.size() > 0);
+        LogComment(L"ContainerCommand has " + std::to_wstring(subcommands.size()) + L" subcommands");
 
         // Log subcommand types
         for (const auto& subcmd : subcommands)

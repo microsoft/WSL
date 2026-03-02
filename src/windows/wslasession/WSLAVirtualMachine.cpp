@@ -46,6 +46,12 @@ void WSLAVirtualMachine::Initialize()
 {
     THROW_IF_FAILED(m_vm->GetId(&m_vmId));
 
+    // Start crash dump collection thread.
+    auto crashDumpSocket = hvsocket::Listen(m_vmId, LX_INIT_UTILITY_VM_CRASH_DUMP_PORT);
+    THROW_LAST_ERROR_IF(!crashDumpSocket);
+
+    m_crashDumpThread = std::thread{[this, socket = std::move(crashDumpSocket)]() mutable { CollectCrashDumps(std::move(socket)); }};
+
     // Establish a socket channel with mini_init in the VM.
     wil::unique_socket socket;
     THROW_IF_FAILED(m_vm->AcceptConnection(reinterpret_cast<HANDLE*>(&socket)));
@@ -99,6 +105,11 @@ WSLAVirtualMachine::~WSLAVirtualMachine()
     if (m_processExitThread.joinable())
     {
         m_processExitThread.join();
+    }
+
+    if (m_crashDumpThread.joinable())
+    {
+        m_crashDumpThread.join();
     }
 
     // Clear the state of all remaining processes now that the VM has exited.
@@ -893,4 +904,72 @@ wil::unique_socket WSLAVirtualMachine::ConnectUnixSocket(const char* Path)
     THROW_HR_IF_MSG(E_FAIL, result.Result < 0, "Failed to connect to unix socket: '%hs', %i", Path, result.Result);
 
     return channel.Release();
+}
+
+void WSLAVirtualMachine::CollectCrashDumps(wil::unique_socket&& listenSocket)
+{
+    // No impersonation needed - the session process already runs as the user.
+    wslutil::SetThreadDescription(L"CrashDumpCollection");
+
+    const auto crashDumpFolder = filesystem::GetTempFolderPath(GetCurrentProcessToken()) / L"wsla-crashes";
+
+    while (!m_vmTerminatingEvent.is_signaled())
+    {
+        try
+        {
+            auto socket = hvsocket::CancellableAccept(listenSocket.get(), INFINITE, m_vmTerminatingEvent.get());
+            if (!socket)
+            {
+                // VM is exiting.
+                break;
+            }
+
+            constexpr DWORD timeout = 30 * 1000;
+            THROW_LAST_ERROR_IF(setsockopt(socket->get(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR);
+
+            auto channel = wsl::shared::SocketChannel{std::move(socket.value()), "crash_dump", m_vmTerminatingEvent.get()};
+
+            const auto& message = channel.ReceiveMessage<LX_PROCESS_CRASH>();
+            const char* process = reinterpret_cast<const char*>(&message.Buffer);
+
+            constexpr auto dumpExtension = ".dmp";
+            constexpr auto dumpPrefix = "wsl-crash";
+
+            auto filename = std::format("{}-{}-{}-{}-{}{}", dumpPrefix, message.Timestamp, message.Pid, process, message.Signal, dumpExtension);
+
+            std::replace_if(filename.begin(), filename.end(), [](auto e) { return !std::isalnum(e) && e != '.' && e != '-'; }, '_');
+
+            auto fullPath = crashDumpFolder / filename;
+
+            WSL_LOG(
+                "WSLALinuxCrash",
+                TraceLoggingValue(fullPath.c_str(), "FullPath"),
+                TraceLoggingValue(message.Pid, "Pid"),
+                TraceLoggingValue(message.Signal, "Signal"),
+                TraceLoggingValue(process, "process"));
+
+            filesystem::EnsureDirectory(crashDumpFolder.c_str());
+
+            // Only delete files that:
+            // - have the temporary flag set
+            // - start with 'wsl-crash'
+            // - end in .dmp
+            //
+            // This logic is here to prevent accidental user file deletion
+            auto pred = [&dumpExtension, &dumpPrefix](const auto& e) {
+                return WI_IsFlagSet(GetFileAttributes(e.path().c_str()), FILE_ATTRIBUTE_TEMPORARY) && e.path().has_extension() &&
+                       e.path().extension() == dumpExtension && e.path().has_filename() &&
+                       e.path().filename().string().find(dumpPrefix) == 0;
+            };
+
+            wslutil::EnforceFileLimit(crashDumpFolder.c_str(), 10, pred);
+
+            wil::unique_hfile file{CreateFileW(fullPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY, nullptr)};
+            THROW_LAST_ERROR_IF(!file);
+
+            channel.SendResultMessage<std::int32_t>(0);
+            relay::InterruptableRelay(reinterpret_cast<HANDLE>(channel.Socket()), file.get(), nullptr);
+        }
+        CATCH_LOG()
+    }
 }
