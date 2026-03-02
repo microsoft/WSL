@@ -30,7 +30,7 @@ namespace wsl::windows::wslc::task {
 void AttachToSession(CLIExecutionContext& context)
 {
     WI_ASSERT(context.Args.Contains(ArgType::SessionId));
-    SessionService::Attach(context.Args.Get<ArgType::SessionId>());
+    context.ExitCode = SessionService::Attach(context.Args.Get<ArgType::SessionId>());
 }
 
 void CreateSession(CLIExecutionContext& context)

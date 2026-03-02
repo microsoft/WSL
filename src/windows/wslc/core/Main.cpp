@@ -79,7 +79,7 @@ try
         // A command exception means there was an input failure. Display the help
         // along with the error message to help the user correct their input.
         command->OutputHelp(&ce);
-        return E_INVALIDARG;
+        return 1;
     }
     // Any other type of error unrelated to the command parsing.
     catch (...)
@@ -105,11 +105,16 @@ try
         }
     }
 
-    return result;
+    if (context.ExitCode.has_value())
+    {
+        return context.ExitCode.value();
+    }
+
+    return FAILED(result) ? 1 : 0;
 }
 catch (...)
 {
-    return E_UNEXPECTED;
+    return 1;
 }
 } // namespace wsl::windows::wslc
 
