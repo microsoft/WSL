@@ -11,7 +11,6 @@ namespace WSLCE2ETests {
         return ExecuteInternal(Command, args...); \
     }
 
-
 struct WSLCCommand
 {
     WSLC_COMMAND(Container, L"container")
@@ -29,4 +28,4 @@ private:
         return WSLCExecutor::Execute(ss.str());
     }
 };
-}
+} // namespace WSLCE2ETests

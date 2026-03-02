@@ -38,7 +38,8 @@ void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
     {
         if (line.find(containerNameOrId) != std::wstring::npos)
         {
-            const std::wstring message = L"Container '" + containerNameOrId + L"' found in container list output but it should not be listed";
+            const std::wstring message =
+                L"Container '" + containerNameOrId + L"' found in container list output but it should not be listed";
             VERIFY_FAIL(message.c_str());
         }
     }
@@ -54,9 +55,8 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
     {
         if (line.find(containerNameOrId) != std::wstring::npos)
         {
-            const std::wstring message =
-                L"Container '" + containerNameOrId + L"' found in container list output but status '" + status +
-                L"' was not found in the same line";
+            const std::wstring message = L"Container '" + containerNameOrId + L"' found in container list output but status '" +
+                                         status + L"' was not found in the same line";
             VERIFY_IS_TRUE(line.find(status) != std::wstring::npos, message.c_str());
             return;
         }
