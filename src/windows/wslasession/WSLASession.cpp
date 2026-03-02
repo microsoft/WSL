@@ -57,6 +57,23 @@ void ValidateContainerName(LPCSTR Name)
     THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslaInvalidContainerName(Name), i == 0 || i > WSLA_MAX_CONTAINER_NAME_LENGTH);
 }
 
+wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage& dockerInspect)
+{
+    wsla_schema::InspectImage wslaInspect{};
+
+    wslaInspect.Id = dockerInspect.Id;
+    wslaInspect.RepoTags = dockerInspect.RepoTags;
+    wslaInspect.RepoDigests = dockerInspect.RepoDigests;
+    wslaInspect.Created = dockerInspect.Created;
+    wslaInspect.Architecture = dockerInspect.Architecture;
+    wslaInspect.Os = dockerInspect.Os;
+    wslaInspect.Size = dockerInspect.Size;
+    wslaInspect.Author = dockerInspect.Author;
+    wslaInspect.Labels = dockerInspect.Config.Labels;
+
+    return wslaInspect;
+}
+
 } // namespace
 
 namespace wsl::windows::service::wsla {
@@ -774,6 +791,49 @@ try
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION), errorMessage, e.StatusCode() == 409);
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
     }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+HRESULT WSLASession::InspectImage(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output)
+try
+{
+    COMServiceExecutionContext context;
+
+    RETURN_HR_IF_NULL(E_POINTER, ImageNameOrId);
+    RETURN_HR_IF_NULL(E_POINTER, Output);
+
+    *Output = nullptr;
+
+    auto lock = m_lock.lock_shared();
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_dockerClient.has_value());
+
+    docker_schema::InspectImage dockerInspect;
+    try
+    {
+        dockerInspect = m_dockerClient->InspectImage(ImageNameOrId);
+    }
+    catch (const DockerHTTPException& e)
+    {
+        std::string errorMessage = "Failed to inspect image";
+        if (e.HasErrorMessage())
+        {
+            errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
+        }
+
+        // Map HTTP status codes to HRESULTs
+        THROW_HR_WITH_USER_ERROR_IF(WSLA_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
+        THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
+        THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);
+    }
+
+    // Convert to WSLA schema
+    auto wslaInspect = ConvertInspectImage(dockerInspect);
+
+    // Serialize to JSON
+    std::string wslaJson = wsl::shared::ToJson(wslaInspect);
+    *Output = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(wslaJson.c_str()).release();
 
     return S_OK;
 }

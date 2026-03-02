@@ -128,6 +128,7 @@ public:
     std::unique_ptr<HTTPRequestContext> LoadImage(uint64_t ContentLength);
     void TagImage(const std::string& Id, const std::string& Repo, const std::string& Tag);
     std::vector<common::docker_schema::Image> ListImages();
+    common::docker_schema::InspectImage InspectImage(const std::string& NameOrId);
     std::vector<common::docker_schema::DeletedImage> DeleteImage(const char* Image, bool Force, bool NoPrune); // Image can be ID or Repo:Tag.
     std::pair<uint32_t, wil::unique_socket> SaveImage(const std::string& NameOrId);
 

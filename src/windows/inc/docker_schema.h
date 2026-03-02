@@ -49,6 +49,11 @@ inline void to_json(nlohmann::json& j, const EmptyObject& memory)
     j = nlohmann::json::object();
 }
 
+inline void from_json(const nlohmann::json& j, EmptyObject& obj)
+{
+    // EmptyObject has no fields, so nothing to deserialize
+}
+
 struct Mount
 {
     std::string Source;
@@ -179,6 +184,94 @@ struct ImportStatus
     std::string status;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImportStatus, status);
+};
+
+struct ImageConfig
+{
+    std::string Hostname;
+    std::string Domainname;
+    std::string User;
+    std::map<std::string, EmptyObject> ExposedPorts;
+    std::vector<std::string> Env;
+    std::vector<std::string> Cmd;
+    std::vector<std::string> Entrypoint;
+    std::string Image;
+    std::map<std::string, EmptyObject> Volumes;
+    std::string WorkingDir;
+    std::map<std::string, std::string> Labels;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        ImageConfig,
+        Hostname,
+        Domainname,
+        User,
+        ExposedPorts,
+        Env,
+        Cmd,
+        Entrypoint,
+        Image,
+        Volumes,
+        WorkingDir,
+        Labels);
+};
+
+struct RootFS
+{
+    std::string Type;
+    std::vector<std::string> Layers;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RootFS, Type, Layers);
+};
+
+struct GraphDriverData
+{
+    std::string Name;
+    std::map<std::string, std::string> Data;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GraphDriverData, Name, Data);
+};
+
+struct InspectImage
+{
+    std::string Id;
+    std::vector<std::string> RepoTags;
+    std::vector<std::string> RepoDigests;
+    std::string Parent;
+    std::string Comment;
+    std::string Created;
+    std::string Container;
+    ImageConfig Config;
+    std::string DockerVersion;
+    std::string Author;
+    std::string Architecture;
+    std::string Os;
+    std::string OsVersion;
+    uint64_t Size{};
+    uint64_t VirtualSize{};
+    GraphDriverData GraphDriver;
+    RootFS RootFS;
+    std::map<std::string, std::string> Metadata;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        InspectImage,
+        Id,
+        RepoTags,
+        RepoDigests,
+        Parent,
+        Comment,
+        Created,
+        Container,
+        Config,
+        DockerVersion,
+        Author,
+        Architecture,
+        Os,
+        OsVersion,
+        Size,
+        VirtualSize,
+        GraphDriver,
+        RootFS,
+        Metadata);
 };
 
 struct CreateExecResponse

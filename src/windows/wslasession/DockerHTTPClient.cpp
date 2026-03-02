@@ -165,6 +165,11 @@ std::vector<docker_schema::Image> DockerHTTPClient::ListImages()
     return Transaction<docker_schema::EmptyRequest, std::vector<docker_schema::Image>>(verb::get, URL::Create("/images/json"));
 }
 
+docker_schema::InspectImage DockerHTTPClient::InspectImage(const std::string& NameOrId)
+{
+    return Transaction<docker_schema::EmptyRequest, docker_schema::InspectImage>(verb::get, URL::Create("/images/{}/json", NameOrId));
+}
+
 std::vector<docker_schema::DeletedImage> wsl::windows::service::wsla::DockerHTTPClient::DeleteImage(const char* Image, bool Force, bool NoPrune)
 {
     auto url = URL::Create("/images/{}", Image);
