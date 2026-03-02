@@ -62,19 +62,33 @@ wsla_schema::InspectImage ConvertInspectImage(const docker_schema::InspectImage&
 {
     wsla_schema::InspectImage wslaInspect{};
 
+    // Direct field mappings
     wslaInspect.Id = dockerInspect.Id;
     wslaInspect.RepoTags = dockerInspect.RepoTags;
     wslaInspect.RepoDigests = dockerInspect.RepoDigests;
+    wslaInspect.Parent = dockerInspect.Parent;
+    wslaInspect.Comment = dockerInspect.Comment;
     wslaInspect.Created = dockerInspect.Created;
+    wslaInspect.Author = dockerInspect.Author;
     wslaInspect.Architecture = dockerInspect.Architecture;
     wslaInspect.Os = dockerInspect.Os;
     wslaInspect.Size = dockerInspect.Size;
-    wslaInspect.Author = dockerInspect.Author;
+    wslaInspect.Metadata = dockerInspect.Metadata;
 
-    // Extract labels from Config if present
-    if (dockerInspect.Config.has_value() && dockerInspect.Config->Labels.has_value())
+    // Convert Config from docker_schema to wsla_schema
+    if (dockerInspect.Config.has_value())
     {
-        wslaInspect.Labels = dockerInspect.Config->Labels.value();
+        wsla_schema::ImageConfig wslaConfig{};
+        const auto& dockerConfig = dockerInspect.Config.value();
+
+        wslaConfig.Cmd = dockerConfig.Cmd;
+        wslaConfig.Entrypoint = dockerConfig.Entrypoint;
+        wslaConfig.Env = dockerConfig.Env;
+        wslaConfig.Labels = dockerConfig.Labels;
+        wslaConfig.User = dockerConfig.User;
+        wslaConfig.WorkingDir = dockerConfig.WorkingDir;
+
+        wslaInspect.Config = wslaConfig;
     }
 
     return wslaInspect;
