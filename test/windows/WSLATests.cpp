@@ -1137,8 +1137,7 @@ class WSLATests
             VERIFY_IS_TRUE(inspectResult.RepoDigests.has_value());
             VERIFY_IS_FALSE(inspectResult.RepoDigests->empty());
             VERIFY_IS_FALSE(inspectResult.Created.empty());
-            VERIFY_IS_TRUE(
-                inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
+            VERIFY_IS_TRUE(inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
             VERIFY_ARE_EQUAL("linux", inspectResult.Os);
             VERIFY_IS_TRUE(inspectResult.Size > 0);
             VERIFY_IS_TRUE(inspectResult.Metadata.has_value());

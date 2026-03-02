@@ -46,12 +46,15 @@ struct EmptyObject
 
 inline void to_json(nlohmann::json& j, const EmptyObject& memory)
 {
+    UNREFERENCED_PARAMETER(memory);
     j = nlohmann::json::object();
 }
 
 inline void from_json(const nlohmann::json& j, EmptyObject& obj)
 {
     // EmptyObject has no fields, so nothing to deserialize
+    UNREFERENCED_PARAMETER(j);
+    UNREFERENCED_PARAMETER(obj);
 }
 
 struct Mount
@@ -199,18 +202,7 @@ struct ImageConfig
     std::string StopSignal;
     std::optional<std::vector<std::string>> Shell;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        ImageConfig,
-        User,
-        ExposedPorts,
-        Env,
-        Cmd,
-        Entrypoint,
-        Volumes,
-        WorkingDir,
-        Labels,
-        StopSignal,
-        Shell);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ImageConfig, User, ExposedPorts, Env, Cmd, Entrypoint, Volumes, WorkingDir, Labels, StopSignal, Shell);
 };
 
 struct RootFS
@@ -249,23 +241,7 @@ struct InspectImage
     std::optional<std::map<std::string, std::string>> Metadata;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        InspectImage,
-        Id,
-        RepoTags,
-        RepoDigests,
-        Parent,
-        Comment,
-        Created,
-        Config,
-        Author,
-        Architecture,
-        Variant,
-        Os,
-        OsVersion,
-        Size,
-        GraphDriver,
-        RootFS,
-        Metadata);
+        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Config, Author, Architecture, Variant, Os, OsVersion, Size, GraphDriver, RootFS, Metadata);
 };
 
 struct CreateExecResponse

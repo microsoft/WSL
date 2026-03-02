@@ -98,19 +98,7 @@ struct InspectImage
     std::optional<ImageConfig> Config;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        InspectImage,
-        Id,
-        RepoTags,
-        RepoDigests,
-        Parent,
-        Comment,
-        Created,
-        Author,
-        Architecture,
-        Os,
-        Size,
-        Metadata,
-        Config);
+        InspectImage, Id, RepoTags, RepoDigests, Parent, Comment, Created, Author, Architecture, Os, Size, Metadata, Config);
 };
 
 } // namespace wsl::windows::common::wsla_schema
