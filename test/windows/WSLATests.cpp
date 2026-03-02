@@ -2288,6 +2288,16 @@ class WSLATests
             ValidateProcessOutput(process, {}, 0);
         }
 
+        // Validate that duplicate tmpfs destinations are rejected.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-duplicate", {"/bin/cat"});
+            launcher.AddTmpfs("/mnt/wsla-tmpfs-dup", "");
+            launcher.AddTmpfs("/mnt/wsla-tmpfs-dup", "");
+
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+        }
+
         // Validate error paths
         {
             WSLAContainerLauncher launcher("debian:latest", std::string(WSLA_MAX_CONTAINER_NAME_LENGTH + 1, 'a'), {"/bin/cat"});

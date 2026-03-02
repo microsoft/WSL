@@ -781,7 +781,7 @@ WslaInspectContainer WSLAContainerImpl::BuildInspectContainer(const DockerInspec
     }
 
     // Map volume mounts using WSLA's host-side data.
-    wslaInspect.Mounts.reserve(m_mountedVolumes.size());
+    wslaInspect.Mounts.reserve(m_mountedVolumes.size() + dockerInspect.HostConfig.Tmpfs.size());
     for (const auto& volume : m_mountedVolumes)
     {
         wsla_schema::InspectMount mountInfo{};
