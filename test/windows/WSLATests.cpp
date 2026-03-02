@@ -1460,6 +1460,10 @@ class WSLATests
             std::string longImageName(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a');
             VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->InspectImage(longImageName.c_str(), &output));
 
+            // Invalid name.
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), m_defaultSession->InspectImage("debian latest", &output));
+            ValidateCOMErrorMessage(L"invalid reference format");
+
             // Attempt to fake to call search endpoint. Our implementation escaped the image name correctly.
             VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("search/debian:latest", &output));
             ValidateCOMErrorMessage(L"No such image: search/debian:latest");
