@@ -17,7 +17,6 @@ Abstract:
 #include "WSLAContainer.h"
 #include "ServiceProcessLauncher.h"
 #include "WslCoreFilesystem.h"
-#include "DebugApi.h"
 
 using namespace wsl::windows::common;
 using relay::MultiHandleWait;
@@ -819,7 +818,6 @@ CATCH_RETURN();
 HRESULT WSLASession::InspectImage(_In_ LPCSTR ImageNameOrId, _Out_ LPSTR* Output)
 try
 {
-    DebugBreak();
     COMServiceExecutionContext context;
 
     RETURN_HR_IF_NULL(E_POINTER, ImageNameOrId);
@@ -843,7 +841,6 @@ try
             errorMessage = e.DockerMessage<docker_schema::ErrorResponse>().message;
         }
 
-        // Map HTTP status codes to HRESULTs
         THROW_HR_WITH_USER_ERROR_IF(WSLA_E_IMAGE_NOT_FOUND, errorMessage, e.StatusCode() == 404);
         THROW_HR_WITH_USER_ERROR_IF(HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS), errorMessage, e.StatusCode() == 400);
         THROW_HR_WITH_USER_ERROR(E_FAIL, errorMessage);

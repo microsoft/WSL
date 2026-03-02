@@ -1108,27 +1108,25 @@ class WSLATests
         // Test inspect debian:latest
         {
             wil::unique_cotaskmem_ansistring output;
-            VERIFY_SUCCEEDED(m_defaultSession->InspectImage("python:3.12-alpine", &output));
+            VERIFY_SUCCEEDED(m_defaultSession->InspectImage("debian:latest", &output));
 
             // Verify output is valid JSON
             VERIFY_IS_NOT_NULL(output.get());
             VERIFY_IS_TRUE(std::strlen(output.get()) > 0);
+            LogInfo("Inspect output: %hs", output.get());
 
             // Parse and validate JSON structure
             auto inspectResult = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(output.get());
 
-            // Verify all 9 fields exposed in wsla_schema::InspectImage
-
-            // 1. Id - should be non-empty and start with "sha256:"
-            VERIFY_IS_FALSE(inspectResult.Id.empty());
+            // Verify all fields exposed in wsla_schema::InspectImage
             VERIFY_IS_TRUE(inspectResult.Id.find("sha256:") == 0);
 
-            // 2. RepoTags - should contain debian:latest
-            VERIFY_IS_FALSE(inspectResult.RepoTags.empty());
+            VERIFY_IS_TRUE(inspectResult.RepoTags.has_value());
+            VERIFY_IS_FALSE(inspectResult.RepoTags->empty());
             bool foundTag = false;
-            for (const auto& tag : inspectResult.RepoTags)
+            for (const auto& tag : inspectResult.RepoTags.value())
             {
-                if (tag.find("debian") != std::string::npos && tag.find("latest") != std::string::npos)
+                if (tag.find("debian:latest") != std::string::npos)
                 {
                     foundTag = true;
                     break;
@@ -1136,50 +1134,32 @@ class WSLATests
             }
             VERIFY_IS_TRUE(foundTag);
 
-            // 3. RepoDigests - should be present (may be empty for local images, but field should exist)
-            // Note: RepoDigests will be populated for images pulled from registry
-
-            // 4. Created - should be non-empty ISO 8601 timestamp
+            VERIFY_IS_TRUE(inspectResult.RepoDigests.has_value());
+            VERIFY_IS_FALSE(inspectResult.RepoDigests->empty());
             VERIFY_IS_FALSE(inspectResult.Created.empty());
-            VERIFY_IS_TRUE(inspectResult.Created.find("T") != std::string::npos); // ISO 8601 format contains 'T'
-
-            // 5. Architecture - should be valid architecture (amd64 or arm64)
-            VERIFY_IS_FALSE(inspectResult.Architecture.empty());
-            VERIFY_IS_TRUE(inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
-
-            // 6. Os - should be "linux"
-            VERIFY_ARE_EQUAL(std::string("linux"), inspectResult.Os);
-
-            // 7. Size - should be greater than 0
+            VERIFY_IS_TRUE(
+                inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
+            VERIFY_ARE_EQUAL("linux", inspectResult.Os);
             VERIFY_IS_TRUE(inspectResult.Size > 0);
+            VERIFY_IS_TRUE(inspectResult.Metadata.has_value());
+            VERIFY_IS_TRUE(inspectResult.Metadata->size() > 0);
 
-            // 8. Author - field should exist (may be empty string, which is valid)
-            // No verification needed as empty string is valid for Author
-
-            // 9. Labels - field should exist (may be empty map, which is valid)
-            // No verification needed as empty map is valid for Labels
-
-            LogInfo("Successfully inspected debian:latest");
-            LogInfo("  Id: %hs", inspectResult.Id.c_str());
-            LogInfo("  RepoTags: %zu tags", inspectResult.RepoTags.size());
-            LogInfo("  RepoDigests: %zu digests", inspectResult.RepoDigests.size());
-            LogInfo("  Created: %hs", inspectResult.Created.c_str());
-            LogInfo("  Architecture: %hs", inspectResult.Architecture.c_str());
-            LogInfo("  Os: %hs", inspectResult.Os.c_str());
-            LogInfo("  Size: %llu bytes", inspectResult.Size);
-            LogInfo("  Author: %hs", inspectResult.Author.empty() ? "(empty)" : inspectResult.Author.c_str());
-            LogInfo("  Labels: %zu labels", inspectResult.Labels.size());
+            VERIFY_IS_TRUE(inspectResult.Config.has_value());
+            const auto& config = inspectResult.Config.value();
+            VERIFY_IS_TRUE(config.Cmd.has_value());
+            VERIFY_IS_TRUE(config.Cmd->size() > 0);
+            VERIFY_IS_TRUE(config.Entrypoint.has_value());
+            VERIFY_ARE_EQUAL(0, config.Entrypoint->size());
+            VERIFY_IS_TRUE(config.Env.has_value());
+            VERIFY_IS_TRUE(config.Env->size() > 0);
+            VERIFY_IS_FALSE(config.Labels.has_value());
         }
 
         // Negative test: Image not found
         {
             wil::unique_cotaskmem_ansistring output;
             VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
-
-            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-            VERIFY_IS_TRUE(comError.has_value());
-
-            LogInfo("Expected error for nonexistent image: %ls", comError->Message.get());
+            ValidateCOMErrorMessage(L"No such image: nonexistent:image");
         }
     }
 
