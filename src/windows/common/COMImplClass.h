@@ -65,9 +65,9 @@ protected:
     }
     CATCH_RETURN();
 
-    auto LockImpl()
+    [[nodiscard]] auto LockImpl()
     {
-        // Check if m_impl is available and add ourselves to the list of callers of that's the case.
+        // Check if m_impl is available and add ourselves to the list of callers if that's the case.
         {
             std::unique_lock lock{m_lock};
             THROW_HR_IF(RPC_E_DISCONNECTED, m_impl == nullptr);

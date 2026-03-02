@@ -4752,7 +4752,7 @@ class WSLATests
             }
         }
 
-        void RunOperation(wil::unique_handle&& Handle)
+        void RunOperation(wil::unique_handle Handle)
         {
             m_result.set_value(m_operation(Handle.get()));
 
@@ -4761,7 +4761,7 @@ class WSLATests
             WI_ASSERT(m_testCompleteEvent.is_signaled());
         }
 
-        void RunIO(wil::unique_handle&& Handle)
+        void RunIO(wil::unique_handle Handle)
         {
             std::vector<char> buffer(1024 * 1024);
             while (true)

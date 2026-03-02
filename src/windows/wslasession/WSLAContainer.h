@@ -74,7 +74,7 @@ public:
 
     __requires_lock_held(m_lock) void Transition(WSLA_CONTAINER_STATE State) noexcept;
 
-    void OnProcessReleased(DockerExecProcessControl* process);
+    void OnProcessReleased(DockerExecProcessControl* process) noexcept;
 
     const std::string& ID() const noexcept;
 
@@ -124,7 +124,7 @@ private:
     std::string m_id;
     WSLAProcessFlags m_initProcessFlags{};
     WSLAContainerFlags m_containerFlags{};
-    std::mutex m_processesLock;
+    mutable std::mutex m_processesLock;
     __guarded_by(m_processesLock) std::vector<DockerExecProcessControl*> m_processes;
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<WSLAProcess> m_initProcess;
     __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;

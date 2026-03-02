@@ -357,7 +357,7 @@ WSLAContainerImpl::~WSLAContainerImpl()
     ReleaseResources();
 }
 
-void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process)
+void WSLAContainerImpl::OnProcessReleased(DockerExecProcessControl* process) noexcept
 {
     std::lock_guard processesLock{m_processesLock};
 
@@ -661,6 +661,7 @@ void WSLAContainerImpl::GetState(WSLA_CONTAINER_STATE* Result)
 void WSLAContainerImpl::GetInitProcess(IWSLAProcess** Process) const
 {
     auto lock = m_lock.lock_shared();
+    std::lock_guard processesLock{m_processesLock};
 
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_initProcess);
     THROW_IF_FAILED(m_initProcess.CopyTo(__uuidof(IWSLAProcess), (void**)Process));
