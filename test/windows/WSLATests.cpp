@@ -1101,6 +1101,63 @@ class WSLATests
         }
     }
 
+    TEST_METHOD(InspectImage)
+    {
+        WSL2_TEST_ONLY();
+
+        // Test inspect debian:latest
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_SUCCEEDED(m_defaultSession->InspectImage("debian:latest", &output));
+
+            // Verify output is valid JSON
+            VERIFY_IS_NOT_NULL(output.get());
+            VERIFY_IS_TRUE(std::strlen(output.get()) > 0);
+
+            // Parse and validate JSON structure
+            auto inspectResult = wsl::shared::FromJson<wsl::windows::common::wsla_schema::InspectImage>(output.get());
+
+            // Verify essential fields are present
+            VERIFY_IS_FALSE(inspectResult.Id.empty());
+            VERIFY_IS_FALSE(inspectResult.RepoTags.empty());
+            VERIFY_IS_TRUE(inspectResult.Size > 0);
+            VERIFY_ARE_EQUAL(std::string("linux"), inspectResult.Os);
+
+            // Verify debian:latest is in RepoTags
+            bool foundTag = false;
+            for (const auto& tag : inspectResult.RepoTags)
+            {
+                if (tag.find("debian") != std::string::npos && tag.find("latest") != std::string::npos)
+                {
+                    foundTag = true;
+                    break;
+                }
+            }
+            VERIFY_IS_TRUE(foundTag);
+
+            LogInfo("Successfully inspected debian:latest - Id: %hs, Size: %llu", inspectResult.Id.c_str(), inspectResult.Size);
+        }
+
+        // Negative test: Image not found
+        {
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
+
+            auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+            VERIFY_IS_TRUE(comError.has_value());
+
+            LogInfo("Expected error for nonexistent image: %ls", comError->Message.get());
+        }
+
+        // Negative test: NULL pointer
+        {
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->InspectImage("debian:latest", nullptr));
+
+            wil::unique_cotaskmem_ansistring output;
+            VERIFY_ARE_EQUAL(E_POINTER, m_defaultSession->InspectImage(nullptr, &output));
+        }
+    }
+
     TEST_METHOD(SaveImage)
     {
         WSL2_TEST_ONLY();
