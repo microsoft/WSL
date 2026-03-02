@@ -4,7 +4,7 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    WSLCE2ETests.cpp
+    WSLCExecutor.cpp
 
 Abstract:
 
@@ -90,10 +90,10 @@ std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
 WSLCExecutionResult WSLCExecutor::Execute(const std::wstring& commandLine)
 {
     auto wslcPath = std::filesystem::path(wslutil::GetMsiPackagePath().value()) / L"wslc.exe";
-    auto cmd = wslcPath.wstring() + L" " + commandLine;
+    auto cmd = L"\"" + wslcPath.wstring() + L"\" " + commandLine;
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
     const auto output = process.RunAndCaptureOutput();
-    return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = HRESULT_FROM_WIN32(output.ExitCode)};
+    return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = static_cast<HRESULT>(output.ExitCode)};
 }
 
 void WSLCExecutor::ExecuteAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput)

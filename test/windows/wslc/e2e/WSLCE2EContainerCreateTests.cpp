@@ -65,7 +65,7 @@ class WSLCE2EContainerCreateTests
         result.VerifyNoErrors();
         std::wstring containerId = GetStdoutOneLine(result);
 
-        // Verify the container is running by listing containers
+        // Verify the container is listed with the correct status
         VerifyContainerIsListed(containerId, L"created");
 
         // wslc container delete <containerName> --force

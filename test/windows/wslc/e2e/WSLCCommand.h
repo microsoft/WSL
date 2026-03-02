@@ -13,7 +13,7 @@ Abstract:
 
 #pragma once
 
-#include "WSLCExecutorHelpers.h"
+#include "WSLCExecutor.h"
 
 #define WSLC_COMMAND(Name, Command) \
     template <typename... Args> \
