@@ -1427,8 +1427,7 @@ class WSLATests
             }
             VERIFY_IS_TRUE(foundTag);
 
-            VERIFY_IS_TRUE(inspectResult.RepoDigests.has_value());
-            VERIFY_IS_FALSE(inspectResult.RepoDigests->empty());
+            // skip testing RepoDigests for loaded test image.
             VERIFY_IS_FALSE(inspectResult.Created.empty());
             VERIFY_IS_TRUE(inspectResult.Architecture == "amd64" || inspectResult.Architecture == "arm64");
             VERIFY_ARE_EQUAL("linux", inspectResult.Os);
@@ -1452,6 +1451,18 @@ class WSLATests
             wil::unique_cotaskmem_ansistring output;
             VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("nonexistent:image", &output));
             ValidateCOMErrorMessage(L"No such image: nonexistent:image");
+        }
+
+        // Negative test: Bad image name input
+        {
+            wil::unique_cotaskmem_ansistring output;
+
+            std::string longImageName(WSLA_MAX_IMAGE_NAME_LENGTH + 1, 'a');
+            VERIFY_ARE_EQUAL(E_INVALIDARG, m_defaultSession->InspectImage(longImageName.c_str(), &output));
+
+            // Attempt to fake to call search endpoint. Our implementation escaped the image name correctly.
+            VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, m_defaultSession->InspectImage("search/debian:latest", &output));
+            ValidateCOMErrorMessage(L"No such image: search/debian:latest");
         }
     }
 
