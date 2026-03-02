@@ -890,6 +890,7 @@ try
 
     try
     {
+        std::lock_guard containersLock{m_containersLock};
         auto& it = m_containers.emplace_back(WSLAContainerImpl::Create(
             *containerOptions,
             *this,
@@ -1088,8 +1089,12 @@ try
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
-            m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
-            exitCode = m_dockerdProcess->Wait(10 * 1000);
+            try
+            {
+                m_dockerdProcess->Get().Signal(WSLASignalSIGKILL);
+                exitCode = m_dockerdProcess->Wait(10 * 1000);
+            }
+            CATCH_LOG();
         }
 
         WSL_LOG("DockerdExit", TraceLoggingValue(exitCode, "code"));

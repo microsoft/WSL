@@ -14,6 +14,7 @@ Abstract:
 #pragma once
 #include "ArgumentTypes.h"
 #include "ExecutionContextData.h"
+#include <optional>
 
 namespace wsl::windows::wslc::execution {
 // The context within which all commands execute.
@@ -35,5 +36,9 @@ struct CLIExecutionContext : public wsl::windows::common::ExecutionContext
 
     // Map of data stored in the context.
     DataMap Data;
+
+    // Process exit code set by tasks like Run/Exec. When set, CoreMain returns this
+    // instead of the HRESULT, enabling `wslc run ... && echo success` patterns.
+    std::optional<int> ExitCode;
 };
 } // namespace wsl::windows::wslc::execution
