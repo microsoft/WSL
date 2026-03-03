@@ -87,7 +87,14 @@ std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
     return lines;
 }
 
-WSLCExecutionResult WSLCExecutor::Execute(const std::wstring& commandLine)
+std::wstring WSLCExecutionResult::GetStdoutOneLine() const
+{
+    auto stdoutLines = GetStdoutLines();
+    VERIFY_ARE_EQUAL(1u, stdoutLines.size());
+    return stdoutLines[0];
+}
+
+WSLCExecutionResult RunWslc(const std::wstring& commandLine)
 {
     auto wslcPath = std::filesystem::path(wslutil::GetMsiPackagePath().value()) / L"wslc.exe";
     auto cmd = L"\"" + wslcPath.wstring() + L"\" " + commandLine;
@@ -96,14 +103,14 @@ WSLCExecutionResult WSLCExecutor::Execute(const std::wstring& commandLine)
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = static_cast<HRESULT>(output.ExitCode)};
 }
 
-void WSLCExecutor::ExecuteAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput)
+void RunWslcAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput)
 {
-    Execute(cmd).VerifyNoErrors(expectedOutput);
+    RunWslc(cmd).VerifyNoErrors(expectedOutput);
 }
 
-void WSLCExecutor::ExecuteAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)
+void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)
 {
-    Execute(cmd).Verify(expected);
+    RunWslc(cmd).Verify(expected);
 }
 
 std::wstring GetWslcHeader()

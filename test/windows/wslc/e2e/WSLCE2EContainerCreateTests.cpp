@@ -15,7 +15,6 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCExecutorHelpers.h"
-#include "WSLCCommand.h"
 
 namespace WSLCE2ETests {
 
@@ -35,19 +34,19 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
-        auto result = WSLCCommand::ContainerCreate("--help");
+        auto result = RunWslc(L"container create --help");
         result.VerifyNoErrors(GetOutput());
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
     {
-        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName);
+        auto result = RunWslc(L"container create --name " + WslcContainerName);
         result.Verify({.Stdout = GetOutput(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
-        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcInvalidImageName);
+        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcInvalidImageName);
 
         auto expectedError = L"Image '" + WslcInvalidImageName + L"' not found, pulling";
         VERIFY_IS_TRUE(result.Stderr->find(expectedError) != std::wstring::npos);
@@ -61,15 +60,15 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
 
         // Create the container with a valid image
-        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcUbuntuImageName);
+        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcUbuntuImageName);
         result.VerifyNoErrors();
-        std::wstring containerId = GetStdoutOneLine(result);
+        std::wstring containerId = result.GetStdoutOneLine();
 
         // Verify the container is listed with the correct status
         VerifyContainerIsListed(containerId, L"created");
 
         // Delete the container
-        result = WSLCCommand::ContainerDelete(WslcContainerName, "--force");
+        result = RunWslc(L"container delete " + WslcContainerName + L" --force");
         result.VerifyNoErrors();
 
         // Verify the container is deleted
@@ -82,12 +81,12 @@ class WSLCE2EContainerCreateTests
         EnsureContainerDoesNotExist(WslcContainerName);
 
         // Create the container with a valid image
-        auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcUbuntuImageName);
+        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcUbuntuImageName);
         result.VerifyNoErrors();
-        auto containerId = GetStdoutOneLine(result);
+        auto containerId = result.GetStdoutOneLine();
 
         // Attempt to create another container with the same name
-        result = WSLCCommand::ContainerCreate("--name", WslcContainerName, WslcUbuntuImageName);
+        result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcUbuntuImageName);
         result.Dump();
         result.Verify(
             {.Stderr = L"Conflict. The container name \"/" + WslcContainerName + L"\" is already in use by container \"" +
@@ -95,7 +94,7 @@ class WSLCE2EContainerCreateTests
              .ExitCode = 1});
 
         // Clean up by deleting the container
-        result = WSLCCommand::ContainerDelete(WslcContainerName, "--force");
+        result = RunWslc(L"container delete " + WslcContainerName + L" --force");
         result.VerifyNoErrors();
     }
 

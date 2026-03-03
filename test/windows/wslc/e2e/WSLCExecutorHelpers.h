@@ -17,7 +17,6 @@ Abstract:
 
 namespace WSLCE2ETests {
 
-std::wstring GetStdoutOneLine(const WSLCExecutionResult& result);
 void VerifyContainerIsListed(const std::wstring& containerName, const std::wstring& status);
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId);
 void EnsureContainerDoesNotExist(const std::wstring& containerName);

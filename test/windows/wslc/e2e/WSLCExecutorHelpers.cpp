@@ -15,22 +15,14 @@ Abstract:
 #include "windows/Common.h"
 #include "WSLCExecutor.h"
 #include "WSLCExecutorHelpers.h"
-#include "WSLCCommand.h"
 
 namespace WSLCE2ETests {
 
 using namespace WEX::Logging;
 
-std::wstring GetStdoutOneLine(const WSLCExecutionResult& result)
-{
-    auto stdoutLines = result.GetStdoutLines();
-    VERIFY_ARE_EQUAL(1u, stdoutLines.size());
-    return stdoutLines[0];
-}
-
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
-    auto result = WSLCCommand::ContainerList("--all");
+    auto result = RunWslc(L"container list --all");
     result.VerifyNoErrors();
 
     auto outputLines = result.GetStdoutLines();
@@ -47,7 +39,7 @@ void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
-    auto result = WSLCCommand::ContainerList("--all");
+    auto result = RunWslc(L"container list --all");
     result.VerifyNoErrors();
 
     auto outputLines = result.GetStdoutLines();
@@ -68,7 +60,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
 
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
-    auto listResult = WSLCCommand::ContainerList("--all");
+    auto listResult = RunWslc(L"container list --all");
     listResult.VerifyNoErrors();
 
     auto stdoutLines = listResult.GetStdoutLines();
@@ -76,7 +68,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
     {
         if (line.find(containerName) != std::wstring::npos)
         {
-            auto result = WSLCCommand::ContainerDelete(containerName, L"--force");
+            auto result = RunWslc(L"container delete " + containerName + L" --force");
             result.VerifyNoErrors();
             break;
         }

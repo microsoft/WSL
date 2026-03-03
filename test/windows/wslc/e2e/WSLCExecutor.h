@@ -30,14 +30,11 @@ struct WSLCExecutionResult
     void Verify(const WSLCExecutionResult& expected) const;
     void VerifyNoErrors(std::optional<std::wstring> expectedOutput = std::nullopt) const;
     std::vector<std::wstring> GetStdoutLines() const;
+    std::wstring GetStdoutOneLine() const;
 };
 
-struct WSLCExecutor
-{
-    static WSLCExecutionResult Execute(const std::wstring& commandLine);
-    static void ExecuteAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected);
-    static void ExecuteAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput = std::nullopt);
-};
-
+WSLCExecutionResult RunWslc(const std::wstring& commandLine);
+void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected);
+void RunWslcAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput = std::nullopt);
 std::wstring GetWslcHeader();
 } // namespace WSLCE2ETests
