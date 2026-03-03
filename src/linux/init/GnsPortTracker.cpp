@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <optional>
-#include <regex>
 #include <iostream>
 #include <linux/audit.h> /* Definition of AUDIT_* constants */
 #include <linux/sock_diag.h>
@@ -336,7 +335,7 @@ std::optional<GnsPortTracker::BindCall> GnsPortTracker::ReadNextRequest()
     }
     catch (const std::exception& e)
     {
-        GNS_LOG_ERROR("Fetch to read bind() call info with ID {}lu for pid {}, {}", callInfo.id, callInfo.pid, e.what());
+        GNS_LOG_ERROR("Failed to read bind() call info with ID {} for pid {}, {}", callInfo.id, callInfo.pid, e.what());
         return {{{}, {}, callInfo.id}};
     }
 }
@@ -468,7 +467,7 @@ int GnsPortTracker::GetSocketProtocol(int pid, int fd)
 {
     const auto path = std::format("/proc/{}/fd/{}", pid, fd);
 
-    // Because there's a race between the time where the buffer size is determined and
+    // Because there's a race between the time where the buffer size is determined
     // and the actual getxattr() call, retry until the buffer size is big enough
     std::string protocol;
     int result = -1;
@@ -617,12 +616,12 @@ void GnsPortTracker::ResolvePortZeroBind(DeferredPortLookup lookup)
     }
 
     PortAllocation allocation(port, resolvedFamily, lookup.Protocol, address);
+    GNS_LOG_INFO(
+        "Port-0 bind resolved: family ({}) port ({}) protocol ({}) for pid {}", resolvedFamily, port, lookup.Protocol, lookup.Pid);
     {
         std::lock_guard lock(m_resolvedMutex);
         m_resolvedQueue.push_back(std::move(allocation));
     }
-    GNS_LOG_INFO(
-        "Port-0 bind resolved: family ({}) port ({}) protocol ({}) for pid {}", resolvedFamily, port, lookup.Protocol, lookup.Pid);
 }
 
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& entry)

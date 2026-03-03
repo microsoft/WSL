@@ -138,8 +138,6 @@ private:
 
     int RequestPort(const PortAllocation& Port, bool Allocate);
 
-    int ClosePort(const PortAllocation& Port);
-
     int HandleRequest(const PortAllocation& Request);
 
     void CompleteRequest(uint64_t Id, int Result);
