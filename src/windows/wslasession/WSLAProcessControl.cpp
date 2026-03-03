@@ -90,7 +90,7 @@ int DockerContainerProcessControl::GetPid() const
     return 1;
 }
 
-void DockerContainerProcessControl::OnContainerReleased()
+void DockerContainerProcessControl::OnContainerReleased() noexcept
 {
     {
         std::lock_guard lock{m_lock};
@@ -183,7 +183,7 @@ void DockerExecProcessControl::OnEvent(ContainerEvent Event, std::optional<int> 
     }
 }
 
-void DockerExecProcessControl::OnContainerReleased()
+void DockerExecProcessControl::OnContainerReleased() noexcept
 {
     {
         std::lock_guard lock{m_lock};
