@@ -537,19 +537,6 @@ class WSLATests
         }
     }
 
-    void ValidateCOMErrorContains(const std::wstring& Substring)
-    {
-        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
-        VERIFY_IS_TRUE(comError.has_value());
-        VERIFY_IS_NOT_NULL(comError->Message.get());
-
-        if (wcsstr(comError->Message.get(), Substring.c_str()) == nullptr)
-        {
-            LogError("COM error '%ls' does not contain expected substring '%ls'", comError->Message.get(), Substring.c_str());
-            VERIFY_FAIL();
-        }
-    }
-
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
     {
         wil::unique_hfile dockerfileHandle;
@@ -2307,9 +2294,9 @@ class WSLATests
             launcher.AddTmpfs("relative-path", "");
 
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_IS_TRUE(FAILED(hresult));
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            ValidateCOMErrorContains(L"mount path must be absolute");
+            ValidateCOMErrorMessage(L"invalid mount path: 'relative-path' mount path must be absolute");
         }
 
         // Validate that invalid tmpfs options are rejected by Docker.
@@ -2318,9 +2305,9 @@ class WSLATests
             launcher.AddTmpfs("/mnt/wsla-tmpfs", "invalid_option_xyz");
 
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_IS_TRUE(FAILED(hresult));
+            VERIFY_ARE_EQUAL(hresult, E_FAIL);
 
-            ValidateCOMErrorContains(L"tmpfs");
+            ValidateCOMErrorMessage(L"invalid tmpfs option [\"invalid_option_xyz\"]");
         }
 
         // Validate error paths
