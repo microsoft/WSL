@@ -2,7 +2,6 @@
 
 [cmdletbinding(PositionalBinding = $false)]
 param (
-    [ValidateSet("X64", "arm64")][string]$Platform = $null,
     [ValidateSet("Debug", "Release")][string]$BuildType = "Debug",
     [string]$BuildOutputPath = [string](Get-Location),
     [string]$PackageCertPath = $null,
@@ -12,9 +11,11 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-if (-not $Platform)
-{
-    $Platform = if ($env:PROCESSOR_ARCHITECTURE -ieq "ARM64") { "arm64" } else { "X64" }
+$processorArchitecture = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment').PROCESSOR_ARCHITECTURE
+$Platform = switch -Wildcard ($processorArchitecture) {
+    '*ARM64*' { 'arm64' }
+    '*AMD64*' { 'X64' }
+    default   { throw "Failed to determine system architecture: $processorArchitecture" }
 }
 
 $PackagePath = "$BuildOutputPath\bin\$Platform\$BuildType\wsl.msi"
