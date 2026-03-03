@@ -654,7 +654,9 @@ bool wsl::windows::common::relay::StandardInputRelay(
             {
             case KEY_EVENT:
 
-                if (!DetachSequence.empty())
+                KeyEvent = &CurrentInputRecord->Event.KeyEvent;
+
+                if (KeyEvent->bKeyDown && IsActionableKey(KeyEvent) && !DetachSequence.empty())
                 {
                     if (CurrentSequence.size() >= DetachSequence.size())
                     {
@@ -670,7 +672,6 @@ bool wsl::windows::common::relay::StandardInputRelay(
                 // pasted from the clipboard and converted to an <Alt>+<Numpad> sequence.
                 //
 
-                KeyEvent = &CurrentInputRecord->Event.KeyEvent;
                 if ((KeyEvent->bKeyDown == FALSE) && (KeyEvent->wVirtualKeyCode != TTY_ALT_NUMPAD_VK_MENU))
                 {
                     break;

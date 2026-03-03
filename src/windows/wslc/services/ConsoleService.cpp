@@ -121,7 +121,7 @@ int ConsoleService::AttachToCurrentConsole(wsl::windows::common::ClientRunningWS
         if (!RelayInteractiveTty(process, process.GetStdHandle(WSLAFDTty).get()))
         {
             wsl::windows::common::wslutil::PrintMessage(L"[detached]", stderr);
-            return 1;
+            return 0;
         }
     }
     else
