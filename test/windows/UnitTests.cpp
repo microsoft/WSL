@@ -1367,7 +1367,7 @@ class UnitTests
 
         ValidateErrorMessage(
             L"--install --from-file fake.tar --in-place",
-            L"Argument --in-place is only valid with a .vhd/.vhdx file path.",
+            L"Argument --in-place is only valid with a .vhd or .vhdx file.",
             L"Wsl/E_INVALIDARG");
 
         {
