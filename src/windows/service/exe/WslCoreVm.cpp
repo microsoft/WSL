@@ -576,7 +576,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::VirtioProxy)
             {
-                wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::None;
+                wsl::core::VirtioNetworkingFlags flags = wsl::core::VirtioNetworkingFlags::Ipv6;
                 WI_SetFlagIf(flags, wsl::core::VirtioNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
                 m_networkingEngine = std::make_unique<wsl::core::VirtioNetworking>(
                     std::move(gnsChannel), flags, LX_INIT_RESOLVCONF_FULL_HEADER, m_guestDeviceManager, m_userToken);

@@ -172,6 +172,27 @@ struct EndpointRoute
     EndpointRoute(const EndpointRoute&) = default;
     EndpointRoute& operator=(const EndpointRoute&) = default;
 
+    // Build a default route (0.0.0.0/0 or ::/0) with the given next hop.
+    static EndpointRoute DefaultRoute(ADDRESS_FAMILY family, const SOCKADDR_INET& nextHop)
+    {
+        EndpointRoute route{};
+        route.Family = family;
+        route.DestinationPrefix.PrefixLength = 0;
+        if (family == AF_INET)
+        {
+            IN4ADDR_SETANY(&route.DestinationPrefix.Prefix.Ipv4);
+            route.DestinationPrefixString = LX_INIT_UNSPECIFIED_ADDRESS;
+        }
+        else
+        {
+            IN6ADDR_SETANY(&route.DestinationPrefix.Prefix.Ipv6);
+            route.DestinationPrefixString = LX_INIT_UNSPECIFIED_V6_ADDRESS;
+        }
+        route.NextHop = nextHop;
+        route.NextHopString = windows::common::string::SockAddrInetToWstring(nextHop);
+        return route;
+    }
+
     EndpointRoute(const MIB_IPFORWARD_ROW2& RouteRow) :
         Family(RouteRow.NextHop.si_family),
         DestinationPrefix(RouteRow.DestinationPrefix),
@@ -258,19 +279,37 @@ struct NetworkSettings
 {
     NetworkSettings() = default;
 
-    NetworkSettings(const GUID& interfaceGuid, EndpointIpAddress preferredIpAddress, EndpointRoute gateway, std::wstring macAddress, uint32_t interfaceIndex, uint32_t mediaType) :
+    NetworkSettings(
+        const GUID& interfaceGuid,
+        EndpointIpAddress preferredIpAddress,
+        EndpointIpAddress preferredIpv6Address,
+        EndpointRoute gateway,
+        EndpointRoute v6Gateway,
+        std::wstring macAddress,
+        uint32_t interfaceIndex,
+        uint32_t mediaType) :
         InterfaceGuid(interfaceGuid),
         PreferredIpAddress(std::move(preferredIpAddress)),
+        PreferredIpv6Address(std::move(preferredIpv6Address)),
         MacAddress(std::move(macAddress)),
         InterfaceIndex(interfaceIndex),
         InterfaceType(mediaType)
     {
-        Routes.emplace(std::move(gateway));
+        if (!gateway.NextHopString.empty())
+        {
+            Routes.emplace(std::move(gateway));
+        }
+
+        if (!v6Gateway.NextHopString.empty())
+        {
+            Routes.emplace(std::move(v6Gateway));
+        }
     }
 
     GUID InterfaceGuid{};
     EndpointIpAddress PreferredIpAddress{};
-    std::set<EndpointIpAddress> IpAddresses{}; // Does not include PreferredIpAddress.
+    EndpointIpAddress PreferredIpv6Address{};
+    std::set<EndpointIpAddress> IpAddresses{}; // Does not include PreferredIpAddress or PreferredIpv6Address.
     std::set<EndpointRoute> Routes{};
     std::wstring MacAddress;
     IF_INDEX InterfaceIndex = 0;
@@ -319,6 +358,32 @@ struct NetworkSettings
     }
 
     std::wstring GetBestGatewayMacAddress() const;
+
+    std::wstring GetBestGatewayV6AddressString() const
+    {
+        for (const auto& route : Routes)
+        {
+            if (route.Family == AF_INET6 && route.DestinationPrefix.PrefixLength == 0 && route.DestinationPrefixString == LX_INIT_UNSPECIFIED_V6_ADDRESS)
+            {
+                return route.NextHopString;
+            }
+        }
+
+        return {};
+    }
+
+    SOCKADDR_INET GetBestGatewayV6Address() const
+    {
+        for (const auto& route : Routes)
+        {
+            if (route.Family == AF_INET6 && route.DestinationPrefix.PrefixLength == 0 && route.DestinationPrefixString == LX_INIT_UNSPECIFIED_V6_ADDRESS)
+            {
+                return route.NextHop;
+            }
+        }
+
+        return {};
+    }
 
     std::wstring IpAddressesString() const
     {
@@ -369,6 +434,9 @@ std::shared_ptr<NetworkSettings> GetHostEndpointSettings();
         TraceLoggingValue((settings)->GetBestGatewayAddressString().c_str(), "bestGatewayAddress"), \
         TraceLoggingValue((settings)->PreferredIpAddress.AddressString.c_str(), "preferredIpAddress"), \
         TraceLoggingValue((settings)->PreferredIpAddress.PrefixLength, "preferredIpAddressPrefixLength"), \
+        TraceLoggingValue((settings)->PreferredIpv6Address.AddressString.c_str(), "preferredIpv6Address"), \
+        TraceLoggingValue((settings)->PreferredIpv6Address.PrefixLength, "preferredIpv6AddressPrefixLength"), \
+        TraceLoggingValue((settings)->GetBestGatewayV6AddressString().c_str(), "bestGatewayV6Address"), \
         TraceLoggingValue((settings)->IpAddressesString().c_str(), "ipAddresses"), \
         TraceLoggingValue((settings)->RoutesString().c_str(), "routes"), \
         TraceLoggingValue((settings)->MacAddress.c_str(), "macAddress"), \

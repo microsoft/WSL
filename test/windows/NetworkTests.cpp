@@ -4690,5 +4690,26 @@ class VirtioProxyTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy, .autoProxy = true}));
         NetworkTests::VerifyHttpProxySimple();
     }
+
+    TEST_METHOD(ConfigurationV6)
+    {
+        VIRTIOPROXY_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::VirtioProxy}));
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        const auto state = NetworkTests::GetInterfaceState(L"eth0");
+
+        // Verify that the guest has a global IPv6 address assigned
+        VERIFY_IS_FALSE(state.V6Addresses.empty());
+
+        // Verify that the guest has an IPv6 default gateway
+        VERIFY_IS_TRUE(state.V6Gateway.has_value());
+    }
 };
 } // namespace NetworkTests
