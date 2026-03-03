@@ -1873,4 +1873,33 @@ You can also access more VS Code Remote options through the command palette with
   <data name="Settings_VMIdleTimeoutTextBox.AutomationProperties.HelpText" xml:space="preserve">
     <value>The number of milliseconds that a VM is idle, before it is shut down.</value>
   </data>
+  <data name="Settings_OOBEVSIntegration.Title" xml:space="preserve">
+    <value>Build, run, debug, and profile your apps running on WSL from Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration.Description" xml:space="preserve">
+    <value>Run and debug your apps on WSL from Visual Studio</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.Content" xml:space="preserve">
+    <value>Learn more about WSL in Visual Studio for .NET developers</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForDotNetLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/visualstudio/debugger/debug-dotnet-core-in-wsl-2</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.Content" xml:space="preserve">
+    <value>Learn more about Visual Studio and WSL for C++ developers</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_VSForCppLink.NavigateUri" xml:space="preserve">
+    <value>https://learn.microsoft.com/cpp/linux/?view=msvc-170</value>
+    <comment>{locked}Uri should redirect to the correct locale for the browser</comment>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Description.Text" xml:space="preserve">
+    <value>You can easily run and debug your .NET Core and cross platform C++ apps in Linux without leaving Visual Studio using Windows Subsystem for Linux (WSL). If you are a cross-platform developer, you can use this method as a simple way to test more of your target environments.</value>
+  </data>
+  <data name="Settings_OOBEVSIntegration_Title.Text" xml:space="preserve">
+    <value>Visual Studio Integration</value>
+  </data>
+  <data name="Settings_Shell_VSIntegration.Content" xml:space="preserve">
+    <value>Visual Studio Integration</value>
+  </data>
 </root>
