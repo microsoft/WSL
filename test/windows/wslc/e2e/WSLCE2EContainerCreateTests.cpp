@@ -46,12 +46,13 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
     {
-        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcInvalidImageName);
-
-        auto expectedError = L"Image '" + WslcInvalidImageName + L"' not found, pulling";
-        VERIFY_IS_TRUE(result.Stderr->find(expectedError) != std::wstring::npos);
-        VERIFY_ARE_EQUAL(L"", *result.Stdout);
-        VERIFY_ARE_EQUAL(1, *result.ExitCode);
+        auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcInvalidImageNameAndTag);
+        std::wstringstream expectedError;
+        expectedError << L"Image '" << WslcInvalidImageNameAndTag << L"' not found, pulling\r\n"
+                      << L"pull access denied for library/" << WslcInvalidImageName
+                      << L", repository does not exist or may require 'docker login': denied: requested access to the resource is denied\r\n"
+                      << L"Error code: WSLA_E_IMAGE_NOT_FOUND\r\n";
+        result.Verify({.Stderr = expectedError.str(), .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_Valid)
@@ -100,7 +101,8 @@ class WSLCE2EContainerCreateTests
 
 private:
     const std::wstring WslcContainerName = L"wslc-test-container";
-    const std::wstring WslcInvalidImageName = L"mcr.microsoft.com/invalid-image:latest";
+    const std::wstring WslcInvalidImageName = L"mcr.microsoft.com/invalid-image";
+    const std::wstring WslcInvalidImageNameAndTag = WslcInvalidImageName + L":latest";
     const std::wstring WslcUbuntuImageName = L"ubuntu:latest";
 
     std::wstring GetOutput() const
