@@ -596,7 +596,8 @@ int Install(_In_ std::wstring_view commandLine)
 
     if (inPlace)
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageArgumentNotValidWithout(WSL_INSTALL_ARG_IN_PLACE, WSL_INSTALL_ARG_FROM_FILE_LONG));
+        THROW_HR_WITH_USER_ERROR(
+            E_INVALIDARG, Localization::MessageArgumentNotValidWithout(WSL_INSTALL_ARG_IN_PLACE, WSL_INSTALL_ARG_FROM_FILE_LONG));
     }
 
     bool rebootRequired = InstallPrerequisites(installWslOptionalComponent);

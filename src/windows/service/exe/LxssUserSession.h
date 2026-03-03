@@ -244,7 +244,8 @@ public:
     /// <summary>
     /// Imports a distribution inplace.
     /// </summary>
-    IFACEMETHOD(ImportDistributionInplace)(_In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid) override;
+    IFACEMETHOD(ImportDistributionInplace)(
+        _In_opt_ LPCWSTR DistributionName, _In_ LPCWSTR VhdPath, _In_ BOOL EnableOobe, _Out_ LXSS_ERROR_INFO* Error, _Out_ GUID* pDistroGuid) override;
 
     /// <summary>
     /// Terminates a distribution by it's client identifier.
