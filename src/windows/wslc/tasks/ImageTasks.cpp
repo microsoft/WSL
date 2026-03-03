@@ -102,7 +102,7 @@ void LoadImage(CLIExecutionContext& context)
     if (context.Args.Contains(ArgType::Input))
     {
         auto& input = context.Args.Get<ArgType::Input>();
-        services::ImageService::Load(session, WideToMultiByte(input));
+        services::ImageService::Load(session, input);
         return;
     }
 

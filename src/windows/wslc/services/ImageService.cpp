@@ -43,11 +43,10 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
     THROW_IF_FAILED(session.Get()->PullImage(image.c_str(), nullptr, callback));
 }
 
-void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::string& input)
+void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
 {
-    std::filesystem::path inputPath(input);
     wil::unique_hfile imageFile{
-        CreateFileW(inputPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!imageFile);
 
     LARGE_INTEGER fileSize{};
