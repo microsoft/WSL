@@ -543,6 +543,15 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
     {
         return;
     }
+    else if (m_state != WslaContainerStateRunning)
+    {
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_STATE),
+            m_state != WslaContainerStateRunning,
+            "Cannot stop container '%hs', state: %i",
+            m_id.c_str(),
+            m_state);
+    }
 
     try
     {
@@ -584,7 +593,6 @@ void WSLAContainerImpl::Stop(WSLASignal Signal, LONG TimeoutSeconds)
         auto io = m_wslaSession.CreateIOContext();
         io.AddHandle(std::make_unique<EventHandle>(m_stoppedNotifiedEvent.get()), MultiHandleWait::CancelOnCompleted);
 
-        // Drop the exclusive lock. No class fields can be accessed after this.
         lock.reset();
 
         io.Run({60s});

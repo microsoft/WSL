@@ -2686,7 +2686,7 @@ class WSLATests
             }
         }
 
-        // Validate that containers can be restarted after being explicitely stopped.
+        // Validate that containers can be restarted after being explicitly stopped.
         {
             WSLAContainerLauncher launcher("debian:latest", "test-stop-start-2", {"sleep", "99999"});
             auto container = launcher.Launch(*m_defaultSession);
@@ -2895,7 +2895,10 @@ class WSLATests
             WSLAContainerLauncher launcher(
                 "debian:latest", "test-container-2", {"sleep", "99999"}, {}, WSLA_CONTAINER_NETWORK_TYPE::WSLA_CONTAINER_NETWORK_HOST);
 
-            auto container = launcher.Launch(*m_defaultSession);
+            auto container = launcher.Create(*m_defaultSession);
+
+            // Validate that a created container cannot be stopped.
+            VERIFY_ARE_EQUAL(container.Get().Stop(WSLASignalSIGKILL, 0), HRESULT_FROM_WIN32(ERROR_INVALID_STATE));
 
             // Verify that the container is in running state.
             VERIFY_ARE_EQUAL(container.State(), WslaContainerStateRunning);
