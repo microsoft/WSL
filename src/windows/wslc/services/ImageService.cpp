@@ -45,8 +45,7 @@ void ImageService::Pull(wsl::windows::wslc::models::Session& session, const std:
 
 void ImageService::Load(wsl::windows::wslc::models::Session& session, const std::wstring& input)
 {
-    wil::unique_hfile imageFile{
-        CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+    wil::unique_hfile imageFile{CreateFileW(input.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
     THROW_LAST_ERROR_IF(!imageFile);
 
     LARGE_INTEGER fileSize{};
