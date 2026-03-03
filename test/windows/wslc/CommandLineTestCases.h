@@ -22,6 +22,7 @@ Abstract:
 COMMAND_LINE_TEST_CASE(L"", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--help", L"root", true)
 COMMAND_LINE_TEST_CASE(L"--version", L"root", true)
+COMMAND_LINE_TEST_CASE(L"-v", L"root", true)
 
 // Session command tests
 COMMAND_LINE_TEST_CASE(L"session list", L"list", true)

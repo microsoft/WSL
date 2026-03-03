@@ -70,7 +70,7 @@ _(TMPFS,          "tmpfs",               NO_ALIAS,          Kind::Value,       L
 _(TTY,            "tty",                 L"t",              Kind::Flag,        L"Open a TTY with the container process.") \
 _(User,           "user",                L"u",              Kind::Value,       L"User ID for the process (name|uid|uid:gid)") \
 _(Verbose,        "verbose",             L"v",              Kind::Flag,        L"Output verbose details") \
-_(Version,        "version",             L"v",              Kind::Flag,        Localization::WSLCCLI_InfoArgDescription()) \
+_(Version,        "version",             L"v",              Kind::Flag,        L"Show version information for this tool") \
 _(Virtual,        "virtualization",      NO_ALIAS,          Kind::Value,       L"Expose virtualization capabilities to the container") \
 _(Volume,         "volume",              NO_ALIAS,          Kind::Value,       L"Bind mount a volume to the container") \
 // clang-format on
