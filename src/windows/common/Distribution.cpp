@@ -261,7 +261,8 @@ AvailableDistributions wsl::windows::common::distribution::GetAvailable()
 
     // Check if the distribution list is overridden by policy
     const auto policyKey = wsl::windows::policies::OpenPoliciesKey();
-    const auto policyValue = wsl::windows::policies::GetStringPolicyValue(policyKey.get(), wsl::windows::policies::c_customDistributionManifest);
+    const auto policyValue =
+        wsl::windows::policies::GetStringPolicyValue(policyKey.get(), wsl::windows::policies::c_customDistributionManifest);
 
     if (policyValue.has_value())
     {
