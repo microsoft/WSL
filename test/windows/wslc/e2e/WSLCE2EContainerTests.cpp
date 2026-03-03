@@ -40,7 +40,7 @@ class WSLCE2EContainerTests
 
     TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)
     {
-        WSLCCommand::Container("INVALID_CMD").Verify({.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = E_INVALIDARG});
+        WSLCCommand::Container("INVALID_CMD").Verify({.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
 private:

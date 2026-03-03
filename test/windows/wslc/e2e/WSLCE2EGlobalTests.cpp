@@ -40,7 +40,7 @@ class WSLCE2EGlobalTests
     TEST_METHOD(WSLCE2E_InvalidCommand_DisplaysErrorMessage)
     {
         WSLCExecutor::ExecuteAndVerify(
-            L"INVALID_CMD", {.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = E_INVALIDARG});
+            L"INVALID_CMD", {.Stdout = GetOutput(), .Stderr = L"Unrecognized command: 'INVALID_CMD'\r\n", .ExitCode = 1});
     }
 
 private:

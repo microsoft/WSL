@@ -42,7 +42,7 @@ class WSLCE2EContainerCreateTests
     TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
     {
         auto result = WSLCCommand::ContainerCreate("--name", WslcContainerName);
-        result.Verify({.Stdout = GetOutput(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = E_INVALIDARG});
+        result.Verify({.Stdout = GetOutput(), .Stderr = L"Required argument not provided: 'image'\r\n", .ExitCode = 1});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_InvalidImage)
@@ -52,7 +52,7 @@ class WSLCE2EContainerCreateTests
         auto expectedError = L"Image '" + WslcInvalidImageName + L"' not found, pulling";
         VERIFY_IS_TRUE(result.Stderr->find(expectedError) != std::wstring::npos);
         VERIFY_ARE_EQUAL(L"", *result.Stdout);
-        VERIFY_ARE_EQUAL(WSLA_E_IMAGE_NOT_FOUND, *result.ExitCode);
+        VERIFY_ARE_EQUAL(1, *result.ExitCode);
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_Valid)
@@ -92,7 +92,7 @@ class WSLCE2EContainerCreateTests
         result.Verify(
             {.Stderr = L"Conflict. The container name \"/" + WslcContainerName + L"\" is already in use by container \"" +
                        containerId + L"\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n",
-             .ExitCode = 0x800700B7});
+             .ExitCode = 1});
 
         // Clean up by deleting the container
         result = WSLCCommand::ContainerDelete(WslcContainerName, "--force");
