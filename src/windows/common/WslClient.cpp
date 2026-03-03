@@ -512,7 +512,7 @@ int Install(_In_ std::wstring_view commandLine)
         // --in-place is only valid for VHD files.
         if (inPlace && !isVhd)
         {
-            THROW_HR_MSG(E_INVALIDARG, L"%ls", L"--in-place is only valid with a .vhd/.vhdx path (and not with '-' / stdin).");
+            THROW_HR_WITH_USER_ERROR(E_INVALIDARG, Localization::MessageArgumentRequiresVhdPath(WSL_INSTALL_ARG_IN_PLACE));
         }
 
         // --fixed-vhd is not valid when importing an existing VHD file.
@@ -534,6 +534,13 @@ int Install(_In_ std::wstring_view commandLine)
 
             SvcComm service;
             id = service.ImportDistributionInplace(name.has_value() ? name->c_str() : nullptr, vhdPath.c_str(), TRUE);
+
+            // Query the name if it was auto-discovered by the service (e.g. from /etc/wsl-distribution.conf).
+            wil::unique_cotaskmem_string queriedName;
+            ULONG ver, uid, envCount, fl;
+            wil::unique_cotaskmem_array_ptr<wil::unique_cotaskmem_ansistring> env;
+            service.GetDistributionConfiguration(&id, &queriedName, &ver, &uid, &envCount, &env, &fl);
+            distroName = queriedName.get();
         }
         else
         {
@@ -571,17 +578,6 @@ int Install(_In_ std::wstring_view commandLine)
 
             id = registeredId;
             distroName = installedName.get();
-        }
-
-        // Query the name if it was auto-discovered by the service (e.g. from /etc/wsl-distribution.conf).
-        if (distroName.empty())
-        {
-            SvcComm service;
-            wil::unique_cotaskmem_string queriedName;
-            ULONG ver, uid, envCount, fl;
-            wil::unique_cotaskmem_array_ptr<wil::unique_cotaskmem_ansistring> env;
-            service.GetDistributionConfiguration(&id, &queriedName, &ver, &uid, &envCount, &env, &fl);
-            distroName = queriedName.get();
         }
 
         wsl::windows::common::wslutil::PrintMessage(Localization::MessageDistributionInstalled(distroName.c_str()), stdout);

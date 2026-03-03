@@ -819,6 +819,10 @@ For information please visit https://aka.ms/wslinstall</value>
     <value>Argument {} requires the {} argument.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageArgumentRequiresVhdPath" xml:space="preserve">
+    <value>Argument {} is only valid with a .vhd or .vhdx file.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageInvalidInstallDistributionName" xml:space="preserve">
     <value>Invalid distribution name: "{}".</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
