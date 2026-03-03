@@ -1512,9 +1512,10 @@ DockerIORelayHandle::DockerIORelayHandle(HandleWrapper&& ReadHandle, HandleWrapp
 void DockerIORelayHandle::Schedule()
 {
     WI_ASSERT(State == IOHandleStatus::Standby);
+    WI_ASSERT(Read->GetState() != IOHandleStatus::Pending);
 
     // If we have an active handle and a buffer, try to flush that first.
-    if (ActiveHandle != nullptr)
+    if (ActiveHandle != nullptr && !PendingBuffer.empty())
     {
         // Push the data to the selected handle.
         DWORD bytesToWrite = std::min(static_cast<DWORD>(RemainingBytes), static_cast<DWORD>(PendingBuffer.size()));
@@ -1535,16 +1536,21 @@ void DockerIORelayHandle::Schedule()
         }
         else if (ActiveHandle->GetState() == IOHandleStatus::Completed)
         {
-            // Switch back to reading if we've written all bytes for this chunk.
-            ActiveHandle = nullptr;
+            if (RemainingBytes == 0)
+            {
+                // Switch back to reading if we've written all bytes for this chunk.
+                ActiveHandle = nullptr;
 
-            ProcessNextHeader();
+                ProcessNextHeader();
+            }
         }
     }
     else
     {
         if (Read->GetState() == IOHandleStatus::Completed)
         {
+            LOG_HR_IF(E_UNEXPECTED, ActiveHandle != nullptr);
+
             // No more data to read, we're done.
             State = IOHandleStatus::Completed;
             return;
@@ -1563,21 +1569,26 @@ void DockerIORelayHandle::Collect()
 {
     WI_ASSERT(State == IOHandleStatus::Pending);
 
-    if (ActiveHandle != nullptr)
+    if (ActiveHandle != nullptr && ActiveHandle->GetState() == IOHandleStatus::Pending)
     {
         // Complete the write.
         ActiveHandle->Collect();
 
         // If the write is completed, switch back to reading.
-        if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+        if (RemainingBytes == 0)
         {
-            ActiveHandle = nullptr;
+            if (ActiveHandle->GetState() == IOHandleStatus::Completed)
+            {
+                ActiveHandle = nullptr;
+            }
         }
 
         // Transition back to standby if there's still data to read.
         // Otherwise switch to Completed since everything is done.
         if (Read->GetState() == IOHandleStatus::Completed)
         {
+            LOG_HR_IF(E_UNEXPECTED, RemainingBytes != 0);
+
             State = IOHandleStatus::Completed;
         }
         else
@@ -1587,6 +1598,8 @@ void DockerIORelayHandle::Collect()
     }
     else
     {
+        WI_ASSERT(Read->GetState() == IOHandleStatus::Pending);
+
         // Complete the read.
         Read->Collect();
 
@@ -1597,7 +1610,7 @@ void DockerIORelayHandle::Collect()
 
 HANDLE DockerIORelayHandle::GetHandle() const
 {
-    if (ActiveHandle != nullptr)
+    if (ActiveHandle != nullptr && !PendingBuffer.empty())
     {
         return ActiveHandle->GetHandle();
     }

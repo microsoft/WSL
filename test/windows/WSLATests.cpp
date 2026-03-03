@@ -3910,6 +3910,19 @@ class WSLATests
 
             VERIFY_ARE_EQUAL(wil::ResultFromException([&]() { runTest(input, "", ""); }), E_INVALIDARG);
         }
+
+        // Validate that behavior is correct if a read spans accross multiple streams.
+        {
+            std::vector<char> input;
+
+            std::string largeStdout(LX_RELAY_BUFFER_SIZE + 150, 'a');
+            std::string largeStderr(LX_RELAY_BUFFER_SIZE + 12, 'b');
+            insert(input, 1, largeStdout);
+            insert(input, 2, largeStderr);
+            insert(input, 1, "regularStdout");
+
+            runTest(input, largeStdout + "regularStdout", largeStderr);
+        }
     }
 
     TEST_METHOD(ContainerRecoveryFromStorage)
