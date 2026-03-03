@@ -537,6 +537,19 @@ class WSLATests
         }
     }
 
+    void ValidateCOMErrorContains(const std::wstring& Substring)
+    {
+        auto comError = wsl::windows::common::wslutil::GetCOMErrorInfo();
+        VERIFY_IS_TRUE(comError.has_value());
+        VERIFY_IS_NOT_NULL(comError->Message.get());
+
+        if (wcsstr(comError->Message.get(), Substring.c_str()) == nullptr)
+        {
+            LogError("COM error '%ls' does not contain expected substring '%ls'", comError->Message.get(), Substring.c_str());
+            VERIFY_FAIL();
+        }
+    }
+
     HRESULT BuildImageFromContext(const std::filesystem::path& contextDir, const char* imageTag, const char* dockerfilePath = nullptr)
     {
         wil::unique_hfile dockerfileHandle;
@@ -2288,14 +2301,26 @@ class WSLATests
             ValidateProcessOutput(process, {}, 0);
         }
 
-        // Validate that duplicate tmpfs destinations are rejected.
+        // Validate that relative tmpfs paths are rejected by Docker.
         {
-            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-duplicate", {"/bin/cat"});
-            launcher.AddTmpfs("/mnt/wsla-tmpfs-dup", "");
-            launcher.AddTmpfs("/mnt/wsla-tmpfs-dup", "");
+            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-relative", {"/bin/cat"});
+            launcher.AddTmpfs("relative-path", "");
 
             auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
-            VERIFY_ARE_EQUAL(hresult, HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_IS_TRUE(FAILED(hresult));
+
+            ValidateCOMErrorContains(L"mount path must be absolute");
+        }
+
+        // Validate that invalid tmpfs options are rejected by Docker.
+        {
+            WSLAContainerLauncher launcher("debian:latest", "test-tmpfs-invalid-opts", {"/bin/cat"});
+            launcher.AddTmpfs("/mnt/wsla-tmpfs", "invalid_option_xyz");
+
+            auto [hresult, container] = launcher.LaunchNoThrow(*m_defaultSession);
+            VERIFY_IS_TRUE(FAILED(hresult));
+
+            ValidateCOMErrorContains(L"tmpfs");
         }
 
         // Validate error paths

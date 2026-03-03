@@ -929,12 +929,6 @@ std::unique_ptr<WSLAContainerImpl> WSLAContainerImpl::Create(
 
             THROW_HR_IF_NULL_MSG(E_INVALIDARG, tmpfs.Destination, "Tmpfs mount at index %lu has null destination", i);
 
-            THROW_HR_IF_MSG(
-                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS),
-                request.HostConfig.Tmpfs.contains(tmpfs.Destination),
-                "Duplicate tmpfs destination: '%hs'",
-                tmpfs.Destination);
-
             request.HostConfig.Tmpfs[tmpfs.Destination] = tmpfs.Options != nullptr ? tmpfs.Options : "";
         }
     }
