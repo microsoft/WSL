@@ -34,7 +34,7 @@ class WSLCE2EContainerTests
 
     TEST_METHOD(WSLCE2E_Container_HelpCommand)
     {
-        RunWslc(L"container --help").VerifyNoErrors(GetOutput());
+        RunWslc(L"container --help").Verify({.Stdout = GetOutput(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Container_InvalidCommand_DisplaysErrorMessage)

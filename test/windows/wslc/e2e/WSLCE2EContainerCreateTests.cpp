@@ -22,20 +22,22 @@ class WSLCE2EContainerCreateTests
 {
     WSL_TEST_CLASS(WSLCE2EContainerCreateTests)
 
-    TEST_CLASS_SETUP(TestClassSetup)
+    TEST_METHOD_SETUP(TestMethodSetup)
     {
+        EnsureContainerDoesNotExist(WslcContainerName);
         return true;
     }
 
-    TEST_CLASS_CLEANUP(TestClassCleanup)
+    TEST_CLASS_CLEANUP(ClassCleanup)
     {
+        EnsureContainerDoesNotExist(WslcContainerName);
         return true;
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_HelpCommand)
     {
         auto result = RunWslc(L"container create --help");
-        result.VerifyNoErrors(GetOutput());
+        result.Verify({.Stdout = GetOutput(), .Stderr = L"", .ExitCode = S_OK});
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_MissingImage)
@@ -57,46 +59,31 @@ class WSLCE2EContainerCreateTests
 
     TEST_METHOD(WSLCE2E_Container_Create_Valid)
     {
-        // Ensure the container does not already exist
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
         auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcUbuntuImageName);
-        result.VerifyNoErrors();
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
         std::wstring containerId = result.GetStdoutOneLine();
 
         // Verify the container is listed with the correct status
         VerifyContainerIsListed(containerId, L"created");
-
-        // Delete the container
-        result = RunWslc(L"container delete " + WslcContainerName + L" --force");
-        result.VerifyNoErrors();
-
-        // Verify the container is deleted
-        VerifyContainerIsNotListed(containerId);
     }
 
     TEST_METHOD(WSLCE2E_Container_Create_DuplicateContainerName)
     {
-        // Ensure the container does not already exist
-        EnsureContainerDoesNotExist(WslcContainerName);
+        VerifyContainerIsNotListed(WslcContainerName);
 
         // Create the container with a valid image
         auto result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcUbuntuImageName);
-        result.VerifyNoErrors();
+        result.Verify({.Stderr = L"", .ExitCode = S_OK});
         auto containerId = result.GetStdoutOneLine();
 
         // Attempt to create another container with the same name
         result = RunWslc(L"container create --name " + WslcContainerName + L" " + WslcUbuntuImageName);
-        result.Dump();
         result.Verify(
-            {.Stderr = L"Conflict. The container name \"/" + WslcContainerName + L"\" is already in use by container \"" +
-                       containerId + L"\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n",
+            {.Stderr = std::format(L"Conflict. The container name \"/{}\" is already in use by container \"{}\". You have to remove (or rename) that container to be able to reuse that name.\r\nError code: ERROR_ALREADY_EXISTS\r\n", WslcContainerName, containerId),
              .ExitCode = 1});
-
-        // Clean up by deleting the container
-        result = RunWslc(L"container delete " + WslcContainerName + L" --force");
-        result.VerifyNoErrors();
     }
 
 private:

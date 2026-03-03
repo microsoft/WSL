@@ -59,16 +59,6 @@ void WSLCExecutionResult::Verify(const WSLCExecutionResult& expected) const
     }
 }
 
-void WSLCExecutionResult::VerifyNoErrors(std::optional<std::wstring> expectedOutput) const
-{
-    VERIFY_ARE_EQUAL(L"", *Stderr);
-    VERIFY_ARE_EQUAL(S_OK, *ExitCode);
-    if (expectedOutput)
-    {
-        VERIFY_ARE_EQUAL(*expectedOutput, *Stdout);
-    }
-}
-
 std::vector<std::wstring> WSLCExecutionResult::GetStdoutLines() const
 {
     std::vector<std::wstring> lines;
@@ -101,11 +91,6 @@ WSLCExecutionResult RunWslc(const std::wstring& commandLine)
     wsl::windows::common::SubProcess process(nullptr, cmd.c_str());
     const auto output = process.RunAndCaptureOutput();
     return {.CommandLine = commandLine, .Stdout = output.Stdout, .Stderr = output.Stderr, .ExitCode = static_cast<HRESULT>(output.ExitCode)};
-}
-
-void RunWslcAndVerifyNoErrors(const std::wstring& cmd, std::optional<std::wstring> expectedOutput)
-{
-    RunWslc(cmd).VerifyNoErrors(expectedOutput);
 }
 
 void RunWslcAndVerify(const std::wstring& cmd, const WSLCExecutionResult& expected)

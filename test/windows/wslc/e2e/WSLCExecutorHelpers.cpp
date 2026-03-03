@@ -23,7 +23,7 @@ using namespace WEX::Logging;
 void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 {
     auto result = RunWslc(L"container list --all");
-    result.VerifyNoErrors();
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -40,7 +40,7 @@ void VerifyContainerIsNotListed(const std::wstring& containerNameOrId)
 void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::wstring& status)
 {
     auto result = RunWslc(L"container list --all");
-    result.VerifyNoErrors();
+    result.Verify({.Stderr = L"", .ExitCode = S_OK});
 
     auto outputLines = result.GetStdoutLines();
     for (const auto& line : outputLines)
@@ -61,7 +61,7 @@ void VerifyContainerIsListed(const std::wstring& containerNameOrId, const std::w
 void EnsureContainerDoesNotExist(const std::wstring& containerName)
 {
     auto listResult = RunWslc(L"container list --all");
-    listResult.VerifyNoErrors();
+    listResult.Verify({.Stderr = L"", .ExitCode = S_OK});
 
     auto stdoutLines = listResult.GetStdoutLines();
     for (const auto& line : stdoutLines)
@@ -69,7 +69,7 @@ void EnsureContainerDoesNotExist(const std::wstring& containerName)
         if (line.find(containerName) != std::wstring::npos)
         {
             auto result = RunWslc(L"container delete " + containerName + L" --force");
-            result.VerifyNoErrors();
+            result.Verify({.Stderr = L"", .ExitCode = S_OK});
             break;
         }
     }
